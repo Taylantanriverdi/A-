@@ -48,6 +48,9 @@ public sealed class AylikRaporV2Controller : ControllerBase
                 FROM "Siparisler" s
                 INNER JOIN "SiparisDurumGecmisi" g ON g."SiparisId"=s."Id"
                 WHERE g."YeniDurum" IN ('Tamamlandı','Teslim')
+                  -- Bugün hâlâ tamamlanmış olmalı; tamamlandıktan sonra geri alınan
+                  -- işler önceden ciroda sayılmaya devam ediyordu.
+                  AND s."Durum" IN ('Tamamlandı','Teslim')
                   AND s."OlusturmaTarihi">={yearStart}
                   AND s."OlusturmaTarihi"<{yearEnd}
                   AND COALESCE(s."Silindi",false)=false
@@ -101,6 +104,7 @@ public sealed class AylikRaporV2Controller : ControllerBase
                 INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
                 INNER JOIN "SiparisDurumGecmisi" g ON g."SiparisId"=s."Id"
                 WHERE g."YeniDurum" IN ('Tamamlandı','Teslim')
+                  AND s."Durum" IN ('Tamamlandı','Teslim')
                   AND s."OlusturmaTarihi">={rangeStart}
                   AND s."OlusturmaTarihi"<{rangeEnd}
                   AND COALESCE(s."Silindi",false)=false

@@ -47,18 +47,25 @@ public class TahsilatlarController : ControllerBase
             .FirstAsync(h => h.Id == dto.HekimId && h.Aktif);
 
         var tarih = NormalizeDate(dto.Tarih) ?? DateTime.UtcNow;
+
+        var kapaliDonem = await CariKurallari.KapaliDonemHatasi(_db, dto.HekimId, tarih);
+        if (kapaliDonem != null) return BadRequest(kapaliDonem);
+
         var odemeTuru = NormalizeOdemeTuru(dto.OdemeTuru);
         var islemNo = NormalizeOptional(dto.IslemNo, 150);
         var aciklama = NormalizeOptional(dto.Aciklama, 500);
         var now = DateTime.UtcNow;
 
-        var id = await _db.Database.SqlQuery<int>($"""
+        // SingleAsync() INSERT ... RETURNING sorgusunu alt sorguya sarmaya çalışıp
+        // her çağrıda hata veriyordu (EF Core 8+); ToListAsync() SQL'i olduğu gibi çalıştırır.
+        var id = (await _db.Database.SqlQuery<int>($"""
             INSERT INTO "Tahsilatlar"
             ("HekimId","Tutar","ParaBirimi","Tarih","OdemeTuru","IslemNo","Aciklama","OlusturmaTarihi")
             VALUES
             ({dto.HekimId},{dto.Tutar},{NormalizeCurrency(dto.ParaBirimi)},{tarih},{odemeTuru},{islemNo},{aciklama},{now})
             RETURNING "Id" AS "Value"
-            """).SingleAsync();
+            """)
+                .ToListAsync()).Single();
 
         return Created($"/api/tahsilatlar/{id}", new
         {
@@ -82,6 +89,22 @@ public class TahsilatlarController : ControllerBase
         if (validation != null) return validation;
 
         var tarih = NormalizeDate(dto.Tarih) ?? DateTime.UtcNow;
+
+        // Kapatılmış döneme ait tahsilat düzenlenemez; düzenleme ile bir tahsilat
+        // kapatılmış döneme de taşınamaz. Aksi halde kapanmış dönem toplamları
+        // ile gerçek kayıtlar ayrışır veya tahsilat bakiyeden kaybolur.
+        var mevcut = await _db.Database.SqlQuery<TahsilatDonemGuardDto>($"""
+            SELECT "HekimId","Tarih" FROM "Tahsilatlar" WHERE "Id"={id}
+            """).FirstOrDefaultAsync();
+        if (mevcut == null) return NotFound("Tahsilat kaydı bulunamadı.");
+
+        var eskiDonem = await CariKurallari.KapaliDonemHatasi(_db, mevcut.HekimId, mevcut.Tarih);
+        if (eskiDonem != null)
+            return BadRequest("Bu tahsilat kapatılmış bir döneme aittir ve düzenlenemez. Önce son dönemi geri alın.");
+
+        var yeniDonem = await CariKurallari.KapaliDonemHatasi(_db, dto.HekimId, tarih);
+        if (yeniDonem != null) return BadRequest(yeniDonem);
+
         var odemeTuru = NormalizeOdemeTuru(dto.OdemeTuru);
         var islemNo = NormalizeOptional(dto.IslemNo, 150);
         var aciklama = NormalizeOptional(dto.Aciklama, 500);
@@ -182,6 +205,12 @@ public sealed class TahsilatKaydetDto
     public string? OdemeTuru { get; set; }
     public string? IslemNo { get; set; }
     public string? Aciklama { get; set; }
+}
+
+public sealed class TahsilatDonemGuardDto
+{
+    public int HekimId { get; set; }
+    public DateTime Tarih { get; set; }
 }
 
 public sealed class TahsilatListeDto

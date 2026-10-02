@@ -17,10 +17,12 @@ public sealed class CariArsivController : ControllerBase
     [HttpGet("ozet")]
     public async Task<IActionResult> Ozet([FromQuery] DateTime? baslangic, [FromQuery] DateTime? bitis)
     {
+        // Pasife alınmış hekimler de listelenir, ancak yalnız açık cari hareketi
+        // veya bakiyesi varsa. Önceden pasife alınan hekimin ödenmemiş borcu
+        // özet ekranından tamamen kayboluyordu.
         var hekimler = await _db.Hekimler.AsNoTracking()
-            .Where(h => h.Aktif)
             .OrderBy(h => h.AdSoyad)
-            .Select(h => new { h.Id, h.AdSoyad, h.KlinikAdi })
+            .Select(h => new { h.Id, h.AdSoyad, h.KlinikAdi, h.Aktif })
             .ToListAsync();
 
         var result = new List<object>();
@@ -29,9 +31,16 @@ public sealed class CariArsivController : ControllerBase
         {
             var d = await BuildCurrent(h.Id, baslangic, bitis);
 
+            if (!h.Aktif &&
+                d.Isler.Count == 0 &&
+                d.Tahsilatlar.Count == 0 &&
+                d.Bakiyeler.Values.All(v => v == 0))
+                continue;
+
             result.Add(new
             {
                 hekimId = h.Id,
+                aktif = h.Aktif,
                 hekimAdi = h.AdSoyad,
                 klinikAdi = h.KlinikAdi,
                 toplamIs = d.Isler.Count,
@@ -114,17 +123,24 @@ public sealed class CariArsivController : ControllerBase
             return BadRequest("Hekim bulunamadı.");
 
         var tarih = NormalizeDate(dto.Tarih) ?? DateTime.UtcNow;
+
+        var kapaliDonem = await CariKurallari.KapaliDonemHatasi(_db, dto.HekimId, tarih);
+        if (kapaliDonem != null) return BadRequest(kapaliDonem);
+
         var odeme = string.IsNullOrWhiteSpace(dto.OdemeTuru) ? "Nakit" : dto.OdemeTuru.Trim();
         var aciklama = Trim(dto.Aciklama, 500);
         var islem = Trim(dto.IslemNo, 150);
 
-        var id = await _db.Database.SqlQuery<int>($"""
+        // SingleAsync() INSERT ... RETURNING sorgusunu alt sorguya sarmaya çalışıp
+        // her çağrıda hata veriyordu (EF Core 8+); ToListAsync() SQL'i olduğu gibi çalıştırır.
+        var id = (await _db.Database.SqlQuery<int>($"""
             INSERT INTO "Tahsilatlar"
             ("HekimId","Tutar","ParaBirimi","Tarih","OdemeTuru","IslemNo","Aciklama","OlusturmaTarihi")
             VALUES
             ({dto.HekimId},{dto.Tutar},{currency},{tarih},{odeme},{islem},{aciklama},{DateTime.UtcNow})
             RETURNING "Id" AS "Value"
-            """).SingleAsync();
+            """)
+                .ToListAsync()).Single();
 
         return Ok(new { id });
     }
@@ -184,7 +200,9 @@ public sealed class CariArsivController : ControllerBase
             }
         }
 
-        var id = await _db.Database.SqlQuery<int>($"""
+        // SingleAsync() INSERT ... RETURNING sorgusunu alt sorguya sarmaya çalışıp
+        // her çağrıda hata veriyordu (EF Core 8+); ToListAsync() SQL'i olduğu gibi çalıştırır.
+        var id = (await _db.Database.SqlQuery<int>($"""
             INSERT INTO "CariDonemleri"
             ("HekimId","BaslangicTarihi","KapanisTarihi","IsSayisi",
              "ToplamlarJson","TahsilatlarJson","BakiyelerJson",
@@ -199,7 +217,8 @@ public sealed class CariArsivController : ControllerBase
              {JsonSerializer.Serialize(current.Tahsilatlar)},
              {dto.DevirEkle},false,{Trim(dto.Notlar,1000)},{DateTime.UtcNow})
             RETURNING "Id" AS "Value"
-            """).SingleAsync();
+            """)
+                .ToListAsync()).Single();
 
         return Ok(new
         {
@@ -262,13 +281,11 @@ public sealed class CariArsivController : ControllerBase
 
         if (row == null) return NotFound("Aktif dönem bulunamadı.");
 
-        var latestId = await _db.Database.SqlQuery<int>($"""
-            SELECT COALESCE(MAX("Id"),0) AS "Value"
-            FROM "CariDonemleri"
-            WHERE "HekimId"={row.HekimId} AND COALESCE("GeriAlindi",false)=false
-            """).SingleAsync();
+        // "En son dönem" kapanış tarihine göre belirlenir (BuildCurrent ile aynı sıra).
+        // Id'ye göre bakıldığında, sonradan aktarılmış eski bir dönem en yeni sanılabiliyordu.
+        var latest = await SonAktifDonem(row.HekimId);
 
-        if (latestId != id)
+        if (latest == null || latest.Id != id)
             return BadRequest("Yalnızca hekimin en son kapatılan dönemi geri alınabilir.");
 
         await _db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -297,6 +314,15 @@ public sealed class CariArsivController : ControllerBase
                 COALESCE(s."ParaBirimi",'TRY') AS "ParaBirimi",
                 COALESCE(SUM(k."Adet" * k."BirimFiyat"),0) AS "Tutar",
                 COALESCE(string_agg(k."IsTuru", ', ' ORDER BY k."Id"),'-') AS "IsTuru",
+                COALESCE(
+                    (
+                        SELECT MAX(g."DegisimTarihi")
+                        FROM "SiparisDurumGecmisi" g
+                        WHERE g."SiparisId"=s."Id"
+                          AND g."YeniDurum" IN ('Tamamlandı','Teslim')
+                    ),
+                    s."OlusturmaTarihi"
+                ) AS "TamamlanmaTarihi",
                 s."OlusturmaTarihi" AS "TeslimTarihi"
             FROM "Siparisler" s
             INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
@@ -318,12 +344,19 @@ public sealed class CariArsivController : ControllerBase
             """).ToListAsync();
 
         var effectiveStart = MaxDate(periodStart, NormalizeDate(filterStart));
+        var userStart = NormalizeDate(filterStart);
         var effectiveEnd = filterEnd.HasValue
             ? NormalizeDate(filterEnd)!.Value.Date.AddDays(1).AddTicks(-1)
             : (DateTime?)null;
 
+        // Dönem sınırı tamamlanma tarihine göre; kullanıcı tarih filtresi ekranda
+        // gösterilen geliş tarihine göre uygulanır. Kapatılmış dönemlere girmiş
+        // işler açık dönemde tekrar sayılmaz.
+        var arsivlenmis = await CariKurallari.ArsivlenmisIsler(_db, hekimId);
         var jobs = allJobs.Where(x =>
-            (!effectiveStart.HasValue || x.TeslimTarihi >= effectiveStart.Value) &&
+            !arsivlenmis.Contains(x.Id) &&
+            (!periodStart.HasValue || x.TamamlanmaTarihi >= periodStart.Value) &&
+            (!userStart.HasValue || x.TeslimTarihi >= userStart.Value) &&
             (!effectiveEnd.HasValue || x.TeslimTarihi <= effectiveEnd.Value)
         ).ToList();
 
@@ -437,6 +470,7 @@ public sealed class CariIsDto
     public decimal Tutar { get; set; }
     public string ParaBirimi { get; set; } = "TRY";
     public DateTime TeslimTarihi { get; set; }
+    public DateTime TamamlanmaTarihi { get; set; }
 }
 
 public sealed class CariTahsilatListeDto

@@ -504,6 +504,16 @@ namespace PrimerLabV2.Controllers
             }
 
 
+            // Npgsql "yeniden deneme" (retry) stratejisi açıkken, strateji dışında
+            // başlatılan işlem (transaction) her seferinde InvalidOperationException
+            // verir. İşlem, LabIsiDuzenle'de olduğu gibi strateji içinde çalıştırılır.
+            var strategy = _db.Database.CreateExecutionStrategy();
+
+            try
+            {
+            return await strategy.ExecuteAsync<IActionResult>(async () =>
+            {
+            _db.ChangeTracker.Clear();
             await using var transaction =
                 await _db.Database
                     .BeginTransactionAsync();
@@ -632,7 +642,12 @@ namespace PrimerLabV2.Controllers
             catch
             {
                 await transaction.RollbackAsync();
-
+                throw;
+            }
+            });
+            }
+            catch
+            {
                 return StatusCode(
                     500,
                     "İş kaydedilirken hata oluştu."
@@ -711,6 +726,14 @@ namespace PrimerLabV2.Controllers
                     dto.TerminTarihi
                 );
 
+            // Retry stratejisi açıkken işlem strateji içinde çalışmalıdır (bkz. YeniIsOlustur).
+            var strategy = _db.Database.CreateExecutionStrategy();
+
+            try
+            {
+            return await strategy.ExecuteAsync<IActionResult>(async () =>
+            {
+            _db.ChangeTracker.Clear();
             await using var transaction =
                 await _db.Database.BeginTransactionAsync();
 
@@ -818,10 +841,15 @@ namespace PrimerLabV2.Controllers
                     }
                 );
             }
-            catch (Exception ex)
+            catch
             {
                 await transaction.RollbackAsync();
-
+                throw;
+            }
+            });
+            }
+            catch (Exception ex)
+            {
                 var rootMessage =
                     ex.GetBaseException().Message;
 
@@ -1074,6 +1102,10 @@ namespace PrimerLabV2.Controllers
 
                 await _db.SaveChangesAsync();
 
+                // Elle verilen Id'ler sayacı ilerletmez; ilerletilmezse sonraki yeni
+                // sipariş aynı kalem Id'sini almaya çalışıp "duplicate key" hatası verir.
+                await VeritabaniSayaclari.IleriAl(_db, "SiparisKalemleri");
+
                 if (string.Equals(siparis.Durum, "Tamamlandı", StringComparison.OrdinalIgnoreCase))
                 {
                     await _db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -1247,6 +1279,16 @@ namespace PrimerLabV2.Controllers
                 return BadRequest(
                     "En az bir iş kalemi gereklidir."
                 );
+            }
+
+            foreach (var kalem in dto.Kalemler)
+            {
+                if (string.IsNullOrWhiteSpace(kalem.IsTuru))
+                    return BadRequest("İş türü boş olamaz.");
+                if (kalem.Adet <= 0)
+                    return BadRequest("Adet en az 1 olmalıdır.");
+                if (kalem.BirimFiyat < 0)
+                    return BadRequest("Birim fiyat negatif olamaz.");
             }
 
 
@@ -1491,8 +1533,9 @@ namespace PrimerLabV2.Controllers
         public string HastaAdi { get; set; }
             = string.Empty;
 
-        public string Durum { get; set; }
-            = "Yeni";
+        // Gönderilmezse işin durumu değişmez. Önceden varsayılan "Yeni" idi ve
+        // durumu göndermeyen bir istek işi sessizce "Bekliyor"a geri alıyordu.
+        public string? Durum { get; set; }
 
         public DateTime? TerminTarihi { get; set; }
 
@@ -1531,8 +1574,8 @@ namespace PrimerLabV2.Controllers
     {
         public int HastaId { get; set; }
 
-        public string Durum { get; set; }
-            = "Yeni";
+        // Gönderilmezse işin durumu değişmez (bkz. LabIsDuzenleDto).
+        public string? Durum { get; set; }
 
         public List<SiparisKalemiOlusturDto>
             Kalemler

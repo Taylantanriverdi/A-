@@ -642,7 +642,11 @@ Kurallar:
                 ORDER BY "Tarih" DESC,"Id" DESC
                 """).ToListAsync();
 
+            // Cari ve Kasa / Arşiv ile aynı kural: kapatılmış dönemlere girmiş işler
+            // açık dönemde tekrar sayılmaz (bkz. CariKurallari).
+            var arsivlenmis = await CariKurallari.ArsivlenmisIsler(_db, hekimId);
             var filteredJobs = jobs
+                .Where(x => !arsivlenmis.Contains(x.Id))
                 .Where(x => !periodStart.HasValue || x.TeslimTarihi >= periodStart.Value)
                 .ToList();
 

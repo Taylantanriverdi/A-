@@ -275,6 +275,7 @@ namespace PrimerLabV2.Controllers
                     return BadRequest("Portal işi farklı bir hekime aktarılamaz.");
 
                 var grup = gruplar[0];
+                var aktarimOncekiDurum = mevcut.Durum;
                 var strategyAktar = _db.Database.CreateExecutionStrategy();
                 await strategyAktar.ExecuteAsync(async () =>
                 {
@@ -314,7 +315,7 @@ namespace PrimerLabV2.Controllers
 
                         await DurumGecmisiEkle(
                             aktarimId,
-                            mevcut.Durum,
+                            aktarimOncekiDurum,
                             "Bekliyor",
                             "Hekim Portalı kaydı Sipariş Formuna aktarıldı; Gelen İş Onayı bekliyor."
                         );
@@ -639,14 +640,22 @@ namespace PrimerLabV2.Controllers
                 ? row.OncekiDurum
                 : "Makyajda";
 
-            await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            // Yalnız gerçekten "Tamamlama Onayı" bekleyen iş geri çevrilebilir.
+            // Önceden kontrol yoktu: eski bir ekrandan (veya çift tıklamayla) gelen
+            // ret isteği, zaten onaylanmış "Tamamlandı" bir işi Makyajda'ya geri
+            // alıyor ve iş ciroya/cariye girmekten çıkıyordu.
+            var guncellenen = await _db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE "Siparisler"
                 SET
                     "Durum"={geri},
                     "TamamlamaOncekiDurum"=NULL,
                     "TamamlamaTalepTarihi"=NULL
                 WHERE "Id"={id}
+                  AND "Durum"='Tamamlama Onayı'
                 """);
+
+            if (guncellenen == 0)
+                return BadRequest("İş tamamlama onayı beklemiyor.");
 
             await DurumGecmisiEkle(
                 id,
@@ -704,6 +713,13 @@ namespace PrimerLabV2.Controllers
             if (!silindi)
                 return BadRequest("Kalıcı silme yalnızca Silinenler'deki kayıtlar için yapılabilir.");
 
+            // Retry stratejisi açıkken işlem strateji içinde çalışmalıdır.
+            var strategy = _db.Database.CreateExecutionStrategy();
+            var bulunamadi = false;
+            await strategy.ExecuteAsync(async () =>
+            {
+            _db.ChangeTracker.Clear();
+            bulunamadi = false;
             await using var tx = await _db.Database.BeginTransactionAsync();
             try
             {
@@ -723,7 +739,8 @@ namespace PrimerLabV2.Controllers
                 if (siparis == null)
                 {
                     await tx.RollbackAsync();
-                    return NotFound("İş bulunamadı.");
+                    bulunamadi = true;
+                    return;
                 }
 
                 _db.Siparisler.Remove(siparis);
@@ -735,6 +752,10 @@ namespace PrimerLabV2.Controllers
                 await tx.RollbackAsync();
                 throw;
             }
+            });
+
+            if (bulunamadi)
+                return NotFound("İş bulunamadı.");
 
             try
             {
@@ -883,12 +904,18 @@ namespace PrimerLabV2.Controllers
                     INNER JOIN "Siparisler" s ON s."Id"=k."SiparisId"
                     INNER JOIN
                     (
-                        SELECT DISTINCT "SiparisId"
+                        -- İşin EN SON tamamlanma tarihi bu aya düşmeli. Böylece
+                        -- tamamlanıp geri alınan ve sonraki ay tekrar tamamlanan
+                        -- iş iki ayda birden sayılmaz.
+                        SELECT "SiparisId"
                         FROM "SiparisDurumGecmisi"
                         WHERE "YeniDurum" IN ('Tamamlandı','Teslim')
-                          AND "DegisimTarihi">={start}
-                          AND "DegisimTarihi"<{end}
+                        GROUP BY "SiparisId"
+                        HAVING MAX("DegisimTarihi")>={start}
+                           AND MAX("DegisimTarihi")<{end}
                     ) d ON d."SiparisId"=s."Id"
+                    WHERE COALESCE(s."Silindi",false)=false
+                      AND s."Durum" IN ('Tamamlandı','Teslim')
                     GROUP BY COALESCE(s."ParaBirimi",'TRY')
                     ORDER BY "ParaBirimi"
                     """)
@@ -900,13 +927,26 @@ namespace PrimerLabV2.Controllers
                     .Sum(x => x.Tutar);
 
             var tamamlananIsTutari = Total("TRY");
-            var tahsilat = await _db.Database
-                .SqlQuery<DecimalScalarDto>($"""
-                    SELECT COALESCE(SUM("Tutar"),0) AS "Value"
+            // Tahsilatlar para birimine göre ayrılır. Önceden TRY, EUR ve USD
+            // tutarları tek sayı olarak toplanıp TL gibi gösteriliyordu
+            // (ör. 1000 TL + 100 EUR = "1100 TL"); Net Nakit de buna göre yanlıştı.
+            var tahsilatDoviz = await _db.Database
+                .SqlQuery<CurrencyTotalDto>($"""
+                    SELECT
+                        COALESCE(NULLIF(BTRIM("ParaBirimi"),''),'TRY') AS "ParaBirimi",
+                        COALESCE(SUM("Tutar"),0)::numeric AS "Tutar"
                     FROM "Tahsilatlar"
                     WHERE "Tarih">={start} AND "Tarih"<{end}
+                    GROUP BY COALESCE(NULLIF(BTRIM("ParaBirimi"),''),'TRY')
                     """)
-                .FirstAsync();
+                .ToListAsync();
+
+            decimal TahsilatToplam(string currency) =>
+                tahsilatDoviz
+                    .Where(x => string.Equals(x.ParaBirimi, currency, StringComparison.OrdinalIgnoreCase))
+                    .Sum(x => x.Tutar);
+
+            var tahsilat = new DecimalScalarDto { Value = TahsilatToplam("TRY") };
 
             var gider = await _db.Database
                 .SqlQuery<DecimalScalarDto>($"""
@@ -924,6 +964,8 @@ namespace PrimerLabV2.Controllers
                 TamamlananUsd = Total("USD"),
                 TamamlananDoviz = tamamlananDoviz,
                 Tahsilat = tahsilat.Value,
+                TahsilatEur = TahsilatToplam("EUR"),
+                TahsilatUsd = TahsilatToplam("USD"),
                 Gider = gider.Value,
                 NetNakit = tahsilat.Value - gider.Value
             });

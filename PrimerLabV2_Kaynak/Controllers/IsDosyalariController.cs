@@ -17,7 +17,8 @@ public class IsDosyalariController : ControllerBase
     private static readonly HashSet<string> AllowedExtensions =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            ".stl", ".obj", ".ply", ".zip", ".rar", ".7z", ".pdf",
+            // .dcm Hekim Portalı'nda kabul ediliyordu; laboratuvar ekranında da kabul edilir.
+            ".stl", ".obj", ".ply", ".dcm", ".zip", ".rar", ".7z", ".pdf",
             ".jpg", ".jpeg", ".png", ".webp", ".txt"
         };
 
@@ -90,7 +91,7 @@ public class IsDosyalariController : ControllerBase
 
         var extension = Path.GetExtension(originalName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
-            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP ve TXT kabul edilir.");
+            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP ve TXT kabul edilir.");
 
         var storedName = Guid.NewGuid().ToString("N") + extension;
         var folder = Path.Combine(StorageRoot(), siparisId.ToString());
@@ -107,12 +108,15 @@ public class IsDosyalariController : ControllerBase
 
             var type = NormalizeType(dosyaTuru);
             var now = DateTime.UtcNow;
-            var id = await _db.Database.SqlQuery<int>($"""
+            // SingleAsync() INSERT ... RETURNING sorgusunu alt sorguya sarmaya çalışıp
+            // her çağrıda hata veriyordu (EF Core 8+); ToListAsync() SQL'i olduğu gibi çalıştırır.
+            var id = (await _db.Database.SqlQuery<int>($"""
                 INSERT INTO "IsDosyalari"
                 ("SiparisId","DosyaTuru","OrijinalDosyaAdi","SaklananDosyaAdi","Uzanti","Boyut","YuklemeTarihi")
                 VALUES ({siparisId},{type},{originalName},{storedName},{extension},{dosya.Length},{now})
                 RETURNING "Id" AS "Value"
-                """).SingleAsync(cancellationToken);
+                """)
+                .ToListAsync(cancellationToken)).Single();
 
             return Ok(new
             {

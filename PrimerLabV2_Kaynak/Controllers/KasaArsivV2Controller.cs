@@ -22,8 +22,8 @@ public sealed class KasaArsivV2Controller : ControllerBase
     [HttpGet("ozet")]
     public async Task<IActionResult> Ozet([FromQuery] DateTime? baslangic, [FromQuery] DateTime? bitis)
     {
+        // Pasif hekim, açık cari hareketi veya bakiyesi varsa listede kalır.
         var hekimler = await _db.Hekimler.AsNoTracking()
-            .Where(x => x.Aktif)
             .OrderBy(x => x.AdSoyad)
             .Select(x => new
             {
@@ -31,7 +31,8 @@ public sealed class KasaArsivV2Controller : ControllerBase
                 x.AdSoyad,
                 x.KlinikAdi,
                 x.Telefon,
-                x.Email
+                x.Email,
+                x.Aktif
             })
             .ToListAsync();
 
@@ -41,9 +42,16 @@ public sealed class KasaArsivV2Controller : ControllerBase
         {
             var cari = await BuildCari(h.Id, baslangic, bitis);
 
+            if (!h.Aktif &&
+                cari.Isler.Count == 0 &&
+                cari.Odemeler.Count == 0 &&
+                cari.Bakiyeler.Values.All(v => v == 0))
+                continue;
+
             result.Add(new
             {
                 hekimId = h.Id,
+                aktif = h.Aktif,
                 hekimAdi = h.AdSoyad,
                 klinikAdi = h.KlinikAdi,
                 telefon = h.Telefon,
@@ -140,11 +148,16 @@ public sealed class KasaArsivV2Controller : ControllerBase
                 return BadRequest("Hekim bulunamadı veya pasif.");
 
             var tarih = ToUtcDate(dto.Tarih) ?? DateTime.UtcNow;
+
+            var kapaliDonem = await CariKurallari.KapaliDonemHatasi(_db, dto.HekimId, tarih);
+            if (kapaliDonem != null) return BadRequest(kapaliDonem);
+
             var tur = string.IsNullOrWhiteSpace(dto.OdemeTuru) ? "Nakit" : dto.OdemeTuru.Trim();
             var aciklama = Trim(dto.Aciklama, 500);
             var islemNo = Trim(dto.IslemNo, 150);
 
             var id = await InsertTahsilatDirect(dto.HekimId, dto.Tutar, currency, tarih, tur, islemNo, aciklama);
+            await VeritabaniSayaclari.IleriAl(_db, "Tahsilatlar");
             return Ok(new { id });
         }
         catch (Exception ex)
@@ -214,6 +227,7 @@ public sealed class KasaArsivV2Controller : ControllerBase
         try
         {
             id = await InsertDonemDirect(hekimId, cari, closeAt, balances, dto);
+            await VeritabaniSayaclari.IleriAl(_db, "CariDonemleri");
         }
         catch (Exception ex)
         {
@@ -241,14 +255,10 @@ public sealed class KasaArsivV2Controller : ControllerBase
         if (row == null)
             return NotFound("Aktif dönem bulunamadı.");
 
-        var lastId = await _db.Database.SqlQuery<int>($"""
-            SELECT COALESCE(MAX("Id"),0) AS "Value"
-            FROM "CariDonemleri"
-            WHERE "HekimId"={row.HekimId}
-              AND COALESCE("GeriAlindi",false)=false
-            """).SingleAsync();
+        // En son dönem, BuildCari ile aynı şekilde kapanış tarihine göre belirlenir.
+        var last = await LastActivePeriod(row.HekimId);
 
-        if (lastId != id)
+        if (last == null || last.Id != id)
             return BadRequest("Yalnızca en son kapatılan dönem geri alınabilir.");
 
         await _db.Database.ExecuteSqlInterpolatedAsync($"""
@@ -311,6 +321,15 @@ public sealed class KasaArsivV2Controller : ControllerBase
                 COALESCE(s."ParaBirimi",'TRY') AS "ParaBirimi",
                 COALESCE(SUM(k."Adet" * k."BirimFiyat"),0) AS "Tutar",
                 COALESCE(string_agg(k."IsTuru", ', ' ORDER BY k."Id"),'-') AS "IsTuru",
+                COALESCE(
+                    (
+                        SELECT MAX(g."DegisimTarihi")
+                        FROM "SiparisDurumGecmisi" g
+                        WHERE g."SiparisId"=s."Id"
+                          AND g."YeniDurum" IN ('Tamamlandı','Teslim')
+                    ),
+                    s."OlusturmaTarihi"
+                ) AS "TamamlanmaTarihi",
                 s."OlusturmaTarihi" AS "TeslimTarihi"
             FROM "Siparisler" s
             INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
@@ -337,8 +356,14 @@ public sealed class KasaArsivV2Controller : ControllerBase
             ? ToUtcDate(bitis)!.Value.Date.AddDays(1).AddTicks(-1)
             : (DateTime?)null;
 
+        // Dönem sınırı tamamlanma tarihine göre; kullanıcı filtresi geliş tarihine göre.
+        // Kapatılmış dönemlere girmiş işler açık dönemde tekrar sayılmaz.
+        var userStart = ToUtcDate(baslangic);
+        var arsivlenmis = await CariKurallari.ArsivlenmisIsler(_db, hekimId);
         var filteredJobs = jobs.Where(x =>
-            (!start.HasValue || x.TeslimTarihi >= start.Value) &&
+            !arsivlenmis.Contains(x.Id) &&
+            (!periodStart.HasValue || x.TamamlanmaTarihi >= periodStart.Value) &&
+            (!userStart.HasValue || x.TeslimTarihi >= userStart.Value) &&
             (!end.HasValue || x.TeslimTarihi <= end.Value)
         ).ToList();
 
@@ -545,6 +570,7 @@ public sealed class KasaArsivJobRow
     public decimal Tutar { get; set; }
     public string ParaBirimi { get; set; } = "TRY";
     public DateTime TeslimTarihi { get; set; }
+    public DateTime TamamlanmaTarihi { get; set; }
 }
 
 public sealed class KasaArsivPaymentRow
