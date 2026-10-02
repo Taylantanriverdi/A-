@@ -1,0 +1,10 @@
+PRIMER LAB V33.07.22.7
+
+Teknisyen Yönetim Merkezi yönetim işlemleri:
+- Teknisyen düzenle
+- Aktif / pasif yap
+- Güvenli silme
+- Geçmiş/atanmış işi olan teknisyen kalıcı silinmez; pasife alınır.
+- Mevcut sipariş ve iş geçmişi korunur.
+
+Kurulum: PrimerLabV2_GUNCELLE_V33_07_22_7.bat dosyasına çift tıklayın.
