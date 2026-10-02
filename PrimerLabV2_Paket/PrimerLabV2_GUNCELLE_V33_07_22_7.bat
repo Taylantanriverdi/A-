@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 setlocal EnableExtensions
 chcp 65001 >nul
 title Primer Lab V33.07.22.7 TEKNISYEN YONETIM ISLEMLERI
@@ -56,9 +56,32 @@ pause
 exit /b 0
 :ROLLBACK
 echo HATA: Guncelleme basarisiz. Degisen kod dosyalari geri aliniyor...
+rem Yeni kodla baslatilmis olabilecek uygulama once kapatilir; aksi halde
+rem dosyalar geri alinsa bile hatali surum calismaya devam eder.
+taskkill /F /IM PrimerLabV2.exe >nul 2>&1
+set "ROLLBACK_OK=1"
 copy /Y "%BACKUP%\Pages\Index.cshtml" "%PROJECT%\Pages\Index.cshtml" >nul
+if errorlevel 1 set "ROLLBACK_OK=0"
 copy /Y "%BACKUP%\Controllers\TeknisyenlerController.cs" "%PROJECT%\Controllers\TeknisyenlerController.cs" >nul
-echo Rollback tamamlandi. Veri dosyalarina dokunulmadi.
+if errorlevel 1 set "ROLLBACK_OK=0"
+if "%ROLLBACK_OK%"=="0" goto ROLLBACK_COPY_FAIL
+echo Eski surum yeniden derleniyor ve baslatiliyor...
+cd /d "%PROJECT%"
+dotnet build "PrimerLabV2.csproj" -c Debug
+if errorlevel 1 goto ROLLBACK_BUILD_FAIL
+start "PrimerLabV2" /min dotnet run --project "PrimerLabV2.csproj" --no-build --urls "%URL%"
+echo Rollback tamamlandi. Eski surum tekrar calisiyor. Veri dosyalarina dokunulmadi.
+pause
+exit /b 1
+:ROLLBACK_COPY_FAIL
+echo KRITIK: Yedek dosyalar geri kopyalanamadi.
+echo Yedek klasoru: %BACKUP%
+echo Bu klasordeki Pages ve Controllers dosyalarini proje klasorune elle kopyalayin.
+pause
+exit /b 1
+:ROLLBACK_BUILD_FAIL
+echo KRITIK: Dosyalar geri alindi ancak eski surum derlenemedi.
+echo Yedek klasoru: %BACKUP%
 pause
 exit /b 1
 :MISSING_PACKAGE

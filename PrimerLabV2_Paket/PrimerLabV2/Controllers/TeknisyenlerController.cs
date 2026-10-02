@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Data.Common;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PrimerLabV2.Data;
 
@@ -55,18 +56,25 @@ namespace PrimerLabV2.Controllers
             }
 
             var duplicate = await _db.Database
-                .SqlQuery<int>($"""
-                    SELECT COUNT(*)::int AS "Value"
+                .SqlQuery<TeknisyenRow>($"""
+                    SELECT
+                        "Id",
+                        "AdSoyad",
+                        "Aktif",
+                        "OlusturmaTarihi"
                     FROM "Teknisyenler"
                     WHERE LOWER(TRIM("AdSoyad")) =
                           LOWER(TRIM({adSoyad}))
+                    LIMIT 1
                     """)
-                .FirstAsync();
+                .FirstOrDefaultAsync();
 
-            if (duplicate > 0)
+            if (duplicate != null)
             {
                 return BadRequest(
-                    "Aynı isimde bir teknisyen zaten kayıtlı."
+                    duplicate.Aktif
+                        ? "Aynı isimde bir teknisyen zaten kayıtlı."
+                        : "Aynı isimde pasif bir teknisyen kayıtlı. Yeni kayıt açmak yerine o teknisyeni 'Aktif Yap' ile tekrar aktifleştir."
                 );
             }
 
@@ -150,7 +158,7 @@ namespace PrimerLabV2.Controllers
                     UPDATE "Teknisyenler"
                     SET
                         "AdSoyad" = {adSoyad},
-                        "Aktif" = {dto.Aktif}
+                        "Aktif" = COALESCE({dto.Aktif}, "Aktif")
                     WHERE "Id" = {id}
                     """);
 
@@ -172,17 +180,32 @@ namespace PrimerLabV2.Controllers
                 """).FirstAsync();
             if (exists == 0) return NotFound("Teknisyen bulunamadı.");
 
-            var used = await _db.Database.SqlQuery<int>($"""
-                SELECT COUNT(*)::int AS "Value"
-                FROM "Siparisler"
-                WHERE "TeknisyenId" = {id}
-                """).FirstAsync();
-            if (used > 0)
-                return Conflict("Bu teknisyene bağlı iş geçmişi bulunduğu için kayıt silinemez. Geçmiş kayıtların bozulmaması için 'Pasife Al' seçeneğini kullan.");
+            const string kullanimdaMesaji =
+                "Bu teknisyene bağlı iş geçmişi bulunduğu için kayıt silinemez. Geçmiş kayıtların bozulmaması için 'Pasife Al' seçeneğini kullan.";
 
-            await _db.Database.ExecuteSqlInterpolatedAsync($"""
-                DELETE FROM "Teknisyenler" WHERE "Id" = {id}
-                """);
+            // Kontrol ve silme tek komutta yapılır: kontrol ile silme arasında
+            // başka bir ekrandan bu teknisyene iş atanırsa kayıt silinmez.
+            int silinen;
+            try
+            {
+                silinen = await _db.Database.ExecuteSqlInterpolatedAsync($"""
+                    DELETE FROM "Teknisyenler" t
+                    WHERE t."Id" = {id}
+                      AND NOT EXISTS (
+                          SELECT 1 FROM "Siparisler" s
+                          WHERE s."TeknisyenId" = {id}
+                      )
+                    """);
+            }
+            catch (DbException ex) when (ex.SqlState == "23503")
+            {
+                // Başka bir tablo (yabancı anahtar) bu teknisyene bağlı.
+                return Conflict(kullanimdaMesaji);
+            }
+
+            if (silinen == 0)
+                return Conflict(kullanimdaMesaji);
+
             return Ok(new { Message = "Teknisyen silindi." });
         }
     }
@@ -285,9 +308,16 @@ namespace PrimerLabV2.Controllers
                     await _db.Database
                         .SqlQuery<int>($"""
                             SELECT COUNT(*)::int AS "Value"
-                            FROM "Teknisyenler"
-                            WHERE "Id" = {teknisyenId}
-                              AND "Aktif" = TRUE
+                            FROM "Teknisyenler" t
+                            WHERE t."Id" = {teknisyenId}
+                              AND (
+                                  t."Aktif" = TRUE
+                                  OR EXISTS (
+                                      SELECT 1 FROM "Siparisler" s
+                                      WHERE s."Id" = {siparisId}
+                                        AND s."TeknisyenId" = {teknisyenId}
+                                  )
+                              )
                             """)
                         .FirstAsync();
 
@@ -363,7 +393,10 @@ namespace PrimerLabV2.Controllers
     public class TeknisyenKaydetDto
     {
         public string? AdSoyad { get; set; }
-        public bool Aktif { get; set; } = true;
+        // null gelirse (istemci göndermezse) mevcut aktiflik durumu korunur.
+        // Eskiden varsayılan "true" olduğu için sadece isim gönderen bir
+        // istek pasif teknisyeni sessizce tekrar aktif yapıyordu.
+        public bool? Aktif { get; set; }
     }
 
     public class TeknisyenAtaDto
