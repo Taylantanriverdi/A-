@@ -1,3 +1,5 @@
+SET client_encoding = 'UTF8';
+
 BEGIN;
 
 -- Primer Lab V32 MASTER - güvenlik, izleme ve performans şeması
@@ -44,9 +46,34 @@ CREATE INDEX IF NOT EXISTS "IX_LegacyArsiv_Tur_Tarih"
     ON "LegacyArsivKayitlari" ("Tur", "KayitTarihi" DESC);
 
 -- Eski JSON aktarımından kalan düz metin portal parolalarını kalıcı olarak arşivden temizle.
+-- Parola alanları JSON'un her seviyesinden (iç içe nesne ve listeler dahil)
+-- temizlenir. Önceki sürüm yalnızca en üst seviyedeki anahtarları siliyordu;
+-- örn. {"liste":[{"password":"..."}]} içindeki parolalar arşivde kalıyordu.
+CREATE OR REPLACE FUNCTION pg_temp.primer_parola_temizle(j jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+IMMUTABLE
+AS $fn$
+BEGIN
+    IF jsonb_typeof(j) = 'object' THEN
+        RETURN COALESCE(
+            (SELECT jsonb_object_agg(e.key, pg_temp.primer_parola_temizle(e.value))
+             FROM jsonb_each(j) AS e
+             WHERE lower(e.key) NOT IN ('password', 'pass', 'parola', 'sifre', 'şifre')),
+            '{}'::jsonb);
+    ELSIF jsonb_typeof(j) = 'array' THEN
+        RETURN COALESCE(
+            (SELECT jsonb_agg(pg_temp.primer_parola_temizle(a.value) ORDER BY a.sira)
+             FROM jsonb_array_elements(j) WITH ORDINALITY AS a(value, sira)),
+            '[]'::jsonb);
+    END IF;
+    RETURN j;
+END
+$fn$;
+
 UPDATE "LegacyArsivKayitlari"
-SET "JsonData" = "JsonData" - 'password' - 'pass'
-WHERE ("JsonData" ? 'password') OR ("JsonData" ? 'pass');
+SET "JsonData" = pg_temp.primer_parola_temizle("JsonData")
+WHERE "JsonData" IS DISTINCT FROM pg_temp.primer_parola_temizle("JsonData");
 
 -- Uygulama rolünün yalnız ihtiyaç duyduğu yeni tablo erişimi.
 GRANT SELECT, INSERT ON TABLE "SistemIslemGunlugu" TO primerlab_app;

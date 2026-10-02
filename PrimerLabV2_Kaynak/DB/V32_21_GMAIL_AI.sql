@@ -1,3 +1,7 @@
+-- Windows'ta psql konsol kodlaması (WIN1254) ile çalıştırıldığında "Gövde"
+-- sütunu "GÃ¶vde" adıyla oluşuyordu; kodlama açıkça UTF-8 yapılır.
+SET client_encoding = 'UTF8';
+
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS "MailGelenler"
@@ -40,6 +44,14 @@ ALTER TABLE "MailGelenler" ADD COLUMN IF NOT EXISTS "AnalizKaynagi" character va
 ALTER TABLE "MailGelenler" ADD COLUMN IF NOT EXISTS "Guven" double precision NULL;
 ALTER TABLE "MailGelenler" ADD COLUMN IF NOT EXISTS "IncelemeGerekli" boolean NOT NULL DEFAULT false;
 ALTER TABLE "MailGelenler" ADD COLUMN IF NOT EXISTS "SenkronTarihi" timestamp with time zone NULL;
+
+-- Silinmiş hekime işaret eden eski kayıtlar varsa yabancı anahtar eklenemiyor
+-- ve tüm betik geri alınıyordu. Bu kayıtlar, kısıtın kendi davranışıyla aynı
+-- şekilde (ON DELETE SET NULL) hekimsiz hale getirilir.
+UPDATE "MailGelenler" m
+SET "HekimId" = NULL
+WHERE m."HekimId" IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM "Hekimler" h WHERE h."Id" = m."HekimId");
 
 DO $$
 BEGIN

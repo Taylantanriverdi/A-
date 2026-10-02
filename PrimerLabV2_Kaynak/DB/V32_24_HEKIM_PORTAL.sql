@@ -20,6 +20,27 @@ ALTER TABLE "Siparisler"
 ALTER TABLE "Siparisler"
     ADD COLUMN IF NOT EXISTS "PortalGonderimId" uuid NULL;
 
+-- Kullanıcı adı büyük/küçük harf farkıyla iki kez açılamasın
+-- ("Ahmet" ve "ahmet" aynı kişi gibi görünür). Mevcut veride böyle bir çakışma
+-- varsa betik bozulmaz; indeks atlanır ve uyarı verilir.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_class WHERE relname = 'UX_HekimPortalHesaplari_KullaniciAdi_Lower'
+    ) THEN
+        IF EXISTS (
+            SELECT 1 FROM "HekimPortalHesaplari"
+            GROUP BY LOWER("KullaniciAdi")
+            HAVING COUNT(*) > 1
+        ) THEN
+            RAISE NOTICE 'Büyük/küçük harf farkıyla aynı portal kullanıcı adları var; benzersizlik indeksi eklenmedi.';
+        ELSE
+            CREATE UNIQUE INDEX "UX_HekimPortalHesaplari_KullaniciAdi_Lower"
+                ON "HekimPortalHesaplari" (LOWER("KullaniciAdi"));
+        END IF;
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS "IX_HekimPortalHesaplari_Aktif"
     ON "HekimPortalHesaplari" ("Aktif","KullaniciAdi");
 CREATE INDEX IF NOT EXISTS "IX_Siparisler_PortalGonderimId"

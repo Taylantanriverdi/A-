@@ -1,11 +1,43 @@
+SET client_encoding = 'UTF8';
+
 BEGIN;
 
 ALTER TABLE "Tahsilatlar"
     ADD COLUMN IF NOT EXISTS "ParaBirimi" character varying(10) NOT NULL DEFAULT 'TRY';
 
+-- Kısıt eklenmeden önce eski/elle girilmiş değerler standart koda çevrilir.
+-- Önceki sürümde 'TL', ' try', 'Euro' gibi tek bir kayıt bile varsa kısıt
+-- eklenemiyor ve tüm betik (CariDonemleri tablosu dahil) geri alınıyordu.
 UPDATE "Tahsilatlar"
-SET "ParaBirimi"='TRY'
-WHERE "ParaBirimi" IS NULL OR BTRIM("ParaBirimi")='';
+SET "ParaBirimi" =
+    CASE
+        WHEN "ParaBirimi" IS NULL OR BTRIM("ParaBirimi") = '' THEN 'TRY'
+        ELSE CASE UPPER(BTRIM("ParaBirimi"))
+            WHEN 'TL'   THEN 'TRY'
+            WHEN '₺'    THEN 'TRY'
+            WHEN 'EURO' THEN 'EUR'
+            WHEN '€'    THEN 'EUR'
+            WHEN 'DOLAR' THEN 'USD'
+            WHEN '$'    THEN 'USD'
+            ELSE UPPER(BTRIM("ParaBirimi"))
+        END
+    END
+WHERE "ParaBirimi" IS NULL
+   OR "ParaBirimi" NOT IN ('TRY','EUR','USD');
+
+DO $$
+DECLARE
+    gecersiz text;
+BEGIN
+    SELECT string_agg(DISTINCT "ParaBirimi", ', ')
+    INTO gecersiz
+    FROM "Tahsilatlar"
+    WHERE "ParaBirimi" NOT IN ('TRY','EUR','USD');
+
+    IF gecersiz IS NOT NULL THEN
+        RAISE EXCEPTION 'Tahsilatlar tablosunda tanınmayan para birimi var: %. Bu kayıtları TRY/EUR/USD olarak düzeltip betiği tekrar çalıştırın.', gecersiz;
+    END IF;
+END $$;
 
 ALTER TABLE "Tahsilatlar"
     DROP CONSTRAINT IF EXISTS "CK_Tahsilatlar_ParaBirimi";
