@@ -14,6 +14,7 @@ echo ============================================================
 if not exist "%SOURCE%\Pages\Index.cshtml" goto MISSING_PACKAGE
 if not exist "%SOURCE%\Controllers\CariKurallari.cs" goto MISSING_PACKAGE
 if not exist "%SOURCE%\Tools\legacy_import.py" goto MISSING_PACKAGE
+if not exist "%SOURCE%\Infrastructure\PrimerLabSecurityMiddleware.cs" goto MISSING_PACKAGE
 if not exist "%PROJECT%\PrimerLabV2.csproj" goto MISSING_PROJECT
 set "STAMP=%DATE:/=-%_%TIME::=-%_%RANDOM%"
 set "STAMP=%STAMP: =0%"
@@ -24,6 +25,8 @@ taskkill /F /IM PrimerLabV2.exe >nul 2>&1
 echo [2/7] Degisecek kod klasorleri yedekleniyor...
 robocopy "%PROJECT%\Controllers" "%BACKUP%\Controllers" /E /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto FAIL_BACKUP
+robocopy "%PROJECT%\Infrastructure" "%BACKUP%\Infrastructure" /E /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 goto FAIL_BACKUP
 robocopy "%PROJECT%\Pages" "%BACKUP%\Pages" Index.cshtml /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto FAIL_BACKUP
 if exist "%PROJECT%\Tools" (
@@ -32,6 +35,8 @@ if exist "%PROJECT%\Tools" (
 )
 echo [3/7] Duzeltmeler uygulaniyor...
 robocopy "%SOURCE%\Controllers" "%PROJECT%\Controllers" *.cs /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 goto ROLLBACK
+robocopy "%SOURCE%\Infrastructure" "%PROJECT%\Infrastructure" *.cs /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto ROLLBACK
 copy /Y "%SOURCE%\Pages\Index.cshtml" "%PROJECT%\Pages\Index.cshtml" >nul
 if errorlevel 1 goto ROLLBACK
@@ -66,6 +71,8 @@ taskkill /F /IM PrimerLabV2.exe >nul 2>&1
 rem /MIR: Controllers klasorunu yedekle birebir ayni yapar (yeni eklenen dosyalar da silinir).
 robocopy "%BACKUP%\Controllers" "%PROJECT%\Controllers" /MIR /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto ROLLBACK_COPY_FAIL
+robocopy "%BACKUP%\Infrastructure" "%PROJECT%\Infrastructure" /MIR /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 goto ROLLBACK_COPY_FAIL
 copy /Y "%BACKUP%\Pages\Index.cshtml" "%PROJECT%\Pages\Index.cshtml" >nul
 if errorlevel 1 goto ROLLBACK_COPY_FAIL
 if exist "%BACKUP%\Tools" (
@@ -83,7 +90,7 @@ exit /b 1
 :ROLLBACK_COPY_FAIL
 echo KRITIK: Yedek dosyalar geri kopyalanamadi.
 echo Yedek klasoru: %BACKUP%
-echo Bu klasordeki Controllers, Pages ve Tools dosyalarini proje klasorune elle kopyalayin.
+echo Bu klasordeki Controllers, Infrastructure, Pages ve Tools dosyalarini proje klasorune elle kopyalayin.
 pause
 exit /b 1
 :ROLLBACK_BUILD_FAIL

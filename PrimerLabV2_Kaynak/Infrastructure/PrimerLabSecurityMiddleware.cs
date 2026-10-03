@@ -19,6 +19,19 @@ public sealed class PrimerLabSecurityMiddleware
     {
         ApplySecurityHeaders(context.Response);
 
+        // DNS rebinding koruması: Kötü niyetli bir web sitesi kendi alan adını
+        // (ör. saldirgan.com) 127.0.0.1'e çözdürerek laboratuvar bilgisayarındaki
+        // tarayıcı üzerinden yönetim API'lerine "yerelden geliyormuş gibi" erişebilir;
+        // Origin ve Host aynı olduğu için çapraz site kontrolü de bunu yakalamaz.
+        // Bu yüzden yalnız localhost, IP adresi ve bu bilgisayarın adı ile gelen
+        // isteklere izin verilir. Ek adresler PrimerLab:AllowedHosts ayarıyla eklenebilir.
+        if (!IsAllowedHost(context.Request.Host.Host))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsync("Geçersiz sunucu adresi.");
+            return;
+        }
+
         var remoteAddress = context.Connection.RemoteIpAddress;
         var doctorPortalRequest =
             context.Request.Path.StartsWithSegments("/hekim-portal") ||
@@ -57,6 +70,31 @@ public sealed class PrimerLabSecurityMiddleware
         }
 
         await _next(context);
+    }
+
+    private bool IsAllowedHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host)) return false;
+        host = host.Trim().TrimEnd('.');
+
+        if (string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)) return true;
+        if (IPAddress.TryParse(host.Trim('[', ']'), out _)) return true;
+
+        var machine = Environment.MachineName;
+        if (string.Equals(host, machine, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(host, machine + ".local", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var extra = _configuration["PrimerLab:AllowedHosts"];
+        if (!string.IsNullOrWhiteSpace(extra))
+        {
+            foreach (var item in extra.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (string.Equals(item, host, StringComparison.OrdinalIgnoreCase)) return true;
+            }
+        }
+
+        return false;
     }
 
     private bool IsRemoteAccessAllowed() =>

@@ -4,13 +4,23 @@ Bu paket V33.07.22.7 (teknisyen yonetimi) paketini de icerir; once onu kurmaniza
 
 KURULUM
 1) PrimerLabV2_GUNCELLE_V33_08.bat dosyasina cift tiklayin.
-   - Controllers, Pages\Index.cshtml ve Tools\legacy_import.py once otomatik yedeklenir.
+   - Controllers, Infrastructure, Pages\Index.cshtml ve Tools\legacy_import.py once otomatik yedeklenir.
    - Derleme veya acilis basarisiz olursa her sey otomatik eski haline doner.
 2) Veritabani sayac esitleme (BIR KEZ yapilir, guvenlidir):
    pgAdmin'de primerlab veritabanina baglanin ve DB\V33_SAYAC_ESITLEME.sql dosyasini calistirin.
    Bu betik hicbir veriyi degistirmez; yalniz Id sayaclarini ileri alir.
 
+GUVENLIK NOTU
+- Yonetim ekrani artik yalniz localhost, IP adresi veya bu bilgisayarin adi ile acilir.
+  (Ornek: http://localhost:5169 ve hekimler icin http://192.168.x.x:5169/hekim-portal)
+- Uygulamayi bir alan adi / tunel uzerinden kullaniyorsaniz o adresi appsettings.json
+  icine ekleyin:  "PrimerLab": { "AllowedHosts": "ornek.alanadi.com" }
+
 DUZELTILEN HATALAR
+- GUVENLIK (DNS rebinding): Kotu niyetli bir web sitesi, bu bilgisayardaki tarayici
+  uzerinden yonetim API'lerine erisip tum veritabani yedegini indirebiliyordu. Engellendi.
+- Mail ekleri indirilemezse mail artik "Inceleme Gerekli" olarak isaretlenir
+  (onceden ekler sessizce kayboluyordu ve bir daha denenmiyordu).
 - Cari ekraninda "Donem Kapat", Cari tahsilat girisi, Tahsilatlar ekranindan tahsilat
   girisi ve is detayina dosya yukleme her seferinde hata veriyordu (EF Core uyumsuzlugu).
 - Is kalemi duzenlendikten sonra yeni is acmak "Is kaydedilemedi" hatasi verebiliyordu.

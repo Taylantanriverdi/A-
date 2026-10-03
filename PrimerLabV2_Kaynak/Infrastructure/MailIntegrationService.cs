@@ -454,9 +454,23 @@ public sealed class MailIntegrationService
                             _runtimeStatus.Phase = "Ek indirilemedi — mail kaydı korundu";
                     }
 
+                    // Eklerin bir kısmı veya tamamı indirilemediyse mail incelemeye düşer.
+                    // Mail "işlendi" sayıldığı için sonraki kontrollerde ekler yeniden
+                    // denenmez; önceden bu durum kullanıcıya hiç yansımıyordu.
+                    var eksikEk = mail.Attachments.Count - savedFiles.Count;
+                    var ekNotu = eksikEk > 0
+                        ? $"{eksikEk} ek dosya indirilemedi; Gmail'den elle kontrol edin."
+                        : null;
+
                     await db.Database.ExecuteSqlInterpolatedAsync($"""
                         UPDATE "MailGelenler"
-                        SET "Dosyalar"={JsonSerializer.Serialize(savedFiles)}
+                        SET "Dosyalar"={JsonSerializer.Serialize(savedFiles)},
+                            "IncelemeGerekli"=CASE WHEN {ekNotu} IS NULL THEN "IncelemeGerekli" ELSE true END,
+                            "Notlar"=CASE
+                                WHEN {ekNotu} IS NULL THEN "Notlar"
+                                WHEN COALESCE("Notlar",'')='' THEN {ekNotu}
+                                ELSE "Notlar" || E'\n' || {ekNotu}
+                            END
                         WHERE "Id"={mailId}
                         """, runToken);
                 }
@@ -592,7 +606,10 @@ public sealed class MailIntegrationService
         var root = Path.GetFullPath(FilesRoot);
         var full = Path.GetFullPath(Path.Combine(root, row.DosyaYolu.Replace('/', Path.DirectorySeparatorChar)));
 
-        if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+        // Ayırıcı ile karşılaştırılır; aksi halde ".../Files2/..." gibi kardeş bir
+        // klasör de ".../Files" ile başladığı için kontrolden geçerdi.
+        var prefix = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             return null;
 
         return File.Exists(full) ? full : null;
