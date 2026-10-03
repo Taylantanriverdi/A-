@@ -19,6 +19,13 @@ public sealed class PrimerLabSecurityMiddleware
     {
         ApplySecurityHeaders(context.Response);
 
+        var portalPort = PortalInternetPort(_configuration);
+        if (portalPort > 0 && context.Connection.LocalPort == portalPort)
+        {
+            await HandleInternetPortal(context);
+            return;
+        }
+
         // DNS rebinding koruması: Kötü niyetli bir web sitesi kendi alan adını
         // (ör. saldirgan.com) 127.0.0.1'e çözdürerek laboratuvar bilgisayarındaki
         // tarayıcı üzerinden yönetim API'lerine "yerelden geliyormuş gibi" erişebilir;
@@ -70,6 +77,80 @@ public sealed class PrimerLabSecurityMiddleware
         }
 
         await _next(context);
+    }
+
+    /// <summary>
+    /// İnternet tünelinin bağlandığı portun numarası (0 = kapalı). Varsayılan 5170.
+    /// </summary>
+    public static int PortalInternetPort(IConfiguration configuration)
+    {
+        var value = configuration["PrimerLab:PortalInternetPort"];
+        if (string.IsNullOrWhiteSpace(value)) return 5170;
+        return int.TryParse(value, out var port) && port is > 0 and < 65536 && port != 5169 ? port : 0;
+    }
+
+    // Bu port yalnız 127.0.0.1'de dinlenir ve yalnız tünel yazılımı (cloudflared /
+    // tailscale) tarafından kullanılır. Tünelden gelen her istek, gerçek kaynağı ne
+    // olursa olsun "internetten" sayılır: yönetim ekranı ve yönetim API'leri hiçbir
+    // koşulda açılmaz, yalnız parola korumalı Hekim Portalı sunulur.
+    private async Task HandleInternetPortal(HttpContext context)
+    {
+        // Gerçek istemci adresi (giriş denemesi sınırı ve istek sınırı hekim bazında çalışsın).
+        // Adres bilinmiyorsa hiçbir zaman "yerel" sayılmayan bir değer kullanılır.
+        context.Connection.RemoteIpAddress = ForwardedClientAddress(context.Request) ?? IPAddress.None;
+
+        // Tünel dış dünyaya yalnız HTTPS ile açılır.
+        var proto = context.Request.Headers["X-Forwarded-Proto"].FirstOrDefault();
+        if (!string.Equals(proto?.Split(',')[0].Trim(), "http", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Request.Scheme = "https";
+            context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
+        }
+
+        var path = context.Request.Path;
+        if (!path.HasValue || path.Value == "/")
+        {
+            context.Response.Redirect("/hekim-portal");
+            return;
+        }
+
+        var allowed =
+            path.StartsWithSegments("/hekim-portal") ||
+            (path.StartsWithSegments("/api/hekim-portal") && !path.StartsWithSegments("/api/hekim-portal/admin"));
+
+        if (!allowed)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            await context.Response.WriteAsync("Bulunamadı.");
+            return;
+        }
+
+        if (IsMutation(context.Request.Method) && IsCrossSiteBrowserRequest(context))
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await context.Response.WriteAsync("Çapraz site isteği güvenlik nedeniyle engellendi.");
+            return;
+        }
+
+        if (path.StartsWithSegments("/api"))
+        {
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            context.Response.Headers.Pragma = "no-cache";
+        }
+
+        await _next(context);
+    }
+
+    private static IPAddress? ForwardedClientAddress(HttpRequest request)
+    {
+        foreach (var header in new[] { "CF-Connecting-IP", "X-Forwarded-For" })
+        {
+            var value = request.Headers[header].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(value)) continue;
+            var first = value.Split(',')[0].Trim();
+            if (IPAddress.TryParse(first, out var address) && !IsLoopback(address)) return address;
+        }
+        return null;
     }
 
     private bool IsAllowedHost(string? host)

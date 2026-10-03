@@ -14,7 +14,7 @@ A) ESKI BILGISAYARDA (verilerinizi tasimak icin) - 5 dakika
 
 3. Bir USB bellege sunlari kopyalayin:
    - Indirdiginiz yedek dosyasi (.json)
-   - "Pages" klasoru          (Hekim Portali sayfasi bunun icindedir - ONEMLI)
+   - "Pages" klasoru          (varsa; Hekim Portali artik programla birlikte gelir)
    - "App_Data" klasoru       (is dosyalari, taramalar, mail ekleri)
    - "wwwroot" klasoru        (varsa)
 
@@ -59,14 +59,11 @@ SIK SORULANLAR
   Hatayi giderip KURULUM.bat'i tekrar calistirin. Tamamlanan adimlar atlanir,
   veriler silinmez. Hata mesajinin fotografini Claude'a gonderebilirsiniz.
 
-- "Hekim Portali sayfasi bulunamadi" uyarisi:
-  Eski bilgisayardaki "Pages" klasorunu ESKI_PC_DOSYALARI'na koyup
-  KURULUM.bat'i tekrar calistirin.
-
 - Hekimler portala nasil girer?
   Ayni Wi-Fi'deki cihazdan: http://BU-BILGISAYARIN-IP-ADRESI:5169/hekim-portal
   (IP adresini Ayarlar > Hekim Portal Hesabi ekraninda gorebilirsiniz.)
   Windows ag profili "Ozel" olmalidir (Ayarlar > Ag ve Internet).
+  Dunyanin her yerinden erisim icin asagidaki "HEKIM PORTALI - INTERNET" bolumune bakin.
 
 - Programi kapatmak: C:\PrimerLab\PrimerLab_Durdur.bat
 - Program dosyalari: C:\PrimerLab\Uygulama
@@ -80,3 +77,32 @@ SIK SORULANLAR
 - PostgreSQL sifresini unuttum:
   Program calismaya devam eder (kendi ayri sifresini kullanir). Yalniz
   pgAdmin ile bakim yaparken gerekir.
+
+
+HEKIM PORTALI - INTERNET (her yerden is gonderme)
+-------------------------------------------------
+Hekim telefonundan/bilgisayarindan girer; hasta adi, isler ve disler, renk,
+materyal, implant markasi/platformu, tarama cihazi, prova, teslim tarihi ve
+agiz ici tarama dosyalarini gonderir. Is, hekimin fiyat listesine gore OTOMATIK
+fiyatlanir ve Primer Lab'de "Gelen Is Onayi" listesine duser. Onayladiginiz
+anda normal is akisina girer.
+
+1. Her hekim icin fiyat listesi tanimli olmali (Hekimler > Fiyat Listesi).
+   Hekim portalda yalniz kendi listesindeki is turlerini gorur; fiyat gormez.
+2. Hekim hesabi: Hekimler > Portal butonu > kullanici adi + parola > Kaydet.
+3. C:\PrimerLab\PORTAL_INTERNET_AC.bat dosyasini calistirin ve secin:
+   1) Cloudflare Tunnel - kendi alan adiniz varsa (orn. portal.primerlab.com)
+   2) Tailscale Funnel  - alan adi gerekmez, ucretsiz
+   Ekrandaki adimlari izleyin. Sonunda hekimlere verilecek adres yazilir;
+   bu adres Hekimler > Portal penceresinde de gorunur.
+4. Modem ayari veya port yonlendirme GEREKMEZ.
+
+Guvenlik:
+- Internetten yalniz Hekim Portali acilir. Yonetim ekrani, muhasebe, yedek
+  ve hekim hesap yonetimi internetten hicbir sekilde acilmaz.
+- Baglanti HTTPS ile sifrelidir. Hekim yalniz kendi islerini gorur.
+- Ust uste hatali parola girilirse hesap 10 dakika kilitlenir.
+- Hekimlere en az 8 karakterli, harf ve rakam iceren parola verin.
+- Tunel ayarinda adres olarak MUTLAKA localhost:5170 yazin (5169 DEGIL).
+- Portal, bu bilgisayar ve Primer Lab acik oldugu surece calisir.
+- Kapatmak icin: PORTAL_INTERNET_AC.bat > 3

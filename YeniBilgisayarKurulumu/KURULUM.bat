@@ -281,17 +281,18 @@ rem Onceki derleme dosyalari silinir; program sifirdan derlenir (eski sayfa kalm
 if exist "%KAYNAK%\obj" rmdir /s /q "%KAYNAK%\obj"
 if exist "%KAYNAK%\bin" rmdir /s /q "%KAYNAK%\bin"
 
-rem Eski bilgisayardan getirilen sayfalar (Hekim Portali vb.). Index.cshtml duzeltilmis surumdur, ezilmez.
-set "PORTAL_SAYFASI="
+rem Eski bilgisayardan getirilen ek sayfalar. Index.cshtml ve Hekim Portali yeni surumdur, ezilmez.
 if exist "%ESKI%\Pages" (
-    robocopy "%ESKI%\Pages" "%KAYNAK%\Pages" *.cshtml *.cs /S /XF Index.cshtml Index.cshtml.cs /NFL /NDL /NJH /NJS /NP >nul
+    robocopy "%ESKI%\Pages" "%KAYNAK%\Pages" *.cshtml *.cs /S /XF Index.cshtml Index.cshtml.cs HekimPortali.cshtml /NFL /NDL /NJH /NJS /NP >nul
     if errorlevel 8 goto KOPYA_HATA
 )
 if exist "%ESKI%\wwwroot" (
     robocopy "%ESKI%\wwwroot" "%KAYNAK%\wwwroot" /E /NFL /NDL /NJH /NJS /NP >nul
     if errorlevel 8 goto KOPYA_HATA
 )
-findstr /s /m /i /c:"hekim-portal" "%KAYNAK%\Pages\*.cshtml" | findstr /v /i "\\Index.cshtml" >nul && set "PORTAL_SAYFASI=1"
+rem Eski Hekim Portali sayfalari kaldirilir: yeni portal HekimPortali.cshtml ile gelir;
+rem ayni adresi kullanan iki sayfa olursa program acilmaz.
+powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/hekim-portal' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"
 
 pushd "%KAYNAK%"
 "%DOTNET%" publish PrimerLabV2.csproj -c Release -o "%UYGULAMA%" -nologo
@@ -316,6 +317,7 @@ rem ------------------------------------------------------------
 echo [7/8] Kisayollar ve guvenlik duvari ayarlaniyor...
 copy /Y "%KIT%PrimerLab_Baslat.bat" "%HEDEF%\PrimerLab_Baslat.bat" >nul
 copy /Y "%KIT%PrimerLab_Durdur.bat" "%HEDEF%\PrimerLab_Durdur.bat" >nul
+copy /Y "%KIT%PORTAL_INTERNET_AC.bat" "%HEDEF%\PORTAL_INTERNET_AC.bat" >nul
 powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Primer Lab.lnk'); $s.TargetPath='%HEDEF%\PrimerLab_Baslat.bat'; $s.WorkingDirectory='%HEDEF%'; $s.WindowStyle=7; $s.IconLocation='%SystemRoot%\System32\shell32.dll,13'; $s.Save()"
 rem Hekim Portali ayni Wi-Fi'deki cihazlardan acilabilsin (yalniz "Ozel" ag profili).
 netsh advfirewall firewall delete rule name="Primer Lab 5169" >nul 2>&1
@@ -360,12 +362,7 @@ echo  KURULUM TAMAMLANDI
 echo ============================================================
 echo  - Masaustundeki "Primer Lab" kisayolu ile acabilirsiniz.
 echo  - Adres: %URL%
-if not defined PORTAL_SAYFASI (
-echo.
-echo  DIKKAT: Hekim Portali sayfasi bulunamadi.
-echo  Eski bilgisayardaki proje klasorunun "Pages" klasorunu
-echo  ESKI_PC_DOSYALARI klasorune kopyalayip KURULUM.bat'i tekrar calistirin.
-)
+echo  - Hekim Portalini internete acmak icin: C:\PrimerLab\PORTAL_INTERNET_AC.bat
 echo.
 echo  Gmail baglantisini ve Primer AI anahtarini Ayarlar'dan yeniden girin
 echo  ^(guvenlik geregi eski bilgisayarin sifreli anahtarlari burada acilamaz^).

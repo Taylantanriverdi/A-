@@ -42,15 +42,18 @@ public sealed class HekimPortalController : ControllerBase
     private readonly PrimerLabDbContext _db;
     private readonly IDataProtector _protector;
     private readonly IWebHostEnvironment _environment;
+    private readonly IConfiguration _configuration;
 
     public HekimPortalController(
         PrimerLabDbContext db,
         IDataProtectionProvider dataProtectionProvider,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        IConfiguration configuration)
     {
         _db = db;
         _protector = dataProtectionProvider.CreateProtector("PrimerLab.HekimPortal.Session.v1");
         _environment = environment;
+        _configuration = configuration;
     }
 
     // =========================================================
@@ -85,7 +88,8 @@ public sealed class HekimPortalController : ControllerBase
             sonGirisTarihi = account?.SonGirisTarihi,
             guncellemeTarihi = account?.GuncellemeTarihi,
             portalYolu = "/hekim-portal",
-            portalAdresleri = GetPortalUrls()
+            portalAdresleri = GetPortalUrls(),
+            internetAdresi = InternetPortalUrl()
         });
     }
 
@@ -190,13 +194,21 @@ public sealed class HekimPortalController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] PortalLoginDto dto, CancellationToken cancellationToken)
     {
-        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        if (IsLoginBlocked(ip, out var waitMinutes))
-            return StatusCode(StatusCodes.Status429TooManyRequests,
-                $"Çok fazla başarısız giriş denemesi. Yaklaşık {waitMinutes} dakika sonra tekrar deneyin.");
-
+        // Tünel gerçek adresi iletmediyse (IPAddress.None) tüm hekimler aynı adreste görünür;
+        // bu durumda yalnız kullanıcı adı sınırı uygulanır, bir hekimin hataları diğerlerini kilitlemez.
+        var remote = HttpContext.Connection.RemoteIpAddress;
+        var ip = remote == null || remote.Equals(System.Net.IPAddress.None) ? "ip:?" : "ip:" + remote;
+        var ipKnown = ip != "ip:?";
         var username = (dto.KullaniciAdi ?? string.Empty).Trim().ToLowerInvariant();
         var password = dto.Parola ?? string.Empty;
+
+        // Portal internete açık olabileceği için deneme sınırı hem IP hem kullanıcı adı bazındadır
+        // (farklı adreslerden tek hesaba parola denemesi de durdurulur).
+        var userKey = "u:" + username;
+        var waitMinutes = 0;
+        if ((ipKnown && IsLoginBlocked(ip, 5, out waitMinutes)) || IsLoginBlocked(userKey, 10, out waitMinutes))
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                $"Çok fazla başarısız giriş denemesi. Yaklaşık {waitMinutes} dakika sonra tekrar deneyin.");
 
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
             return BadRequest("Kullanıcı adı ve parola gereklidir.");
@@ -213,12 +225,14 @@ public sealed class HekimPortalController : ControllerBase
 
         if (account == null || !account.Aktif || !account.HekimAktif || !VerifyPassword(password, account.ParolaSalt, account.ParolaHash))
         {
-            RegisterLoginFailure(ip);
+            if (ipKnown) RegisterLoginFailure(ip);
+            if (username.Length > 0) RegisterLoginFailure(userKey);
             await Task.Delay(Random.Shared.Next(150, 450), cancellationToken);
             return Unauthorized("Kullanıcı adı veya parola hatalı.");
         }
 
         LoginAttempts.TryRemove(ip, out _);
+        LoginAttempts.TryRemove(userKey, out _);
 
         var expiresUtc = DateTime.UtcNow.AddHours(12);
         var session = new PortalSession
@@ -404,12 +418,21 @@ public sealed class HekimPortalController : ControllerBase
         var allowedPrices = await PortalPriceList(session.HekimId, cancellationToken);
         var priceMap = allowedPrices.ToDictionary(x => x.IsTuru, StringComparer.CurrentCultureIgnoreCase);
 
+        // Fiyat hekime tanımlı listeden otomatik alınır; portal istemcisinden fiyat kabul edilmez.
+        // Adet gönderilmediyse kaleme seçilen diş sayısı kullanılır (köprü: 3 diş = 3 üye;
+        // gece plağı gibi çene işlerinde hekim adedi 1 bırakır).
         var cleanItems = new List<(PortalNewJobItemDto Dto, PortalPriceRow Price)>();
         foreach (var item in dto.Kalemler)
         {
             var name = item.IsTuru.Trim();
             if (!priceMap.TryGetValue(name, out var price))
                 return BadRequest($"'{name}' hekime tanımlı iş listesinde bulunmuyor.");
+
+            if (item.Disler is { Count: > 0 })
+            {
+                item.Disler = item.Disler.Distinct().OrderBy(x => x).ToList();
+                if (item.Adet <= 0) item.Adet = item.Disler.Count;
+            }
 
             cleanItems.Add((item, price));
         }
@@ -422,9 +445,10 @@ public sealed class HekimPortalController : ControllerBase
             .ToList();
 
         var termin = NormalizeDate(dto.TerminTarihi);
-        var teeth = dto.Disler.Distinct().OrderBy(x => x).ToArray();
+        var teeth = AllTeeth(dto).ToArray();
         var toothText = string.Join(",", teeth);
         var notes = Normalize(dto.Notlar, 4000);
+        var jobNotes = Normalize(BuildJobNotes(dto, cleanItems.Select(x => (x.Price.IsTuru, x.Dto)).ToList(), notes), 8000);
         var designSource = dto.TasarimKaynagi == "doctor" ? "doctor" : "lab";
         var portalSubmissionId = Guid.NewGuid();
         var savedPaths = new List<string>();
@@ -458,7 +482,7 @@ public sealed class HekimPortalController : ControllerBase
                         {
                             Hasta = hasta,
                             Durum = "Bekliyor",
-                            Notlar = notes,
+                            Notlar = jobNotes,
                             Aktif = true,
                             OlusturmaTarihi = DateTime.UtcNow,
                             Kalemler = groupItems.Select(x => new SiparisKalemi
@@ -648,17 +672,73 @@ public sealed class HekimPortalController : ControllerBase
         foreach (var item in dto.Kalemler)
         {
             if (string.IsNullOrWhiteSpace(item.IsTuru)) return "İş türü boş bırakılamaz.";
-            if (item.Adet <= 0 || item.Adet > 99) return "İş adedi 1-99 arasında olmalıdır.";
+            var hasTeeth = item.Disler is { Count: > 0 };
+            if (hasTeeth && item.Disler!.Any(x => !ValidTeeth.Contains(x))) return "Geçersiz diş numarası seçildi.";
+            if (item.Adet > 99 || (item.Adet <= 0 && !hasTeeth)) return "İş adedi 1-99 arasında olmalıdır.";
         }
 
-        if (dto.Disler == null || dto.Disler.Count == 0) return "En az bir diş seçilmelidir.";
+        dto.Disler ??= new List<int>();
         if (dto.Disler.Any(x => !ValidTeeth.Contains(x))) return "Geçersiz diş numarası seçildi.";
+        if (!AllTeeth(dto).Any()) return "En az bir diş seçilmelidir.";
+
+        if (dto.ImplantVar && string.IsNullOrWhiteSpace(dto.ImplantMarkasi)) return "İmplant markası gereklidir.";
+        foreach (var (value, label) in new[]
+                 {
+                     (dto.ImplantMarkasi, "İmplant markası"), (dto.ImplantPlatform, "İmplant platformu"),
+                     (dto.AbutmentTipi, "Abutment tipi"), (dto.BaglantiTipi, "Bağlantı tipi"),
+                     (dto.TaramaCihazi, "Tarama cihazı"), (dto.ProvaAsamasi, "Prova aşaması"),
+                     (dto.ReferansNo, "Referans no")
+                 })
+        {
+            if ((value?.Trim().Length ?? 0) > 120) return $"{label} çok uzun.";
+        }
         if (string.IsNullOrWhiteSpace(dto.DisRengi)) return "Diş rengi gereklidir.";
         if (dto.DisRengi.Trim().Length > 50) return "Diş rengi çok uzun.";
         if (string.IsNullOrWhiteSpace(dto.Materyal)) return "Materyal seçilmelidir.";
         if (dto.Materyal.Trim().Length > 120) return "Materyal bilgisi çok uzun.";
         if (dto.TerminTarihi == null) return "Teslim tarihi seçilmelidir.";
         return null;
+    }
+
+    private static IEnumerable<int> AllTeeth(PortalNewJobDto dto) =>
+        (dto.Disler ?? new List<int>())
+            .Concat(dto.Kalemler.SelectMany(x => x.Disler ?? new List<int>()))
+            .Distinct()
+            .OrderBy(x => x);
+
+    // Ana sistemde yeni alan/kolon gerektirmeden portal bilgileri iş notunda düzenli bir blok
+    // olarak saklanır; Gelen İş Onayı ve iş detayında olduğu gibi görünür.
+    private static string BuildJobNotes(
+        PortalNewJobDto dto,
+        List<(string IsTuru, PortalNewJobItemDto Item)> items,
+        string? doctorNote)
+    {
+        static string? Clean(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Replace('\n', ' ').Replace('\r', ' ');
+        var lines = new List<string>();
+
+        if (dto.Acil) lines.Add("⚠ ACİL İŞ");
+        if (Clean(dto.ReferansNo) is { } refNo) lines.Add("Klinik ref no: " + refNo);
+
+        var plan = items
+            .Where(x => x.Item.Disler is { Count: > 0 })
+            .Select(x => $"{x.IsTuru}: {string.Join(",", x.Item.Disler!)}")
+            .ToList();
+        if (plan.Count > 0) lines.Add("Diş planı: " + string.Join(" | ", plan));
+
+        if (dto.ImplantVar)
+        {
+            var parts = new List<string> { Clean(dto.ImplantMarkasi) ?? "-" };
+            if (Clean(dto.ImplantPlatform) is { } platform) parts.Add("Platform/çap: " + platform);
+            if (Clean(dto.AbutmentTipi) is { } abutment) parts.Add("Abutment: " + abutment);
+            if (Clean(dto.BaglantiTipi) is { } baglanti) parts.Add("Bağlantı: " + baglanti);
+            lines.Add("İmplant: " + string.Join(" · ", parts));
+        }
+
+        if (Clean(dto.TaramaCihazi) is { } scanner) lines.Add("Tarama cihazı: " + scanner);
+        if (Clean(dto.ProvaAsamasi) is { } prova) lines.Add("Prova: " + prova);
+        if (doctorNote != null) lines.Add("Hekim notu: " + doctorNote);
+
+        return lines.Count == 0 ? string.Empty : "[Hekim Portalı]\n" + string.Join("\n", lines);
     }
 
     private static string? ValidateFile(IFormFile file)
@@ -775,9 +855,19 @@ public sealed class HekimPortalController : ControllerBase
         return v.Length <= max ? v : v[..max];
     }
 
-    private static string[] GetPortalUrls()
+    private string? InternetPortalUrl()
+    {
+        var value = _configuration["PrimerLab:PortalInternetUrl"];
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        value = value.Trim().TrimEnd('/');
+        if (!value.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) value = "https://" + value;
+        return value.EndsWith("/hekim-portal", StringComparison.OrdinalIgnoreCase) ? value : value + "/hekim-portal";
+    }
+
+    private string[] GetPortalUrls()
     {
         var urls = new List<string>();
+        if (InternetPortalUrl() is { } internet) urls.Add(internet);
         try
         {
             var addresses = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName())
@@ -845,26 +935,27 @@ public sealed class HekimPortalController : ControllerBase
                System.Net.IPAddress.IsLoopback(address.MapToIPv4());
     }
 
-    private static bool IsLoginBlocked(string ip, out int waitMinutes)
+    private static bool IsLoginBlocked(string key, int limit, out int waitMinutes)
     {
         waitMinutes = 0;
-        if (!LoginAttempts.TryGetValue(ip, out var state)) return false;
+        if (!LoginAttempts.TryGetValue(key, out var state)) return false;
 
         lock (state)
         {
             var now = DateTime.UtcNow;
             state.Failures.RemoveAll(x => now - x > TimeSpan.FromMinutes(10));
-            if (state.Failures.Count < 5) return false;
+            if (state.Failures.Count < limit) return false;
 
-            var remaining = TimeSpan.FromMinutes(10) - (now - state.Failures[0]);
+            var remaining = TimeSpan.FromMinutes(10) - (now - state.Failures[state.Failures.Count - limit]);
             waitMinutes = Math.Max(1, (int)Math.Ceiling(remaining.TotalMinutes));
             return remaining > TimeSpan.Zero;
         }
     }
 
-    private static void RegisterLoginFailure(string ip)
+    private static void RegisterLoginFailure(string key)
     {
-        var state = LoginAttempts.GetOrAdd(ip, _ => new LoginAttemptState());
+        if (LoginAttempts.Count > 50_000) LoginAttempts.Clear();
+        var state = LoginAttempts.GetOrAdd(key, _ => new LoginAttemptState());
         lock (state)
         {
             var now = DateTime.UtcNow;
@@ -945,12 +1036,22 @@ public sealed class PortalNewJobDto
     public string? Notlar { get; set; }
     public string TasarimKaynagi { get; set; } = "lab";
     public List<PortalNewJobItemDto> Kalemler { get; set; } = new();
+    public bool Acil { get; set; }
+    public string? ReferansNo { get; set; }
+    public bool ImplantVar { get; set; }
+    public string? ImplantMarkasi { get; set; }
+    public string? ImplantPlatform { get; set; }
+    public string? AbutmentTipi { get; set; }
+    public string? BaglantiTipi { get; set; }
+    public string? TaramaCihazi { get; set; }
+    public string? ProvaAsamasi { get; set; }
 }
 
 public sealed class PortalNewJobItemDto
 {
     public string IsTuru { get; set; } = string.Empty;
     public int Adet { get; set; } = 1;
+    public List<int>? Disler { get; set; }
 }
 
 public sealed class PortalJobRow

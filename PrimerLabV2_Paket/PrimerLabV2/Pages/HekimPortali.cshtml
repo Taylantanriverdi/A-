@@ -1,0 +1,803 @@
+@page "/hekim-portal"
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#10233e" />
+    <title>Primer Lab Hekim Portalı</title>
+    <style>
+        :root{--ink:#10233e;--muted:#64748b;--line:#dbe3ef;--bg:#f3f6fb;--card:#fff;--blue:#1565c0;--blue-soft:#eff6ff;--green:#15803d;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb}
+        *{box-sizing:border-box}
+        html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;-webkit-text-size-adjust:100%}
+        button,input,select,textarea{font:inherit;color:inherit}
+        .hidden{display:none!important}
+        .wrap{max-width:860px;margin:0 auto;padding:16px}
+        .brand{display:flex;align-items:center;gap:10px}
+        .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900;font-size:15px;letter-spacing:.5px}
+        .brand-name{font-weight:900;font-size:16px;line-height:1.1}
+        .brand-sub{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px}
+
+        /* Giriş */
+        .login{min-height:100vh;display:grid;place-items:center;padding:16px}
+        .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
+        .login-card h1{font-size:20px;margin:18px 0 4px}
+        .login-card p{margin:0 0 18px;color:var(--muted);font-size:13px}
+
+        /* Üst bar */
+        .topbar{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff}
+        .topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;padding-bottom:10px}
+        .topbar .brand-logo{background:#fff;color:var(--ink)}
+        .topbar .brand-sub{color:#b8c4d6}
+        .who{font-size:12px;text-align:right;line-height:1.3}
+        .who b{display:block;font-size:13px}
+        .link-btn{background:none;border:0;color:#b8c4d6;text-decoration:underline;cursor:pointer;padding:0;font-size:12px}
+        .tabs{display:flex;gap:6px;background:#0b1a2f}
+        .tabs .wrap{display:flex;gap:6px;padding-top:6px;padding-bottom:0}
+        .tab{flex:1;border:0;background:transparent;color:#b8c4d6;padding:11px 8px;font-weight:800;cursor:pointer;border-radius:10px 10px 0 0}
+        .tab.active{background:var(--bg);color:var(--ink)}
+
+        /* Kartlar */
+        .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:14px}
+        .card-title{display:flex;align-items:center;gap:8px;font-weight:900;font-size:15px;margin-bottom:12px}
+        .step{width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+        .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+        .field{margin-bottom:12px}
+        .field:last-child{margin-bottom:0}
+        label.lbl{display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:5px}
+        .req{color:var(--red)}
+        .inp{width:100%;height:44px;border:1px solid #cbd5e1;border-radius:10px;padding:0 12px;background:#fff;outline:none}
+        textarea.inp{height:auto;min-height:90px;padding:10px 12px;resize:vertical}
+        .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(21,101,192,.15)}
+        .hint{font-size:12px;color:var(--muted);margin-top:5px}
+        .btn{height:46px;border:0;border-radius:12px;padding:0 18px;font-weight:900;cursor:pointer;background:var(--blue);color:#fff}
+        .btn:disabled{opacity:.55;cursor:not-allowed}
+        .btn-block{width:100%}
+        .btn-ghost{background:var(--blue-soft);color:var(--blue);border:1px dashed #93c5fd}
+        .btn-light{background:#fff;color:var(--ink);border:1px solid var(--line)}
+        .btn-sm{height:34px;padding:0 12px;border-radius:9px;font-size:13px}
+        .check{display:flex;align-items:center;gap:9px;font-weight:800;cursor:pointer;user-select:none}
+        .check input{width:20px;height:20px;accent-color:var(--blue)}
+        .chips{display:flex;flex-wrap:wrap;gap:8px}
+        .chip{border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:9px 13px;font-weight:800;font-size:13px;cursor:pointer}
+        .chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+        .msg{border-radius:12px;padding:11px 13px;font-size:13px;font-weight:700;margin-bottom:12px}
+        .msg.err{background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+        .msg.ok{background:var(--green-soft);color:var(--green);border:1px solid #bbf7d0}
+        .msg.info{background:var(--amber-soft);color:var(--amber);border:1px solid #fde68a}
+
+        /* İş kalemleri */
+        .item{border:2px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:#fff}
+        .item.active{border-color:var(--c,var(--blue));box-shadow:0 0 0 3px color-mix(in srgb,var(--c,var(--blue)) 18%,transparent)}
+        .item-head{display:grid;grid-template-columns:14px minmax(0,1fr) 74px 40px;gap:8px;align-items:center}
+        .dot{width:14px;height:14px;border-radius:50%;background:var(--c)}
+        .item-head .inp{height:42px}
+        .qty{text-align:center}
+        .del{height:42px;border:1px solid #fecaca;background:#fff;color:var(--red);border-radius:10px;font-size:18px;cursor:pointer}
+        .item-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+        .item-teeth{font-weight:800;color:var(--ink)}
+        .pick{border:0;background:var(--blue-soft);color:var(--blue);border-radius:8px;padding:7px 10px;font-weight:900;font-size:12px;cursor:pointer}
+        .item.active .pick{background:var(--c);color:#fff}
+
+        /* Diş şeması */
+        .chart{margin-top:6px;border:1px solid var(--line);border-radius:14px;padding:12px 8px;background:#fbfdff}
+        .chart-note{font-size:12px;color:var(--muted);text-align:center;margin-bottom:8px}
+        .chart-note b{color:var(--ink)}
+        .jaw{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:3px}
+        .jaw + .jaw{margin-top:10px;padding-top:10px;border-top:1px dashed #cbd5e1}
+        .tooth{aspect-ratio:3/4;min-height:34px;border:1px solid #cbd5e1;background:#fff;border-radius:7px;font-size:11px;font-weight:900;cursor:pointer;padding:0;position:relative}
+        .tooth:nth-child(8){margin-right:3px}
+        .tooth.on{color:#fff;border-color:transparent}
+        .tooth.multi::after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:#fff}
+        .jaw-btns{display:flex;gap:6px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+
+        /* Dosyalar */
+        .drop{border:2px dashed #93c5fd;background:var(--blue-soft);border-radius:14px;padding:18px;text-align:center;cursor:pointer;color:var(--blue);font-weight:800}
+        .drop.over{background:#dbeafe}
+        .files{margin-top:10px;display:grid;gap:6px}
+        .file{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+        .file span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .file small{color:var(--muted);flex:none}
+        .file button{border:0;background:none;color:var(--red);font-size:18px;cursor:pointer;flex:none}
+
+        /* Gönder */
+        .send-bar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 30%);padding:18px 0 14px}
+        .progress{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin-bottom:10px}
+        .progress div{height:100%;width:0;background:var(--blue);transition:width .2s}
+        .summary{font-size:13px;line-height:1.6}
+        .summary b{color:#334155}
+        .done{text-align:center;padding:30px 16px}
+        .done .big{font-size:46px}
+        .done h2{margin:8px 0}
+
+        /* İşlerim */
+        .toolbar{display:flex;gap:8px;margin-bottom:12px}
+        .job{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
+        .job-head{display:flex;justify-content:space-between;gap:10px;padding:12px 14px;cursor:pointer;align-items:center}
+        .job-name{font-weight:900}
+        .job-sub{font-size:12px;color:var(--muted);margin-top:3px}
+        .badge{border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;white-space:nowrap;background:#e2e8f0;color:#334155}
+        .badge.wait{background:var(--amber-soft);color:var(--amber)}
+        .badge.prod{background:var(--blue-soft);color:var(--blue)}
+        .badge.done{background:var(--green-soft);color:var(--green)}
+        .badge.cancel{background:var(--red-soft);color:var(--red)}
+        .job-body{border-top:1px solid var(--line);padding:12px 14px;font-size:13px;line-height:1.6;background:#fbfdff}
+        .job-body pre{white-space:pre-wrap;font:inherit;margin:4px 0 0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+        .job-body a{color:var(--blue);font-weight:800}
+        .empty{text-align:center;color:var(--muted);padding:30px 10px}
+
+        @@media (max-width:620px){
+            .wrap{padding:12px}
+            .grid2{grid-template-columns:1fr}
+            .jaw{gap:2px}
+            .tooth{font-size:10px;min-height:30px;border-radius:5px}
+            .tooth:nth-child(8){margin-right:2px}
+        }
+    </style>
+</head>
+<body>
+
+<!-- GİRİŞ -->
+<section id="loginScreen" class="login hidden">
+    <form class="login-card" onsubmit="girisYap(event)">
+        <div class="brand">
+            <div class="brand-logo">PL</div>
+            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
+        </div>
+        <h1>Hoş geldiniz</h1>
+        <p>Laboratuvarın size verdiği kullanıcı adı ve parola ile giriş yapın.</p>
+        <div id="loginMsg" class="msg err hidden"></div>
+        <div class="field">
+            <label class="lbl" for="loginUser">Kullanıcı adı</label>
+            <input id="loginUser" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+        </div>
+        <div class="field">
+            <label class="lbl" for="loginPass">Parola</label>
+            <input id="loginPass" class="inp" type="password" autocomplete="current-password" required />
+        </div>
+        <button id="loginBtn" class="btn btn-block" type="submit">Giriş Yap</button>
+    </form>
+</section>
+
+<!-- UYGULAMA -->
+<div id="appScreen" class="hidden">
+    <header class="topbar">
+        <div class="wrap">
+            <div class="brand">
+                <div class="brand-logo">PL</div>
+                <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
+            </div>
+            <div class="who"><b id="whoName">-</b><span id="whoClinic"></span> <button class="link-btn" type="button" onclick="cikisYap()">Çıkış</button></div>
+        </div>
+        <nav class="tabs"><div class="wrap">
+            <button class="tab active" id="tabYeni" type="button" onclick="sekme('yeni')">＋ Yeni İş Gönder</button>
+            <button class="tab" id="tabIsler" type="button" onclick="sekme('isler')">📋 İşlerim</button>
+        </div></nav>
+    </header>
+
+    <main class="wrap">
+        <!-- YENİ İŞ -->
+        <section id="yeniBolum">
+            <div id="formMsg" class="msg err hidden"></div>
+            <div id="listeYokMsg" class="msg info hidden">Size tanımlı iş listesi henüz bulunmuyor. Lütfen laboratuvarı arayın; liste tanımlandığında buradan iş gönderebilirsiniz.</div>
+
+            <form id="isFormu" onsubmit="gonder(event)" novalidate>
+                <div class="card">
+                    <div class="card-title"><span class="step">1</span> Hasta Bilgisi</div>
+                    <div class="grid2">
+                        <div class="field">
+                            <label class="lbl" for="hastaAdi">Hasta adı soyadı <span class="req">*</span></label>
+                            <input id="hastaAdi" class="inp" maxlength="150" autocomplete="off" placeholder="Örn. Ayşe Yılmaz" />
+                        </div>
+                        <div class="field">
+                            <label class="lbl" for="referansNo">Klinik dosya / referans no</label>
+                            <input id="referansNo" class="inp" maxlength="60" autocomplete="off" placeholder="İsteğe bağlı" />
+                        </div>
+                    </div>
+                    <label class="check"><input id="acil" type="checkbox" /> Acil iş</label>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><span class="step">2</span> Yapılacak İşler ve Dişler <span class="req">*</span></div>
+                    <div id="kalemler"></div>
+                    <button class="btn btn-ghost btn-sm" type="button" onclick="kalemEkle()">＋ Başka iş türü ekle</button>
+                    <div class="chart">
+                        <div class="chart-note" id="chartNote">Seçili iş için dişlere dokunun</div>
+                        <div class="jaw" id="ustCene"></div>
+                        <div class="jaw" id="altCene"></div>
+                        <div class="jaw-btns">
+                            <button class="btn btn-light btn-sm" type="button" onclick="ceneSec('ust')">Tüm üst çene</button>
+                            <button class="btn btn-light btn-sm" type="button" onclick="ceneSec('alt')">Tüm alt çene</button>
+                            <button class="btn btn-light btn-sm" type="button" onclick="disTemizle()">Seçimi temizle</button>
+                        </div>
+                    </div>
+                    <div class="hint">Her iş türü için dişleri ayrı seçin. Adet, seçilen diş sayısı kadar otomatik dolar; gece plağı gibi çene işlerinde adedi 1 yapabilirsiniz.</div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><span class="step">3</span> Renk ve Materyal</div>
+                    <div class="grid2">
+                        <div class="field">
+                            <label class="lbl" for="disRengi">Diş rengi <span class="req">*</span></label>
+                            <input id="disRengi" class="inp" maxlength="50" list="renkler" autocomplete="off" placeholder="Örn. A2, A3.5, BL2" />
+                            <datalist id="renkler"></datalist>
+                        </div>
+                        <div class="field">
+                            <label class="lbl">Materyal <span class="req">*</span></label>
+                            <div class="chips" id="materyaller"></div>
+                            <input id="materyalDiger" class="inp hidden" style="margin-top:8px" maxlength="100" placeholder="Materyali yazın" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><span class="step">4</span> İmplant Bilgisi</div>
+                    <label class="check"><input id="implantVar" type="checkbox" onchange="implantGoster()" /> Bu işte implant üstü çalışma var</label>
+                    <div id="implantAlan" class="hidden" style="margin-top:12px">
+                        <div class="grid2">
+                            <div class="field">
+                                <label class="lbl" for="implantMarka">İmplant markası <span class="req">*</span></label>
+                                <input id="implantMarka" class="inp" maxlength="80" list="implantMarkalari" autocomplete="off" placeholder="Örn. Straumann" />
+                                <datalist id="implantMarkalari"></datalist>
+                            </div>
+                            <div class="field">
+                                <label class="lbl" for="implantPlatform">Sistem / platform / çap</label>
+                                <input id="implantPlatform" class="inp" maxlength="80" autocomplete="off" placeholder="Örn. BLT RC Ø4.1" />
+                            </div>
+                            <div class="field">
+                                <label class="lbl" for="abutmentTipi">Abutment</label>
+                                <select id="abutmentTipi" class="inp">
+                                    <option value="">Laboratuvar karar versin</option>
+                                    <option>Ti-base</option>
+                                    <option>Özel (custom) abutment</option>
+                                    <option>Stok abutment</option>
+                                    <option>Multi-unit</option>
+                                    <option>Hekim gönderecek</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label class="lbl" for="baglantiTipi">Bağlantı</label>
+                                <select id="baglantiTipi" class="inp">
+                                    <option value="">Laboratuvar karar versin</option>
+                                    <option>Vidalı</option>
+                                    <option>Simante</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><span class="step">5</span> Ağız İçi Tarama ve Dosyalar</div>
+                    <div class="grid2">
+                        <div class="field">
+                            <label class="lbl" for="taramaCihazi">Tarama cihazı</label>
+                            <select id="taramaCihazi" class="inp">
+                                <option value="">Seçiniz</option>
+                                <option>iTero</option>
+                                <option>3Shape TRIOS</option>
+                                <option>Medit</option>
+                                <option>Primescan / CEREC</option>
+                                <option>Carestream</option>
+                                <option>Shining 3D</option>
+                                <option>Planmeca</option>
+                                <option>Diğer</option>
+                                <option>Fiziksel ölçü gönderilecek</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label class="lbl" for="tasarimKaynagi">Tasarım</label>
+                            <select id="tasarimKaynagi" class="inp">
+                                <option value="lab">Tasarımı laboratuvar yapsın</option>
+                                <option value="doctor">Tasarım dosyasını ben gönderiyorum</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="drop" id="drop" onclick="document.getElementById('dosyaInput').click()">
+                        📎 Tarama dosyalarını seçin veya buraya sürükleyin
+                        <div class="hint">STL, PLY, OBJ, DCM, ZIP, RAR, 7Z, PDF, fotoğraf · en fazla 8 dosya</div>
+                    </div>
+                    <input id="dosyaInput" type="file" multiple class="hidden" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt" onchange="dosyaEkle(this.files);this.value=''" />
+                    <div class="files" id="dosyalar"></div>
+                    <div class="hint" id="dosyaUyari"></div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title"><span class="step">6</span> Teslim, Prova ve Notlar</div>
+                    <div class="grid2">
+                        <div class="field">
+                            <label class="lbl" for="termin">İstenen teslim tarihi <span class="req">*</span></label>
+                            <input id="termin" class="inp" type="date" />
+                        </div>
+                        <div class="field">
+                            <label class="lbl" for="prova">Prova</label>
+                            <select id="prova" class="inp">
+                                <option value="">Prova istemiyorum (direkt bitim)</option>
+                                <option>Altyapı provası</option>
+                                <option>Diş dizimi / estetik prova</option>
+                                <option>Bisküvi prova</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field">
+                        <label class="lbl" for="notlar">Laboratuvara notunuz</label>
+                        <textarea id="notlar" class="inp" maxlength="4000" placeholder="Form, kontakt, okluzyon, özel istekler..."></textarea>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-title">Özet</div>
+                    <div class="summary" id="ozet"></div>
+                </div>
+
+                <div class="send-bar">
+                    <div class="progress hidden" id="ilerleme"><div></div></div>
+                    <button id="gonderBtn" class="btn btn-block" type="submit">Laboratuvara Gönder</button>
+                </div>
+            </form>
+
+            <div id="gonderildi" class="card done hidden">
+                <div class="big">✅</div>
+                <h2>İş laboratuvara ulaştı</h2>
+                <p id="gonderildiMsg" class="hint"></p>
+                <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px">
+                    <button class="btn" type="button" onclick="yeniForm()">Yeni iş gönder</button>
+                    <button class="btn btn-light" type="button" onclick="sekme('isler')">İşlerime git</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- İŞLERİM -->
+        <section id="islerBolum" class="hidden">
+            <div class="toolbar">
+                <input id="isAra" class="inp" placeholder="Hasta adı veya iş türü ara" oninput="isleriCiz()" />
+                <button class="btn btn-light" type="button" onclick="isleriYukle()">Yenile</button>
+            </div>
+            <div id="islerListe"><div class="empty">Yükleniyor...</div></div>
+        </section>
+    </main>
+</div>
+
+<script>
+    const UST = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28];
+    const ALT = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38];
+    const RENKLER = ["#1565c0","#15803d","#c2410c","#7c3aed","#be123c","#0f766e","#a16207","#4338ca","#0369a1","#9d174d","#3f6212","#6b21a8"];
+    const MATERYALLER = ["Zirkonyum","Metal Destekli Porselen","E.max","Lamine","PMMA","Titanyum","Diğer"];
+    const VITA = ["A1","A2","A3","A3.5","A4","B1","B2","B3","B4","C1","C2","C3","C4","D2","D3","D4","BL1","BL2","BL3","BL4","OM1","OM2","OM3"];
+    const IMPLANTLAR = ["Straumann","Nobel Biocare","Osstem","Megagen","Dentium","Zimmer Biomet","Astra Tech (Dentsply)","Neodent","BEGO","Bredent","MIS","Alpha-Bio","Hiossen","Medentika","Implance","NucleOSS","Biohorizons","Camlog","Dio","Anthogyr","Implantium"];
+    const MAX_DOSYA = 8, MAX_BOYUT = 250 * 1024 * 1024, INTERNET_UYARI = 95 * 1024 * 1024;
+
+    let isTurleri = [];
+    let kalemler = [];
+    let aktifKalem = null;
+    let dosyalar = [];
+    let materyal = "";
+    let isler = [];
+    let acikIs = null;
+    let sayac = 0;
+
+    const $ = id => document.getElementById(id);
+    const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const boyut = b => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+    const tarih = v => { if (!v) return "-"; const d = new Date(v); return isNaN(d) ? "-" : d.toLocaleDateString("tr-TR"); };
+
+    async function api(url, opt) {
+        const r = await fetch(url, Object.assign({ cache: "no-store", credentials: "same-origin" }, opt || {}));
+        if (r.status === 401) { girisEkrani(); throw new Error("Oturum sona erdi, lütfen tekrar giriş yapın."); }
+        if (!r.ok) throw new Error((await r.text()) || ("İşlem başarısız (" + r.status + ")"));
+        const t = r.headers.get("content-type") || "";
+        return t.includes("json") ? r.json() : r.text();
+    }
+
+    function mesaj(el, text, tur) {
+        const m = $(el);
+        if (!text) { m.classList.add("hidden"); return; }
+        m.className = "msg " + (tur || "err");
+        m.textContent = text;
+        if (el === "formMsg") m.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    // ---------- Oturum ----------
+    function girisEkrani() {
+        $("appScreen").classList.add("hidden");
+        $("loginScreen").classList.remove("hidden");
+        setTimeout(() => $("loginUser").focus(), 50);
+    }
+
+    async function girisYap(e) {
+        e.preventDefault();
+        mesaj("loginMsg", "");
+        const btn = $("loginBtn");
+        btn.disabled = true; btn.textContent = "Giriş yapılıyor...";
+        try {
+            const r = await fetch("/api/hekim-portal/login", {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+                body: JSON.stringify({ kullaniciAdi: $("loginUser").value.trim(), parola: $("loginPass").value })
+            });
+            if (!r.ok) throw new Error((await r.text()) || "Giriş yapılamadı.");
+            $("loginPass").value = "";
+            await basla();
+        } catch (err) {
+            mesaj("loginMsg", err.message);
+        } finally {
+            btn.disabled = false; btn.textContent = "Giriş Yap";
+        }
+    }
+
+    async function cikisYap() {
+        try { await fetch("/api/hekim-portal/logout", { method: "POST", credentials: "same-origin" }); } catch {}
+        girisEkrani();
+    }
+
+    async function basla() {
+        let me;
+        try {
+            const r = await fetch("/api/hekim-portal/me", { cache: "no-store", credentials: "same-origin" });
+            if (!r.ok) { girisEkrani(); return; }
+            me = await r.json();
+        } catch { girisEkrani(); return; }
+        $("loginScreen").classList.add("hidden");
+        $("appScreen").classList.remove("hidden");
+        $("whoName").textContent = (me.hekim && me.hekim.adSoyad) || "";
+        $("whoClinic").textContent = (me.hekim && me.hekim.klinikAdi) || "";
+        isTurleri = (me.isTurleri || []).map(x => x.isTuru).filter(Boolean);
+        $("listeYokMsg").classList.toggle("hidden", isTurleri.length > 0);
+        $("gonderBtn").disabled = isTurleri.length === 0;
+        if (!kalemler.length) yeniForm();
+        else kalemleriCiz();
+        if (!$("islerBolum").classList.contains("hidden")) isleriYukle();
+    }
+
+    function sekme(ad) {
+        $("tabYeni").classList.toggle("active", ad === "yeni");
+        $("tabIsler").classList.toggle("active", ad === "isler");
+        $("yeniBolum").classList.toggle("hidden", ad !== "yeni");
+        $("islerBolum").classList.toggle("hidden", ad !== "isler");
+        if (ad === "isler") isleriYukle();
+        window.scrollTo(0, 0);
+    }
+
+    // ---------- Form ----------
+    function yeniForm() {
+        ["hastaAdi","referansNo","disRengi","implantMarka","implantPlatform","notlar","materyalDiger"].forEach(id => $(id).value = "");
+        ["abutmentTipi","baglantiTipi","taramaCihazi","prova"].forEach(id => $(id).value = "");
+        $("tasarimKaynagi").value = "lab";
+        $("acil").checked = false;
+        $("implantVar").checked = false;
+        materyal = "";
+        dosyalar = [];
+        kalemler = [];
+        sayac = 0;
+        kalemEkle();
+        const d = new Date(); d.setDate(d.getDate() + 5);
+        $("termin").value = yerelTarih(d);
+        $("termin").min = yerelTarih(new Date());
+        implantGoster(); materyalCiz(); dosyalariCiz(); mesaj("formMsg", "");
+        $("isFormu").classList.remove("hidden");
+        $("gonderildi").classList.add("hidden");
+        ozetCiz();
+    }
+
+    function yerelTarih(d) {
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+
+    function kalemEkle() {
+        if (kalemler.length >= 12) { mesaj("formMsg", "Bir gönderimde en fazla 12 iş türü olabilir."); return; }
+        const k = { id: ++sayac, isTuru: "", disler: [], adet: 1, adetElle: false, renk: RENKLER[kalemler.length % RENKLER.length] };
+        kalemler.push(k);
+        aktifKalem = k.id;
+        kalemleriCiz();
+    }
+
+    function kalemSil(id) {
+        kalemler = kalemler.filter(k => k.id !== id);
+        if (!kalemler.length) { kalemEkle(); return; }
+        if (aktifKalem === id) aktifKalem = kalemler[kalemler.length - 1].id;
+        kalemleriCiz();
+    }
+
+    function kalemSec(id) { aktifKalem = id; kalemleriCiz(); }
+
+    function kalemleriCiz() {
+        const opts = isTurleri.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+        $("kalemler").innerHTML = kalemler.map(k => `
+            <div class="item ${k.id === aktifKalem ? "active" : ""}" style="--c:${k.renk}" onclick="kalemSec(${k.id})">
+                <div class="item-head">
+                    <span class="dot"></span>
+                    <select class="inp" onchange="kalemTur(${k.id},this.value)" onclick="event.stopPropagation()">
+                        <option value="">İş türü seçin...</option>${opts}
+                    </select>
+                    <input class="inp qty" type="number" min="1" max="99" value="${k.adet}" title="Adet" onclick="event.stopPropagation()" oninput="kalemAdet(${k.id},this.value)" />
+                    <button class="del" type="button" title="Kaldır" onclick="event.stopPropagation();kalemSil(${k.id})">×</button>
+                </div>
+                <div class="item-foot">
+                    <span>Dişler: <span class="item-teeth">${k.disler.length ? k.disler.join(", ") : "seçilmedi"}</span></span>
+                    <button class="pick" type="button">${k.id === aktifKalem ? "Diş seçiliyor ↓" : "Diş seç"}</button>
+                </div>
+            </div>`).join("");
+        kalemler.forEach((k, i) => { $("kalemler").children[i].querySelector("select").value = k.isTuru; });
+        disleriCiz();
+        ozetCiz();
+    }
+
+    function kalemTur(id, v) {
+        const k = kalemler.find(x => x.id === id); if (!k) return;
+        k.isTuru = v;
+        if (aktifKalem !== id) { aktifKalem = id; kalemleriCiz(); } else disleriCiz();
+        if (/implant/i.test(v.toLocaleLowerCase("tr-TR").replace(/ı/g, "i")) && !$("implantVar").checked) {
+            $("implantVar").checked = true; implantGoster();
+        }
+        ozetCiz();
+    }
+
+    function kalemAdet(id, v) {
+        const k = kalemler.find(x => x.id === id); if (!k) return;
+        const n = parseInt(v, 10);
+        k.adet = isNaN(n) ? 0 : n;
+        k.adetElle = true;
+        ozetCiz();
+    }
+
+    function disleriCiz() {
+        const aktif = kalemler.find(k => k.id === aktifKalem);
+        $("chartNote").innerHTML = aktif
+            ? `Dişlere dokunun: <b style="color:${aktif.renk}">${esc(aktif.isTuru || "seçili iş")}</b>`
+            : "Önce bir iş seçin";
+        const ciz = liste => liste.map(n => {
+            const sahip = kalemler.filter(k => k.disler.includes(n));
+            const on = sahip.find(k => k.id === aktifKalem) || sahip[0];
+            const st = on ? `style="background:${on.renk}"` : "";
+            return `<button type="button" class="tooth ${on ? "on" : ""} ${sahip.length > 1 ? "multi" : ""}" ${st} onclick="disDegistir(${n})" title="${n}${sahip.length ? " · " + esc(sahip.map(k => k.isTuru || "iş").join(", ")) : ""}">${n}</button>`;
+        }).join("");
+        $("ustCene").innerHTML = ciz(UST);
+        $("altCene").innerHTML = ciz(ALT);
+    }
+
+    function disAyarla(k, liste) {
+        k.disler = Array.from(new Set(liste)).sort((a, b) => a - b);
+        if (!k.adetElle) k.adet = Math.max(1, k.disler.length);
+    }
+
+    function disDegistir(n) {
+        const k = kalemler.find(x => x.id === aktifKalem); if (!k) return;
+        disAyarla(k, k.disler.includes(n) ? k.disler.filter(x => x !== n) : k.disler.concat(n));
+        kalemleriCiz();
+    }
+
+    function ceneSec(cene) {
+        const k = kalemler.find(x => x.id === aktifKalem); if (!k) return;
+        const liste = cene === "ust" ? UST : ALT;
+        const hepsi = liste.every(n => k.disler.includes(n));
+        disAyarla(k, hepsi ? k.disler.filter(n => !liste.includes(n)) : k.disler.concat(liste));
+        kalemleriCiz();
+    }
+
+    function disTemizle() {
+        const k = kalemler.find(x => x.id === aktifKalem); if (!k) return;
+        k.adetElle = false;
+        disAyarla(k, []);
+        kalemleriCiz();
+    }
+
+    function materyalCiz() {
+        $("materyaller").innerHTML = MATERYALLER.map(m => {
+            const on = m === "Diğer" ? (materyal && !MATERYALLER.includes(materyal)) || materyal === "Diğer" : materyal === m;
+            return `<button type="button" class="chip ${on ? "on" : ""}" onclick="materyalSec('${m}')">${esc(m)}</button>`;
+        }).join("");
+    }
+
+    function materyalSec(m) {
+        materyal = m;
+        $("materyalDiger").classList.toggle("hidden", m !== "Diğer");
+        if (m === "Diğer") $("materyalDiger").focus();
+        materyalCiz(); ozetCiz();
+    }
+
+    function implantGoster() {
+        $("implantAlan").classList.toggle("hidden", !$("implantVar").checked);
+        ozetCiz();
+    }
+
+    // ---------- Dosyalar ----------
+    function dosyaEkle(list) {
+        mesaj("formMsg", "");
+        const izinli = /\.(stl|obj|ply|dcm|zip|rar|7z|pdf|jpe?g|png|webp|txt)$/i;
+        for (const f of Array.from(list || [])) {
+            if (dosyalar.length >= MAX_DOSYA) { mesaj("formMsg", "En fazla " + MAX_DOSYA + " dosya yüklenebilir. Fazlasını ZIP yapıp tek dosya olarak ekleyin."); break; }
+            if (!izinli.test(f.name)) { mesaj("formMsg", "'" + f.name + "' desteklenmeyen dosya türü."); continue; }
+            if (f.size <= 0) { mesaj("formMsg", "'" + f.name + "' boş dosya."); continue; }
+            if (f.size > MAX_BOYUT) { mesaj("formMsg", "'" + f.name + "' 250 MB sınırını aşıyor."); continue; }
+            if (dosyalar.some(x => x.name === f.name && x.size === f.size)) continue;
+            dosyalar.push(f);
+        }
+        dosyalariCiz();
+    }
+
+    function dosyaSil(i) { dosyalar.splice(i, 1); dosyalariCiz(); }
+
+    function dosyalariCiz() {
+        $("dosyalar").innerHTML = dosyalar.map((f, i) =>
+            `<div class="file"><span>📄 ${esc(f.name)}</span><small>${boyut(f.size)}</small><button type="button" onclick="dosyaSil(${i})" title="Kaldır">×</button></div>`).join("");
+        const toplam = dosyalar.reduce((s, f) => s + f.size, 0);
+        $("dosyaUyari").textContent = toplam > INTERNET_UYARI && location.protocol === "https:"
+            ? "Toplam " + boyut(toplam) + ". İnternet bağlantısında 100 MB üzeri gönderim reddedilebilir; dosyaları ZIP yapıp küçültün veya iki ayrı iş olarak gönderin."
+            : "";
+        ozetCiz();
+    }
+
+    (function () {
+        const d = $("drop");
+        ["dragenter","dragover"].forEach(ev => d.addEventListener(ev, e => { e.preventDefault(); d.classList.add("over"); }));
+        ["dragleave","drop"].forEach(ev => d.addEventListener(ev, e => { e.preventDefault(); d.classList.remove("over"); }));
+        d.addEventListener("drop", e => dosyaEkle(e.dataTransfer.files));
+    })();
+
+    // ---------- Özet + gönderim ----------
+    function secilenMateryal() {
+        return materyal === "Diğer" ? $("materyalDiger").value.trim() : materyal;
+    }
+
+    function ozetCiz() {
+        const satir = kalemler.filter(k => k.isTuru).map(k =>
+            `${esc(k.isTuru)} × ${k.adet}${k.disler.length ? " <span style='color:#64748b'>(" + k.disler.join(", ") + ")</span>" : ""}`);
+        $("ozet").innerHTML =
+            `<div><b>Hasta:</b> ${esc($("hastaAdi").value.trim() || "-")}${$("acil").checked ? " · <b style='color:#dc2626'>ACİL</b>" : ""}</div>` +
+            `<div><b>İşler:</b> ${satir.length ? satir.join("<br>") : "-"}</div>` +
+            `<div><b>Renk / materyal:</b> ${esc($("disRengi").value.trim() || "-")} / ${esc(secilenMateryal() || "-")}</div>` +
+            ($("implantVar").checked ? `<div><b>İmplant:</b> ${esc($("implantMarka").value.trim() || "-")} ${esc($("implantPlatform").value.trim())}</div>` : "") +
+            `<div><b>Dosya:</b> ${dosyalar.length ? dosyalar.length + " dosya" : "yok"} · <b>Teslim:</b> ${esc($("termin").value ? tarih($("termin").value + "T12:00:00") : "-")}</div>` +
+            `<div class="hint">Fiyatlandırma, laboratuvarın sizinle anlaştığı fiyat listesine göre otomatik yapılır.</div>`;
+    }
+
+    ["hastaAdi","disRengi","implantMarka","implantPlatform","termin","materyalDiger"].forEach(id => $(id).addEventListener("input", ozetCiz));
+    $("acil").addEventListener("change", ozetCiz);
+
+    function dogrula() {
+        if (!$("hastaAdi").value.trim()) return ["Hasta adı soyadı yazın.", "hastaAdi"];
+        const dolu = kalemler.filter(k => k.isTuru);
+        if (!dolu.length) return ["En az bir iş türü seçin.", "kalemler"];
+        if (kalemler.some(k => !k.isTuru && k.disler.length)) return ["Diş seçtiğiniz satırın iş türünü seçin.", "kalemler"];
+        if (dolu.some(k => !(k.adet >= 1 && k.adet <= 99))) return ["Adet 1 ile 99 arasında olmalı.", "kalemler"];
+        if (!dolu.some(k => k.disler.length)) return ["Diş şemasından işlem yapılacak dişleri seçin.", "kalemler"];
+        if (!$("disRengi").value.trim()) return ["Diş rengini yazın.", "disRengi"];
+        if (!secilenMateryal()) return ["Materyal seçin.", "materyaller"];
+        if ($("implantVar").checked && !$("implantMarka").value.trim()) return ["İmplant markasını yazın.", "implantMarka"];
+        if (!$("termin").value) return ["Teslim tarihini seçin.", "termin"];
+        return null;
+    }
+
+    function gonder(e) {
+        e.preventDefault();
+        const hata = dogrula();
+        if (hata) {
+            mesaj("formMsg", hata[0]);
+            const el = $(hata[1]); if (el && el.focus) setTimeout(() => el.focus({ preventScroll: true }), 300);
+            return;
+        }
+        mesaj("formMsg", "");
+        const dolu = kalemler.filter(k => k.isTuru);
+        const payload = {
+            hastaAdi: $("hastaAdi").value.trim(),
+            referansNo: $("referansNo").value.trim() || null,
+            acil: $("acil").checked,
+            disRengi: $("disRengi").value.trim(),
+            materyal: secilenMateryal(),
+            disler: Array.from(new Set(dolu.flatMap(k => k.disler))).sort((a, b) => a - b),
+            terminTarihi: $("termin").value,
+            notlar: $("notlar").value.trim() || null,
+            tasarimKaynagi: $("tasarimKaynagi").value,
+            implantVar: $("implantVar").checked,
+            implantMarkasi: $("implantVar").checked ? $("implantMarka").value.trim() : null,
+            implantPlatform: $("implantVar").checked ? ($("implantPlatform").value.trim() || null) : null,
+            abutmentTipi: $("implantVar").checked ? ($("abutmentTipi").value || null) : null,
+            baglantiTipi: $("implantVar").checked ? ($("baglantiTipi").value || null) : null,
+            taramaCihazi: $("taramaCihazi").value || null,
+            provaAsamasi: $("prova").value || null,
+            kalemler: dolu.map(k => ({ isTuru: k.isTuru, adet: k.adet, disler: k.disler }))
+        };
+        const fd = new FormData();
+        fd.append("payload", JSON.stringify(payload));
+        dosyalar.forEach(f => fd.append("files", f, f.name));
+
+        const btn = $("gonderBtn"), bar = $("ilerleme"), ic = bar.firstElementChild;
+        btn.disabled = true; btn.textContent = "Gönderiliyor...";
+        bar.classList.remove("hidden"); ic.style.width = "0%";
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/hekim-portal/jobs");
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = ev => {
+            if (!ev.lengthComputable) return;
+            const y = Math.round(ev.loaded * 100 / ev.total);
+            ic.style.width = y + "%";
+            btn.textContent = y < 100 ? "Yükleniyor... %" + y : "Kaydediliyor...";
+        };
+        const bitir = () => { btn.disabled = false; btn.textContent = "Laboratuvara Gönder"; bar.classList.add("hidden"); };
+        xhr.onload = () => {
+            bitir();
+            if (xhr.status === 401) { girisEkrani(); mesaj("loginMsg", "Oturum sona erdi. Giriş yaptıktan sonra Gönder'e tekrar basın; formunuz duruyor."); return; }
+            if (xhr.status === 413) { mesaj("formMsg", "Dosyalar çok büyük. ZIP yapıp küçültün veya ikiye bölerek gönderin."); return; }
+            if (xhr.status < 200 || xhr.status >= 300) { mesaj("formMsg", xhr.responseText || ("Gönderilemedi (" + xhr.status + ")")); return; }
+            let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
+            $("gonderildiMsg").textContent = (d.message || "İş laboratuvara gönderildi.") + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "");
+            $("isFormu").classList.add("hidden");
+            $("gonderildi").classList.remove("hidden");
+            kalemler = []; dosyalar = [];
+            window.scrollTo(0, 0);
+        };
+        xhr.onerror = () => { bitir(); mesaj("formMsg", "Bağlantı koptu, iş gönderilemedi. İnternetinizi kontrol edip tekrar deneyin; formunuz duruyor."); };
+        xhr.send(fd);
+    }
+
+    // ---------- İşlerim ----------
+    async function isleriYukle() {
+        $("islerListe").innerHTML = '<div class="empty">Yükleniyor...</div>';
+        try {
+            isler = await api("/api/hekim-portal/jobs");
+            isleriCiz();
+        } catch (err) {
+            $("islerListe").innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
+        }
+    }
+
+    function durum(j) {
+        if (j.onayDurumu === "Gelen Onay") return ["Laboratuvar onayı bekleniyor", "wait"];
+        if (j.onayDurumu === "Reddedildi") return ["Reddedildi", "cancel"];
+        const d = j.durum || "-";
+        if (/teslim|tamam/i.test(d)) return [d, "done"];
+        if (/iptal/i.test(d)) return [d, "cancel"];
+        if (/bekli/i.test(d)) return [d, "wait"];
+        return [d, "prod"];
+    }
+
+    function isleriCiz() {
+        const q = $("isAra").value.trim().toLocaleLowerCase("tr-TR");
+        const liste = isler.filter(j => !q ||
+            (j.hastaAdi || "").toLocaleLowerCase("tr-TR").includes(q) ||
+            (j.kalemler || []).some(k => (k.isTuru || "").toLocaleLowerCase("tr-TR").includes(q)));
+        if (!liste.length) { $("islerListe").innerHTML = `<div class="empty">${isler.length ? "Aramaya uyan iş yok." : "Henüz gönderilmiş işiniz yok."}</div>`; return; }
+        $("islerListe").innerHTML = liste.map(j => {
+            const [d, c] = durum(j);
+            const kal = (j.kalemler || []).map(k => esc(k.isTuru) + " × " + k.adet).join(", ");
+            return `<div class="job">
+                <div class="job-head" onclick="isAc(${j.id})">
+                    <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}</div></div>
+                    <span class="badge ${c}">${esc(d)}</span>
+                </div>
+                ${acikIs === j.id ? `<div class="job-body" id="isDetay${j.id}">
+                    <div><b>Teslim:</b> ${tarih(j.terminTarihi)} · <b>Renk:</b> ${esc(j.disRengi || "-")} · <b>Materyal:</b> ${esc(j.materyal || "-")}</div>
+                    <div><b>Dişler:</b> ${esc(j.disSemasi || "-")}</div>
+                    ${j.notlar ? `<div><b>Notlar:</b><pre>${esc(j.notlar)}</pre></div>` : ""}
+                    <div><b>Dosyalar:</b> <span id="isDosya${j.id}">${j.dosyaSayisi ? "yükleniyor..." : "yok"}</span></div>
+                </div>` : ""}
+            </div>`;
+        }).join("");
+        if (acikIs) dosyalariGetir(acikIs);
+    }
+
+    function isAc(id) { acikIs = acikIs === id ? null : id; isleriCiz(); }
+
+    async function dosyalariGetir(id) {
+        const el = $("isDosya" + id); if (!el) return;
+        const j = isler.find(x => x.id === id);
+        if (!j || !j.dosyaSayisi) return;
+        try {
+            const list = await api(`/api/hekim-portal/jobs/${id}/files`);
+            el.innerHTML = list.length ? list.map(f =>
+                `<div><a href="/api/hekim-portal/jobs/${id}/files/${f.id}">${esc(f.orijinalDosyaAdi)}</a> <span class="hint">${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</span></div>`).join("") : "yok";
+        } catch (err) { el.textContent = err.message; }
+    }
+
+    // Renk ve implant önerileri
+    $("renkler").innerHTML = VITA.map(v => `<option value="${v}">`).join("");
+    $("implantMarkalari").innerHTML = IMPLANTLAR.map(v => `<option value="${esc(v)}">`).join("");
+
+    basla();
+</script>
+</body>
+</html>

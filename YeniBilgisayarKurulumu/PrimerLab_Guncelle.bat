@@ -50,9 +50,12 @@ goto KAPANMA_BEKLE
 :KAPANDI
 
 echo [3/4] Yeni surum derleniyor...
-rem /MIR kullanilmaz: eski bilgisayardan gelen sayfalar (Hekim Portali) korunur.
+rem /MIR kullanilmaz: eski bilgisayardan gelen ek sayfalar korunur.
 robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /E /IS /IT /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto GERI_AL
+rem Eski Hekim Portali sayfalari kaldirilir: yeni portal HekimPortali.cshtml ile gelir;
+rem ayni adresi kullanan iki sayfa olursa program acilmaz.
+powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/hekim-portal' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"
 rem Onceki derleme dosyalari silinir; program her guncellemede sifirdan derlenir.
 rem (Zip'ten cikan dosyalarin saati saat dilimi farki yuzunden eski gorunebiliyor;
 rem  derleyici bu durumda sayfayi yeniden derlemeyip eski surumu birakiyordu.)
@@ -64,6 +67,7 @@ set "DERLEME=%errorlevel%"
 popd
 if not "%DERLEME%"=="0" goto GERI_AL
 
+copy /Y "%KIT%PORTAL_INTERNET_AC.bat" "%HEDEF%\PORTAL_INTERNET_AC.bat" >nul 2>&1
 echo [4/4] Primer Lab baslatiliyor...
 rem Program yonetici olarak degil, normal kullanici yetkisiyle baslatilir.
 explorer.exe "%HEDEF%\PrimerLab_Baslat.bat"
