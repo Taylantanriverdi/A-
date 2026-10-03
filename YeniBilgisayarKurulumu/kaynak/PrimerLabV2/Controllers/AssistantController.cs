@@ -14,193 +14,107 @@ namespace PrimerLabV2.Controllers
     public class AssistantController : ControllerBase
     {
         private readonly PrimerLabDbContext _db;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IWebHostEnvironment _environment;
-        private readonly IDataProtector _protector;
+        private readonly YapayZekaServisi _ai;
 
         public AssistantController(
             PrimerLabDbContext db,
-            IHttpClientFactory httpClientFactory,
-            IWebHostEnvironment environment,
-            IDataProtectionProvider dataProtectionProvider)
+            YapayZekaServisi ai)
         {
             _db = db;
-            _httpClientFactory = httpClientFactory;
-            _environment = environment;
-            _protector = dataProtectionProvider.CreateProtector(
-                ClaudeIstemcisi.KorumaAmaci);
+            _ai = ai;
         }
-
-        private string SettingsPath()
-        {
-            var path = ClaudeIstemcisi.AyarDosyasi(_environment.ContentRootPath);
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            return path;
-        }
-
-        private AssistantResolvedSettings? ResolveSettings()
-        {
-            var path = SettingsPath();
-            if (!System.IO.File.Exists(path)) return null;
-
-            try
-            {
-                var stored = JsonSerializer.Deserialize<AssistantStoredSettings>(
-                    System.IO.File.ReadAllText(path));
-
-                if (stored == null ||
-                    string.IsNullOrWhiteSpace(stored.ProtectedApiKey))
-                {
-                    return null;
-                }
-
-                return new AssistantResolvedSettings
-                {
-                    ApiKey = _protector.Unprotect(stored.ProtectedApiKey),
-                    Model = NormalizeModel(stored.Model)
-                };
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private static string NormalizeModel(string? value) =>
-            ClaudeIstemcisi.ModelNormalize(value);
 
         [HttpGet("status")]
-        public IActionResult Status()
-        {
-            var settings = ResolveSettings();
-            return Ok(new
-            {
-                Configured = settings != null,
-                Model = settings?.Model ?? ClaudeIstemcisi.VarsayilanModel,
-                Provider = "Claude"
-            });
-        }
+        public IActionResult Status() => Ok(_ai.Durum());
 
+        // Seçilen sağlayıcının anahtarı test edilir, kaydedilir ve o sağlayıcı kullanılmaya başlanır.
         [HttpPost("settings")]
         public async Task<IActionResult> SaveSettings(
             [FromBody] AssistantSettingsDto dto)
         {
+            var saglayici = SaglayiciOku(dto.Provider);
+            if (saglayici == null) return BadRequest("Geçersiz yapay zekâ sağlayıcısı.");
+            var ad = YapayZekaServisi.SaglayiciAdi(saglayici);
+
             var key = (dto.ApiKey ?? string.Empty).Trim();
+            var model = YapayZekaServisi.ModelNormalize(saglayici, dto.Model);
 
-            if (!ClaudeIstemcisi.AnahtarBicimiGecerli(key))
+            // Anahtar boşsa: kayıtlı anahtarla sağlayıcıyı / modeli değiştir.
+            if (key.Length == 0)
             {
-                return BadRequest(
-                    "Claude API anahtarı geçersiz görünüyor. Anahtar \"sk-ant-\" ile başlamalıdır (console.anthropic.com > API Keys).");
+                return _ai.AktifYap(saglayici, model)
+                    ? Ok(_ai.Durum())
+                    : BadRequest($"{ad} için kayıtlı API anahtarı yok. Önce anahtarı girin.");
             }
 
-            var model = NormalizeModel(dto.Model);
+            if (YapayZekaServisi.AnahtarBicimHatasi(saglayici, key) is { } bicimHatasi)
+                return BadRequest(bicimHatasi);
 
-            var test = await SendClaudeAsync(
-                key,
-                model,
-                "Sadece OK yaz.",
+            var ayar = new YapayZekaAyari { Saglayici = saglayici, ApiKey = key, Model = model };
+            var test = await _ai.GonderAsync(
+                ayar,
                 "Kısa bağlantı testi yap ve yalnızca OK yaz.",
-                2048,
-                "low");
+                "Sadece OK yaz.",
+                YapayZekaAmaci.BaglantiTesti);
 
-            if (!test.Success)
+            if (!test.Basarili)
             {
                 return BadRequest(
-                    "Claude bağlantı testi başarısız. " +
-                    test.Error +
-                    (string.IsNullOrWhiteSpace(test.RequestId)
+                    $"{ad} bağlantı testi başarısız. " +
+                    test.Hata +
+                    (string.IsNullOrWhiteSpace(test.IstekNo)
                         ? ""
-                        : " | Request ID: " + test.RequestId));
+                        : " | İstek no: " + test.IstekNo));
             }
 
-            var stored = new AssistantStoredSettings
-            {
-                ProtectedApiKey = _protector.Protect(key),
-                Model = model,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            var settingsPath = SettingsPath();
-            var tempPath = settingsPath + ".tmp";
-            var json = JsonSerializer.Serialize(
-                stored,
-                new JsonSerializerOptions { WriteIndented = true });
-
-            await System.IO.File.WriteAllTextAsync(tempPath, json);
-            System.IO.File.Move(tempPath, settingsPath, overwrite: true);
-            EskiOpenAiAyariniSil();
-
-            return Ok(new
-            {
-                Configured = true,
-                Model = model
-            });
+            _ai.Kaydet(saglayici, key, model);
+            return Ok(_ai.Durum());
         }
 
         [HttpDelete("settings")]
-        public IActionResult DeleteSettings()
+        public IActionResult DeleteSettings([FromQuery] string? provider)
         {
-            var path = SettingsPath();
-            if (System.IO.File.Exists(path))
-            {
-                System.IO.File.Delete(path);
-            }
-            EskiOpenAiAyariniSil();
+            var saglayici = SaglayiciOku(provider);
+            if (saglayici == null) return BadRequest("Geçersiz yapay zekâ sağlayıcısı.");
+            _ai.Sil(saglayici);
             return NoContent();
-        }
-
-        // Önceki sürümün OpenAI anahtarı artık kullanılmaz; diskte bırakılmaz.
-        private void EskiOpenAiAyariniSil()
-        {
-            try
-            {
-                var eski = Path.Combine(_environment.ContentRootPath, "App_Data", "Secrets", "primer-ai.json");
-                if (System.IO.File.Exists(eski)) System.IO.File.Delete(eski);
-            }
-            catch
-            {
-            }
         }
 
         [HttpPost("diagnostics")]
         public async Task<IActionResult> Diagnostics(
             [FromBody] AssistantSettingsDto dto)
         {
+            var saglayici = SaglayiciOku(dto.Provider);
+            if (saglayici == null) return BadRequest("Geçersiz yapay zekâ sağlayıcısı.");
+
             var key = (dto.ApiKey ?? string.Empty).Trim();
+            if (YapayZekaServisi.AnahtarBicimHatasi(saglayici, key) is { } bicimHatasi)
+                return BadRequest(bicimHatasi);
 
-            if (!ClaudeIstemcisi.AnahtarBicimiGecerli(key))
-            {
-                return BadRequest("API anahtarı biçimi geçersiz. Claude anahtarı \"sk-ant-\" ile başlamalıdır.");
-            }
-
-            var requestedModel = NormalizeModel(dto.Model);
-
-            var candidates = new[] { requestedModel }
-            .Concat(ClaudeIstemcisi.Modeller)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+            var candidates = new[] { YapayZekaServisi.ModelNormalize(saglayici, dto.Model) }
+                .Concat(YapayZekaServisi.Modeller(saglayici))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
 
             var results = new List<object>();
 
             foreach (var candidate in candidates)
             {
-                var test = await SendClaudeAsync(
-                    key,
-                    candidate,
-                    "Sadece OK yaz.",
+                var test = await _ai.GonderAsync(
+                    new YapayZekaAyari { Saglayici = saglayici, ApiKey = key, Model = candidate },
                     "Bu yalnızca API bağlantı testidir. Yalnızca OK yaz.",
-                    2048,
-                    "low");
+                    "Sadece OK yaz.",
+                    YapayZekaAmaci.BaglantiTesti);
 
                 results.Add(new
                 {
                     Model = candidate,
-                    test.Success,
-                    test.Error,
-                    test.RequestId
+                    Success = test.Basarili,
+                    Error = test.Hata,
+                    RequestId = test.IstekNo
                 });
 
-                if (test.Success)
+                if (test.Basarili)
                 {
                     return Ok(new
                     {
@@ -214,11 +128,16 @@ namespace PrimerLabV2.Controllers
             return BadRequest(new
             {
                 Success = false,
-                Message = "Hiçbir Claude modeliyle bağlantı kurulamadı.",
+                Message = $"Hiçbir {YapayZekaServisi.SaglayiciAdi(saglayici)} modeliyle bağlantı kurulamadı.",
                 Results = results
             });
         }
 
+        private static string? SaglayiciOku(string? deger)
+        {
+            var s = string.IsNullOrWhiteSpace(deger) ? YapayZekaServisi.Claude : deger.Trim().ToLowerInvariant();
+            return YapayZekaServisi.GecerliSaglayici(s) ? s : null;
+        }
 
         private static List<AssistantChatHistoryItem> NormalizeHistory(
             List<AssistantChatHistoryItem>? history)
@@ -288,11 +207,11 @@ namespace PrimerLabV2.Controllers
         public async Task<IActionResult> Chat(
             [FromBody] AssistantChatDto dto)
         {
-            var settings = ResolveSettings();
+            var settings = _ai.Aktif();
             if (settings == null)
             {
                 return BadRequest(
-                    "Önce Ayarlar bölümünden Claude API anahtarı kaydet.");
+                    "Önce Ayarlar bölümünden Claude veya OpenAI API anahtarı kaydet.");
             }
 
             var message = (dto.Message ?? string.Empty).Trim();
@@ -380,26 +299,24 @@ Kurallar:
                 "<GUVENILMEYEN_CANLI_VERI>\n" + snapshot +
                 "\n</GUVENILMEYEN_CANLI_VERI>";
 
-            var result = await SendClaudeAsync(
-                settings.ApiKey,
-                settings.Model,
-                input,
+            var result = await _ai.GonderAsync(
+                settings,
                 instructions,
-                16000,
-                "medium");
+                input,
+                YapayZekaAmaci.Sohbet);
 
-            if (!result.Success)
+            if (!result.Basarili)
             {
                 return StatusCode(
                     502,
-                    "Claude yanıtı alınamadı: " + result.Error);
+                    YapayZekaServisi.SaglayiciAdi(settings.Saglayici) + " yanıtı alınamadı: " + result.Hata);
             }
 
             AssistantModelResponse? parsed = null;
             try
             {
                 parsed = JsonSerializer.Deserialize<AssistantModelResponse>(
-                    ExtractJsonObject(result.Text ?? string.Empty),
+                    ExtractJsonObject(result.Metin ?? string.Empty),
                     new JsonSerializerOptions
                     {
                         PropertyNameCaseInsensitive = true
@@ -413,7 +330,7 @@ Kurallar:
             {
                 return Ok(new
                 {
-                    Answer = result.Text ?? "Yanıt oluşturulamadı.",
+                    Answer = result.Metin ?? "Yanıt oluşturulamadı.",
                     Actions = Array.Empty<object>()
                 });
             }
@@ -900,32 +817,6 @@ Kurallar:
             };
         }
 
-        // input: kullanıcı mesajı; instructions: sistem talimatı.
-        private static async Task<AiResult> SendClaudeAsync(
-            string apiKey,
-            string model,
-            string input,
-            string instructions,
-            int maxOutputTokens,
-            string effort)
-        {
-            var sonuc = await ClaudeIstemcisi.GonderAsync(
-                apiKey,
-                model,
-                instructions,
-                input,
-                maxOutputTokens,
-                effort);
-
-            return new AiResult
-            {
-                Success = sonuc.Basarili,
-                Text = sonuc.Metin,
-                Error = sonuc.Hata,
-                RequestId = sonuc.IstekNo
-            };
-        }
-
         private static string ExtractJsonObject(string value)
         {
             var text = value.Trim()
@@ -946,6 +837,7 @@ Kurallar:
 
     public class AssistantSettingsDto
     {
+        public string? Provider { get; set; }
         public string? ApiKey { get; set; }
         public string? Model { get; set; }
     }
@@ -962,31 +854,10 @@ Kurallar:
         public string? Content { get; set; }
     }
 
-    public class AssistantStoredSettings
-    {
-        public string ProtectedApiKey { get; set; } = string.Empty;
-        public string Model { get; set; } = ClaudeIstemcisi.VarsayilanModel;
-        public DateTime UpdatedAt { get; set; }
-    }
-
-    public class AssistantResolvedSettings
-    {
-        public string ApiKey { get; set; } = string.Empty;
-        public string Model { get; set; } = ClaudeIstemcisi.VarsayilanModel;
-    }
-
     public class AssistantModelResponse
     {
         public string? Answer { get; set; }
         public List<Dictionary<string, JsonElement>>? Actions { get; set; }
-    }
-
-    public class AiResult
-    {
-        public bool Success { get; set; }
-        public string? Text { get; set; }
-        public string? Error { get; set; }
-        public string? RequestId { get; set; }
     }
 
     public class AssistantJobRow

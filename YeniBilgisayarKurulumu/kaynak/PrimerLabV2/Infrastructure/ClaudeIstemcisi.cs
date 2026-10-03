@@ -59,7 +59,7 @@ public static class ClaudeIstemcisi
     }
 
     /// <param name="efor">low | medium | high (Claude Haiku 4.5'te kullanılmaz).</param>
-    public static async Task<ClaudeSonuc> GonderAsync(
+    public static async Task<YapayZekaSonuc> GonderAsync(
         string apiKey,
         string model,
         string sistem,
@@ -106,40 +106,40 @@ public static class ClaudeIstemcisi
             BetaMessage yanit = await Istemci(apiKey).Beta.Messages.Create(parametreler, ct);
 
             if (yanit.StopReason == "refusal")
-                return ClaudeSonuc.Hatali("Claude bu isteği güvenlik nedeniyle yanıtlamadı. Soruyu farklı ifade edin.", yanit.ID);
+                return YapayZekaSonuc.Hatali("Claude bu isteği güvenlik nedeniyle yanıtlamadı. Soruyu farklı ifade edin.", yanit.ID);
 
             var metin = string.Concat(yanit.Content.Select(b => b.TryPickText(out var t) ? t.Text : string.Empty)).Trim();
 
             if (string.IsNullOrWhiteSpace(metin))
             {
-                return ClaudeSonuc.Hatali(
+                return YapayZekaSonuc.Hatali(
                     yanit.StopReason == "max_tokens"
                         ? "Claude yanıtı uzunluk sınırına takıldı; soruyu daraltıp tekrar deneyin."
                         : "Claude boş yanıt döndürdü.",
                     yanit.ID);
             }
 
-            return new ClaudeSonuc(true, metin, null, yanit.ID);
+            return new YapayZekaSonuc(true, metin, null, yanit.ID);
         }
         catch (AnthropicUnauthorizedException)
         {
-            return ClaudeSonuc.Hatali("Claude API anahtarı geçersiz veya iptal edilmiş.");
+            return YapayZekaSonuc.Hatali("Claude API anahtarı geçersiz veya iptal edilmiş.");
         }
         catch (AnthropicRateLimitException)
         {
-            return ClaudeSonuc.Hatali("Claude kullanım sınırına ulaşıldı. Biraz sonra tekrar deneyin.");
+            return YapayZekaSonuc.Hatali("Claude kullanım sınırına ulaşıldı. Biraz sonra tekrar deneyin.");
         }
         catch (AnthropicApiException ex)
         {
-            return ClaudeSonuc.Hatali(ApiHataMesaji(ex.Message));
+            return YapayZekaSonuc.Hatali(ApiHataMesaji(ex.Message));
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return ClaudeSonuc.Hatali("Claude zamanında yanıt vermedi. Tekrar deneyin.");
+            return YapayZekaSonuc.Hatali("Claude zamanında yanıt vermedi. Tekrar deneyin.");
         }
         catch (HttpRequestException)
         {
-            return ClaudeSonuc.Hatali("Claude'a bağlanılamadı. İnternet bağlantısını kontrol edin.");
+            return YapayZekaSonuc.Hatali("Claude'a bağlanılamadı. İnternet bağlantısını kontrol edin.");
         }
     }
 
@@ -169,7 +169,7 @@ public static class ClaudeIstemcisi
     }
 }
 
-public sealed record ClaudeSonuc(bool Basarili, string? Metin, string? Hata, string? IstekNo)
+public sealed record YapayZekaSonuc(bool Basarili, string? Metin, string? Hata, string? IstekNo)
 {
-    public static ClaudeSonuc Hatali(string hata, string? istekNo = null) => new(false, null, hata, istekNo);
+    public static YapayZekaSonuc Hatali(string hata, string? istekNo = null) => new(false, null, hata, istekNo);
 }

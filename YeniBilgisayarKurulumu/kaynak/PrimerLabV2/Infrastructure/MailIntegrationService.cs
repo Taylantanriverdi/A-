@@ -15,7 +15,7 @@ public sealed class MailIntegrationService
     private readonly IHttpClientFactory _httpFactory;
     private readonly IWebHostEnvironment _env;
     private readonly IDataProtector _gmailProtector;
-    private readonly IDataProtector _aiProtector;
+    private readonly YapayZekaServisi _ai;
     private readonly SemaphoreSlim _runLock = new(1, 1);
     private readonly object _statusLock = new();
     private readonly MailRuntimeStatus _runtimeStatus = new();
@@ -25,13 +25,14 @@ public sealed class MailIntegrationService
         IServiceScopeFactory scopeFactory,
         IHttpClientFactory httpFactory,
         IWebHostEnvironment env,
-        IDataProtectionProvider protectionProvider)
+        IDataProtectionProvider protectionProvider,
+        YapayZekaServisi ai)
     {
         _scopeFactory = scopeFactory;
         _httpFactory = httpFactory;
         _env = env;
         _gmailProtector = protectionProvider.CreateProtector("PrimerLab.GmailOAuth.v1");
-        _aiProtector = protectionProvider.CreateProtector(ClaudeIstemcisi.KorumaAmaci);
+        _ai = ai;
     }
 
     public string RootPath
@@ -57,7 +58,6 @@ public sealed class MailIntegrationService
     private string SettingsPath => Path.Combine(RootPath, "settings.json");
     private string CredentialsPath => Path.Combine(_env.ContentRootPath, "App_Data", "Secrets", "gmail-oauth.json");
     private string TokenPath => Path.Combine(_env.ContentRootPath, "App_Data", "Secrets", "gmail-token.json");
-    private string AiSettingsPath => ClaudeIstemcisi.AyarDosyasi(_env.ContentRootPath);
 
     public MailRuntimeSettings GetSettings()
     {
@@ -208,7 +208,7 @@ public sealed class MailIntegrationService
             credentialsConfigured = creds != null,
             gmailConnected = token != null && !string.IsNullOrWhiteSpace(token.RefreshToken ?? token.AccessToken),
             aiConfigured = ai != null,
-            aiModel = ai?.Model ?? "",
+            aiModel = ai == null ? "" : YapayZekaServisi.SaglayiciAdi(ai.Saglayici) + " · " + ai.Model,
             settings = GetSettings(),
             runtime = GetRuntimeStatus(),
             mailCount,
@@ -841,7 +841,7 @@ public sealed class MailIntegrationService
     }
 
     private async Task<MailAnalysis> AnalyzeWithAiAsync(
-        AiSettings ai,
+        YapayZekaAyari ai,
         GmailMail mail,
         List<MailDoctor> doctors,
         CancellationToken cancellationToken)
@@ -896,14 +896,12 @@ SİSTEMDEKİ HEKİM/KLİNİKLER:
 {doctorHints}
 """;
 
-        // Claude yanıt veremezse (anahtar, kredi, bağlantı) mail yerel kurallarla okunur.
-        var sonuc = await ClaudeIstemcisi.GonderAsync(
-            ai.ApiKey,
-            ai.Model,
+        // Yapay zekâ yanıt veremezse (anahtar, kredi, bağlantı) mail yerel kurallarla okunur.
+        var sonuc = await _ai.GonderAsync(
+            ai,
             instructions,
             input,
-            4000,
-            "low",
+            YapayZekaAmaci.MailAnalizi,
             cancellationToken);
         if (!sonuc.Basarili || string.IsNullOrWhiteSpace(sonuc.Metin))
             return AnalyzeLocally(mail, doctors);
@@ -1108,32 +1106,8 @@ SİSTEMDEKİ HEKİM/KLİNİKLER:
         File.WriteAllText(TokenPath, _gmailProtector.Protect(raw));
     }
 
-    private AiSettings? ReadAiSettings()
-    {
-        try
-        {
-            if (!File.Exists(AiSettingsPath)) return null;
-            using var doc = JsonDocument.Parse(File.ReadAllText(AiSettingsPath));
-            var root = doc.RootElement;
-
-            var protectedKey = root.TryGetProperty("ProtectedApiKey", out var pk)
-                ? pk.GetString()
-                : root.TryGetProperty("protectedApiKey", out var pk2) ? pk2.GetString() : null;
-
-            var model = root.TryGetProperty("Model", out var modelEl)
-                ? modelEl.GetString()
-                : root.TryGetProperty("model", out var modelEl2) ? modelEl2.GetString() : null;
-
-            if (string.IsNullOrWhiteSpace(protectedKey)) return null;
-
-            return new AiSettings
-            {
-                ApiKey = _aiProtector.Unprotect(protectedKey),
-                Model = ClaudeIstemcisi.ModelNormalize(model)
-            };
-        }
-        catch { return null; }
-    }
+    // Ayarlar'da seçili yapay zekâ sağlayıcısı (Claude veya OpenAI).
+    private YapayZekaAyari? ReadAiSettings() => _ai.Aktif();
 
     private static string BuildQuery(MailRuntimeSettings settings)
     {
@@ -1333,12 +1307,6 @@ public sealed class GmailToken
     public string? AccessToken { get; set; }
     public string? RefreshToken { get; set; }
     public DateTime ExpiresAt { get; set; }
-}
-
-public sealed class AiSettings
-{
-    public string ApiKey { get; set; } = "";
-    public string Model { get; set; } = ClaudeIstemcisi.VarsayilanModel;
 }
 
 public sealed class GmailMail

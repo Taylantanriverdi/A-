@@ -29,6 +29,7 @@ builder.Services.AddRazorPages();
 builder.Services.AddOpenApi();
 builder.Services.AddDataProtection();
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<YapayZekaServisi>();
 builder.Services.AddSingleton<MailIntegrationService>();
 builder.Services.AddHostedService<MailIntegrationWorker>();
 
