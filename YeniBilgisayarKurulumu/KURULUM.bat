@@ -90,12 +90,69 @@ winget install --id PostgreSQL.PostgreSQL.17 -e --silent --accept-package-agreem
 call :PG_BUL
 if not defined PGBIN goto PG_HATA
 echo       Kuruldu: %PGBIN%
+call :PG_SERVIS_BUL
+if not defined PGSVC goto PG_ONAR
 goto PG_SIFRE_TAMAM
 :PG_MEVCUT
 echo       Zaten kurulu: %PGBIN%
+call :PG_SERVIS_BUL
+if not defined PGSVC goto PG_ONAR
+echo       Servis: %PGSVC%
 echo.
 echo       Kurulu PostgreSQL'in "postgres" kullanici sifresini yazin.
 call :SIFRE_SOR
+goto PG_SIFRE_TAMAM
+
+rem ------------------------------------------------------------
+rem PostgreSQL programi var ama Windows servisi yok (yarim kalmis kurulum).
+rem Var olan veri klasoru servis olarak kaydedilir; yoksa yenisi olusturulur.
+:PG_ONAR
+echo.
+echo       UYARI: PostgreSQL programi var ama veritabani servisi kurulu degil.
+echo       (Onceki bir kurulum yarida kalmis olabilir.) Onariliyor...
+if not exist "%PGBIN%\pg_ctl.exe" goto PG_YENIDEN_KUR
+if not exist "%PGBIN%\postgres.exe" goto PG_YENIDEN_KUR
+if not exist "%PGBIN%\initdb.exe" goto PG_YENIDEN_KUR
+set "PGSVC=postgresql-x64-17"
+set "PGYENI="
+if exist "%PGDATA%\PG_VERSION" goto PG_ONAR_KAYIT
+if exist "%HEDEF%\pgdata\PG_VERSION" (
+    set "PGDATA=%HEDEF%\pgdata"
+    goto PG_ONAR_KAYIT
+)
+echo       Eski veri klasoru bulunamadi; yeni veritabani alani olusturulacak.
+echo       Yeni "postgres" sifresi belirleyin (KAGIDA YAZIN).
+call :SIFRE_SOR
+set "PGDATA=%HEDEF%\pgdata"
+powershell -NoProfile -Command "[IO.File]::WriteAllText($env:TEMP + '\primerlab_pw.txt', $env:PGPASS)"
+"%PGBIN%\initdb.exe" -D "%PGDATA%" -U postgres -E UTF8 --auth=scram-sha-256 --pwfile="%TEMP%\primerlab_pw.txt"
+set "INITDB_RC=%errorlevel%"
+del /q "%TEMP%\primerlab_pw.txt" >nul 2>&1
+if not "%INITDB_RC%"=="0" goto PG_ONAR_HATA
+set "PGYENI=1"
+:PG_ONAR_KAYIT
+echo       Servis kaydediliyor: %PGSVC%
+echo       Veri klasoru: "%PGDATA%"
+"%PGBIN%\pg_ctl.exe" register -N "%PGSVC%" -D "%PGDATA%" -S auto
+if errorlevel 1 goto PG_ONAR_HATA
+net start "%PGSVC%"
+if errorlevel 1 goto PG_ONAR_HATA
+echo       Servis calisiyor.
+if defined PGYENI goto PG_SIFRE_TAMAM
+echo.
+echo       Bu veritabaninin "postgres" sifresini yazin.
+call :SIFRE_SOR
+goto PG_SIFRE_TAMAM
+
+:PG_YENIDEN_KUR
+echo       PostgreSQL eksik kurulmus; yeniden kurulacak (veri klasoru silinmez).
+echo       Yeni "postgres" sifresi belirleyin (KAGIDA YAZIN).
+call :SIFRE_SOR
+winget install --id PostgreSQL.PostgreSQL.17 -e --force --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui none --superpassword %PGPASS% --serverport 5432"
+call :PG_BUL
+call :PG_SERVIS_BUL
+if not defined PGSVC goto PG_HATA
+
 :PG_SIFRE_TAMAM
 set "PSQL="%PGBIN%\psql.exe" -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 -q -X"
 set "PGHATA=%TEMP%\primerlab_pg_hata.txt"
@@ -318,6 +375,10 @@ for /f "usebackq tokens=1,* delims=|" %%A in (`powershell -NoProfile -Command "$
     set "PGSVC=%%A"
     set "PGDATA=%%B"
 )
+if not defined PGSVC goto PG_SERVIS_SC
+sc query "%PGSVC%" >nul 2>&1
+if errorlevel 1 set "PGSVC="
+:PG_SERVIS_SC
 if not defined PGSVC for /f "tokens=2" %%S in ('sc query state^= all ^| findstr /i /c:"SERVICE_NAME: postgresql"') do if not defined PGSVC set "PGSVC=%%S"
 if not defined PGDATA set "PGDATA=%PGBIN%\..\data"
 exit /b 0
@@ -353,6 +414,10 @@ echo HATA: PostgreSQL'e baglanilamadi. Sunucunun verdigi mesaj:
 type "%PGHATA%"
 echo.
 echo Bu mesajin fotografini Claude'a gonderin.
+goto SON_HATA
+:PG_ONAR_HATA
+echo HATA: PostgreSQL servisi onarilamadi. Yukaridaki mesajlarin fotografini Claude'a gonderin.
+echo Servis: %PGSVC%   Veri klasoru: %PGDATA%
 goto SON_HATA
 :SIFIRLA_HATA
 echo HATA: postgres sifresi sifirlanamadi. Sunucunun verdigi mesaj:
