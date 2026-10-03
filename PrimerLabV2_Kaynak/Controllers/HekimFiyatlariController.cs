@@ -200,6 +200,31 @@ namespace PrimerLabV2.Controllers
 
 
         // =========================================================
+        // İŞ TÜRÜ ÖNERİLERİ
+        //
+        // Her hekimin iş listesi kendisine özeldir. Hekim listesine iş
+        // yazarken, aynı işin farklı yazılmaması için diğer hekimlerde
+        // kullanılan iş adları öneri olarak sunulur.
+        // =========================================================
+
+        [HttpGet("is-turleri")]
+        public async Task<IActionResult> IsTuruOnerileri()
+        {
+            var rows = await _db.Database.SqlQuery<string>($"""
+                SELECT MIN(BTRIM("IsTuru")) AS "Value"
+                FROM "HekimFiyatlari"
+                WHERE "HekimId" <> 0
+                  AND "Aktif" = TRUE
+                  AND BTRIM("IsTuru") <> ''
+                GROUP BY LOWER(BTRIM("IsTuru"))
+                ORDER BY 1
+                """).ToListAsync();
+
+            return Ok(rows);
+        }
+
+
+        // =========================================================
         // HEKİME ÖZEL FİYATLAR
         // =========================================================
 

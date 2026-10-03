@@ -621,8 +621,6 @@ public sealed class HekimPortalController : ControllerBase
     private async Task<List<PortalPriceRow>> PortalPriceList(int hekimId, CancellationToken cancellationToken)
     {
         // Hekim portalda yalnız kendisine tanımlı işleri görür (Hekimler > Fiyat Listesi).
-        // Önceden merkezi kataloğun tamamı her hekime gösteriliyor, fiyatı tanımlı olmayan
-        // işler 0 fiyatla sipariş edilebiliyordu.
         var ozel = await _db.Database.SqlQuery<PortalPriceRow>($"""
             SELECT
                 "IsTuru" AS "IsTuru",
@@ -635,22 +633,9 @@ public sealed class HekimPortalController : ControllerBase
             ORDER BY "Sira","IsTuru"
             """).ToListAsync(cancellationToken);
 
-        if (ozel.Count > 0)
-            return ozel;
-
-        // Hekime henüz liste tanımlanmadıysa portal kullanılamaz hale gelmesin diye
-        // merkezi katalog gösterilir; fiyat laboratuvarda Gelen İş Onayı sırasında girilir.
-        return await _db.Database.SqlQuery<PortalPriceRow>($"""
-            SELECT
-                "IsTuru" AS "IsTuru",
-                0::numeric AS "BirimFiyat",
-                'TRY' AS "ParaBirimi",
-                "Sira" AS "Sira"
-            FROM "HekimFiyatlari"
-            WHERE "HekimId"=0
-              AND "Aktif"=true
-            ORDER BY "Sira","IsTuru"
-            """).ToListAsync(cancellationToken);
+        // Merkezi katalog kullanılmaz: listesi tanımlanmamış hekim portalda iş türü
+        // göremez; laboratuvar Hekimler ekranından listesini tanımlamalıdır.
+        return ozel;
     }
 
     private static string? ValidateNewJob(PortalNewJobDto dto)
