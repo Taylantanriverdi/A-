@@ -42,7 +42,7 @@ B) YENI BILGISAYARDA - 25 dakika
 
 8. Ayarlar bolumunden sunlari YENIDEN yapin (guvenlik geregi tasinmaz):
    - Gmail baglantisi (credentials.json yukle + Baglan)
-   - Primer AI (OpenAI) anahtari
+   - Primer AI (Claude) API anahtari - console.anthropic.com > API Keys
    Hekim portal hesaplari ve sifreleri yedekle birlikte gelir.
 
 

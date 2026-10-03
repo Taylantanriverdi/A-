@@ -31,7 +31,7 @@ public sealed class MailIntegrationService
         _httpFactory = httpFactory;
         _env = env;
         _gmailProtector = protectionProvider.CreateProtector("PrimerLab.GmailOAuth.v1");
-        _aiProtector = protectionProvider.CreateProtector("PrimerLab.OpenAI.ApiKey.v1");
+        _aiProtector = protectionProvider.CreateProtector(ClaudeIstemcisi.KorumaAmaci);
     }
 
     public string RootPath
@@ -57,7 +57,7 @@ public sealed class MailIntegrationService
     private string SettingsPath => Path.Combine(RootPath, "settings.json");
     private string CredentialsPath => Path.Combine(_env.ContentRootPath, "App_Data", "Secrets", "gmail-oauth.json");
     private string TokenPath => Path.Combine(_env.ContentRootPath, "App_Data", "Secrets", "gmail-token.json");
-    private string AiSettingsPath => Path.Combine(_env.ContentRootPath, "App_Data", "Secrets", "primer-ai.json");
+    private string AiSettingsPath => ClaudeIstemcisi.AyarDosyasi(_env.ContentRootPath);
 
     public MailRuntimeSettings GetSettings()
     {
@@ -896,32 +896,19 @@ SİSTEMDEKİ HEKİM/KLİNİKLER:
 {doctorHints}
 """;
 
-        var http = _httpFactory.CreateClient();
-        http.Timeout = TimeSpan.FromSeconds(45);
-
-        using var req = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/responses");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ai.ApiKey);
-        req.Content = new StringContent(
-            JsonSerializer.Serialize(new
-            {
-                model = ai.Model,
-                instructions,
-                input,
-                reasoning = new { effort = "none" },
-                max_output_tokens = 1200,
-                store = false
-            }),
-            Encoding.UTF8,
-            "application/json");
-
-        using var res = await http.SendAsync(req, cancellationToken);
-        var body = await res.Content.ReadAsStringAsync(cancellationToken);
-        if (!res.IsSuccessStatusCode)
+        // Claude yanıt veremezse (anahtar, kredi, bağlantı) mail yerel kurallarla okunur.
+        var sonuc = await ClaudeIstemcisi.GonderAsync(
+            ai.ApiKey,
+            ai.Model,
+            instructions,
+            input,
+            4000,
+            "low",
+            cancellationToken);
+        if (!sonuc.Basarili || string.IsNullOrWhiteSpace(sonuc.Metin))
             return AnalyzeLocally(mail, doctors);
 
-        var text = ExtractOpenAiText(body);
-        if (string.IsNullOrWhiteSpace(text))
-            return AnalyzeLocally(mail, doctors);
+        var text = sonuc.Metin;
 
         try
         {
@@ -1142,7 +1129,7 @@ SİSTEMDEKİ HEKİM/KLİNİKLER:
             return new AiSettings
             {
                 ApiKey = _aiProtector.Unprotect(protectedKey),
-                Model = string.IsNullOrWhiteSpace(model) ? "gpt-5.6-luna" : model!
+                Model = ClaudeIstemcisi.ModelNormalize(model)
             };
         }
         catch { return null; }
@@ -1186,33 +1173,6 @@ SİSTEMDEKİ HEKİM/KLİNİKLER:
             .ToList();
 
         return links;
-    }
-
-    private static string ExtractOpenAiText(string body)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(body);
-            if (doc.RootElement.TryGetProperty("output_text", out var ot) &&
-                ot.ValueKind == JsonValueKind.String)
-                return ot.GetString() ?? "";
-
-            if (doc.RootElement.TryGetProperty("output", out var output))
-            {
-                foreach (var item in output.EnumerateArray())
-                {
-                    if (!item.TryGetProperty("content", out var content)) continue;
-                    foreach (var c in content.EnumerateArray())
-                    {
-                        if (c.TryGetProperty("text", out var text) &&
-                            text.ValueKind == JsonValueKind.String)
-                            return text.GetString() ?? "";
-                    }
-                }
-            }
-        }
-        catch { }
-        return "";
     }
 
     private static string StripCodeFence(string text)
@@ -1378,7 +1338,7 @@ public sealed class GmailToken
 public sealed class AiSettings
 {
     public string ApiKey { get; set; } = "";
-    public string Model { get; set; } = "gpt-5.6-luna";
+    public string Model { get; set; } = ClaudeIstemcisi.VarsayilanModel;
 }
 
 public sealed class GmailMail

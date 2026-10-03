@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PrimerLabV2.Data;
+using PrimerLabV2.Infrastructure;
 
 namespace PrimerLabV2.Controllers
 {
@@ -17,13 +18,6 @@ namespace PrimerLabV2.Controllers
         private readonly IWebHostEnvironment _environment;
         private readonly IDataProtector _protector;
 
-        private static readonly string[] AllowedModels =
-        {
-            "gpt-5.6-terra",
-            "gpt-5.6-sol",
-            "gpt-5.6-luna"
-        };
-
         public AssistantController(
             PrimerLabDbContext db,
             IHttpClientFactory httpClientFactory,
@@ -34,18 +28,14 @@ namespace PrimerLabV2.Controllers
             _httpClientFactory = httpClientFactory;
             _environment = environment;
             _protector = dataProtectionProvider.CreateProtector(
-                "PrimerLab.OpenAI.ApiKey.v1");
+                ClaudeIstemcisi.KorumaAmaci);
         }
 
         private string SettingsPath()
         {
-            var dir = Path.Combine(
-                _environment.ContentRootPath,
-                "App_Data",
-                "Secrets");
-
-            Directory.CreateDirectory(dir);
-            return Path.Combine(dir, "primer-ai.json");
+            var path = ClaudeIstemcisi.AyarDosyasi(_environment.ContentRootPath);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            return path;
         }
 
         private AssistantResolvedSettings? ResolveSettings()
@@ -76,13 +66,8 @@ namespace PrimerLabV2.Controllers
             }
         }
 
-        private static string NormalizeModel(string? value)
-        {
-            var model = (value ?? "gpt-5.6-terra").Trim();
-            return AllowedModels.Contains(model)
-                ? model
-                : "gpt-5.6-terra";
-        }
+        private static string NormalizeModel(string? value) =>
+            ClaudeIstemcisi.ModelNormalize(value);
 
         [HttpGet("status")]
         public IActionResult Status()
@@ -91,7 +76,8 @@ namespace PrimerLabV2.Controllers
             return Ok(new
             {
                 Configured = settings != null,
-                Model = settings?.Model ?? "gpt-5.6-terra"
+                Model = settings?.Model ?? ClaudeIstemcisi.VarsayilanModel,
+                Provider = "Claude"
             });
         }
 
@@ -101,26 +87,26 @@ namespace PrimerLabV2.Controllers
         {
             var key = (dto.ApiKey ?? string.Empty).Trim();
 
-            if (key.Length < 20 || key.Any(char.IsWhiteSpace))
+            if (!ClaudeIstemcisi.AnahtarBicimiGecerli(key))
             {
                 return BadRequest(
-                    "OpenAI API anahtarı geçersiz görünüyor.");
+                    "Claude API anahtarı geçersiz görünüyor. Anahtar \"sk-ant-\" ile başlamalıdır (console.anthropic.com > API Keys).");
             }
 
             var model = NormalizeModel(dto.Model);
 
-            var test = await SendOpenAiAsync(
+            var test = await SendClaudeAsync(
                 key,
                 model,
                 "Sadece OK yaz.",
                 "Kısa bağlantı testi yap ve yalnızca OK yaz.",
-                256,
-                "none");
+                2048,
+                "low");
 
             if (!test.Success)
             {
                 return BadRequest(
-                    "OpenAI bağlantı testi başarısız. " +
+                    "Claude bağlantı testi başarısız. " +
                     test.Error +
                     (string.IsNullOrWhiteSpace(test.RequestId)
                         ? ""
@@ -142,6 +128,7 @@ namespace PrimerLabV2.Controllers
 
             await System.IO.File.WriteAllTextAsync(tempPath, json);
             System.IO.File.Move(tempPath, settingsPath, overwrite: true);
+            EskiOpenAiAyariniSil();
 
             return Ok(new
             {
@@ -158,7 +145,21 @@ namespace PrimerLabV2.Controllers
             {
                 System.IO.File.Delete(path);
             }
+            EskiOpenAiAyariniSil();
             return NoContent();
+        }
+
+        // Önceki sürümün OpenAI anahtarı artık kullanılmaz; diskte bırakılmaz.
+        private void EskiOpenAiAyariniSil()
+        {
+            try
+            {
+                var eski = Path.Combine(_environment.ContentRootPath, "App_Data", "Secrets", "primer-ai.json");
+                if (System.IO.File.Exists(eski)) System.IO.File.Delete(eski);
+            }
+            catch
+            {
+            }
         }
 
         [HttpPost("diagnostics")]
@@ -167,20 +168,15 @@ namespace PrimerLabV2.Controllers
         {
             var key = (dto.ApiKey ?? string.Empty).Trim();
 
-            if (key.Length < 20 || key.Any(char.IsWhiteSpace))
+            if (!ClaudeIstemcisi.AnahtarBicimiGecerli(key))
             {
-                return BadRequest("API anahtarı biçimi geçersiz.");
+                return BadRequest("API anahtarı biçimi geçersiz. Claude anahtarı \"sk-ant-\" ile başlamalıdır.");
             }
 
             var requestedModel = NormalizeModel(dto.Model);
 
-            var candidates = new[]
-            {
-                requestedModel,
-                "gpt-5.6-luna",
-                "gpt-5.6-terra",
-                "gpt-5.6-sol"
-            }
+            var candidates = new[] { requestedModel }
+            .Concat(ClaudeIstemcisi.Modeller)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
 
@@ -188,13 +184,13 @@ namespace PrimerLabV2.Controllers
 
             foreach (var candidate in candidates)
             {
-                var test = await SendOpenAiAsync(
+                var test = await SendClaudeAsync(
                     key,
                     candidate,
                     "Sadece OK yaz.",
                     "Bu yalnızca API bağlantı testidir. Yalnızca OK yaz.",
-                    256,
-                    "none");
+                    2048,
+                    "low");
 
                 results.Add(new
                 {
@@ -218,7 +214,7 @@ namespace PrimerLabV2.Controllers
             return BadRequest(new
             {
                 Success = false,
-                Message = "Hiçbir GPT-5.6 modeliyle bağlantı kurulamadı.",
+                Message = "Hiçbir Claude modeliyle bağlantı kurulamadı.",
                 Results = results
             });
         }
@@ -296,7 +292,7 @@ namespace PrimerLabV2.Controllers
             if (settings == null)
             {
                 return BadRequest(
-                    "Önce Ayarlar bölümünden OpenAI API anahtarı kaydet.");
+                    "Önce Ayarlar bölümünden Claude API anahtarı kaydet.");
             }
 
             var message = (dto.Message ?? string.Empty).Trim();
@@ -384,19 +380,19 @@ Kurallar:
                 "<GUVENILMEYEN_CANLI_VERI>\n" + snapshot +
                 "\n</GUVENILMEYEN_CANLI_VERI>";
 
-            var result = await SendOpenAiAsync(
+            var result = await SendClaudeAsync(
                 settings.ApiKey,
                 settings.Model,
                 input,
                 instructions,
-                2200,
-                "low");
+                16000,
+                "medium");
 
             if (!result.Success)
             {
                 return StatusCode(
                     502,
-                    "OpenAI yanıtı alınamadı: " + result.Error);
+                    "Claude yanıtı alınamadı: " + result.Error);
             }
 
             AssistantModelResponse? parsed = null;
@@ -904,158 +900,30 @@ Kurallar:
             };
         }
 
-        private async Task<OpenAiResult> SendOpenAiAsync(
+        // input: kullanıcı mesajı; instructions: sistem talimatı.
+        private static async Task<AiResult> SendClaudeAsync(
             string apiKey,
             string model,
             string input,
             string instructions,
             int maxOutputTokens,
-            string reasoningEffort = "none")
+            string effort)
         {
-            var http = _httpClientFactory.CreateClient();
-            http.Timeout = TimeSpan.FromSeconds(90);
-
-            using var request = new HttpRequestMessage(
-                HttpMethod.Post,
-                "https://api.openai.com/v1/responses");
-
-            request.Headers.Authorization =
-                new AuthenticationHeaderValue("Bearer", apiKey);
-
-            var payload = new
-            {
-                model = NormalizeModel(model),
+            var sonuc = await ClaudeIstemcisi.GonderAsync(
+                apiKey,
+                model,
                 instructions,
                 input,
-                reasoning = new
-                {
-                    effort = string.IsNullOrWhiteSpace(reasoningEffort)
-                        ? "none"
-                        : reasoningEffort
-                },
-                max_output_tokens = Math.Max(maxOutputTokens, 256),
-                store = false
+                maxOutputTokens,
+                effort);
+
+            return new AiResult
+            {
+                Success = sonuc.Basarili,
+                Text = sonuc.Metin,
+                Error = sonuc.Hata,
+                RequestId = sonuc.IstekNo
             };
-
-            request.Content = new StringContent(
-                JsonSerializer.Serialize(payload),
-                Encoding.UTF8,
-                "application/json");
-
-            try
-            {
-                using var response = await http.SendAsync(request);
-                var body = await response.Content.ReadAsStringAsync();
-
-                var requestId =
-                    response.Headers.TryGetValues(
-                        "x-request-id",
-                        out var requestIds)
-                        ? requestIds.FirstOrDefault()
-                        : null;
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var parsedError = ExtractOpenAiError(body);
-                    var detail = !string.IsNullOrWhiteSpace(parsedError)
-                        ? parsedError
-                        : body;
-
-                    if (string.IsNullOrWhiteSpace(detail))
-                    {
-                        detail =
-                            $"{(int)response.StatusCode} {response.ReasonPhrase}";
-                    }
-
-                    if (detail.Length > 1800)
-                    {
-                        detail = detail[..1800];
-                    }
-
-                    return new OpenAiResult
-                    {
-                        Success = false,
-                        Error =
-                            $"HTTP {(int)response.StatusCode}: {detail}",
-                        RequestId = requestId
-                    };
-                }
-
-                var text = ExtractOutputText(body);
-
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    return new OpenAiResult
-                    {
-                        Success = false,
-                        Error = "OpenAI boş yanıt döndürdü.",
-                        RequestId = requestId
-                    };
-                }
-
-                return new OpenAiResult
-                {
-                    Success = true,
-                    Text = text,
-                    RequestId = requestId
-                };
-            }
-            catch (Exception ex)
-            {
-                return new OpenAiResult
-                {
-                    Success = false,
-                    Error = ex.Message
-                };
-            }
-        }
-
-        private static string? ExtractOpenAiError(string json)
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty("error", out var error) &&
-                    error.TryGetProperty("message", out var message))
-                {
-                    return message.GetString();
-                }
-            }
-            catch
-            {
-            }
-            return null;
-        }
-
-        private static string ExtractOutputText(string json)
-        {
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("output", out var output) ||
-                output.ValueKind != JsonValueKind.Array)
-            {
-                return string.Empty;
-            }
-
-            foreach (var item in output.EnumerateArray())
-            {
-                if (!item.TryGetProperty("content", out var content) ||
-                    content.ValueKind != JsonValueKind.Array)
-                {
-                    continue;
-                }
-
-                foreach (var c in content.EnumerateArray())
-                {
-                    if (c.TryGetProperty("type", out var type) &&
-                        type.GetString() == "output_text" &&
-                        c.TryGetProperty("text", out var text))
-                    {
-                        return text.GetString() ?? string.Empty;
-                    }
-                }
-            }
-
-            return string.Empty;
         }
 
         private static string ExtractJsonObject(string value)
@@ -1097,14 +965,14 @@ Kurallar:
     public class AssistantStoredSettings
     {
         public string ProtectedApiKey { get; set; } = string.Empty;
-        public string Model { get; set; } = "gpt-5.6-terra";
+        public string Model { get; set; } = ClaudeIstemcisi.VarsayilanModel;
         public DateTime UpdatedAt { get; set; }
     }
 
     public class AssistantResolvedSettings
     {
         public string ApiKey { get; set; } = string.Empty;
-        public string Model { get; set; } = "gpt-5.6-terra";
+        public string Model { get; set; } = ClaudeIstemcisi.VarsayilanModel;
     }
 
     public class AssistantModelResponse
@@ -1113,7 +981,7 @@ Kurallar:
         public List<Dictionary<string, JsonElement>>? Actions { get; set; }
     }
 
-    public class OpenAiResult
+    public class AiResult
     {
         public bool Success { get; set; }
         public string? Text { get; set; }
