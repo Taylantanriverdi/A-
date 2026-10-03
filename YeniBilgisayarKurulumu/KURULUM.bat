@@ -330,9 +330,9 @@ if errorlevel 2 (
 
 rem ------------------------------------------------------------
 echo [8/8] Primer Lab baslatiliyor...
-pushd "%UYGULAMA%"
-start "PrimerLab" /min "%UYGULAMA%\PrimerLabV2.exe"
-popd
+rem Program yonetici olarak degil, normal kullanici yetkisiyle baslatilir
+rem (boylece sonraki guncellemeler de onu kapatabilir).
+explorer.exe "%HEDEF%\PrimerLab_Baslat.bat"
 powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 60;$i++){ try { if((Invoke-WebRequest -UseBasicParsing '%URL%' -TimeoutSec 2).StatusCode -eq 200){$ok=$true;break} } catch {}; Start-Sleep 1 }; if(-not $ok){exit 1}"
 if errorlevel 1 goto BASLATMA_HATA
 
@@ -354,7 +354,6 @@ if defined YEDEK (
     )
 )
 
-start "" "%URL%"
 echo.
 echo ============================================================
 echo  KURULUM TAMAMLANDI

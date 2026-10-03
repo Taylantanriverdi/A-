@@ -6,6 +6,15 @@ title PRIMER LAB - GUNCELLEME
 rem Kurulu Primer Lab'i bu klasordeki yeni surume gunceller.
 rem Veritabanina, verilere, App_Data'ya ve baglanti ayarlarina dokunmaz.
 
+rem Yonetici izni gerekli: calisan Primer Lab'i kapatabilmek icin.
+net session >nul 2>&1
+if errorlevel 1 (
+    echo Yonetici izni isteniyor...
+    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
+
 set "KIT=%~dp0"
 set "HEDEF=C:\PrimerLab"
 set "KAYNAK=%HEDEF%\Kaynak"
@@ -27,8 +36,18 @@ robocopy "%KAYNAK%" "%YEDEK%" /E /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto YEDEK_HATA
 
 echo [2/4] Primer Lab kapatiliyor...
+rem Program kapanana kadar bekle; kapanmazsa hicbir dosyaya dokunmadan dur.
 taskkill /F /IM PrimerLabV2.exe >nul 2>&1
-timeout /t 2 /nobreak >nul
+set /a KDENEME=0
+:KAPANMA_BEKLE
+tasklist /FI "IMAGENAME eq PrimerLabV2.exe" 2>nul | find /I "PrimerLabV2.exe" >nul
+if errorlevel 1 goto KAPANDI
+set /a KDENEME+=1
+if %KDENEME% GEQ 10 goto KAPANMADI
+taskkill /F /IM PrimerLabV2.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+goto KAPANMA_BEKLE
+:KAPANDI
 
 echo [3/4] Yeni surum derleniyor...
 rem /MIR kullanilmaz: eski bilgisayardan gelen sayfalar (Hekim Portali) korunur.
@@ -46,7 +65,8 @@ popd
 if not "%DERLEME%"=="0" goto GERI_AL
 
 echo [4/4] Primer Lab baslatiliyor...
-call "%HEDEF%\PrimerLab_Baslat.bat"
+rem Program yonetici olarak degil, normal kullanici yetkisiyle baslatilir.
+explorer.exe "%HEDEF%\PrimerLab_Baslat.bat"
 echo.
 echo GUNCELLEME TAMAMLANDI.
 echo Tarayicida eski sayfa gorunuyorsa sayfada Ctrl + F5 tuslarina basin.
@@ -63,11 +83,16 @@ if exist "%KAYNAK%\bin" rmdir /s /q "%KAYNAK%\bin"
 pushd "%KAYNAK%"
 "%DOTNET%" publish PrimerLabV2.csproj -c Release -o "%UYGULAMA%" -nologo >nul
 popd
-call "%HEDEF%\PrimerLab_Baslat.bat"
+explorer.exe "%HEDEF%\PrimerLab_Baslat.bat"
 echo Onceki surum tekrar calisiyor. Yukaridaki hata mesajinin fotografini Claude'a gonderin.
 pause
 exit /b 1
 
+:KAPANMADI
+echo HATA: Calisan Primer Lab kapatilamadi. Hicbir degisiklik yapilmadi.
+echo Bilgisayari yeniden baslatip PrimerLab_Guncelle.bat'i tekrar calistirin.
+pause
+exit /b 1
 :KURULU_DEGIL
 echo HATA: Bu bilgisayarda kurulu Primer Lab bulunamadi. Once KURULUM.bat'i calistirin.
 pause
