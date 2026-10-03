@@ -86,7 +86,7 @@ echo       - En az 8 karakter, yalniz harf ve rakam (Turkce karakter ve bosluk y
 echo       - BU SIFREYI BIR KAGIDA YAZIN. pgAdmin ve yedekler icin gerekir.
 call :SIFRE_SOR
 echo       PostgreSQL kuruluyor (birkac dakika surebilir)...
-winget install --id PostgreSQL.PostgreSQL.17 -e --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui none --superpassword %PGPASS% --serverport 5432"
+winget install --id PostgreSQL.PostgreSQL.17 -e --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui none --superpassword %PGPASS% --serverport 5432 --locale C"
 call :PG_BUL
 if not defined PGBIN goto PG_HATA
 echo       Kuruldu: %PGBIN%
@@ -125,10 +125,21 @@ echo       Yeni "postgres" sifresi belirleyin (KAGIDA YAZIN).
 call :SIFRE_SOR
 set "PGDATA=%HEDEF%\pgdata"
 powershell -NoProfile -Command "[IO.File]::WriteAllText($env:TEMP + '\primerlab_pw.txt', $env:PGPASS)"
-"%PGBIN%\initdb.exe" -D "%PGDATA%" -U postgres -E UTF8 --auth=scram-sha-256 --pwfile="%TEMP%\primerlab_pw.txt"
-set "INITDB_RC=%errorlevel%"
+rem Turkce Windows'ta bolge adi "Turkish_Turkiye.1254" (u harfi ile) PostgreSQL tarafindan
+rem kabul edilmiyor (bilinen PostgreSQL hatasi). Bu yuzden bolge adi kullanilmaz:
+rem once Turkce siralama icin ICU (tr-TR) denenir, olmazsa genel "C" ayari kullanilir.
+if exist "%PGDATA%" if not exist "%PGDATA%\PG_VERSION" rmdir /s /q "%PGDATA%"
+"%PGBIN%\initdb.exe" -D "%PGDATA%" -U postgres -E UTF8 --locale=C --lc-messages=C --locale-provider=icu --icu-locale=tr-TR --auth=scram-sha-256 --pwfile="%TEMP%\primerlab_pw.txt"
+if not errorlevel 1 goto PG_INITDB_TAMAM
+echo       ICU kullanilamadi; genel ayarla tekrar deneniyor...
+if exist "%PGDATA%" rmdir /s /q "%PGDATA%"
+"%PGBIN%\initdb.exe" -D "%PGDATA%" -U postgres -E UTF8 --locale=C --lc-messages=C --auth=scram-sha-256 --pwfile="%TEMP%\primerlab_pw.txt"
+if errorlevel 1 (
+    del /q "%TEMP%\primerlab_pw.txt" >nul 2>&1
+    goto PG_ONAR_HATA
+)
+:PG_INITDB_TAMAM
 del /q "%TEMP%\primerlab_pw.txt" >nul 2>&1
-if not "%INITDB_RC%"=="0" goto PG_ONAR_HATA
 set "PGYENI=1"
 :PG_ONAR_KAYIT
 echo       Servis kaydediliyor: %PGSVC%
@@ -148,7 +159,7 @@ goto PG_SIFRE_TAMAM
 echo       PostgreSQL eksik kurulmus; yeniden kurulacak (veri klasoru silinmez).
 echo       Yeni "postgres" sifresi belirleyin (KAGIDA YAZIN).
 call :SIFRE_SOR
-winget install --id PostgreSQL.PostgreSQL.17 -e --force --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui none --superpassword %PGPASS% --serverport 5432"
+winget install --id PostgreSQL.PostgreSQL.17 -e --force --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui none --superpassword %PGPASS% --serverport 5432 --locale C"
 call :PG_BUL
 call :PG_SERVIS_BUL
 if not defined PGSVC goto PG_HATA
