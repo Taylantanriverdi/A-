@@ -97,18 +97,83 @@ echo.
 echo       Kurulu PostgreSQL'in "postgres" kullanici sifresini yazin.
 call :SIFRE_SOR
 :PG_SIFRE_TAMAM
-set "PGPASSWORD=%PGPASS%"
 set "PSQL="%PGBIN%\psql.exe" -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 -q -X"
+set "PGHATA=%TEMP%\primerlab_pg_hata.txt"
 
+rem PostgreSQL servisi kapaliysa baslat.
+call :PG_SERVIS_BUL
+if not defined PGSVC goto PG_DENE
+sc query "%PGSVC%" | find "RUNNING" >nul
+if not errorlevel 1 goto PG_DENE
+echo       PostgreSQL servisi baslatiliyor (%PGSVC%)...
+net start "%PGSVC%" >nul 2>&1
+
+:PG_DENE
+set "PGPASSWORD=%PGPASS%"
 echo       Sunucuya baglaniliyor...
 set /a DENEME=0
 :PG_BEKLE
-%PSQL% -d postgres -c "SELECT 1" >nul 2>&1
+%PSQL% -d postgres -c "SELECT 1" >nul 2>"%PGHATA%"
 if not errorlevel 1 goto PG_HAZIR
+rem Sifre hatasi beklemekle duzelmez; hemen kullaniciya sor.
+findstr /i /c:"password" /c:"parola" /c:"28P01" "%PGHATA%" >nul
+if not errorlevel 1 goto PG_SIFRE_YANLIS
 set /a DENEME+=1
 if %DENEME% GEQ 30 goto PG_BAGLANTI_HATA
 timeout /t 2 /nobreak >nul
 goto PG_BEKLE
+
+:PG_SIFRE_YANLIS
+echo.
+echo       SIFRE KABUL EDILMEDI. Bu bilgisayardaki PostgreSQL daha once
+echo       farkli bir sifreyle kurulmus.
+echo.
+echo         [T] Sifreyi tekrar yaz
+echo         [S] Sifreyi hatirlamiyorum - yeni sifre belirle (veriler silinmez)
+echo         [C] Cikis
+choice /c TSC /n /m "      Seciminiz (T/S/C): "
+if errorlevel 3 goto SON_HATA
+if errorlevel 2 goto PG_SIFIRLA
+call :SIFRE_SOR
+goto PG_DENE
+
+rem ------------------------------------------------------------
+rem postgres sifresini sifirlama: pg_hba.conf gecici olarak yalniz bu
+rem bilgisayardan (localhost) sifresiz girise izin verecek sekilde degistirilir,
+rem sifre degistirilir ve dosya hemen eski haline getirilir. Veriler etkilenmez.
+:PG_SIFIRLA
+echo.
+echo       Yeni "postgres" sifresini belirleyin (KAGIDA YAZIN).
+call :SIFRE_SOR
+call :PG_SERVIS_BUL
+if not defined PGSVC goto SIFIRLA_HATA
+if not exist "%PGDATA%\pg_hba.conf" goto SIFIRLA_HATA
+copy /Y "%PGDATA%\pg_hba.conf" "%PGDATA%\pg_hba.conf.primerlab_yedek" >nul
+if errorlevel 1 goto SIFIRLA_HATA
+> "%PGDATA%\pg_hba.conf" echo host all postgres 127.0.0.1/32 trust
+>> "%PGDATA%\pg_hba.conf" echo host all postgres ::1/128 trust
+echo       Sifre degistiriliyor, servis yeniden baslatiliyor...
+net stop "%PGSVC%" >nul 2>&1
+net start "%PGSVC%" >nul 2>&1
+set "SIFIRLAMA="
+set /a SDENEME=0
+:SIFIRLA_BEKLE
+"%PGBIN%\psql.exe" -h localhost -p 5432 -U postgres -q -X -d postgres -c "ALTER USER postgres PASSWORD '%PGPASS%';" >nul 2>"%PGHATA%"
+if not errorlevel 1 goto SIFIRLA_OK
+set /a SDENEME+=1
+if %SDENEME% GEQ 20 goto SIFIRLA_GERI_AL
+timeout /t 2 /nobreak >nul
+goto SIFIRLA_BEKLE
+:SIFIRLA_OK
+set "SIFIRLAMA=1"
+:SIFIRLA_GERI_AL
+copy /Y "%PGDATA%\pg_hba.conf.primerlab_yedek" "%PGDATA%\pg_hba.conf" >nul
+net stop "%PGSVC%" >nul 2>&1
+net start "%PGSVC%" >nul 2>&1
+if not defined SIFIRLAMA goto SIFIRLA_HATA
+echo       Sifre degistirildi.
+goto PG_DENE
+
 :PG_HAZIR
 echo       Baglanti tamam.
 
@@ -117,7 +182,9 @@ echo [5/8] Primer Lab veritabani hazirlaniyor...
 for /f "delims=" %%P in ('powershell -NoProfile -Command "-join ((48..57)+(65..90)+(97..122) | Get-Random -Count 24 | ForEach-Object {[char]$_})"') do set "APPPASS=%%P"
 if not defined APPPASS goto DB_HATA
 
-%PSQL% -d postgres -c "DO $$BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='primerlab_app') THEN CREATE ROLE primerlab_app LOGIN PASSWORD '%APPPASS%'; ELSE ALTER ROLE primerlab_app LOGIN PASSWORD '%APPPASS%'; END IF; END$$;"
+rem Uygulama kendi rolunu kullanir (primerlab_web). Bu bilgisayarda eski bir Primer Lab
+rem varsa onun kullandigi primerlab_app rolunun sifresi degistirilmez.
+%PSQL% -d postgres -c "DO $$BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='primerlab_web') THEN CREATE ROLE primerlab_web LOGIN PASSWORD '%APPPASS%'; ELSE ALTER ROLE primerlab_web LOGIN PASSWORD '%APPPASS%'; END IF; END$$;"
 if errorlevel 1 goto DB_HATA
 
 set "DBVAR="
@@ -129,9 +196,11 @@ if not defined DBVAR (
 ) else (
     echo       Veritabani zaten var; veriler korunuyor.
 )
-%PSQL% -d postgres -c "GRANT CONNECT, TEMPORARY ON DATABASE primerlab TO primerlab_app;"
+%PSQL% -d postgres -c "GRANT CONNECT, TEMPORARY ON DATABASE primerlab TO primerlab_web;"
 if errorlevel 1 goto DB_HATA
 %PSQL% -d primerlab -f "%KIT%kaynak\DB\V33_TAM_KURULUM_SEMA.sql"
+if errorlevel 1 goto DB_HATA
+%PSQL% -d primerlab -c "GRANT USAGE ON SCHEMA public TO primerlab_web; GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO primerlab_web; GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO primerlab_web; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO primerlab_web; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO primerlab_web;"
 if errorlevel 1 goto DB_HATA
 echo       Tablolar hazir.
 
@@ -160,7 +229,7 @@ popd
 if not "%DERLEME%"=="0" goto DERLEME_HATA
 
 rem Baglanti bilgisi yalniz bu bilgisayarda; kullanicilar okuyabilir, yalniz yonetici degistirebilir.
-powershell -NoProfile -Command "$j = @{ ConnectionStrings = @{ DefaultConnection = 'Host=localhost;Port=5432;Database=primerlab;Username=primerlab_app;Password=%APPPASS%' } } | ConvertTo-Json; [IO.File]::WriteAllText('%UYGULAMA%\appsettings.Production.json', $j)"
+powershell -NoProfile -Command "$j = @{ ConnectionStrings = @{ DefaultConnection = 'Host=localhost;Port=5432;Database=primerlab;Username=primerlab_web;Password=%APPPASS%' } } | ConvertTo-Json; [IO.File]::WriteAllText('%UYGULAMA%\appsettings.Production.json', $j)"
 if errorlevel 1 goto DB_HATA
 icacls "%UYGULAMA%\appsettings.Production.json" /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" "*S-1-5-32-545:R" >nul
 
@@ -242,6 +311,17 @@ for /f "delims=" %%D in ('dir /b /ad /o-n "%ProgramFiles%\PostgreSQL" 2^>nul') d
 )
 exit /b 0
 
+:PG_SERVIS_BUL
+set "PGSVC="
+set "PGDATA="
+for /f "usebackq tokens=1,* delims=|" %%A in (`powershell -NoProfile -Command "$i = Get-ItemProperty 'HKLM:\SOFTWARE\PostgreSQL\Installations\*' -ErrorAction SilentlyContinue | Where-Object { $_.'Service ID' } | Select-Object -First 1; if ($i) { $i.'Service ID' + '|' + $i.'Data Directory' }"`) do (
+    set "PGSVC=%%A"
+    set "PGDATA=%%B"
+)
+if not defined PGSVC for /f "tokens=2" %%S in ('sc query state^= all ^| findstr /i /c:"SERVICE_NAME: postgresql"') do if not defined PGSVC set "PGSVC=%%S"
+if not defined PGDATA set "PGDATA=%PGBIN%\..\data"
+exit /b 0
+
 :SIFRE_SOR
 set "PGPASS="
 set /p "PGPASS=      Sifre: "
@@ -269,8 +349,16 @@ goto SON_HATA
 echo HATA: PostgreSQL kurulamadi. Internet baglantisini kontrol edip tekrar deneyin.
 goto SON_HATA
 :PG_BAGLANTI_HATA
-echo HATA: PostgreSQL'e baglanilamadi. Sifre yanlis olabilir veya servis calismiyor olabilir.
-echo KURULUM.bat'i tekrar calistirip sifreyi dikkatle yazin.
+echo HATA: PostgreSQL'e baglanilamadi. Sunucunun verdigi mesaj:
+type "%PGHATA%"
+echo.
+echo Bu mesajin fotografini Claude'a gonderin.
+goto SON_HATA
+:SIFIRLA_HATA
+echo HATA: postgres sifresi sifirlanamadi. Sunucunun verdigi mesaj:
+if exist "%PGHATA%" type "%PGHATA%"
+echo Servis: %PGSVC%   Veri klasoru: %PGDATA%
+echo Bu ekranin fotografini Claude'a gonderin.
 goto SON_HATA
 :DB_HATA
 echo HATA: Veritabani hazirlanamadi. Yukaridaki hata mesajini Claude'a iletin.

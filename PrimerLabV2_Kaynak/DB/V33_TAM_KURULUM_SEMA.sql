@@ -10,6 +10,8 @@
 -- (NULL) veya varsayılan değerlidir.
 
 SET client_encoding = 'UTF8';
+-- "zaten var, atlanıyor" bildirimleri gizlenir; gerçek uyarılar (WARNING) görünür.
+SET client_min_messages = warning;
 
 BEGIN;
 
@@ -88,8 +90,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FK_Siparisler_Teknisyenler_TeknisyenId') THEN
         ALTER TABLE "Siparisler"
             ADD CONSTRAINT "FK_Siparisler_Teknisyenler_TeknisyenId"
-            FOREIGN KEY ("TeknisyenId") REFERENCES "Teknisyenler"("Id") ON DELETE RESTRICT;
+            FOREIGN KEY ("TeknisyenId") REFERENCES "Teknisyenler"("Id") ON DELETE RESTRICT
+            NOT VALID; -- mevcut eski kayıtlar kontrol edilmez; yeni kayıtlar kontrol edilir
     END IF;
+EXCEPTION WHEN others THEN
+    RAISE WARNING 'Teknisyen yabancı anahtarı eklenemedi: %', SQLERRM;
 END $$;
 
 CREATE TABLE IF NOT EXISTS "SiparisKalemleri"
@@ -312,8 +317,20 @@ CREATE INDEX IF NOT EXISTS "IX_Giderler_Tarih" ON "Giderler" ("Tarih" DESC);
 CREATE INDEX IF NOT EXISTS "IX_CariDonemleri_Hekim_Kapanis" ON "CariDonemleri" ("HekimId", "KapanisTarihi" DESC);
 CREATE INDEX IF NOT EXISTS "IX_CariDonemleri_Aktif" ON "CariDonemleri" ("HekimId", "GeriAlindi", "KapanisTarihi" DESC);
 CREATE INDEX IF NOT EXISTS "IX_HekimPortalHesaplari_Aktif" ON "HekimPortalHesaplari" ("Aktif", "KullaniciAdi");
-CREATE UNIQUE INDEX IF NOT EXISTS "UX_HekimPortalHesaplari_KullaniciAdi_Lower" ON "HekimPortalHesaplari" (LOWER("KullaniciAdi"));
-CREATE UNIQUE INDEX IF NOT EXISTS "UX_MailGelenler_MesajId" ON "MailGelenler" ("MesajId") WHERE "MesajId" IS NOT NULL;
+-- Tekil indeksler: mevcut bir veritabanında çakışan eski kayıt varsa kurulum
+-- bozulmaz, yalnız uyarı verilir.
+DO $$
+BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS "UX_HekimPortalHesaplari_KullaniciAdi_Lower" ON "HekimPortalHesaplari" (LOWER("KullaniciAdi"));
+EXCEPTION WHEN others THEN
+    RAISE WARNING 'Portal kullanıcı adı indeksi eklenemedi: %', SQLERRM;
+END $$;
+DO $$
+BEGIN
+    CREATE UNIQUE INDEX IF NOT EXISTS "UX_MailGelenler_MesajId" ON "MailGelenler" ("MesajId") WHERE "MesajId" IS NOT NULL;
+EXCEPTION WHEN others THEN
+    RAISE WARNING 'Mail mesaj indeksi eklenemedi: %', SQLERRM;
+END $$;
 CREATE INDEX IF NOT EXISTS "IX_MailGelenler_Tarih" ON "MailGelenler" ("Tarih" DESC);
 CREATE INDEX IF NOT EXISTS "IX_MailGelenler_Inceleme" ON "MailGelenler" ("IncelemeGerekli", "Aktarildi");
 CREATE INDEX IF NOT EXISTS "IX_MailDosyalari_MailId" ON "MailDosyalari" ("MailId");

@@ -65,6 +65,11 @@ SIK SORULANLAR
 - Program dosyalari: C:\PrimerLab\Uygulama
 - Is dosyalari:      C:\PrimerLab\Uygulama\App_Data
 
+- "SIFRE KABUL EDILMEDI" mesaji:
+  Bu bilgisayarda PostgreSQL daha once baska bir sifreyle kurulmus demektir.
+  [T] ile dogru sifreyi tekrar yazin; hatirlamiyorsaniz [S] secin ve yeni bir
+  sifre belirleyin. Sifirlama verileri silmez.
+
 - PostgreSQL sifresini unuttum:
   Program calismaya devam eder (kendi ayri sifresini kullanir). Yalniz
   pgAdmin ile bakim yaparken gerekir.
