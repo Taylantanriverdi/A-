@@ -620,23 +620,36 @@ public sealed class HekimPortalController : ControllerBase
 
     private async Task<List<PortalPriceRow>> PortalPriceList(int hekimId, CancellationToken cancellationToken)
     {
-        // TEK DOĞRULUK KAYNAĞI: HekimId=0 merkezi iş kataloğudur.
-        // Portal hiçbir zaman hekimin eski/özel fiyat satırlarından bağımsız bir iş listesi üretmez.
-        // Hekime özel kayıt varsa yalnız fiyat ve para birimini üstüne bindirir.
+        // Hekim portalda yalnız kendisine tanımlı işleri görür (Hekimler > Fiyat Listesi).
+        // Önceden merkezi kataloğun tamamı her hekime gösteriliyor, fiyatı tanımlı olmayan
+        // işler 0 fiyatla sipariş edilebiliyordu.
+        var ozel = await _db.Database.SqlQuery<PortalPriceRow>($"""
+            SELECT
+                "IsTuru" AS "IsTuru",
+                "BirimFiyat" AS "BirimFiyat",
+                COALESCE("ParaBirimi",'TRY') AS "ParaBirimi",
+                "Sira" AS "Sira"
+            FROM "HekimFiyatlari"
+            WHERE "HekimId"={hekimId}
+              AND "Aktif"=true
+            ORDER BY "Sira","IsTuru"
+            """).ToListAsync(cancellationToken);
+
+        if (ozel.Count > 0)
+            return ozel;
+
+        // Hekime henüz liste tanımlanmadıysa portal kullanılamaz hale gelmesin diye
+        // merkezi katalog gösterilir; fiyat laboratuvarda Gelen İş Onayı sırasında girilir.
         return await _db.Database.SqlQuery<PortalPriceRow>($"""
             SELECT
-                k."IsTuru" AS "IsTuru",
-                COALESCE(p."BirimFiyat",0) AS "BirimFiyat",
-                COALESCE(p."ParaBirimi",'TRY') AS "ParaBirimi",
-                k."Sira" AS "Sira"
-            FROM "HekimFiyatlari" k
-            LEFT JOIN "HekimFiyatlari" p
-              ON p."HekimId"={hekimId}
-             AND p."Aktif"=true
-             AND LOWER(p."IsTuru")=LOWER(k."IsTuru")
-            WHERE k."HekimId"=0
-              AND k."Aktif"=true
-            ORDER BY k."Sira",k."IsTuru"
+                "IsTuru" AS "IsTuru",
+                0::numeric AS "BirimFiyat",
+                'TRY' AS "ParaBirimi",
+                "Sira" AS "Sira"
+            FROM "HekimFiyatlari"
+            WHERE "HekimId"=0
+              AND "Aktif"=true
+            ORDER BY "Sira","IsTuru"
             """).ToListAsync(cancellationToken);
     }
 

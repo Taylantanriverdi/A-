@@ -46,6 +46,13 @@ B) YENI BILGISAYARDA - 25 dakika
    Hekim portal hesaplari ve sifreleri yedekle birlikte gelir.
 
 
+GUNCELLEME (program kuruluysa)
+------------------------------
+Yeni bir surum geldiginde KURULUM.bat'i degil, PrimerLab_Guncelle.bat'i
+calistirin. Veritabanina ve verilere dokunmaz; once yedek alir, sorun
+olursa eski surume doner.
+
+
 SIK SORULANLAR
 --------------
 - Kurulum yarida kaldi / hata verdi:

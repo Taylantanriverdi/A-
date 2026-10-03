@@ -532,6 +532,21 @@
             margin-bottom: 9px;
         }
 
+        .doctor-price-add {
+            display: flex;
+            gap: 8px;
+            margin: 4px 0 14px;
+        }
+
+        .doctor-price-add select {
+            flex: 1;
+            min-width: 0;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 10px 11px;
+            background: white;
+        }
+
         .price-row input {
             width: 100%;
             border: 1px solid #d1d5db;
@@ -4968,15 +4983,24 @@
 
                 <div class="price-list-toolbar">
                     <div class="price-list-note">
-                        İş türleri merkezi katalogdan gelir. Burada sadece
-                        seçili hekimin özel fiyatını gir. Fiyatı boş bıraktığın
-                        iş bu hekimin yeni iş ekranında görünmez.
+                        Bu hekimin Sipariş Formu, İş Yönetim Merkezi ve Hekim Portalı
+                        ekranlarında yalnız aşağıdaki işler görünür. Merkezi katalogdan
+                        iş ekleyip fiyatını girin; listeden çıkarmak için × kullanın.
                     </div>
 
                     <button type="button"
                             class="button button-light"
                             onclick="closeHekimFiyatModal(); openIsKatalogModal();">
                         İş Kataloğunu Düzenle
+                    </button>
+                </div>
+
+                <div class="doctor-price-add">
+                    <select id="hekimFiyatKatalogSec" aria-label="Katalogdan iş seç"></select>
+                    <button type="button"
+                            class="button button-blue"
+                            onclick="hekimFiyatKatalogdanEkle()">
+                        + Listeye Ekle
                     </button>
                 </div>
 
@@ -12743,13 +12767,52 @@
         async function masterAddLine(id){
             const host=document.getElementById('masterLines_'+Number(id)); if(!host)return;
             try{
-                const katalog=await masterKatalogGet();
+                // Yalnız bu işin hekimine tanımlı işler; seçilince hekimin fiyatı otomatik gelir.
+                const is=anayasaIsler.find(a=>Number(a.id)===Number(id));
+                const liste=await hekimIsListesiGetir(Number(is?.hekimId||0));
+                const katalog=liste.kalemler;
                 const r=document.createElement('div'); r.className='master-line';
-                const opts=['<option value="">İş türü seç...</option>'].concat(katalog.map(k=>`<option value="${escapeHtml(String(k.isTuru||''))}">${escapeHtml(String(k.isTuru||''))}</option>`)).join('');
-                r.innerHTML=`<select class="ml-type" onchange="masterLineChanged(${Number(id)})">${opts}</select><input class="ml-qty" type="number" min="1" step="1" placeholder="Adet" oninput="masterLineChanged(${Number(id)})"><input class="ml-price" type="number" min="0" step="0.01" placeholder="Birim fiyat" oninput="masterLineChanged(${Number(id)})"><button type="button" class="master-x" onclick="this.closest('.master-line').remove();masterLineChanged(${Number(id)})">×</button>`;
+                const opts=['<option value="">İş türü seç...</option>'].concat(katalog.map(k=>`<option value="${escapeHtml(String(k.isTuru||''))}" data-price="${Number(k.birimFiyat||0)}">${escapeHtml(String(k.isTuru||''))}</option>`)).join('');
+                r.innerHTML=`<select class="ml-type" onchange="masterTurSecildi(this,${Number(id)})">${opts}</select><input class="ml-qty" type="number" min="1" step="1" placeholder="Adet" oninput="masterLineChanged(${Number(id)})"><input class="ml-price" type="number" min="0" step="0.01" placeholder="Birim fiyat" oninput="masterLineChanged(${Number(id)})"><button type="button" class="master-x" onclick="this.closest('.master-line').remove();masterLineChanged(${Number(id)})">×</button>`;
                 host.appendChild(r); r.querySelector('.ml-type')?.focus();
             }catch(e){ showError(e.message||'İş kalemi eklenemedi.'); }
         }
+        function masterTurSecildi(select,id){
+            const price=select.closest('.master-line')?.querySelector('.ml-price');
+            const opt=select.selectedOptions?.[0];
+            if(price && !String(price.value||'').trim() && opt && opt.dataset.price!==undefined && Number(opt.dataset.price)>0)
+                price.value=String(Number(opt.dataset.price));
+            masterLineChanged(id);
+        }
+
+        // Hekimin iş listesi (kendi fiyatlarıyla). Liste boşsa merkezi katalog döner (yedek=true).
+        const hekimIsListesiOnbellek=new Map();
+        async function hekimIsListesiGetir(hekimId){
+            hekimId=Number(hekimId||0);
+            if(hekimId && hekimIsListesiOnbellek.has(hekimId)) return hekimIsListesiOnbellek.get(hekimId);
+            let fiyatlar=[];
+            if(hekimId){
+                const r=await fetch('/api/hekim-fiyatlari/'+hekimId,{cache:'no-store'});
+                if(r.ok){ const d=await r.json(); fiyatlar=Array.isArray(d)?d:[]; }
+            }
+            let sonuc;
+            if(fiyatlar.length){
+                sonuc={yedek:false,kalemler:fiyatlar.filter(x=>x&&x.isTuru).map(x=>({isTuru:x.isTuru,birimFiyat:Number(x.birimFiyat||0),paraBirimi:String(x.paraBirimi||'TRY').toUpperCase()}))};
+            }else{
+                const katalog=await masterKatalogGet();
+                sonuc={yedek:true,kalemler:katalog.map(k=>({isTuru:k.isTuru,birimFiyat:0,paraBirimi:'TRY'}))};
+            }
+            if(hekimId) hekimIsListesiOnbellek.set(hekimId,sonuc);
+            return sonuc;
+        }
+        function hekimListeNotuGoster(host,liste){
+            if(!host||!host.parentNode)return;
+            let note=document.getElementById('anKalemNotu');
+            if(!liste||!liste.yedek){ note?.remove(); return; }
+            if(!note){ note=document.createElement('div'); note.id='anKalemNotu'; note.className='form-error'; note.style.display='block'; host.parentNode.insertBefore(note,host); }
+            note.innerText='Bu hekime iş listesi tanımlanmamış; merkezi katalogdaki tüm işler fiyatsız gösteriliyor. Hekimler ekranından bu hekimin fiyat listesine iş ekleyin.';
+        }
+
         function masterFillTechFilter(){ const e=document.getElementById('masterTechFilter');if(!e)return;const old=e.value;e.innerHTML='<option value="">Tüm Teknisyenler</option>'+teknisyenler.filter(t=>t.aktif!==false).map(t=>`<option value="${Number(t.id)}">${escapeHtml(t.adSoyad||t.ad||'-')}</option>`).join('');e.value=old; }
         function masterFillDoctorFilter(){ const e=document.getElementById('masterDoctorFilter');if(!e)return;const old=e.value;e.innerHTML='<option value="">Tüm Hekimler</option>'+hekimler.filter(h=>h.aktif!==false).slice().sort((a,b)=>String(a.adSoyad||a.ad||'').localeCompare(String(b.adSoyad||b.ad||''),'tr')).map(h=>`<option value="${Number(h.id)}">${escapeHtml(h.adSoyad||h.ad||'-')}</option>`).join('');e.value=old; }
         function masterClearSearch(){ const e=document.getElementById('anDagitimSearch');if(e)e.value='';renderAnayasaDagitim();e?.focus(); }
@@ -13922,32 +13985,25 @@
             if(b)b.innerText=c;
         }
 
+        let anayasaHekimSecimNo=0;
         async function anayasaHekimDegisti() {
+            // Hekim hızlıca değiştirilirse yalnız son seçimin listesi uygulanır.
+            const secimNo=++anayasaHekimSecimNo;
             const id=Number(document.getElementById("anHekim")?.value||0);
             const host=document.getElementById("anKalemler"); if(host)host.innerHTML="";
             anayasaHekimFiyatlari=[];
             if(!id){anayasaKalemToplamGuncelle();return;}
+            let liste=null;
             try{
-                // Sipariş formunun iş türü listesi HER ZAMAN merkezi katalogdan gelir.
-                // Hekim fiyatları yalnız fiyat/para birimi katmanıdır; ayrı bir liste değildir.
-                const [katalogResponse, fiyatResponse] = await Promise.all([
-                    fetch("/api/hekim-fiyatlari/katalog",{cache:"no-store"}),
-                    fetch("/api/hekim-fiyatlari/"+id,{cache:"no-store"})
-                ]);
-                const katalog = katalogResponse.ok ? await katalogResponse.json() : [];
-                const fiyatlar = fiyatResponse.ok ? await fiyatResponse.json() : [];
-                const fiyatMap = new Map((Array.isArray(fiyatlar)?fiyatlar:[]).map(x=>[
-                    String(x.isTuru||'').trim().toLocaleLowerCase('tr-TR'), x
-                ]));
-                anayasaHekimFiyatlari=(Array.isArray(katalog)?katalog:[]).map(k=>{
-                    const f=fiyatMap.get(String(k.isTuru||'').trim().toLocaleLowerCase('tr-TR'));
-                    return {
-                        isTuru:k.isTuru,
-                        birimFiyat:Number(f?.birimFiyat||0),
-                        paraBirimi:String(f?.paraBirimi||'TRY').toUpperCase()
-                    };
-                });
+                // Sipariş formunda yalnız seçili hekime tanımlı işler (kendi fiyatlarıyla) görünür.
+                // Hekime henüz liste tanımlanmadıysa iş açmak engellenmesin diye merkezi
+                // katalog gösterilir ve uyarı verilir.
+                liste=await hekimIsListesiGetir(id);
+                if(secimNo!==anayasaHekimSecimNo)return;
+                anayasaHekimFiyatlari=liste.kalemler;
             }catch(e){console.error(e);}
+            if(secimNo!==anayasaHekimSecimNo)return;
+            hekimListeNotuGoster(host, liste);
             anayasaKalemEkle(anayasaHekimFiyatlari[0]||null);
         }
 
@@ -16935,47 +16991,22 @@ function togglePrimerAi(){
                     fiyatListesiGetir(hekimFiyatDuzenlenenId)
                 ]);
 
-                const katalog = sonuc[0];
+                // Pencerede yalnız bu hekime tanımlı işler listelenir.
+                // Katalogdaki diğer işler "Listeye Ekle" seçicisinden eklenir.
+                hekimFiyatKatalog = sonuc[0];
                 const fiyatlar = sonuc[1];
-
-                const fiyatMap = new Map();
-
-                fiyatlar.forEach(function (fiyat) {
-                    fiyatMap.set(
-                        String(fiyat.isTuru || "")
-                            .trim()
-                            .toLocaleLowerCase("tr-TR"),
-                        {
-                            fiyat: Number(fiyat.birimFiyat || 0),
-                            paraBirimi: String(fiyat.paraBirimi || "TRY").toUpperCase()
-                        }
-                    );
-                });
 
                 container.innerHTML = "";
 
-                katalog.forEach(function (kalem) {
-                    const key =
-                        String(kalem.isTuru || "")
-                            .trim()
-                            .toLocaleLowerCase("tr-TR");
-
-                    const fiyatBilgi =
-                        fiyatMap.has(key)
-                            ? fiyatMap.get(key)
-                            : null;
-
+                fiyatlar.forEach(function (fiyat) {
                     hekimFiyatSatiriEkle(
-                        kalem.isTuru,
-                        fiyatBilgi?.fiyat ?? null,
-                        fiyatBilgi?.paraBirimi || "TRY"
+                        fiyat.isTuru,
+                        Number(fiyat.birimFiyat || 0),
+                        String(fiyat.paraBirimi || "TRY").toUpperCase()
                     );
                 });
 
-                if (!katalog.length) {
-                    container.innerHTML =
-                        '<div class="empty">İş kataloğu boş.</div>';
-                }
+                hekimFiyatListesiniYenile();
             }
             catch (error) {
                 container.innerHTML = "";
@@ -17007,9 +17038,10 @@ function togglePrimerAi(){
             paraBirimi = "TRY"
         ) {
             const container = document.getElementById("hekimFiyatSatirlari");
+            container.querySelector(".empty")?.remove();
             const row = document.createElement("div");
             row.className = "price-row";
-            row.style.gridTemplateColumns = "minmax(260px,1fr) 160px 110px";
+            row.style.gridTemplateColumns = "minmax(220px,1fr) 150px 100px 46px";
 
             const fiyatDegeri = birimFiyat === null || birimFiyat === undefined
                 ? ""
@@ -17028,9 +17060,65 @@ function togglePrimerAi(){
                     <option value="TRY"${currency==='TRY'?' selected':''}>TRY ₺</option>
                     <option value="EUR"${currency==='EUR'?' selected':''}>EUR €</option>
                     <option value="USD"${currency==='USD'?' selected':''}>USD $</option>
-                </select>`;
+                </select>
+                <button type="button"
+                        class="icon-delete-button"
+                        title="Bu işi hekimin listesinden çıkar"
+                        onclick="hekimFiyatSatiriSil(this)">×</button>`;
 
             container.appendChild(row);
+            return row;
+        }
+
+        let hekimFiyatKatalog = [];
+
+        function hekimFiyatAnahtar(value) {
+            return String(value || "").trim().toLocaleLowerCase("tr-TR");
+        }
+
+        // Katalog seçicisini (listede olmayan işler) ve boş liste mesajını günceller.
+        function hekimFiyatListesiniYenile() {
+            const container = document.getElementById("hekimFiyatSatirlari");
+            const select = document.getElementById("hekimFiyatKatalogSec");
+            if (!container || !select) return;
+
+            const mevcut = new Set(
+                Array.from(container.querySelectorAll(".doctor-price-name"))
+                    .map(function (input) { return hekimFiyatAnahtar(input.value); })
+            );
+
+            const eklenebilir = hekimFiyatKatalog.filter(function (kalem) {
+                return kalem && kalem.isTuru && !mevcut.has(hekimFiyatAnahtar(kalem.isTuru));
+            });
+
+            select.innerHTML = eklenebilir.length
+                ? '<option value="">Katalogdan iş seç...</option>' +
+                  eklenebilir.map(function (kalem) {
+                      return '<option value="' + escapeHtml(kalem.isTuru) + '">' +
+                          escapeHtml(kalem.isTuru) + '</option>';
+                  }).join("")
+                : '<option value="">Katalogdaki tüm işler listede</option>';
+            select.disabled = !eklenebilir.length;
+
+            if (!container.querySelector(".price-row") && !container.querySelector(".empty")) {
+                container.innerHTML =
+                    '<div class="empty">Bu hekime henüz iş eklenmedi. Yukarıdan katalogdan iş seçip "Listeye Ekle"ye basın.</div>';
+            }
+        }
+
+        function hekimFiyatKatalogdanEkle() {
+            const select = document.getElementById("hekimFiyatKatalogSec");
+            const isTuru = select ? select.value : "";
+            if (!isTuru) return;
+
+            const row = hekimFiyatSatiriEkle(isTuru, null, "TRY");
+            hekimFiyatListesiniYenile();
+            row.querySelector(".doctor-price-value")?.focus();
+        }
+
+        function hekimFiyatSatiriSil(button) {
+            button.closest(".price-row")?.remove();
+            hekimFiyatListesiniYenile();
         }
 
         function hekimFiyatSatirlariniOku() {
@@ -17054,15 +17142,13 @@ function togglePrimerAi(){
                     const raw =
                         String(priceInput.value || "").trim();
 
-                    if (!isTuru || raw === "") {
+                    if (!isTuru) {
                         return;
                     }
 
-                    const birimFiyat = Number(raw);
-
-                    if (!Number.isFinite(birimFiyat)) {
-                        return;
-                    }
+                    // Listede olan işin fiyatı boşsa kaydetmeden önce uyarılır
+                    // (önceden boş fiyatlı iş sessizce listeden düşüyordu).
+                    const birimFiyat = raw === "" ? NaN : Number(raw);
 
                     fiyatlar.push({
                         isTuru: isTuru,
@@ -17098,6 +17184,13 @@ function togglePrimerAi(){
             }
 
             for (const fiyat of fiyatlar) {
+                if (!Number.isFinite(fiyat.birimFiyat)) {
+                    hata.innerText =
+                        "\"" + fiyat.isTuru + "\" için fiyat girin (ücretsizse 0 yazın) veya × ile listeden çıkarın.";
+                    hata.style.display = "block";
+                    return;
+                }
+
                 if (fiyat.birimFiyat < 0) {
                     hata.innerText =
                         "Fiyat 0'dan küçük olamaz.";
@@ -17132,6 +17225,7 @@ function togglePrimerAi(){
                     );
                 }
 
+                hekimIsListesiOnbellek.delete(hekimId);
                 closeHekimFiyatModal();
 
                 showSuccess(
@@ -17333,6 +17427,8 @@ function togglePrimerAi(){
                     );
                 }
 
+                masterKatalogCache=null;
+                hekimIsListesiOnbellek.clear();
                 closeIsKatalogModal();
 
                 showSuccess(
