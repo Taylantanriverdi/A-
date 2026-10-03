@@ -32,8 +32,13 @@ timeout /t 2 /nobreak >nul
 
 echo [3/4] Yeni surum derleniyor...
 rem /MIR kullanilmaz: eski bilgisayardan gelen sayfalar (Hekim Portali) korunur.
-robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /E /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /E /IS /IT /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto GERI_AL
+rem Onceki derleme dosyalari silinir; program her guncellemede sifirdan derlenir.
+rem (Zip'ten cikan dosyalarin saati saat dilimi farki yuzunden eski gorunebiliyor;
+rem  derleyici bu durumda sayfayi yeniden derlemeyip eski surumu birakiyordu.)
+if exist "%KAYNAK%\obj" rmdir /s /q "%KAYNAK%\obj"
+if exist "%KAYNAK%\bin" rmdir /s /q "%KAYNAK%\bin"
 pushd "%KAYNAK%"
 "%DOTNET%" publish PrimerLabV2.csproj -c Release -o "%UYGULAMA%" -nologo
 set "DERLEME=%errorlevel%"
@@ -44,6 +49,7 @@ echo [4/4] Primer Lab baslatiliyor...
 call "%HEDEF%\PrimerLab_Baslat.bat"
 echo.
 echo GUNCELLEME TAMAMLANDI.
+echo Tarayicida eski sayfa gorunuyorsa sayfada Ctrl + F5 tuslarina basin.
 echo Onceki surumun yedegi: %YEDEK%
 pause
 exit /b 0
@@ -51,7 +57,9 @@ exit /b 0
 :GERI_AL
 echo.
 echo HATA: Yeni surum derlenemedi. Onceki surume geri donuluyor...
-robocopy "%YEDEK%" "%KAYNAK%" /MIR /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%YEDEK%" "%KAYNAK%" /MIR /IS /IT /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
+if exist "%KAYNAK%\obj" rmdir /s /q "%KAYNAK%\obj"
+if exist "%KAYNAK%\bin" rmdir /s /q "%KAYNAK%\bin"
 pushd "%KAYNAK%"
 "%DOTNET%" publish PrimerLabV2.csproj -c Release -o "%UYGULAMA%" -nologo >nul
 popd

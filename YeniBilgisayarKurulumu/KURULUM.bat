@@ -275,8 +275,11 @@ echo       Tablolar hazir.
 rem ------------------------------------------------------------
 echo [6/8] Program derleniyor...
 taskkill /F /IM PrimerLabV2.exe >nul 2>&1
-robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /MIR /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
+robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /MIR /IS /IT /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto KOPYA_HATA
+rem Onceki derleme dosyalari silinir; program sifirdan derlenir (eski sayfa kalmasin).
+if exist "%KAYNAK%\obj" rmdir /s /q "%KAYNAK%\obj"
+if exist "%KAYNAK%\bin" rmdir /s /q "%KAYNAK%\bin"
 
 rem Eski bilgisayardan getirilen sayfalar (Hekim Portali vb.). Index.cshtml duzeltilmis surumdur, ezilmez.
 set "PORTAL_SAYFASI="
