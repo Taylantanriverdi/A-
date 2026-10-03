@@ -1,0 +1,293 @@
+@echo off
+setlocal EnableExtensions
+chcp 65001 >nul
+title PRIMER LAB - YENI BILGISAYAR KURULUMU
+
+rem ============================================================
+rem  Yonetici izni gerekli (program kurulumu, guvenlik duvari).
+rem ============================================================
+net session >nul 2>&1
+if errorlevel 1 (
+    echo Yonetici izni isteniyor...
+    powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+
+set "KIT=%~dp0"
+set "HEDEF=C:\PrimerLab"
+set "KAYNAK=%HEDEF%\Kaynak"
+set "UYGULAMA=%HEDEF%\Uygulama"
+set "ESKI=%KIT%ESKI_PC_DOSYALARI"
+set "URL=http://localhost:5169"
+set "DOTNET=%ProgramFiles%\dotnet\dotnet.exe"
+
+echo ============================================================
+echo  PRIMER LAB - YENI BILGISAYAR KURULUMU
+echo ============================================================
+echo  Program klasoru : %HEDEF%
+echo  Bu islem 10-20 dakika surebilir. Pencereyi kapatmayin.
+echo ============================================================
+echo.
+
+if not exist "%KIT%kaynak\PrimerLabV2\PrimerLabV2.csproj" goto KIT_EKSIK
+if not exist "%KIT%kaynak\DB\V33_TAM_KURULUM_SEMA.sql" goto KIT_EKSIK
+if not exist "%HEDEF%" mkdir "%HEDEF%"
+rem Program normal kullanici olarak calisir; is dosyalari ve mail ekleri icin yazabilmeli.
+rem (*S-1-5-32-545 = Users grubu; Turkce Windows'ta grup adi farkli oldugu icin SID kullanilir.)
+icacls "%HEDEF%" /grant "*S-1-5-32-545:(OI)(CI)M" >nul
+
+rem ------------------------------------------------------------
+echo [1/8] Windows paket yoneticisi (winget) kontrol ediliyor...
+where winget >nul 2>&1
+if errorlevel 1 goto WINGET_YOK
+echo       Tamam.
+
+rem ------------------------------------------------------------
+echo [2/8] .NET 10 SDK kontrol ediliyor...
+set "DOTNET_VAR="
+if exist "%DOTNET%" (
+    "%DOTNET%" --list-sdks 2>nul | findstr /b "10." >nul && set "DOTNET_VAR=1"
+)
+if defined DOTNET_VAR (
+    echo       Zaten kurulu.
+) else (
+    echo       Kuruluyor...
+    winget install --id Microsoft.DotNet.SDK.10 -e --silent --accept-package-agreements --accept-source-agreements
+    "%DOTNET%" --list-sdks 2>nul | findstr /b "10." >nul
+    if errorlevel 1 goto DOTNET_HATA
+    echo       Kuruldu.
+)
+
+rem ------------------------------------------------------------
+echo [3/8] Python kontrol ediliyor (eski yedek aktarimi icin)...
+set "PYEXE="
+if exist "%ProgramFiles%\Python312\python.exe" set "PYEXE=%ProgramFiles%\Python312\python.exe"
+if not defined PYEXE (
+    echo       Kuruluyor...
+    winget install --id Python.Python.3.12 -e --silent --scope machine --accept-package-agreements --accept-source-agreements
+    if exist "%ProgramFiles%\Python312\python.exe" set "PYEXE=%ProgramFiles%\Python312\python.exe"
+)
+if defined PYEXE (
+    setx /M PRIMERLAB_PYTHON "%PYEXE%" >nul
+    echo       Tamam: %PYEXE%
+) else (
+    echo       UYARI: Python kurulamadi. Program calisir; yalniz "Eski Yedegi Ice Aktar" calismaz.
+)
+
+rem ------------------------------------------------------------
+echo [4/8] PostgreSQL veritabani sunucusu kontrol ediliyor...
+rem Not: Bu adimda parantezli blok kullanilmaz; blok icindeki %DEGISKEN%'ler
+rem blok okunurken acilir ve blok icinde girilen sifre bos kalirdi.
+call :PG_BUL
+if defined PGBIN goto PG_MEVCUT
+echo.
+echo       PostgreSQL kurulacak. Veritabani yonetici sifresi belirleyin.
+echo       - En az 8 karakter, yalniz harf ve rakam (Turkce karakter ve bosluk yok)
+echo       - BU SIFREYI BIR KAGIDA YAZIN. pgAdmin ve yedekler icin gerekir.
+call :SIFRE_SOR
+echo       PostgreSQL kuruluyor (birkac dakika surebilir)...
+winget install --id PostgreSQL.PostgreSQL.17 -e --silent --accept-package-agreements --accept-source-agreements --override "--mode unattended --unattendedmodeui none --superpassword %PGPASS% --serverport 5432"
+call :PG_BUL
+if not defined PGBIN goto PG_HATA
+echo       Kuruldu: %PGBIN%
+goto PG_SIFRE_TAMAM
+:PG_MEVCUT
+echo       Zaten kurulu: %PGBIN%
+echo.
+echo       Kurulu PostgreSQL'in "postgres" kullanici sifresini yazin.
+call :SIFRE_SOR
+:PG_SIFRE_TAMAM
+set "PGPASSWORD=%PGPASS%"
+set "PSQL="%PGBIN%\psql.exe" -h localhost -p 5432 -U postgres -v ON_ERROR_STOP=1 -q -X"
+
+echo       Sunucuya baglaniliyor...
+set /a DENEME=0
+:PG_BEKLE
+%PSQL% -d postgres -c "SELECT 1" >nul 2>&1
+if not errorlevel 1 goto PG_HAZIR
+set /a DENEME+=1
+if %DENEME% GEQ 30 goto PG_BAGLANTI_HATA
+timeout /t 2 /nobreak >nul
+goto PG_BEKLE
+:PG_HAZIR
+echo       Baglanti tamam.
+
+rem ------------------------------------------------------------
+echo [5/8] Primer Lab veritabani hazirlaniyor...
+for /f "delims=" %%P in ('powershell -NoProfile -Command "-join ((48..57)+(65..90)+(97..122) | Get-Random -Count 24 | ForEach-Object {[char]$_})"') do set "APPPASS=%%P"
+if not defined APPPASS goto DB_HATA
+
+%PSQL% -d postgres -c "DO $$BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='primerlab_app') THEN CREATE ROLE primerlab_app LOGIN PASSWORD '%APPPASS%'; ELSE ALTER ROLE primerlab_app LOGIN PASSWORD '%APPPASS%'; END IF; END$$;"
+if errorlevel 1 goto DB_HATA
+
+set "DBVAR="
+%PSQL% -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='primerlab'" | findstr /x "1" >nul && set "DBVAR=1"
+if not defined DBVAR (
+    %PSQL% -d postgres -c "CREATE DATABASE primerlab ENCODING 'UTF8' TEMPLATE template0;"
+    if errorlevel 1 goto DB_HATA
+    echo       Veritabani olusturuldu.
+) else (
+    echo       Veritabani zaten var; veriler korunuyor.
+)
+%PSQL% -d postgres -c "GRANT CONNECT, TEMPORARY ON DATABASE primerlab TO primerlab_app;"
+if errorlevel 1 goto DB_HATA
+%PSQL% -d primerlab -f "%KIT%kaynak\DB\V33_TAM_KURULUM_SEMA.sql"
+if errorlevel 1 goto DB_HATA
+echo       Tablolar hazir.
+
+rem ------------------------------------------------------------
+echo [6/8] Program derleniyor...
+taskkill /F /IM PrimerLabV2.exe >nul 2>&1
+robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /MIR /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
+if errorlevel 8 goto KOPYA_HATA
+
+rem Eski bilgisayardan getirilen sayfalar (Hekim Portali vb.). Index.cshtml duzeltilmis surumdur, ezilmez.
+set "PORTAL_SAYFASI="
+if exist "%ESKI%\Pages" (
+    robocopy "%ESKI%\Pages" "%KAYNAK%\Pages" *.cshtml *.cs /S /XF Index.cshtml Index.cshtml.cs /NFL /NDL /NJH /NJS /NP >nul
+    if errorlevel 8 goto KOPYA_HATA
+)
+if exist "%ESKI%\wwwroot" (
+    robocopy "%ESKI%\wwwroot" "%KAYNAK%\wwwroot" /E /NFL /NDL /NJH /NJS /NP >nul
+    if errorlevel 8 goto KOPYA_HATA
+)
+findstr /s /m /i /c:"hekim-portal" "%KAYNAK%\Pages\*.cshtml" | findstr /v /i "\\Index.cshtml" >nul && set "PORTAL_SAYFASI=1"
+
+pushd "%KAYNAK%"
+"%DOTNET%" publish PrimerLabV2.csproj -c Release -o "%UYGULAMA%" -nologo
+set "DERLEME=%errorlevel%"
+popd
+if not "%DERLEME%"=="0" goto DERLEME_HATA
+
+rem Baglanti bilgisi yalniz bu bilgisayarda; kullanicilar okuyabilir, yalniz yonetici degistirebilir.
+powershell -NoProfile -Command "$j = @{ ConnectionStrings = @{ DefaultConnection = 'Host=localhost;Port=5432;Database=primerlab;Username=primerlab_app;Password=%APPPASS%' } } | ConvertTo-Json; [IO.File]::WriteAllText('%UYGULAMA%\appsettings.Production.json', $j)"
+if errorlevel 1 goto DB_HATA
+icacls "%UYGULAMA%\appsettings.Production.json" /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" "*S-1-5-32-545:R" >nul
+
+rem Eski bilgisayarin dosyalari (is dosyalari, mail ekleri). Secrets klasoru bu bilgisayarda acilamaz, alinmaz.
+if exist "%ESKI%\App_Data" (
+    echo       Eski is dosyalari kopyalaniyor...
+    robocopy "%ESKI%\App_Data" "%UYGULAMA%\App_Data" /E /XD Secrets /XO /NFL /NDL /NJH /NJS /NP >nul
+    if errorlevel 8 goto KOPYA_HATA
+)
+echo       Derleme tamam.
+
+rem ------------------------------------------------------------
+echo [7/8] Kisayollar ve guvenlik duvari ayarlaniyor...
+copy /Y "%KIT%PrimerLab_Baslat.bat" "%HEDEF%\PrimerLab_Baslat.bat" >nul
+copy /Y "%KIT%PrimerLab_Durdur.bat" "%HEDEF%\PrimerLab_Durdur.bat" >nul
+powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Primer Lab.lnk'); $s.TargetPath='%HEDEF%\PrimerLab_Baslat.bat'; $s.WorkingDirectory='%HEDEF%'; $s.WindowStyle=7; $s.IconLocation='%SystemRoot%\System32\shell32.dll,13'; $s.Save()"
+rem Hekim Portali ayni Wi-Fi'deki cihazlardan acilabilsin (yalniz "Ozel" ag profili).
+netsh advfirewall firewall delete rule name="Primer Lab 5169" >nul 2>&1
+netsh advfirewall firewall add rule name="Primer Lab 5169" dir=in action=allow protocol=TCP localport=5169 profile=private >nul
+echo.
+choice /c EH /n /m "      Bilgisayar acilinca Primer Lab otomatik baslasin mi? (E/H): "
+if errorlevel 2 (
+    del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\Primer Lab.lnk" >nul 2>&1
+) else (
+    powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Startup')+'\Primer Lab.lnk'); $s.TargetPath='%HEDEF%\PrimerLab_Baslat.bat'; $s.Arguments='sessiz'; $s.WorkingDirectory='%HEDEF%'; $s.WindowStyle=7; $s.Save()"
+)
+
+rem ------------------------------------------------------------
+echo [8/8] Primer Lab baslatiliyor...
+pushd "%UYGULAMA%"
+start "PrimerLab" /min "%UYGULAMA%\PrimerLabV2.exe"
+popd
+powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 60;$i++){ try { if((Invoke-WebRequest -UseBasicParsing '%URL%' -TimeoutSec 2).StatusCode -eq 200){$ok=$true;break} } catch {}; Start-Sleep 1 }; if(-not $ok){exit 1}"
+if errorlevel 1 goto BASLATMA_HATA
+
+rem Eski bilgisayardan alinan tam yedek varsa geri yuklemeyi teklif et.
+set "YEDEK="
+for %%F in ("%ESKI%\*.json") do set "YEDEK=%%~fF"
+if defined YEDEK (
+    echo.
+    echo       Eski bilgisayarin yedegi bulundu: "%YEDEK%"
+    choice /c EH /n /m "      Bu yedek simdi geri yuklensin mi? Yeni veritabanindaki veriler yedektekiyle degisir. (E/H): "
+    if not errorlevel 2 (
+        curl.exe -s -o "%HEDEF%\geri_yukleme_sonucu.txt" -w "%%{http_code}" -F "file=@%YEDEK%" -F "confirm=RESTORE" "%URL%/api/backup/restore" > "%HEDEF%\geri_yukleme_kodu.txt"
+        findstr /x "200" "%HEDEF%\geri_yukleme_kodu.txt" >nul
+        if errorlevel 1 (
+            echo       UYARI: Yedek geri yuklenemedi. Ayrinti: %HEDEF%\geri_yukleme_sonucu.txt
+        ) else (
+            echo       Yedek basariyla geri yuklendi.
+        )
+    )
+)
+
+start "" "%URL%"
+echo.
+echo ============================================================
+echo  KURULUM TAMAMLANDI
+echo ============================================================
+echo  - Masaustundeki "Primer Lab" kisayolu ile acabilirsiniz.
+echo  - Adres: %URL%
+if not defined PORTAL_SAYFASI (
+echo.
+echo  DIKKAT: Hekim Portali sayfasi bulunamadi.
+echo  Eski bilgisayardaki proje klasorunun "Pages" klasorunu
+echo  ESKI_PC_DOSYALARI klasorune kopyalayip KURULUM.bat'i tekrar calistirin.
+)
+echo.
+echo  Gmail baglantisini ve Primer AI anahtarini Ayarlar'dan yeniden girin
+echo  ^(guvenlik geregi eski bilgisayarin sifreli anahtarlari burada acilamaz^).
+echo ============================================================
+pause
+exit /b 0
+
+rem ============================================================
+:PG_BUL
+set "PGBIN="
+for /f "delims=" %%D in ('dir /b /ad /o-n "%ProgramFiles%\PostgreSQL" 2^>nul') do (
+    if not defined PGBIN if exist "%ProgramFiles%\PostgreSQL\%%D\bin\psql.exe" set "PGBIN=%ProgramFiles%\PostgreSQL\%%D\bin"
+)
+exit /b 0
+
+:SIFRE_SOR
+set "PGPASS="
+set /p "PGPASS=      Sifre: "
+if not defined PGPASS goto SIFRE_SOR
+powershell -NoProfile -Command "if ($env:PGPASS -cmatch '^[A-Za-z0-9]{8,64}$') { exit 0 } else { exit 1 }"
+if errorlevel 1 (
+    echo       Gecersiz: en az 8 karakter, yalniz harf ve rakam kullanin.
+    goto SIFRE_SOR
+)
+exit /b 0
+
+rem ============================================================
+:KIT_EKSIK
+echo HATA: Kurulum dosyalari eksik. Zip dosyasinin tamamini acip KURULUM.bat'i oradan calistirin.
+goto SON_HATA
+:WINGET_YOK
+echo HATA: Windows "Uygulama Yukleyici" (winget) bulunamadi.
+echo Microsoft Store aciliyor; "Uygulama Yukleyici"yi guncelleyip KURULUM.bat'i tekrar calistirin.
+start "" "ms-windows-store://pdp/?productid=9NBLGGH4NNS1"
+goto SON_HATA
+:DOTNET_HATA
+echo HATA: .NET 10 SDK kurulamadi. Internet baglantisini kontrol edip tekrar deneyin.
+goto SON_HATA
+:PG_HATA
+echo HATA: PostgreSQL kurulamadi. Internet baglantisini kontrol edip tekrar deneyin.
+goto SON_HATA
+:PG_BAGLANTI_HATA
+echo HATA: PostgreSQL'e baglanilamadi. Sifre yanlis olabilir veya servis calismiyor olabilir.
+echo KURULUM.bat'i tekrar calistirip sifreyi dikkatle yazin.
+goto SON_HATA
+:DB_HATA
+echo HATA: Veritabani hazirlanamadi. Yukaridaki hata mesajini Claude'a iletin.
+goto SON_HATA
+:KOPYA_HATA
+echo HATA: Dosyalar kopyalanamadi. C:\PrimerLab klasorunun acik olmadigindan emin olun.
+goto SON_HATA
+:DERLEME_HATA
+echo HATA: Program derlenemedi. Yukaridaki hata mesajini Claude'a iletin.
+goto SON_HATA
+:BASLATMA_HATA
+echo HATA: Program baslatildi ancak acilmadi.
+echo Ayrinti icin %UYGULAMA% klasorunde PrimerLabV2.exe'yi cift tiklayip mesaji okuyun.
+goto SON_HATA
+:SON_HATA
+echo.
+echo Kurulum tamamlanmadi. Sorunu giderip KURULUM.bat'i tekrar calistirabilirsiniz;
+echo tamamlanan adimlar atlanir, veriler silinmez.
+pause
+exit /b 1

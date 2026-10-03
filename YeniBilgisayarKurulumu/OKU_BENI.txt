@@ -1,0 +1,70 @@
+﻿PRIMER LAB - YENI BILGISAYARA KURULUM REHBERI
+=============================================
+
+Toplam sure: yaklasik 30 dakika. Internet baglantisi gerekir.
+
+
+A) ESKI BILGISAYARDA (verilerinizi tasimak icin) - 5 dakika
+------------------------------------------------------------
+1. Primer Lab'i acin ve Ayarlar bolumunden TAM YEDEK indirin.
+   (Dosya adi "PrimerLab_Backup_....json" seklindedir.)
+
+2. Eski proje klasorunu acin:
+   C:\Users\Primer\Desktop\DentalLab\PrimerLabV2\PrimerLabV2
+
+3. Bir USB bellege sunlari kopyalayin:
+   - Indirdiginiz yedek dosyasi (.json)
+   - "Pages" klasoru          (Hekim Portali sayfasi bunun icindedir - ONEMLI)
+   - "App_Data" klasoru       (is dosyalari, taramalar, mail ekleri)
+   - "wwwroot" klasoru        (varsa)
+
+
+B) YENI BILGISAYARDA - 25 dakika
+---------------------------------
+4. Bu zip dosyasini masaustune acin.
+
+5. USB'deki dosyalari bu klasordeki "ESKI_PC_DOSYALARI" klasorune koyun:
+   ESKI_PC_DOSYALARI\PrimerLab_Backup_....json
+   ESKI_PC_DOSYALARI\Pages\...
+   ESKI_PC_DOSYALARI\App_Data\...
+
+6. KURULUM.bat dosyasina cift tiklayin.
+   - "Bu uygulamanin degisiklik yapmasina izin verilsin mi?" sorusuna EVET deyin.
+   - Sizden bir veritabani sifresi isteyecek. En az 8 karakter, yalniz harf
+     ve rakam kullanin (orn: PrimerLab2026). BU SIFREYI BIR KAGIDA YAZIN.
+   - Program .NET, PostgreSQL ve Python'u kendisi indirip kurar.
+   - "Otomatik baslasin mi?" sorusuna E derseniz bilgisayar acilinca program
+     arka planda kendiliginden calisir.
+   - "Yedek geri yuklensin mi?" sorusuna E deyin; eski verileriniz gelir.
+
+7. Kurulum bitince tarayici acilir. Sonra masaustundeki "Primer Lab"
+   kisayolu ile acabilirsiniz.
+
+8. Ayarlar bolumunden sunlari YENIDEN yapin (guvenlik geregi tasinmaz):
+   - Gmail baglantisi (credentials.json yukle + Baglan)
+   - Primer AI (OpenAI) anahtari
+   Hekim portal hesaplari ve sifreleri yedekle birlikte gelir.
+
+
+SIK SORULANLAR
+--------------
+- Kurulum yarida kaldi / hata verdi:
+  Hatayi giderip KURULUM.bat'i tekrar calistirin. Tamamlanan adimlar atlanir,
+  veriler silinmez. Hata mesajinin fotografini Claude'a gonderebilirsiniz.
+
+- "Hekim Portali sayfasi bulunamadi" uyarisi:
+  Eski bilgisayardaki "Pages" klasorunu ESKI_PC_DOSYALARI'na koyup
+  KURULUM.bat'i tekrar calistirin.
+
+- Hekimler portala nasil girer?
+  Ayni Wi-Fi'deki cihazdan: http://BU-BILGISAYARIN-IP-ADRESI:5169/hekim-portal
+  (IP adresini Ayarlar > Hekim Portal Hesabi ekraninda gorebilirsiniz.)
+  Windows ag profili "Ozel" olmalidir (Ayarlar > Ag ve Internet).
+
+- Programi kapatmak: C:\PrimerLab\PrimerLab_Durdur.bat
+- Program dosyalari: C:\PrimerLab\Uygulama
+- Is dosyalari:      C:\PrimerLab\Uygulama\App_Data
+
+- PostgreSQL sifresini unuttum:
+  Program calismaya devam eder (kendi ayri sifresini kullanir). Yalniz
+  pgAdmin ile bakim yaparken gerekir.
