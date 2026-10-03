@@ -1062,6 +1062,21 @@
             #siparisFormu{position:absolute;left:0;top:0;width:100%;background:#fff}
             .sidebar,.ref-order-top,.ref-history,.global-new-job,.ai-fab,.ai-panel{display:none!important}
             .ref-order-paper{box-shadow:none;border:0;max-width:100%;padding:0}
+
+            /* Sipariş formu tek A5 sayfası: ölçek (--a5-zoom) yazdırmadan önce hesaplanır. */
+            body.print-a5 #siparisFormu{padding:0!important;margin:0!important}
+            body.print-a5 #siparisFormu .ref-order-paper{zoom:var(--a5-zoom,1);padding:7mm!important;margin:0!important;width:auto!important;max-width:none!important}
+            body.print-a5 .ref-order-paper .ref-add-line,
+            body.print-a5 .ref-order-paper .ref-help,
+            body.print-a5 .ref-order-paper .an-job-line button{display:none!important}
+            body.print-a5 .ref-order-paper select,
+            body.print-a5 .ref-order-paper input:not([type=radio]):not([type=checkbox]){-webkit-appearance:none;appearance:none;background-image:none!important}
+            body.print-a5 .ref-order-paper input[type=number]{-moz-appearance:textfield}
+            body.print-a5 .ref-order-paper input::-webkit-outer-spin-button,
+            body.print-a5 .ref-order-paper input::-webkit-inner-spin-button,
+            body.print-a5 .ref-order-paper input::-webkit-calendar-picker-indicator{display:none;-webkit-appearance:none}
+            body.print-a5 .ref-order-paper .ref-box{break-inside:avoid}
+            body.print-a5 .ref-order-paper textarea{resize:none;overflow:hidden}
         }
 
         .constitution-grid{
@@ -14127,6 +14142,30 @@
                 showError("Yazdırmadan önce siparişi Onaya Gönder.");
                 return;
             }
+            const paper=document.querySelector('#siparisFormu .ref-order-paper');
+            if(!paper){ window.print(); return; }
+
+            // Çıktı tek bir A5 (148 x 210 mm) dikey sayfaya sığdırılır. Sayfa kenar boşluğu
+            // 0 verilir (tarayıcının tarih/adres satırları çıkmaz), boşluk formun içinde (7 mm).
+            const sayfa=document.createElement('style');
+            sayfa.id='a5YazdirmaSayfasi';
+            sayfa.textContent='@@page{size:A5 portrait;margin:0}';
+            document.head.appendChild(sayfa);
+
+            // Ölçek: formun ekrandaki genişliği ve yüksekliği A5'in kullanılabilir alanına sığacak kadar.
+            const mm=96/25.4, kenar=7*2;
+            const genislik=Math.max(1,paper.scrollWidth), yukseklik=Math.max(1,paper.scrollHeight);
+            const olcek=Math.min(1,(148-kenar)*mm/genislik,(210-kenar)*mm/yukseklik)*0.97;
+            paper.style.setProperty('--a5-zoom',String(olcek));
+            document.body.classList.add('print-a5');
+
+            const temizle=function(){
+                document.body.classList.remove('print-a5');
+                paper.style.removeProperty('--a5-zoom');
+                document.getElementById('a5YazdirmaSayfasi')?.remove();
+                window.removeEventListener('afterprint',temizle);
+            };
+            window.addEventListener('afterprint',temizle);
             window.print();
         }
 
