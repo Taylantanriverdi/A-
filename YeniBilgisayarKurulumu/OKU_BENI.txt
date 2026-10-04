@@ -273,3 +273,17 @@ Ucret: kisi yazdiktan sonraki 24 saatteki cevaplar ucretsiz; sablonla giden
 bildirimler mesaj basina birkac kurus-sent. Test numarasi en fazla 5 kayitli
 numaraya yazabilir; hekimlere yaygin bildirim icin ileride gercek isletme
 numarasi eklenir (yalniz Phone number ID ve jeton degisir).
+
+
+SIPARIS FORMU CIKTISINDA TARAMA GORUNTULERI
+------------------------------------------
+Hekimin (veya sizin) ise ekledigi STL / PLY / OBJ tarama dosyalari, Siparis
+Formu yazdirilirken formun altina resim olarak eklenir:
+  UST CENE (cigneme yuzeyinden, on disler yukarida)
+  ALT CENE (cigneme yuzeyinden, on disler asagida)
+  KAPANIS  (iki cene birlikte, onden; ust cene ustte)
+Dosyalar adindan taninir: upper/ust/maxilla, lower/alt/mandible,
+bite/kapanis/buccal. Adi taninmayan taramalar sirayla ust ve alt cene yerine
+konur (dosya adi resmin altinda yazar). Tasarim dosyalari eklenmez.
+Kapanis resmi, ayri bite dosyasi yerine ust ve alt cene birlikte cizilerek
+olusturulur (tarayicilar ikisini ayni konumda verir).
