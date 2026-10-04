@@ -130,7 +130,9 @@ public sealed class PrimerLabSecurityMiddleware
             path.StartsWithSegments("/hekim-portal") ||
             (path.StartsWithSegments("/api/hekim-portal") && !path.StartsWithSegments("/api/hekim-portal/admin")) ||
             path.StartsWithSegments("/teknisyen") ||
-            (path.StartsWithSegments("/api/teknisyen-portal") && !path.StartsWithSegments("/api/teknisyen-portal/admin"));
+            (path.StartsWithSegments("/api/teknisyen-portal") && !path.StartsWithSegments("/api/teknisyen-portal/admin")) ||
+            // WhatsApp (Meta) webhook'u: istekler Meta imzasıyla doğrulanır.
+            path.Equals("/api/whatsapp/webhook", StringComparison.OrdinalIgnoreCase);
 
         if (!allowed)
         {

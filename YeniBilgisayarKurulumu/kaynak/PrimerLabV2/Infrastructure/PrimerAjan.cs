@@ -59,10 +59,14 @@ public sealed class PrimerAjan
 
     // ================================================================ ana döngü
 
-    public async Task<Sonuc> CalistirAsync(YapayZekaAyari ayar, string mesaj, IReadOnlyList<(string Rol, string Icerik)> gecmis, CancellationToken ct)
+    private string? _kanalTalimati;
+
+    /// <param name="kanalTalimati">Kanala özel ek talimat (ör. WhatsApp: kısa cevap, sayfa açma önerme).</param>
+    public async Task<Sonuc> CalistirAsync(YapayZekaAyari ayar, string mesaj, IReadOnlyList<(string Rol, string Icerik)> gecmis, CancellationToken ct, string? kanalTalimati = null)
     {
         _oneriler.Clear();
         _adimlar.Clear();
+        _kanalTalimati = kanalTalimati;
         return YapayZekaServisi.YerelAracDestegi(ayar.Saglayici)
             ? await YerelAraclaAsync(ayar, mesaj, gecmis, ct)
             : await JsonProtokoluyleAsync(ayar, mesaj, gecmis, ct);
@@ -70,7 +74,7 @@ public sealed class PrimerAjan
 
     private async Task<Sonuc> YerelAraclaAsync(YapayZekaAyari ayar, string mesaj, IReadOnlyList<(string Rol, string Icerik)> gecmis, CancellationToken ct)
     {
-        var mesajlar = new List<JsonObject> { new() { ["role"] = "system", ["content"] = SistemTalimati() } };
+        var mesajlar = new List<JsonObject> { new() { ["role"] = "system", ["content"] = SistemTalimati() + (_kanalTalimati ?? "") } };
         foreach (var (rol, icerik) in gecmis)
             mesajlar.Add(new JsonObject { ["role"] = rol == "user" ? "user" : "assistant", ["content"] = icerik });
         mesajlar.Add(new JsonObject { ["role"] = "user", ["content"] = mesaj });
@@ -112,7 +116,7 @@ public sealed class PrimerAjan
             katalog.Append("- ").Append(f["name"]).Append(": ").Append(f["description"]).Append(" Parametreler: ")
                 .AppendLine(f["parameters"]!.ToJsonString(Js));
         }
-        var sistem = SistemTalimati() + """
+        var sistem = SistemTalimati() + (_kanalTalimati ?? "") + """
 
 
 ARAÇ KULLANIMI (JSON PROTOKOLÜ):

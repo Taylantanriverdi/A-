@@ -184,6 +184,21 @@ public sealed class PortalHesaplariController : ControllerBase
         return Ok(new { message = "E-posta kaydedildi." });
     }
 
+    /// <summary>WhatsApp bildirimleri için telefon (hekimde hekim kartındaki telefon güncellenir).</summary>
+    [HttpPost("{tur}/{id:int}/telefon")]
+    public async Task<IActionResult> Telefon(string tur, int id, [FromBody] HesapTelefonDto dto, CancellationToken ct)
+    {
+        if (!GuvenlikController.AnaBilgisayar(HttpContext)) return GuvenlikController.Yasak();
+        if (tur is not ("hekim" or "teknisyen")) return BadRequest("Geçersiz hesap türü.");
+        var ham = (dto.Telefon ?? "").Trim();
+        if (ham.Length > 0 && WhatsAppServisi.Numara(ham) == null) return BadRequest("Telefon numarası geçersiz (ör. 0532 123 45 67).");
+        var tel = ham.Length == 0 ? null : ham;
+        _kimlik.BilgiGuncelle(tur + ":" + id, b => b.Telefon = tel);
+        if (tur == "hekim")
+            await _db.Database.ExecuteSqlInterpolatedAsync($"""UPDATE "Hekimler" SET "Telefon"={tel} WHERE "Id"={id}""", ct);
+        return Ok(new { message = "Telefon kaydedildi." });
+    }
+
     /// <summary>
     /// Kendi kaydını yapan hekimi laboratuvardaki mevcut hekim kartına bağlar (aynı kişi iki kez
     /// görünmesin; mevcut fiyat listesi ve işleri portalda görünsün). Kayıtla açılan boş kart pasife alınır.
@@ -309,6 +324,7 @@ public sealed class HesapDurumDto { public bool Aktif { get; set; } }
 public sealed class HesapSifreDto { public string? YeniParola { get; set; } }
 public sealed class HesapEpostaDto { public string? Eposta { get; set; } }
 public sealed class HekimEslestirDto { public int HedefHekimId { get; set; } }
+public sealed class HesapTelefonDto { public string? Telefon { get; set; } }
 
 public sealed class EpostaAyarDto
 {

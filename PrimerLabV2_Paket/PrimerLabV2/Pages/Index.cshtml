@@ -2644,6 +2644,7 @@
         .ph-kutu span{font-size:12px;color:#64748b;font-weight:700}
         .ph-filtre{display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px 4px}
         .ph-filtre select,.ph-filtre input{max-width:260px}
+        .wa-kart>label.checkbox-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:7px 0}
         .ph-smtp{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
         .ph-etiket{display:inline-block;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:800;white-space:nowrap}
         .ph-aktif{background:#ecfdf5;color:#15803d}.ph-pasif{background:#f1f5f9;color:#64748b}.ph-onay{background:#fffbeb;color:#b45309}
@@ -4626,6 +4627,58 @@
                 <div class="panel" style="border-color:#bfdbfe">
                   <div class="panel-header"><div><div class="panel-title">Primer AI — Yapay Zekâ Bağlantısı</div><div class="page-subtitle">DeepSeek, Claude (Anthropic) veya OpenAI kullanabilirsiniz. Anahtarlar tarayıcıda tutulmaz; bu bilgisayarda şifrelenerek saklanır. Primer AI bir <b>ajan</b> olarak çalışır: sorunuzu cevaplamak için işleri, hekimleri, cari hesapları, raporları, mesajları, dosyaları ve gerekirse veritabanının tamamını kendisi sorgular; veri değiştiren işlemleri yalnız önerir, siz onaylayınca uygulanır.</div></div></div>
                   <div style="padding:18px 22px"><div class="ai-config-grid"><div class="form-group" style="margin:0"><label for="aiProviderSelect">Sağlayıcı</label><select id="aiProviderSelect" onchange="primerAiSaglayiciDegisti()"><option value="deepseek">DeepSeek</option><option value="claude">Claude (Anthropic)</option><option value="openai">OpenAI</option></select></div><div class="form-group" style="margin:0"><label for="aiApiKeyInput" id="aiApiKeyLabel">Claude API Anahtarı</label><input id="aiApiKeyInput" type="password" autocomplete="new-password" placeholder="sk-ant-..." /></div><div class="form-group" style="margin:0"><label for="aiModelSelect">Model</label><select id="aiModelSelect"></select></div><button type="button" class="button button-blue" onclick="primerAiAyarKaydet()">Kaydet + Kullan</button><button type="button" class="button button-light" onclick="primerAiAnahtarSil()">Anahtarı Sil</button></div><div id="aiSettingsStatus" class="price-list-note" style="margin-top:10px">Durum kontrol ediliyor...</div><div class="ai-security-note"><span id="aiKeyNote"></span> Anahtarı kayıtlı bir sağlayıcıya geçmek veya modeli değiştirmek için anahtar alanını boş bırakıp Kaydet + Kullan'a basın. Primer AI veritabanını yalnız salt-okunur sorgularla okur (şifre alanlarına erişemez); kalıcı silme yapamaz. Veri değiştiren her işlemi düğme olarak önerir, siz onaylamadan hiçbir şey değişmez.</div></div>
+                </div>
+                <div class="panel" style="margin-top:16px;border-color:#86efac">
+                  <div class="panel-header"><div><div class="panel-title">💬 WhatsApp — Primer AI ve Bildirimler</div><div class="page-subtitle">Kendi WhatsApp'ınızdan Primer AI'ya yazın; hekimlere iş durumu ve teknisyenlere yeni iş bildirimi gitsin, her sabah özet gelsin. Meta'nın resmi WhatsApp Cloud API'si kullanılır.</div></div></div>
+                  <div class="wa-kart" style="padding:14px 22px 18px">
+                    <details style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:800;color:#15803d">📘 Kurulum adımları (bir kez, ~20 dk)</summary>
+                      <ol style="font-size:13px;line-height:1.6;margin:8px 0 0 18px">
+                        <li><b>developers.facebook.com</b> → Facebook hesabınızla giriş → <b>My Apps → Create App</b> → kullanım: <b>“Other” → “Business”</b> → uygulamaya ad verin.</li>
+                        <li>Uygulamada <b>WhatsApp → Set up</b>. Meta size ücretsiz bir <b>test numarası</b> verir. <b>API Setup</b> sayfasında <b>“To”</b> listesine <b>kendi WhatsApp numaranızı</b> ekleyip gelen kodla doğrulayın.</li>
+                        <li>Aynı sayfadan <b>Phone number ID</b> ve <b>Temporary access token</b>'ı kopyalayıp aşağıya yazın. (Geçici jeton 24 saat geçerlidir; kalıcı için: business.facebook.com → Ayarlar → Sistem kullanıcıları → yeni kullanıcı → uygulamayı ata → “Token oluştur”, izinler: <i>whatsapp_business_messaging</i>, <i>whatsapp_business_management</i>.)</li>
+                        <li>Uygulama → <b>App settings → Basic → App secret</b> → “Show” → aşağıdaki <b>Uygulama gizli anahtarı</b>na yazın (gelen mesajların gerçekten Meta'dan geldiğini doğrular; zorunlu).</li>
+                        <li><b>PORTAL_INTERNET_AC.bat</b> ile internet adresi açık olmalı. WhatsApp → <b>Configuration → Webhook → Edit</b>: <b>Callback URL</b> = aşağıdaki Webhook adresi, <b>Verify token</b> = aşağıdaki doğrulama jetonu → <b>Verify and save</b>. Sonra <b>Webhook fields</b>'te <b>messages</b> için <b>Subscribe</b>.</li>
+                        <li>Bildirim şablonu: <b>business.facebook.com → WhatsApp Manager → Mesaj şablonları → Şablon oluştur</b> → Kategori <b>Utility (Yardımcı)</b>, ad <b>primer_bildirim</b>, dil <b>Türkçe</b>, gövde: <code>Primer Dental Lab bildirimi: {{1}}</code> → onaya gönder. (Siz son 24 saatte yazdıysanız şablon gerekmez.)</li>
+                        <li>Aşağıyı doldurup <b>Kaydet</b> → <b>Deneme Mesajı</b>. Sonra telefonunuzdan test numarasına “merhaba” yazın.</li>
+                      </ol>
+                      <div class="price-list-note" style="margin-top:6px">Ücret: Size ya da hekime, kişi yazdıktan sonraki 24 saat içinde verilen cevaplar ücretsizdir. Bildirim ve sabah özeti gibi sizin başlattığınız şablon mesajlar mesaj başına birkaç kuruş–sent tutar (Meta fiyat listesi). Test numarası en fazla 5 kayıtlı numaraya mesaj atabilir; hekimlere bildirim için ileride gerçek bir işletme numarası eklenir (yalnız Phone number ID ve jeton değişir).</div>
+                    </details>
+                    <label class="checkbox-line"><input id="waAktif" type="checkbox" /> <span><b>WhatsApp açık</b></span></label>
+                    <div class="ph-smtp" style="margin-top:8px">
+                      <div class="form-group" style="margin:0"><label for="waPnid">Telefon numarası kimliği (Phone number ID)</label><input id="waPnid" inputmode="numeric" /></div>
+                      <div class="form-group" style="margin:0"><label for="waJeton">Erişim jetonu (Access token)</label><input id="waJeton" type="password" autocomplete="new-password" /></div>
+                      <div class="form-group" style="margin:0"><label for="waSir">Uygulama gizli anahtarı (App secret)</label><input id="waSir" type="password" autocomplete="new-password" /></div>
+                      <div class="form-group" style="margin:0"><label for="waSurum">API sürümü</label><input id="waSurum" placeholder="v23.0" /></div>
+                    </div>
+                    <div class="ph-smtp" style="margin-top:10px">
+                      <div class="form-group" style="margin:0"><label>Webhook adresi (Callback URL)</label><div style="display:flex;gap:6px"><input id="waWebhook" readonly /><button type="button" class="button button-light" onclick="waKopyala('waWebhook')">Kopyala</button></div></div>
+                      <div class="form-group" style="margin:0"><label>Doğrulama jetonu (Verify token)</label><div style="display:flex;gap:6px"><input id="waVerify" readonly /><button type="button" class="button button-light" onclick="waKopyala('waVerify')">Kopyala</button></div></div>
+                    </div>
+                    <div class="form-group" style="margin-top:10px"><label for="waYoneticiler">Yönetici WhatsApp numaraları (Primer AI'ya tam yetkiyle yazabilecekler; her satıra bir numara, ör. 0532 123 45 67)</label><textarea id="waYoneticiler" rows="2" style="width:100%"></textarea></div>
+                    <label class="checkbox-line"><input id="waHekimSorgu" type="checkbox" /> <span>Hekimler WhatsApp'tan <b>kendi işlerinin durumunu</b> sorabilsin (hekim kartındaki telefonla tanınır; yalnız kendi işlerini görür, fiyat görmez; istekleri size iletilir)</span></label>
+                    <label class="checkbox-line"><input id="waHekimBildirim" type="checkbox" /> <span>Hekime durum bildirimi:</span>
+                      <span style="display:inline-flex;gap:12px;flex-wrap:wrap;margin-left:8px">
+                        <label><input type="checkbox" class="waOlay" value="Onaylandı" /> işe alındı</label>
+                        <label><input type="checkbox" class="waOlay" value="Tasarımda" /> tasarımda</label>
+                        <label><input type="checkbox" class="waOlay" value="Üretimde" /> üretimde</label>
+                        <label><input type="checkbox" class="waOlay" value="Tamamlandı" /> tamamlandı</label>
+                      </span></label>
+                    <label class="checkbox-line"><input id="waTeknisyen" type="checkbox" /> <span>Teknisyene <b>yeni iş atandı</b> bildirimi (telefonu Portal Hesapları → Telefon'dan girilir)</span></label>
+                    <label class="checkbox-line"><input id="waOzet" type="checkbox" /> <span>Her sabah yöneticilere <b>günün özeti</b>, saat</span> <select id="waOzetSaat" style="width:auto;margin-left:6px"></select></label>
+                    <label class="checkbox-line"><input id="waKisalt" type="checkbox" /> <span>Bildirimlerde hasta adını kısalt (Ayşe Yılmaz → A. Y.) — KVKK için önerilir</span></label>
+                    <div class="ph-smtp" style="margin-top:8px">
+                      <div class="form-group" style="margin:0"><label for="waSablon">Bildirim şablonu adı</label><input id="waSablon" placeholder="primer_bildirim" /></div>
+                      <div class="form-group" style="margin:0"><label for="waDil">Şablon dili</label><input id="waDil" placeholder="tr" /></div>
+                    </div>
+                    <div class="button-group" style="margin-top:12px">
+                      <button type="button" class="button button-blue" onclick="waKaydet()">Kaydet</button>
+                      <button type="button" class="button button-light" onclick="waDeneme()">Deneme Mesajı</button>
+                      <button type="button" class="button button-light" onclick="waOzetGonder()">Özeti Şimdi Gönder</button>
+                    </div>
+                    <div id="waDurum" class="price-list-note" style="margin-top:10px">Durum kontrol ediliyor...</div>
+                    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:700;color:#64748b">Son WhatsApp olayları</summary><div id="waGunluk" style="font-size:12px;max-height:220px;overflow:auto;margin-top:6px"></div></details>
+                    <div class="ai-security-note">WhatsApp'tan yazdığınızda Primer AI programdaki asistanla aynı yetkiyle cevaplar; veri değiştiren işlemleri numaralı liste olarak sunar, siz <b>1</b> / <b>HEPSİ</b> yazınca uygular, <b>İPTAL</b> ile vazgeçersiniz. Kısayollar: <b>ÖZET</b>, <b>YENİ</b>, <b>YARDIM</b>. Listede olmayan numaralara cevap verilmez; Meta imzası olmayan istekler reddedilir.</div>
+                  </div>
                 </div>
                 <div class="panel" style="margin-top:16px;border-color:#bbf7d0;">
                     <div class="panel-header">
@@ -13493,6 +13546,7 @@
                 else if(h.aktif) isl.push('<button class="button button-light" onclick="portalDurum(\''+h.tur+'\','+h.id+',false)">Pasif yap</button>');
                 else isl.push('<button class="button button-light" onclick="portalDurum(\''+h.tur+'\','+h.id+',true)">Aktif yap</button>');
                 isl.push('<button class="button button-light" onclick="portalEpostaDuzenle(\''+h.tur+'\','+h.id+')">E-posta</button>');
+                isl.push('<button class="button button-light" onclick="portalTelefonDuzenle(\''+h.tur+'\','+h.id+')">Telefon</button>');
                 if(h.tur==='hekim'&&h.kendiKaydi) isl.push('<button class="button button-light" title="Bu kişi laboratuvarda zaten kayıtlı bir hekimse onun kartına bağlayın" onclick="portalEslestir('+h.id+')">Hekime bağla</button>');
                 return '<tr data-k="'+k+'">'
                     +'<td>'+(h.tur==='hekim'?'Hekim':'Teknisyen'+tip)+'</td>'
@@ -13639,6 +13693,60 @@
             finally{ await portalHesaplariYukle(); }
         }
         setInterval(()=>portalHesaplariYukle(true),60000);
+
+        // ---------------- WhatsApp ----------------
+        function waKopyala(id){const v=document.getElementById(id).value;if(!v)return;navigator.clipboard&&navigator.clipboard.writeText(v).then(()=>showSuccess('Kopyalandı.'));}
+        async function waYukle(){
+            const d0=document.getElementById('waDurum'); if(!d0) return;
+            const sa=document.getElementById('waOzetSaat'); if(sa&&!sa.options.length){for(let h=5;h<=22;h++){const o=document.createElement('option');o.value=String(h);o.textContent=String(h).padStart(2,'0')+':00';sa.appendChild(o);}}
+            try{
+                const r=await fetch('/api/whatsapp/ayarlar',{cache:'no-store'}); if(!r.ok) throw new Error((await r.text())||'Alınamadı.');
+                const d=await r.json();
+                const set=(id,v)=>{const el=document.getElementById(id);if(!el||document.activeElement===el)return;if(el.type==='checkbox')el.checked=!!v;else el.value=v??'';};
+                set('waAktif',d.aktif);set('waPnid',d.telefonNumarasiId);set('waSurum',d.apiSurumu);set('waWebhook',d.webhookAdresi||'(önce PORTAL_INTERNET_AC.bat ile internet adresini açın)');set('waVerify',d.dogrulamaJetonu);
+                set('waYoneticiler',(d.yoneticiler||[]).join('\n'));set('waHekimSorgu',d.hekimSorgu);set('waHekimBildirim',d.hekimBildirim);set('waTeknisyen',d.teknisyenBildirim);
+                set('waOzet',d.sabahOzeti);set('waOzetSaat',String(d.ozetSaati||8));set('waKisalt',d.hastaAdiKisalt);set('waSablon',d.sablonAdi);set('waDil',d.sablonDili);
+                document.querySelectorAll('.waOlay').forEach(c=>c.checked=(d.hekimBildirimOlaylari||[]).includes(c.value));
+                document.getElementById('waJeton').placeholder=d.jetonKayitli?'kayıtlı — değiştirmek için yazın':'EAAG...';
+                document.getElementById('waSir').placeholder=d.uygulamaSirriKayitli?'kayıtlı — değiştirmek için yazın':'App secret';
+                d0.innerText=(d.hazir?'Bağlı ✓':(d.aktif?'Eksik ayar: Phone number ID ve erişim jetonu gerekli':'Kapalı'))+(d.aktif&&!d.uygulamaSirriKayitli?' · UYARI: uygulama gizli anahtarı girilmedi, gelen mesajlar işlenmez':'')+' · bugün gönderilen: '+(d.bugunGonderilen||0)+(d.sonHata?'\nSon hata ('+(d.sonHataTarihi?new Date(d.sonHataTarihi).toLocaleString('tr-TR'):'')+'): '+d.sonHata:'');
+                d0.style.color=d.hazir?'':'#b45309';
+                const g=document.getElementById('waGunluk'); g.innerHTML='';
+                (d.gunluk||[]).forEach(x=>{const e=document.createElement('div');e.style.cssText='padding:4px 0;border-bottom:1px solid #eef2f7'+(x.hata?';color:#b91c1c':'');e.textContent=new Date(x.zaman).toLocaleString('tr-TR')+' · '+x.yon+' · '+x.numara+' · '+x.ozet;g.appendChild(e);});
+                if(!(d.gunluk||[]).length) g.textContent='Henüz olay yok.';
+            }catch(e){d0.innerText=e.message;}
+        }
+        async function waKaydet(){
+            try{
+                const r=await fetch('/api/whatsapp/ayarlar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+                    aktif:document.getElementById('waAktif').checked,
+                    telefonNumarasiId:document.getElementById('waPnid').value.trim(),
+                    erisimJetonu:document.getElementById('waJeton').value.trim()||null,
+                    uygulamaSirri:document.getElementById('waSir').value.trim()||null,
+                    apiSurumu:document.getElementById('waSurum').value.trim()||'v23.0',
+                    yoneticiler:document.getElementById('waYoneticiler').value.split(/\n|,/).map(x=>x.trim()).filter(Boolean),
+                    hekimSorgu:document.getElementById('waHekimSorgu').checked,
+                    hekimBildirim:document.getElementById('waHekimBildirim').checked,
+                    hekimBildirimOlaylari:[...document.querySelectorAll('.waOlay')].filter(c=>c.checked).map(c=>c.value),
+                    teknisyenBildirim:document.getElementById('waTeknisyen').checked,
+                    sabahOzeti:document.getElementById('waOzet').checked,
+                    ozetSaati:Number(document.getElementById('waOzetSaat').value||8),
+                    hastaAdiKisalt:document.getElementById('waKisalt').checked,
+                    sablonAdi:document.getElementById('waSablon').value.trim()||null,
+                    sablonDili:document.getElementById('waDil').value.trim()||null})});
+                if(!r.ok) throw new Error((await r.text())||'Kaydedilemedi.');
+                document.getElementById('waJeton').value=''; document.getElementById('waSir').value='';
+                showSuccess('WhatsApp ayarları kaydedildi.'); await waYukle();
+            }catch(e){showError(e.message);}
+        }
+        async function waDeneme(){try{const r=await fetch('/api/whatsapp/deneme',{method:'POST'});const t=await r.text();if(!r.ok)throw new Error(t);showSuccess(JSON.parse(t).message);}catch(e){showError(e.message||'Gönderilemedi.');}finally{waYukle();}}
+        async function waOzetGonder(){try{const r=await fetch('/api/whatsapp/ozet-gonder',{method:'POST'});const t=await r.text();if(!r.ok)throw new Error(t);showSuccess('Özet gönderildi.');}catch(e){showError(e.message||'Gönderilemedi.');}finally{waYukle();}}
+        async function portalTelefonDuzenle(tur,id){
+            const h=portalBul(tur,id);
+            const yeni=prompt((h?.adSoyad||'')+' — WhatsApp bildirimleri için telefon (ör. 0532 123 45 67; silmek için boş):', h?.telefon||'');
+            if(yeni===null) return;
+            try{const r=await fetch('/api/portal-hesaplari/'+tur+'/'+id+'/telefon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telefon:yeni.trim()})});if(!r.ok)throw new Error((await r.text())||'Kaydedilemedi.');showSuccess('Telefon kaydedildi.');await portalHesaplariYukle();}catch(e){showError(e.message);}
+        }
 
         // ---------------- Portal hesabı e-posta durumu (hesap pencerelerinde) ----------------
         function epostaDurumGoster(tur, d){
@@ -15463,6 +15571,7 @@ function togglePrimerAi(){
             await primerAiDurumYukle();
             portalHesaplariYukle(true);
             otomatikYedekYukle();
+            waYukle();
         }
 
         async function durumKaydet() {

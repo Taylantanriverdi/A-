@@ -247,3 +247,29 @@ DeepSeek kurulumu:
    Model = DeepSeek Chat (onerilir), "Kaydet + Kullan". Baglanti test edilir.
 DeepSeek Reasoner daha derin dusunur ama daha yavastir. Claude veya OpenAI
 anahtari da kayitliysa saglayici istenildigi zaman degistirilebilir.
+
+
+WHATSAPP (PRIMER AI VE BILDIRIMLER)
+----------------------------------
+Meta'nin resmi WhatsApp Cloud API'si kullanilir (numara kapatilma riski yok).
+Kurulum adimlari Ayarlar > "WhatsApp - Primer AI ve Bildirimler" kartinda
+("Kurulum adimlari" basligina tiklayin). Ozetle:
+ 1. developers.facebook.com > Create App (Business) > WhatsApp > Set up.
+    Meta'nin ucretsiz test numarasi Primer AI hatti olur; "To" listesine
+    KENDI numaranizi ekleyin.
+ 2. Phone number ID, Access token ve App secret'i karta yazin, Kaydet.
+ 3. PORTAL_INTERNET_AC.bat acik olmali. Meta > WhatsApp > Configuration >
+    Webhook: karttaki Webhook adresi ve Dogrulama jetonu; "messages" Subscribe.
+ 4. WhatsApp Manager'da "primer_bildirim" sablonu (Utility, Turkce, govde:
+    "Primer Dental Lab bildirimi: {{1}}").
+ 5. "Deneme Mesaji" > telefondan test numarasina "merhaba" yazin.
+Kullanim: Primer AI'ya WhatsApp'tan yazin. Islem onerileri numarali gelir:
+ 1 / 1 3 / HEPSI = uygula, IPTAL = vazgec. Kisayollar: OZET, YENI, YARDIM.
+Hekimler (hekim kartindaki telefonla taninir) yalniz kendi islerinin durumunu
+sorabilir; fiyat ve baska veri goremez, talepleri size iletilir.
+Bildirimler: hekime is alindi/tasarimda/uretimde/tamamlandi, teknisyene yeni
+is (telefonu Portal Hesaplari > Telefon), size her sabah ozet.
+Ucret: kisi yazdiktan sonraki 24 saatteki cevaplar ucretsiz; sablonla giden
+bildirimler mesaj basina birkac kurus-sent. Test numarasi en fazla 5 kayitli
+numaraya yazabilir; hekimlere yaygin bildirim icin ileride gercek isletme
+numarasi eklenir (yalniz Phone number ID ve jeton degisir).
