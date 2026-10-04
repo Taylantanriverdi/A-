@@ -2,7 +2,7 @@
 REM ==========================================================================
 REM  OTOPILOT - TEK TIKLA KURULUM VE BASLATMA
 REM  Cift tikla. Eksik olanlari kurar (Python, Git), DeepSeek API anahtarini
-REM  sorar, proje klasorunu sectirir ve otopilotu baslatir (DeepSeek ile).
+REM  sorar, paneli acar ve otopilotu baslatir. Projeler panelden eklenir.
 REM  Sonraki acilislarda kaldigi yerden devam eder.
 REM ==========================================================================
 setlocal EnableExtensions
@@ -83,88 +83,34 @@ echo       Anahtar kaydedildi.
 :anahtar_tamam
 echo       Tamam.
 
-REM ---------------------------------------------------------------- 5. Proje
-echo [5/5] Proje seciliyor...
-set "PROJE="
-set "YENI=0"
-if exist "%VERI%\son_proje.txt" set /p PROJE=<"%VERI%\son_proje.txt"
-if not defined PROJE goto proje_sec
-if not exist "%PROJE%\" goto proje_sec
+REM ---------------------------------------------------------------- 5. Otomatik baslatma (bir kez sorulur)
+if exist "%VERI%\otomatik_soruldu" goto calistir
 echo.
-echo       Son proje: %PROJE%
-choice /c DY /n /m "      [D] Bu projeyle devam et   [Y] Yeni klasor sec : "
-if errorlevel 2 goto proje_sec
-goto proje_hazir
-
-:proje_sec
-echo       Acilan pencereden gelistirilecek proje klasorunu sec...
-set "PROJE="
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -STA -Command "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.Form -Property @{TopMost=$true}; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = 'Gelistirilecek proje klasorunu sec'; if ($d.ShowDialog($f) -eq 'OK') { $d.SelectedPath }"`) do set "PROJE=%%i"
-if not defined PROJE goto iptal
-set "YENI=1"
->"%VERI%\son_proje.txt" echo %PROJE%
-
-:proje_hazir
-echo       Proje: %PROJE%
-
-REM Proje git deposu degilse olustur ve mevcut hali ilk surum olarak kaydet
-if exist "%PROJE%\.git" goto git_deposu_var
-echo       Proje git ile takip edilmiyor; mevcut hali "ilk surum" olarak kaydediliyor...
-git -C "%PROJE%" init -q
-call :git_kimlik
-if not exist "%PROJE%\.gitignore" call :gitignore_yaz
-git -C "%PROJE%" add -A
-git -C "%PROJE%" commit -q -m "Otopilot oncesi ilk surum"
-if errorlevel 1 goto git_hata
-goto git_kayitli
-
-:git_deposu_var
-call :git_kimlik
-set "DAL="
-for /f "delims=" %%b in ('git -C "%PROJE%" rev-parse --abbrev-ref HEAD 2^>nul') do set "DAL=%%b"
-if /i "%DAL%"=="otopilot/gelistirme" goto git_kayitli
-set "KIRLI="
-for /f "delims=" %%k in ('git -C "%PROJE%" status --porcelain') do set "KIRLI=1"
-if not defined KIRLI goto git_kayitli
-echo.
-echo       Projede kaydedilmemis degisiklikler var. Otopilot baslamadan once kaydedilmeleri gerekiyor.
-choice /c EH /n /m "      Simdi kaydedeyim mi? [E] Evet  [H] Hayir, cik : "
-if errorlevel 2 goto son
-git -C "%PROJE%" add -A
-git -C "%PROJE%" commit -q -m "Otopilot oncesi kaydedilen degisiklikler"
-if errorlevel 1 goto git_hata
-
-:git_kayitli
-if "%YENI%"=="0" goto calistir
-echo.
-choice /c EH /n /m "      Bilgisayar her acildiginda otopilot kendiliginden baslasin mi? [E/H] : "
-if errorlevel 2 goto calistir
-%PY% -m otopilot otomatik-kur "%PROJE%"
+choice /c EH /n /m "[5/5] Bilgisayar her acildiginda otopilot kendiliginden baslasin mi? [E/H] : "
+set "CEVAP=%errorlevel%"
+>"%VERI%\otomatik_soruldu" echo 1
+if "%CEVAP%"=="2" goto calistir
+%PY% -m otopilot otomatik-kur
 
 :calistir
-REM Canli izleme panelini arka planda ac (zaten aciksa sadece tarayicida gosterir)
+REM Paneli arka planda ac; projeler panelden eklenir
 start "Otopilot Panel" /min %PY% -m otopilot arayuz
 echo.
 echo ==========================================================
-echo  Otopilot calisiyor. Islem akisini tarayicida acilan
-echo  panelden izleyebilirsin: http://127.0.0.1:8765
-echo  Bu pencereyi kapatirsan durur; tekrar actiginda (ya da
-echo  paneldeki Baslat ile) kaldigi yerden devam eder.
+echo  Otopilot paneli tarayicida aciliyor: http://127.0.0.1:8765
+echo.
+echo  - "Proje ekle" ile eski yazilimlarini ekle (tek tek ya da
+echo    bir klasordeki hepsini birden).
+echo  - Otomatik gelistirmesi acik projeler sirayla gelistirilir.
+echo  - Bu pencereyi kapatirsan durur; panelden Baslat ile ya da
+echo    bu dosyayla tekrar baslatinca kaldigi yerden devam eder.
 echo ==========================================================
 echo.
-%PY% -m otopilot baslat "%PROJE%" --motor deepseek
-goto son
-
-:iptal
-echo       Klasor secilmedi.
+%PY% -m otopilot hepsi
 goto son
 
 :anahtar_yok
 echo HATA: Anahtar girilmedi. Dosyayi tekrar calistir.
-goto son
-
-:git_hata
-echo HATA: Proje git'e kaydedilemedi. Yukaridaki mesaja bak.
 goto son
 
 REM ======================================================== yardimci bolumler
@@ -181,24 +127,6 @@ echo HATA: winget bulunamadi. Microsoft Store'dan "App Installer" uygulamasini k
 echo veya eksik programi elle kur, sonra bu dosyayi tekrar calistir.
 start "" ms-windows-store://pdp/?productid=9NBLGGH4NNS1
 exit /b 1
-
-:gitignore_yaz
-> "%PROJE%\.gitignore" echo node_modules/
->>"%PROJE%\.gitignore" echo .venv/
->>"%PROJE%\.gitignore" echo venv/
->>"%PROJE%\.gitignore" echo __pycache__/
->>"%PROJE%\.gitignore" echo dist/
->>"%PROJE%\.gitignore" echo build/
->>"%PROJE%\.gitignore" echo bin/
->>"%PROJE%\.gitignore" echo obj/
->>"%PROJE%\.gitignore" echo *.log
->>"%PROJE%\.gitignore" echo .env
-exit /b 0
-
-:git_kimlik
-git -C "%PROJE%" config user.name >nul 2>&1 || git -C "%PROJE%" config user.name "%USERNAME%"
-git -C "%PROJE%" config user.email >nul 2>&1 || git -C "%PROJE%" config user.email "%USERNAME%@otopilot.local"
-exit /b 0
 
 :son
 echo.

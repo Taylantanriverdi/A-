@@ -16,14 +16,52 @@ import platform
 import sys
 from pathlib import Path
 
-from .durum import Durum, ProjeAyarlari
+from .durum import VARSAYILAN_HEDEF, Durum, ProjeAyarlari
 
 REPO = Path(__file__).resolve().parent.parent
 
 
-def _baslangic_dosyasi(durum: Durum) -> Path:
+def _baslangic_dosyasi(durum: Durum | None) -> Path:
     baslangic = Path(os.environ["APPDATA"]) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-    return baslangic / f"otopilot-{durum.dizin.name}.bat"
+    return baslangic / (f"otopilot-{durum.dizin.name}.bat" if durum else "otopilot-hepsi.bat")
+
+
+def proje_ekle(yol: Path, hedef: str = "", motor: str | None = None) -> tuple[Durum, list[str]]:
+    """Klasörü otopilota ekler (git hazırlığı dahil). Arayüz ve komut satırı ortak kullanır."""
+    from . import proje as pj
+
+    yol = yol.expanduser().resolve()
+    if not yol.is_dir():
+        raise ValueError(f"Klasör bulunamadı: {yol}")
+    if (sebep := pj.tehlikeli_klasor(yol)):
+        raise ValueError(sebep)
+    if (yol / "otopilot" / "dongu.py").exists():
+        raise ValueError("Otopilotun kendi klasörü proje olarak eklenemez.")
+    d = Durum(yol)
+    a = d.ayarlari_oku() or ProjeAyarlari(proje=str(yol))
+    yapilan = pj.projeyi_hazirla(yol, a.dal)
+    a.hedef = hedef.strip() or a.hedef or VARSAYILAN_HEDEF
+    a.otomatik = True
+    if motor:
+        a.motor = motor
+    d.ayarlari_yaz(a)
+    d.olay("bilgi", "➕ Proje otopilota eklendi" + (f" ({', '.join(yapilan)})" if yapilan else "") + ".")
+    return d, yapilan
+
+
+def ekle(args) -> None:
+    for yol in args.yollar:
+        try:
+            d, yapilan = proje_ekle(Path(yol), args.hedef or "", args.motor)
+            print(f"✓ {d.proje}" + (f"  ({', '.join(yapilan)})" if yapilan else ""))
+        except (ValueError, OSError) as e:
+            print(f"✗ {yol}: {e}")
+
+
+def hepsi(args) -> None:
+    from . import yonetici
+
+    yonetici.calistir()
 
 
 def baslat(args) -> None:
@@ -93,22 +131,21 @@ def durum(args) -> None:
 
 
 def otomatik_kur(args) -> None:
-    d = Durum(Path(args.proje).expanduser())
+    d = Durum(Path(args.proje).expanduser()) if args.proje else None
+    komut = f'baslat "{d.proje}"' if d else "hepsi"
     if platform.system() == "Windows":
         dosya = _baslangic_dosyasi(d)
         bat = REPO / "otopilot.bat"
-        dosya.write_text(
-            f'@echo off\r\nstart "Otopilot {d.proje.name}" /min "{bat}" baslat "{d.proje}"\r\n', encoding="ascii",
-            errors="replace",
-        )
+        dosya.write_text(f'@echo off\r\nstart "Otopilot" /min "{bat}" {komut}\r\n', encoding="ascii", errors="replace")
         print(f"Tamam. Windows her açıldığında otopilot başlayacak.\nBaşlangıç dosyası: {dosya}")
     else:
+        hedef = f"baslat '{d.proje}'" if d else "hepsi"
         print("Linux/macOS için crontab'a şu satırı ekle (crontab -e):\n")
-        print(f"@reboot cd {REPO} && {sys.executable} -m otopilot baslat '{d.proje}' >> '{d.gunluk_dosyasi}' 2>&1")
+        print(f"@reboot cd {REPO} && {sys.executable} -m otopilot {hedef} >> ~/.otopilot/yonetici.log 2>&1")
 
 
 def otomatik_kaldir(args) -> None:
-    d = Durum(Path(args.proje).expanduser())
+    d = Durum(Path(args.proje).expanduser()) if args.proje else None
     if platform.system() == "Windows":
         dosya = _baslangic_dosyasi(d)
         if dosya.exists():
@@ -155,12 +192,21 @@ def main(argv: list[str] | None = None) -> None:
     dz.add_argument("proje")
     dz.set_defaults(f=durum)
 
-    ok = alt.add_parser("otomatik-kur", help="bilgisayar açılınca otomatik başlat")
-    ok.add_argument("proje")
+    e = alt.add_parser("ekle", help="bir veya daha fazla proje klasörünü otopilota ekle")
+    e.add_argument("yollar", nargs="+")
+    e.add_argument("--hedef", help="hedef (boşsa genel geliştirme hedefi kullanılır)")
+    e.add_argument("--motor", choices=["deepseek", "claude"])
+    e.set_defaults(f=ekle)
+
+    h = alt.add_parser("hepsi", help="otomatik geliştirmesi açık tüm projeleri sırayla geliştir")
+    h.set_defaults(f=hepsi)
+
+    ok = alt.add_parser("otomatik-kur", help="bilgisayar açılınca otomatik başlat (proje verilmezse tüm projeler)")
+    ok.add_argument("proje", nargs="?")
     ok.set_defaults(f=otomatik_kur)
 
     ka = alt.add_parser("otomatik-kaldir", help="otomatik başlatmayı kaldır")
-    ka.add_argument("proje")
+    ka.add_argument("proje", nargs="?")
     ka.set_defaults(f=otomatik_kaldir)
 
     ui = alt.add_parser("arayuz", help="tarayıcıda canlı izleme ve kontrol paneli")

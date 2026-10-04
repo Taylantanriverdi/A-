@@ -323,6 +323,10 @@ class Otopilot:
                             self.d.olay("bitti", "🎯 Planlayıcı hedefin tamamlandığını bildirdi.", asama="bitti")
                             return
                         if sonuc is None:
+                            if self.tek_sefer:  # yönetici modunda diğer projeleri bekletme
+                                self.d.olay("hata", "Planlama başarısız; bu proje bir süre dinlendirilecek.",
+                                            asama="hata")
+                                return
                             self._bekle(dt.datetime.now().astimezone() + dt.timedelta(minutes=30),
                                         "Planlama başarısız")
                         continue

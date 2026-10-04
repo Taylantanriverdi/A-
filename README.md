@@ -56,29 +56,33 @@ görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Cl
 
 ### En kolay yol (Windows): `OTOPILOT_BASLAT.bat`'a çift tıkla
 
-Tek dosya her şeyi yapar:
+1. Eksikse Python, Git ve gerekli Python paketini kurar; DeepSeek API anahtarını sorar (bir kez).
+2. Bilgisayar açılınca kendiliğinden başlasın mı diye sorar (bir kez).
+3. Tarayıcıda **paneli** açar ve otopilotu başlatır.
 
-1. Python, Git ve gerekli Python paketi yoksa kurar.
-2. DeepSeek API anahtarı tanımlı değilse anahtar sayfasını açar, anahtarı sorar ve kaydeder.
-3. Proje klasörünü pencereden seçtirir. Proje git ile takip edilmiyorsa mevcut halini "ilk sürüm" olarak kaydeder.
-4. İstersen bilgisayar her açıldığında otomatik başlamasını ayarlar.
-5. Hedefi sorar ve otopilotu başlatır.
+Panelde **＋ Proje ekle** ile eski yazılımlarını eklersin:
 
-Sonraki çift tıklamalarda son projeyle kaldığı yerden devam eder.
+- Tek bir projenin klasörünü ya da birçok projenin bulunduğu üst klasörü seç; içindeki projeler
+  (web, Python, Node, Java, C#, PHP, Flutter...) otomatik bulunur, istediklerini işaretleyip eklersin.
+- Hedef isteğe bağlıdır. Boş bırakırsan genel geliştirme hedefi kullanılır: hataları düzelt, yarım
+  özellikleri tamamla, kullanılabilirliği ve kaliteyi artır, test ekle.
+- Proje git ile takip edilmiyorsa mevcut hali "ilk sürüm" olarak kaydedilir. Dosyalar silinmez.
 
-### Canlı izleme paneli
+**Tüm projeler kendiliğinden gelişir:** Otopilot, otomatik geliştirmesi açık projeler arasında sırayla dolaşır;
+her turda en uzun süredir sıra gelmeyen projede bir görev yapar (gerekirse önce görev planlar). Hedefi tamamlanan
+proje, yeni görev eklenene ya da hedef değişene kadar bekletilir; hata veren proje 30 dakika dinlendirilir.
 
-`OTOPILOT_BASLAT.bat` başlarken tarayıcıda **canlı paneli** de açar (yalnızca `OTOPILOT_PANEL.bat` ile de
-açılabilir): <http://127.0.0.1:8765>
+### Panel
 
-- **Şu an:** ne yapıldığını düz Türkçe anlatır ("Testler başarısız — DeepSeek düzeltiyor, deneme 2/3"),
-  üzerinde çalışılan görevi ve o adımda geçen süreyi gösterir; limit/bakiye beklemesinde geri sayım çıkar.
-- **İşlem akışı:** Planla → Uygula → Test → Kaydet döngüsü, Düzelt ve Geri al dalları ile Bekle durumu;
-  o anki adım yanıp söner, görevde tamamlanan adımlar yeşil, başarısız olan kırmızı görünür.
-- **Görevler:** biten / bekleyen / başarısız görevler ve notları; panelden yeni görev eklenebilir, hedef düzenlenebilir.
-- **Canlı akış:** her adım, kodlayıcının çalıştırdığı komutlar ve düzenlediği dosyalar, test çıktıları.
-- **Son commit'ler** ve özet sayılar.
-- **Başlat / Durdur** düğmeleri. Durdurulan otopilot yeniden başlatılınca kaldığı yerden devam eder.
+<http://127.0.0.1:8765> — `OTOPILOT_BASLAT.bat` açar; yalnızca paneli açmak için `OTOPILOT_PANEL.bat`.
+
+- **Solda projelerin:** her birinin tek satırlık durumu ("Kod yazılıyor", "Hata düzeltiliyor (1/3)",
+  "Hedef tamamlandı"...), biten/sıradaki görev sayısı ve **otomatik geliştir** anahtarı.
+- **Sağda seçili proje:** ne olduğunu anlatan tek cümle, üzerinde çalışılan görev, adımda geçen süre ve
+  basit adım göstergesi (Planla → Uygula → Test → Kaydet). Beklemede geri sayım, hatada sebebi görünür.
+- **Sekmeler:** *Görevler* (görev ekle, sıradakiler, tamamlananlar), *Akış* (adım adım ne yapıldı; komut
+  ayrıntıları isteğe bağlı), *Geçmiş* (commit'ler), *Ayarlar* (hedef, test komutu, otomatik, listeden çıkar).
+- Üstte tek **Başlat / Durdur** düğmesi. Durdurulan otopilot yeniden başlatılınca kaldığı yerden devam eder.
 
 Panel yalnızca bu bilgisayardan açılabilir; değişiklik isteklerini sayfaya gömülü rastgele bir anahtarla doğrular.
 
@@ -101,7 +105,16 @@ otopilot.bat otomatik-kur C:\projeler\uygulama
 otopilot.bat otomatik-kaldir C:\projeler\uygulama
 ```
 
-Linux/macOS'ta aynı komutlar: `python -m otopilot baslat ~/projeler/uygulama --hedef "..."`, panel için `python -m otopilot arayuz`.
+Tüm projeleri sırayla geliştirmek ve proje eklemek için:
+
+```bat
+otopilot.bat ekle C:\eski\proje1 C:\eski\proje2 --hedef "..."   :: hedef isteğe bağlı
+otopilot.bat hepsi                                                :: otomatik açık tüm projeler
+otopilot.bat arayuz                                               :: panel
+otopilot.bat otomatik-kur                                         :: açılışta "hepsi" başlasın
+```
+
+Linux/macOS'ta aynı komutlar `python -m otopilot ...` ile çalışır.
 
 Görev listesini istediğin zaman `~/.otopilot/<proje>/gorevler.md` dosyasından düzenleyebilirsin:
 `- [ ]` bekliyor, `- [x]` bitti, `- [!]` başarısız. İşi incelemek için `git log otopilot/gelistirme`;
@@ -285,6 +298,7 @@ otopilot/
   limit.py      limit mesajından sıfırlanma saatini çıkarma
   proje.py      git ve test komutu
   durum.py      kalıcı durum, görev listesi, olaylar, kilit
+  yonetici.py   tüm projeleri sırayla geliştiren yönetici ("hepsi")
   arayuz.py     canlı izleme paneli sunucusu (127.0.0.1:8765)
   arayuz.html   panel sayfası
 OTOPILOT_BASLAT.bat  tek tıkla kurulum + başlatma (paneli de açar)

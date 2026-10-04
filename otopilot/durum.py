@@ -18,6 +18,13 @@ KOK = Path(os.environ.get("OTOPILOT_DIZIN", Path.home() / ".otopilot"))
 
 GOREV = re.compile(r"^(\s*)- \[( |x|X|!)\] (.+)$")
 
+# Hedef verilmeden eklenen projeler için genel geliştirme hedefi
+VARSAYILAN_HEDEF = (
+    "Projeyi incele ve geliştir: hataları düzelt, yarım kalmış özellikleri tamamla, kullanılabilirliği ve "
+    "görünümü iyileştir, kod kalitesini artır ve önemli kısımlar için test ekle. Projenin mevcut amacına ve "
+    "stiline sadık kal."
+)
+
 
 @dataclass
 class ProjeAyarlari:
@@ -30,6 +37,7 @@ class ProjeAyarlari:
     ek_izinler: list[str] = field(default_factory=list)
     model: str | None = None
     max_deneme: int = 3
+    otomatik: bool = True  # "hepsini geliştir" yöneticisi bu projede çalışsın mı
 
 
 @dataclass
@@ -186,6 +194,30 @@ class Durum:
                 self.kilit_dosyasi.unlink()
         except OSError:
             pass
+
+
+def tum_projeler() -> list[Durum]:
+    """Otopilota eklenmiş tüm projeler, en son hareket edenden başlayarak."""
+    if not KOK.exists():
+        return []
+    sonuc = []
+    for dizin in KOK.iterdir():
+        ayar = dizin / "ayarlar.json"
+        if not ayar.exists():
+            continue
+        try:
+            proje = Path(json.loads(ayar.read_text(encoding="utf-8"))["proje"])
+        except (json.JSONDecodeError, KeyError, OSError):
+            continue
+        d = Durum(proje)
+        if d.dizin == dizin:
+            sonuc.append(d)
+
+    def son_hareket(d: Durum) -> float:
+        dosyalar = [d.olay_dosyasi, d.durum_dosyasi, d.ayar_dosyasi]
+        return max((f.stat().st_mtime for f in dosyalar if f.exists()), default=0)
+
+    return sorted(sonuc, key=son_hareket, reverse=True)
 
 
 def _surec_yasiyor(pid: int) -> bool:

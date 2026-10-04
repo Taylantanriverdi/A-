@@ -100,3 +100,110 @@ def testleri_calistir(proje: Path, komut: str | None, zaman_asimi_dk: int = 20) 
     if len(cikti) > 6000:
         cikti = "...\n" + cikti[-6000:]
     return TestSonucu(r.returncode == 0, cikti, komut)
+
+
+# --------------------------------------------------------------------------- #
+# Proje ekleme
+# --------------------------------------------------------------------------- #
+
+VARSAYILAN_GITIGNORE = "\n".join([
+    "node_modules/", ".venv/", "venv/", "__pycache__/", "dist/", "build/", "bin/", "obj/",
+    "*.log", ".env", ".DS_Store", "Thumbs.db", "",
+])
+
+# Bir klasörün yazılım projesi olduğunu gösteren işaretler -> tür adı
+PROJE_ISARETLERI = [
+    ("package.json", "Node / web"), ("pyproject.toml", "Python"), ("requirements.txt", "Python"),
+    ("setup.py", "Python"), ("go.mod", "Go"), ("Cargo.toml", "Rust"), ("pom.xml", "Java"),
+    ("build.gradle", "Java / Android"), ("pubspec.yaml", "Flutter"), ("composer.json", "PHP"),
+    ("index.html", "Web"), ("manage.py", "Django"),
+]
+UZANTI_TURLERI = {".py": "Python", ".html": "Web", ".js": "JavaScript", ".ts": "TypeScript", ".cs": "C#",
+                  ".java": "Java", ".php": "PHP", ".cpp": "C++", ".c": "C", ".go": "Go", ".kt": "Kotlin",
+                  ".swift": "Swift", ".dart": "Flutter", ".rb": "Ruby"}
+ATLANACAK = {"node_modules", ".git", ".venv", "venv", "__pycache__", "dist", "build", "bin", "obj", ".idea",
+             ".vscode", "AppData", "$RECYCLE.BIN", "System Volume Information"}
+
+
+def tehlikeli_klasor(yol: Path) -> str | None:
+    """Otopilota verilmemesi gereken klasörler (sürücü kökü, ev dizini, sistem klasörleri)."""
+    yol = yol.resolve()
+    if yol.parent == yol:
+        return "Sürücü kökü proje olarak eklenemez; projenin kendi klasörünü seç."
+    if yol == Path.home().resolve():
+        return "Ev klasörünün tamamı eklenemez; projenin kendi klasörünü seç."
+    sistem = [os.environ.get(k) for k in ("SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData")]
+    for s in filter(None, sistem):
+        if yol == Path(s).resolve() or yol.is_relative_to(Path(s).resolve()):
+            return "Sistem klasörleri eklenemez."
+    if str(yol) in ("/usr", "/etc", "/bin", "/var", "/System", "/Library"):
+        return "Sistem klasörleri eklenemez."
+    return None
+
+
+def proje_turu(yol: Path) -> str | None:
+    """Klasör bir yazılım projesine benziyorsa türünü, benzemiyorsa None döner."""
+    for dosya, tur in PROJE_ISARETLERI:
+        if (yol / dosya).exists():
+            return tur
+    try:
+        sayac: dict[str, int] = {}
+        for i, f in enumerate(yol.iterdir()):
+            if i > 300:
+                break
+            if f.is_file() and f.suffix.lower() in UZANTI_TURLERI:
+                t = UZANTI_TURLERI[f.suffix.lower()]
+                sayac[t] = sayac.get(t, 0) + 1
+    except OSError:
+        return None
+    if sayac:
+        return max(sayac, key=sayac.get)
+    return "Git deposu" if (yol / ".git").exists() else None
+
+
+def projeleri_tara(kok: Path, derinlik: int = 2) -> list[dict]:
+    """Bir klasörün altındaki yazılım projelerini bulur (iç içe projelere girmez)."""
+    bulunan: list[dict] = []
+
+    def gez(yol: Path, kalan: int) -> None:
+        try:
+            alt = sorted((p for p in yol.iterdir() if p.is_dir() and p.name not in ATLANACAK
+                          and not p.name.startswith(".")), key=lambda p: p.name.lower())
+        except OSError:
+            return
+        for p in alt:
+            tur = proje_turu(p)
+            if tur:
+                bulunan.append({"yol": str(p), "isim": p.name, "tur": tur, "git": (p / ".git").exists()})
+            elif kalan > 1:
+                gez(p, kalan - 1)
+
+    gez(kok, derinlik)
+    return bulunan[:200]
+
+
+def projeyi_hazirla(yol: Path, dal: str = "otopilot/gelistirme") -> list[str]:
+    """Klasörü otopilota hazırlar: git deposu yoksa oluşturur, kaydedilmemiş değişiklikleri kaydeder.
+
+    Dosyalara dokunmaz; yalnızca .gitignore yoksa ekler. Yapılanları açıklayan satırlar döner.
+    """
+    yapilan: list[str] = []
+    if not (yol / ".git").exists():
+        if not (yol / ".gitignore").exists():
+            (yol / ".gitignore").write_text(VARSAYILAN_GITIGNORE, encoding="utf-8")
+            yapilan.append(".gitignore eklendi")
+        git(yol, "init", "-q")
+        yapilan.append("git deposu oluşturuldu")
+    if not git(yol, "config", "user.name", kontrol=False):
+        git(yol, "config", "user.name", os.environ.get("USERNAME") or os.environ.get("USER") or "Otopilot")
+    if not git(yol, "config", "user.email", kontrol=False):
+        git(yol, "config", "user.email", "otopilot@localhost")
+
+    commit_yok = not git(yol, "rev-parse", "--verify", "-q", "HEAD", kontrol=False)
+    mevcut_dal = "" if commit_yok else git(yol, "rev-parse", "--abbrev-ref", "HEAD")
+    if commit_yok or (mevcut_dal != dal and kirli_mi(yol)):
+        git(yol, "add", "-A")
+        mesaj = "Otopilot öncesi ilk sürüm" if commit_yok else "Otopilot öncesi kaydedilen değişiklikler"
+        git(yol, "commit", "-q", "--allow-empty", "-m", mesaj)
+        yapilan.append(f"mevcut hali kaydedildi ({mesaj.lower()})")
+    return yapilan
