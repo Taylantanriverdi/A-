@@ -1028,13 +1028,14 @@
         .dsb:hover{filter:brightness(.95);box-shadow:0 0 0 2px rgba(4,120,87,.15)}
         .dsb.dsb-tasarim{border-color:#c7d2fe;background:#eef2ff;color:#4338ca}
         .dsb.dsb-diger{border-color:#e2e8f0;background:#f8fafc;color:#475569}
-        .onz-pop{position:fixed;z-index:9999;width:360px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.22);padding:10px;display:none;font-size:12px}
+        .onz-pop{position:fixed;z-index:9999;width:620px;max-width:calc(100vw - 16px);background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.22);padding:10px;display:none;font-size:12px}
         .onz-bas{display:flex;justify-content:space-between;align-items:center;font-weight:900;color:#10233e;margin-bottom:6px}
-        .onz-tuval{position:relative;width:340px;height:250px;border-radius:10px;background:radial-gradient(circle at 50% 35%,#f8fafc,#e2e8f0);overflow:hidden;cursor:grab}
+        .onz-tuval{position:relative;flex:0 0 340px;width:340px;height:250px;border-radius:10px;background:radial-gradient(circle at 50% 35%,#f8fafc,#e2e8f0);overflow:hidden;cursor:grab}
         .onz-tuval canvas{width:340px;height:250px;display:block}
         .onz-durum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#64748b;font-weight:800}
-        .onz-liste{margin-top:8px;max-height:150px;overflow:auto;display:grid;gap:4px}
-        .onz-dosya{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:5px 7px;border-radius:8px;border:1px solid #eef2f7}
+        .onz-govde{display:flex;gap:10px;align-items:flex-start}
+        .onz-liste{flex:1;min-width:0;max-height:250px;overflow:auto;display:grid;gap:4px;align-content:start}
+        .onz-dosya{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 8px;border-radius:8px;border:1px solid #eef2f7}
         .onz-dosya.secili{border-color:#93c5fd;background:#eff6ff}
         .onz-dosya span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
         .onz-dosya a{color:#1565c0;font-weight:900;text-decoration:none;white-space:nowrap}
@@ -13381,8 +13382,8 @@
             const x=isDosyaKaydi(id)||{};
             const turAd=tur==='Diger'?'Diğer dosyalar':tur+' dosyaları';
             p.innerHTML=`<div class="onz-bas"><span>#${Number(id)} · ${escapeHtml(x.hastaAdi||'')} — ${turAd}</span><button type="button" class="dsb" onclick="dosyaHepsiniIndir(${Number(id)},'${tur}')">⬇ Tümü</button></div>
-                <div class="onz-tuval" id="onzTuvalKutu"><div class="onz-durum" id="onzDurum">Yükleniyor...</div></div>
-                <div class="onz-liste" id="onzListe"></div>`;
+                <div class="onz-govde"><div class="onz-tuval" id="onzTuvalKutu"><div class="onz-durum" id="onzDurum">Yükleniyor...</div></div>
+                <div class="onz-liste" id="onzListe"></div></div>`;
             p.style.display='block';
             const g=p.getBoundingClientRect();
             let left=Math.min(r.left, window.innerWidth-g.width-8), top=r.bottom+6;
