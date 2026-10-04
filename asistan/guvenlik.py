@@ -52,6 +52,9 @@ class Guvenlik:
 
     def komut_onayi(self, komut: str) -> tuple[bool, str]:
         """Terminal komutu çalıştırılabilir mi? (izin, ret_sebebi)"""
+        for kalip in self.ayarlar.yasak_kaliplar:
+            if re.search(kalip, komut, re.IGNORECASE):
+                return False, "Bu komut bu modda yasak (git işlemlerini otopilot yönetir)."
         if tehlikeli_mi(komut):
             if self._sor(f"TEHLİKELİ komut: {komut}"):
                 return True, ""

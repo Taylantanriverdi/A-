@@ -31,6 +31,9 @@ class Ayarlar:
     # Gözetimsiz modda kullanıcıya soru sorulamaz
     gozetimsiz: bool = False
 
+    # Her modda reddedilen komut kalıpları (regex); ör. otopilot git işlemlerini kendisi yönetir
+    yasak_kaliplar: list[str] = field(default_factory=list)
+
     # Dosya düzenleyicinin dokunabileceği kök dizinler
     izinli_dizinler: list[Path] = field(
         default_factory=lambda: [

@@ -2,16 +2,23 @@
 
 Bu depoda iki araç var:
 
-1. **[Otopilot](#otopilot--claude-code-ile-otomatik-proje-geliştirme)** — Claude Code'u yöneterek projeni
-   senin yerine geliştirir; limit dolunca bekler, açılınca kaldığı yerden devam eder.
+1. **[Otopilot](#otopilot--otomatik-proje-geliştirme)** — DeepSeek API (veya Claude Code) ile projeni
+   senin yerine geliştirir; limit/bakiye dolunca bekler, açılınca kaldığı yerden devam eder.
 2. **[Kişisel Yapay Zeka Asistanı](#kişisel-yapay-zeka-asistanı)** — bilgisayarını senin gibi kullanan
    asistan (DeepSeek API).
 
 ---
 
-## Otopilot · Claude Code ile otomatik proje geliştirme
+## Otopilot · otomatik proje geliştirme
 
-Otopilot, bilgisayarındaki **Claude Code**'a (kendi Claude aboneliğinle) talimat verip projeni durmadan geliştirir:
+Otopilot, bir yapay zeka kodlayıcısına talimat verip projeni durmadan geliştirir. İki motor var:
+
+| Motor | Ne gerekir | Seçim |
+|---|---|---|
+| **DeepSeek** (varsayılan) | DeepSeek API anahtarı (`DEEPSEEK_API_KEY`) ve bakiye | `--motor deepseek` |
+| **Claude Code** | Kurulu ve giriş yapılmış Claude Code (Claude aboneliği) | `--motor claude` |
+
+Motor proje ayarlarına kaydedilir; bir kez seçmen yeter.
 
 ```
 görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Claude'a geri ver → commit → sıradaki
@@ -24,8 +31,9 @@ görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Cl
 - **Test eder:** Testleri Claude değil otopilot çalıştırır; sonuç başarısızsa çıktıyı aynı Claude oturumuna
   verip düzeltmesini ister (varsayılan 3 deneme). Yine olmazsa değişiklikleri geri alır, yamayı saklar,
   görevi `[!]` işaretler ve sıradakine geçer.
-- **Limitte durur, açılınca devam eder:** Claude "limit doldu" dediğinde mesajdaki sıfırlanma saatini okur,
-  o saate kadar bekler ve aynı oturumu sürdürür. Saat okunamazsa 30 dakikada bir yeniden dener.
+- **Limitte durur, açılınca devam eder:** DeepSeek bakiyesi biterse 30 dakikada bir yeniden dener
+  (bakiye yükleyince kendiliğinden devam eder); hız sınırında 2 dakika bekler. Claude motorunda limit
+  mesajındaki sıfırlanma saatine kadar bekler. Her durumda aynı oturumu sürdürür.
 - **Bilgisayar kapansa da kaybolmaz:** Kaldığı yeri `~/.otopilot/<proje>/` altına yazar. `otomatik-kur` ile
   Windows her açıldığında kendiliğinden başlar.
 - **Güvenli:** Yalnızca `otopilot/gelistirme` dalında çalışır, her görevi ayrı commit'ler, asla push yapmaz.
@@ -33,8 +41,10 @@ görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Cl
 
 ### Gereksinimler
 
-- Python 3.10+ (ek paket gerekmez)
-- **Claude Code komut satırı sürümü** kurulu ve giriş yapılmış. Claude masaüstü uygulaması tek başına
+- Python 3.10+ ve Git
+- DeepSeek motoru için: `pip install openai` ve [DeepSeek API anahtarı](https://platform.deepseek.com/api_keys)
+  (`setx DEEPSEEK_API_KEY sk-...`). Model varsayılan olarak `deepseek-chat`; `--model` ile değiştirilebilir.
+- Claude motoru için: **Claude Code komut satırı sürümü** kurulu ve giriş yapılmış. Claude masaüstü uygulaması tek başına
   yetmez. Windows'ta PowerShell'de:
   ```powershell
   irm https://claude.ai/install.ps1 | iex
@@ -48,8 +58,8 @@ görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Cl
 
 Tek dosya her şeyi yapar:
 
-1. Python, Git ve Claude Code yoksa kurar.
-2. Claude hesabına giriş yapılmamışsa tarayıcıda giriş açar.
+1. Python, Git ve gerekli Python paketi yoksa kurar.
+2. DeepSeek API anahtarı tanımlı değilse anahtar sayfasını açar, anahtarı sorar ve kaydeder.
 3. Proje klasörünü pencereden seçtirir. Proje git ile takip edilmiyorsa mevcut halini "ilk sürüm" olarak kaydeder.
 4. İstersen bilgisayar her açıldığında otomatik başlamasını ayarlar.
 5. Hedefi sorar ve otopilotu başlatır.
@@ -95,11 +105,14 @@ beğendiğinde dalı ana dalına birleştir.
 | `--tam-yetki` | Claude her komutu sormadan çalıştırır. Yalnızca güvendiğin projede/sanal makinede |
 | `--tek-sefer` | Tek görev yapıp çık |
 
-**İzinler:** Varsayılan olarak Claude dosya okuyup düzenleyebilir, `git status/diff/log` ve test komutunu
+**İzinler (DeepSeek):** Kodlayıcı proje klasöründe dosya düzenleyebilir ve komut çalıştırabilir; tehlikeli
+komutlar ve git işlemleri (commit, push, reset, checkout...) engellenir, git'i otopilot yönetir.
+
+**İzinler (Claude):** Varsayılan olarak Claude dosya okuyup düzenleyebilir, `git status/diff/log` ve test komutunu
 çalıştırabilir; başka bir komut isterse sormadan reddedilir, süreç asla takılı kalmaz. Projen derleme veya
 paket kurulumu gerektiriyorsa `--izin "Bash(npm *)"` gibi ekle.
 
-**Limitler hakkında:** Otopilot Claude'un limitlerini aşmaz, yalnızca dolduğunda bekler. Limit tüm Claude
+**Limitler hakkında (Claude):** Otopilot Claude'un limitlerini aşmaz, yalnızca dolduğunda bekler. Limit tüm Claude
 kullanımınla ortaktır; otopilot çalışırken Claude'u başka işlerde de kullanırsan limit daha çabuk dolar.
 
 ---
@@ -251,7 +264,8 @@ Her modda:
 otopilot/
   __main__.py   komut satırı (baslat, gorev, durum, otomatik-kur)
   dongu.py      ana döngü: planla, uygula, test et, düzelt, commit, limitte bekle
-  claude.py     Claude Code CLI sarmalayıcı
+  deepseek.py   DeepSeek motoru (asistan/ araçlarını kullanır)
+  claude.py     Claude Code motoru (CLI sarmalayıcı)
   limit.py      limit mesajından sıfırlanma saatini çıkarma
   proje.py      git ve test komutu
   durum.py      kalıcı durum, görev listesi, kilit

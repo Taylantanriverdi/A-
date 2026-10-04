@@ -1,8 +1,8 @@
 """Otopilot ana döngüsü.
 
-Görev seç → Claude'a talimat ver → testleri çalıştır → gerekirse hatayı Claude'a geri ver →
+Görev seç → kodlayıcıya (DeepSeek veya Claude Code) talimat ver → testleri çalıştır → gerekirse hatayı geri ver →
 commit et → sıradakine geç. Görev listesi biterse hedefe göre yeni görevler planlatır.
-Claude'un kullanım limiti dolunca sıfırlanma saatine kadar bekler ve kaldığı yerden devam eder.
+Limit dolunca (Claude kullanım limiti, DeepSeek bakiyesi/hız sınırı) bekler ve kaldığı yerden devam eder.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import proje as pj
 from .claude import ClaudeCLI, Sonuc
+from .deepseek import DeepSeekMotor
 from .durum import AktifGorev, Durum, ProjeAyarlari
 
 LIMIT_PAYI = dt.timedelta(minutes=3)  # sıfırlanmadan sonra güvenlik payı
@@ -36,6 +37,7 @@ DEVAM = ("Önceki çalışma yarıda kaldı (kullanım limiti, bağlantı sorunu
          "Durumu kontrol et ve görevi kaldığın yerden tamamla: {gorev}")
 
 DUZELT = """\
+Görev: {gorev}
 Doğrulama başarısız oldu. Komut: {komut}
 Deneme {deneme}/{max_deneme}. Çıktı:
 
@@ -85,7 +87,10 @@ class Otopilot:
         self.a = ayar
         self.proje = durum.proje
         self.tek_sefer = tek_sefer
-        self.claude = ClaudeCLI(self.proje, ayar.izin_modu, self._izinler(), ayar.model)
+        if ayar.motor == "claude":
+            self.claude = ClaudeCLI(self.proje, ayar.izin_modu, self._izinler(), ayar.model)
+        else:
+            self.claude = DeepSeekMotor(self.proje, ayar.model)
 
     def _izinler(self) -> list[str]:
         izinler = list(self.a.ek_izinler)
@@ -94,7 +99,7 @@ class Otopilot:
         return izinler
 
     # ------------------------------------------------------------------ #
-    # Claude çağrısı: limit ve geçici hatalarda bekle, sonra devam et
+    # Kodlayıcı çağrısı: limit ve geçici hatalarda bekle, sonra devam et
     # ------------------------------------------------------------------ #
 
     def _bekle(self, ne_zamana: dt.datetime, sebep: str) -> None:
@@ -129,11 +134,11 @@ class Otopilot:
             if s.limit:
                 zaman = (s.sifirlanma + LIMIT_PAYI) if s.sifirlanma else dt.datetime.now().astimezone() + BILINMEYEN_LIMIT_BEKLEME
                 if not s.sifirlanma:
-                    self.d.gunluk(f"Limit mesajında sıfırlanma saati okunamadı: {s.metin[:200]!r}")
-                self._bekle(zaman, "Claude kullanım limiti doldu")
+                    self.d.gunluk(f"Bekleme süresi bilinmiyor, 30 dk sonra yeniden denenecek: {s.metin[:200]!r}")
+                self._bekle(zaman, s.hata or "Kullanım limiti doldu")
                 hata_sayisi = 0
                 continue
-            self.d.gunluk(f"⚠  Claude hatası: {s.hata[:300]}")
+            self.d.gunluk(f"⚠  Kodlayıcı hatası: {s.hata[:300]}")
             if hata_sayisi >= len(HATA_BEKLEME_DK):
                 return s  # kalıcı hata: çağıran taraf karar versin
             bekleme = HATA_BEKLEME_DK[hata_sayisi]
@@ -230,17 +235,17 @@ class Otopilot:
                 self.d.gunluk("❌ Doğrulama yine başarısız; deneme hakkı bitti.")
                 self._basarisiz(g, t.cikti)
                 return
-            self.d.gunluk(f"❌ Doğrulama başarısız, Claude düzeltiyor (deneme {g.deneme}/{self.a.max_deneme}).")
+            self.d.gunluk(f"❌ Doğrulama başarısız, kodlayıcı düzeltiyor (deneme {g.deneme}/{self.a.max_deneme}).")
             self.d.aktif_gorev_yaz(g)
             s = self.claude_cagir(
-                DUZELT.format(komut=t.komut, deneme=g.deneme, max_deneme=self.a.max_deneme, cikti=t.cikti),
+                DUZELT.format(gorev=g.satir, komut=t.komut, deneme=g.deneme, max_deneme=self.a.max_deneme, cikti=t.cikti),
                 g.oturum, devam_istemi=devam,
             )
             g.oturum, g.son_test = s.oturum, s.metin[-1500:]
             self.d.aktif_gorev_yaz(g)
 
         ozet = " ".join((g.son_test or "").split())
-        if pj.hepsini_commit_et(self.proje, f"{g.satir}\n\n{ozet[:1500]}\n\nOtopilot (Claude Code) tarafından yapıldı."):
+        if pj.hepsini_commit_et(self.proje, f"{g.satir}\n\n{ozet[:1500]}\n\nOtopilot ({self.a.motor}) tarafından yapıldı."):
             self.d.gorevi_isaretle(g.satir, "x", ozet[:400])
             self.d.gunluk(f"✅ Bitti ve commit edildi: {g.satir}")
         elif pj.git(self.proje, "rev-parse", "HEAD") != g.baslangic:
@@ -271,7 +276,8 @@ class Otopilot:
         try:
             self.hazirla()
             self._onceki_beklemeyi_tamamla()
-            self.d.gunluk(f"🚀 Otopilot başladı: {self.proje} · dal {self.a.dal} · test: {self.a.test_komutu or 'yok'}")
+            self.d.gunluk(f"🚀 Otopilot başladı: {self.proje} · motor {self.a.motor} · dal {self.a.dal} · "
+                          f"test: {self.a.test_komutu or 'yok'}")
 
             if not self.d.aktif_gorev():
                 taban = pj.testleri_calistir(self.proje, self.a.test_komutu)

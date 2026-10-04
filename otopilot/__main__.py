@@ -36,6 +36,8 @@ def baslat(args) -> None:
         a.test_komutu = args.test
     if args.dal:
         a.dal = args.dal
+    if args.motor:
+        a.motor = args.motor
     if args.model:
         a.model = args.model
     if args.max_deneme:
@@ -73,13 +75,14 @@ def durum(args) -> None:
     print(f"Proje      : {d.proje}")
     if a:
         print(f"Hedef      : {a.hedef or '-'}")
+        print(f"Motor      : {a.motor}{' / ' + a.model if a.model else ''}")
         print(f"Dal / test : {a.dal} / {a.test_komutu or 'yok'}")
     print(f"Görevler   : {say['x']} bitti, {say[' ']} bekliyor, {say['!']} başarısız")
     if v.get("aktif"):
         print(f"Şu an      : {v['aktif']['satir']} (aşama: {v['aktif']['asama']}, deneme: {v['aktif']['deneme']})")
     if v.get("bekle_until"):
         print(f"Bekliyor   : {v.get('bekleme_sebebi')} → {v['bekle_until']}")
-    print(f"Maliyet    : ~${v.get('toplam_maliyet', 0)} (abonelikte bilgi amaçlıdır)")
+    print(f"Maliyet    : ~${v.get('toplam_maliyet', 0)} (yalnızca Claude motorunda hesaplanır)")
     print(f"Dosyalar   : {d.dizin}")
 
 
@@ -112,7 +115,7 @@ def otomatik_kaldir(args) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(prog="otopilot", description="Claude Code ile projeni otomatik geliştirir.")
+    p = argparse.ArgumentParser(prog="otopilot", description="DeepSeek API veya Claude Code ile projeni otomatik geliştirir.")
     alt = p.add_subparsers(dest="komut", required=True)
 
     b = alt.add_parser("baslat", help="otopilotu çalıştır (kaldığı yerden devam eder)")
@@ -121,7 +124,9 @@ def main(argv: list[str] | None = None) -> None:
     b.add_argument("--gorev", nargs="*", help="başlamadan önce eklenecek görevler")
     b.add_argument("--test", help="doğrulama komutu (ör. 'npm test'); verilmezse otomatik bulunur")
     b.add_argument("--dal", help="çalışma dalı (varsayılan otopilot/gelistirme)")
-    b.add_argument("--model", help="Claude modeli (ör. opus, sonnet)")
+    b.add_argument("--motor", choices=["deepseek", "claude"],
+                   help="kodlayıcı: deepseek (DeepSeek API, varsayılan) veya claude (Claude Code)")
+    b.add_argument("--model", help="model adı (DeepSeek: deepseek-chat / deepseek-reasoner; Claude: opus, sonnet)")
     b.add_argument("--max-deneme", type=int, help="test başarısız olursa düzeltme deneme sayısı (varsayılan 3)")
     b.add_argument("--izin", nargs="*", help="Claude'a ek izin, ör. \"Bash(npm *)\" \"Bash(python *)\"")
     b.add_argument("--tam-yetki", action="store_true",

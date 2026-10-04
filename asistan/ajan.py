@@ -155,6 +155,8 @@ class Ajan:
     def gorev(self, metin: str) -> str:
         """Kullanıcı mesajını ekler ve model işi bitirene kadar döngüyü çalıştırır."""
         self.guvenlik.gunluge_yaz("gorev", metin)
+        self.son_hata: tuple[int | None, str] | None = None  # (HTTP durumu, mesaj) — çağıranlar için
+        self.durduruldu = False
         self.mesajlar.append({"role": "user", "content": metin})
         return self._dongu()
 
@@ -193,11 +195,14 @@ class Ajan:
                     self._dusunce_geri_gonder = False
                     continue
                 print(f"[hata] API 400: {e.message}", file=sys.stderr)
+                self.son_hata = (400, e.message)
                 return son_metin
-            except openai.RateLimitError:
+            except openai.RateLimitError as e:
                 print("[hata] Hız sınırına takıldı; biraz sonra tekrar dene.", file=sys.stderr)
+                self.son_hata = (429, e.message)
                 return son_metin
             except openai.APIStatusError as e:
+                self.son_hata = (e.status_code, e.message)
                 if e.status_code == 402:
                     print("[hata] DeepSeek hesabında bakiye yetersiz.", file=sys.stderr)
                 else:
@@ -205,6 +210,7 @@ class Ajan:
                 return son_metin
             except openai.APIConnectionError:
                 print("[hata] API'ye bağlanılamadı.", file=sys.stderr)
+                self.son_hata = (None, "API'ye bağlanılamadı")
                 return son_metin
 
             secim = yanit.choices[0]
@@ -234,6 +240,7 @@ class Ajan:
             if mesaj.tool_calls:
                 durduruldu = self._araclari_calistir(kayit["tool_calls"])
                 if durduruldu:
+                    self.durduruldu = True
                     print("\n[durduruldu] Görev kullanıcı tarafından kesildi.")
                     return son_metin
                 continue

@@ -23,6 +23,7 @@ GOREV = re.compile(r"^(\s*)- \[( |x|X|!)\] (.+)$")
 class ProjeAyarlari:
     proje: str
     hedef: str = ""
+    motor: str = "deepseek"  # deepseek (DeepSeek API) | claude (Claude Code CLI)
     test_komutu: str | None = None
     dal: str = "otopilot/gelistirme"
     izin_modu: str = "acceptEdits"

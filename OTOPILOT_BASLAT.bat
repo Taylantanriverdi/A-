@@ -1,8 +1,8 @@
 @echo off
 REM ==========================================================================
 REM  OTOPILOT - TEK TIKLA KURULUM VE BASLATMA
-REM  Cift tikla. Eksik olanlari kurar (Python, Git, Claude Code), Claude'a
-REM  giris yaptirir, proje klasorunu sectirir ve otopilotu baslatir.
+REM  Cift tikla. Eksik olanlari kurar (Python, Git), DeepSeek API anahtarini
+REM  sorar, proje klasorunu sectirir ve otopilotu baslatir (DeepSeek ile).
 REM  Sonraki acilislarda kaldigi yerden devam eder.
 REM ==========================================================================
 setlocal EnableExtensions
@@ -18,7 +18,7 @@ REM Yeni kurulan programlar bu pencerede de gorunsun diye bilinen klasorleri PAT
 set "PATH=%USERPROFILE%\.local\bin;%ProgramFiles%\Git\cmd;%LOCALAPPDATA%\Programs\Python\Launcher;%LOCALAPPDATA%\Programs\Python\Python313;%LOCALAPPDATA%\Programs\Python\Python312;%PATH%"
 
 echo ==========================================================
-echo    OTOPILOT - Claude Code ile projeni otomatik gelistirir
+echo    OTOPILOT - DeepSeek ile projeni otomatik gelistirir
 echo ==========================================================
 echo.
 
@@ -53,32 +53,34 @@ goto son
 :git_tamam
 echo       Tamam.
 
-REM ---------------------------------------------------------------- 3. Claude Code
-echo [3/5] Claude Code kontrol ediliyor...
-call :claude_bul
-if defined CLAUDE goto claude_tamam
-echo       Claude Code yok, resmi kurulum betigiyle kuruluyor...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://claude.ai/install.ps1 | iex"
-call :claude_bul
-if defined CLAUDE goto claude_tamam
-echo HATA: Claude Code kurulamadi. Bu pencereyi kapatip dosyayi tekrar calistirmayi dene.
-echo Olmazsa: https://claude.com/claude-code
+REM ---------------------------------------------------------------- 3. Paketler
+echo [3/5] Gerekli Python paketi kontrol ediliyor...
+%PY% -c "import openai" >nul 2>&1
+if not errorlevel 1 goto paket_tamam
+echo       openai paketi kuruluyor...
+%PY% -m pip install --user --quiet --disable-pip-version-check openai
+%PY% -c "import openai" >nul 2>&1
+if not errorlevel 1 goto paket_tamam
+echo HATA: openai paketi kurulamadi. Internet baglantini kontrol edip tekrar calistir.
 goto son
-:claude_tamam
-echo       Tamam: %CLAUDE%
+:paket_tamam
+echo       Tamam.
 
-REM ---------------------------------------------------------------- 4. Giris
-echo [4/5] Claude girisi kontrol ediliyor...
-"%CLAUDE%" auth status 2>nul | findstr /r /c:"loggedIn.*true" >nul
-if not errorlevel 1 goto giris_tamam
-echo       Giris yapilmamis. Tarayici acilacak; Claude hesabinla giris yap.
+REM ---------------------------------------------------------------- 4. DeepSeek API anahtari
+echo [4/5] DeepSeek API anahtari kontrol ediliyor...
+if defined DEEPSEEK_API_KEY goto anahtar_tamam
 echo.
-"%CLAUDE%" auth login
-"%CLAUDE%" auth status 2>nul | findstr /r /c:"loggedIn.*true" >nul
-if not errorlevel 1 goto giris_tamam
-echo HATA: Giris yapilamadi. Dosyayi tekrar calistir.
-goto son
-:giris_tamam
+echo       DeepSeek API anahtari gerekli. Tarayicida anahtar sayfasi aciliyor:
+echo       giris yap, "Create new API key" ile anahtar olustur ve buraya yapistir.
+echo       (Hesabinda bakiye olmasi gerekir.)
+start "" https://platform.deepseek.com/api_keys
+echo.
+set "DEEPSEEK_API_KEY="
+set /p "DEEPSEEK_API_KEY=      API anahtari: "
+if not defined DEEPSEEK_API_KEY goto anahtar_yok
+setx DEEPSEEK_API_KEY "%DEEPSEEK_API_KEY%" >nul
+echo       Anahtar kaydedildi.
+:anahtar_tamam
 echo       Tamam.
 
 REM ---------------------------------------------------------------- 5. Proje
@@ -147,11 +149,15 @@ echo  actiginda kaldigi yerden devam eder. Ilerleme icin:
 echo  %VERI%  klasorundeki gorevler.md ve gunluk.log
 echo ==========================================================
 echo.
-%PY% -m otopilot baslat "%PROJE%"
+%PY% -m otopilot baslat "%PROJE%" --motor deepseek
 goto son
 
 :iptal
 echo       Klasor secilmedi.
+goto son
+
+:anahtar_yok
+echo HATA: Anahtar girilmedi. Dosyayi tekrar calistir.
 goto son
 
 :git_hata
@@ -163,11 +169,6 @@ REM ======================================================== yardimci bolumler
 set "PY="
 py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1 && set "PY=py -3" && exit /b 0
 python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1 && set "PY=python"
-exit /b 0
-
-:claude_bul
-set "CLAUDE="
-for /f "delims=" %%c in ('%PY% -c "from otopilot.claude import claude_bul; print(claude_bul())" 2^>nul') do set "CLAUDE=%%c"
 exit /b 0
 
 :winget_kontrol
