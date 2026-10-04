@@ -48,7 +48,13 @@ def baslat(args) -> None:
     if args.gorev:
         d.gorev_ekle(args.gorev)
     if not a.hedef and not d.siradaki_gorev() and not d.aktif_gorev():
-        raise SystemExit("Ne yapılacağını söyle: --hedef \"...\" ver veya `gorev` komutuyla görev ekle.")
+        if not sys.stdin.isatty():
+            raise SystemExit("Ne yapılacağını söyle: --hedef \"...\" ver veya `gorev` komutuyla görev ekle.")
+        print("\nBu proje için henüz hedef yok. Projenin nasıl geliştirilmesini istediğini yaz.")
+        print("Örnek: Hekim portalına randevu sistemi, bildirimler ve raporlama ekle; hataları düzelt.\n")
+        while not a.hedef:
+            a.hedef = input("Hedef: ").strip()
+        d.ayarlari_yaz(a)
     Otopilot(d, a, tek_sefer=args.tek_sefer).calistir()
 
 
@@ -79,8 +85,6 @@ def durum(args) -> None:
 
 def otomatik_kur(args) -> None:
     d = Durum(Path(args.proje).expanduser())
-    if not d.ayarlari_oku():
-        raise SystemExit("Önce bir kez `baslat` ile çalıştır ki ayarlar kaydedilsin.")
     if platform.system() == "Windows":
         dosya = _baslangic_dosyasi(d)
         bat = REPO / "otopilot.bat"

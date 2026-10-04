@@ -44,9 +44,21 @@ görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Cl
   yerdeyse `setx OTOPILOT_CLAUDE "C:\tam\yol\claude.exe"` ile göster.
 - Projenin bir git deposu olması
 
-### Kullanım (Windows)
+### En kolay yol (Windows): `OTOPILOT_BASLAT.bat`'a çift tıkla
 
-`otopilot.bat`'a çift tıkla; proje klasörünü ve hedefi sorar. Ya da:
+Tek dosya her şeyi yapar:
+
+1. Python, Git ve Claude Code yoksa kurar.
+2. Claude hesabına giriş yapılmamışsa tarayıcıda giriş açar.
+3. Proje klasörünü pencereden seçtirir. Proje git ile takip edilmiyorsa mevcut halini "ilk sürüm" olarak kaydeder.
+4. İstersen bilgisayar her açıldığında otomatik başlamasını ayarlar.
+5. Hedefi sorar ve otopilotu başlatır.
+
+Sonraki çift tıklamalarda son projeyle kaldığı yerden devam eder.
+
+### Komut satırından kullanım
+
+Ya da:
 
 ```bat
 :: İlk çalıştırma: hedefi ver (ayarlar kaydedilir, sonraki çalıştırmalarda gerekmez)
@@ -243,7 +255,8 @@ otopilot/
   limit.py      limit mesajından sıfırlanma saatini çıkarma
   proje.py      git ve test komutu
   durum.py      kalıcı durum, görev listesi, kilit
-otopilot.bat    Windows başlatıcı
+OTOPILOT_BASLAT.bat  tek tıkla kurulum + başlatma
+otopilot.bat    Windows komut satırı başlatıcı
 asistan/
   __main__.py   komut satırı (sohbet, ogren, otonom)
   ajan.py       ajan döngüsü ve sistem istemi
