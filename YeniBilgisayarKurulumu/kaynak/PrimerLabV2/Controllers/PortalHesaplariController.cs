@@ -279,8 +279,8 @@ public sealed class PortalHesaplariController : ControllerBase
         if (!GuvenlikController.AnaBilgisayar(HttpContext)) return GuvenlikController.Yasak();
         var e = PortalKimlik.EpostaNormalize(dto.Eposta);
         if (e == null) return BadRequest("Deneme için geçerli bir e-posta adresi girin.");
-        var hata = await _eposta.DenemeGonderAsync(e, ct);
-        return hata == null ? Ok(new { message = "Deneme e-postası gönderildi: " + e }) : BadRequest("Gönderilemedi: " + hata);
+        var (basarili, mesaj) = await _eposta.DenemeGonderAsync(e, ct);
+        return basarili ? Ok(new { message = mesaj }) : BadRequest("Gönderilemedi: " + mesaj);
     }
 }
 
