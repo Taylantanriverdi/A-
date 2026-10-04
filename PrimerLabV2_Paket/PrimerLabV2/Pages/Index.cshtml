@@ -1022,6 +1022,22 @@
         .ref-order-page{max-width:1180px;margin:0 auto}
         .ref-order-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
         .ref-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+        /* İş satırlarında dosya simgeleri ve 3B önizleme */
+        .dsimge{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle;flex-wrap:nowrap}
+        .dsb{border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;border-radius:7px;padding:1px 6px;font-size:11px;font-weight:900;cursor:pointer;line-height:18px;white-space:nowrap}
+        .dsb:hover{filter:brightness(.95);box-shadow:0 0 0 2px rgba(4,120,87,.15)}
+        .dsb.dsb-tasarim{border-color:#c7d2fe;background:#eef2ff;color:#4338ca}
+        .dsb.dsb-diger{border-color:#e2e8f0;background:#f8fafc;color:#475569}
+        .onz-pop{position:fixed;z-index:9999;width:360px;background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.22);padding:10px;display:none;font-size:12px}
+        .onz-bas{display:flex;justify-content:space-between;align-items:center;font-weight:900;color:#10233e;margin-bottom:6px}
+        .onz-tuval{position:relative;width:340px;height:250px;border-radius:10px;background:radial-gradient(circle at 50% 35%,#f8fafc,#e2e8f0);overflow:hidden;cursor:grab}
+        .onz-tuval canvas{width:340px;height:250px;display:block}
+        .onz-durum{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:#64748b;font-weight:800}
+        .onz-liste{margin-top:8px;max-height:150px;overflow:auto;display:grid;gap:4px}
+        .onz-dosya{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:5px 7px;border-radius:8px;border:1px solid #eef2f7}
+        .onz-dosya.secili{border-color:#93c5fd;background:#eff6ff}
+        .onz-dosya span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+        .onz-dosya a{color:#1565c0;font-weight:900;text-decoration:none;white-space:nowrap}
         .ref-order-paper{max-width:760px;margin:0 auto;background:#fff;border:1px solid #dbe3ef;box-shadow:0 8px 28px rgba(15,23,42,.08);padding:24px}
         .ref-order-brand{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:20px;border-bottom:2px solid #172033;padding-bottom:14px;margin-bottom:14px}
         .ref-order-logo{font-size:34px;font-weight:1000;letter-spacing:-2px;text-align:center;color:#0b1d36}
@@ -3681,9 +3697,8 @@
                 <div class="topbar">
                     <div>
                         <h1 class="page-title">Dosyalar</h1>
-                        <div class="page-subtitle">Hekimden gelen tarama → teknisyen tasarımı yükler → "Tasarımı Gelenler"den kontrol edip Üretime Al → Üretime Alınanlar.</div>
+                        <div class="page-subtitle">Hekimden gelen tarama → teknisyen tasarımı yükler → "Tasarımı Gelenler"den kontrol edip Üretime Al → Üretime Alınanlar. 🦷/📐 simgesine tıklayınca dosyalar iner, üzerine gelince 3B önizleme açılır.</div>
                     </div>
-                    <button class="button button-blue" type="button" onclick="openTopluDosyaModal()">📁 Toplu Dosya Yükle</button>
                 </div>
                 <div class="constitution-toolbar" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;">
                     <select id="anFilesTab" onchange="renderAnayasaFiles()">
@@ -3693,6 +3708,7 @@
                     </select>
                     <input id="anFilesSearch" type="text" placeholder="Ara..."
                            oninput="renderAnayasaFiles()" />
+                    <button class="button button-blue" type="button" onclick="openTopluDosyaModal()" style="margin-left:auto">📁 Toplu Dosya Yükle</button>
                 </div>
                 <div class="panel">
                     <div class="table-wrapper">
@@ -6642,7 +6658,7 @@
                     <td>${Number(item.id || 0) || "-"}</td>
                     <td>${escapeHtml(item.hekimAdi ?? "-")}</td>
                     <td>
-                        ${escapeHtml(item.hastaAdi ?? "-")}
+                        ${escapeHtml(item.hastaAdi ?? "-")}${dosyaSimge(item.id)}
                         ${(disRengiRozeti(item) || oncelikRozeti(item))
                             ? `<div style="margin-top:5px;">${disRengiRozeti(item)} ${oncelikRozeti(item)}</div>`
                             : ""}
@@ -7715,7 +7731,7 @@
                     <td><strong>#${Number(item.id)}</strong></td>
                     <td>${escapeHtml(item.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(item.klinikAdi||"-")}</div></td>
                     <td>
-                        ${escapeHtml(item.hastaAdi||"-")}
+                        ${escapeHtml(item.hastaAdi||"-")}${dosyaSimge(item.id)}
                         <div style="margin-top:5px;">${disRengiRozeti(item)}</div>
                     </td>
                     <td>
@@ -8403,7 +8419,7 @@
                             </td>
 
                             <td>
-                                ${escapeHtml(item.hastaAdi || "-")}
+                                ${escapeHtml(item.hastaAdi || "-")}${dosyaSimge(item.id)}
                                 <div class="ops-mini">
                                     ${escapeHtml(item.hekimAdi || "-")}
                                     ${item.klinikAdi
@@ -8721,7 +8737,7 @@
                             </td>
 
                             <td>
-                                ${escapeHtml(item.hastaAdi || "-")}
+                                ${escapeHtml(item.hastaAdi || "-")}${dosyaSimge(item.id)}
                                 <div class="ops-mini">
                                     ${escapeHtml(item.hekimAdi || "-")}
                                     ${item.klinikAdi
@@ -9122,7 +9138,7 @@
                                 #${Number(item.id)}
                             </div>
                             <div class="planning-card-name">
-                                ${escapeHtml(item.hastaAdi || "-")}
+                                ${escapeHtml(item.hastaAdi || "-")}${dosyaSimge(item.id)}
                             </div>
                         </div>
 
@@ -9584,7 +9600,7 @@
                     return `
                         <div class="planning-alert-item"
                              onclick="openIsDetayModal(${Number(item.id)})">
-                            <strong>#${Number(item.id)} — ${escapeHtml(item.hastaAdi || "-")}</strong>
+                            <strong>#${Number(item.id)} — ${escapeHtml(item.hastaAdi || "-")}${dosyaSimge(item.id)}</strong>
                             <br/>
                             ${escapeHtml(neden.join(" • ") || "Kontrol et")}
                         </div>
@@ -9948,7 +9964,7 @@
                     <div class="kanban-card-top">
                         <div>
                             <div class="kanban-job-no">#${Number(item.id)}</div>
-                            <div class="kanban-patient">${escapeHtml(item.hastaAdi || "-")}</div>
+                            <div class="kanban-patient">${escapeHtml(item.hastaAdi || "-")}${dosyaSimge(item.id)}</div>
                             <div class="kanban-doctor">
                                 ${escapeHtml(item.hekimAdi || "-")}
                                 ${item.klinikAdi ? " • " + escapeHtml(item.klinikAdi) : ""}
@@ -10762,7 +10778,7 @@
                             <td>${item.id ?? "-"}</td>
                             <td>${escapeHtml(item.hekimAdi ?? "-")}</td>
                             <td>
-                                ${escapeHtml(item.hastaAdi ?? "-")}
+                                ${escapeHtml(item.hastaAdi ?? "-")}${dosyaSimge(item.id)}
                                 <div style="margin-top:5px;">
                             ${disRengiRozeti(item)}
                             ${oncelikRozeti(item)}
@@ -12769,7 +12785,7 @@
             hgSonListe=all.filter(x=>hgKategori(x)===hgAktifSekme).filter(x=>hgZamanUygun(x,zaman)).filter(x=>!hekim||`${x.hekimAdi||""} ${x.klinikAdi||""}`.toLocaleLowerCase("tr").includes(hekim)).filter(x=>!ara||`${x.id} ${x.hastaAdi||""}`.toLocaleLowerCase("tr").includes(ara)).filter(x=>!tur||anayasaKalemOzet(x).replace(/<[^>]+>/g," ").toLocaleLowerCase("tr").includes(tur)).filter(x=>!durum||anayasaDurum(x.durum)===durum).sort((a,b)=>new Date(hgTarih(b)||0)-new Date(hgTarih(a)||0));
             document.getElementById("hgSonuc").innerText=`${hgSonListe.length} kayıt gösteriliyor`;
             if(!hgSonListe.length){body.innerHTML='<tr><td colspan="10" class="empty">Seçilen filtrelere uygun portal işi yok.</td></tr>';return;}
-            body.innerHTML=hgSonListe.map(x=>{const kat=hgKategori(x),cls=kat==="yeni"?"hg-new":kat==="devam"?"hg-run":"hg-done";return `<tr><td><strong>#${Number(x.id)}</strong></td><td>${hgTarih(x)?tarihGoster(hgTarih(x)):"-"}</td><td>${escapeHtml(x.hastaAdi||"-")}</td><td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.klinikAdi||"")}</div></td><td>${anayasaKalemOzet(x)}</td><td>${escapeHtml(x.disRengi||"-")}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td><span class="hg-status ${cls}">${escapeHtml(anayasaDurum(x.durum)||kat)}</span></td><td>${Number(x.dosyaSayisi||0)>0?`<button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">${Number(x.dosyaSayisi)} dosya</button>`:"-"}</td><td><div class="button-group">${kat==="yeni"?`<button class="button hg-green" onclick="anayasaPortalSiparisFormaAktar(${Number(x.id)})">Siparişe Aktar</button>`:""}<button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Detay</button><button class="button" style="background:#fee2e2;color:#991b1b;" onclick="anayasaSil(${Number(x.id)})">Sil</button></div></td></tr>`}).join("");
+            body.innerHTML=hgSonListe.map(x=>{const kat=hgKategori(x),cls=kat==="yeni"?"hg-new":kat==="devam"?"hg-run":"hg-done";return `<tr><td><strong>#${Number(x.id)}</strong></td><td>${hgTarih(x)?tarihGoster(hgTarih(x)):"-"}</td><td>${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</td><td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.klinikAdi||"")}</div></td><td>${anayasaKalemOzet(x)}</td><td>${escapeHtml(x.disRengi||"-")}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td><span class="hg-status ${cls}">${escapeHtml(anayasaDurum(x.durum)||kat)}</span></td><td>${Number(x.dosyaSayisi||0)>0?`<button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">${Number(x.dosyaSayisi)} dosya</button>`:"-"}</td><td><div class="button-group">${kat==="yeni"?`<button class="button hg-green" onclick="anayasaPortalSiparisFormaAktar(${Number(x.id)})">Siparişe Aktar</button>`:""}<button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Detay</button><button class="button" style="background:#fee2e2;color:#991b1b;" onclick="anayasaSil(${Number(x.id)})">Sil</button></div></td></tr>`}).join("");
         }
         function anayasaHekimGelenPdf(){ if(!hgSonListe.length)return showError("PDF için listede kayıt yok."); const baslik=hgAktifSekme==="yeni"?"Yeni Gelenler":hgAktifSekme==="devam"?"Onaylanan / Devam Eden":"Tamamlananlar"; const rows=hgSonListe.map(x=>`<tr><td>#${Number(x.id)}</td><td>${hgTarih(x)?tarihGoster(hgTarih(x)):"-"}</td><td>${escapeHtml(x.hastaAdi||"-")}</td><td>${escapeHtml(x.hekimAdi||"-")}</td><td>${anayasaKalemOzet(x)}</td><td>${escapeHtml(x.disRengi||"-")}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td>${escapeHtml(anayasaDurum(x.durum)||"-")}</td></tr>`).join(""); const w=window.open("","_blank","width=1100,height=800"); if(!w)return showError("PDF penceresi tarayıcı tarafından engellendi."); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Primer Lab - ${baslik}</title><style>body{font-family:Arial,sans-serif;color:#0f172a;padding:28px}h1{margin:0}p{color:#64748b}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:11px}th,td{border-bottom:1px solid #dbe4ef;padding:8px;text-align:left}th{background:#eff6ff}@@page{size:landscape;margin:12mm}.no-price{font-size:10px;color:#94a3b8}</style></head><body><h1>Primer Lab — ${baslik}</h1><p>${hgSonListe.length} kayıt • ${new Date().toLocaleString("tr-TR")}</p><div class="no-price">Bu rapor operasyon takibi içindir; finansal bilgi içermez.</div><table><thead><tr><th>İş No</th><th>Geliş</th><th>Hasta</th><th>Hekim</th><th>İş</th><th>Renk</th><th>Termin</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close(); }
 
@@ -12820,7 +12836,7 @@
             const incoming=anayasaIsler.filter(x=>!x.silindi && x.onayDurumu==="Gelen Onay");
             const c1=document.getElementById("anGelenOnayCount"); if(c1)c1.innerText=incoming.length;
             const b1=document.getElementById("anGelenOnayBody"); if(!b1)return;
-            b1.innerHTML=incoming.length?incoming.map(function(x){return `<tr><td>#${Number(x.id)}</td><td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.klinikAdi||"")}</div></td><td>${escapeHtml(x.hastaAdi||"-")}</td><td>${anayasaKalemOzet(x)}</td><td>${disRengiRozeti(x)}<div class="ops-mini">${escapeHtml(x.materyal||"-")}</div></td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td><div class="button-group"><button class="button button-blue" onclick="anayasaGelenOnay(${Number(x.id)},true)">Onayla</button><button class="button" style="background:#fee2e2;color:#991b1b;" onclick="anayasaGelenOnay(${Number(x.id)},false)">Reddet</button></div></td></tr>`;}).join(""):'<tr><td colspan="7" class="empty">Gelen iş onayı yok.</td></tr>';
+            b1.innerHTML=incoming.length?incoming.map(function(x){return `<tr><td>#${Number(x.id)}</td><td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.klinikAdi||"")}</div></td><td>${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</td><td>${anayasaKalemOzet(x)}</td><td>${disRengiRozeti(x)}<div class="ops-mini">${escapeHtml(x.materyal||"-")}</div></td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td><div class="button-group"><button class="button button-blue" onclick="anayasaGelenOnay(${Number(x.id)},true)">Onayla</button><button class="button" style="background:#fee2e2;color:#991b1b;" onclick="anayasaGelenOnay(${Number(x.id)},false)">Reddet</button></div></td></tr>`;}).join(""):'<tr><td colspan="7" class="empty">Gelen iş onayı yok.</td></tr>';
         }
 
         async function anayasaGelenOnay(id, approve) {
@@ -12950,7 +12966,7 @@
                 }).join("");
                 return `<tr>
                     <td>#${Number(x.id)}</td>
-                    <td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.hastaAdi||"-")}</div></td>
+                    <td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</div></td>
                     <td>${anayasaKalemOzet(x)}</td>
                     <td>${disRengiRozeti(x)}</td>
                     <td>${escapeHtml(a?.teknisyenAdi||"Atanmamış")}</td>
@@ -12986,7 +13002,7 @@
             const list=anayasaIsler.filter(x=>!x.silindi&&anayasaDurum(x.durum)==="Tamamlandı"&&anayasaIsSearch(x,q));
             if(!list.length){body.innerHTML='<tr><td colspan="9" class="empty">Tamamlanan iş yok.</td></tr>';return;}
             body.innerHTML=list.map(function(x){return `<tr>
-                <td>#${Number(x.id)}</td><td>${escapeHtml(x.hekimAdi||"-")}</td><td>${escapeHtml(x.hastaAdi||"-")}</td>
+                <td>#${Number(x.id)}</td><td>${escapeHtml(x.hekimAdi||"-")}</td><td>${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</td>
                 <td>${anayasaKalemOzet(x)}</td><td>${disRengiRozeti(x)}</td><td>${Number(x.toplamAdet||0)}</td>
                 <td>${paraBirimiFormat(x.toplamTutar||0, x.paraBirimi)}</td><td>${Number(x.dosyaSayisi||0)}</td>
                 <td><div class="button-group"><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button>
@@ -13021,7 +13037,7 @@
                 const a=teknisyenAtamasi(x);
                 return `<tr>
                     <td>#${Number(x.id)}</td>
-                    <td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.hastaAdi||"-")}</div></td>
+                    <td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</div></td>
                     <td>${escapeHtml(a?.teknisyenAdi||"Atanmamış")}</td>
                     <td>${Number(x.taramaDosyaSayisi||0)}</td>
                     <td>${Number(x.tasarimDosyaSayisi||0)}</td>
@@ -13084,7 +13100,7 @@
             const name=t.adSoyad||t.ad||"Teknisyen";
             const active=anayasaIsler.filter(x=>!x.silindi&&anayasaDurum(x.durum)!=="Tamamlandı"&&Number(teknisyenAtamasi(x)?.teknisyenId)===Number(id));
             const done=anayasaIsler.filter(x=>!x.silindi&&anayasaDurum(x.durum)==="Tamamlandı"&&Number(teknisyenAtamasi(x)?.teknisyenId)===Number(id));
-            const rows=active.slice(0,8).map(x=>`<tr><td>#${Number(x.id)}</td><td><b>${escapeHtml(x.hekimAdi||'-')}</b><div class="ops-mini">${escapeHtml(x.hastaAdi||'-')}</div></td><td>${escapeHtml((x.isKalemleri||[]).map(k=>k.isTuru||k.ad||'').filter(Boolean).join(', ')||'-')}</td><td>${anayasaDurumRozeti(x.durum)}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):'-'}</td><td><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button></td></tr>`).join('');
+            const rows=active.slice(0,8).map(x=>`<tr><td>#${Number(x.id)}</td><td><b>${escapeHtml(x.hekimAdi||'-')}</b><div class="ops-mini">${escapeHtml(x.hastaAdi||'-')}${dosyaSimge(x.id)}</div></td><td>${escapeHtml((x.isKalemleri||[]).map(k=>k.isTuru||k.ad||'').filter(Boolean).join(', ')||'-')}</td><td>${anayasaDurumRozeti(x.durum)}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):'-'}</td><td><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button></td></tr>`).join('');
             box.style.display="block";
             const initials=String(name).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('tr-TR');
             box.innerHTML=`<div class="tech-detail-hero"><div class="tech-detail-identity"><div class="tech-detail-avatar">${escapeHtml(initials)}</div><div><div class="tech-detail-name">${escapeHtml(name)}</div><div class="tech-status-pill ${t.aktif===false?'passive':''}">${t.aktif===false?'Pasif':'● Aktif'}</div></div></div><div class="tech-profile-actions"><button class="button button-blue" onclick="openTeknisyenPanelModal(${Number(id)})">🔑 Panel Hesabı</button><button class="button button-light" onclick="openTeknisyenDuzenleModal(${Number(id)})">✎ Düzenle</button><button class="button ${t.aktif===false?'button-blue':'button-light'}" onclick="teknisyenAktifDegistir(${Number(id)},${t.aktif===false?'true':'false'})">${t.aktif===false?'Aktif Yap':'Pasife Al'}</button><button class="button tech-danger-button" onclick="teknisyenSil(${Number(id)})">Sil</button></div></div>
@@ -13101,6 +13117,181 @@
                 showSuccess("İş Silinenler'e taşındı.");
             }catch(e){showError(e.message);}
         }
+
+        // ---------------- Dosya simgeleri, tek tık indirme ve 3B önizleme ----------------
+        let isDosyaHaritasiKaynak=null, isDosyaHaritasi=new Map();
+        function isDosyaKaydi(id){
+            if(isDosyaHaritasiKaynak!==anayasaIsler){ isDosyaHaritasi=new Map((anayasaIsler||[]).map(x=>[Number(x.id),x])); isDosyaHaritasiKaynak=anayasaIsler; }
+            return isDosyaHaritasi.get(Number(id));
+        }
+        // Dosyası olan işin satırında: 🦷 tarama, 📐 tasarım, 📎 diğer. Tıkla: o türün tümünü indir; üzerine gel: önizleme.
+        function dosyaSimge(id){
+            const x=isDosyaKaydi(id); if(!x) return '';
+            const t=Number(x.taramaDosyaSayisi||0), d=Number(x.tasarimDosyaSayisi||0), o=Math.max(0,Number(x.dosyaSayisi||0)-t-d);
+            if(!t&&!d&&!o) return '';
+            const b=(tur,cls,ikon,n,ad)=>`<button type="button" class="dsb ${cls}" title="${ad} (${n}) — tıkla: tümünü indir" onclick="event.stopPropagation();dosyaHepsiniIndir(${Number(id)},'${tur}')" onmouseenter="onizlemeGoster(this,${Number(id)},'${tur}')" onmouseleave="onizlemeGizleGecikmeli()">${ikon} ${n}</button>`;
+            return '<span class="dsimge">'+(t?b('Tarama','dsb-tarama','🦷',t,'Tarama dosyaları'):'')+(d?b('Tasarım','dsb-tasarim','📐',d,'Tasarım dosyaları'):'')+(o?b('Diger','dsb-diger','📎',o,'Diğer dosyalar'):'')+'</span>';
+        }
+
+        function dosyaHepsiniIndir(id,tur){
+            const a=document.createElement('a');
+            a.href='/api/is-dosyalari/siparis/'+Number(id)+'/indir-hepsi?tur='+encodeURIComponent(tur);
+            a.download=''; document.body.appendChild(a); a.click(); a.remove();
+        }
+
+        let onzZaman=null, onzAcZaman=null, onzAktif=null;
+        const onzListeOnbellek=new Map(), onzMeshOnbellek=new Map();
+        function onzPencere(){
+            let p=document.getElementById('onzPop');
+            if(!p){
+                p=document.createElement('div'); p.id='onzPop'; p.className='onz-pop';
+                p.addEventListener('mouseenter',()=>{clearTimeout(onzZaman);});
+                p.addEventListener('mouseleave',onizlemeGizleGecikmeli);
+                document.body.appendChild(p);
+            }
+            return p;
+        }
+        function onizlemeGizleGecikmeli(){
+            clearTimeout(onzAcZaman); clearTimeout(onzZaman);
+            onzZaman=setTimeout(()=>{ const p=document.getElementById('onzPop'); if(p)p.style.display='none'; onzAktif=null; onzGL.dur(); },300);
+        }
+        function onizlemeGoster(el,id,tur){
+            clearTimeout(onzZaman); clearTimeout(onzAcZaman);
+            onzAcZaman=setTimeout(()=>onizlemeAc(el,id,tur),220);
+        }
+        async function onizlemeAc(el,id,tur){
+            const p=onzPencere(), r=el.getBoundingClientRect();
+            const anahtar=id+'|'+tur;
+            if(onzAktif===anahtar && p.style.display==='block') return;
+            onzAktif=anahtar;
+            const x=isDosyaKaydi(id)||{};
+            const turAd=tur==='Diger'?'Diğer dosyalar':tur+' dosyaları';
+            p.innerHTML=`<div class="onz-bas"><span>#${Number(id)} · ${escapeHtml(x.hastaAdi||'')} — ${turAd}</span><button type="button" class="dsb" onclick="dosyaHepsiniIndir(${Number(id)},'${tur}')">⬇ Tümü</button></div>
+                <div class="onz-tuval" id="onzTuvalKutu"><div class="onz-durum" id="onzDurum">Yükleniyor...</div></div>
+                <div class="onz-liste" id="onzListe"></div>`;
+            p.style.display='block';
+            const g=p.getBoundingClientRect();
+            let left=Math.min(r.left, window.innerWidth-g.width-8), top=r.bottom+6;
+            if(top+g.height>window.innerHeight-8) top=Math.max(8,r.top-g.height-6);
+            p.style.left=Math.max(8,left)+'px'; p.style.top=top+'px';
+            onzGL.baslat(document.getElementById('onzTuvalKutu'));
+            let liste;
+            try{ liste=await onzDosyaListesi(id); }catch(e){ onzDurum(e.message||'Dosya listesi alınamadı.'); return; }
+            if(onzAktif!==anahtar) return;
+            liste=liste.filter(f=>tur==='Diger'?!['Tarama','Tasarım'].includes(f.dosyaTuru):f.dosyaTuru===tur);
+            const onizlenebilir=f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||'');
+            document.getElementById('onzListe').innerHTML=liste.map(f=>`<div class="onz-dosya" data-id="${Number(f.id)}">
+                <span title="${escapeHtml(f.orijinalDosyaAdi)}" onmouseenter="${onizlenebilir(f)?`onzDosyaCiz(${Number(f.id)},'${anahtar}')`:''}">${onizlenebilir(f)?'🧊 ':'📄 '}${escapeHtml(f.orijinalDosyaAdi)}</span>
+                <a href="/api/is-dosyalari/${Number(f.id)}/indir" download title="İndir">⬇ ${(Number(f.boyut||0)/1048576).toFixed(1)} MB</a></div>`).join('')||'<div class="ops-mini">Dosya yok.</div>';
+            const ilk=liste.find(onizlenebilir);
+            if(ilk) onzDosyaCiz(Number(ilk.id),anahtar); else onzDurum('Önizleme STL, PLY ve OBJ dosyaları için yapılır. Dosyayı ⬇ ile indirebilirsiniz.');
+        }
+        function onzDurum(t){ const d=document.getElementById('onzDurum'); if(d){ d.style.display=t?'flex':'none'; d.innerText=t||''; } }
+        async function onzDosyaListesi(id){
+            const k=onzListeOnbellek.get(id);
+            if(k && Date.now()-k.zaman<20000) return k.liste;
+            const r=await fetch('/api/is-dosyalari/siparis/'+Number(id),{cache:'no-store'});
+            if(!r.ok) throw new Error((await r.text())||'Dosya listesi alınamadı.');
+            const liste=await r.json(); onzListeOnbellek.set(id,{zaman:Date.now(),liste}); return liste;
+        }
+        async function onzDosyaCiz(fileId,anahtar){
+            document.querySelectorAll('#onzListe .onz-dosya').forEach(e=>e.classList.toggle('secili',Number(e.dataset.id)===fileId));
+            const x=isDosyaKaydi((anahtar||'').split('|')[0])||{};
+            const renk=(anahtar||'').endsWith('|Tasarım')?[0.55,0.62,0.95]:[0.93,0.86,0.76];
+            let mesh=onzMeshOnbellek.get(fileId);
+            if(!mesh){
+                onzDurum('3B önizleme hazırlanıyor...');
+                try{
+                    const r=await fetch('/api/is-dosyalari/'+fileId+'/onizleme');
+                    if(!r.ok) throw new Error((await r.text())||'Önizleme oluşturulamadı.');
+                    mesh=onzMeshCoz(await r.arrayBuffer());
+                    if(onzMeshOnbellek.size>=8) onzMeshOnbellek.delete(onzMeshOnbellek.keys().next().value);
+                    onzMeshOnbellek.set(fileId,mesh);
+                }catch(e){ if(onzAktif===anahtar) onzDurum(e.message||'Önizleme oluşturulamadı.'); return; }
+            }
+            if(onzAktif!==anahtar) return;
+            onzDurum(''); onzGL.ciz(mesh,renk);
+        }
+        // Sunucunun sadeleştirilmiş ağ biçimi: "PLM1" | nokta | üçgen | float32 xyz | uint32 indeks
+        function onzMeshCoz(buf){
+            const dv=new DataView(buf);
+            if(String.fromCharCode(dv.getUint8(0),dv.getUint8(1),dv.getUint8(2),dv.getUint8(3))!=='PLM1') throw new Error('Önizleme verisi okunamadı.');
+            const vc=dv.getUint32(4,true), tc=dv.getUint32(8,true);
+            const p=new Float32Array(buf,12,vc*3), idx=new Uint32Array(buf,12+vc*12,tc*3);
+            let mn=[Infinity,Infinity,Infinity], mx=[-Infinity,-Infinity,-Infinity];
+            for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<mn[k])mn[k]=p[i+k]; if(p[i+k]>mx[k])mx[k]=p[i+k]; }
+            const c=[(mn[0]+mx[0])/2,(mn[1]+mx[1])/2,(mn[2]+mx[2])/2];
+            let r=0; for(let i=0;i<p.length;i+=3){ const dx=p[i]-c[0],dy=p[i+1]-c[1],dz=p[i+2]-c[2]; r=Math.max(r,dx*dx+dy*dy+dz*dz); }
+            r=Math.sqrt(r)||1;
+            const pos=new Float32Array(p.length); for(let i=0;i<p.length;i+=3){ pos[i]=(p[i]-c[0])/r; pos[i+1]=(p[i+1]-c[1])/r; pos[i+2]=(p[i+2]-c[2])/r; }
+            const nor=new Float32Array(p.length);
+            for(let i=0;i<idx.length;i+=3){
+                const a=idx[i]*3,b=idx[i+1]*3,d=idx[i+2]*3;
+                const ux=pos[b]-pos[a],uy=pos[b+1]-pos[a+1],uz=pos[b+2]-pos[a+2], vx=pos[d]-pos[a],vy=pos[d+1]-pos[a+1],vz=pos[d+2]-pos[a+2];
+                const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+                for(const q of [a,b,d]){ nor[q]+=nx; nor[q+1]+=ny; nor[q+2]+=nz; }
+            }
+            return {pos,nor,idx,adet:idx.length};
+        }
+        // Bağımsız küçük WebGL görüntüleyici: otomatik döner, fareyle sürükleyerek çevrilir.
+        const onzGL=(function(){
+            let gl=null, prog=null, tuval=null, buf={}, adet=0, renk=[0.9,0.85,0.75], rx=-0.5, ry=0, anim=0, surukle=null, uintExt=null;
+            const vs='attribute vec3 p;attribute vec3 n;uniform mat4 m;uniform mat3 r;varying vec3 vn;void main(){vn=r*n;gl_Position=m*vec4(p,1.0);}';
+            const fs='precision mediump float;varying vec3 vn;uniform vec3 c;void main(){vec3 N=normalize(vn);float d=abs(dot(N,normalize(vec3(0.35,0.55,1.0))));float s=pow(max(d,0.0),24.0)*0.25;gl_FragColor=vec4(c*(0.28+0.72*d)+s,1.0);}';
+            function derle(t,src){const sh=gl.createShader(t);gl.shaderSource(sh,src);gl.compileShader(sh);return sh;}
+            // Tek tuval ve tek WebGL bağlamı yeniden kullanılır (tarayıcıların bağlam sınırı var).
+            function baslat(kutu){
+                dur(); rx=-0.5; ry=0;
+                if(!tuval){
+                    tuval=document.createElement('canvas'); tuval.width=680; tuval.height=500;
+                    gl=tuval.getContext('webgl',{antialias:true});
+                    if(gl){
+                        uintExt=gl.getExtension('OES_element_index_uint');
+                        prog=gl.createProgram(); gl.attachShader(prog,derle(gl.VERTEX_SHADER,vs)); gl.attachShader(prog,derle(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(prog);
+                        buf={p:gl.createBuffer(),n:gl.createBuffer(),i:gl.createBuffer()};
+                    }
+                    tuval.onmousedown=e=>{surukle={x:e.clientX,y:e.clientY,rx,ry};tuval.style.cursor='grabbing';};
+                    window.addEventListener('mouseup',()=>{surukle=null;tuval.style.cursor='grab';});
+                    tuval.onmousemove=e=>{ if(!surukle)return; ry=surukle.ry+(e.clientX-surukle.x)*0.01; rx=surukle.rx+(e.clientY-surukle.y)*0.01; };
+                }
+                if(kutu) kutu.insertBefore(tuval,kutu.firstChild);
+                if(!gl){ onzDurum('Bu tarayıcı 3B önizlemeyi desteklemiyor.'); return; }
+                gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+            }
+            function ciz(mesh,c){
+                if(!gl) return; renk=c;
+                if(!uintExt && mesh.pos.length/3>65535){ onzDurum('Bu tarayıcıda büyük model gösterilemiyor.'); return; }
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.p); gl.bufferData(gl.ARRAY_BUFFER,mesh.pos,gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.n); gl.bufferData(gl.ARRAY_BUFFER,mesh.nor,gl.STATIC_DRAW);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buf.i); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,uintExt?mesh.idx:new Uint16Array(mesh.idx),gl.STATIC_DRAW);
+                adet=mesh.adet; cancelAnimationFrame(anim); kare();
+            }
+            function kare(){
+                if(!gl||!adet) return;
+                if(!surukle) ry+=0.008;
+                const cx=Math.cos(rx),sx=Math.sin(rx),cy=Math.cos(ry),sy=Math.sin(ry);
+                // R = Rx * Ry (sütun düzeninde)
+                const R=[cy,sx*sy,-cx*sy, 0,cx,sx, sy,-sx*cy,cx*cy];
+                const a=tuval.width/tuval.height, f=1/Math.tan(0.45), near=0.1, far=10, z=-2.7;
+                const P=[f/a,0,0,0, 0,f,0,0, 0,0,(far+near)/(near-far),-1, 0,0,2*far*near/(near-far),0];
+                const MV=[R[0],R[1],R[2],0, R[3],R[4],R[5],0, R[6],R[7],R[8],0, 0,0,z,1];
+                const M=new Float32Array(16);
+                for(let i=0;i<4;i++)for(let j=0;j<4;j++){let s=0;for(let k=0;k<4;k++)s+=P[k*4+j]*MV[i*4+k];M[i*4+j]=s;}
+                gl.viewport(0,0,tuval.width,tuval.height); gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST);
+                gl.useProgram(prog);
+                const lp=gl.getAttribLocation(prog,'p'), ln=gl.getAttribLocation(prog,'n');
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.p); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp,3,gl.FLOAT,false,0,0);
+                gl.bindBuffer(gl.ARRAY_BUFFER,buf.n); gl.enableVertexAttribArray(ln); gl.vertexAttribPointer(ln,3,gl.FLOAT,false,0,0);
+                gl.uniformMatrix4fv(gl.getUniformLocation(prog,'m'),false,M);
+                gl.uniformMatrix3fv(gl.getUniformLocation(prog,'r'),false,new Float32Array(R));
+                gl.uniform3fv(gl.getUniformLocation(prog,'c'),new Float32Array(renk));
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,buf.i);
+                gl.drawElements(gl.TRIANGLES,adet,uintExt?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+                anim=requestAnimationFrame(kare);
+            }
+            function dur(){ cancelAnimationFrame(anim); adet=0; }
+            return {baslat,ciz,dur};
+        })();
 
         // ---------------- Teknisyen Paneli hesabı ----------------
         async function openTeknisyenPanelModal(id){
@@ -13392,7 +13583,7 @@
             host.innerHTML=list.length?list.map(function(x){
                 return `<div class="msg-job${Number(anayasaMesajAktifIsId)===Number(x.id)?' active':''}"
                     onclick="anayasaMesajAc(${Number(x.id)})">
-                    <strong>#${Number(x.id)} ${escapeHtml(x.hastaAdi||"-")}</strong>
+                    <strong>#${Number(x.id)} ${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</strong>
                     <div class="ops-mini">${escapeHtml(x.hekimAdi||"-")} • ${escapeHtml(anayasaDurum(x.durum))}</div>
                 </div>`;
             }).join(""):'<div class="empty" style="padding:28px 16px;line-height:1.6"><strong>Mesaj listesi temiz.</strong><br>Bu sürümden sonra açılan yeni işler burada otomatik oluşacak.</div>';
@@ -14546,7 +14737,7 @@
                 return `<tr>
                     <td>${escapeHtml(tarihGoster(x.olusturmaTarihi||x.tarih)||'-')}</td>
                     <td>${escapeHtml(x.hekimAdi||'-')}</td>
-                    <td>${escapeHtml(x.hastaAdi||'-')}</td>
+                    <td>${escapeHtml(x.hastaAdi||'-')}${dosyaSimge(x.id)}</td>
                     <td>${escapeHtml(isText)}</td>
                     <td>${escapeHtml(String(uye))}</td>
                     <td><button type="button" class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button></td>

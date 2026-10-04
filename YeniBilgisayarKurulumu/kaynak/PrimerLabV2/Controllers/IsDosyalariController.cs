@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using System.IO.Compression;
 using PrimerLabV2.Data;
+using PrimerLabV2.Infrastructure;
 
 namespace PrimerLabV2.Controllers;
 
@@ -132,6 +134,104 @@ public class IsDosyalariController : ControllerBase
             try { if (System.IO.File.Exists(fullPath)) System.IO.File.Delete(fullPath); } catch { }
             throw;
         }
+    }
+
+    // Bir işin tüm tarama (veya tasarım) dosyaları tek tıkla: tek dosyaysa kendisi, birden fazlaysa zip.
+    [HttpGet("siparis/{siparisId:int}/indir-hepsi")]
+    public async Task<IActionResult> HepsiniIndir(int siparisId, [FromQuery] string? tur, CancellationToken cancellationToken)
+    {
+        var hasta = await _db.Database.SqlQuery<string>($"""
+            SELECT COALESCE(h."AdSoyad",'hasta') AS "Value"
+            FROM "Siparisler" s LEFT JOIN "Hastalar" h ON h."Id"=s."HastaId"
+            WHERE s."Id"={siparisId}
+            """).ToListAsync(cancellationToken);
+        if (hasta.Count == 0) return NotFound("İş bulunamadı.");
+
+        var tumu = string.IsNullOrWhiteSpace(tur) || tur == "Hepsi";
+        var secilenTur = NormalizeType(tur);
+        var files = (await _db.Database.SqlQuery<IsDosyasiKayitDto>($"""
+            SELECT "Id","SiparisId","DosyaTuru","OrijinalDosyaAdi","SaklananDosyaAdi","Uzanti","Boyut","YuklemeTarihi"
+            FROM "IsDosyalari" WHERE "SiparisId"={siparisId}
+            ORDER BY "YuklemeTarihi","Id"
+            """).ToListAsync(cancellationToken))
+            .Where(f => tumu || f.DosyaTuru == secilenTur)
+            .Select(f => (Kayit: f, Yol: TryPath(f)))
+            .Where(x => x.Yol != null && System.IO.File.Exists(x.Yol))
+            .ToList();
+
+        if (files.Count == 0) return NotFound("İndirilecek dosya bulunamadı.");
+
+        var provider = new FileExtensionContentTypeProvider();
+        if (files.Count == 1)
+        {
+            var tek = files[0];
+            if (!provider.TryGetContentType(tek.Kayit.OrijinalDosyaAdi, out var ct)) ct = "application/octet-stream";
+            return PhysicalFile(tek.Yol!, ct, Path.GetFileName(tek.Kayit.OrijinalDosyaAdi), enableRangeProcessing: true);
+        }
+
+        // Zip geçici dosyaya yazılır (Kestrel eşzamanlı yazmaya izin vermez); indirme bitince silinir.
+        var gecici = Path.Combine(Path.GetTempPath(), "primerlab_" + Guid.NewGuid().ToString("N") + ".zip");
+        await using (var zipAkis = new FileStream(gecici, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16, useAsync: true))
+        using (var zip = new ZipArchive(zipAkis, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var kullanilan = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (kayit, yol) in files)
+            {
+                var ad = Path.GetFileName(kayit.OrijinalDosyaAdi);
+                if (tumu) ad = kayit.DosyaTuru + "/" + ad;
+                var aday = ad; var n = 2;
+                while (!kullanilan.Add(aday))
+                    aday = Path.Combine(Path.GetDirectoryName(ad) ?? "", Path.GetFileNameWithoutExtension(ad) + $" ({n++})" + Path.GetExtension(ad)).Replace('\\', '/');
+                var giris = zip.CreateEntry(aday, CompressionLevel.Fastest);
+                await using var hedef = giris.Open();
+                await using var kaynak = new FileStream(yol!, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, useAsync: true);
+                await kaynak.CopyToAsync(hedef, cancellationToken);
+            }
+        }
+
+        var zipAdi = $"{siparisId}_{GuvenliAd(hasta[0])}_{(tumu ? "dosyalar" : secilenTur == "Tasarım" ? "tasarim" : secilenTur == "Tarama" ? "tarama" : "dosyalar")}.zip";
+        var akis = new FileStream(gecici, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, 1 << 16, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+        return File(akis, "application/zip", zipAdi);
+    }
+
+    // Fare ile üzerine gelindiğinde gösterilen hafif 3B önizleme (STL / PLY / OBJ).
+    [HttpGet("{id:int}/onizleme")]
+    public async Task<IActionResult> Onizleme(int id, CancellationToken cancellationToken)
+    {
+        var file = await GetFile(id);
+        if (file == null) return NotFound("Dosya kaydı bulunamadı.");
+        var yol = TryPath(file);
+        if (yol == null || !System.IO.File.Exists(yol)) return NotFound("Dosyanın fiziksel kopyası bulunamadı.");
+        if (!MeshOnizleme.Desteklenen.Contains(file.Uzanti)) return StatusCode(StatusCodes.Status415UnsupportedMediaType, "Bu dosya türü için önizleme yok.");
+
+        string? onizleme;
+        try
+        {
+            onizleme = await MeshOnizleme.OnizlemeYolu(
+                yol, file.Uzanti,
+                Path.Combine(_environment.ContentRootPath, "App_Data", "Onizleme"),
+                file.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or FormatException or OverflowException or EndOfStreamException)
+        {
+            return StatusCode(StatusCodes.Status422UnprocessableEntity, "Dosya okunamadı; önizleme oluşturulamadı.");
+        }
+
+        if (onizleme == null) return StatusCode(StatusCodes.Status422UnprocessableEntity, "Önizleme oluşturulamadı.");
+        Response.Headers.CacheControl = "private, max-age=86400";
+        return PhysicalFile(onizleme, "application/octet-stream");
+    }
+
+    private string? TryPath(IsDosyasiKayitDto f)
+    {
+        try { return SafeStoredPath(f.SiparisId, f.SaklananDosyaAdi); } catch { return null; }
+    }
+
+    private static string GuvenliAd(string ad)
+    {
+        var temiz = new string((ad ?? "").Select(c => char.IsLetterOrDigit(c) ? c : '_').ToArray()).Trim('_');
+        return string.IsNullOrEmpty(temiz) ? "hasta" : temiz[..Math.Min(temiz.Length, 40)];
     }
 
     [HttpGet("{id:int}/indir")]

@@ -156,3 +156,16 @@ Ana program 30 saniyede bir kendini yeniler; yeni is, yuklenen tasarim,
 biten is ve gelen mesaj icin ekranda bildirim cikar.
 Hekim ve teknisyenin internetten girebilmesi icin PORTAL_INTERNET_AC.bat bir
 kez calistirilmis olmali; bu bilgisayar ve Primer Lab acik kalmalidir.
+
+
+DOSYA SIMGELERI VE 3B ONIZLEME
+------------------------------
+Is listelerinde (Devam Eden, Hekimden Gelenler, Onay, Dosyalar, Tamamlanan,
+Mesajlar, Teknisyen detayi vb.) dosyasi olan her isin hasta adinin yaninda:
+  🦷 n  = tarama dosyalari     📐 n = tasarim dosyalari     📎 n = diger
+- Simgeye TIKLAYIN: o turun tum dosyalari tek seferde iner (birden fazlaysa zip).
+- Fareyi simgenin USTUNE GETIRIN: STL / PLY / OBJ dosyasinin 3B onizlemesi
+  acilir (kendiliginden doner, fareyle surukleyerek cevrilir). Pencerede
+  dosyalarin listesi vardir; tek tek indirilebilir, uzerine gelinen dosya
+  onizlenir. Buyuk taramalar ilk acilista birkac saniye hazirlanir, sonra
+  aninda acilir. (3Shape DCM ve ZIP dosyalari onizlenemez, indirilebilir.)
