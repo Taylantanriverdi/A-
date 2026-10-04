@@ -55,7 +55,7 @@ robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /E /IS /IT /XD bin obj /NFL /NDL /
 if errorlevel 8 goto GERI_AL
 rem Eski Hekim Portali sayfalari kaldirilir: yeni portal HekimPortali.cshtml ile gelir;
 rem ayni adresi kullanan iki sayfa olursa program acilmaz.
-powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/hekim-portal' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"
+powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and $_.Name -ne 'TeknisyenPaneli.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/(hekim-portal|teknisyen)' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"
 rem Onceki derleme dosyalari silinir; program her guncellemede sifirdan derlenir.
 rem (Zip'ten cikan dosyalarin saati saat dilimi farki yuzunden eski gorunebiliyor;
 rem  derleyici bu durumda sayfayi yeniden derlemeyip eski surumu birakiyordu.)

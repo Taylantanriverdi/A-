@@ -107,3 +107,30 @@ Guvenlik:
 - Tunel ayarinda adres olarak MUTLAKA localhost:5170 yazin (5169 DEGIL).
 - Portal, bu bilgisayar ve Primer Lab acik oldugu surece calisir.
 - Kapatmak icin: PORTAL_INTERNET_AC.bat > 3
+
+
+TEKNISYEN PANELI (eski Firebase "Teknisyen Portali"nin yerine)
+--------------------------------------------------------------
+Teknisyen telefonundan/bilgisayarindan kendi hesabiyla girer, yalniz kendisine
+atanmis (onaylanmis) isleri gorur. Fiyat gormez.
+- Durum: Bekliyor > Tasarimda > Uretimde > Makyajda > "Bitti - onaya gonder".
+  Tamamlandi'yi laboratuvar (siz) Onay Bekleyen ekranindan onaylarsiniz.
+- Tarama dosyalarini indirir, tasarim/uretim dosyasi yukler.
+- Is bazinda mesajlasir (ana programdaki Mesajlar ekrani ve hekim portali
+  ayni yazismayi gorur; hekim teknisyen adini gormez, "Laboratuvar" gorur).
+- Dis teknisyen: isi once "Kabul Et"meli; hekim adini bas harfleriyle gorur.
+
+Hesap: Teknisyenler > teknisyeni secin > "Panel Hesabi" > kullanici adi,
+parola, ic/dis tipi > Kaydet.
+Adres: ayni Wi-Fi'den http://BU-BILGISAYARIN-IP-ADRESI:5169/teknisyen
+Internet erisimi aciksa (PORTAL_INTERNET_AC.bat): internet adresi + /teknisyen
+
+GELEN ISLER PANELI (eski Firebase paneli)
+-----------------------------------------
+Tum ozellikleri ana programda var: Hekimden Gelenler (gelen isler ve onay),
+Is Dagitim (teknisyen atama), Dosyalar (tarama/tasarim, toplu yukleme),
+Mesajlar, Siparis Formu, Tamamlanan Isler, Silinenler.
+
+Eski Firebase panelleri artik gerekmez. Tasindiktan sonra Firebase projesini
+(primer-dental) kapatmaniz onerilir: eski teknisyen parolalari orada duz metin
+olarak duruyordu.

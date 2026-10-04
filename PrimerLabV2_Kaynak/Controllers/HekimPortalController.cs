@@ -329,7 +329,8 @@ public sealed class HekimPortalController : ControllerBase
                 COALESCE(s."PortalTasarimKaynagi",'lab') AS "TasarimKaynagi",
                 COALESCE(s."ParaBirimi",'TRY') AS "ParaBirimi",
                 COALESCE((SELECT SUM(k."Adet") FROM "SiparisKalemleri" k WHERE k."SiparisId"=s."Id"),0)::int AS "ToplamAdet",
-                COALESCE((SELECT COUNT(*) FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id"),0)::int AS "DosyaSayisi"
+                COALESCE((SELECT COUNT(*) FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id"),0)::int AS "DosyaSayisi",
+                COALESCE((SELECT COUNT(*) FROM "IsMesajlari" m WHERE m."SiparisId"=s."Id"),0)::int AS "MesajSayisi"
             FROM "Siparisler" s
             INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
             WHERE p."HekimId"={session.HekimId}
@@ -370,6 +371,7 @@ public sealed class HekimPortalController : ControllerBase
             x.TasarimKaynagi,
             x.ToplamAdet,
             x.DosyaSayisi,
+            x.MesajSayisi,
             kalemler = byJob.TryGetValue(x.Id, out var list)
                 ? list.Select(k => (object)new { k.IsTuru, k.Adet }).ToArray()
                 : Array.Empty<object>()
@@ -563,6 +565,53 @@ public sealed class HekimPortalController : ControllerBase
             dosyaSayisi = files.Count,
             dahiliKayitSayisi = createdJobIds.Count
         });
+    }
+
+    // İş bazında laboratuvarla yazışma (ana programdaki Mesajlar ekranıyla aynı kayıtlar).
+    [HttpGet("jobs/{jobId:int}/messages")]
+    public async Task<IActionResult> JobMessages(int jobId, CancellationToken cancellationToken)
+    {
+        var session = await RequireSession(cancellationToken);
+        if (session.Error != null) return session.Error;
+        if (!await OwnsJob(session.HekimId, jobId, cancellationToken)) return NotFound("İş bulunamadı.");
+
+        var rows = await _db.Database.SqlQuery<IsMesajSatiri>($"""
+            SELECT "Id","GonderenTipi","GonderenAdi","Mesaj","Tarih"
+            FROM "IsMesajlari" WHERE "SiparisId"={jobId}
+            ORDER BY "Tarih","Id"
+            """).ToListAsync(cancellationToken);
+
+        // Laboratuvar içi kişiler (teknisyen adları) hekime gösterilmez.
+        return Ok(rows.Select(m => new
+        {
+            m.Id,
+            Gonderen = m.GonderenTipi == "Hekim" ? "Siz" : "Laboratuvar",
+            Benim = m.GonderenTipi == "Hekim",
+            m.Mesaj,
+            m.Tarih
+        }));
+    }
+
+    [HttpPost("jobs/{jobId:int}/messages")]
+    public async Task<IActionResult> SendJobMessage(int jobId, [FromBody] IsMesajDto dto, CancellationToken cancellationToken)
+    {
+        var session = await RequireSession(cancellationToken);
+        if (session.Error != null) return session.Error;
+        if (!await OwnsJob(session.HekimId, jobId, cancellationToken)) return NotFound("İş bulunamadı.");
+
+        var mesaj = (dto.Mesaj ?? string.Empty).Trim();
+        if (mesaj.Length == 0) return BadRequest("Mesaj boş olamaz.");
+        if (mesaj.Length > 4000) return BadRequest("Mesaj en fazla 4000 karakter olabilir.");
+
+        var hekimAdi = await _db.Hekimler.AsNoTracking()
+            .Where(x => x.Id == session.HekimId).Select(x => x.AdSoyad)
+            .FirstOrDefaultAsync(cancellationToken) ?? "Hekim";
+
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "IsMesajlari" ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")
+            VALUES ({jobId},{"Hekim"},{hekimAdi},{mesaj},{DateTime.UtcNow})
+            """, cancellationToken);
+        return Ok(new { message = "Mesaj gönderildi." });
     }
 
     [HttpGet("jobs/{jobId:int}/files")]
@@ -1070,6 +1119,7 @@ public sealed class PortalJobRow
     public string ParaBirimi { get; set; } = "TRY";
     public int ToplamAdet { get; set; }
     public int DosyaSayisi { get; set; }
+    public int MesajSayisi { get; set; }
 }
 
 public sealed class PortalJobItemRow

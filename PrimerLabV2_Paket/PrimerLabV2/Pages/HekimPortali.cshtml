@@ -129,6 +129,16 @@
         .job-body pre{white-space:pre-wrap;font:inherit;margin:4px 0 0;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
         .job-body a{color:var(--blue);font-weight:800}
         .empty{text-align:center;color:var(--muted);padding:30px 10px}
+        .stepper{display:flex;gap:4px;margin:4px 0 10px}
+        .stepper div{flex:1;text-align:center;font-size:10px;font-weight:800;color:var(--muted);border-top:4px solid #e2e8f0;padding-top:4px}
+        .stepper div.on{border-color:var(--blue);color:var(--blue)}
+        .stepper div.ok{border-color:var(--green);color:var(--green)}
+        .msgs{display:grid;gap:6px;margin:6px 0;max-height:280px;overflow:auto}
+        .msg-b{max-width:85%;padding:7px 10px;border-radius:12px;background:#fff;border:1px solid var(--line);white-space:pre-wrap}
+        .msg-b.me{margin-left:auto;background:var(--blue-soft);border-color:#bfdbfe}
+        .msg-b small{display:block;color:var(--muted);font-size:10px;font-weight:700}
+        .msg-form{display:flex;gap:6px}
+        .msg-form textarea{flex:1;min-height:42px;height:42px;resize:vertical;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px}
 
         @@media (max-width:620px){
             .wrap{padding:12px}
@@ -766,18 +776,58 @@
             const kal = (j.kalemler || []).map(k => esc(k.isTuru) + " × " + k.adet).join(", ");
             return `<div class="job">
                 <div class="job-head" onclick="isAc(${j.id})">
-                    <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}</div></div>
+                    <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}${j.mesajSayisi ? " · 💬 " + j.mesajSayisi : ""}</div></div>
                     <span class="badge ${c}">${esc(d)}</span>
                 </div>
                 ${acikIs === j.id ? `<div class="job-body" id="isDetay${j.id}">
+                    ${asamaCiz(j)}
                     <div><b>Teslim:</b> ${tarih(j.terminTarihi)} · <b>Renk:</b> ${esc(j.disRengi || "-")} · <b>Materyal:</b> ${esc(j.materyal || "-")}</div>
                     <div><b>Dişler:</b> ${esc(j.disSemasi || "-")}</div>
                     ${j.notlar ? `<div><b>Notlar:</b><pre>${esc(j.notlar)}</pre></div>` : ""}
                     <div><b>Dosyalar:</b> <span id="isDosya${j.id}">${j.dosyaSayisi ? "yükleniyor..." : "yok"}</span></div>
+                    <div style="margin-top:10px"><b>💬 Laboratuvarla yazışma</b>
+                        <div class="msgs" id="isMesaj${j.id}"><span class="hint">Yükleniyor...</span></div>
+                        <div class="msg-form"><textarea id="isMesajYaz${j.id}" maxlength="4000" placeholder="Bu iş hakkında laboratuvara yazın..."></textarea>
+                        <button class="btn btn-sm" type="button" style="height:42px" onclick="mesajGonder(${j.id})">Gönder</button></div>
+                    </div>
                 </div>` : ""}
             </div>`;
         }).join("");
-        if (acikIs) dosyalariGetir(acikIs);
+        if (acikIs) { dosyalariGetir(acikIs); mesajlariGetir(acikIs); }
+    }
+
+    // Eski portaldaki aşama göstergesi: Gönderildi → Onaylandı → Tasarım → Üretim → Tamamlandı
+    function asamaCiz(j) {
+        const adim = ["Gönderildi", "Onaylandı", "Tasarım", "Üretim", "Tamamlandı"];
+        const d = j.durum || "";
+        let n = 1;
+        if (j.onayDurumu === "Gelen Onay" || j.onayDurumu === "Reddedildi") n = 0;
+        else if (/teslim|tamamland/i.test(d)) n = 4;
+        else if (/üretim|makyaj|tamamlama/i.test(d)) n = 3;
+        else if (/tasar/i.test(d)) n = 2;
+        return `<div class="stepper">${adim.map((a, i) => `<div class="${i < n ? "ok" : i === n ? "on" : ""}">${a}</div>`).join("")}</div>`;
+    }
+
+    async function mesajlariGetir(id) {
+        const el = $("isMesaj" + id); if (!el) return;
+        try {
+            const list = await api(`/api/hekim-portal/jobs/${id}/messages`);
+            el.innerHTML = list.length ? list.map(m =>
+                `<div class="msg-b ${m.benim ? "me" : ""}"><small>${esc(m.gonderen)} · ${new Date(m.tarih).toLocaleString("tr-TR")}</small>${esc(m.mesaj)}</div>`).join("")
+                : '<span class="hint">Henüz mesaj yok.</span>';
+            el.scrollTop = el.scrollHeight;
+        } catch (err) { el.textContent = err.message; }
+    }
+
+    async function mesajGonder(id) {
+        const t = $("isMesajYaz" + id); const mesaj = (t.value || "").trim();
+        if (!mesaj) return;
+        try {
+            await api(`/api/hekim-portal/jobs/${id}/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mesaj }) });
+            t.value = "";
+            const j = isler.find(x => x.id === id); if (j) j.mesajSayisi = (j.mesajSayisi || 0) + 1;
+            await mesajlariGetir(id);
+        } catch (err) { alert(err.message); }
     }
 
     function isAc(id) { acikIs = acikIs === id ? null : id; isleriCiz(); }

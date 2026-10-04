@@ -40,9 +40,12 @@ public sealed class PrimerLabSecurityMiddleware
         }
 
         var remoteAddress = context.Connection.RemoteIpAddress;
+        // Hekim Portalı ve Teknisyen Paneli kendi parola/oturum katmanına sahiptir.
         var doctorPortalRequest =
             context.Request.Path.StartsWithSegments("/hekim-portal") ||
-            context.Request.Path.StartsWithSegments("/api/hekim-portal");
+            context.Request.Path.StartsWithSegments("/api/hekim-portal") ||
+            context.Request.Path.StartsWithSegments("/teknisyen") ||
+            context.Request.Path.StartsWithSegments("/api/teknisyen-portal");
 
         if (!IsRemoteAccessAllowed() && !IsLoopback(remoteAddress))
         {
@@ -116,7 +119,9 @@ public sealed class PrimerLabSecurityMiddleware
 
         var allowed =
             path.StartsWithSegments("/hekim-portal") ||
-            (path.StartsWithSegments("/api/hekim-portal") && !path.StartsWithSegments("/api/hekim-portal/admin"));
+            (path.StartsWithSegments("/api/hekim-portal") && !path.StartsWithSegments("/api/hekim-portal/admin")) ||
+            path.StartsWithSegments("/teknisyen") ||
+            (path.StartsWithSegments("/api/teknisyen-portal") && !path.StartsWithSegments("/api/teknisyen-portal/admin"));
 
         if (!allowed)
         {

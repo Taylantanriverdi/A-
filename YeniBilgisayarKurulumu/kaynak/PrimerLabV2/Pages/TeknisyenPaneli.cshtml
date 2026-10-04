@@ -1,0 +1,427 @@
+@page "/teknisyen"
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#10233e" />
+    <title>Primer Lab Teknisyen Paneli</title>
+    <style>
+        :root{--ink:#10233e;--muted:#64748b;--line:#dbe3ef;--bg:#f3f6fb;--card:#fff;--blue:#1565c0;--blue-soft:#eff6ff;--green:#15803d;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb;--violet:#6d28d9;--violet-soft:#f5f3ff}
+        *{box-sizing:border-box}
+        html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;-webkit-text-size-adjust:100%}
+        button,input,select,textarea{font:inherit;color:inherit}
+        .hidden{display:none!important}
+        .wrap{max-width:980px;margin:0 auto;padding:16px}
+        .brand{display:flex;align-items:center;gap:10px}
+        .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900;font-size:15px}
+        .brand-name{font-weight:900;font-size:16px;line-height:1.1}
+        .brand-sub{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px}
+        .login{min-height:100vh;display:grid;place-items:center;padding:16px}
+        .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
+        .login-card h1{font-size:20px;margin:18px 0 4px}
+        .login-card p{margin:0 0 18px;color:var(--muted);font-size:13px}
+        .topbar{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff}
+        .topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;padding-bottom:10px}
+        .topbar .brand-logo{background:#fff;color:var(--ink)}
+        .topbar .brand-sub{color:#b8c4d6}
+        .who{font-size:12px;text-align:right;line-height:1.35}
+        .who b{display:block;font-size:13px}
+        .link-btn{background:none;border:0;color:#b8c4d6;text-decoration:underline;cursor:pointer;padding:0;font-size:12px}
+        .tabs{background:#0b1a2f}
+        .tabs .wrap{display:flex;gap:6px;padding-top:6px;padding-bottom:0}
+        .tab{flex:1;border:0;background:transparent;color:#b8c4d6;padding:11px 8px;font-weight:800;cursor:pointer;border-radius:10px 10px 0 0}
+        .tab.active{background:var(--bg);color:var(--ink)}
+        .field{margin-bottom:12px}
+        label.lbl{display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:5px}
+        .inp{width:100%;height:44px;border:1px solid #cbd5e1;border-radius:10px;padding:0 12px;background:#fff;outline:none}
+        textarea.inp{height:auto;min-height:70px;padding:10px 12px;resize:vertical}
+        .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(21,101,192,.15)}
+        .btn{height:44px;border:0;border-radius:12px;padding:0 16px;font-weight:900;cursor:pointer;background:var(--blue);color:#fff}
+        .btn:disabled{opacity:.5;cursor:not-allowed}
+        .btn-block{width:100%}
+        .btn-sm{height:36px;padding:0 12px;border-radius:9px;font-size:13px}
+        .btn-light{background:#fff;color:var(--ink);border:1px solid var(--line)}
+        .btn-green{background:var(--green)}
+        .msg{border-radius:12px;padding:11px 13px;font-size:13px;font-weight:700;margin-bottom:12px}
+        .msg.err{background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+        .msg.ok{background:var(--green-soft);color:var(--green);border:1px solid #bbf7d0}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+        .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+        .stat b{display:block;font-size:22px}
+        .stat span{font-size:11px;color:var(--muted);font-weight:800}
+        .toolbar{display:flex;gap:8px;margin-bottom:12px}
+        .job{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:12px;padding:14px}
+        .job.yeni{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(21,101,192,.08)}
+        .job-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .job-name{font-weight:900;font-size:16px}
+        .job-sub{font-size:12px;color:var(--muted);margin-top:3px}
+        .late{color:var(--red);font-weight:900}
+        .badge{border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;white-space:nowrap;background:#e2e8f0;color:#334155}
+        .b-Bekliyor{background:var(--amber-soft);color:var(--amber)}
+        .b-Tasarımda{background:var(--violet-soft);color:var(--violet)}
+        .b-Üretimde,.b-Makyajda{background:var(--blue-soft);color:var(--blue)}
+        .b-Tamamlama{background:#fef9c3;color:#854d0e}
+        .b-Tamamlandı{background:var(--green-soft);color:var(--green)}
+        .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+        .chip{background:#f1f5f9;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:800}
+        .info{font-size:13px;line-height:1.6}
+        .info pre{white-space:pre-wrap;font:inherit;margin:4px 0 0;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px}
+        .steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+        .step{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:900;cursor:pointer}
+        .step.on{background:var(--ink);border-color:var(--ink);color:#fff}
+        .step:disabled{opacity:.45;cursor:not-allowed}
+        .step.on:disabled{opacity:1;cursor:default}
+        .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+        .note{font-size:12px;color:var(--muted)}
+        .empty{text-align:center;color:var(--muted);padding:34px 10px;background:#fff;border:1px dashed var(--line);border-radius:16px}
+        .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+        .modal-box{background:#fff;width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px}
+        .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+        .modal-head h3{margin:0;font-size:16px}
+        .x{border:0;background:#f1f5f9;border-radius:9px;width:34px;height:34px;font-size:18px;cursor:pointer}
+        .file{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px}
+        .file a{color:var(--blue);font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .file small{color:var(--muted);flex:none}
+        .msgs{display:grid;gap:6px;margin:8px 0;max-height:46vh;overflow:auto}
+        .msg-b{max-width:85%;padding:7px 10px;border-radius:12px;background:#f8fafc;border:1px solid var(--line);white-space:pre-wrap;font-size:13px}
+        .msg-b.me{margin-left:auto;background:var(--blue-soft);border-color:#bfdbfe}
+        .msg-b small{display:block;color:var(--muted);font-size:10px;font-weight:700}
+        .progress{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin:8px 0}
+        .progress div{height:100%;width:0;background:var(--blue);transition:width .2s}
+        .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;z-index:60;max-width:92vw}
+        @@media (min-width:700px){.modal{align-items:center}.modal-box{border-radius:18px}}
+        @@media (max-width:620px){.wrap{padding:12px}.stats{grid-template-columns:repeat(2,1fr)}}
+    </style>
+</head>
+<body>
+
+<section id="loginScreen" class="login hidden">
+    <form class="login-card" onsubmit="girisYap(event)">
+        <div class="brand">
+            <div class="brand-logo">PL</div>
+            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+        </div>
+        <h1>Teknisyen girişi</h1>
+        <p>Laboratuvarın size verdiği kullanıcı adı ve parola ile giriş yapın.</p>
+        <div id="loginMsg" class="msg err hidden"></div>
+        <div class="field">
+            <label class="lbl" for="loginUser">Kullanıcı adı</label>
+            <input id="loginUser" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+        </div>
+        <div class="field">
+            <label class="lbl" for="loginPass">Parola</label>
+            <input id="loginPass" class="inp" type="password" autocomplete="current-password" required />
+        </div>
+        <button id="loginBtn" class="btn btn-block" type="submit">Giriş Yap</button>
+    </form>
+</section>
+
+<div id="appScreen" class="hidden">
+    <header class="topbar">
+        <div class="wrap">
+            <div class="brand">
+                <div class="brand-logo">PL</div>
+                <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+            </div>
+            <div class="who"><b id="whoName">-</b><span id="whoTip"></span> <button class="link-btn" type="button" onclick="cikisYap()">Çıkış</button></div>
+        </div>
+        <nav class="tabs"><div class="wrap">
+            <button class="tab active" id="tabAktif" type="button" onclick="sekme('aktif')">🛠️ Devam Eden</button>
+            <button class="tab" id="tabBiten" type="button" onclick="sekme('biten')">✅ Tamamlanan</button>
+        </div></nav>
+    </header>
+
+    <main class="wrap">
+        <div class="stats">
+            <div class="stat"><b id="stYeni">0</b><span>YENİ / BEKLEYEN</span></div>
+            <div class="stat"><b id="stDevam">0</b><span>DEVAM EDEN</span></div>
+            <div class="stat"><b id="stOnay">0</b><span>ONAY BEKLEYEN</span></div>
+            <div class="stat"><b id="stGec">0</b><span>TESLİMİ GECİKEN</span></div>
+        </div>
+        <div class="toolbar">
+            <input id="ara" class="inp" placeholder="Hasta, hekim veya iş türü ara" oninput="ciz()" />
+            <button class="btn btn-light" type="button" onclick="yukle()">Yenile</button>
+        </div>
+        <div id="liste"><div class="empty">Yükleniyor...</div></div>
+    </main>
+</div>
+
+<div id="modal" class="modal hidden" onclick="if(event.target===this)modalKapat()">
+    <div class="modal-box">
+        <div class="modal-head"><h3 id="modalBaslik">-</h3><button class="x" type="button" onclick="modalKapat()">×</button></div>
+        <div id="modalIcerik"></div>
+    </div>
+</div>
+
+<script>
+    const ADIMLAR = ["Bekliyor", "Tasarımda", "Üretimde", "Makyajda", "Tamamlama Onayı"];
+    let ben = null;
+    let isler = [];
+    let gorunum = "aktif";
+    let acikModal = null;
+    let yenilemeZamani = null;
+    let bilinenIsler = null;
+
+    const $ = id => document.getElementById(id);
+    const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const tarih = v => { if (!v) return "-"; const d = new Date(v); return isNaN(d) ? "-" : d.toLocaleDateString("tr-TR"); };
+    const boyut = b => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+
+    function bildir(t) {
+        document.querySelectorAll(".toast").forEach(x => x.remove());
+        const el = document.createElement("div"); el.className = "toast"; el.textContent = t;
+        document.body.appendChild(el); setTimeout(() => el.remove(), 3200);
+    }
+
+    async function api(url, opt) {
+        const r = await fetch(url, Object.assign({ cache: "no-store", credentials: "same-origin" }, opt || {}));
+        if (r.status === 401) { girisEkrani(); throw new Error("Oturum sona erdi, tekrar giriş yapın."); }
+        if (!r.ok) throw new Error((await r.text()) || ("İşlem başarısız (" + r.status + ")"));
+        const t = r.headers.get("content-type") || "";
+        return t.includes("json") ? r.json() : r.text();
+    }
+
+    function girisEkrani() {
+        clearInterval(yenilemeZamani);
+        $("appScreen").classList.add("hidden");
+        $("loginScreen").classList.remove("hidden");
+        setTimeout(() => $("loginUser").focus(), 50);
+    }
+
+    async function girisYap(e) {
+        e.preventDefault();
+        const m = $("loginMsg"); m.classList.add("hidden");
+        const btn = $("loginBtn"); btn.disabled = true; btn.textContent = "Giriş yapılıyor...";
+        try {
+            const r = await fetch("/api/teknisyen-portal/login", {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+                body: JSON.stringify({ kullaniciAdi: $("loginUser").value.trim(), parola: $("loginPass").value })
+            });
+            if (!r.ok) throw new Error((await r.text()) || "Giriş yapılamadı.");
+            $("loginPass").value = "";
+            await basla();
+        } catch (err) { m.textContent = err.message; m.classList.remove("hidden"); }
+        finally { btn.disabled = false; btn.textContent = "Giriş Yap"; }
+    }
+
+    async function cikisYap() {
+        try { await fetch("/api/teknisyen-portal/logout", { method: "POST", credentials: "same-origin" }); } catch {}
+        ben = null; bilinenIsler = null; girisEkrani();
+    }
+
+    async function basla() {
+        try {
+            const r = await fetch("/api/teknisyen-portal/me", { cache: "no-store", credentials: "same-origin" });
+            if (!r.ok) { girisEkrani(); return; }
+            ben = await r.json();
+        } catch { girisEkrani(); return; }
+        $("loginScreen").classList.add("hidden");
+        $("appScreen").classList.remove("hidden");
+        $("whoName").textContent = ben.adSoyad;
+        $("whoTip").textContent = ben.tip === "dis" ? "Dış teknisyen" : "İç teknisyen";
+        await yukle();
+        clearInterval(yenilemeZamani);
+        yenilemeZamani = setInterval(() => { if (!acikModal && document.visibilityState === "visible") yukle(true); }, 60000);
+    }
+
+    function sekme(ad) {
+        gorunum = ad;
+        $("tabAktif").classList.toggle("active", ad === "aktif");
+        $("tabBiten").classList.toggle("active", ad === "biten");
+        ciz();
+    }
+
+    async function yukle(sessiz) {
+        try {
+            isler = await api("/api/teknisyen-portal/jobs");
+            const idler = new Set(isler.map(x => x.id));
+            if (bilinenIsler) {
+                const yeni = isler.filter(x => !bilinenIsler.has(x.id) && x.durum !== "Tamamlandı").length;
+                if (yeni) bildir("🔔 Size " + yeni + " yeni iş atandı.");
+            }
+            bilinenIsler = idler;
+            ciz();
+        } catch (err) { if (!sessiz) $("liste").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+
+    function gecikti(j) {
+        if (!j.terminTarihi || j.durum === "Tamamlandı" || j.durum === "Tamamlama Onayı") return false;
+        const t = new Date(j.terminTarihi); t.setHours(23, 59, 59);
+        return t < new Date();
+    }
+
+    function ciz() {
+        const aktif = isler.filter(j => j.durum !== "Tamamlandı");
+        $("stYeni").textContent = aktif.filter(j => !j.kabul || j.durum === "Bekliyor").length;
+        $("stDevam").textContent = aktif.filter(j => j.kabul && ["Tasarımda", "Üretimde", "Makyajda"].includes(j.durum)).length;
+        $("stOnay").textContent = aktif.filter(j => j.durum === "Tamamlama Onayı").length;
+        $("stGec").textContent = aktif.filter(gecikti).length;
+
+        const q = $("ara").value.trim().toLocaleLowerCase("tr-TR");
+        let liste = (gorunum === "aktif" ? aktif : isler.filter(j => j.durum === "Tamamlandı"))
+            .filter(j => !q || [j.hastaAdi, j.hekimAdi, ...(j.kalemler || []).map(k => k.isTuru)].some(v => (v || "").toLocaleLowerCase("tr-TR").includes(q)));
+        if (gorunum === "aktif") {
+            const oncelik = { "Bekliyor": 0, "Tasarımda": 1, "Üretimde": 2, "Makyajda": 3, "Tamamlama Onayı": 4 };
+            liste.sort((a, b) => (a.kabul ? 1 : 0) - (b.kabul ? 1 : 0) || (oncelik[a.durum] ?? 9) - (oncelik[b.durum] ?? 9) ||
+                String(a.terminTarihi || "9999").localeCompare(String(b.terminTarihi || "9999")));
+        } else {
+            liste.sort((a, b) => String(b.tamamlanmaTarihi || "").localeCompare(String(a.tamamlanmaTarihi || "")));
+        }
+        if (!liste.length) {
+            $("liste").innerHTML = `<div class="empty">${q ? "Aramaya uyan iş yok." : gorunum === "aktif" ? "Size atanmış devam eden iş yok." : "Tamamlanan iş yok."}</div>`;
+            return;
+        }
+        $("liste").innerHTML = liste.map(isKarti).join("");
+    }
+
+    function isKarti(j) {
+        const kalem = (j.kalemler || []).map(k => `<span class="chip">${esc(k.isTuru)} × ${k.adet}</span>`).join("");
+        const rozet = j.durum === "Tamamlama Onayı" ? "b-Tamamlama" : "b-" + (j.durum || "");
+        const kilitli = !j.kabul;
+        const bitti = j.durum === "Tamamlandı";
+        const onayda = j.durum === "Tamamlama Onayı";
+        const adimlar = bitti ? "" : `<div class="steps">${ADIMLAR.map(a =>
+            `<button type="button" class="step ${j.durum === a ? "on" : ""}" ${kilitli || onayda || j.durum === a ? "disabled" : ""}
+              onclick="durumYap(${j.id},'${a}')">${a === "Tamamlama Onayı" ? "✔ Bitti — onaya gönder" : a}</button>`).join("")}</div>`;
+        return `<div class="job ${kilitli || j.durum === "Bekliyor" ? "yeni" : ""}">
+            <div class="job-top">
+                <div>
+                    <div class="job-name">${esc(j.hastaAdi)}</div>
+                    <div class="job-sub">#${j.id} · Hekim: ${esc(j.hekimAdi)} · Teslim: <span class="${gecikti(j) ? "late" : ""}">${tarih(j.terminTarihi)}${gecikti(j) ? " (gecikti)" : ""}</span></div>
+                </div>
+                <span class="badge ${esc(rozet)}">${esc(j.durum || "-")}</span>
+            </div>
+            <div class="chips">${kalem}</div>
+            <div class="info">
+                <div><b>Renk:</b> ${esc(j.disRengi || "-")} · <b>Materyal:</b> ${esc(j.materyal || "-")} · <b>Dişler:</b> ${esc(j.disSemasi || "-")}</div>
+                ${j.notlar ? `<pre>${esc(j.notlar)}</pre>` : ""}
+            </div>
+            ${kilitli ? `<div class="actions"><button class="btn btn-green btn-sm" type="button" onclick="kabulEt(${j.id})">✅ İşi Kabul Et</button>
+                <span class="note">Kabul ettikten sonra tarama dosyalarını indirip çalışmaya başlayabilirsiniz.</span></div>` : ""}
+            ${onayda ? `<div class="note" style="margin-top:10px">⏳ Laboratuvarın tamamlama onayı bekleniyor.</div>` : ""}
+            ${adimlar}
+            <div class="actions">
+                <button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım)</button>
+                <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}</button>
+            </div>
+        </div>`;
+    }
+
+    async function kabulEt(id) {
+        try { const r = await api(`/api/teknisyen-portal/jobs/${id}/kabul`, { method: "POST" }); bildir(r.message || "İş kabul edildi."); await yukle(true); }
+        catch (err) { bildir(err.message); }
+    }
+
+    async function durumYap(id, durum) {
+        if (durum === "Tamamlama Onayı" && !confirm("İş bitti olarak laboratuvar onayına gönderilsin mi?")) return;
+        try {
+            const r = await api(`/api/teknisyen-portal/jobs/${id}/durum`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ durum }) });
+            bildir(r.message || "Durum güncellendi.");
+            await yukle(true);
+        } catch (err) { bildir(err.message); }
+    }
+
+    function modalAc(baslik, html) {
+        $("modalBaslik").textContent = baslik;
+        $("modalIcerik").innerHTML = html;
+        $("modal").classList.remove("hidden");
+    }
+
+    function modalKapat() {
+        $("modal").classList.add("hidden");
+        acikModal = null;
+        yukle(true);
+    }
+
+    async function dosyalarAc(id) {
+        const j = isler.find(x => x.id === id); if (!j) return;
+        acikModal = { tur: "dosya", id };
+        modalAc(`#${id} · ${j.hastaAdi} — Dosyalar`, '<div class="note">Yükleniyor...</div>');
+        await dosyalariCiz(id);
+    }
+
+    async function dosyalariCiz(id) {
+        const j = isler.find(x => x.id === id); if (!j || !acikModal || acikModal.id !== id) return;
+        let list = [];
+        try { list = await api(`/api/teknisyen-portal/jobs/${id}/files`); }
+        catch (err) { $("modalIcerik").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; return; }
+        const satir = f => j.kabul
+            ? `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${f.id}">${esc(f.orijinalDosyaAdi)}</a><small>${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</small></div>`
+            : `<div class="file"><span>${esc(f.orijinalDosyaAdi)}</span><small>${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</small></div>`;
+        $("modalIcerik").innerHTML =
+            (j.kabul ? "" : '<div class="msg err">Dosyaları indirmek için önce işi kabul edin.</div>') +
+            (list.length ? list.map(satir).join("") : '<div class="note">Bu işte henüz dosya yok.</div>') +
+            (j.kabul && j.durum !== "Tamamlandı" ? `
+            <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+                <label class="lbl">Dosya yükle (tasarım / üretim)</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <select id="yukTur" class="inp" style="width:auto"><option value="Tasarım">Tasarım</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
+                    <input id="yukDosya" type="file" multiple class="inp" style="flex:1;padding-top:9px" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo" />
+                    <button class="btn btn-sm" type="button" style="height:44px" onclick="dosyaYukle(${id})">Yükle</button>
+                </div>
+                <div class="progress hidden" id="yukCubuk"><div></div></div>
+                <div class="note" id="yukDurum"></div>
+            </div>` : "");
+    }
+
+    async function dosyaYukle(id) {
+        const secim = Array.from($("yukDosya").files || []);
+        if (!secim.length) { bildir("Dosya seçin."); return; }
+        const tur = $("yukTur").value, cubuk = $("yukCubuk"), ic = cubuk.firstElementChild, durum = $("yukDurum");
+        cubuk.classList.remove("hidden");
+        let tamam = 0, hata = "";
+        for (const f of secim) {
+            durum.textContent = `${tamam + 1} / ${secim.length} · ${f.name}`;
+            await new Promise(res => {
+                const fd = new FormData(); fd.append("dosya", f, f.name); fd.append("dosyaTuru", tur);
+                const x = new XMLHttpRequest();
+                x.open("POST", `/api/teknisyen-portal/jobs/${id}/files`);
+                x.withCredentials = true;
+                x.upload.onprogress = ev => { if (ev.lengthComputable) ic.style.width = Math.round((tamam + ev.loaded / ev.total) * 100 / secim.length) + "%"; };
+                x.onload = () => { if (x.status >= 200 && x.status < 300) tamam++; else hata = x.responseText || ("HTTP " + x.status); res(); };
+                x.onerror = () => { hata = "Bağlantı koptu."; res(); };
+                x.send(fd);
+            });
+        }
+        bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : `${tamam} dosya yüklendi.`);
+        await yukle(true);
+        await dosyalariCiz(id);
+    }
+
+    async function mesajlarAc(id) {
+        const j = isler.find(x => x.id === id); if (!j) return;
+        acikModal = { tur: "mesaj", id };
+        modalAc(`#${id} · ${j.hastaAdi} — Mesajlar`, `
+            <div class="msgs" id="mesajListe"><div class="note">Yükleniyor...</div></div>
+            <div style="display:flex;gap:8px"><textarea id="mesajYaz" class="inp" maxlength="4000" placeholder="Laboratuvara / hekime mesaj yazın..."></textarea>
+            <button class="btn btn-sm" type="button" style="height:auto" onclick="mesajGonder(${id})">Gönder</button></div>`);
+        await mesajlariCiz(id);
+    }
+
+    async function mesajlariCiz(id) {
+        const el = $("mesajListe"); if (!el) return;
+        try {
+            const list = await api(`/api/teknisyen-portal/jobs/${id}/messages`);
+            el.innerHTML = list.length ? list.map(m => `<div class="msg-b ${m.benim ? "me" : ""}"><small>${esc(m.gonderenAdi || m.gonderenTipi)} · ${new Date(m.tarih).toLocaleString("tr-TR")}</small>${esc(m.mesaj)}</div>`).join("")
+                : '<div class="note">Henüz mesaj yok.</div>';
+            el.scrollTop = el.scrollHeight;
+        } catch (err) { el.innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+
+    async function mesajGonder(id) {
+        const t = $("mesajYaz"); const mesaj = (t.value || "").trim(); if (!mesaj) return;
+        try {
+            await api(`/api/teknisyen-portal/jobs/${id}/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mesaj }) });
+            t.value = ""; await mesajlariCiz(id);
+        } catch (err) { bildir(err.message); }
+    }
+
+    basla();
+</script>
+</body>
+</html>

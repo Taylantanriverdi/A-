@@ -4964,6 +4964,33 @@
         </div>
     </div>
 
+    <div id="teknisyenPanelModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="width:560px;">
+            <div class="modal-header">
+                <div>
+                    <h2>Teknisyen Paneli Hesabı</h2>
+                    <p id="teknisyenPanelAlt">-</p>
+                </div>
+                <button type="button" class="modal-close" onclick="closeTeknisyenPanelModal()">×</button>
+            </div>
+            <div style="padding:22px;">
+                <input type="hidden" id="teknisyenPanelId" />
+                <div class="form-group"><label for="teknisyenPanelUser">Kullanıcı adı</label><input id="teknisyenPanelUser" type="text" autocomplete="off" /></div>
+                <div class="form-group"><label for="teknisyenPanelPass">Parola <span id="teknisyenPanelPassNot" style="font-weight:600;color:#64748b"></span></label><input id="teknisyenPanelPass" type="password" autocomplete="new-password" placeholder="En az 8 karakter, harf ve rakam" /></div>
+                <div class="form-group"><label for="teknisyenPanelTip">Teknisyen tipi</label>
+                    <select id="teknisyenPanelTip"><option value="ic">İç teknisyen (laboratuvar kadrosu)</option><option value="dis">Dış teknisyen (işi kabul eder, hekim adını baş harfleriyle görür)</option></select></div>
+                <label style="display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:12px"><input id="teknisyenPanelAktif" type="checkbox" checked style="width:auto" /> Hesap aktif</label>
+                <div class="form-group"><label>Panel adresi</label><div style="display:flex;gap:8px"><input id="teknisyenPanelUrl" type="text" readonly /><button type="button" class="button button-light" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('teknisyenPanelUrl').value).then(()=>showSuccess('Adres kopyalandı.'))">Kopyala</button></div>
+                    <div class="price-list-note" style="margin-top:6px">Teknisyen bu adresi aynı Wi-Fi'deki telefon/bilgisayardan açar. İnternet erişimi açıksa (PORTAL_INTERNET_AC.bat) aynı internet adresinin sonuna /teknisyen yazılarak her yerden girilir.</div></div>
+                <div id="teknisyenPanelHata" class="form-error" style="display:none;"></div>
+                <div class="modal-footer">
+                    <button type="button" class="button button-light" onclick="closeTeknisyenPanelModal()">Kapat</button>
+                    <button type="button" class="button button-blue" id="teknisyenPanelKaydet" onclick="saveTeknisyenPanelHesap()">Kaydet</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="topluDosyaModal" class="modal-overlay" style="display:none;">
         <div class="modal-box" style="width:1120px;max-width:96vw;">
             <div class="modal-header">
@@ -13018,7 +13045,7 @@
             const rows=active.slice(0,8).map(x=>`<tr><td>#${Number(x.id)}</td><td><b>${escapeHtml(x.hekimAdi||'-')}</b><div class="ops-mini">${escapeHtml(x.hastaAdi||'-')}</div></td><td>${escapeHtml((x.isKalemleri||[]).map(k=>k.isTuru||k.ad||'').filter(Boolean).join(', ')||'-')}</td><td>${anayasaDurumRozeti(x.durum)}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):'-'}</td><td><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button></td></tr>`).join('');
             box.style.display="block";
             const initials=String(name).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('tr-TR');
-            box.innerHTML=`<div class="tech-detail-hero"><div class="tech-detail-identity"><div class="tech-detail-avatar">${escapeHtml(initials)}</div><div><div class="tech-detail-name">${escapeHtml(name)}</div><div class="tech-status-pill ${t.aktif===false?'passive':''}">${t.aktif===false?'Pasif':'● Aktif'}</div></div></div><div class="tech-profile-actions"><button class="button button-light" onclick="openTeknisyenDuzenleModal(${Number(id)})">✎ Düzenle</button><button class="button ${t.aktif===false?'button-blue':'button-light'}" onclick="teknisyenAktifDegistir(${Number(id)},${t.aktif===false?'true':'false'})">${t.aktif===false?'Aktif Yap':'Pasife Al'}</button><button class="button tech-danger-button" onclick="teknisyenSil(${Number(id)})">Sil</button></div></div>
+            box.innerHTML=`<div class="tech-detail-hero"><div class="tech-detail-identity"><div class="tech-detail-avatar">${escapeHtml(initials)}</div><div><div class="tech-detail-name">${escapeHtml(name)}</div><div class="tech-status-pill ${t.aktif===false?'passive':''}">${t.aktif===false?'Pasif':'● Aktif'}</div></div></div><div class="tech-profile-actions"><button class="button button-blue" onclick="openTeknisyenPanelModal(${Number(id)})">🔑 Panel Hesabı</button><button class="button button-light" onclick="openTeknisyenDuzenleModal(${Number(id)})">✎ Düzenle</button><button class="button ${t.aktif===false?'button-blue':'button-light'}" onclick="teknisyenAktifDegistir(${Number(id)},${t.aktif===false?'true':'false'})">${t.aktif===false?'Aktif Yap':'Pasife Al'}</button><button class="button tech-danger-button" onclick="teknisyenSil(${Number(id)})">Sil</button></div></div>
                 <div class="tech-detail-kpis"><div><span>Aktif İş</span><b>${active.length}</b></div><div><span>Tamamlanan</span><b>${done.length}</b></div><div><span>Toplam İş</span><b>${active.length+done.length}</b></div></div>
                 <div class="tech-detail-title">Aktif İşler</div><div class="table-wrap"><table><thead><tr><th>İş</th><th>Hekim / Hasta</th><th>İş Kalemi</th><th>Durum</th><th>Termin</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="empty">Bu teknisyene atanmış aktif iş bulunmuyor.</td></tr>'}</tbody></table></div>`;
         }
@@ -13031,6 +13058,50 @@
                 await loadAnayasaData();await loadSiparisler();
                 showSuccess("İş Silinenler'e taşındı.");
             }catch(e){showError(e.message);}
+        }
+
+        // ---------------- Teknisyen Paneli hesabı ----------------
+        async function openTeknisyenPanelModal(id){
+            const t=teknisyenler.find(x=>Number(x.id)===Number(id)); if(!t) return;
+            const err=document.getElementById('teknisyenPanelHata'); err.style.display='none';
+            document.getElementById('teknisyenPanelId').value=String(id);
+            document.getElementById('teknisyenPanelAlt').innerText=t.adSoyad||'-';
+            document.getElementById('teknisyenPanelPass').value='';
+            document.getElementById('teknisyenPanelModal').style.display='flex';
+            try{
+                const r=await fetch('/api/teknisyen-portal/admin/account/'+Number(id),{cache:'no-store'});
+                if(!r.ok) throw new Error((await r.text())||'Hesap bilgisi alınamadı.');
+                const d=await r.json();
+                document.getElementById('teknisyenPanelUser').value=d.kullaniciAdi||'';
+                document.getElementById('teknisyenPanelTip').value=d.tip==='dis'?'dis':'ic';
+                document.getElementById('teknisyenPanelAktif').checked=d.aktif!==false;
+                document.getElementById('teknisyenPanelPassNot').innerText=d.hesapVar?'(değiştirmeyecekseniz boş bırakın)':'(yeni hesap için zorunlu)';
+                let adres=window.location.origin+'/teknisyen';
+                try{ const pr=await fetch('/api/hekim-portal/admin/account/'+Number((hekimler[0]||{}).id||0),{cache:'no-store'}); if(pr.ok){ const pd=await pr.json(); const a=(pd.portalAdresleri||[])[0]; if(a) adres=a.replace(/\/hekim-portal$/,'/teknisyen'); } }catch{}
+                document.getElementById('teknisyenPanelUrl').value=adres;
+            }catch(e){ err.innerText=e.message; err.style.display='block'; }
+        }
+
+        function closeTeknisyenPanelModal(){
+            document.getElementById('teknisyenPanelModal').style.display='none';
+            document.getElementById('teknisyenPanelPass').value='';
+        }
+
+        async function saveTeknisyenPanelHesap(){
+            const id=Number(document.getElementById('teknisyenPanelId').value||0);
+            const err=document.getElementById('teknisyenPanelHata'), btn=document.getElementById('teknisyenPanelKaydet');
+            err.style.display='none'; btn.disabled=true;
+            try{
+                const r=await fetch('/api/teknisyen-portal/admin/account/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+                    kullaniciAdi:document.getElementById('teknisyenPanelUser').value.trim(),
+                    yeniParola:document.getElementById('teknisyenPanelPass').value||null,
+                    tip:document.getElementById('teknisyenPanelTip').value,
+                    aktif:document.getElementById('teknisyenPanelAktif').checked})});
+                if(!r.ok) throw new Error((await r.text())||'Hesap kaydedilemedi.');
+                showSuccess('Teknisyen panel hesabı kaydedildi.');
+                closeTeknisyenPanelModal();
+            }catch(e){ err.innerText=e.message; err.style.display='block'; }
+            finally{ btn.disabled=false; }
         }
 
         // ---------------- Toplu dosya yükleme ----------------

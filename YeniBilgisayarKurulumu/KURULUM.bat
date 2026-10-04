@@ -283,7 +283,7 @@ if exist "%KAYNAK%\bin" rmdir /s /q "%KAYNAK%\bin"
 
 rem Eski bilgisayardan getirilen ek sayfalar. Index.cshtml ve Hekim Portali yeni surumdur, ezilmez.
 if exist "%ESKI%\Pages" (
-    robocopy "%ESKI%\Pages" "%KAYNAK%\Pages" *.cshtml *.cs /S /XF Index.cshtml Index.cshtml.cs HekimPortali.cshtml /NFL /NDL /NJH /NJS /NP >nul
+    robocopy "%ESKI%\Pages" "%KAYNAK%\Pages" *.cshtml *.cs /S /XF Index.cshtml Index.cshtml.cs HekimPortali.cshtml TeknisyenPaneli.cshtml /NFL /NDL /NJH /NJS /NP >nul
     if errorlevel 8 goto KOPYA_HATA
 )
 if exist "%ESKI%\wwwroot" (
@@ -292,7 +292,7 @@ if exist "%ESKI%\wwwroot" (
 )
 rem Eski Hekim Portali sayfalari kaldirilir: yeni portal HekimPortali.cshtml ile gelir;
 rem ayni adresi kullanan iki sayfa olursa program acilmaz.
-powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/hekim-portal' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"
+powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and $_.Name -ne 'TeknisyenPaneli.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/(hekim-portal|teknisyen)' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"
 
 pushd "%KAYNAK%"
 "%DOTNET%" publish PrimerLabV2.csproj -c Release -o "%UYGULAMA%" -nologo
