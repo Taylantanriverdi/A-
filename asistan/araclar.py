@@ -238,56 +238,119 @@ class Hafiza:
 
 
 # --------------------------------------------------------------------------- #
-# Araç tanımları
+# Araç tanımları (OpenAI / DeepSeek fonksiyon çağrısı biçimi)
 # --------------------------------------------------------------------------- #
 
-OZEL_ARACLAR = [
-    {
-        "name": "hafiza",
-        "description": (
-            "Kalıcı hafıza. 'profil' kullanıcının kim olduğunu, nasıl çalıştığını, kod stilini, "
-            "tercih ettiği araçları ve kurallarını tutar; her oturumun başında sana verilir. "
-            "'notlar' yarım kalan işler, proje bilgileri ve öğrendiğin şeyler içindir. "
-            "Kullanıcı hakkında kalıcı ve faydalı bir şey öğrendiğinde (tercih, alışkanlık, düzeltme) "
-            "profile ekle. Şifre veya gizli anahtar asla yazma."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "islem": {"type": "string", "enum": ["oku", "ekle", "yaz"]},
-                "dosya": {"type": "string", "enum": ["profil", "notlar"]},
-                "metin": {"type": "string", "description": "ekle/yaz için içerik (Markdown)"},
+KOORDINAT = {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
+
+
+def _fonksiyon(ad: str, aciklama: str, ozellikler: dict, zorunlu: list[str]) -> dict:
+    return {
+        "type": "function",
+        "function": {
+            "name": ad,
+            "description": aciklama,
+            "parameters": {
+                "type": "object",
+                "properties": ozellikler,
+                "required": zorunlu,
+                "additionalProperties": False,
             },
-            "required": ["islem", "dosya"],
-            "additionalProperties": False,
         },
-        "strict": True,
-        "eager_input_streaming": True,
-    },
-    {
-        "name": "kullaniciya_sor",
-        "description": (
-            "Kullanıcıya soru sor ve cevabını bekle. Yalnızca gerçekten gerekli olduğunda kullan: "
-            "geri alınamaz bir karar, eksik bir bilgi (ör. hangi hesap) veya belirsiz bir istek."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {"soru": {"type": "string"}},
-            "required": ["soru"],
-            "additionalProperties": False,
+    }
+
+
+def bilgisayar_araci(genislik: int, yukseklik: int) -> dict:
+    return _fonksiyon(
+        "bilgisayar",
+        f"Ekranı, fareyi ve klavyeyi kullan. Ekran görüntüsü {genislik}x{yukseklik} pikseldir; koordinatlar "
+        "[x, y] biçiminde bu görüntünün piksel uzayındadır (sol üst 0,0). Ekran görüntüsü sonraki mesajda görsel "
+        "olarak gelir. Her eylem grubundan sonra 'screenshot' ile sonucu doğrula.",
+        {
+            "action": {
+                "type": "string",
+                "enum": [
+                    "screenshot", "zoom", "left_click", "right_click", "middle_click", "double_click",
+                    "triple_click", "left_click_drag", "mouse_move", "left_mouse_down", "left_mouse_up",
+                    "cursor_position", "scroll", "type", "key", "hold_key", "wait",
+                ],
+                "description": "Yapılacak eylem.",
+            },
+            "coordinate": {**KOORDINAT, "description": "Tıklama/taşıma/kaydırma/sürükleme hedefi [x, y]."},
+            "start_coordinate": {**KOORDINAT, "description": "left_click_drag başlangıç noktası [x, y]."},
+            "region": {
+                "type": "array", "items": {"type": "number"}, "minItems": 4, "maxItems": 4,
+                "description": "zoom için bölge [x0, y0, x1, y1].",
+            },
+            "text": {
+                "type": "string",
+                "description": "type: yazılacak metin. key/hold_key: tuş veya kombinasyon (ör. 'Return', "
+                "'ctrl+s', 'alt+tab', 'super'). Tıklama/kaydırmada basılı tutulacak değiştirici (ör. 'shift').",
+            },
+            "scroll_direction": {"type": "string", "enum": ["up", "down", "left", "right"]},
+            "scroll_amount": {"type": "integer", "description": "Kaydırma adımı (ör. 3)."},
+            "duration": {"type": "number", "description": "wait/hold_key süresi (saniye, en fazla 300)."},
+            "repeat": {"type": "integer", "description": "key için tekrar sayısı (1-100)."},
         },
-        "strict": True,
-        "eager_input_streaming": True,
-    },
+        ["action"],
+    )
+
+
+ARACLAR = [
+    _fonksiyon(
+        "bash",
+        "Kalıcı bir kabuk oturumunda komut çalıştır (Windows'ta PowerShell). cd, ortam değişkenleri ve sanal "
+        "ortam komutlar arasında korunur. Etkileşimli komutlardan kaçın; uzun işleri arka planda çalıştır.",
+        {
+            "command": {"type": "string", "description": "Çalıştırılacak komut."},
+            "restart": {"type": "boolean", "description": "true ise kabuğu yeniden başlat."},
+        },
+        [],
+    ),
+    _fonksiyon(
+        "dosya",
+        "Dosyaları görüntüle ve düzenle. view: dosya içeriği (satır numaralı) veya dizin listesi. "
+        "create: dosyayı oluştur/üzerine yaz. str_replace: old_str'yi (dosyada tam 1 kez geçmeli) new_str ile "
+        "değiştir. insert: insert_line satırından sonra insert_text ekle (0 = dosya başı).",
+        {
+            "command": {"type": "string", "enum": ["view", "create", "str_replace", "insert"]},
+            "path": {"type": "string", "description": "Mutlak dosya yolu."},
+            "file_text": {"type": "string"},
+            "old_str": {"type": "string"},
+            "new_str": {"type": "string"},
+            "insert_line": {"type": "integer"},
+            "insert_text": {"type": "string"},
+            "view_range": {
+                "type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2,
+                "description": "view için [başlangıç, bitiş] satırı; bitiş -1 = dosya sonu.",
+            },
+        },
+        ["command", "path"],
+    ),
+    _fonksiyon(
+        "hafiza",
+        "Kalıcı hafıza. 'profil' kullanıcının kim olduğunu, nasıl çalıştığını, kod stilini, tercih ettiği "
+        "araçları ve kurallarını tutar; her oturumun başında sana verilir. 'notlar' yarım kalan işler, proje "
+        "bilgileri ve öğrendiğin şeyler içindir. Kullanıcı hakkında kalıcı ve faydalı bir şey öğrendiğinde "
+        "profile ekle. Şifre veya gizli anahtar asla yazma.",
+        {
+            "islem": {"type": "string", "enum": ["oku", "ekle", "yaz"]},
+            "dosya": {"type": "string", "enum": ["profil", "notlar"]},
+            "metin": {"type": "string", "description": "ekle/yaz için içerik (Markdown)."},
+        },
+        ["islem", "dosya"],
+    ),
+    _fonksiyon(
+        "kullaniciya_sor",
+        "Kullanıcıya soru sor ve cevabını bekle. Yalnızca gerçekten gerekli olduğunda kullan: geri alınamaz bir "
+        "karar, eksik bir bilgi veya belirsiz bir istek.",
+        {"soru": {"type": "string"}},
+        ["soru"],
+    ),
 ]
 
 
-def arac_tanimlari(ekran: bool) -> list[dict]:
-    araclar: list[dict] = [
-        {"type": "bash_20250124", "name": "bash"},
-        {"type": "text_editor_20250728", "name": "str_replace_based_edit_tool"},
-        *OZEL_ARACLAR,
-    ]
-    if ekran:
-        araclar.insert(0, {"type": "computer_toolset_20260801"})
-    return araclar
+def arac_tanimlari(ekran_boyutu: tuple[int, int] | None) -> list[dict]:
+    if ekran_boyutu:
+        return [bilgisayar_araci(*ekran_boyutu), *ARACLAR]
+    return list(ARACLAR)

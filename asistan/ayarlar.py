@@ -14,10 +14,14 @@ VERI_DIZINI = Path(os.environ.get("ASISTAN_DIZIN", Path.home() / ".asistan"))
 
 @dataclass
 class Ayarlar:
-    model: str = os.environ.get("ASISTAN_MODEL", "claude-opus-5-5")
-    # low | medium | high | xhigh | max — bilgisayar kullanımı ve kodlama için "high" iyi bir denge
-    efor: str = os.environ.get("ASISTAN_EFOR", "high")
-    max_tokens: int = 64000
+    # DeepSeek (OpenAI uyumlu API). Başka bir OpenAI uyumlu servis için ASISTAN_API_URL'yi değiştir.
+    api_url: str = os.environ.get("ASISTAN_API_URL", "https://api.deepseek.com")
+    api_anahtari: str = os.environ.get("DEEPSEEK_API_KEY", "")
+    # Ekran kontrolü için görüntü kabul eden bir model gerekir (ör. DeepSeek'in "flash" görsel modelleri).
+    model: str = os.environ.get("ASISTAN_MODEL", "deepseek-chat")
+    max_tokens: int = int(os.environ.get("ASISTAN_MAX_TOKENS", "8192"))
+    # Geçmişte tutulacak en fazla ekran görüntüsü (eskiler metne çevrilir; maliyeti düşürür)
+    max_goruntu: int = int(os.environ.get("ASISTAN_MAX_GORUNTU", "3"))
 
     # onayli  : terminal komutları ve dosya değişiklikleri için onay ister (varsayılan)
     # tam     : fare/klavye dahil her eylem için onay ister

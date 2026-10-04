@@ -37,8 +37,6 @@ def _ayarlar(args) -> Ayarlar:
     a = Ayarlar()
     if args.model:
         a.model = args.model
-    if args.efor:
-        a.efor = args.efor
     if args.mod:
         a.mod = args.mod
     if args.ekransiz:
@@ -68,8 +66,7 @@ def sohbet(ajan: Ajan) -> None:
 def main(argv: list[str] | None = None) -> None:
     argv = sys.argv[1:] if argv is None else argv
     ortak = argparse.ArgumentParser(add_help=False)
-    ortak.add_argument("--model", help="ör. claude-opus-5-5")
-    ortak.add_argument("--efor", choices=["low", "medium", "high", "xhigh", "max"])
+    ortak.add_argument("--model", help="DeepSeek model adı (ör. deepseek-chat, deepseek-reasoner)")
     ortak.add_argument("--mod", choices=["onayli", "tam", "otonom"], help="onay modu")
     ortak.add_argument("--ekransiz", action="store_true", help="ekran/fare/klavye kontrolünü kapat")
 

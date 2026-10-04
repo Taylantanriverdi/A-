@@ -1,8 +1,14 @@
 # A- · Kişisel Yapay Zeka Asistanı
 
 Bilgisayarını senin gibi kullanan, uygulamaları açıp kullanan, değişiklik yapan ve zamanla
-senin adına yazılım geliştirmeye devam eden bir asistan. Claude API'nin bilgisayar kullanımı
-(`computer_toolset_20260801`), terminal (`bash`) ve dosya düzenleme araçlarıyla çalışır.
+senin adına yazılım geliştirmeye devam eden bir asistan. **DeepSeek API** (OpenAI uyumlu) ile çalışır;
+ekran, terminal, dosya ve hafıza araçlarını fonksiyon çağrısıyla kullanır.
+
+> **Ekran kontrolü için görüntü destekleyen bir model gerekir.** Asistan açılışta seçili modelin
+> görüntü kabul edip etmediğini dener. Kabul etmiyorsa ekran kontrolünü kapatır ve terminal + dosyalarla
+> çalışmaya devam eder (yazılım geliştirme bu modda tam çalışır). Görüntü destekleyen güncel DeepSeek
+> modelinin adını [platform.deepseek.com](https://platform.deepseek.com) üzerinden kontrol edip
+> `ASISTAN_MODEL` ile ayarla.
 
 ## Neler yapabilir
 
@@ -17,13 +23,33 @@ senin adına yazılım geliştirmeye devam eden bir asistan. Claude API'nin bilg
 
 ## Kurulum
 
+### Windows (kolay yol)
+
+1. [Python 3.10+](https://www.python.org/downloads/) kur ("Add python.exe to PATH" kutusunu işaretle).
+2. Zip'i bir klasöre çıkar, **`kurulum.bat`**'a çift tıkla. DeepSeek API anahtarını sorar ve kaydeder.
+3. **`baslat.bat`** ile asistanı aç.
+4. Güncellemek için **`guncelle.bat`**: Git kuruluysa `git pull` yapar, değilse en son sürümü
+   GitHub'dan zip olarak indirip üzerine yazar ve paketleri günceller. Profilin ve notların korunur.
+
+```bat
+baslat.bat                                  :: sohbet modu
+baslat.bat "Not Defteri'ni aç ve alışveriş listesi yaz"
+baslat.bat ogren C:\Users\%USERNAME%\projeler   :: seni tanısın
+baslat.bat otonom C:\projeler\uygulamam      :: senin adına kod yazsın
+```
+
+> Depo gizliyse zip indirme giriş ister; bu durumda Git kurup klasörü `git clone` ile al,
+> `guncelle.bat` git üzerinden çalışır.
+
+### Elle kurulum (tüm sistemler)
+
 ```bash
-git clone https://github.com/taylantanriverdi/a-.git
-cd a-
+git clone -b claude/gifted-knuth-b3ij29 https://github.com/Taylantanriverdi/A-.git
+cd A-
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-... # Windows: setx ANTHROPIC_API_KEY sk-ant-...
+export DEEPSEEK_API_KEY=sk-...      # Windows: setx DEEPSEEK_API_KEY sk-...
 ```
 
 İşletim sistemine göre ek adımlar:
@@ -102,8 +128,11 @@ Her modda:
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `ASISTAN_MODEL` | `claude-opus-5-5` | Kullanılacak model |
-| `ASISTAN_EFOR` | `high` | `low` … `max`; zor kodlama işleri için `xhigh` |
+| `DEEPSEEK_API_KEY` | — | DeepSeek API anahtarı (zorunlu) |
+| `ASISTAN_MODEL` | `deepseek-chat` | Model adı; ekran kontrolü için görüntü destekleyen bir model seç |
+| `ASISTAN_API_URL` | `https://api.deepseek.com` | Başka bir OpenAI uyumlu servis için değiştirilebilir |
+| `ASISTAN_MAX_TOKENS` | `8192` | Yanıt başına en fazla token |
+| `ASISTAN_MAX_GORUNTU` | `3` | Geçmişte tutulan ekran görüntüsü sayısı (eskiler silinir, maliyet düşer) |
 | `ASISTAN_MOD` | `onayli` | Onay modu |
 | `ASISTAN_IZINLI_DIZINLER` | ev dizini | Dosya düzenleyicinin erişebileceği dizinler (`:` / `;` ile ayır) |
 | `ASISTAN_EKRAN` | `1` | `0` ise ekran kontrolü kapalı |
@@ -121,10 +150,13 @@ asistan/
   guvenlik.py   onaylar, tehlikeli komut tespiti, günlük
   otonom.py     görev listesinden otonom yazılım geliştirme
   ayarlar.py    ayarlar
+kurulum.bat     Windows kurulumu (sanal ortam + paketler + API anahtarı)
+baslat.bat      Windows başlatıcı
+guncelle.bat    Windows güncelleyici
 ```
 
 ## Maliyet
 
-Her model turu API ücretine tabidir; ekran görüntüleri en çok token harcayan kısımdır. Uzun
-oturumlarda eski bağlam sunucu tarafında otomatik özetlenir. Basit işler için `--efor medium`
-kullanarak maliyeti düşürebilirsin.
+Her model turu DeepSeek API ücretine tabidir; ekran görüntüleri en çok token harcayan kısımdır.
+Geçmişte yalnızca son birkaç ekran görüntüsü tutulur (`ASISTAN_MAX_GORUNTU`). Bakiye biterse
+asistan "bakiye yetersiz" uyarısıyla durur.

@@ -1,24 +1,24 @@
-"""Ajan döngüsü: modele sorar, istenen araçları çalıştırır, iş bitene kadar tekrarlar."""
+"""Ajan döngüsü: modele sorar, istenen araçları çalıştırır, iş bitene kadar tekrarlar.
+
+DeepSeek API (OpenAI uyumlu Chat Completions) ile çalışır.
+"""
 
 from __future__ import annotations
 
+import base64
 import datetime as dt
 import getpass
+import io
+import json
 import platform
 import sys
 from pathlib import Path
 
-import anthropic
+import openai
 
 from .araclar import AracHatasi, Duzenleyici, Hafiza, Terminal, arac_tanimlari
 from .ayarlar import Ayarlar
 from .guvenlik import Guvenlik
-
-BETALAR = [
-    "server-side-fallback-2026-07-01",  # güvenlik sınıflandırıcısı reddederse başka modelle devam
-    "thinking-display-updates-2026-08-18",  # araç çağrıları arası kısa ilerleme notları
-    "compact-2026-01-12",  # uzun oturumlarda eski bağlamı sunucu tarafında özetle
-]
 
 SISTEM_SABLONU = """\
 Sen {kullanici} adlı kişinin kişisel yapay zeka asistanısın ve onun bilgisayarında, onun adına çalışıyorsun.
@@ -28,15 +28,16 @@ terminalde komut çalıştırır, dosyaları düzenler ve yazılım geliştirirs
 # Ortam
 - İşletim sistemi: {isletim_sistemi}
 - Ev dizini: {ev}
-- Dosya düzenleyicinin izinli dizinleri: {izinli}
+- Dosya aracının izinli dizinleri: {izinli}
 - Ekran kontrolü: {ekran}
 - Çalışma modu: {mod}
 
 # Nasıl çalışırsın
-- Bir işi en hızlı ve güvenilir yoldan yap: terminal veya dosya düzenleyiciyle yapılabilecek işi
+- Bir işi en hızlı ve güvenilir yoldan yap: terminal veya dosya aracıyla yapılabilecek işi
   arayüzde tıklayarak yapma; arayüz gerektiren işlerde (tarayıcı, masaüstü uygulamaları) ekranı kullan.
-- Ekranda işlem yaparken her eylem grubunu bir ekran görüntüsüyle bitir ve sonucu doğrula.
-  Küçük yazıları okumak için zoom kullan.
+- Ekranda işlem yaparken önce ekran görüntüsü al, her eylem grubundan sonra yeniden alıp sonucu doğrula.
+  Küçük yazıları okumak için zoom kullan. Tahminle tıklama yapma.
+- Windows'ta uygulama açmanın en kolay yolu: `key` ile "super" bas, uygulama adını `type` ile yaz, "Return" bas.
 - Kod yazarken kullanıcının profilindeki stile, dile ve araçlara uy. Mevcut kodun stilini taklit et.
   Değişikliklerden sonra testleri/derlemeyi çalıştır, küçük ve anlamlı commit'ler at.
   Kullanıcı açıkça istemedikçe git push yapma, geçmişi yeniden yazma.
@@ -59,27 +60,75 @@ terminalde komut çalıştırır, dosyaları düzenler ve yazılım geliştirirs
 {notlar}
 """
 
+ESKI_GORUNTU = "[Eski ekran görüntüsü yer kazanmak için kaldırıldı.]"
+
+
+def _png_veri_url(blok: dict) -> str:
+    return f"data:{blok['source']['media_type']};base64,{blok['source']['data']}"
+
+
+def _kucuk_png() -> str:
+    from PIL import Image
+
+    tampon = io.BytesIO()
+    Image.new("RGB", (16, 16), (255, 255, 255)).save(tampon, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(tampon.getvalue()).decode()
+
 
 class Ajan:
     def __init__(self, ayarlar: Ayarlar):
         self.ayarlar = ayarlar
-        self.istemci = anthropic.Anthropic()
+        if not ayarlar.api_anahtari:
+            raise SystemExit("DEEPSEEK_API_KEY tanımlı değil. https://platform.deepseek.com adresinden anahtar al.")
+        self.istemci = openai.OpenAI(api_key=ayarlar.api_anahtari, base_url=ayarlar.api_url)
         self.guvenlik = Guvenlik(ayarlar)
         self.terminal = Terminal(ayarlar.komut_zaman_asimi)
         self.duzenleyici = Duzenleyici(ayarlar, self.guvenlik)
         self.hafiza = Hafiza(ayarlar)
         self.bilgisayar = None
         if ayarlar.ekran:
-            try:
-                from .bilgisayar import Bilgisayar
+            self._ekrani_baslat()
+        boyut = (self.bilgisayar.goruntu_w, self.bilgisayar.goruntu_h) if self.bilgisayar else None
+        self.araclar = arac_tanimlari(boyut)
+        self.mesajlar: list[dict] = [{"role": "system", "content": self._sistem_istemi()}]
+        self._dusunce_geri_gonder = True
 
-                self.bilgisayar = Bilgisayar()
-            except Exception as e:  # ekran yoksa (sunucu, SSH) yazılım modunda devam et
-                print(f"[uyarı] Ekran kontrolü başlatılamadı, ekransız devam ediliyor: {e}", file=sys.stderr)
-                self.ayarlar.ekran = False
-        self.araclar = arac_tanimlari(self.ayarlar.ekran)
-        self.sistem = self._sistem_istemi()
-        self.mesajlar: list[dict] = []
+    def _ekrani_baslat(self) -> None:
+        try:
+            from .bilgisayar import Bilgisayar
+
+            self.bilgisayar = Bilgisayar()
+        except Exception as e:  # ekran yoksa (sunucu, SSH) yazılım modunda devam et
+            print(f"[uyarı] Ekran kontrolü başlatılamadı, ekransız devam ediliyor: {e}", file=sys.stderr)
+            self.ayarlar.ekran = False
+            return
+        if not self._goruntu_destekleniyor():
+            print(
+                f"[uyarı] '{self.ayarlar.model}' modeli görüntü kabul etmiyor; ekran kontrolü kapatıldı.\n"
+                "        Ekranı kullanmak için görüntü destekleyen bir DeepSeek modeli seç (ASISTAN_MODEL).\n"
+                "        Terminal ve dosya araçlarıyla devam ediliyor.",
+                file=sys.stderr,
+            )
+            self.bilgisayar = None
+            self.ayarlar.ekran = False
+
+    def _goruntu_destekleniyor(self) -> bool:
+        """Modelin görüntü kabul edip etmediğini küçük bir istekle dener."""
+        try:
+            self.istemci.chat.completions.create(
+                model=self.ayarlar.model,
+                max_tokens=1,
+                messages=[{"role": "user", "content": [
+                    {"type": "text", "text": "Bu görüntünün rengi ne? Tek kelime."},
+                    {"type": "image_url", "image_url": {"url": _kucuk_png()}},
+                ]}],
+            )
+            return True
+        except openai.BadRequestError:
+            return False
+        except openai.APIError as e:
+            print(f"[uyarı] Görüntü desteği denenemedi: {e}", file=sys.stderr)
+            return False
 
     def _sistem_istemi(self) -> str:
         a = self.ayarlar
@@ -103,139 +152,165 @@ class Ajan:
 
     # ------------------------------------------------------------------ #
 
-    def _kullanici_ekle(self, icerik: list[dict]) -> None:
-        if self.mesajlar and self.mesajlar[-1]["role"] == "user":
-            self.mesajlar[-1]["content"].extend(icerik)
-        else:
-            self.mesajlar.append({"role": "user", "content": icerik})
-
     def gorev(self, metin: str) -> str:
         """Kullanıcı mesajını ekler ve model işi bitirene kadar döngüyü çalıştırır."""
         self.guvenlik.gunluge_yaz("gorev", metin)
-        self._kullanici_ekle([{"type": "text", "text": metin}])
+        self.mesajlar.append({"role": "user", "content": metin})
         return self._dongu()
 
+    def _eski_goruntuleri_temizle(self) -> None:
+        """Yalnızca son N ekran görüntüsünü tutar; eskileri metne çevirir."""
+        sayac = 0
+        for m in reversed(self.mesajlar):
+            if m["role"] != "user" or not isinstance(m["content"], list):
+                continue
+            for i, parca in enumerate(m["content"]):
+                if parca.get("type") == "image_url":
+                    sayac += 1
+                    if sayac > self.ayarlar.max_goruntu:
+                        m["content"][i] = {"type": "text", "text": ESKI_GORUNTU}
+
     def _istek(self):
-        return self.istemci.beta.messages.stream(
+        mesajlar = self.mesajlar
+        if not self._dusunce_geri_gonder:
+            mesajlar = [{k: v for k, v in m.items() if k != "reasoning_content"} for m in mesajlar]
+        return self.istemci.chat.completions.create(
             model=self.ayarlar.model,
             max_tokens=self.ayarlar.max_tokens,
-            system=self.sistem,
+            messages=mesajlar,
             tools=self.araclar,
-            messages=self.mesajlar,
-            thinking={"type": "adaptive", "display": "updates"},
-            output_config={"effort": self.ayarlar.efor},
-            cache_control={"type": "ephemeral"},
-            context_management={
-                "edits": [{"type": "compact_20260112", "trigger": {"type": "input_tokens", "value": 150_000}}]
-            },
-            fallbacks="default",
-            betas=BETALAR,
         )
 
     def _dongu(self) -> str:
         son_metin = ""
         for _ in range(self.ayarlar.max_tur):
+            self._eski_goruntuleri_temizle()
             try:
-                with self._istek() as akis:
-                    for olay in akis:
-                        if olay.type == "content_block_delta":
-                            d = olay.delta
-                            if d.type == "text_delta":
-                                print(d.text, end="", flush=True)
-                            elif d.type == "thinking_delta" and d.thinking:
-                                print(f"\033[2m{d.thinking}\033[0m", end="", flush=True)
-                        elif olay.type == "content_block_stop":
-                            print(flush=True)
-                    yanit = akis.get_final_message()
-            except anthropic.RateLimitError:
+                yanit = self._istek()
+            except openai.BadRequestError as e:
+                # Bazı DeepSeek modelleri geri gönderilen düşünce metnini kabul etmez
+                if self._dusunce_geri_gonder and "reasoning_content" in str(e):
+                    self._dusunce_geri_gonder = False
+                    continue
+                print(f"[hata] API 400: {e.message}", file=sys.stderr)
+                return son_metin
+            except openai.RateLimitError:
                 print("[hata] Hız sınırına takıldı; biraz sonra tekrar dene.", file=sys.stderr)
                 return son_metin
-            except anthropic.APIStatusError as e:
-                print(f"[hata] API {e.status_code}: {e.message}", file=sys.stderr)
+            except openai.APIStatusError as e:
+                if e.status_code == 402:
+                    print("[hata] DeepSeek hesabında bakiye yetersiz.", file=sys.stderr)
+                else:
+                    print(f"[hata] API {e.status_code}: {e.message}", file=sys.stderr)
                 return son_metin
-            except anthropic.APIConnectionError:
+            except openai.APIConnectionError:
                 print("[hata] API'ye bağlanılamadı.", file=sys.stderr)
                 return son_metin
 
-            icerik = [b.to_dict() for b in yanit.content]
-            self.mesajlar.append({"role": "assistant", "content": icerik})
-            for b in icerik:
-                if b.get("type") == "text":
-                    son_metin = b["text"]
-                elif b.get("type") == "fallback":
-                    print(f"[bilgi] {b.get('from', {}).get('model')} reddetti, "
-                          f"{b.get('to', {}).get('model')} devam ediyor.", file=sys.stderr)
+            secim = yanit.choices[0]
+            mesaj = secim.message
+            dusunce = getattr(mesaj, "reasoning_content", None)
+            if dusunce:
+                print(f"\033[2m{dusunce.strip()[-600:]}\033[0m")
+            if mesaj.content:
+                print(mesaj.content)
+                son_metin = mesaj.content
 
-            if yanit.stop_reason == "refusal":
-                ayrinti = yanit.stop_details.explanation if yanit.stop_details else ""
-                print(f"[bilgi] Model bu isteği reddetti. {ayrinti}", file=sys.stderr)
-                self.guvenlik.gunluge_yaz("ret", ayrinti)
+            kayit: dict = {"role": "assistant", "content": mesaj.content or ""}
+            if dusunce:
+                kayit["reasoning_content"] = dusunce
+            if mesaj.tool_calls:
+                kayit["tool_calls"] = [
+                    {"id": c.id, "type": "function",
+                     "function": {"name": c.function.name, "arguments": c.function.arguments}}
+                    for c in mesaj.tool_calls
+                ]
+            self.mesajlar.append(kayit)
+
+            if secim.finish_reason == "content_filter":
+                print("[bilgi] Yanıt içerik filtresine takıldı.", file=sys.stderr)
                 return son_metin
 
-            arac_cagrilari = [b for b in icerik if b.get("type") == "tool_use"]
-            if arac_cagrilari:
-                sonuclar, durduruldu = self._araclari_calistir(arac_cagrilari)
-                self._kullanici_ekle(sonuclar)
+            if mesaj.tool_calls:
+                durduruldu = self._araclari_calistir(kayit["tool_calls"])
                 if durduruldu:
                     print("\n[durduruldu] Görev kullanıcı tarafından kesildi.")
                     return son_metin
                 continue
 
-            if yanit.stop_reason == "max_tokens":
-                self._kullanici_ekle([{"type": "text", "text": "Yanıtın yarıda kesildi, kaldığın yerden devam et."}])
+            if secim.finish_reason == "length":
+                self.mesajlar.append({"role": "user", "content": "Yanıtın yarıda kesildi, kaldığın yerden devam et."})
                 continue
 
-            return son_metin  # end_turn
+            return son_metin  # stop
 
         print(f"[uyarı] {self.ayarlar.max_tur} tur sınırına ulaşıldı.", file=sys.stderr)
         return son_metin
 
     # ------------------------------------------------------------------ #
 
-    def _araclari_calistir(self, cagrilar: list[dict]) -> tuple[list[dict], bool]:
-        """Araç çağrılarını sırayla çalıştırır. Ctrl+C kalanları iptal eder."""
-        sonuclar: list[dict] = []
+    def _araclari_calistir(self, cagrilar: list[dict]) -> bool:
+        """Araç çağrılarını sırayla çalıştırır, sonuçları geçmişe ekler. Ctrl+C kalanları iptal eder.
+
+        OpenAI biçiminde araç sonuçları görüntü taşıyamaz; ekran görüntüleri araç sonuçlarından
+        sonra tek bir kullanıcı mesajında gönderilir.
+        """
+        goruntuler: list[dict] = []
         ekran_hatasi = False
         durduruldu = False
         for c in cagrilar:
-            sonuc = {"type": "tool_result", "tool_use_id": c["id"]}
-            ekran_mi = c.get("toolset_name") == "computer"
-            if ekran_mi:
-                sonuc["toolset_name"] = "computer"
-
+            ad = c["function"]["name"]
+            ekran_mi = ad == "bilgisayar"
             if durduruldu:
-                sonuc.update(is_error=True, content="Çalıştırılmadı: kullanıcı görevi durdurdu.")
+                icerik = "Çalıştırılmadı: kullanıcı görevi durdurdu."
             elif ekran_mi and ekran_hatasi:
-                sonuc.update(is_error=True, content="Not executed: an earlier computer action in this turn failed.")
+                icerik = "Çalıştırılmadı: bu turdaki önceki bir ekran eylemi başarısız oldu."
             else:
                 try:
-                    sonuc["content"] = self._arac(c)
+                    sonuc = self._arac(ad, c["function"]["arguments"])
+                    if isinstance(sonuc, dict):  # ekran görüntüsü
+                        goruntuler.append({"type": "image_url", "image_url": {"url": _png_veri_url(sonuc)}})
+                        icerik = f"Görüntü {len(goruntuler)} bir sonraki mesajda."
+                    else:
+                        icerik = sonuc
                 except KeyboardInterrupt:
                     durduruldu = True
-                    sonuc.update(is_error=True, content="Kullanıcı görevi durdurdu.")
+                    icerik = "Kullanıcı görevi durdurdu."
                 except Exception as e:
                     if ekran_mi:
                         ekran_hatasi = True
-                    sonuc.update(is_error=True, content=f"Hata: {e}")
-                    self.guvenlik.gunluge_yaz("hata", {"arac": c.get("name"), "hata": str(e)})
-            sonuclar.append(sonuc)
-        return sonuclar, durduruldu
+                    icerik = f"Hata: {e}"
+                    self.guvenlik.gunluge_yaz("hata", {"arac": ad, "hata": str(e)})
+            self.mesajlar.append({"role": "tool", "tool_call_id": c["id"], "content": icerik})
 
-    def _arac(self, c: dict):
-        ad, girdi = c.get("name"), c.get("input")
+        if goruntuler:
+            self.mesajlar.append({
+                "role": "user",
+                "content": [{"type": "text", "text": "Araç çağrılarından gelen ekran görüntüleri:"}, *goruntuler],
+            })
+        return durduruldu
+
+    def _arac(self, ad: str, ham_girdi: str):
+        try:
+            girdi = json.loads(ham_girdi or "{}")
+        except json.JSONDecodeError:
+            raise AracHatasi("Araç argümanları geçerli JSON değil; tekrar dene.")
         if not isinstance(girdi, dict):
-            raise AracHatasi("Araç girdisi geçersiz veya eksik (JSON nesnesi bekleniyordu); tekrar dene.")
+            raise AracHatasi("Araç argümanları bir JSON nesnesi olmalı.")
         self.guvenlik.gunluge_yaz("arac", {"ad": ad, "girdi": _ozet(girdi)})
 
-        if c.get("toolset_name") == "computer":
+        if ad == "bilgisayar":
             if not self.bilgisayar:
                 raise AracHatasi("Ekran kontrolü kapalı.")
-            izin, sebep = self.guvenlik.ekran_onayi(ad, girdi)
+            eylem = girdi.pop("action", None)
+            if not isinstance(eylem, str):
+                raise AracHatasi("'action' gerekli.")
+            izin, sebep = self.guvenlik.ekran_onayi(eylem, girdi)
             if not izin:
                 raise AracHatasi(sebep)
-            print(f"  🖱  {ad} {_ozet(girdi) if ad not in ('screenshot',) else ''}")
-            sonuc = self.bilgisayar.calistir(ad, girdi)
-            return sonuc if isinstance(sonuc, list) else [{"type": "text", "text": sonuc}]
+            print(f"  🖱  {eylem} {_ozet(girdi) if girdi else ''}")
+            sonuc = self.bilgisayar.calistir(eylem, girdi)
+            return sonuc[0] if isinstance(sonuc, list) else sonuc
 
         if ad == "bash":
             if girdi.get("restart"):
@@ -249,7 +324,7 @@ class Ajan:
                 raise AracHatasi(sebep)
             return self.terminal.calistir(komut) or "(çıktı yok)"
 
-        if ad == "str_replace_based_edit_tool":
+        if ad == "dosya":
             print(f"  ✎ {girdi.get('command')} {girdi.get('path')}")
             return self.duzenleyici.calistir(girdi)
 
