@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import glob
 import json
+import os
+import platform
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -34,16 +37,77 @@ class Sonuc:
     ham: dict = field(default_factory=dict)
 
 
+KURULUM_YARDIMI = """\
+Claude Code (komut satırı sürümü) bulunamadı. Not: Claude masaüstü uygulaması tek başına yetmez.
+
+Windows'ta kurmak için PowerShell'i aç ve şunu çalıştır:
+    irm https://claude.ai/install.ps1 | iex
+Ardından YENİ bir pencere açıp bir kez `claude` yazarak giriş yap. (Windows'ta Git for Windows da
+gerekir: https://git-scm.com)
+
+Zaten kuruluysa, claude.exe dosyasının tam yolunu OTOPILOT_CLAUDE ortam değişkenine yaz:
+    setx OTOPILOT_CLAUDE "C:\\Users\\<kullanici>\\.local\\bin\\claude.exe"
+
+Aranan yerler:
+"""
+
+
+def _claude_code_mu(yol: str) -> bool:
+    """Adayın gerçekten Claude Code CLI olduğunu doğrular (masaüstü uygulaması da Claude.exe adını taşır)."""
+    try:
+        r = subprocess.run([yol, "--version"], capture_output=True, text=True, timeout=30,
+                           encoding="utf-8", errors="replace")
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return r.returncode == 0 and "claude code" in (r.stdout + r.stderr).lower()
+
+
+def claude_adaylari() -> list[str]:
+    adaylar: list[str] = []
+    if os.environ.get("OTOPILOT_CLAUDE"):
+        adaylar.append(os.environ["OTOPILOT_CLAUDE"].strip('"'))
+    for ad in ("claude", "claude.exe", "claude.cmd"):
+        if (y := shutil.which(ad)):
+            adaylar.append(y)
+    ev = Path.home()
+    if platform.system() == "Windows":
+        appdata = os.environ.get("APPDATA", str(ev / "AppData" / "Roaming"))
+        local = os.environ.get("LOCALAPPDATA", str(ev / "AppData" / "Local"))
+        adaylar += [
+            str(ev / ".local" / "bin" / "claude.exe"),       # resmi yerel kurulum
+            str(Path(appdata) / "npm" / "claude.cmd"),        # npm install -g
+            str(Path(local) / "Programs" / "claude" / "claude.exe"),
+            str(Path(local) / "Microsoft" / "WinGet" / "Links" / "claude.exe"),
+            str(ev / "scoop" / "shims" / "claude.exe"),
+        ]
+        # Masaüstü uygulamasının indirdiği Claude Code sürümleri (en yenisi önce)
+        for desen in (str(Path(appdata) / "Claude" / "claude-code" / "*" / "claude.exe"),
+                      str(Path(local) / "AnthropicClaude" / "**" / "claude-code" / "**" / "claude.exe")):
+            adaylar += sorted(glob.glob(desen, recursive=True), key=os.path.getmtime, reverse=True)
+    else:
+        adaylar += [str(ev / ".local" / "bin" / "claude"), str(ev / ".claude" / "local" / "claude"),
+                    "/usr/local/bin/claude", "/opt/homebrew/bin/claude"]
+    gorulen, sonuc = set(), []
+    for a in adaylar:
+        anahtar = os.path.normcase(os.path.abspath(a))
+        if anahtar not in gorulen:
+            gorulen.add(anahtar)
+            sonuc.append(a)
+    return sonuc
+
+
+def claude_bul() -> str:
+    adaylar = claude_adaylari()
+    for a in adaylar:
+        if os.path.isfile(a) and _claude_code_mu(a):
+            return a
+    raise SystemExit(KURULUM_YARDIMI + "\n".join(f"  - {a}" for a in adaylar))
+
+
 class ClaudeCLI:
     def __init__(self, proje: Path, izin_modu: str = "acceptEdits", ek_izinler: list[str] | None = None,
                  model: str | None = None, zaman_asimi_dk: int = 90):
-        yol = shutil.which("claude")
-        if not yol:
-            raise SystemExit(
-                "Claude Code bulunamadı. Kur: https://claude.com/claude-code — sonra bir kez `claude` "
-                "çalıştırıp giriş yap."
-            )
-        self.yol = yol
+        self.yol = claude_bul()
         self.proje = proje
         self.izin_modu = izin_modu
         self.ek_izinler = ek_izinler or []

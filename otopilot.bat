@@ -15,9 +15,6 @@ where py >nul 2>&1 && set "PY=py -3"
 if not defined PY where python >nul 2>&1 && set "PY=python"
 if not defined PY goto python_yok
 
-where claude >nul 2>&1
-if errorlevel 1 goto claude_yok
-
 if not "%~1"=="" goto calistir
 
 echo ============================================
@@ -43,11 +40,6 @@ goto bitis
 
 :python_yok
 echo HATA: Python bulunamadi. https://www.python.org/downloads/ adresinden kur.
-goto son
-
-:claude_yok
-echo HATA: Claude Code bulunamadi.
-echo Kur: https://claude.com/claude-code  ardindan bir kez "claude" yazip giris yap.
 goto son
 
 :son

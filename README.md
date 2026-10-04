@@ -34,7 +34,14 @@ görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Cl
 ### Gereksinimler
 
 - Python 3.10+ (ek paket gerekmez)
-- [Claude Code](https://claude.com/claude-code) kurulu ve giriş yapılmış (bir kez `claude` yazıp giriş yap)
+- **Claude Code komut satırı sürümü** kurulu ve giriş yapılmış. Claude masaüstü uygulaması tek başına
+  yetmez. Windows'ta PowerShell'de:
+  ```powershell
+  irm https://claude.ai/install.ps1 | iex
+  ```
+  Sonra yeni bir pencerede bir kez `claude` yazıp giriş yap (Windows'ta [Git for Windows](https://git-scm.com)
+  da gerekir). Otopilot `claude.exe`'yi PATH'te olmasa bile bilinen kurulum yerlerinde arar; farklı bir
+  yerdeyse `setx OTOPILOT_CLAUDE "C:\tam\yol\claude.exe"` ile göster.
 - Projenin bir git deposu olması
 
 ### Kullanım (Windows)
