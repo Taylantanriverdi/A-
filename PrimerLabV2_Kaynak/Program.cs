@@ -34,6 +34,7 @@ builder.Services.AddSingleton<TeknisyenHesapDeposu>();
 builder.Services.AddSingleton<EpostaServisi>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EpostaServisi>());
 builder.Services.AddSingleton<PortalKimlik>();
+builder.Services.AddScoped<PrimerAjan>();
 builder.Services.AddSingleton<OtomatikYedekServisi>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<OtomatikYedekServisi>());
 builder.Services.AddSingleton<MailIntegrationService>();

@@ -224,3 +224,26 @@ Son 30 yedek saklanir, eskiler silinir. Ayarlar > "Otomatik Yedek" kartinda:
   yedek oraya da kopyalanir. Bilgisayar bozulsa/calinsa bile yedek kalir.
   Istenirse tarama/tasarim dosyalari da (yalniz yeni ve degisenler) kopyalanir.
 Geri yukleme: Ayarlar > "Tam Yedekten Geri Yukle" > yedek .json dosyasi.
+
+
+PRIMER AI (YAPAY ZEKA AJANI) VE DEEPSEEK
+---------------------------------------
+Primer AI sag alttaki yildiz dugmesiyle acilir. Sorunuzu cevaplamak icin
+yazilimin her yerine kendisi bakar: isler, is detayi (kalemler, durum gecmisi,
+dosyalar, mesajlar), hekimler ve fiyat listeleri, cari hesaplar (Kasa / Arsiv
+ile ayni kural), tahsilat, gider, donem raporlari, teknisyen is yuku, portal
+hesaplari, mail kutusu, yedek ve sistem durumu; gerekirse veritabanina
+salt-okunur sorgu yazar. Cevabin altindaki "kaynak incelendi" satirina
+tiklayinca nelere baktigi gorunur.
+Veri degistiren islemleri (durum, teknisyen atama, onay, uretime alma,
+mesaj, tahsilat, gider, portal hesabi, yedek...) yalniz ONERIR; dugmeye basip
+onaylamadan hicbir sey degismez. Kalici silme yapamaz, sifre alanlarini okuyamaz.
+
+DeepSeek kurulumu:
+1. platform.deepseek.com > kayit/giris > "API keys" > "Create new API key";
+   anahtari kopyalayin (sk- ile baslar, yalniz bir kez gosterilir).
+2. "Top up" ile hesaba bakiye yukleyin (bakiye yoksa "402" hatasi alinir).
+3. Ayarlar > Primer AI: Saglayici = DeepSeek, anahtari yapistirin,
+   Model = DeepSeek Chat (onerilir), "Kaydet + Kullan". Baglanti test edilir.
+DeepSeek Reasoner daha derin dusunur ama daha yavastir. Claude veya OpenAI
+anahtari da kayitliysa saglayici istenildigi zaman degistirilebilir.

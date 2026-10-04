@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.DataProtection;
 
 namespace PrimerLabV2.Infrastructure;
@@ -21,7 +22,7 @@ public sealed class YapayZekaAyari
 }
 
 /// <summary>
-/// Primer AI sağlayıcıları: Claude (Anthropic) ve OpenAI. İki anahtar ayrı dosyalarda,
+/// Primer AI sağlayıcıları: Claude (Anthropic), OpenAI ve DeepSeek. Anahtarlar ayrı dosyalarda,
 /// Windows veri koruması ile şifreli saklanır; Ayarlar'da seçilen sağlayıcı kullanılır.
 /// Sohbet asistanı ve mail sipariş analizi bu servisi kullanır.
 /// </summary>
@@ -29,6 +30,14 @@ public sealed class YapayZekaServisi
 {
     public const string Claude = "claude";
     public const string OpenAi = "openai";
+    public const string DeepSeek = "deepseek";
+
+    // DeepSeek (OpenAI uyumlu Chat Completions API, araç çağırma destekli).
+    public const string DeepSeekVarsayilanModel = "deepseek-chat";
+    public static readonly string[] DeepSeekModeller = { "deepseek-chat", "deepseek-reasoner" };
+    private const string DeepSeekKorumaAmaci = "PrimerLab.DeepSeek.ApiKey.v1";
+    public const string DeepSeekAdresi = "https://api.deepseek.com/chat/completions";
+    public const string OpenAiSohbetAdresi = "https://api.openai.com/v1/chat/completions";
 
     // OpenAI: önceki sürümdeki model listesi ve dosya/koruma adları aynen korunur,
     // böylece daha önce kaydedilmiş OpenAI anahtarı yeniden girmeden çalışır.
@@ -41,6 +50,7 @@ public sealed class YapayZekaServisi
     private readonly string _gizliKlasor;
     private readonly IDataProtector _claudeKoruma;
     private readonly IDataProtector _openAiKoruma;
+    private readonly IDataProtector _deepSeekKoruma;
     private readonly IHttpClientFactory _httpFactory;
     private readonly object _dosyaKilidi = new();
 
@@ -52,22 +62,39 @@ public sealed class YapayZekaServisi
         _gizliKlasor = Path.Combine(environment.ContentRootPath, "App_Data", "Secrets");
         _claudeKoruma = dataProtectionProvider.CreateProtector(ClaudeIstemcisi.KorumaAmaci);
         _openAiKoruma = dataProtectionProvider.CreateProtector(OpenAiKorumaAmaci);
+        _deepSeekKoruma = dataProtectionProvider.CreateProtector(DeepSeekKorumaAmaci);
         _httpFactory = httpFactory;
     }
 
-    public static bool GecerliSaglayici(string? s) => s is Claude or OpenAi;
+    public static bool GecerliSaglayici(string? s) => s is Claude or OpenAi or DeepSeek;
 
-    public static string SaglayiciAdi(string saglayici) => saglayici == OpenAi ? "OpenAI" : "Claude";
+    public static string SaglayiciAdi(string saglayici) => saglayici switch
+    {
+        OpenAi => "OpenAI",
+        DeepSeek => "DeepSeek",
+        _ => "Claude"
+    };
 
-    public static string[] Modeller(string saglayici) =>
-        saglayici == OpenAi ? OpenAiModeller : ClaudeIstemcisi.Modeller;
+    public static string[] Modeller(string saglayici) => saglayici switch
+    {
+        OpenAi => OpenAiModeller,
+        DeepSeek => DeepSeekModeller,
+        _ => ClaudeIstemcisi.Modeller
+    };
 
     public static string ModelNormalize(string saglayici, string? model)
     {
-        if (saglayici != OpenAi) return ClaudeIstemcisi.ModelNormalize(model);
         var m = (model ?? string.Empty).Trim();
-        return OpenAiModeller.Contains(m) ? m : OpenAiVarsayilanModel;
+        return saglayici switch
+        {
+            OpenAi => OpenAiModeller.Contains(m) ? m : OpenAiVarsayilanModel,
+            DeepSeek => DeepSeekModeller.Contains(m) ? m : DeepSeekVarsayilanModel,
+            _ => ClaudeIstemcisi.ModelNormalize(model)
+        };
     }
+
+    /// <summary>Sağlayıcı yerel araç çağırmayı (function calling) destekliyor mu (DeepSeek, OpenAI).</summary>
+    public static bool YerelAracDestegi(string saglayici) => saglayici is DeepSeek or OpenAi;
 
     /// <summary>Anahtar biçimi uygunsa null, değilse kullanıcıya gösterilecek mesaj.</summary>
     public static string? AnahtarBicimHatasi(string saglayici, string anahtar)
@@ -75,6 +102,11 @@ public sealed class YapayZekaServisi
         if (saglayici == OpenAi)
             return anahtar.Length < 20 || anahtar.Any(char.IsWhiteSpace)
                 ? "OpenAI API anahtarı geçersiz görünüyor (platform.openai.com > API keys)."
+                : null;
+
+        if (saglayici == DeepSeek)
+            return !anahtar.StartsWith("sk-", StringComparison.Ordinal) || anahtar.Length < 20 || anahtar.Any(char.IsWhiteSpace)
+                ? "DeepSeek API anahtarı geçersiz görünüyor. Anahtar \"sk-\" ile başlar (platform.deepseek.com > API keys)."
                 : null;
 
         return ClaudeIstemcisi.AnahtarBicimiGecerli(anahtar)
@@ -85,11 +117,21 @@ public sealed class YapayZekaServisi
     // ---------------------------------------------------------------- ayarlar
 
     private string AnahtarDosyasi(string saglayici) =>
-        Path.Combine(_gizliKlasor, saglayici == OpenAi ? "primer-ai.json" : "primer-ai-claude.json");
+        Path.Combine(_gizliKlasor, saglayici switch
+        {
+            OpenAi => "primer-ai.json",
+            DeepSeek => "primer-ai-deepseek.json",
+            _ => "primer-ai-claude.json"
+        });
 
     private string SecimDosyasi => Path.Combine(_gizliKlasor, "primer-ai-saglayici.json");
 
-    private IDataProtector Koruma(string saglayici) => saglayici == OpenAi ? _openAiKoruma : _claudeKoruma;
+    private IDataProtector Koruma(string saglayici) => saglayici switch
+    {
+        OpenAi => _openAiKoruma,
+        DeepSeek => _deepSeekKoruma,
+        _ => _claudeKoruma
+    };
 
     public YapayZekaAyari? Oku(string saglayici)
     {
@@ -122,7 +164,7 @@ public sealed class YapayZekaServisi
     {
         var secim = SeciliSaglayici();
         if (secim != null && Oku(secim) is { } secili) return secili;
-        return Oku(Claude) ?? Oku(OpenAi);
+        return Oku(Claude) ?? Oku(DeepSeek) ?? Oku(OpenAi);
     }
 
     private string? SeciliSaglayici()
@@ -184,6 +226,7 @@ public sealed class YapayZekaServisi
         var aktif = Aktif();
         var claude = Oku(Claude);
         var openAi = Oku(OpenAi);
+        var deepSeek = Oku(DeepSeek);
         return new
         {
             Configured = aktif != null,
@@ -191,7 +234,9 @@ public sealed class YapayZekaServisi
             ProviderName = aktif == null ? null : SaglayiciAdi(aktif.Saglayici),
             Model = aktif?.Model,
             Claude = new { Configured = claude != null, Model = claude?.Model ?? ClaudeIstemcisi.VarsayilanModel },
-            OpenAi = new { Configured = openAi != null, Model = openAi?.Model ?? OpenAiVarsayilanModel }
+            OpenAi = new { Configured = openAi != null, Model = openAi?.Model ?? OpenAiVarsayilanModel },
+            DeepSeek = new { Configured = deepSeek != null, Model = deepSeek?.Model ?? DeepSeekVarsayilanModel },
+            AjanModu = aktif != null && YerelAracDestegi(aktif.Saglayici) ? "yerel-arac" : "json-arac"
         };
     }
 
@@ -215,6 +260,9 @@ public sealed class YapayZekaServisi
         YapayZekaAmaci amac,
         CancellationToken ct = default)
     {
+        if (ayar.Saglayici == DeepSeek)
+            return DeepSeekMetinAsync(ayar, sistem, kullaniciMesaji, amac, ct);
+
         if (ayar.Saglayici == OpenAi)
         {
             // Önceki sürümün OpenAI ayarları (yanıt uzunluğu ve düşünme derinliği) korunur.
@@ -343,4 +391,140 @@ public sealed class YapayZekaServisi
 
         return string.Empty;
     }
+
+    // ---------------------------------------------------------------- DeepSeek / OpenAI uyumlu sohbet + araç çağırma
+
+    private async Task<YapayZekaSonuc> DeepSeekMetinAsync(YapayZekaAyari ayar, string sistem, string mesaj, YapayZekaAmaci amac, CancellationToken ct)
+    {
+        var mesajlar = new List<JsonObject>
+        {
+            new() { ["role"] = "system", ["content"] = sistem },
+            new() { ["role"] = "user", ["content"] = mesaj }
+        };
+        var uzunluk = amac switch { YapayZekaAmaci.Sohbet => 4000, YapayZekaAmaci.MailAnalizi => 2000, _ => 64 };
+        var y = await AracliTurAsync(ayar, mesajlar, null, uzunluk, ct, jsonCikti: amac == YapayZekaAmaci.MailAnalizi);
+        if (!y.Basarili) return YapayZekaSonuc.Hatali(y.Hata ?? "DeepSeek yanıt vermedi.", y.IstekNo);
+        return string.IsNullOrWhiteSpace(y.Metin)
+            ? YapayZekaSonuc.Hatali("DeepSeek boş yanıt döndürdü.", y.IstekNo)
+            : new YapayZekaSonuc(true, y.Metin, null, y.IstekNo);
+    }
+
+    /// <summary>
+    /// OpenAI uyumlu Chat Completions çağrısı (DeepSeek ve OpenAI). Araç tanımları verilirse model
+    /// araç çağırabilir; dönen asistan mesajı (araç çağrılarıyla) olduğu gibi geçmişe eklenebilir.
+    /// </summary>
+    public async Task<AracliYanit> AracliTurAsync(
+        YapayZekaAyari ayar,
+        List<JsonObject> mesajlar,
+        JsonArray? araclar,
+        int enFazlaUzunluk,
+        CancellationToken ct,
+        bool jsonCikti = false)
+    {
+        var adres = ayar.Saglayici == OpenAi ? OpenAiSohbetAdresi : DeepSeekAdresi;
+        var ozelAdres = Environment.GetEnvironmentVariable("PRIMERLAB_DEEPSEEK_URL");
+        if (ayar.Saglayici == DeepSeek && !string.IsNullOrWhiteSpace(ozelAdres)) adres = ozelAdres;
+
+        var govde = new JsonObject
+        {
+            ["model"] = ModelNormalize(ayar.Saglayici, ayar.Model),
+            ["messages"] = new JsonArray(mesajlar.Select(m => (JsonNode)m.DeepClone()).ToArray()),
+            ["stream"] = false
+        };
+        if (ayar.Saglayici == OpenAi) govde["max_completion_tokens"] = Math.Max(enFazlaUzunluk, 256);
+        else
+        {
+            govde["max_tokens"] = Math.Clamp(enFazlaUzunluk, 16, 8192);
+            if (ayar.Model != "deepseek-reasoner") govde["temperature"] = 0.2;
+        }
+        if (araclar != null && araclar.Count > 0)
+        {
+            govde["tools"] = araclar.DeepClone();
+            govde["tool_choice"] = "auto";
+        }
+        else if (jsonCikti) govde["response_format"] = new JsonObject { ["type"] = "json_object" };
+
+        var ilk = await IstekAsync(adres, ayar.ApiKey, govde.ToJsonString(), ct);
+        // Bazı DeepSeek sürümleri geçmişte reasoning_content alanını kabul etmez: alan çıkarılıp tekrar denenir.
+        if (!ilk.Basarili && (ilk.Hata ?? "").Contains("reasoning_content", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (var m in ((JsonArray)govde["messages"]!).OfType<JsonObject>()) m.Remove("reasoning_content");
+            ilk = await IstekAsync(adres, ayar.ApiKey, govde.ToJsonString(), ct);
+        }
+        return ilk;
+    }
+
+    private async Task<AracliYanit> IstekAsync(string adres, string apiKey, string json, CancellationToken ct)
+    {
+        var http = _httpFactory.CreateClient();
+        http.Timeout = TimeSpan.FromSeconds(180);
+        using var istek = new HttpRequestMessage(HttpMethod.Post, adres);
+        istek.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        istek.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        try
+        {
+            using var yanit = await http.SendAsync(istek, ct);
+            var govde = await yanit.Content.ReadAsStringAsync(ct);
+            var istekNo = yanit.Headers.TryGetValues("x-request-id", out var ids) ? ids.FirstOrDefault() : null;
+            if (!yanit.IsSuccessStatusCode)
+            {
+                var detay = OpenAiHatasi(govde) ?? govde;
+                if (string.IsNullOrWhiteSpace(detay)) detay = $"{(int)yanit.StatusCode} {yanit.ReasonPhrase}";
+                if (detay.Length > 1500) detay = detay[..1500];
+                var ipucu = (int)yanit.StatusCode switch
+                {
+                    401 => " (API anahtarı geçersiz.)",
+                    402 => " (Hesap bakiyesi yetersiz: platform.deepseek.com > Top up ile bakiye yükleyin.)",
+                    429 => " (Çok fazla istek; biraz bekleyip tekrar deneyin.)",
+                    _ => ""
+                };
+                return AracliYanit.Hatali($"HTTP {(int)yanit.StatusCode}: {detay}{ipucu}", istekNo);
+            }
+
+            var kok = JsonNode.Parse(govde)!.AsObject();
+            var mesaj = kok["choices"]?[0]?["message"]?.AsObject();
+            if (mesaj == null) return AracliYanit.Hatali("Yanıt okunamadı.", istekNo);
+            var cagrilar = new List<AracCagrisi>();
+            if (mesaj["tool_calls"] is JsonArray tc)
+                foreach (var c in tc.OfType<JsonObject>())
+                    cagrilar.Add(new AracCagrisi(
+                        c["id"]?.GetValue<string>() ?? Guid.NewGuid().ToString("N"),
+                        c["function"]?["name"]?.GetValue<string>() ?? "",
+                        c["function"]?["arguments"]?.GetValue<string>() ?? "{}"));
+
+            var asistan = new JsonObject { ["role"] = "assistant", ["content"] = mesaj["content"]?.DeepClone() };
+            if (mesaj["reasoning_content"] is JsonNode rc) asistan["reasoning_content"] = rc.DeepClone();
+            if (mesaj["tool_calls"] is JsonNode tcs) asistan["tool_calls"] = tcs.DeepClone();
+            var metin = mesaj["content"] is JsonValue v && v.TryGetValue<string>(out var str) ? str : null;
+            var kullanim = kok["usage"]?["total_tokens"]?.GetValue<int>() ?? 0;
+            return new AracliYanit(true, metin, cagrilar, asistan, null, istekNo, kullanim);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return AracliYanit.Hatali("Yapay zekâ zamanında yanıt vermedi. Tekrar deneyin.");
+        }
+        catch (HttpRequestException)
+        {
+            return AracliYanit.Hatali("Yapay zekâ sunucusuna bağlanılamadı. İnternet bağlantısını kontrol edin.");
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or FormatException)
+        {
+            return AracliYanit.Hatali("Yapay zekâ yanıtı okunamadı: " + ex.Message);
+        }
+    }
+}
+
+public sealed record AracCagrisi(string Id, string Ad, string ArgumanlarJson);
+
+public sealed record AracliYanit(
+    bool Basarili,
+    string? Metin,
+    List<AracCagrisi> Cagrilar,
+    JsonObject? AsistanMesaji,
+    string? Hata,
+    string? IstekNo,
+    int Token)
+{
+    public static AracliYanit Hatali(string hata, string? istekNo = null) =>
+        new(false, null, new List<AracCagrisi>(), null, hata, istekNo, 0);
 }
