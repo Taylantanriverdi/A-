@@ -68,7 +68,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     // =========================================================
 
     [HttpGet("admin/account/{teknisyenId:int}")]
-    public async Task<IActionResult> AdminHesap(int teknisyenId, CancellationToken ct)
+    public async Task<IActionResult> AdminHesap(int teknisyenId, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
     {
         if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
             return StatusCode(StatusCodes.Status403Forbidden, "Hesap yönetimi yalnız ana Primer Lab bilgisayarından yapılabilir.");
@@ -86,7 +86,9 @@ public sealed class TeknisyenPortalController : ControllerBase
             aktif = hesap?.Aktif ?? true,
             hesapVar = hesap != null,
             sonGirisTarihi = hesap?.SonGirisTarihi,
-            panelYolu = "/teknisyen"
+            panelYolu = "/teknisyen",
+            ikiAdimKurulu = ikiAdim.KuruluMu("teknisyen:" + teknisyenId),
+            ikiAdimZorunlu = ikiAdim.Zorunlu
         });
     }
 
@@ -117,6 +119,16 @@ public sealed class TeknisyenPortalController : ControllerBase
         return Ok(new { message = "Teknisyen panel hesabı kaydedildi.", kullaniciAdi, tip });
     }
 
+    [HttpDelete("admin/account/{teknisyenId:int}/iki-adim")]
+    public IActionResult AdminIkiAdimSifirla(int teknisyenId, [FromServices] IkiAdimDogrulama ikiAdim)
+    {
+        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
+            return StatusCode(StatusCodes.Status403Forbidden, "Hesap yönetimi yalnız ana Primer Lab bilgisayarından yapılabilir.");
+        return ikiAdim.Sifirla("teknisyen:" + teknisyenId)
+            ? Ok(new { message = "İki adımlı doğrulama sıfırlandı; teknisyen bir sonraki girişte yeniden kuracak." })
+            : NotFound("Bu teknisyende kurulu iki adımlı doğrulama yok.");
+    }
+
     [HttpDelete("admin/account/{teknisyenId:int}")]
     public IActionResult AdminHesapPasif(int teknisyenId)
     {
@@ -130,7 +142,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     // =========================================================
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] TeknisyenGirisDto dto, CancellationToken ct)
+    public async Task<IActionResult> Login([FromBody] TeknisyenGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
     {
         var kullaniciAdi = (dto.KullaniciAdi ?? string.Empty).Trim().ToLowerInvariant();
         var parola = dto.Parola ?? string.Empty;
@@ -157,6 +169,66 @@ public sealed class TeknisyenPortalController : ControllerBase
 
         if (ipAnahtar != null) GirisDenemeleri.TryRemove(ipAnahtar, out _);
         GirisDenemeleri.TryRemove(kAnahtar, out _);
+
+        // İki adımlı doğrulama: oturum, telefondaki kod girilince açılır.
+        var ikiAdimHesap = "teknisyen:" + tek.Id;
+        if (ikiAdim.KuruluMu(ikiAdimHesap))
+            return Ok(new { ikiAdim = "kod", jeton = ikiAdim.JetonUret(ikiAdimHesap) });
+        if (ikiAdim.Zorunlu)
+            return Ok(new { ikiAdim = "kurulum", jeton = ikiAdim.JetonUret(ikiAdimHesap) });
+
+        return await OturumAc(tek.Id, ct);
+    }
+
+    [HttpPost("login/kod")]
+    public async Task<IActionResult> LoginKod([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
+    {
+        var j = ikiAdim.JetonCoz(dto.Jeton, "teknisyen:");
+        if (j == null) return Unauthorized("Süre doldu. Lütfen kullanıcı adı ve parolayla tekrar giriş yapın.");
+        var kilit = "2fa:" + j.Hesap;
+        if (Engelli(kilit, 5)) return StatusCode(StatusCodes.Status429TooManyRequests, "Çok fazla hatalı kod. 10 dakika sonra tekrar deneyin.");
+        if (!ikiAdim.Dogrula(j.Hesap, dto.Kod))
+        {
+            HataKaydet(kilit);
+            await Task.Delay(Random.Shared.Next(150, 450), ct);
+            return Unauthorized("Kod hatalı veya süresi geçmiş. Uygulamadaki güncel kodu girin.");
+        }
+        GirisDenemeleri.TryRemove(kilit, out _);
+        return await OturumAc(int.Parse(j.Hesap["teknisyen:".Length..]), ct);
+    }
+
+    [HttpPost("login/kurulum")]
+    public IActionResult LoginKurulum([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim)
+    {
+        var j = ikiAdim.JetonCoz(dto.Jeton, "teknisyen:");
+        if (j == null) return Unauthorized("Süre doldu. Lütfen kullanıcı adı ve parolayla tekrar giriş yapın.");
+        if (ikiAdim.KuruluMu(j.Hesap)) return BadRequest("İki adımlı doğrulama zaten kurulu.");
+        var hesap = _hesaplar.Getir(int.Parse(j.Hesap["teknisyen:".Length..]));
+        return Ok(ikiAdim.KurulumBilgisi(j.Hesap, hesap?.KullaniciAdi ?? "teknisyen"));
+    }
+
+    [HttpPost("login/kurulum-tamamla")]
+    public async Task<IActionResult> LoginKurulumTamamla([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
+    {
+        var j = ikiAdim.JetonCoz(dto.Jeton, "teknisyen:");
+        if (j?.KurulumAnahtari == null) return Unauthorized("Süre doldu. Lütfen tekrar giriş yapın.");
+        var kilit = "2fa:" + j.Hesap;
+        if (Engelli(kilit, 5)) return StatusCode(StatusCodes.Status429TooManyRequests, "Çok fazla hatalı kod. 10 dakika sonra tekrar deneyin.");
+        if (ikiAdim.KuruluMu(j.Hesap)) return BadRequest("İki adımlı doğrulama zaten kurulu.");
+        if (!ikiAdim.KurulumuTamamla(j.Hesap, j.KurulumAnahtari, dto.Kod))
+        {
+            HataKaydet(kilit);
+            return Unauthorized("Kod doğrulanamadı. Uygulamaya eklediğiniz hesabın güncel kodunu girin.");
+        }
+        GirisDenemeleri.TryRemove(kilit, out _);
+        return await OturumAc(int.Parse(j.Hesap["teknisyen:".Length..]), ct);
+    }
+
+    private async Task<IActionResult> OturumAc(int teknisyenId, CancellationToken ct)
+    {
+        var hesap = _hesaplar.Getir(teknisyenId);
+        var tek = await TeknisyenGetir(teknisyenId, ct);
+        if (hesap == null || tek == null || !hesap.Aktif || !tek.Aktif) return Unauthorized("Hesap pasif.");
 
         var bitis = DateTime.UtcNow.AddHours(12);
         var oturum = JsonSerializer.Serialize(new TeknisyenOturum { TeknisyenId = tek.Id, Bitis = bitis });

@@ -26,6 +26,14 @@
         .login{min-height:100vh;display:grid;place-items:center;padding:16px}
         .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
         .login-card h1{font-size:20px;margin:18px 0 4px}
+        .ika-bilgi{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+        .ika-qr{display:grid;place-items:center;margin:4px 0 10px}
+        .ika-qr svg{width:200px;height:200px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px}
+        .ika-link{display:block;text-align:center;font-size:13px;font-weight:800;color:var(--blue);margin-bottom:8px}
+        .ika-anahtar{font-size:12px;color:var(--muted);margin-bottom:12px;word-break:break-all}
+        .ika-anahtar code{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:.5px}
+        .ika-kod{font-size:24px!important;letter-spacing:6px;text-align:center;font-weight:900}
+        .ika-geri{background:none;border:0;color:var(--muted);font-weight:800;cursor:pointer;margin-top:10px;width:100%;font-size:13px}
         .login-card p{margin:0 0 18px;color:var(--muted);font-size:13px}
 
         /* Üst bar */
@@ -161,6 +169,7 @@
         <h1>Hoş geldiniz</h1>
         <p>Laboratuvarın size verdiği kullanıcı adı ve parola ile giriş yapın.</p>
         <div id="loginMsg" class="msg err hidden"></div>
+        <div id="sifreAdimi">
         <div class="field">
             <label class="lbl" for="loginUser">Kullanıcı adı</label>
             <input id="loginUser" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" required />
@@ -169,7 +178,22 @@
             <label class="lbl" for="loginPass">Parola</label>
             <input id="loginPass" class="inp" type="password" autocomplete="current-password" required />
         </div>
+        </div>
+        <div id="kodAdimi" class="hidden">
+            <div id="kurulumAlani" class="hidden">
+                <p class="ika-bilgi"><b>Güvenliğiniz için bir kez kurulum:</b> Telefonunuza <b>Google Authenticator</b> veya <b>Microsoft Authenticator</b> uygulamasını kurun. Uygulamada <b>+</b> &rarr; <b>QR kodu tara</b> deyip aşağıdaki kodu okutun.</p>
+                <div id="kurulumQr" class="ika-qr"></div>
+                <a id="kurulumLink" class="ika-link" href="#">Bu telefondaysanız: doğrulama uygulamasında aç</a>
+                <div class="ika-anahtar">QR okutamıyorsanız uygulamaya elle girin: <code id="kurulumAnahtar"></code></div>
+            </div>
+            <p id="kodAciklama" class="ika-bilgi">Telefonunuzdaki doğrulama uygulamasında <b>Primer Dental Lab</b> için görünen 6 haneli kodu girin.</p>
+            <div class="field">
+                <label class="lbl" for="loginKod">Doğrulama kodu</label>
+                <input id="loginKod" class="inp ika-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+            </div>
+        </div>
         <button id="loginBtn" class="btn btn-block" type="submit">Giriş Yap</button>
+        <button id="ikaGeri" class="ika-geri hidden" type="button" onclick="ikiAdimSifirla()">&larr; Kullanıcı adı ve parolaya dön</button>
     </form>
 </section>
 
@@ -415,6 +439,7 @@
     function girisEkrani() {
         $("appScreen").classList.add("hidden");
         $("loginScreen").classList.remove("hidden");
+        if (typeof ikiAdimSifirla === "function") ikiAdimSifirla();
         setTimeout(() => $("loginUser").focus(), 50);
     }
 
@@ -424,18 +449,83 @@
         const btn = $("loginBtn");
         btn.disabled = true; btn.textContent = "Giriş yapılıyor...";
         try {
+            if (ikiAdim) { await kodGonder(); return; }
             const r = await fetch("/api/hekim-portal/login", {
                 method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
                 body: JSON.stringify({ kullaniciAdi: $("loginUser").value.trim(), parola: $("loginPass").value })
             });
             if (!r.ok) throw new Error((await r.text()) || "Giriş yapılamadı.");
             $("loginPass").value = "";
-            await basla();
+            await girisCevabi(await r.json().catch(() => ({})));
         } catch (err) {
             mesaj("loginMsg", err.message);
         } finally {
-            btn.disabled = false; btn.textContent = "Giriş Yap";
+            btn.disabled = false; btn.textContent = ikiAdim ? (ikiAdim.tur === "kurulum-qr" ? "Onayla" : "Doğrula") : "Giriş Yap";
         }
+    }
+
+    // ---------- İki adımlı doğrulama (parola + telefondaki 6 haneli kod) ----------
+    let ikiAdim = null; // { tur: "kod" | "kurulum-qr", jeton }
+    function ikiAdimSifirla() {
+        ikiAdim = null;
+        $("sifreAdimi").classList.remove("hidden");
+        $("kodAdimi").classList.add("hidden");
+        $("ikaGeri").classList.add("hidden");
+        $("loginUser").required = true; $("loginPass").required = true;
+        $("loginKod").value = "";
+        $("loginBtn").textContent = "Giriş Yap";
+    }
+    function ikiAdimGoster(d) {
+        ikiAdim = { tur: d.ikiAdim, jeton: d.jeton };
+        const kurulum = d.ikiAdim === "kurulum-qr";
+        $("sifreAdimi").classList.add("hidden");
+        $("kodAdimi").classList.remove("hidden");
+        $("ikaGeri").classList.remove("hidden");
+        $("kurulumAlani").classList.toggle("hidden", !kurulum);
+        $("loginUser").required = false; $("loginPass").required = false;
+        if (kurulum) {
+            $("kurulumQr").innerHTML = d.qrSvg || "";
+            $("kurulumLink").href = d.otpauth || "#";
+            $("kurulumAnahtar").textContent = d.anahtar || "";
+            $("kodAciklama").innerHTML = "Uygulamaya eklendikten sonra görünen <b>6 haneli kodu</b> girip <b>Onayla</b>'ya basın. Sonraki girişlerde yalnız bu kod istenir.";
+        } else {
+            $("kodAciklama").innerHTML = "Telefonunuzdaki doğrulama uygulamasında <b>Primer Dental Lab</b> için görünen 6 haneli kodu girin.";
+        }
+        $("loginKod").value = "";
+        setTimeout(() => $("loginKod").focus(), 50);
+    }
+    async function ikiAdimPost(yol, govde) {
+        const r = await fetch("/api/hekim-portal" + yol, {
+            method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+            body: JSON.stringify(govde)
+        });
+        const metin = await r.text();
+        if (!r.ok) {
+            const err = new Error(metin || "İşlem başarısız.");
+            err.sureDoldu = r.status === 401 && metin.startsWith("Süre doldu");
+            throw err;
+        }
+        try { return JSON.parse(metin); } catch { return {}; }
+    }
+    // Parola cevabına göre: oturum açıldı / kod iste / ilk kurulum ekranı.
+    async function girisCevabi(d) {
+        if (d && d.ikiAdim === "kod") { ikiAdimGoster(d); return; }
+        if (d && d.ikiAdim === "kurulum") { ikiAdimGoster(await ikiAdimPost("/login/kurulum", { jeton: d.jeton })); return; }
+        ikiAdimSifirla();
+        await basla();
+    }
+    async function kodGonder() {
+        const kod = $("loginKod").value.replace(/\D/g, "");
+        if (kod.length !== 6) throw new Error("6 haneli kodu girin.");
+        try {
+            await ikiAdimPost(ikiAdim.tur === "kurulum-qr" ? "/login/kurulum-tamamla" : "/login/kod", { jeton: ikiAdim.jeton, kod });
+        } catch (err) {
+            if (err.sureDoldu) ikiAdimSifirla();
+            $("loginKod").value = "";
+            throw err;
+        }
+        ikiAdimSifirla();
+        await basla();
     }
 
     async function cikisYap() {

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
 using PrimerLabV2.Data;
+using PrimerLabV2.Infrastructure;
 using PrimerLabV2.Models;
 
 namespace PrimerLabV2.Controllers;
@@ -61,7 +62,7 @@ public sealed class HekimPortalController : ControllerBase
     // =========================================================
 
     [HttpGet("admin/account/{hekimId:int}")]
-    public async Task<IActionResult> AdminGetAccount(int hekimId, CancellationToken cancellationToken)
+    public async Task<IActionResult> AdminGetAccount(int hekimId, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken cancellationToken)
     {
         if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
             return StatusCode(StatusCodes.Status403Forbidden, "Portal hesap yönetimi yalnız ana Primer Lab bilgisayarından yapılabilir.");
@@ -88,6 +89,8 @@ public sealed class HekimPortalController : ControllerBase
             sonGirisTarihi = account?.SonGirisTarihi,
             guncellemeTarihi = account?.GuncellemeTarihi,
             portalYolu = "/hekim-portal",
+            ikiAdimKurulu = ikiAdim.KuruluMu("hekim:" + hekim.Id),
+            ikiAdimZorunlu = ikiAdim.Zorunlu,
             portalAdresleri = GetPortalUrls(),
             internetAdresi = InternetPortalUrl()
         });
@@ -171,6 +174,17 @@ public sealed class HekimPortalController : ControllerBase
         });
     }
 
+    // Telefonu değişen / kaybolan hekim için: bir sonraki girişte kodu yeniden kurar.
+    [HttpDelete("admin/account/{hekimId:int}/iki-adim")]
+    public IActionResult AdminIkiAdimSifirla(int hekimId, [FromServices] IkiAdimDogrulama ikiAdim)
+    {
+        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
+            return StatusCode(StatusCodes.Status403Forbidden, "Hesap yönetimi yalnız ana Primer Lab bilgisayarından yapılabilir.");
+        return ikiAdim.Sifirla("hekim:" + hekimId)
+            ? Ok(new { message = "İki adımlı doğrulama sıfırlandı; hekim bir sonraki girişte yeniden kuracak." })
+            : NotFound("Bu hekimde kurulu iki adımlı doğrulama yok.");
+    }
+
     [HttpDelete("admin/account/{hekimId:int}")]
     public async Task<IActionResult> AdminDisableAccount(int hekimId, CancellationToken cancellationToken)
     {
@@ -192,7 +206,7 @@ public sealed class HekimPortalController : ControllerBase
     // =========================================================
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] PortalLoginDto dto, CancellationToken cancellationToken)
+    public async Task<IActionResult> Login([FromBody] PortalLoginDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken cancellationToken)
     {
         // Tünel gerçek adresi iletmediyse (IPAddress.None) tüm hekimler aynı adreste görünür;
         // bu durumda yalnız kullanıcı adı sınırı uygulanır, bir hekimin hataları diğerlerini kilitlemez.
@@ -233,6 +247,81 @@ public sealed class HekimPortalController : ControllerBase
 
         LoginAttempts.TryRemove(ip, out _);
         LoginAttempts.TryRemove(userKey, out _);
+
+        // İki adımlı doğrulama: parola doğru olsa da oturum, telefondaki kod girilince açılır.
+        var hesap = "hekim:" + account.HekimId;
+        if (ikiAdim.KuruluMu(hesap))
+            return Ok(new { ikiAdim = "kod", jeton = ikiAdim.JetonUret(hesap) });
+        if (ikiAdim.Zorunlu)
+            return Ok(new { ikiAdim = "kurulum", jeton = ikiAdim.JetonUret(hesap) });
+
+        return await OturumAc(account.HekimId, cancellationToken);
+    }
+
+    // Parola sonrası 6 haneli kod.
+    [HttpPost("login/kod")]
+    public async Task<IActionResult> LoginKod([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken cancellationToken)
+    {
+        var j = ikiAdim.JetonCoz(dto.Jeton, "hekim:");
+        if (j == null) return Unauthorized("Süre doldu. Lütfen kullanıcı adı ve parolayla tekrar giriş yapın.");
+        var kilit = "2fa:" + j.Hesap;
+        if (IsLoginBlocked(kilit, 5, out var bekle))
+            return StatusCode(StatusCodes.Status429TooManyRequests, $"Çok fazla hatalı kod. Yaklaşık {bekle} dakika sonra tekrar deneyin.");
+        if (!ikiAdim.Dogrula(j.Hesap, dto.Kod))
+        {
+            RegisterLoginFailure(kilit);
+            await Task.Delay(Random.Shared.Next(150, 450), cancellationToken);
+            return Unauthorized("Kod hatalı veya süresi geçmiş. Uygulamadaki güncel kodu girin.");
+        }
+        LoginAttempts.TryRemove(kilit, out _);
+        return await OturumAc(int.Parse(j.Hesap["hekim:".Length..]), cancellationToken);
+    }
+
+    // İlk girişte kurulum: QR kod ve elle girilecek anahtar.
+    [HttpPost("login/kurulum")]
+    public async Task<IActionResult> LoginKurulum([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken cancellationToken)
+    {
+        var j = ikiAdim.JetonCoz(dto.Jeton, "hekim:");
+        if (j == null) return Unauthorized("Süre doldu. Lütfen kullanıcı adı ve parolayla tekrar giriş yapın.");
+        if (ikiAdim.KuruluMu(j.Hesap)) return BadRequest("İki adımlı doğrulama zaten kurulu.");
+        var hekimId = int.Parse(j.Hesap["hekim:".Length..]);
+        var kullanici = await _db.Database.SqlQuery<string>($"""
+            SELECT "KullaniciAdi" AS "Value" FROM "HekimPortalHesaplari" WHERE "HekimId"={hekimId}
+            """).FirstOrDefaultAsync(cancellationToken) ?? "hekim";
+        return Ok(ikiAdim.KurulumBilgisi(j.Hesap, kullanici));
+    }
+
+    [HttpPost("login/kurulum-tamamla")]
+    public async Task<IActionResult> LoginKurulumTamamla([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken cancellationToken)
+    {
+        var j = ikiAdim.JetonCoz(dto.Jeton, "hekim:");
+        if (j?.KurulumAnahtari == null) return Unauthorized("Süre doldu. Lütfen tekrar giriş yapın.");
+        var kilit = "2fa:" + j.Hesap;
+        if (IsLoginBlocked(kilit, 5, out var bekle))
+            return StatusCode(StatusCodes.Status429TooManyRequests, $"Çok fazla hatalı kod. Yaklaşık {bekle} dakika sonra tekrar deneyin.");
+        if (ikiAdim.KuruluMu(j.Hesap)) return BadRequest("İki adımlı doğrulama zaten kurulu.");
+        if (!ikiAdim.KurulumuTamamla(j.Hesap, j.KurulumAnahtari, dto.Kod))
+        {
+            RegisterLoginFailure(kilit);
+            return Unauthorized("Kod doğrulanamadı. Uygulamaya eklediğiniz hesabın güncel kodunu girin.");
+        }
+        LoginAttempts.TryRemove(kilit, out _);
+        return await OturumAc(int.Parse(j.Hesap["hekim:".Length..]), cancellationToken);
+    }
+
+    private async Task<IActionResult> OturumAc(int hekimId, CancellationToken cancellationToken)
+    {
+        var account = await _db.Database.SqlQuery<PortalLoginRow>($"""
+            SELECT
+                p."Id",p."HekimId",p."KullaniciAdi",p."ParolaHash",p."ParolaSalt",p."Aktif",
+                h."AdSoyad" AS "HekimAdi",h."KlinikAdi",h."Aktif" AS "HekimAktif"
+            FROM "HekimPortalHesaplari" p
+            INNER JOIN "Hekimler" h ON h."Id"=p."HekimId"
+            WHERE p."HekimId"={hekimId}
+            LIMIT 1
+            """).FirstOrDefaultAsync(cancellationToken);
+        if (account == null || !account.Aktif || !account.HekimAktif)
+            return Unauthorized("Portal hesabı pasif.");
 
         var expiresUtc = DateTime.UtcNow.AddHours(12);
         var session = new PortalSession
@@ -1026,6 +1115,12 @@ public sealed class PortalAccountSaveDto
     public string? KullaniciAdi { get; set; }
     public string? YeniParola { get; set; }
     public bool Aktif { get; set; } = true;
+}
+
+public sealed class IkiAdimGirisDto
+{
+    public string? Jeton { get; set; }
+    public string? Kod { get; set; }
 }
 
 public sealed class PortalLoginDto

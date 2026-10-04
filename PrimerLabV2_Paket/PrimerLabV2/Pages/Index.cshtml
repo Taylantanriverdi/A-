@@ -4182,6 +4182,13 @@
                             </div>
                             <div class="field-help" style="margin-top:8px;">Portal ana yazılımla aynı PostgreSQL verisini kullanır. Gönderilen işler anında “Hekimden Gelenler / Onay Bekleyen” bölümüne düşer.</div>
                         </div>
+                        <div class="panel" style="margin-top:14px;padding:12px;">
+                            <div style="font-size:11px;color:#64748b;font-weight:700;">İKİ ADIMLI DOĞRULAMA</div>
+                            <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:7px;flex-wrap:wrap">
+                                <span id="hekimPortalIkiAdim" style="font-size:13px;font-weight:700">-</span>
+                                <button id="hekimPortalIkiAdimBtn" class="button button-light" type="button" style="display:none" onclick="ikiAdimSifirlaAdmin('hekim')">İki adımlı doğrulamayı sıfırla</button>
+                            </div>
+                        </div>
                         <div id="hekimPortalError" class="form-error" style="display:none;margin-top:12px;"></div>
                     </div>
                     <div class="modal-footer">
@@ -4494,6 +4501,31 @@
                         <button type="button" class="button" style="background:#dc2626;color:#fff;" onclick="tamSistemSifirla()">Tüm Yazılımı Sıfırla</button>
                     </div>
                     <div style="padding:0 22px 18px;color:#991b1b;font-size:13px;">İşlemden önce otomatik tam JSON yedeği ve operasyonel dosya güvenlik kopyası alınır. Yedek oluşturulamazsa sıfırlama başlamaz.</div>
+                </div>
+
+                <div class="panel" style="margin-top:16px;border-color:#c7d2fe">
+                  <div class="panel-header"><div><div class="panel-title">🔐 Portal Güvenliği — İki Adımlı Doğrulama</div><div class="page-subtitle">Hekim Portalı ve Teknisyen Paneli girişinde parolaya ek olarak telefondaki doğrulama uygulamasının (Google / Microsoft Authenticator) 6 haneli kodu istenir. Parola başkasının eline geçse bile tek başına giriş yapılamaz.</div></div></div>
+                  <div style="padding:14px 22px 18px">
+                    <label class="checkbox-line"><input id="ikiAdimZorunlu" type="checkbox" onchange="ikiAdimZorunluKaydet()" /> <span><b>Zorunlu</b> — kodu kurmamış hekim/teknisyen ilk girişte telefonuna kurmadan giremez (önerilir)</span></label>
+                    <div id="ikiAdimDurum" class="price-list-note" style="margin-top:8px">Durum kontrol ediliyor...</div>
+                    <div class="field-help" style="margin-top:6px">Telefonunu kaybeden veya değiştiren kişi için: Hekimler / Teknisyenler listesinde ilgili kişinin <b>Portal</b> / <b>Panel</b> hesabını açıp <b>İki adımlı doğrulamayı sıfırla</b>'ya basın; bir sonraki girişte yeni telefonuna kurar.</div>
+                  </div>
+                </div>
+
+                <div class="panel" style="margin-top:16px;border-color:#bbf7d0">
+                  <div class="panel-header"><div><div class="panel-title">🌙 Otomatik Yedek</div><div class="page-subtitle">Her gece belirlenen saatte tam veritabanı yedeği alınır (bilgisayar o saatte kapalıysa açıldıktan sonra). Yedekler “Tam Yedekten Geri Yükle” ile açılabilir.</div></div><button type="button" class="button button-blue" id="otomatikYedekSimdiBtn" onclick="otomatikYedekSimdi()">Şimdi Yedekle</button></div>
+                  <div style="padding:14px 22px 18px">
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+                      <label class="checkbox-line" style="margin:0"><input id="otomatikYedekAktif" type="checkbox" checked /> <span>Otomatik yedek açık</span></label>
+                      <div class="form-group" style="margin:0;min-width:120px"><label for="otomatikYedekSaat">Yedek saati</label><select id="otomatikYedekSaat"></select></div>
+                      <div class="form-group" style="margin:0;min-width:140px"><label for="otomatikYedekSakla">Saklanacak yedek</label><input id="otomatikYedekSakla" type="number" min="3" max="365" value="30" /></div>
+                      <div class="form-group" style="margin:0;flex:1;min-width:240px"><label for="otomatikYedekEk">İkinci klasör (USB disk, OneDrive vb. — isteğe bağlı)</label><input id="otomatikYedekEk" type="text" placeholder="ör. D:\Yedek  veya  C:\Users\...\OneDrive" /></div>
+                    </div>
+                    <label class="checkbox-line" style="margin-top:10px"><input id="otomatikYedekDosya" type="checkbox" /> <span>İkinci klasöre tarama/tasarım dosyalarını da kopyala (yalnız yeni ve değişenler)</span></label>
+                    <div style="margin-top:10px"><button type="button" class="button button-light" onclick="otomatikYedekKaydet()">Ayarları Kaydet</button></div>
+                    <div id="otomatikYedekDurum" class="price-list-note" style="margin-top:10px">Durum kontrol ediliyor...</div>
+                    <div id="otomatikYedekListe" style="margin-top:10px;max-height:220px;overflow:auto;font-size:13px"></div>
+                  </div>
                 </div>
 
                 <div class="panel" style="border-color:#bfdbfe">
@@ -4998,6 +5030,7 @@
                 <label style="display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:12px"><input id="teknisyenPanelAktif" type="checkbox" checked style="width:auto" /> Hesap aktif</label>
                 <div class="form-group"><label>Panel adresi</label><div style="display:flex;gap:8px"><input id="teknisyenPanelUrl" type="text" readonly /><button type="button" class="button button-light" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('teknisyenPanelUrl').value).then(()=>showSuccess('Adres kopyalandı.'))">Kopyala</button></div>
                     <div class="price-list-note" style="margin-top:6px">Teknisyen bu adresi aynı Wi-Fi'deki telefon/bilgisayardan açar. İnternet erişimi açıksa (PORTAL_INTERNET_AC.bat) aynı internet adresinin sonuna /teknisyen yazılarak her yerden girilir.</div></div>
+                <div class="form-group"><label>İki adımlı doğrulama</label><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span id="teknisyenPanelIkiAdim" style="font-size:13px;font-weight:700">-</span><button id="teknisyenPanelIkiAdimBtn" type="button" class="button button-light" style="display:none" onclick="ikiAdimSifirlaAdmin('teknisyen')">İki adımlı doğrulamayı sıfırla</button></div></div>
                 <div id="teknisyenPanelHata" class="form-error" style="display:none;"></div>
                 <div class="modal-footer">
                     <button type="button" class="button button-light" onclick="closeTeknisyenPanelModal()">Kapat</button>
@@ -13293,6 +13326,105 @@
             return {baslat,ciz,dur};
         })();
 
+        // ---------------- İki adımlı doğrulama (yönetim) ----------------
+        function ikiAdimDurumGoster(tur, d){
+            const el=document.getElementById(tur==='hekim'?'hekimPortalIkiAdim':'teknisyenPanelIkiAdim');
+            const btn=document.getElementById(tur==='hekim'?'hekimPortalIkiAdimBtn':'teknisyenPanelIkiAdimBtn');
+            if(!el||!btn) return;
+            if(!d){ el.innerText='-'; el.style.color=''; btn.style.display='none'; return; }
+            if(d.ikiAdimKurulu){ el.innerText='Kurulu ✓ (girişte telefon kodu isteniyor)'; el.style.color='#15803d'; btn.style.display=''; }
+            else if(d.ikiAdimZorunlu){ el.innerText='Henüz kurulmadı — ilk girişte telefonuna kuracak'; el.style.color='#b45309'; btn.style.display='none'; }
+            else { el.innerText='Kapalı (yalnız parola)'; el.style.color='#64748b'; btn.style.display='none'; }
+        }
+        async function ikiAdimSifirlaAdmin(tur){
+            const id=Number(document.getElementById(tur==='hekim'?'hekimPortalHekimId':'teknisyenPanelId').value||0);
+            if(!id) return;
+            if(!confirm('İki adımlı doğrulama sıfırlansın mı?\n\nKişi bir sonraki girişte parolasını girdikten sonra QR kodu yeni telefonuna okutarak yeniden kuracak. Telefonu kaybolduysa veya değiştiyse kullanın.')) return;
+            const yol=tur==='hekim'?'/api/hekim-portal/admin/account/':'/api/teknisyen-portal/admin/account/';
+            try{
+                const r=await fetch(yol+id+'/iki-adim',{method:'DELETE'});
+                if(!r.ok) throw new Error((await r.text())||'Sıfırlanamadı.');
+                const g=await fetch(yol+id,{cache:'no-store'});
+                if(g.ok) ikiAdimDurumGoster(tur, await g.json());
+                showSuccess('İki adımlı doğrulama sıfırlandı.');
+            }catch(e){ showError(e.message||'Sıfırlanamadı.'); }
+        }
+        async function ikiAdimAyarYukle(){
+            const el=document.getElementById('ikiAdimDurum'), cb=document.getElementById('ikiAdimZorunlu');
+            if(!el||!cb) return;
+            try{
+                const r=await fetch('/api/guvenlik/iki-adim',{cache:'no-store'});
+                if(!r.ok) throw new Error((await r.text())||'Durum alınamadı.');
+                const d=await r.json();
+                cb.checked=!!d.zorunlu;
+                el.innerText=d.zorunlu?'Açık: Hekim Portalı ve Teknisyen Paneli girişinde telefon kodu zorunlu.':'Kapalı: kodu kurmamış kişiler yalnız parolayla girebilir (önerilmez).';
+            }catch(e){ el.innerText=e.message||'Durum alınamadı.'; }
+        }
+        async function ikiAdimZorunluKaydet(){
+            const cb=document.getElementById('ikiAdimZorunlu');
+            if(!cb.checked && !confirm('İki adımlı doğrulama zorunluluğu kapatılsın mı?\n\nPortal adresi internete açıkken bu önerilmez: parolası ele geçen biri giriş yapabilir.')){ cb.checked=true; return; }
+            try{
+                const r=await fetch('/api/guvenlik/iki-adim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zorunlu:cb.checked})});
+                if(!r.ok) throw new Error((await r.text())||'Kaydedilemedi.');
+                await ikiAdimAyarYukle();
+                showSuccess(cb.checked?'İki adımlı doğrulama zorunlu.':'İki adımlı doğrulama zorunluluğu kapatıldı.');
+            }catch(e){ showError(e.message||'Kaydedilemedi.'); await ikiAdimAyarYukle(); }
+        }
+
+        // ---------------- Otomatik yedek ----------------
+        function otomatikYedekBoyut(b){ b=Number(b||0); return b>=1048576?(b/1048576).toFixed(1)+' MB':Math.max(1,Math.round(b/1024))+' KB'; }
+        async function otomatikYedekYukle(){
+            const durum=document.getElementById('otomatikYedekDurum'); if(!durum) return;
+            const saat=document.getElementById('otomatikYedekSaat');
+            if(saat && !saat.options.length){ for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=String(h); o.textContent=String(h).padStart(2,'0')+':00'; saat.appendChild(o);} }
+            try{
+                const r=await fetch('/api/otomatik-yedek',{cache:'no-store'});
+                if(!r.ok) throw new Error((await r.text())||'Durum alınamadı.');
+                const d=await r.json();
+                document.getElementById('otomatikYedekAktif').checked=!!d.aktif;
+                saat.value=String(d.saat??2);
+                document.getElementById('otomatikYedekSakla').value=String(d.saklanacak??30);
+                document.getElementById('otomatikYedekEk').value=d.ekKlasor||'';
+                document.getElementById('otomatikYedekDosya').checked=!!d.dosyalariDaYedekle;
+                const son=d.sonYedek?new Date(d.sonYedek).toLocaleString('tr-TR'):'henüz yok';
+                durum.innerText=(d.aktif?'Açık · her gün '+String(d.saat).padStart(2,'0')+':00 sonrası':'KAPALI')+' · Son yedek: '+son+(d.sonDurum?' — '+d.sonDurum:'')+'\nKlasör: '+(d.klasor||'-');
+                durum.style.color=d.sonBasarili===false?'#b91c1c':'';
+                const liste=document.getElementById('otomatikYedekListe'); liste.innerHTML='';
+                const yedekler=d.yedekler||[];
+                if(!yedekler.length){ liste.innerHTML='<div style="color:#64748b">Henüz otomatik yedek yok.</div>'; return; }
+                yedekler.forEach(y=>{
+                    const row=document.createElement('div');
+                    row.style.cssText='display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #eef2f7';
+                    const ad=document.createElement('span'); ad.textContent=new Date(y.tarih).toLocaleString('tr-TR')+' · '+otomatikYedekBoyut(y.boyut);
+                    const a=document.createElement('a'); a.href='/api/otomatik-yedek/indir/'+encodeURIComponent(y.ad); a.textContent='İndir'; a.style.fontWeight='800';
+                    row.appendChild(ad); row.appendChild(a); liste.appendChild(row);
+                });
+            }catch(e){ durum.innerText=e.message||'Durum alınamadı.'; }
+        }
+        async function otomatikYedekKaydet(){
+            try{
+                const r=await fetch('/api/otomatik-yedek',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+                    aktif:document.getElementById('otomatikYedekAktif').checked,
+                    saat:Number(document.getElementById('otomatikYedekSaat').value||2),
+                    saklanacak:Number(document.getElementById('otomatikYedekSakla').value||30),
+                    ekKlasor:document.getElementById('otomatikYedekEk').value.trim()||null,
+                    dosyalariDaYedekle:document.getElementById('otomatikYedekDosya').checked})});
+                if(!r.ok) throw new Error((await r.text())||'Ayarlar kaydedilemedi.');
+                await otomatikYedekYukle();
+                showSuccess('Otomatik yedek ayarları kaydedildi.');
+            }catch(e){ showError(e.message||'Ayarlar kaydedilemedi.'); }
+        }
+        async function otomatikYedekSimdi(){
+            const btn=document.getElementById('otomatikYedekSimdiBtn'); btn.disabled=true; btn.innerText='Yedekleniyor...';
+            try{
+                const r=await fetch('/api/otomatik-yedek/simdi',{method:'POST'});
+                const t=await r.text();
+                if(!r.ok) throw new Error(t||'Yedek alınamadı.');
+                showSuccess('Yedek alındı.');
+            }catch(e){ showError(e.message||'Yedek alınamadı.'); }
+            finally{ btn.disabled=false; btn.innerText='Şimdi Yedekle'; await otomatikYedekYukle(); }
+        }
+
         // ---------------- Teknisyen Paneli hesabı ----------------
         async function openTeknisyenPanelModal(id){
             const t=teknisyenler.find(x=>Number(x.id)===Number(id)); if(!t) return;
@@ -13301,6 +13433,7 @@
             document.getElementById('teknisyenPanelAlt').innerText=t.adSoyad||'-';
             document.getElementById('teknisyenPanelPass').value='';
             document.getElementById('teknisyenPanelModal').style.display='flex';
+            ikiAdimDurumGoster('teknisyen', null);
             try{
                 const r=await fetch('/api/teknisyen-portal/admin/account/'+Number(id),{cache:'no-store'});
                 if(!r.ok) throw new Error((await r.text())||'Hesap bilgisi alınamadı.');
@@ -13308,6 +13441,7 @@
                 document.getElementById('teknisyenPanelUser').value=d.kullaniciAdi||'';
                 document.getElementById('teknisyenPanelTip').value=d.tip==='dis'?'dis':'ic';
                 document.getElementById('teknisyenPanelAktif').checked=d.aktif!==false;
+                ikiAdimDurumGoster('teknisyen', d);
                 document.getElementById('teknisyenPanelPassNot').innerText=d.hesapVar?'(değiştirmeyecekseniz boş bırakın)':'(yeni hesap için zorunlu)';
                 let adres=window.location.origin+'/teknisyen';
                 try{ const pr=await fetch('/api/hekim-portal/admin/account/'+Number((hekimler[0]||{}).id||0),{cache:'no-store'}); if(pr.ok){ const pd=await pr.json(); const a=(pd.portalAdresleri||[])[0]; if(a) adres=a.replace(/\/hekim-portal$/,'/teknisyen'); } }catch{}
@@ -15048,6 +15182,8 @@ function togglePrimerAi(){
 
             await loadAnayasaData();
             await primerAiDurumYukle();
+            ikiAdimAyarYukle();
+            otomatikYedekYukle();
         }
 
         async function durumKaydet() {
@@ -17257,6 +17393,7 @@ function togglePrimerAi(){
             document.getElementById("hekimPortalUser").value = "";
             document.getElementById("hekimPortalPass").value = "";
             document.getElementById("hekimPortalActive").checked = true;
+            ikiAdimDurumGoster("hekim", null);
             document.getElementById("hekimPortalUrl").value =
                 window.location.origin + "/hekim-portal";
             modal.style.display = "flex";
@@ -17267,6 +17404,7 @@ function togglePrimerAi(){
                 const d = await r.json();
                 document.getElementById("hekimPortalUser").value = d.kullaniciAdi || "";
                 document.getElementById("hekimPortalActive").checked = d.aktif !== false;
+                ikiAdimDurumGoster("hekim", d);
                 if (Array.isArray(d.portalAdresleri) && d.portalAdresleri.length) {
                     document.getElementById("hekimPortalUrl").value = d.portalAdresleri[0];
                 }

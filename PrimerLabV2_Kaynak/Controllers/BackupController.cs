@@ -444,7 +444,10 @@ public sealed class BackupController : ControllerBase
         return "py";
     }
 
-    private async Task<JsonObject> BuildBackupDocument()
+    private Task<JsonObject> BuildBackupDocument() => YedekBelgesiOlustur(_db);
+
+    // Tam yedek belgesi; otomatik gece yedeği de aynı biçimi kullanır (Geri Yükle ile açılabilir).
+    internal static async Task<JsonObject> YedekBelgesiOlustur(PrimerLabDbContext _db)
     {
         var root = new JsonObject
         {

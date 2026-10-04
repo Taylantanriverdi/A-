@@ -169,3 +169,37 @@ Mesajlar, Teknisyen detayi vb.) dosyasi olan her isin hasta adinin yaninda:
   dosyalarin listesi vardir; tek tek indirilebilir, uzerine gelinen dosya
   onizlenir. Buyuk taramalar ilk acilista birkac saniye hazirlanir, sonra
   aninda acilir. (3Shape DCM ve ZIP dosyalari onizlenemez, indirilebilir.)
+
+IKI ADIMLI DOGRULAMA (Hekim Portali ve Teknisyen Paneli)
+-------------------------------------------------------
+Portal internete acikken parola tek basina yetmez: girerken telefondaki
+dogrulama uygulamasinin 6 haneli kodu da istenir. Parola baskasinin eline
+gecse bile kod olmadan giris yapilamaz.
+
+Hekim / teknisyen icin ILK GIRIS (bir kez):
+1. Telefona "Google Authenticator" veya "Microsoft Authenticator" kurulur
+   (App Store / Google Play, ucretsiz).
+2. Portalda kullanici adi + parola girilir; ekranda QR kod cikar.
+3. Uygulamada "+" > "QR kodu tara" ile kod okutulur (portal ayni telefonda
+   aciksa "dogrulama uygulamasinda ac" baglantisina dokunmak yeterli).
+4. Uygulamada gorunen 6 haneli kod girilip "Onayla"ya basilir.
+Sonraki girislerde: kullanici adi + parola, ardindan uygulamadaki guncel kod.
+
+Telefon kayboldu / degisti: Hekimler > hekim > "Portal" (ya da Teknisyenler >
+teknisyen > "Panel Hesabi") > "Iki adimli dogrulamayi sifirla". Kisi bir
+sonraki giriste QR kodu yeni telefonuna okutur.
+Ayarlar > "Portal Guvenligi" kartinda zorunluluk acilip kapatilabilir
+(internete acikken ACIK birakilmasi onerilir). Telefon saati otomatik
+olmalidir; saat yanlissa kod kabul edilmez.
+
+OTOMATIK YEDEK
+--------------
+Her gun belirlenen saatten sonra (varsayilan 02:00; bilgisayar o saatte
+kapaliysa acildiktan sonra) tam veritabani yedegi alinir:
+  C:\PrimerLab\Yedekler\Otomatik\PrimerLab_OtomatikYedek_TARIH.json
+Son 30 yedek saklanir, eskiler silinir. Ayarlar > "Otomatik Yedek" kartinda:
+- saat, saklanacak yedek sayisi, "Simdi Yedekle", yedekleri indirme,
+- IKINCI KLASOR (onerilir): USB disk veya OneDrive klasoru yazilirsa her
+  yedek oraya da kopyalanir. Bilgisayar bozulsa/calinsa bile yedek kalir.
+  Istenirse tarama/tasarim dosyalari da (yalniz yeni ve degisenler) kopyalanir.
+Geri yukleme: Ayarlar > "Tam Yedekten Geri Yukle" > yedek .json dosyasi.
