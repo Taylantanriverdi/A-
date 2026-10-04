@@ -4,30 +4,9 @@ using PrimerLabV2.Infrastructure;
 
 namespace PrimerLabV2.Controllers;
 
-/// <summary>Portal güvenliği (iki adımlı doğrulama zorunluluğu) — yalnız ana bilgisayardan.</summary>
-[ApiController]
-[Route("api/guvenlik")]
-public sealed class GuvenlikController : ControllerBase
+/// <summary>Yalnız ana bilgisayardan yapılabilen yönetim işleri için ortak denetim.</summary>
+internal static class GuvenlikController
 {
-    private readonly IkiAdimDogrulama _ikiAdim;
-
-    public GuvenlikController(IkiAdimDogrulama ikiAdim) => _ikiAdim = ikiAdim;
-
-    [HttpGet("iki-adim")]
-    public IActionResult Getir()
-    {
-        if (!AnaBilgisayar(HttpContext)) return Yasak();
-        return Ok(new { zorunlu = _ikiAdim.Zorunlu });
-    }
-
-    [HttpPost("iki-adim")]
-    public IActionResult Kaydet([FromBody] IkiAdimAyarDto dto)
-    {
-        if (!AnaBilgisayar(HttpContext)) return Yasak();
-        _ikiAdim.ZorunluAyarla(dto.Zorunlu);
-        return Ok(new { zorunlu = _ikiAdim.Zorunlu });
-    }
-
     internal static bool AnaBilgisayar(HttpContext context)
     {
         var ip = context.Connection.RemoteIpAddress;
@@ -37,11 +16,6 @@ public sealed class GuvenlikController : ControllerBase
 
     internal static ObjectResult Yasak() =>
         new("Bu ayar yalnız ana Primer Lab bilgisayarından değiştirilebilir.") { StatusCode = StatusCodes.Status403Forbidden };
-}
-
-public sealed class IkiAdimAyarDto
-{
-    public bool Zorunlu { get; set; }
 }
 
 /// <summary>Otomatik gece yedeği ayarları, elle yedek ve yedek indirme.</summary>

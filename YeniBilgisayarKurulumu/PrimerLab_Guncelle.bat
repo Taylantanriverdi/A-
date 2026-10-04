@@ -53,6 +53,8 @@ echo [3/4] Yeni surum derleniyor...
 rem /MIR kullanilmaz: eski bilgisayardan gelen ek sayfalar korunur.
 robocopy "%KIT%kaynak\PrimerLabV2" "%KAYNAK%" /E /IS /IT /XD bin obj /NFL /NDL /NJH /NJS /NP >nul
 if errorlevel 8 goto GERI_AL
+rem Yeni surumde kaldirilan kaynak dosyalari silinir (kalirsa derleme bozulur).
+if exist "%KAYNAK%\Infrastructure\IkiAdimDogrulama.cs" del /f /q "%KAYNAK%\Infrastructure\IkiAdimDogrulama.cs"
 rem Eski Hekim Portali sayfalari kaldirilir: yeni portal HekimPortali.cshtml ile gelir;
 rem ayni adresi kullanan iki sayfa olursa program acilmaz.
 powershell -NoProfile -Command "Get-ChildItem -Path (Join-Path $env:KAYNAK 'Pages') -Filter *.cshtml -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'HekimPortali.cshtml' -and $_.Name -ne 'TeknisyenPaneli.cshtml' -and (Select-String -Path $_.FullName -Pattern '^\s*@page\s+.?/(hekim-portal|teknisyen)' -Quiet) } | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force; Remove-Item -LiteralPath ($_.FullName + '.cs') -Force -ErrorAction SilentlyContinue }"

@@ -170,27 +170,48 @@ Mesajlar, Teknisyen detayi vb.) dosyasi olan her isin hasta adinin yaninda:
   onizlenir. Buyuk taramalar ilk acilista birkac saniye hazirlanir, sonra
   aninda acilir. (3Shape DCM ve ZIP dosyalari onizlenemez, indirilebilir.)
 
-IKI ADIMLI DOGRULAMA (Hekim Portali ve Teknisyen Paneli)
--------------------------------------------------------
-Portal internete acikken parola tek basina yetmez: girerken telefondaki
-dogrulama uygulamasinin 6 haneli kodu da istenir. Parola baskasinin eline
-gecse bile kod olmadan giris yapilamaz.
+PORTAL HESAPLARI: KENDI KENDINE KAYIT VE E-POSTA KODU
+----------------------------------------------------
+Hekimler ve teknisyenler laboratuvara ihtiyac duymadan kendi kullanici adi ve
+sifrelerini olusturur:
+  Portal adresi > "Hesabiniz yok mu? Kayit olun" > bilgiler + kullanici adi +
+  sifre > e-postaya gelen 6 haneli kod > hesap acilir.
+Giriste: kullanici adi + sifre, ardindan e-postaya gelen kod ("Bu cihazi 30
+gun hatirla" secilirse o cihazda 30 gun kod sorulmaz).
+Sifresini unutan: "Sifremi unuttum" > kullanici adi veya e-posta > e-postaya
+gelen kod > yeni sifre.
 
-Hekim / teknisyen icin ILK GIRIS (bir kez):
-1. Telefona "Google Authenticator" veya "Microsoft Authenticator" kurulur
-   (App Store / Google Play, ucretsiz).
-2. Portalda kullanici adi + parola girilir; ekranda QR kod cikar.
-3. Uygulamada "+" > "QR kodu tara" ile kod okutulur (portal ayni telefonda
-   aciksa "dogrulama uygulamasinda ac" baglantisina dokunmak yeterli).
-4. Uygulamada gorunen 6 haneli kod girilip "Onayla"ya basilir.
-Sonraki girislerde: kullanici adi + parola, ardindan uygulamadaki guncel kod.
+ILK KURULUM (bir kez): Portal Hesaplari > "E-posta Gonderimi"
+  Gmail icin: Google Hesabi > Guvenlik > 2 Adimli Dogrulama'yi acin >
+  "Uygulama sifreleri" > 16 haneli sifre olusturun. Gmail dugmesine basin,
+  e-posta adresinizi ve bu uygulama sifresini yazip kaydedin, "Deneme Gonder".
+  E-posta ayari yapilmadan kayit alinmaz ve giris kodu gonderilemez
+  (girisler yalniz sifreyle olur).
 
-Telefon kayboldu / degisti: Hekimler > hekim > "Portal" (ya da Teknisyenler >
-teknisyen > "Panel Hesabi") > "Iki adimli dogrulamayi sifirla". Kisi bir
-sonraki giriste QR kodu yeni telefonuna okutur.
-Ayarlar > "Portal Guvenligi" kartinda zorunluluk acilip kapatilabilir
-(internete acikken ACIK birakilmasi onerilir). Telefon saati otomatik
-olmalidir; saat yanlissa kod kabul edilmez.
+YONETIM: menude "Portal Hesaplari"
+- Tum hekim/teknisyen hesaplari: kullanici adi, e-posta, telefon, kayit ve son
+  giris tarihi, kendi kaydi mi laboratuvar mi.
+- Aktif / Pasif yap, Onayla (onay istendiyse), E-posta degistir.
+- "Sifre belirle": yeni sifre verirsiniz (bos birakilirsa guclu sifre uretilir),
+  sifre bir kez gosterilir. Mevcut sifreler guvenlik geregi geri cevrilemez
+  bicimde saklanir; kimse (yonetici dahil) okuyamaz.
+- "Hekime bagla": kendi kaydini yapan hekim laboratuvarda zaten kayitliysa
+  mevcut hekim kartina baglanir (fiyat listesi ve isleri gorunur).
+- Ayarlar: kayit alimi acik/kapali, yeni kayitlar onay beklesin, giriste
+  e-posta kodu, cihaz hatirlama suresi, kendi kaydini yapan teknisyen tipi.
+
+YOGUNLUK / SAHTE BASVURU KORUMASI
+- Her basvuruda tarayici kisa bir "is kaniti" hesaplar (insan icin ~1 sn);
+  basvuru yogunlastikca zorluk otomatik artar. Gizli tuzak alani botlari ayiklar.
+- Ayni baglantidan 10 dakikada en fazla 5, gunde 30 basvuru; tumunde saatte
+  en fazla 200 (ayarlanabilir). Fazlasina "sistem yogun" denir, sunucu yavaslamaz.
+- Hesap ancak e-postadaki kod girilince acilir; dogrulanmayan basvuru kayit
+  olusturmaz. Kodlar 10 dk gecerli, 5 hatali denemede gecersiz olur.
+- E-postalar sirayla ve dakika/gun sinirina uyularak gonderilir (Gmail hesabi
+  kilitlenmez). Giris kodlari oncelikli gider ve gunluk sinirin %40'i onlara
+  ayrilir: toplu sahte basvuru gercek kullanicilarin girisini engelleyemez.
+- Parola ozetleme ayni anda cekirdek sayisi kadar yapilir; yuzlerce esanli
+  istek islemciyi kilitlemez.
 
 OTOMATIK YEDEK
 --------------

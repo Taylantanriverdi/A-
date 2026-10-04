@@ -24,14 +24,16 @@
         .login{min-height:100vh;display:grid;place-items:center;padding:16px}
         .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
         .login-card h1{font-size:20px;margin:18px 0 4px}
-        .ika-bilgi{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45}
-        .ika-qr{display:grid;place-items:center;margin:4px 0 10px}
-        .ika-qr svg{width:200px;height:200px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px}
-        .ika-link{display:block;text-align:center;font-size:13px;font-weight:800;color:var(--blue);margin-bottom:8px}
-        .ika-anahtar{font-size:12px;color:var(--muted);margin-bottom:12px;word-break:break-all}
-        .ika-anahtar code{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:.5px}
-        .ika-kod{font-size:24px!important;letter-spacing:6px;text-align:center;font-weight:900}
-        .ika-geri{background:none;border:0;color:var(--muted);font-weight:800;cursor:pointer;margin-top:10px;width:100%;font-size:13px}
+        .pk-alt{display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
+        .pk-link{background:none;border:0;color:var(--blue);font-weight:800;cursor:pointer;padding:4px 0;font-size:13px}
+        .pk-geri{display:block;width:100%;text-align:center;margin-top:12px;color:var(--muted)}
+        .pk-bilgi{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+        .pk-kod{font-size:24px!important;letter-spacing:6px;text-align:center;font-weight:900}
+        .pk-onay{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#334155;margin:4px 0 14px;line-height:1.4;cursor:pointer}
+        .pk-onay input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:var(--blue)}
+        .pk-gizli{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+        .pk-iki{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .pk-iki .field{margin-bottom:12px}
         .login-card p{margin:0 0 18px;color:var(--muted);font-size:13px}
         .topbar{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff}
         .topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;padding-bottom:10px}
@@ -128,22 +130,124 @@
         </div>
         </div>
         <div id="kodAdimi" class="hidden">
-            <div id="kurulumAlani" class="hidden">
-                <p class="ika-bilgi"><b>Güvenliğiniz için bir kez kurulum:</b> Telefonunuza <b>Google Authenticator</b> veya <b>Microsoft Authenticator</b> uygulamasını kurun. Uygulamada <b>+</b> &rarr; <b>QR kodu tara</b> deyip aşağıdaki kodu okutun.</p>
-                <div id="kurulumQr" class="ika-qr"></div>
-                <a id="kurulumLink" class="ika-link" href="#">Bu telefondaysanız: doğrulama uygulamasında aç</a>
-                <div class="ika-anahtar">QR okutamıyorsanız uygulamaya elle girin: <code id="kurulumAnahtar"></code></div>
+            <div id="pkEpostaAlani" class="hidden">
+                <p class="pk-bilgi">Güvenliğiniz için girişte e-posta adresinize tek kullanımlık kod gönderiyoruz. Bir kez e-posta adresinizi yazın ve gelen kodla onaylayın.</p>
+                <div class="field">
+                    <label class="lbl" for="pkGirisEposta">E-posta adresiniz</label>
+                    <input id="pkGirisEposta" class="inp" type="email" autocomplete="email" placeholder="ornek@@klinik.com" />
+                </div>
             </div>
-            <p id="kodAciklama" class="ika-bilgi">Telefonunuzdaki doğrulama uygulamasında <b>Primer Dental Lab</b> için görünen 6 haneli kodu girin.</p>
-            <div class="field">
-                <label class="lbl" for="loginKod">Doğrulama kodu</label>
-                <input id="loginKod" class="inp ika-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+            <div id="pkKodAlani" class="hidden">
+                <p id="pkKodBilgi" class="pk-bilgi"></p>
+                <div class="field">
+                    <label class="lbl" for="pkGirisKod">E-postadaki 6 haneli kod</label>
+                    <input id="pkGirisKod" class="inp pk-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+                </div>
+                <label id="pkHatirlaSatir" class="pk-onay"><input id="pkHatirla" type="checkbox" /> <span id="pkHatirlaMetin">Bu cihazı hatırla</span></label>
+                <button type="button" class="pk-link" onclick="pkKodTekrar()">Kod gelmedi mi? Tekrar gönder</button>
             </div>
         </div>
         <button id="loginBtn" class="btn btn-block" type="submit">Giriş Yap</button>
-        <button id="ikaGeri" class="ika-geri hidden" type="button" onclick="ikiAdimSifirla()">&larr; Kullanıcı adı ve parolaya dön</button>
+        <div id="pkAltLinkler" class="pk-alt">
+            <button type="button" class="pk-link hidden" id="pkSifreLink" onclick="pkEkran('sifre')">Şifremi unuttum</button>
+            <button type="button" class="pk-link hidden" id="pkKayitLink" onclick="pkEkran('kayit')">Hesabınız yok mu? Kayıt olun</button>
+        </div>
+        <button id="pkGirisGeri" class="pk-link pk-geri hidden" type="button" onclick="pkGirisSifirla();pkMsg('loginMsg','')">&larr; Kullanıcı adı ve şifreye dön</button>
     </form>
 </section>
+
+<!-- KAYIT OL -->
+<section id="kayitScreen" class="login hidden">
+    <form class="login-card" onsubmit="pkKayit(event)">
+        <div class="brand">
+            <div class="brand-logo">PL</div>
+            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+        </div>
+        <h1>Yeni hesap</h1>
+        <p>Bilgilerinizi doldurun; e-postanıza gelen kodla hesabınızı onaylayın. Kullanıcı adınızı ve şifrenizi kendiniz belirlersiniz.</p>
+        <div id="kayitMsg" class="msg err hidden"></div>
+        <div id="kayitForm">
+            <div class="field">
+                <label class="lbl" for="kAdSoyad">Ad soyad</label>
+                <input id="kAdSoyad" class="inp" autocomplete="name" maxlength="150" required />
+            </div>
+            <div class="pk-iki">
+                <div class="field">
+                    <label class="lbl" for="kTelefon">Telefon</label>
+                    <input id="kTelefon" class="inp" type="tel" autocomplete="tel" maxlength="30" />
+                </div>
+                <div class="field">
+                    <label class="lbl" for="kEposta">E-posta</label>
+                    <input id="kEposta" class="inp" type="email" autocomplete="email" maxlength="160" required />
+                </div>
+            </div>
+            <div class="field">
+                <label class="lbl" for="kKullanici">Kullanıcı adı</label>
+                <input id="kKullanici" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" pattern="[a-zA-Z0-9._\-]{3,64}" title="3-64 karakter: harf, rakam, nokta, alt çizgi, tire" required />
+            </div>
+            <div class="pk-iki">
+                <div class="field">
+                    <label class="lbl" for="kParola">Şifre</label>
+                    <input id="kParola" class="inp" type="password" autocomplete="new-password" minlength="8" required />
+                </div>
+                <div class="field">
+                    <label class="lbl" for="kParola2">Şifre (tekrar)</label>
+                    <input id="kParola2" class="inp" type="password" autocomplete="new-password" minlength="8" required />
+                </div>
+            </div>
+            <p class="pk-bilgi" style="margin-top:-4px">Şifre en az 8 karakter; en az bir harf ve bir rakam.</p>
+            <div class="pk-gizli" aria-hidden="true"><label>Web sitesi <input id="kWebsite" tabindex="-1" autocomplete="off" /></label></div>
+            <label class="pk-onay"><input id="kKvkk" type="checkbox" /> <span>Ad, telefon ve e-posta bilgilerimin iş takibi ve iletişim amacıyla Primer Dental Lab tarafından işlenmesini kabul ediyorum.</span></label>
+        </div>
+        <div id="kayitKodAlani" class="hidden">
+            <p id="kayitKodBilgi" class="pk-bilgi"></p>
+            <div class="field">
+                <label class="lbl" for="kKod">E-postadaki 6 haneli kod</label>
+                <input id="kKod" class="inp pk-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+            </div>
+        </div>
+        <button id="kayitBtn" class="btn btn-block" type="submit">Kayıt Ol</button>
+        <button type="button" class="pk-link pk-geri" onclick="pkEkran('login')">&larr; Girişe dön</button>
+    </form>
+</section>
+
+<!-- ŞİFREMİ UNUTTUM -->
+<section id="sifreScreen" class="login hidden">
+    <form class="login-card" onsubmit="pkSifre(event)">
+        <div class="brand">
+            <div class="brand-logo">PL</div>
+            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+        </div>
+        <h1>Şifremi unuttum</h1>
+        <p>Kullanıcı adınızı veya kayıtlı e-posta adresinizi yazın; e-postanıza şifre yenileme kodu gönderelim.</p>
+        <div id="sifreMsg" class="msg err hidden"></div>
+        <div id="sifreAdim1">
+            <div class="field">
+                <label class="lbl" for="sKimlik">Kullanıcı adı veya e-posta</label>
+                <input id="sKimlik" class="inp" autocapitalize="none" spellcheck="false" maxlength="160" />
+            </div>
+        </div>
+        <div id="sifreAdim2" class="hidden">
+            <div class="field">
+                <label class="lbl" for="sKod">E-postadaki 6 haneli kod</label>
+                <input id="sKod" class="inp pk-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+            </div>
+            <div class="pk-iki">
+                <div class="field">
+                    <label class="lbl" for="sYeni">Yeni şifre</label>
+                    <input id="sYeni" class="inp" type="password" autocomplete="new-password" />
+                </div>
+                <div class="field">
+                    <label class="lbl" for="sYeni2">Yeni şifre (tekrar)</label>
+                    <input id="sYeni2" class="inp" type="password" autocomplete="new-password" />
+                </div>
+            </div>
+        </div>
+        <button id="sifreBtn" class="btn btn-block" type="submit">Kod Gönder</button>
+        <button type="button" class="pk-link pk-geri" onclick="pkEkran('login')">&larr; Girişe dön</button>
+    </form>
+</section>
+
 
 <div id="appScreen" class="hidden">
     <header class="topbar">
@@ -215,8 +319,7 @@
     function girisEkrani() {
         clearInterval(yenilemeZamani);
         $("appScreen").classList.add("hidden");
-        $("loginScreen").classList.remove("hidden");
-        if (typeof ikiAdimSifirla === "function") ikiAdimSifirla();
+        pkEkran("login");
         setTimeout(() => $("loginUser").focus(), 50);
     }
 
@@ -225,80 +328,232 @@
         const m = $("loginMsg"); m.classList.add("hidden");
         const btn = $("loginBtn"); btn.disabled = true; btn.textContent = "Giriş yapılıyor...";
         try {
-            if (ikiAdim) { await kodGonder(); return; }
+            if (pkGiris) { await pkKodAdimi(); return; }
             const r = await fetch("/api/teknisyen-portal/login", {
                 method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
                 body: JSON.stringify({ kullaniciAdi: $("loginUser").value.trim(), parola: $("loginPass").value })
             });
             if (!r.ok) throw new Error((await r.text()) || "Giriş yapılamadı.");
             $("loginPass").value = "";
-            await girisCevabi(await r.json().catch(() => ({})));
+            await pkGirisCevabi(await r.json().catch(() => ({})));
         } catch (err) { m.textContent = err.message; m.classList.remove("hidden"); }
-        finally { btn.disabled = false; btn.textContent = ikiAdim ? (ikiAdim.tur === "kurulum-qr" ? "Onayla" : "Doğrula") : "Giriş Yap"; }
+        finally { btn.disabled = false; btn.textContent = pkButon(); }
     }
 
-    // ---------- İki adımlı doğrulama (parola + telefondaki 6 haneli kod) ----------
-    let ikiAdim = null; // { tur: "kod" | "kurulum-qr", jeton }
-    function ikiAdimSifirla() {
-        ikiAdim = null;
-        $("sifreAdimi").classList.remove("hidden");
-        $("kodAdimi").classList.add("hidden");
-        $("ikaGeri").classList.add("hidden");
-        $("loginUser").required = true; $("loginPass").required = true;
-        $("loginKod").value = "";
-        $("loginBtn").textContent = "Giriş Yap";
+    // ---------- Giriş: e-posta kodu, kendi kendine kayıt, şifremi unuttum ----------
+    const PK_API = "/api/teknisyen-portal";
+    let pkGiris = null;      // parola sonrası adım: { tur: "eposta-gir" | "eposta-kod", jeton, ... }
+    let pkKayitJeton = null; // kayıtta e-posta kodu bekleniyor
+    let pkSifreJeton = null; // şifre yenilemede kod bekleniyor
+    function pkMsg(id, text, tur) {
+        const m = $(id);
+        if (!text) { m.classList.add("hidden"); return; }
+        m.className = "msg " + (tur || "err");
+        m.textContent = text;
     }
-    function ikiAdimGoster(d) {
-        ikiAdim = { tur: d.ikiAdim, jeton: d.jeton };
-        const kurulum = d.ikiAdim === "kurulum-qr";
-        $("sifreAdimi").classList.add("hidden");
-        $("kodAdimi").classList.remove("hidden");
-        $("ikaGeri").classList.remove("hidden");
-        $("kurulumAlani").classList.toggle("hidden", !kurulum);
-        $("loginUser").required = false; $("loginPass").required = false;
-        if (kurulum) {
-            $("kurulumQr").innerHTML = d.qrSvg || "";
-            $("kurulumLink").href = d.otpauth || "#";
-            $("kurulumAnahtar").textContent = d.anahtar || "";
-            $("kodAciklama").innerHTML = "Uygulamaya eklendikten sonra görünen <b>6 haneli kodu</b> girip <b>Onayla</b>'ya basın. Sonraki girişlerde yalnız bu kod istenir.";
-        } else {
-            $("kodAciklama").innerHTML = "Telefonunuzdaki doğrulama uygulamasında <b>Primer Dental Lab</b> için görünen 6 haneli kodu girin.";
-        }
-        $("loginKod").value = "";
-        setTimeout(() => $("loginKod").focus(), 50);
-    }
-    async function ikiAdimPost(yol, govde) {
-        const r = await fetch("/api/teknisyen-portal" + yol, {
+    async function pkPost(yol, govde) {
+        const r = await fetch(PK_API + yol, {
             method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
-            body: JSON.stringify(govde)
+            body: JSON.stringify(govde || {})
         });
         const metin = await r.text();
         if (!r.ok) {
             const err = new Error(metin || "İşlem başarısız.");
-            err.sureDoldu = r.status === 401 && metin.startsWith("Süre doldu");
+            err.sureDoldu = r.status === 401 && /^(Süre doldu|Çok fazla hatalı kod)/.test(metin);
             throw err;
         }
         try { return JSON.parse(metin); } catch { return {}; }
     }
-    // Parola cevabına göre: oturum açıldı / kod iste / ilk kurulum ekranı.
-    async function girisCevabi(d) {
-        if (d && d.ikiAdim === "kod") { ikiAdimGoster(d); return; }
-        if (d && d.ikiAdim === "kurulum") { ikiAdimGoster(await ikiAdimPost("/login/kurulum", { jeton: d.jeton })); return; }
-        ikiAdimSifirla();
+    function pkEkran(ad) {
+        $("loginScreen").classList.toggle("hidden", ad !== "login");
+        $("kayitScreen").classList.toggle("hidden", ad !== "kayit");
+        $("sifreScreen").classList.toggle("hidden", ad !== "sifre");
+        pkMsg("kayitMsg", ""); pkMsg("sifreMsg", "");
+        if (ad === "kayit") { pkKayitJeton = null; $("kayitForm").classList.remove("hidden"); $("kayitKodAlani").classList.add("hidden"); $("kayitBtn").textContent = "Kayıt Ol"; setTimeout(() => $("kAdSoyad").focus(), 50); }
+        if (ad === "sifre") { pkSifreJeton = null; $("sifreAdim1").classList.remove("hidden"); $("sifreAdim2").classList.add("hidden"); $("sifreBtn").textContent = "Kod Gönder"; setTimeout(() => $("sKimlik").focus(), 50); }
+        if (ad === "login") { pkGirisSifirla(); pkDurumYukle(); }
+    }
+    async function pkDurumYukle() {
+        try {
+            const d = await (await fetch(PK_API + "/kayit/durum", { cache: "no-store" })).json();
+            $("pkKayitLink").classList.toggle("hidden", !d.kayitAcik);
+            $("pkSifreLink").classList.toggle("hidden", !d.sifreSifirlama);
+        } catch {}
+    }
+    function pkButon() {
+        return !pkGiris ? "Giriş Yap" : pkGiris.tur === "eposta-gir" ? "Kodu Gönder" : "Doğrula ve Giriş Yap";
+    }
+    function pkGirisSifirla() {
+        pkGiris = null;
+        $("sifreAdimi").classList.remove("hidden");
+        $("kodAdimi").classList.add("hidden");
+        $("pkGirisGeri").classList.add("hidden");
+        $("pkAltLinkler").classList.remove("hidden");
+        $("loginUser").required = true; $("loginPass").required = true;
+        $("pkGirisKod").value = "";
+        $("loginBtn").textContent = pkButon();
+    }
+    function pkGirisAdim(d) {
+        pkGiris = { tur: d.ikiAdim, jeton: d.jeton };
+        const kodMu = d.ikiAdim === "eposta-kod";
+        $("sifreAdimi").classList.add("hidden");
+        $("kodAdimi").classList.remove("hidden");
+        $("pkGirisGeri").classList.remove("hidden");
+        $("pkAltLinkler").classList.add("hidden");
+        $("loginUser").required = false; $("loginPass").required = false;
+        $("pkEpostaAlani").classList.toggle("hidden", kodMu);
+        $("pkKodAlani").classList.toggle("hidden", !kodMu);
+        if (kodMu) {
+            $("pkKodBilgi").textContent = (d.eposta || "E-posta") + " adresine 6 haneli giriş kodu gönderdik. Birkaç dakika içinde gelmezse gereksiz (spam) klasörüne bakın.";
+            const gun = Number(d.hatirlaGun || 0);
+            $("pkHatirlaSatir").classList.toggle("hidden", gun <= 0);
+            $("pkHatirlaMetin").textContent = "Bu cihazı " + gun + " gün hatırla (bu süre içinde kod sorulmaz)";
+            $("pkGirisKod").value = "";
+            setTimeout(() => $("pkGirisKod").focus(), 50);
+        } else {
+            if (d.oneri) $("pkGirisEposta").value = d.oneri;
+            setTimeout(() => $("pkGirisEposta").focus(), 50);
+        }
+        $("loginBtn").textContent = pkButon();
+    }
+    async function pkGirisCevabi(d) {
+        if (d && (d.ikiAdim === "eposta-kod" || d.ikiAdim === "eposta-gir")) { pkGirisAdim(d); return; }
+        pkGirisSifirla();
         await basla();
     }
-    async function kodGonder() {
-        const kod = $("loginKod").value.replace(/\D/g, "");
-        if (kod.length !== 6) throw new Error("6 haneli kodu girin.");
+    async function pkKodAdimi() {
+        if (pkGiris.tur === "eposta-gir") {
+            const e = $("pkGirisEposta").value.trim();
+            if (!e) throw new Error("E-posta adresinizi yazın.");
+            try { pkGirisAdim(await pkPost("/login/eposta", { jeton: pkGiris.jeton, eposta: e })); }
+            catch (err) { if (/^Süre doldu/.test(err.message)) pkGirisSifirla(); throw err; }
+            return;
+        }
+        const kod = $("pkGirisKod").value.replace(/\D/g, "");
+        if (kod.length !== 6) throw new Error("E-postanıza gelen 6 haneli kodu girin.");
         try {
-            await ikiAdimPost(ikiAdim.tur === "kurulum-qr" ? "/login/kurulum-tamamla" : "/login/kod", { jeton: ikiAdim.jeton, kod });
+            await pkPost("/login/kod", { jeton: pkGiris.jeton, kod, hatirla: $("pkHatirla").checked });
         } catch (err) {
-            if (err.sureDoldu) ikiAdimSifirla();
-            $("loginKod").value = "";
+            if (err.sureDoldu) pkGirisSifirla();
+            $("pkGirisKod").value = "";
             throw err;
         }
-        ikiAdimSifirla();
+        pkGirisSifirla();
         await basla();
+    }
+    async function pkKodTekrar() {
+        try { await pkPost("/login/kod-tekrar", { jeton: pkGiris && pkGiris.jeton }); pkMsg("loginMsg", "Yeni kod gönderildi. Son gelen kodu girin.", "ok"); }
+        catch (e) { pkMsg("loginMsg", e.message); }
+    }
+
+    // Bot engeli (iş kanıtı): sunucunun verdiği metin için SHA-256 özeti belirli sayıda sıfır bitle
+    // başlayan bir sayı aranır. Normal bir kişi için yaklaşık 1 saniye sürer.
+    const PK_K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+    const PK_W = new Uint32Array(64);
+    function pkSha256Ilk(s) {
+        const W = PK_W; W.fill(0);
+        const L = s.length;
+        for (let i = 0; i < L; i++) W[i >> 2] |= s.charCodeAt(i) << (24 - 8 * (i & 3));
+        W[L >> 2] |= 0x80 << (24 - 8 * (L & 3));
+        W[15] = L * 8;
+        for (let i = 16; i < 64; i++) {
+            const x = W[i - 15], y = W[i - 2];
+            const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+            const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+            W[i] = (W[i - 16] + s0 + W[i - 7] + s1) | 0;
+        }
+        let a = 0x6a09e667, b = 0xbb67ae85, c = 0x3c6ef372, d = 0xa54ff53a, e = 0x510e527f, f = 0x9b05688c, g = 0x1f83d9ab, h = 0x5be0cd19;
+        for (let i = 0; i < 64; i++) {
+            const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+            const t1 = (h + S1 + ((e & f) ^ (~e & g)) + PK_K[i] + W[i]) | 0;
+            const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+            const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+            h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+        }
+        return (0x6a09e667 + a) >>> 0;
+    }
+    async function pkZorluk() {
+        const r = await fetch(PK_API + "/kayit/zorluk", { cache: "no-store" });
+        if (!r.ok) throw new Error((await r.text()) || "Güvenlik kontrolü başlatılamadı.");
+        const z = await r.json();
+        let n = 0;
+        for (;;) {
+            for (let i = 0; i < 25000; i++, n++)
+                if ((pkSha256Ilk(z.tuz + ":" + n) >>> (32 - z.bit)) === 0) return { zorlukJeton: z.jeton, zorlukCevap: String(n) };
+            await new Promise(res => setTimeout(res, 0));
+        }
+    }
+
+    async function pkKayit(e) {
+        e.preventDefault();
+        pkMsg("kayitMsg", "");
+        const btn = $("kayitBtn"); btn.disabled = true;
+        try {
+            if (!pkKayitJeton) {
+                if ($("kParola").value !== $("kParola2").value) throw new Error("Şifreler aynı değil.");
+                if (!$("kKvkk").checked) throw new Error("Devam etmek için bilgilendirme metnini onaylayın.");
+                btn.textContent = "Güvenlik kontrolü...";
+                const z = await pkZorluk();
+                btn.textContent = "Gönderiliyor...";
+                const d = await pkPost("/kayit/basla", Object.assign({
+                    adSoyad: $("kAdSoyad").value.trim(), 
+                    telefon: $("kTelefon").value.trim(), eposta: $("kEposta").value.trim(),
+                    kullaniciAdi: $("kKullanici").value.trim(), parola: $("kParola").value,
+                    kvkk: $("kKvkk").checked, website: $("kWebsite").value
+                }, z));
+                pkKayitJeton = d.jeton;
+                $("kayitForm").classList.add("hidden");
+                $("kayitKodAlani").classList.remove("hidden");
+                $("kayitKodBilgi").textContent = (d.eposta || "E-posta") + " adresine 6 haneli doğrulama kodu gönderdik (10 dakika geçerli). Gelmezse gereksiz (spam) klasörüne bakın.";
+                $("kKod").value = ""; setTimeout(() => $("kKod").focus(), 50);
+            } else {
+                const kod = $("kKod").value.replace(/\D/g, "");
+                if (kod.length !== 6) throw new Error("E-postanıza gelen 6 haneli kodu girin.");
+                const d = await pkPost("/kayit/tamamla", { jeton: pkKayitJeton, kod });
+                pkKayitJeton = null;
+                $("kParola").value = ""; $("kParola2").value = "";
+                if (d.onayBekliyor) { pkEkran("login"); pkMsg("loginMsg", d.message || "Kaydınız alındı; laboratuvar onayından sonra giriş yapabilirsiniz.", "ok"); return; }
+                $("kayitScreen").classList.add("hidden");
+                await basla();
+            }
+        } catch (err) {
+            if (err.sureDoldu || /^Bu kullanıcı adı az önce/.test(err.message)) { pkKayitJeton = null; $("kayitForm").classList.remove("hidden"); $("kayitKodAlani").classList.add("hidden"); }
+            pkMsg("kayitMsg", err.message);
+        } finally {
+            btn.disabled = false; btn.textContent = pkKayitJeton ? "Hesabı Onayla" : "Kayıt Ol";
+        }
+    }
+
+    async function pkSifre(e) {
+        e.preventDefault();
+        pkMsg("sifreMsg", "");
+        const btn = $("sifreBtn"); btn.disabled = true;
+        try {
+            if (!pkSifreJeton) {
+                const kimlik = $("sKimlik").value.trim();
+                if (!kimlik) throw new Error("Kullanıcı adınızı veya e-posta adresinizi yazın.");
+                btn.textContent = "Güvenlik kontrolü...";
+                const z = await pkZorluk();
+                const d = await pkPost("/sifre/basla", Object.assign({ kimlik }, z));
+                pkSifreJeton = d.jeton;
+                $("sifreAdim1").classList.add("hidden"); $("sifreAdim2").classList.remove("hidden");
+                pkMsg("sifreMsg", "Bu bilgilerle kayıtlı bir hesap varsa, hesabın e-posta adresine kod gönderildi. Gelmezse gereksiz (spam) klasörüne bakın.", "ok");
+                setTimeout(() => $("sKod").focus(), 50);
+            } else {
+                const kod = $("sKod").value.replace(/\D/g, "");
+                if (kod.length !== 6) throw new Error("E-postanıza gelen 6 haneli kodu girin.");
+                if ($("sYeni").value !== $("sYeni2").value) throw new Error("Yeni şifreler aynı değil.");
+                await pkPost("/sifre/tamamla", { jeton: pkSifreJeton, kod, yeniParola: $("sYeni").value });
+                pkSifreJeton = null; $("sYeni").value = ""; $("sYeni2").value = ""; $("sKod").value = "";
+                pkEkran("login");
+                pkMsg("loginMsg", "Şifreniz yenilendi. Yeni şifrenizle giriş yapabilirsiniz.", "ok");
+            }
+        } catch (err) {
+            if (err.sureDoldu) { pkSifreJeton = null; $("sifreAdim1").classList.remove("hidden"); $("sifreAdim2").classList.add("hidden"); }
+            pkMsg("sifreMsg", err.message);
+        } finally {
+            btn.disabled = false; btn.textContent = pkSifreJeton ? "Şifreyi Yenile" : "Kod Gönder";
+        }
     }
 
     async function cikisYap() {

@@ -84,6 +84,66 @@ public sealed class TeknisyenHesapDeposu
         }
     }
 
+    public static (string Hash, string Salt) OzetUret(string parola)
+    {
+        var salt = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+        return (Ozet(parola, salt), salt);
+    }
+
+    /// <summary>Kendi kaydını yapan teknisyen için: parola özeti önceden hesaplanmış yeni hesap.</summary>
+    public bool OzetliEkle(int teknisyenId, string kullaniciAdi, string hash, string salt, string tip, bool aktif)
+    {
+        lock (_kilit)
+        {
+            var liste = Oku();
+            if (liste.Any(x => x.TeknisyenId == teknisyenId ||
+                               string.Equals(x.KullaniciAdi, kullaniciAdi, StringComparison.OrdinalIgnoreCase)))
+                return false;
+            liste.Add(new Hesap
+            {
+                TeknisyenId = teknisyenId, KullaniciAdi = kullaniciAdi, ParolaHash = hash, ParolaSalt = salt,
+                Tip = tip == Dis ? Dis : Ic, Aktif = aktif, GuncellemeTarihi = DateTime.UtcNow
+            });
+            Yaz(liste);
+            return true;
+        }
+    }
+
+    public bool KullaniciAdiBos(string kullaniciAdi)
+    {
+        lock (_kilit)
+            return !Oku().Any(x => string.Equals(x.KullaniciAdi, kullaniciAdi, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public bool ParolaAyarla(int teknisyenId, string hash, string salt)
+    {
+        lock (_kilit)
+        {
+            var liste = Oku();
+            var hesap = liste.FirstOrDefault(x => x.TeknisyenId == teknisyenId);
+            if (hesap == null) return false;
+            hesap.ParolaHash = hash;
+            hesap.ParolaSalt = salt;
+            hesap.GuncellemeTarihi = DateTime.UtcNow;
+            Yaz(liste);
+            return true;
+        }
+    }
+
+    public bool AktifAyarla(int teknisyenId, bool aktif)
+    {
+        lock (_kilit)
+        {
+            var liste = Oku();
+            var hesap = liste.FirstOrDefault(x => x.TeknisyenId == teknisyenId);
+            if (hesap == null) return false;
+            hesap.Aktif = aktif;
+            hesap.GuncellemeTarihi = DateTime.UtcNow;
+            Yaz(liste);
+            return true;
+        }
+    }
+
     public bool Pasiflestir(int teknisyenId)
     {
         lock (_kilit)

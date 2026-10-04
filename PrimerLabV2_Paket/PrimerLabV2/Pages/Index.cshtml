@@ -2638,7 +2638,19 @@
         .technician-settings-grid{display:grid;grid-template-columns:300px minmax(0,1fr);gap:15px}.technician-add-box{background:#f8fafc;border:1px solid #e5eaf1;border-radius:11px;padding:13px}.technician-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.technician-row{border:1px solid #e5eaf1;border-radius:10px;padding:10px 12px;background:#fff}.technician-row.editable-row:hover{background:#f8fbff;border-color:#bfdbfe}
         @@media(max-width:1100px){.tech-kpi-grid{grid-template-columns:repeat(2,1fr)}.tech-workspace{grid-template-columns:290px minmax(0,1fr)}.technician-settings-grid{grid-template-columns:1fr}.technician-list{grid-template-columns:1fr}}
         @@media(max-width:820px){.tech-workspace{grid-template-columns:1fr}.tech-center-list{max-height:330px}.tech-detail-kpis{grid-template-columns:1fr}.tech-page-head{flex-direction:column}.tech-head-actions{width:100%}}
-    </style>
+            .ph-ozet{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}
+        .ph-kutu{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:12px 14px}
+        .ph-kutu b{display:block;font-size:22px}
+        .ph-kutu span{font-size:12px;color:#64748b;font-weight:700}
+        .ph-filtre{display:flex;gap:10px;flex-wrap:wrap;padding:14px 16px 4px}
+        .ph-filtre select,.ph-filtre input{max-width:260px}
+        .ph-smtp{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+        .ph-etiket{display:inline-block;border-radius:999px;padding:3px 9px;font-size:11px;font-weight:800;white-space:nowrap}
+        .ph-aktif{background:#ecfdf5;color:#15803d}.ph-pasif{background:#f1f5f9;color:#64748b}.ph-onay{background:#fffbeb;color:#b45309}
+        .ph-yeni{background:#eff6ff;color:#1565c0}
+        .ph-islem{display:flex;gap:6px;flex-wrap:wrap}
+        .ph-islem .button{padding:6px 10px;font-size:12px;min-height:0;height:auto}
+</style>
 </head>
 
 <body>
@@ -2686,6 +2698,8 @@
                     onclick="showSection('hekimler', this)">Hekimler</button>
             <button class="menu-item" type="button"
                     onclick="showSection('anayasaTeknisyenler', this)">Teknisyenler <span id="menuBadgeTeknisyen" class="menu-badge amber">0</span></button>
+            <button class="menu-item" type="button"
+                    onclick="showSection('portalHesaplari', this)">Portal Hesapları <span id="menuBadgePortal" class="menu-badge amber">0</span></button>
             <button class="menu-item" type="button"
                     onclick="showSection('mesajlar', this)">Mesajlar</button>
 
@@ -4183,10 +4197,10 @@
                             <div class="field-help" style="margin-top:8px;">Portal ana yazılımla aynı PostgreSQL verisini kullanır. Gönderilen işler anında “Hekimden Gelenler / Onay Bekleyen” bölümüne düşer.</div>
                         </div>
                         <div class="panel" style="margin-top:14px;padding:12px;">
-                            <div style="font-size:11px;color:#64748b;font-weight:700;">İKİ ADIMLI DOĞRULAMA</div>
+                            <div style="font-size:11px;color:#64748b;font-weight:700;">GİRİŞ KODU E-POSTASI</div>
                             <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:7px;flex-wrap:wrap">
-                                <span id="hekimPortalIkiAdim" style="font-size:13px;font-weight:700">-</span>
-                                <button id="hekimPortalIkiAdimBtn" class="button button-light" type="button" style="display:none" onclick="ikiAdimSifirlaAdmin('hekim')">İki adımlı doğrulamayı sıfırla</button>
+                                <span id="hekimPortalEposta" style="font-size:13px;font-weight:700">-</span>
+                                <button class="button button-light" type="button" onclick="closeHekimPortalModal();showSection('portalHesaplari')">Portal Hesapları</button>
                             </div>
                         </div>
                         <div id="hekimPortalError" class="form-error" style="display:none;margin-top:12px;"></div>
@@ -4425,6 +4439,92 @@
                 </div>
             </section>
 
+<section id="portalHesaplari" class="section">
+                <div class="topbar">
+                    <div>
+                        <h1 class="page-title">Portal Hesapları</h1>
+                        <div class="page-subtitle">Hekim Portalı ve Teknisyen Paneli hesapları — kendi kaydını yapanlar, onay, aktif/pasif, şifre ve e-posta</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="button button-dark" type="button" onclick="portalHesaplariYukle()">Yenile</button>
+                    </div>
+                </div>
+
+                <div id="phOzet" class="ph-ozet"></div>
+
+                <div class="panel">
+                    <div class="ph-filtre">
+                        <select id="phTur" onchange="portalHesaplariCiz()"><option value="">Tüm hesaplar</option><option value="hekim">Hekimler</option><option value="teknisyen">Teknisyenler</option></select>
+                        <select id="phDurum" onchange="portalHesaplariCiz()"><option value="">Tüm durumlar</option><option value="onay">Onay bekleyenler</option><option value="yeni">Son 7 günde kayıt olanlar</option><option value="kendi">Kendi kaydını yapanlar</option><option value="aktif">Aktif</option><option value="pasif">Pasif</option></select>
+                        <input id="phAra" type="search" placeholder="Ad, kullanıcı adı, e-posta, telefon ara..." oninput="portalHesaplariCiz()" />
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tür</th>
+                                    <th>Ad Soyad / Klinik</th>
+                                    <th>Kullanıcı adı</th>
+                                    <th>Şifre</th>
+                                    <th>E-posta</th>
+                                    <th>Telefon</th>
+                                    <th>Kayıt</th>
+                                    <th>Son giriş</th>
+                                    <th>Durum</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="phTablo"><tr><td colspan="10">Yükleniyor...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="price-list-note" style="padding:10px 16px 14px">Şifreler güvenlik gereği geri çevrilemez biçimde saklanır; kimse (yönetici dahil) mevcut şifreyi okuyamaz. <b>Şifre belirle</b> ile yeni şifre verirsiniz; verdiğiniz şifre bir kez gösterilir, kişiye iletirsiniz. Kişi isterse portaldaki <b>Şifremi unuttum</b> ile kendisi de yenileyebilir.</div>
+                </div>
+
+                <div class="panel" style="margin-top:16px">
+                    <div class="panel-header"><div><div class="panel-title">Kayıt ve Giriş Ayarları</div><div class="page-subtitle">Hekimler ve teknisyenler kullanıcı adı ve şifrelerini kendileri oluşturur; e-postalarına gelen kodla doğrular.</div></div></div>
+                    <div style="padding:14px 22px 18px">
+                        <label class="checkbox-line"><input id="phKayitAcik" type="checkbox" /> <span><b>Kayıt alımı açık</b> — portallarda “Kayıt olun” bağlantısı görünür</span></label>
+                        <label class="checkbox-line"><input id="phOnay" type="checkbox" /> <span><b>Yeni kayıtlar onayımı beklesin</b> — kapalıysa kişi e-postasını doğrular doğrulamaz girer; açıksa bu listede “Onayla” deyince girebilir</span></label>
+                        <label class="checkbox-line"><input id="phKod" type="checkbox" /> <span><b>Girişte e-posta kodu iste</b> (önerilir) — şifreyi bilen başkası, e-postaya erişimi yoksa giremez</span></label>
+                        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:flex-end">
+                            <div class="form-group" style="margin:0;min-width:170px"><label for="phHatirla">“Bu cihazı hatırla” süresi (gün)</label><input id="phHatirla" type="number" min="0" max="365" /></div>
+                            <div class="form-group" style="margin:0;min-width:220px"><label for="phTekTip">Kendi kaydını yapan teknisyen</label><select id="phTekTip"><option value="dis">Dış teknisyen (önerilir)</option><option value="ic">İç teknisyen</option></select></div>
+                            <div class="form-group" style="margin:0;min-width:200px"><label for="phSaatlik">Saatte en fazla başvuru (tümü)</label><input id="phSaatlik" type="number" min="20" max="5000" /></div>
+                            <button type="button" class="button button-blue" onclick="portalAyarKaydet()">Ayarları Kaydet</button>
+                        </div>
+                        <div id="phYogunluk" class="price-list-note" style="margin-top:10px"></div>
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-top:16px;border-color:#bfdbfe">
+                    <div class="panel-header"><div><div class="panel-title">✉️ E-posta Gönderimi (doğrulama kodları)</div><div class="page-subtitle">Kayıt, giriş ve şifre yenileme kodları bu hesaptan gönderilir. Ayar yapılmadan kayıt alınamaz ve giriş kodu gönderilemez (girişler yalnız şifreyle olur).</div></div></div>
+                    <div style="padding:14px 22px 18px">
+                        <div class="button-group" style="margin-bottom:10px">
+                            <button type="button" class="button button-light" onclick="smtpHazirAyar('gmail')">Gmail</button>
+                            <button type="button" class="button button-light" onclick="smtpHazirAyar('outlook')">Outlook / Hotmail</button>
+                            <button type="button" class="button button-light" onclick="smtpHazirAyar('yandex')">Yandex</button>
+                        </div>
+                        <div class="ph-smtp">
+                            <div class="form-group" style="margin:0"><label for="smtpSunucu">SMTP sunucusu</label><input id="smtpSunucu" placeholder="smtp.gmail.com" /></div>
+                            <div class="form-group" style="margin:0"><label for="smtpPort">Port</label><input id="smtpPort" type="number" value="587" /></div>
+                            <div class="form-group" style="margin:0"><label for="smtpKullanici">E-posta adresi (kullanıcı)</label><input id="smtpKullanici" autocomplete="off" placeholder="laboratuvar@@gmail.com" /></div>
+                            <div class="form-group" style="margin:0"><label for="smtpParola">Uygulama şifresi</label><input id="smtpParola" type="password" autocomplete="new-password" /></div>
+                            <div class="form-group" style="margin:0"><label for="smtpAd">Gönderen adı</label><input id="smtpAd" placeholder="Primer Dental Lab" /></div>
+                            <div class="form-group" style="margin:0"><label for="smtpDakika">Dakikada en fazla</label><input id="smtpDakika" type="number" min="1" max="120" /></div>
+                            <div class="form-group" style="margin:0"><label for="smtpGun">Günde en fazla</label><input id="smtpGun" type="number" min="10" max="10000" /></div>
+                        </div>
+                        <label class="checkbox-line" style="margin-top:8px"><input id="smtpSsl" type="checkbox" checked /> <span>Şifreli bağlantı (STARTTLS) — açık bırakın</span></label>
+                        <div class="button-group" style="margin-top:10px;align-items:center">
+                            <button type="button" class="button button-blue" onclick="smtpKaydet()">E-posta Ayarını Kaydet</button>
+                            <input id="smtpTestAdres" placeholder="deneme için e-posta adresi" style="max-width:260px" />
+                            <button type="button" class="button button-light" onclick="smtpTest()">Deneme Gönder</button>
+                        </div>
+                        <div id="smtpDurum" class="price-list-note" style="margin-top:10px">Durum kontrol ediliyor...</div>
+                        <div class="ai-security-note" style="margin-top:10px"><b>Gmail:</b> normal Gmail şifresi çalışmaz. Google Hesabı → Güvenlik → “2 Adımlı Doğrulama”yı açın → “Uygulama şifreleri”nden 16 haneli bir şifre oluşturup buraya yazın. Gmail günde yaklaşık 500 e-posta gönderir; “Günde en fazla” bu sınırın altında kalmalı. Şifre bu bilgisayarda şifrelenerek saklanır.</div>
+                    </div>
+                </div>
+            </section>
+
 <section id="ayarlar" class="section">
                 <div class="topbar">
                     <div>
@@ -4501,15 +4601,6 @@
                         <button type="button" class="button" style="background:#dc2626;color:#fff;" onclick="tamSistemSifirla()">Tüm Yazılımı Sıfırla</button>
                     </div>
                     <div style="padding:0 22px 18px;color:#991b1b;font-size:13px;">İşlemden önce otomatik tam JSON yedeği ve operasyonel dosya güvenlik kopyası alınır. Yedek oluşturulamazsa sıfırlama başlamaz.</div>
-                </div>
-
-                <div class="panel" style="margin-top:16px;border-color:#c7d2fe">
-                  <div class="panel-header"><div><div class="panel-title">🔐 Portal Güvenliği — İki Adımlı Doğrulama</div><div class="page-subtitle">Hekim Portalı ve Teknisyen Paneli girişinde parolaya ek olarak telefondaki doğrulama uygulamasının (Google / Microsoft Authenticator) 6 haneli kodu istenir. Parola başkasının eline geçse bile tek başına giriş yapılamaz.</div></div></div>
-                  <div style="padding:14px 22px 18px">
-                    <label class="checkbox-line"><input id="ikiAdimZorunlu" type="checkbox" onchange="ikiAdimZorunluKaydet()" /> <span><b>Zorunlu</b> — kodu kurmamış hekim/teknisyen ilk girişte telefonuna kurmadan giremez (önerilir)</span></label>
-                    <div id="ikiAdimDurum" class="price-list-note" style="margin-top:8px">Durum kontrol ediliyor...</div>
-                    <div class="field-help" style="margin-top:6px">Telefonunu kaybeden veya değiştiren kişi için: Hekimler / Teknisyenler listesinde ilgili kişinin <b>Portal</b> / <b>Panel</b> hesabını açıp <b>İki adımlı doğrulamayı sıfırla</b>'ya basın; bir sonraki girişte yeni telefonuna kurar.</div>
-                  </div>
                 </div>
 
                 <div class="panel" style="margin-top:16px;border-color:#bbf7d0">
@@ -5012,6 +5103,30 @@
         </div>
     </div>
 
+    <div id="portalSifreModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="width:460px;">
+            <div class="modal-header">
+                <div><h2>Şifre Belirle</h2><p id="psAlt">-</p></div>
+                <button type="button" class="modal-close" onclick="portalSifreKapat()">×</button>
+            </div>
+            <div style="padding:16px 22px">
+                <div id="psGiris">
+                    <div class="form-group"><label for="psYeni">Yeni şifre</label><input id="psYeni" type="text" autocomplete="off" placeholder="Boş bırakırsanız güçlü bir şifre oluşturulur" /></div>
+                    <div class="price-list-note">En az 8 karakter, en az bir harf ve bir rakam. Eski şifre ve “hatırlanan cihazlar” geçersiz olur.</div>
+                </div>
+                <div id="psSonuc" style="display:none">
+                    <div class="price-list-note">Yeni şifre (yalnız şimdi gösterilir — kişiye iletin):</div>
+                    <div style="display:flex;gap:8px;margin-top:8px"><input id="psGoster" type="text" readonly style="font-size:18px;font-weight:800;letter-spacing:1px" /><button type="button" class="button button-light" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('psGoster').value).then(()=>showSuccess('Şifre kopyalandı.'))">Kopyala</button></div>
+                </div>
+                <div id="psHata" class="form-error" style="display:none;margin-top:10px"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="button button-light" onclick="portalSifreKapat()">Kapat</button>
+                <button id="psKaydet" type="button" class="button button-blue" onclick="portalSifreKaydet()">Şifreyi Belirle</button>
+            </div>
+        </div>
+    </div>
+
     <div id="teknisyenPanelModal" class="modal-overlay" style="display:none;">
         <div class="modal-box" style="width:560px;">
             <div class="modal-header">
@@ -5030,7 +5145,7 @@
                 <label style="display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:12px"><input id="teknisyenPanelAktif" type="checkbox" checked style="width:auto" /> Hesap aktif</label>
                 <div class="form-group"><label>Panel adresi</label><div style="display:flex;gap:8px"><input id="teknisyenPanelUrl" type="text" readonly /><button type="button" class="button button-light" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('teknisyenPanelUrl').value).then(()=>showSuccess('Adres kopyalandı.'))">Kopyala</button></div>
                     <div class="price-list-note" style="margin-top:6px">Teknisyen bu adresi aynı Wi-Fi'deki telefon/bilgisayardan açar. İnternet erişimi açıksa (PORTAL_INTERNET_AC.bat) aynı internet adresinin sonuna /teknisyen yazılarak her yerden girilir.</div></div>
-                <div class="form-group"><label>İki adımlı doğrulama</label><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span id="teknisyenPanelIkiAdim" style="font-size:13px;font-weight:700">-</span><button id="teknisyenPanelIkiAdimBtn" type="button" class="button button-light" style="display:none" onclick="ikiAdimSifirlaAdmin('teknisyen')">İki adımlı doğrulamayı sıfırla</button></div></div>
+                <div class="form-group"><label>Giriş kodu e-postası</label><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span id="teknisyenPanelEposta" style="font-size:13px;font-weight:700">-</span><button type="button" class="button button-light" onclick="closeTeknisyenPanelModal();showSection('portalHesaplari')">Portal Hesapları</button></div></div>
                 <div id="teknisyenPanelHata" class="form-error" style="display:none;"></div>
                 <div class="modal-footer">
                     <button type="button" class="button button-light" onclick="closeTeknisyenPanelModal()">Kapat</button>
@@ -6072,6 +6187,10 @@
 
             if (id === "ayarlar") {
                 renderTeknisyenler();
+            }
+
+            if (id === "portalHesaplari") {
+                portalHesaplariYukle();
             }
 
             if (id === "operasyon") {
@@ -13326,49 +13445,203 @@
             return {baslat,ciz,dur};
         })();
 
-        // ---------------- İki adımlı doğrulama (yönetim) ----------------
-        function ikiAdimDurumGoster(tur, d){
-            const el=document.getElementById(tur==='hekim'?'hekimPortalIkiAdim':'teknisyenPanelIkiAdim');
-            const btn=document.getElementById(tur==='hekim'?'hekimPortalIkiAdimBtn':'teknisyenPanelIkiAdimBtn');
-            if(!el||!btn) return;
-            if(!d){ el.innerText='-'; el.style.color=''; btn.style.display='none'; return; }
-            if(d.ikiAdimKurulu){ el.innerText='Kurulu ✓ (girişte telefon kodu isteniyor)'; el.style.color='#15803d'; btn.style.display=''; }
-            else if(d.ikiAdimZorunlu){ el.innerText='Henüz kurulmadı — ilk girişte telefonuna kuracak'; el.style.color='#b45309'; btn.style.display='none'; }
-            else { el.innerText='Kapalı (yalnız parola)'; el.style.color='#64748b'; btn.style.display='none'; }
-        }
-        async function ikiAdimSifirlaAdmin(tur){
-            const id=Number(document.getElementById(tur==='hekim'?'hekimPortalHekimId':'teknisyenPanelId').value||0);
-            if(!id) return;
-            if(!confirm('İki adımlı doğrulama sıfırlansın mı?\n\nKişi bir sonraki girişte parolasını girdikten sonra QR kodu yeni telefonuna okutarak yeniden kuracak. Telefonu kaybolduysa veya değiştiyse kullanın.')) return;
-            const yol=tur==='hekim'?'/api/hekim-portal/admin/account/':'/api/teknisyen-portal/admin/account/';
+        // ---------------- Portal Hesapları (kayıt olanlar, onay, aktif/pasif, şifre, e-posta) ----------------
+        let portalVeri=null, portalSifreHedef=null;
+        async function portalHesaplariYukle(sessiz){
             try{
-                const r=await fetch(yol+id+'/iki-adim',{method:'DELETE'});
-                if(!r.ok) throw new Error((await r.text())||'Sıfırlanamadı.');
-                const g=await fetch(yol+id,{cache:'no-store'});
-                if(g.ok) ikiAdimDurumGoster(tur, await g.json());
-                showSuccess('İki adımlı doğrulama sıfırlandı.');
-            }catch(e){ showError(e.message||'Sıfırlanamadı.'); }
+                const r=await fetch('/api/portal-hesaplari',{cache:'no-store'});
+                if(!r.ok) throw new Error((await r.text())||'Portal hesapları alınamadı.');
+                portalVeri=await r.json();
+                const onay=(portalVeri.hesaplar||[]).filter(h=>h.onayBekliyor).length;
+                const rozet=document.getElementById('menuBadgePortal');
+                if(rozet){ rozet.textContent=String(onay); rozet.style.display=onay>0?'':'none'; }
+                if(!sessiz || document.getElementById('portalHesaplari')?.classList.contains('active')){ portalHesaplariCiz(); portalAyarlariDoldur(); }
+            }catch(e){ if(!sessiz) showError(e.message||'Portal hesapları alınamadı.'); }
         }
-        async function ikiAdimAyarYukle(){
-            const el=document.getElementById('ikiAdimDurum'), cb=document.getElementById('ikiAdimZorunlu');
-            if(!el||!cb) return;
+        function phTarih(v){ if(!v) return '-'; const d=new Date(v); return isNaN(d)?'-':d.toLocaleDateString('tr-TR')+' '+d.toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}); }
+        function portalHesaplariCiz(){
+            const tb=document.getElementById('phTablo'); if(!tb||!portalVeri) return;
+            const hes=portalVeri.hesaplar||[];
+            const yediGun=Date.now()-7*864e5;
+            const yeniMi=h=>h.kendiKaydi&&h.kayitTarihi&&new Date(h.kayitTarihi).getTime()>=yediGun;
+            document.getElementById('phOzet').innerHTML=[
+                ['Hekim hesabı',hes.filter(h=>h.tur==='hekim').length],
+                ['Teknisyen hesabı',hes.filter(h=>h.tur==='teknisyen').length],
+                ['Onay bekleyen',hes.filter(h=>h.onayBekliyor).length],
+                ['Son 7 gün kayıt',hes.filter(yeniMi).length],
+                ['Pasif',hes.filter(h=>!h.aktif&&!h.onayBekliyor).length]
+            ].map(x=>'<div class="ph-kutu"><b>'+x[1]+'</b><span>'+x[0]+'</span></div>').join('');
+            const tur=document.getElementById('phTur').value, durum=document.getElementById('phDurum').value;
+            const ara=(document.getElementById('phAra').value||'').toLocaleLowerCase('tr-TR').trim();
+            let liste=hes.filter(h=>(!tur||h.tur===tur)
+                && (!durum || (durum==='onay'&&h.onayBekliyor) || (durum==='yeni'&&yeniMi(h)) || (durum==='kendi'&&h.kendiKaydi) || (durum==='aktif'&&h.aktif) || (durum==='pasif'&&!h.aktif))
+                && (!ara || [h.adSoyad,h.klinik,h.kullaniciAdi,h.eposta,h.telefon].join(' ').toLocaleLowerCase('tr-TR').includes(ara)));
+            liste.sort((a,b)=>(b.onayBekliyor-a.onayBekliyor)||(new Date(b.kayitTarihi||0)-new Date(a.kayitTarihi||0)));
+            if(!liste.length){ tb.innerHTML='<tr><td colspan="10">Kayıt yok.</td></tr>'; return; }
+            tb.innerHTML=liste.map(h=>{
+                const k=h.tur+':'+h.id;
+                const durumEt=h.onayBekliyor?'<span class="ph-etiket ph-onay">Onay bekliyor</span>':h.aktif?'<span class="ph-etiket ph-aktif">Aktif</span>':'<span class="ph-etiket ph-pasif">Pasif</span>';
+                const yeni=yeniMi(h)?' <span class="ph-etiket ph-yeni">Yeni kayıt</span>':'';
+                const kaynak=h.kendiKaydi?'Kendi kaydı':'Laboratuvar';
+                const tip=h.tur==='teknisyen'?(h.tip==='ic'?' · iç':' · dış'):'';
+                const isl=[];
+                if(h.onayBekliyor) isl.push('<button class="button button-blue" onclick="portalDurum(\''+h.tur+'\','+h.id+',true)">Onayla</button>');
+                else if(h.aktif) isl.push('<button class="button button-light" onclick="portalDurum(\''+h.tur+'\','+h.id+',false)">Pasif yap</button>');
+                else isl.push('<button class="button button-light" onclick="portalDurum(\''+h.tur+'\','+h.id+',true)">Aktif yap</button>');
+                isl.push('<button class="button button-light" onclick="portalEpostaDuzenle(\''+h.tur+'\','+h.id+')">E-posta</button>');
+                if(h.tur==='hekim'&&h.kendiKaydi) isl.push('<button class="button button-light" title="Bu kişi laboratuvarda zaten kayıtlı bir hekimse onun kartına bağlayın" onclick="portalEslestir('+h.id+')">Hekime bağla</button>');
+                return '<tr data-k="'+k+'">'
+                    +'<td>'+(h.tur==='hekim'?'Hekim':'Teknisyen'+tip)+'</td>'
+                    +'<td><b>'+escapeHtml(h.adSoyad||'-')+'</b>'+(h.klinik?'<div style="font-size:12px;color:#64748b">'+escapeHtml(h.klinik)+'</div>':'')+yeni+'</td>'
+                    +'<td><b>'+escapeHtml(h.kullaniciAdi||'-')+'</b></td>'
+                    +'<td>•••••• <button class="button button-light" style="padding:4px 8px;font-size:12px" onclick="portalSifreAc(\''+h.tur+'\','+h.id+')">Şifre belirle</button></td>'
+                    +'<td>'+(h.eposta?escapeHtml(h.eposta)+(h.epostaDogrulandi?' <span title="Doğrulandı" style="color:#15803d">✓</span>':''):'<span style="color:#94a3b8">-</span>')+'</td>'
+                    +'<td>'+escapeHtml(h.telefon||'-')+'</td>'
+                    +'<td>'+phTarih(h.kayitTarihi)+'<div style="font-size:11px;color:#64748b">'+kaynak+'</div></td>'
+                    +'<td>'+phTarih(h.sonGiris)+'</td>'
+                    +'<td>'+durumEt+'</td>'
+                    +'<td><div class="ph-islem">'+isl.join('')+'</div></td></tr>';
+            }).join('');
+        }
+        function portalBul(tur,id){ return (portalVeri?.hesaplar||[]).find(h=>h.tur===tur&&Number(h.id)===Number(id)); }
+        async function portalDurum(tur,id,aktif){
+            const h=portalBul(tur,id);
+            if(!aktif && !confirm((h?.adSoyad||'Hesap')+' pasif yapılsın mı? Portala giremez; işleri ve kayıtları silinmez.')) return;
             try{
-                const r=await fetch('/api/guvenlik/iki-adim',{cache:'no-store'});
-                if(!r.ok) throw new Error((await r.text())||'Durum alınamadı.');
+                const r=await fetch('/api/portal-hesaplari/'+tur+'/'+id+'/durum',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({aktif})});
+                if(!r.ok) throw new Error((await r.text())||'İşlem yapılamadı.');
+                showSuccess(aktif?(h?.onayBekliyor?'Kayıt onaylandı; kişi artık giriş yapabilir.':'Hesap aktif.'):'Hesap pasif.');
+                await portalHesaplariYukle();
+                if(tur==='hekim' && typeof loadHekimler==='function') loadHekimler();
+            }catch(e){ showError(e.message); }
+        }
+        function portalSifreAc(tur,id){
+            const h=portalBul(tur,id); portalSifreHedef={tur,id};
+            document.getElementById('psAlt').innerText=(h?.adSoyad||'-')+' · '+(h?.kullaniciAdi||'');
+            document.getElementById('psYeni').value='';
+            document.getElementById('psGiris').style.display=''; document.getElementById('psSonuc').style.display='none';
+            document.getElementById('psHata').style.display='none';
+            document.getElementById('psKaydet').style.display='';
+            document.getElementById('portalSifreModal').style.display='flex';
+            setTimeout(()=>document.getElementById('psYeni').focus(),50);
+        }
+        function portalSifreKapat(){ document.getElementById('portalSifreModal').style.display='none'; document.getElementById('psGoster').value=''; portalSifreHedef=null; }
+        async function portalSifreKaydet(){
+            if(!portalSifreHedef) return;
+            const err=document.getElementById('psHata'); err.style.display='none';
+            try{
+                const r=await fetch('/api/portal-hesaplari/'+portalSifreHedef.tur+'/'+portalSifreHedef.id+'/sifre',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({yeniParola:document.getElementById('psYeni').value.trim()||null})});
+                if(!r.ok) throw new Error((await r.text())||'Şifre belirlenemedi.');
                 const d=await r.json();
-                cb.checked=!!d.zorunlu;
-                el.innerText=d.zorunlu?'Açık: Hekim Portalı ve Teknisyen Paneli girişinde telefon kodu zorunlu.':'Kapalı: kodu kurmamış kişiler yalnız parolayla girebilir (önerilmez).';
-            }catch(e){ el.innerText=e.message||'Durum alınamadı.'; }
+                document.getElementById('psGoster').value=d.parola;
+                document.getElementById('psGiris').style.display='none'; document.getElementById('psSonuc').style.display='';
+                document.getElementById('psKaydet').style.display='none';
+                showSuccess('Yeni şifre belirlendi.');
+            }catch(e){ err.innerText=e.message; err.style.display='block'; }
         }
-        async function ikiAdimZorunluKaydet(){
-            const cb=document.getElementById('ikiAdimZorunlu');
-            if(!cb.checked && !confirm('İki adımlı doğrulama zorunluluğu kapatılsın mı?\n\nPortal adresi internete açıkken bu önerilmez: parolası ele geçen biri giriş yapabilir.')){ cb.checked=true; return; }
+        async function portalEpostaDuzenle(tur,id){
+            const h=portalBul(tur,id);
+            const yeni=prompt((h?.adSoyad||'')+' — giriş kodlarının gideceği e-posta adresi (silmek için boş bırakın):', h?.eposta||'');
+            if(yeni===null) return;
             try{
-                const r=await fetch('/api/guvenlik/iki-adim',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({zorunlu:cb.checked})});
+                const r=await fetch('/api/portal-hesaplari/'+tur+'/'+id+'/eposta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eposta:yeni.trim()})});
                 if(!r.ok) throw new Error((await r.text())||'Kaydedilemedi.');
-                await ikiAdimAyarYukle();
-                showSuccess(cb.checked?'İki adımlı doğrulama zorunlu.':'İki adımlı doğrulama zorunluluğu kapatıldı.');
-            }catch(e){ showError(e.message||'Kaydedilemedi.'); await ikiAdimAyarYukle(); }
+                showSuccess((await r.json()).message||'Kaydedildi.');
+                await portalHesaplariYukle();
+            }catch(e){ showError(e.message); }
+        }
+        async function portalEslestir(id){
+            const h=portalBul('hekim',id);
+            const hesapli=new Set((portalVeri?.hesaplar||[]).filter(x=>x.tur==='hekim').map(x=>Number(x.id)));
+            const adaylar=(hekimler||[]).filter(x=>x.aktif!==false && !hesapli.has(Number(x.id)));
+            if(!adaylar.length) return showError('Bağlanabilecek (portal hesabı olmayan) hekim yok.');
+            const metin=adaylar.slice(0,60).map(x=>x.id+' — '+x.adSoyad+(x.klinikAdi&&x.klinikAdi!==x.adSoyad?' ('+x.klinikAdi+')':'')).join('\n');
+            const sec=prompt((h?.adSoyad||'')+' kendi kaydını yaptı. Laboratuvarda zaten kayıtlıysa hangi hekim kartına bağlansın? Hekim numarasını yazın:\n\n'+metin);
+            if(!sec) return;
+            const hedef=Number(String(sec).trim());
+            if(!adaylar.some(x=>Number(x.id)===hedef)) return showError('Listeden geçerli bir hekim numarası yazın.');
+            if(!confirm('Portal hesabı #'+hedef+' numaralı hekime bağlanacak; kayıtla açılan kart pasife alınacak, varsa işleri taşınacak. Devam edilsin mi?')) return;
+            try{
+                const r=await fetch('/api/portal-hesaplari/hekim/'+id+'/eslestir',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hedefHekimId:hedef})});
+                if(!r.ok) throw new Error((await r.text())||'Bağlanamadı.');
+                showSuccess('Portal hesabı hekim kartına bağlandı.');
+                await portalHesaplariYukle();
+                if(typeof loadHekimler==='function') loadHekimler();
+            }catch(e){ showError(e.message); }
+        }
+        function portalAyarlariDoldur(){
+            if(!portalVeri) return;
+            const a=portalVeri.ayarlar||{}, ep=portalVeri.eposta||{}, ist=portalVeri.istatistik||{};
+            const set=(id,v)=>{const el=document.getElementById(id); if(el&&document.activeElement!==el){ if(el.type==='checkbox') el.checked=!!v; else el.value=v??''; }};
+            set('phKayitAcik',a.kayitAcik); set('phOnay',a.onayGereksin); set('phKod',a.giristeEpostaKodu);
+            set('phHatirla',a.cihazHatirlaGun); set('phTekTip',a.yeniTeknisyenTipi||'dis'); set('phSaatlik',a.saatlikKayitSiniri);
+            document.getElementById('phYogunluk').innerText='Yoğunluk koruması: son 1 saatte '+(ist.sonSaatKayitBasvurusu||0)+' kayıt, '+(ist.sonSaatSifreBasvurusu||0)+' şifre yenileme başvurusu · bekleyen kod: '+(ist.bekleyenKod||0)+' · engellenen istek: '+(ist.engellenenIstek||0)+' · bot kontrol zorluğu: '+(ist.zorlukBit||17)+' bit';
+            set('smtpSunucu',ep.sunucu); set('smtpPort',ep.port||587); set('smtpKullanici',ep.kullanici); set('smtpAd',ep.gonderenAd);
+            set('smtpDakika',ep.dakikadaEnFazla||20); set('smtpGun',ep.gundeEnFazla||450); set('smtpSsl',ep.ssl!==false);
+            const pw=document.getElementById('smtpParola'); if(pw) pw.placeholder=ep.parolaKayitli?'kayıtlı — değiştirmek için yazın':'uygulama şifresi';
+            const d=document.getElementById('smtpDurum');
+            d.innerText=(ep.hazir?'Hazır ✓ ':'AYAR YAPILMADI — kayıt alınamaz, giriş kodu gönderilemez. ')
+                +' · kuyrukta: '+(ep.kuyrukta||0)+' · bugün gönderilen: '+(ep.bugunGonderilen||0)
+                +(ep.sonBasari?' · son başarılı: '+phTarih(ep.sonBasari):'')
+                +(ep.sonHata?'\nSon hata ('+phTarih(ep.sonHataTarihi)+'): '+ep.sonHata:'');
+            d.style.color=ep.hazir?(ep.sonHata&&(!ep.sonBasari||new Date(ep.sonHataTarihi)>new Date(ep.sonBasari))?'#b91c1c':''):'#b45309';
+        }
+        async function portalAyarKaydet(){
+            try{
+                const r=await fetch('/api/portal-hesaplari/ayarlar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+                    kayitAcik:document.getElementById('phKayitAcik').checked,
+                    onayGereksin:document.getElementById('phOnay').checked,
+                    giristeEpostaKodu:document.getElementById('phKod').checked,
+                    cihazHatirlaGun:Number(document.getElementById('phHatirla').value||0),
+                    yeniTeknisyenTipi:document.getElementById('phTekTip').value,
+                    saatlikKayitSiniri:Number(document.getElementById('phSaatlik').value||200)})});
+                if(!r.ok) throw new Error((await r.text())||'Kaydedilemedi.');
+                showSuccess('Kayıt ve giriş ayarları kaydedildi.');
+                await portalHesaplariYukle();
+            }catch(e){ showError(e.message); }
+        }
+        function smtpHazirAyar(t){
+            const v={gmail:['smtp.gmail.com',587],outlook:['smtp-mail.outlook.com',587],yandex:['smtp.yandex.com',587]}[t];
+            document.getElementById('smtpSunucu').value=v[0]; document.getElementById('smtpPort').value=v[1]; document.getElementById('smtpSsl').checked=true;
+            document.getElementById('smtpKullanici').focus();
+        }
+        async function smtpKaydet(){
+            try{
+                const r=await fetch('/api/portal-hesaplari/eposta-ayarlari',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+                    sunucu:document.getElementById('smtpSunucu').value.trim(),
+                    port:Number(document.getElementById('smtpPort').value||587),
+                    ssl:document.getElementById('smtpSsl').checked,
+                    kullanici:document.getElementById('smtpKullanici').value.trim(),
+                    parola:document.getElementById('smtpParola').value.replace(/\s+/g,'')||null,
+                    gonderenAd:document.getElementById('smtpAd').value.trim()||null,
+                    dakikadaEnFazla:Number(document.getElementById('smtpDakika').value||20),
+                    gundeEnFazla:Number(document.getElementById('smtpGun').value||450)})});
+                if(!r.ok) throw new Error((await r.text())||'Kaydedilemedi.');
+                document.getElementById('smtpParola').value='';
+                showSuccess('E-posta ayarı kaydedildi. “Deneme Gönder” ile kontrol edin.');
+                await portalHesaplariYukle();
+            }catch(e){ showError(e.message); }
+        }
+        async function smtpTest(){
+            const adres=document.getElementById('smtpTestAdres').value.trim()||document.getElementById('smtpKullanici').value.trim();
+            const d=document.getElementById('smtpDurum'); d.innerText='Deneme e-postası gönderiliyor...';
+            try{
+                const r=await fetch('/api/portal-hesaplari/eposta-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eposta:adres})});
+                const t=await r.text();
+                if(!r.ok) throw new Error(t||'Gönderilemedi.');
+                showSuccess(JSON.parse(t).message);
+            }catch(e){ showError(e.message); }
+            finally{ await portalHesaplariYukle(); }
+        }
+        setInterval(()=>portalHesaplariYukle(true),60000);
+
+        // ---------------- Portal hesabı e-posta durumu (hesap pencerelerinde) ----------------
+        function epostaDurumGoster(tur, d){
+            const el=document.getElementById(tur==='hekim'?'hekimPortalEposta':'teknisyenPanelEposta');
+            if(!el) return;
+            if(!d){ el.innerText='-'; el.style.color=''; return; }
+            if(d.eposta && d.epostaDogrulandi){ el.innerText=d.eposta+' (doğrulandı ✓)'; el.style.color='#15803d'; }
+            else { el.innerText='Kayıtlı değil — ilk girişte kendisi yazıp gelen kodla doğrulayacak'; el.style.color='#b45309'; }
         }
 
         // ---------------- Otomatik yedek ----------------
@@ -13433,7 +13706,7 @@
             document.getElementById('teknisyenPanelAlt').innerText=t.adSoyad||'-';
             document.getElementById('teknisyenPanelPass').value='';
             document.getElementById('teknisyenPanelModal').style.display='flex';
-            ikiAdimDurumGoster('teknisyen', null);
+            epostaDurumGoster('teknisyen', null);
             try{
                 const r=await fetch('/api/teknisyen-portal/admin/account/'+Number(id),{cache:'no-store'});
                 if(!r.ok) throw new Error((await r.text())||'Hesap bilgisi alınamadı.');
@@ -13441,7 +13714,7 @@
                 document.getElementById('teknisyenPanelUser').value=d.kullaniciAdi||'';
                 document.getElementById('teknisyenPanelTip').value=d.tip==='dis'?'dis':'ic';
                 document.getElementById('teknisyenPanelAktif').checked=d.aktif!==false;
-                ikiAdimDurumGoster('teknisyen', d);
+                epostaDurumGoster('teknisyen', d);
                 document.getElementById('teknisyenPanelPassNot').innerText=d.hesapVar?'(değiştirmeyecekseniz boş bırakın)':'(yeni hesap için zorunlu)';
                 let adres=window.location.origin+'/teknisyen';
                 try{ const pr=await fetch('/api/hekim-portal/admin/account/'+Number((hekimler[0]||{}).id||0),{cache:'no-store'}); if(pr.ok){ const pd=await pr.json(); const a=(pd.portalAdresleri||[])[0]; if(a) adres=a.replace(/\/hekim-portal$/,'/teknisyen'); } }catch{}
@@ -15182,7 +15455,7 @@ function togglePrimerAi(){
 
             await loadAnayasaData();
             await primerAiDurumYukle();
-            ikiAdimAyarYukle();
+            portalHesaplariYukle(true);
             otomatikYedekYukle();
         }
 
@@ -17393,7 +17666,7 @@ function togglePrimerAi(){
             document.getElementById("hekimPortalUser").value = "";
             document.getElementById("hekimPortalPass").value = "";
             document.getElementById("hekimPortalActive").checked = true;
-            ikiAdimDurumGoster("hekim", null);
+            epostaDurumGoster("hekim", null);
             document.getElementById("hekimPortalUrl").value =
                 window.location.origin + "/hekim-portal";
             modal.style.display = "flex";
@@ -17404,7 +17677,7 @@ function togglePrimerAi(){
                 const d = await r.json();
                 document.getElementById("hekimPortalUser").value = d.kullaniciAdi || "";
                 document.getElementById("hekimPortalActive").checked = d.aktif !== false;
-                ikiAdimDurumGoster("hekim", d);
+                epostaDurumGoster("hekim", d);
                 if (Array.isArray(d.portalAdresleri) && d.portalAdresleri.length) {
                     document.getElementById("hekimPortalUrl").value = d.portalAdresleri[0];
                 }

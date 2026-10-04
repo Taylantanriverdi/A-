@@ -68,7 +68,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     // =========================================================
 
     [HttpGet("admin/account/{teknisyenId:int}")]
-    public async Task<IActionResult> AdminHesap(int teknisyenId, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
+    public async Task<IActionResult> AdminHesap(int teknisyenId, [FromServices] PortalKimlik kimlik, CancellationToken ct)
     {
         if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
             return StatusCode(StatusCodes.Status403Forbidden, "Hesap yönetimi yalnız ana Primer Lab bilgisayarından yapılabilir.");
@@ -87,8 +87,8 @@ public sealed class TeknisyenPortalController : ControllerBase
             hesapVar = hesap != null,
             sonGirisTarihi = hesap?.SonGirisTarihi,
             panelYolu = "/teknisyen",
-            ikiAdimKurulu = ikiAdim.KuruluMu("teknisyen:" + teknisyenId),
-            ikiAdimZorunlu = ikiAdim.Zorunlu
+            eposta = kimlik.BilgiGetir("teknisyen:" + teknisyenId)?.Email,
+            epostaDogrulandi = kimlik.BilgiGetir("teknisyen:" + teknisyenId)?.EmailDogrulamaTarihi != null
         });
     }
 
@@ -119,16 +119,6 @@ public sealed class TeknisyenPortalController : ControllerBase
         return Ok(new { message = "Teknisyen panel hesabı kaydedildi.", kullaniciAdi, tip });
     }
 
-    [HttpDelete("admin/account/{teknisyenId:int}/iki-adim")]
-    public IActionResult AdminIkiAdimSifirla(int teknisyenId, [FromServices] IkiAdimDogrulama ikiAdim)
-    {
-        if (!IsLoopback(HttpContext.Connection.RemoteIpAddress))
-            return StatusCode(StatusCodes.Status403Forbidden, "Hesap yönetimi yalnız ana Primer Lab bilgisayarından yapılabilir.");
-        return ikiAdim.Sifirla("teknisyen:" + teknisyenId)
-            ? Ok(new { message = "İki adımlı doğrulama sıfırlandı; teknisyen bir sonraki girişte yeniden kuracak." })
-            : NotFound("Bu teknisyende kurulu iki adımlı doğrulama yok.");
-    }
-
     [HttpDelete("admin/account/{teknisyenId:int}")]
     public IActionResult AdminHesapPasif(int teknisyenId)
     {
@@ -142,7 +132,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     // =========================================================
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] TeknisyenGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
+    public async Task<IActionResult> Login([FromBody] TeknisyenGirisDto dto, [FromServices] PortalKimlik kimlik, CancellationToken ct)
     {
         var kullaniciAdi = (dto.KullaniciAdi ?? string.Empty).Trim().ToLowerInvariant();
         var parola = dto.Parola ?? string.Empty;
@@ -152,76 +142,220 @@ public sealed class TeknisyenPortalController : ControllerBase
 
         if ((ipAnahtar != null && Engelli(ipAnahtar, 5)) || Engelli(kAnahtar, 10))
             return StatusCode(StatusCodes.Status429TooManyRequests, "Çok fazla hatalı giriş denemesi. 10 dakika sonra tekrar deneyin.");
+        if (ipAnahtar != null && !kimlik.Izin("tgiris-ip:" + ipAnahtar, 40, TimeSpan.FromMinutes(10)))
+            return StatusCode(StatusCodes.Status429TooManyRequests, "Çok fazla giriş isteği. Birkaç dakika sonra tekrar deneyin.");
 
         if (kullaniciAdi.Length == 0 || parola.Length == 0)
-            return BadRequest("Kullanıcı adı ve parola gereklidir.");
+            return BadRequest("Kullanıcı adı ve şifre gereklidir.");
 
         var hesap = _hesaplar.KullaniciAdiyla(kullaniciAdi);
         var tek = hesap == null ? null : await TeknisyenGetir(hesap.TeknisyenId, ct);
+        bool? dogru = hesap == null ? false : await kimlik.OzetKapisindan(() => TeknisyenHesapDeposu.ParolaDogru(hesap, parola), ct);
+        if (dogru == null) return StatusCode(StatusCodes.Status503ServiceUnavailable, PortalKimlik.YogunMesaj);
 
-        if (hesap == null || tek == null || !hesap.Aktif || !tek.Aktif || !TeknisyenHesapDeposu.ParolaDogru(hesap, parola))
+        if (hesap == null || tek == null || dogru == false || !tek.Aktif)
         {
             if (ipAnahtar != null) HataKaydet(ipAnahtar);
             if (kullaniciAdi.Length > 0) HataKaydet(kAnahtar);
             await Task.Delay(Random.Shared.Next(150, 450), ct);
-            return Unauthorized("Kullanıcı adı veya parola hatalı.");
+            return Unauthorized("Kullanıcı adı veya şifre hatalı.");
         }
 
         if (ipAnahtar != null) GirisDenemeleri.TryRemove(ipAnahtar, out _);
         GirisDenemeleri.TryRemove(kAnahtar, out _);
 
-        // İki adımlı doğrulama: oturum, telefondaki kod girilince açılır.
-        var ikiAdimHesap = "teknisyen:" + tek.Id;
-        if (ikiAdim.KuruluMu(ikiAdimHesap))
-            return Ok(new { ikiAdim = "kod", jeton = ikiAdim.JetonUret(ikiAdimHesap) });
-        if (ikiAdim.Zorunlu)
-            return Ok(new { ikiAdim = "kurulum", jeton = ikiAdim.JetonUret(ikiAdimHesap) });
+        var anahtar = "teknisyen:" + tek.Id;
+        if (!hesap.Aktif)
+            return StatusCode(StatusCodes.Status403Forbidden, kimlik.BilgiGetir(anahtar)?.OnayBekliyor == true
+                ? "Kaydınız laboratuvarın onayını bekliyor. Onaylandığında bu bilgilerle giriş yapabilirsiniz."
+                : "Hesabınız pasif. Lütfen laboratuvarla görüşün.");
 
+        Request.Cookies.TryGetValue(CihazCerezi, out var cihaz);
+        var (yanit, oturumAc, hata) = kimlik.GirisSonrasi(anahtar, hesap.ParolaHash, cihaz);
+        if (hata != null) return StatusCode(StatusCodes.Status429TooManyRequests, hata);
+        if (!oturumAc) return Ok(yanit);
         return await OturumAc(tek.Id, ct);
     }
 
+    private const string CihazCerezi = "primer_teknisyen_cihaz";
+
+    [HttpPost("login/eposta")]
+    public IActionResult LoginEposta([FromBody] EpostaKodDto dto, [FromServices] PortalKimlik kimlik)
+    {
+        var (yanit, hata) = kimlik.GirisEpostasi(dto.Jeton, "teknisyen:", dto.Eposta);
+        return hata != null ? BadRequest(hata) : Ok(yanit);
+    }
+
     [HttpPost("login/kod")]
-    public async Task<IActionResult> LoginKod([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
+    public async Task<IActionResult> LoginKod([FromBody] EpostaKodDto dto, [FromServices] PortalKimlik kimlik, CancellationToken ct)
     {
-        var j = ikiAdim.JetonCoz(dto.Jeton, "teknisyen:");
-        if (j == null) return Unauthorized("Süre doldu. Lütfen kullanıcı adı ve parolayla tekrar giriş yapın.");
-        var kilit = "2fa:" + j.Hesap;
-        if (Engelli(kilit, 5)) return StatusCode(StatusCodes.Status429TooManyRequests, "Çok fazla hatalı kod. 10 dakika sonra tekrar deneyin.");
-        if (!ikiAdim.Dogrula(j.Hesap, dto.Kod))
+        var (anahtar, hata) = kimlik.GirisKoduDogrula(dto.Jeton, dto.Kod, "teknisyen:");
+        if (hata != null)
         {
-            HataKaydet(kilit);
             await Task.Delay(Random.Shared.Next(150, 450), ct);
-            return Unauthorized("Kod hatalı veya süresi geçmiş. Uygulamadaki güncel kodu girin.");
+            return Unauthorized(hata);
         }
-        GirisDenemeleri.TryRemove(kilit, out _);
-        return await OturumAc(int.Parse(j.Hesap["teknisyen:".Length..]), ct);
-    }
-
-    [HttpPost("login/kurulum")]
-    public IActionResult LoginKurulum([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim)
-    {
-        var j = ikiAdim.JetonCoz(dto.Jeton, "teknisyen:");
-        if (j == null) return Unauthorized("Süre doldu. Lütfen kullanıcı adı ve parolayla tekrar giriş yapın.");
-        if (ikiAdim.KuruluMu(j.Hesap)) return BadRequest("İki adımlı doğrulama zaten kurulu.");
-        var hesap = _hesaplar.Getir(int.Parse(j.Hesap["teknisyen:".Length..]));
-        return Ok(ikiAdim.KurulumBilgisi(j.Hesap, hesap?.KullaniciAdi ?? "teknisyen"));
-    }
-
-    [HttpPost("login/kurulum-tamamla")]
-    public async Task<IActionResult> LoginKurulumTamamla([FromBody] IkiAdimGirisDto dto, [FromServices] IkiAdimDogrulama ikiAdim, CancellationToken ct)
-    {
-        var j = ikiAdim.JetonCoz(dto.Jeton, "teknisyen:");
-        if (j?.KurulumAnahtari == null) return Unauthorized("Süre doldu. Lütfen tekrar giriş yapın.");
-        var kilit = "2fa:" + j.Hesap;
-        if (Engelli(kilit, 5)) return StatusCode(StatusCodes.Status429TooManyRequests, "Çok fazla hatalı kod. 10 dakika sonra tekrar deneyin.");
-        if (ikiAdim.KuruluMu(j.Hesap)) return BadRequest("İki adımlı doğrulama zaten kurulu.");
-        if (!ikiAdim.KurulumuTamamla(j.Hesap, j.KurulumAnahtari, dto.Kod))
+        var id = PortalKimlik.HesapId(anahtar!);
+        if (dto.Hatirla && _hesaplar.Getir(id) is { } h)
         {
-            HataKaydet(kilit);
-            return Unauthorized("Kod doğrulanamadı. Uygulamaya eklediğiniz hesabın güncel kodunu girin.");
+            var gun = kimlik.AyarlariOku().CihazHatirlaGun;
+            Request.Cookies.TryGetValue(CihazCerezi, out var mevcut);
+            PortalKimlik.CihazCereziYaz(HttpContext, CihazCerezi,
+                PortalKimlik.CihazCereziEkle(mevcut, kimlik.CihazJetonu(anahtar!, h.ParolaHash, gun)), gun);
         }
-        GirisDenemeleri.TryRemove(kilit, out _);
-        return await OturumAc(int.Parse(j.Hesap["teknisyen:".Length..]), ct);
+        return await OturumAc(id, ct);
+    }
+
+    [HttpPost("login/kod-tekrar")]
+    public IActionResult LoginKodTekrar([FromBody] EpostaKodDto dto, [FromServices] PortalKimlik kimlik)
+    {
+        var hata = kimlik.KoduTekrarGonder(dto.Jeton);
+        return hata != null ? StatusCode(StatusCodes.Status429TooManyRequests, hata) : Ok(new { message = "Yeni kod gönderildi." });
+    }
+
+    // =========================================================
+    // KENDİ KENDİNE KAYIT VE ŞİFRE SIFIRLAMA
+    // =========================================================
+
+    [HttpGet("kayit/durum")]
+    public IActionResult KayitDurum([FromServices] PortalKimlik kimlik)
+    {
+        var a = kimlik.AyarlariOku();
+        return Ok(new { kayitAcik = a.KayitAcik && kimlik.EpostaHazir, sifreSifirlama = kimlik.EpostaHazir, onayGereksin = a.OnayGereksin });
+    }
+
+    [HttpGet("kayit/zorluk")]
+    public IActionResult KayitZorluk([FromServices] PortalKimlik kimlik) => Ok(kimlik.ZorlukUret());
+
+    [HttpPost("kayit/basla")]
+    public async Task<IActionResult> KayitBasla([FromBody] PortalKayitDto dto, [FromServices] PortalKimlik kimlik, CancellationToken ct)
+    {
+        var a = kimlik.AyarlariOku();
+        if (!a.KayitAcik) return StatusCode(StatusCodes.Status403Forbidden, "Yeni kayıt şu anda kapalı. Lütfen laboratuvarla görüşün.");
+        if (!kimlik.EpostaHazir) return StatusCode(StatusCodes.Status503ServiceUnavailable, "Laboratuvarın e-posta ayarı henüz yapılmadığı için kayıt alınamıyor.");
+        if (!string.IsNullOrEmpty(dto.Website)) return Ok(new { jeton = kimlik.SahteKod(PortalKimlik.AmacKayit), eposta = "" });
+        if (!kimlik.ZorlukDogrula(dto.ZorlukJeton, dto.ZorlukCevap))
+            return BadRequest("Güvenlik doğrulaması tamamlanamadı. Sayfayı yenileyip tekrar deneyin.");
+        var izin = kimlik.BasvuruIzni(HttpContext, "kayit");
+        if (izin != null) return StatusCode(StatusCodes.Status429TooManyRequests, izin);
+
+        var adSoyad = Kisalt(dto.AdSoyad, 150);
+        var telefon = Kisalt(dto.Telefon, 30);
+        var email = PortalKimlik.EpostaNormalize(dto.Eposta);
+        var kullaniciAdi = (dto.KullaniciAdi ?? string.Empty).Trim().ToLowerInvariant();
+        if (adSoyad == null || adSoyad.Length < 3) return BadRequest("Adınızı ve soyadınızı yazın.");
+        if (email == null) return BadRequest("Geçerli bir e-posta adresi girin.");
+        if (!UsernameRegex.IsMatch(kullaniciAdi))
+            return BadRequest("Kullanıcı adı 3-64 karakter olmalı; yalnız harf, rakam, nokta, alt çizgi ve tire kullanılabilir.");
+        var parolaHatasi = PortalKimlik.ParolaKontrol(dto.Parola);
+        if (parolaHatasi != null) return BadRequest(parolaHatasi);
+        if (!dto.Kvkk) return BadRequest("Devam etmek için bilgilendirme metnini onaylayın.");
+        if (!_hesaplar.KullaniciAdiBos(kullaniciAdi)) return Conflict("Bu kullanıcı adı alınmış. Başka bir kullanıcı adı seçin.");
+        var sahip = kimlik.EpostaSahibi(email);
+        if (sahip != null && sahip.StartsWith("teknisyen:", StringComparison.Ordinal))
+            return Conflict("Bu e-posta ile kayıtlı bir hesap var. Giriş yapın ya da \"Şifremi unuttum\"u kullanın.");
+
+        var ozet = await kimlik.OzetKapisindan(() => { var o = TeknisyenHesapDeposu.OzetUret(dto.Parola!); return new[] { o.Hash, o.Salt }; }, ct);
+        if (ozet == null) return StatusCode(StatusCodes.Status503ServiceUnavailable, PortalKimlik.YogunMesaj);
+
+        var veri = JsonSerializer.Serialize(new HekimKayitVerisi(adSoyad, null, telefon, kullaniciAdi, ozet[0], ozet[1], PortalKimlik.IpAnahtari(HttpContext)));
+        var (jeton, hata) = kimlik.KodGonder(PortalKimlik.AmacKayit, null, email, veri);
+        if (hata != null) return StatusCode(StatusCodes.Status429TooManyRequests, hata);
+        return Ok(new { jeton, eposta = PortalKimlik.Maskele(email) });
+    }
+
+    [HttpPost("kayit/tamamla")]
+    public async Task<IActionResult> KayitTamamla([FromBody] EpostaKodDto dto, [FromServices] PortalKimlik kimlik, CancellationToken ct)
+    {
+        var (k, hata) = kimlik.KodDogrula(dto.Jeton, dto.Kod, PortalKimlik.AmacKayit);
+        if (hata != null)
+        {
+            await Task.Delay(Random.Shared.Next(150, 450), ct);
+            return Unauthorized(hata);
+        }
+        var v = JsonSerializer.Deserialize<HekimKayitVerisi>(k!.Veri!)!;
+        var a = kimlik.AyarlariOku();
+        if (!_hesaplar.KullaniciAdiBos(v.KullaniciAdi))
+            return Conflict("Bu kullanıcı adı az önce başka biri tarafından alındı. Lütfen baştan başlayıp başka bir kullanıcı adı seçin.");
+
+        var id = (await _db.Database.SqlQuery<int>($"""
+            INSERT INTO "Teknisyenler" ("AdSoyad","Aktif","OlusturmaTarihi") VALUES ({v.AdSoyad},true,{DateTime.UtcNow})
+            RETURNING "Id" AS "Value"
+            """).ToListAsync(ct))[0];
+        if (!_hesaplar.OzetliEkle(id, v.KullaniciAdi, v.ParolaHash, v.ParolaSalt, a.YeniTeknisyenTipi, !a.OnayGereksin))
+        {
+            await _db.Database.ExecuteSqlInterpolatedAsync($"""UPDATE "Teknisyenler" SET "Aktif"=false WHERE "Id"={id}""", ct);
+            return Conflict("Bu kullanıcı adı az önce başka biri tarafından alındı. Lütfen baştan başlayıp başka bir kullanıcı adı seçin.");
+        }
+
+        kimlik.BilgiGuncelle("teknisyen:" + id, b =>
+        {
+            b.Email = k.Email;
+            b.EmailDogrulamaTarihi = DateTime.UtcNow;
+            b.KendiKaydi = true;
+            b.KayitTarihi = DateTime.UtcNow;
+            b.OnayBekliyor = a.OnayGereksin;
+            b.KayitIp = v.Ip;
+            b.Telefon = v.Telefon;
+        });
+
+        if (a.OnayGereksin) return Ok(new { onayBekliyor = true, message = "Kaydınız alındı. Laboratuvar onayladığında giriş yapabilirsiniz." });
+        return await OturumAc(id, ct);
+    }
+
+    [HttpPost("sifre/basla")]
+    public IActionResult SifreBasla([FromBody] SifreSifirlaDto dto, [FromServices] PortalKimlik kimlik)
+    {
+        if (!kimlik.EpostaHazir) return StatusCode(StatusCodes.Status503ServiceUnavailable, "Şifre sıfırlama için laboratuvarın e-posta ayarı yapılmamış. Laboratuvarla görüşün.");
+        if (!kimlik.ZorlukDogrula(dto.ZorlukJeton, dto.ZorlukCevap))
+            return BadRequest("Güvenlik doğrulaması tamamlanamadı. Sayfayı yenileyip tekrar deneyin.");
+        var izin = kimlik.BasvuruIzni(HttpContext, "sifre");
+        if (izin != null) return StatusCode(StatusCodes.Status429TooManyRequests, izin);
+
+        var giris = (dto.Kimlik ?? string.Empty).Trim().ToLowerInvariant();
+        string? anahtar = null;
+        if (giris.Contains('@'))
+        {
+            var e = PortalKimlik.EpostaNormalize(giris);
+            var s = e == null ? null : kimlik.EpostaSahibi(e);
+            if (s != null && s.StartsWith("teknisyen:", StringComparison.Ordinal)) anahtar = s;
+        }
+        else if (giris.Length > 0 && _hesaplar.KullaniciAdiyla(giris) is { } h)
+            anahtar = "teknisyen:" + h.TeknisyenId;
+
+        var bilgi = anahtar == null ? null : kimlik.BilgiGetir(anahtar);
+        string? jeton = null;
+        if (bilgi?.Email != null && bilgi.EmailDogrulamaTarihi != null)
+        {
+            var (j, hata) = kimlik.KodGonder(PortalKimlik.AmacSifre, anahtar, bilgi.Email);
+            if (hata != null) return StatusCode(StatusCodes.Status429TooManyRequests, hata);
+            jeton = j;
+        }
+        return Ok(new { jeton = jeton ?? kimlik.SahteKod(PortalKimlik.AmacSifre) });
+    }
+
+    [HttpPost("sifre/tamamla")]
+    public async Task<IActionResult> SifreTamamla([FromBody] SifreSifirlaDto dto, [FromServices] PortalKimlik kimlik, CancellationToken ct)
+    {
+        var parolaHatasi = PortalKimlik.ParolaKontrol(dto.YeniParola);
+        if (parolaHatasi != null) return BadRequest(parolaHatasi);
+        var (k, hata) = kimlik.KodDogrula(dto.Jeton, dto.Kod, PortalKimlik.AmacSifre);
+        if (hata != null)
+        {
+            await Task.Delay(Random.Shared.Next(150, 450), ct);
+            return Unauthorized(hata);
+        }
+        if (k!.Hesap == null || !k.Hesap.StartsWith("teknisyen:", StringComparison.Ordinal)) return Unauthorized("Süre doldu. Lütfen baştan başlayın.");
+        var ozet = await kimlik.OzetKapisindan(() => { var o = TeknisyenHesapDeposu.OzetUret(dto.YeniParola!); return new[] { o.Hash, o.Salt }; }, ct);
+        if (ozet == null) return StatusCode(StatusCodes.Status503ServiceUnavailable, PortalKimlik.YogunMesaj);
+        _hesaplar.ParolaAyarla(PortalKimlik.HesapId(k.Hesap), ozet[0], ozet[1]);
+        return Ok(new { message = "Şifreniz yenilendi. Yeni şifrenizle giriş yapabilirsiniz." });
+    }
+
+    private static string? Kisalt(string? deger, int max)
+    {
+        var t = (deger ?? string.Empty).Trim();
+        return t.Length == 0 ? null : t.Length > max ? t[..max] : t;
     }
 
     private async Task<IActionResult> OturumAc(int teknisyenId, CancellationToken ct)
