@@ -57,10 +57,12 @@ public sealed class PortalKimlik
     {
         public bool KayitAcik { get; set; } = true;
         public bool OnayGereksin { get; set; }
-        public bool GiristeEpostaKodu { get; set; } = true;
+        public bool GiristeEpostaKodu { get; set; }
         public int CihazHatirlaGun { get; set; } = 30;
         public string YeniTeknisyenTipi { get; set; } = TeknisyenHesapDeposu.Dis;
         public int SaatlikKayitSiniri { get; set; } = 200;
+        /// <summary>2: girişte e-posta kodu varsayılan olarak kapatıldı (eski ayar dosyaları bir kez kapatılır).</summary>
+        public int AyarSurumu { get; set; }
     }
 
     public Ayarlar AyarlariOku()
@@ -69,7 +71,16 @@ public sealed class PortalKimlik
         {
             try
             {
-                return File.Exists(_ayarDosyasi) ? JsonSerializer.Deserialize<Ayarlar>(File.ReadAllText(_ayarDosyasi)) ?? new Ayarlar() : new Ayarlar();
+                if (!File.Exists(_ayarDosyasi)) return new Ayarlar { AyarSurumu = 2 };
+                var a = JsonSerializer.Deserialize<Ayarlar>(File.ReadAllText(_ayarDosyasi)) ?? new Ayarlar();
+                if (a.AyarSurumu < 2)
+                {
+                    // Hekim ve teknisyen kullanıcı adı + şifreyle doğrudan girer; kod istenirse yönetici yeniden açar.
+                    a.GiristeEpostaKodu = false;
+                    a.AyarSurumu = 2;
+                    DosyaYaz(_ayarDosyasi, a);
+                }
+                return a;
             }
             catch (JsonException) { return new Ayarlar(); }
         }

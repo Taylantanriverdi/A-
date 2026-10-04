@@ -176,8 +176,10 @@ Hekimler ve teknisyenler laboratuvara ihtiyac duymadan kendi kullanici adi ve
 sifrelerini olusturur:
   Portal adresi > "Hesabiniz yok mu? Kayit olun" > bilgiler + kullanici adi +
   sifre > e-postaya gelen 6 haneli kod > hesap acilir.
-Giriste: kullanici adi + sifre, ardindan e-postaya gelen kod ("Bu cihazi 30
-gun hatirla" secilirse o cihazda 30 gun kod sorulmaz).
+Giriste: kullanici adi + sifre ile dogrudan girilir (V20 ve sonrasi; e-posta
+kodu sorulmaz). Isterseniz Portal Hesaplari > "Giriste e-posta kodu iste"
+kutusunu acarak sifreden sonra e-postaya gelen kodu da sordurabilirsiniz
+("Bu cihazi 30 gun hatirla" secilirse o cihazda 30 gun kod sorulmaz).
 Sifresini unutan: "Sifremi unuttum" > kullanici adi veya e-posta > e-postaya
 gelen kod > yeni sifre.
 
