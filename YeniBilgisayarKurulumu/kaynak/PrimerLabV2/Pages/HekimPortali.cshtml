@@ -169,7 +169,7 @@
             <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
         </div>
         <h1>Hoş geldiniz</h1>
-        <p>Laboratuvarın size verdiği kullanıcı adı ve parola ile giriş yapın.</p>
+        <p>Kullanıcı adınız ve şifrenizle giriş yapın. Hesabınız yoksa aşağıdan kendiniz kayıt olabilirsiniz.</p>
         <div id="loginMsg" class="msg err hidden"></div>
         <div id="sifreAdimi">
         <div class="field">
@@ -177,7 +177,7 @@
             <input id="loginUser" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" required />
         </div>
         <div class="field">
-            <label class="lbl" for="loginPass">Parola</label>
+            <label class="lbl" for="loginPass">Şifre</label>
             <input id="loginPass" class="inp" type="password" autocomplete="current-password" required />
         </div>
         </div>
@@ -201,8 +201,8 @@
         </div>
         <button id="loginBtn" class="btn btn-block" type="submit">Giriş Yap</button>
         <div id="pkAltLinkler" class="pk-alt">
-            <button type="button" class="pk-link hidden" id="pkSifreLink" onclick="pkEkran('sifre')">Şifremi unuttum</button>
-            <button type="button" class="pk-link hidden" id="pkKayitLink" onclick="pkEkran('kayit')">Hesabınız yok mu? Kayıt olun</button>
+            <button type="button" class="pk-link" id="pkSifreLink" onclick="pkAc('sifre')">Şifremi unuttum</button>
+            <button type="button" class="pk-link" id="pkKayitLink" onclick="pkAc('kayit')">Hesabınız yok mu? <b>Kayıt olun</b></button>
         </div>
         <button id="pkGirisGeri" class="pk-link pk-geri hidden" type="button" onclick="pkGirisSifirla();pkMsg('loginMsg','')">&larr; Kullanıcı adı ve şifreye dön</button>
     </form>
@@ -604,12 +604,25 @@
         if (ad === "sifre") { pkSifreJeton = null; $("sifreAdim1").classList.remove("hidden"); $("sifreAdim2").classList.add("hidden"); $("sifreBtn").textContent = "Kod Gönder"; setTimeout(() => $("sKimlik").focus(), 50); }
         if (ad === "login") { pkGirisSifirla(); pkDurumYukle(); }
     }
+    let pkDurum = null;
     async function pkDurumYukle() {
-        try {
-            const d = await (await fetch(PK_API + "/kayit/durum", { cache: "no-store" })).json();
-            $("pkKayitLink").classList.toggle("hidden", !d.kayitAcik);
-            $("pkSifreLink").classList.toggle("hidden", !d.sifreSifirlama);
-        } catch {}
+        try { pkDurum = await (await fetch(PK_API + "/kayit/durum", { cache: "no-store" })).json(); } catch {}
+        return pkDurum;
+    }
+    // Bağlantılar her zaman görünür; kayıt / şifre yenileme kapalıysa nedeni açıklanır.
+    async function pkAc(ad) {
+        const d = await pkDurumYukle();
+        if (ad === "kayit" && d && !d.kayitAcik) {
+            pkMsg("loginMsg", d.sifreSifirlama
+                ? "Yeni kayıt şu anda kapalı. Hesap açmak için lütfen laboratuvarla görüşün."
+                : "Kayıt henüz açılmadı: laboratuvarın e-posta ayarı yapılınca buradan kendiniz kayıt olabileceksiniz. Şimdilik hesap için laboratuvarla görüşün.", "info");
+            return;
+        }
+        if (ad === "sifre" && d && !d.sifreSifirlama) {
+            pkMsg("loginMsg", "Şifre yenileme henüz açılmadı (laboratuvarın e-posta ayarı yapılmamış). Yeni şifre için laboratuvarla görüşün.", "info");
+            return;
+        }
+        pkEkran(ad);
     }
     function pkButon() {
         return !pkGiris ? "Giriş Yap" : pkGiris.tur === "eposta-gir" ? "Kodu Gönder" : "Doğrula ve Giriş Yap";

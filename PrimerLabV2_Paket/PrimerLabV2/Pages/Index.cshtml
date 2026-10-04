@@ -4450,6 +4450,10 @@
                     </div>
                 </div>
 
+                <div id="phUyari" class="panel" style="display:none;margin-bottom:14px;border:2px solid #fde68a;background:#fffbeb;padding:14px 18px;color:#92400e;font-weight:700">
+                    ⚠️ E-posta ayarı yapılmadı: hekim ve teknisyenler henüz kendi kendine <b>kayıt olamaz</b> ve <b>şifremi unuttum</b> çalışmaz; girişler yalnız şifreyle yapılır.
+                    Aşağıdaki <b>“E-posta Gönderimi”</b> bölümünden Gmail adresinizi ve uygulama şifrenizi girip <b>Deneme Gönder</b>'e basın.
+                </div>
                 <div id="phOzet" class="ph-ozet"></div>
 
                 <div class="panel">
@@ -13578,6 +13582,7 @@
             document.getElementById('phYogunluk').innerText='Yoğunluk koruması: son 1 saatte '+(ist.sonSaatKayitBasvurusu||0)+' kayıt, '+(ist.sonSaatSifreBasvurusu||0)+' şifre yenileme başvurusu · bekleyen kod: '+(ist.bekleyenKod||0)+' · engellenen istek: '+(ist.engellenenIstek||0)+' · bot kontrol zorluğu: '+(ist.zorlukBit||17)+' bit';
             set('smtpSunucu',ep.sunucu); set('smtpPort',ep.port||587); set('smtpKullanici',ep.kullanici); set('smtpAd',ep.gonderenAd);
             set('smtpDakika',ep.dakikadaEnFazla||20); set('smtpGun',ep.gundeEnFazla||450); set('smtpSsl',ep.ssl!==false);
+            const uy=document.getElementById('phUyari'); if(uy) uy.style.display=ep.hazir?'none':'';
             const pw=document.getElementById('smtpParola'); if(pw) pw.placeholder=ep.parolaKayitli?'kayıtlı — değiştirmek için yazın':'uygulama şifresi';
             const d=document.getElementById('smtpDurum');
             d.innerText=(ep.hazir?'Hazır ✓ ':'AYAR YAPILMADI — kayıt alınamaz, giriş kodu gönderilemez. ')
