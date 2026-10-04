@@ -291,3 +291,17 @@ Kapanis resmi, ayri bite dosyasi yerine ust ve alt cene birlikte cizilerek
 olusturulur. Tarayici iki ceneyi kapanis konumunda verdiyse o konum aynen
 kullanilir; ayri ayri disa aktarilmissa program orta hatlari ve kesicileri
 hizalayip disleri birbirine oturtur (ust kesiciler hafif onde).
+
+IC TEKNISYEN: SIPARIS FORMU VE GECMIS SIPARIS FORMLARI
+----------------------------------------------------
+Teknisyen Paneli'ne giren IC teknisyenlerde "Siparis Formlari" sekmesi
+vardir (dis teknisyenlerde yoktur):
+- "+ Yeni Siparis": hekim secilir, hekim portalindaki formun aynisi doldurulur
+  (is turleri ve fiyat o hekimin listesinden gelir, tarama dosyalari eklenebilir).
+  Siparis "Teknisyen Paneli" kaynagiyla Onay Bekleyen listesine duser;
+  gecmisinde hangi teknisyenin actigi yazar. Onaylamak sizdedir.
+- Tum isler (silinenler haric) yeniden eskiye listelenir; is no, hasta, hekim,
+  klinik veya is turuyle aranir. "Formu Gor / Yazdir" ile fiyatsiz siparis formu
+  acilir ve yazdirilir; "Dosyalar" ile isin dosyalari indirilir.
+Hekime is listesi tanimli degilse o hekim icin siparis acilamaz
+(Hekimler > Fiyat Listesi).

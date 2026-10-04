@@ -328,6 +328,15 @@
             <div id="listeYokMsg" class="msg info hidden">Size tanımlı iş listesi henüz bulunmuyor. Lütfen laboratuvarı arayın; liste tanımlandığında buradan iş gönderebilirsiniz.</div>
 
             <form id="isFormu" onsubmit="gonder(event)" novalidate>
+                <div class="card hidden" id="tekHekimKart">
+                    <div class="card-title"><span class="step">0</span> Hekim <span class="req">*</span></div>
+                    <div class="field">
+                        <label class="lbl" for="tekHekim">Siparişi veren hekim</label>
+                        <input id="tekHekimAra" class="inp" autocomplete="off" placeholder="Hekim veya klinik ara" oninput="tekHekimleriCiz()" style="margin-bottom:8px" />
+                        <select id="tekHekim" class="inp" onchange="tekHekimSecildi()"></select>
+                    </div>
+                    <div class="hint">İş türleri ve fiyatlar seçilen hekimin listesinden gelir. Sipariş laboratuvarın onayına (Onay Bekleyen) düşer.</div>
+                </div>
                 <div class="card">
                     <div class="card-title"><span class="step">1</span> Hasta Bilgisi</div>
                     <div class="grid2">
@@ -545,6 +554,7 @@
 
     // ---------- Oturum ----------
     function girisEkrani() {
+        if (TEK) { tekHata("Teknisyen oturumu sona erdi. Teknisyen Paneli'nden tekrar giriş yapın."); return; }
         $("appScreen").classList.add("hidden");
         pkEkran("login");
         setTimeout(() => $("loginUser").focus(), 50);
@@ -805,7 +815,64 @@
         girisEkrani();
     }
 
+    // ---------- İç teknisyen modu (/hekim-portal?mod=teknisyen) ----------
+    // Teknisyen Paneli oturumuyla girilir; hekim seçilir, form aynı, kayıt laboratuvar onayına düşer.
+    const TEK = new URLSearchParams(location.search).get("mod") === "teknisyen";
+    let tekHekimler = [];
+    function tekHata(metin) {
+        $("loginScreen").classList.add("hidden"); $("kayitScreen").classList.add("hidden"); $("sifreScreen").classList.add("hidden");
+        $("appScreen").classList.add("hidden");
+        document.body.insertAdjacentHTML("beforeend", `<section class="login"><div class="login-card"><h1>Sipariş formu açılamadı</h1><div class="msg err">${esc(metin)}</div><a class="btn btn-block" style="display:grid;place-items:center;text-decoration:none" href="/teknisyen">Teknisyen Paneli'ne dön</a></div></section>`);
+    }
+    async function tekBasla() {
+        let d;
+        try {
+            const r = await fetch("/api/hekim-portal/teknisyen/hekimler", { cache: "no-store", credentials: "same-origin" });
+            if (!r.ok) { tekHata((await r.text()) || "Teknisyen Paneli'nden giriş yapın."); return; }
+            d = await r.json();
+        } catch { tekHata("Bağlantı kurulamadı."); return; }
+        tekHekimler = d.hekimler || [];
+        document.title = "Primer Lab Sipariş Formu";
+        document.querySelector("#appScreen .brand-sub").textContent = "SİPARİŞ FORMU";
+        document.querySelector("#appScreen .tabs").classList.add("hidden");
+        $("whoName").textContent = (d.teknisyen && d.teknisyen.adSoyad) || "";
+        $("whoClinic").innerHTML = '<a class="link-btn" href="/teknisyen">← Teknisyen Paneli</a>';
+        document.querySelector("#appScreen .who > button").classList.add("hidden");
+        $("tekHekimKart").classList.remove("hidden");
+        $("gonderBtn").textContent = "Siparişi Kaydet";
+        $("gonderildi").querySelector("h2").textContent = "Sipariş kaydedildi";
+        $("gonderildi").querySelector("button.btn-light").classList.add("hidden");
+        $("gonderildi").querySelector("button.btn").textContent = "Yeni sipariş aç";
+        $("loginScreen").classList.add("hidden");
+        $("appScreen").classList.remove("hidden");
+        isTurleri = [];
+        tekHekimleriCiz();
+        yeniForm();
+        $("gonderBtn").disabled = true;
+    }
+    function tekHekimleriCiz() {
+        const q = $("tekHekimAra").value.trim().toLocaleLowerCase("tr-TR"), sec = $("tekHekim").value;
+        const liste = tekHekimler.filter(h => !q || (h.adSoyad + " " + (h.klinikAdi || "")).toLocaleLowerCase("tr-TR").includes(q));
+        $("tekHekim").innerHTML = '<option value="">Hekim seçin...</option>' + liste.map(h =>
+            `<option value="${h.id}">${esc(h.adSoyad)}${h.klinikAdi ? " — " + esc(h.klinikAdi) : ""}${h.isTuruSayisi ? "" : " (iş listesi yok)"}</option>`).join("");
+        if (liste.some(h => String(h.id) === sec)) $("tekHekim").value = sec;
+        else if (liste.length === 1 && q) { $("tekHekim").value = String(liste[0].id); tekHekimSecildi(); }
+    }
+    async function tekHekimSecildi() {
+        const id = Number($("tekHekim").value || 0);
+        isTurleri = [];
+        if (id) {
+            try { const d = await api("/api/hekim-portal/teknisyen/me?hekimId=" + id); isTurleri = (d.isTurleri || []).map(x => x.isTuru).filter(Boolean); }
+            catch (err) { mesaj("formMsg", err.message); }
+        }
+        $("listeYokMsg").textContent = "Bu hekime tanımlı iş listesi yok. Ana programda Hekimler > Fiyat Listesi'nden tanımlanmalı.";
+        $("listeYokMsg").classList.toggle("hidden", !id || isTurleri.length > 0);
+        $("gonderBtn").disabled = !id || isTurleri.length === 0;
+        kalemler = []; sayac = 0; kalemEkle(); ozetCiz();
+    }
+
     async function basla() {
+        if (TEK) { await tekBasla(); return; }
         let me;
         try {
             const r = await fetch("/api/hekim-portal/me", { cache: "no-store", credentials: "same-origin" });
@@ -1051,6 +1118,7 @@
             const el = $(hata[1]); if (el && el.focus) setTimeout(() => el.focus({ preventScroll: true }), 300);
             return;
         }
+        if (TEK && !$("tekHekim").value) { mesaj("formMsg", "Hekim seçin."); $("tekHekim").focus(); return; }
         mesaj("formMsg", "");
         const dolu = kalemler.filter(k => k.isTuru);
         const payload = {
@@ -1081,7 +1149,7 @@
         bar.classList.remove("hidden"); ic.style.width = "0%";
 
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", "/api/hekim-portal/jobs");
+        xhr.open("POST", TEK ? "/api/hekim-portal/teknisyen/jobs?hekimId=" + Number($("tekHekim").value) : "/api/hekim-portal/jobs");
         xhr.withCredentials = true;
         xhr.upload.onprogress = ev => {
             if (!ev.lengthComputable) return;
@@ -1089,14 +1157,15 @@
             ic.style.width = y + "%";
             btn.textContent = y < 100 ? "Yükleniyor... %" + y : "Kaydediliyor...";
         };
-        const bitir = () => { btn.disabled = false; btn.textContent = "Laboratuvara Gönder"; bar.classList.add("hidden"); };
+        const bitir = () => { btn.disabled = false; btn.textContent = TEK ? "Siparişi Kaydet" : "Laboratuvara Gönder"; bar.classList.add("hidden"); };
         xhr.onload = () => {
             bitir();
+            if (xhr.status === 401 && TEK) { mesaj("formMsg", "Teknisyen oturumu sona erdi. Başka sekmede Teknisyen Paneli'ne giriş yapıp Kaydet'e tekrar basın; form duruyor."); return; }
             if (xhr.status === 401) { girisEkrani(); mesaj("loginMsg", "Oturum sona erdi. Giriş yaptıktan sonra Gönder'e tekrar basın; formunuz duruyor."); return; }
             if (xhr.status === 413) { mesaj("formMsg", "Dosyalar çok büyük. ZIP yapıp küçültün veya ikiye bölerek gönderin."); return; }
             if (xhr.status < 200 || xhr.status >= 300) { mesaj("formMsg", xhr.responseText || ("Gönderilemedi (" + xhr.status + ")")); return; }
             let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
-            $("gonderildiMsg").textContent = (d.message || "İş laboratuvara gönderildi.") + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "");
+            $("gonderildiMsg").textContent = (TEK ? "#" + (d.siparisIds || [d.siparisId]).join(", #") + " numaralı sipariş açıldı; laboratuvarın Onay Bekleyen listesine düştü." : (d.message || "İş laboratuvara gönderildi.")) + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "");
             $("isFormu").classList.add("hidden");
             $("gonderildi").classList.remove("hidden");
             kalemler = []; dosyalar = [];

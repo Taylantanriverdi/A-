@@ -573,6 +573,41 @@ public sealed class TeknisyenPortalController : ControllerBase
     }
 
     // =========================================================
+    // SİPARİŞ FORMLARI (yalnız iç teknisyen) — tüm işlerin formları, fiyatsız
+    // =========================================================
+
+    [HttpGet("siparis-formlari")]
+    public async Task<IActionResult> SiparisFormlari([FromQuery] string? ara, [FromQuery] int sayfa, CancellationToken ct)
+    {
+        var o = await Oturum(ct);
+        if (o.Hata != null) return o.Hata;
+        if (o.Tip != TeknisyenHesapDeposu.Ic) return StatusCode(StatusCodes.Status403Forbidden, "Sipariş formlarını yalnız iç teknisyenler görebilir.");
+        var q = (ara ?? "").Trim();
+        if (q.Length > 80) q = q[..80];
+        var desen = "%" + q.Replace("\\", "").Replace("%", "").Replace("_", "") + "%";
+        var no = int.TryParse(q.TrimStart('#'), out var n) ? n : -1;
+        sayfa = Math.Max(0, sayfa);
+        var rows = await _db.Database.SqlQuery<SiparisFormuSatiri>($"""
+            SELECT s."Id", COALESCE(p."AdSoyad",'-') AS "HastaAdi", COALESCE(h."AdSoyad",'-') AS "HekimAdi",
+                   h."KlinikAdi", COALESCE(s."Durum",'Bekliyor') AS "Durum", COALESCE(s."OnayDurumu",'Onaylandı') AS "OnayDurumu",
+                   s."OlusturmaTarihi", s."TerminTarihi", s."DisRengi", s."DisSemasi", s."Materyal", s."Notlar",
+                   t."AdSoyad" AS "TeknisyenAdi", s."Kaynak",
+                   (SELECT string_agg(k."IsTuru" || ' × ' || k."Adet", ', ' ORDER BY k."Id") FROM "SiparisKalemleri" k WHERE k."SiparisId"=s."Id") AS "Kalemler",
+                   (SELECT COUNT(*)::int FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id") AS "DosyaSayisi"
+            FROM "Siparisler" s
+            INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
+            LEFT JOIN "Hekimler" h ON h."Id"=p."HekimId"
+            LEFT JOIN "Teknisyenler" t ON t."Id"=s."TeknisyenId"
+            WHERE COALESCE(s."Silindi",false)=false
+              AND ({q} = '' OR s."Id"={no} OR p."AdSoyad" ILIKE {desen} OR h."AdSoyad" ILIKE {desen} OR h."KlinikAdi" ILIKE {desen}
+                   OR EXISTS(SELECT 1 FROM "SiparisKalemleri" k WHERE k."SiparisId"=s."Id" AND k."IsTuru" ILIKE {desen}))
+            ORDER BY s."Id" DESC
+            LIMIT 51 OFFSET {sayfa * 50}
+            """).ToListAsync(ct);
+        return Ok(new { formlar = rows.Take(50), devami = rows.Count > 50 });
+    }
+
+    // =========================================================
     // DOSYALAR
     // =========================================================
 
@@ -581,7 +616,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     {
         var o = await Oturum(ct);
         if (o.Hata != null) return o.Hata;
-        if (await IsDurumu(o.Tek!.Id, jobId, ct) == null) return NotFound("İş bulunamadı.");
+        if (!await OkumaErisimi(o.Tek!.Id, o.Tip, jobId, ct)) return NotFound("İş bulunamadı.");
 
         var rows = await _db.Database.SqlQuery<TeknisyenDosyaSatiri>($"""
             SELECT "Id","DosyaTuru","OrijinalDosyaAdi","SaklananDosyaAdi","Boyut","YuklemeTarihi"
@@ -596,7 +631,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     {
         var o = await Oturum(ct);
         if (o.Hata != null) return o.Hata;
-        if (await IsDurumu(o.Tek!.Id, jobId, ct) == null) return NotFound("İş bulunamadı.");
+        if (!await OkumaErisimi(o.Tek!.Id, o.Tip, jobId, ct)) return NotFound("İş bulunamadı.");
         if (o.Tip == TeknisyenHesapDeposu.Dis && !await KabulEdildi(o.Tek.Id, jobId, ct))
             return BadRequest("Dosyaları indirmek için önce işi kabul edin.");
 
@@ -743,6 +778,16 @@ public sealed class TeknisyenPortalController : ControllerBase
         return liste.FirstOrDefault();
     }
 
+    // Okuma (dosya listesi / indirme): dış teknisyen yalnız kendi işine; iç teknisyen laboratuvar kadrosu
+    // olduğu için silinmemiş tüm işlere (geçmiş sipariş formları) erişir.
+    private async Task<bool> OkumaErisimi(int tekId, string tip, int jobId, CancellationToken ct)
+    {
+        if (tip != TeknisyenHesapDeposu.Ic) return await IsDurumu(tekId, jobId, ct) != null;
+        return await _db.Database.SqlQuery<int>($"""
+            SELECT COUNT(*)::int AS "Value" FROM "Siparisler" WHERE "Id"={jobId} AND COALESCE("Silindi",false)=false
+            """).SingleAsync(ct) > 0;
+    }
+
     private static string KabulDeseni(int tekId) => KabulOnEki + "%(#" + tekId + ")";
 
     private async Task<bool> KabulEdildi(int tekId, int jobId, CancellationToken ct)
@@ -870,6 +915,26 @@ public sealed class TeknisyenIsSatiri
     public DateTime? TamamlanmaTarihi { get; set; }
     public DateTime? TasarimTeslimTarihi { get; set; }
     public bool UretimeAlindi { get; set; }
+}
+
+public sealed class SiparisFormuSatiri
+{
+    public int Id { get; set; }
+    public string HastaAdi { get; set; } = string.Empty;
+    public string HekimAdi { get; set; } = string.Empty;
+    public string? KlinikAdi { get; set; }
+    public string Durum { get; set; } = string.Empty;
+    public string OnayDurumu { get; set; } = string.Empty;
+    public DateTime OlusturmaTarihi { get; set; }
+    public DateTime? TerminTarihi { get; set; }
+    public string? DisRengi { get; set; }
+    public string? DisSemasi { get; set; }
+    public string? Materyal { get; set; }
+    public string? Notlar { get; set; }
+    public string? TeknisyenAdi { get; set; }
+    public string? Kaynak { get; set; }
+    public string? Kalemler { get; set; }
+    public int DosyaSayisi { get; set; }
 }
 
 public sealed class TeknisyenKalemSatiri

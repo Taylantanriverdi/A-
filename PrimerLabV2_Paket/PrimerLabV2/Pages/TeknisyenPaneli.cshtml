@@ -104,6 +104,13 @@
         .msg-b small{display:block;color:var(--muted);font-size:10px;font-weight:700}
         .progress{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin:8px 0}
         .progress div{height:100%;width:0;background:var(--blue);transition:width .2s}
+        .form-satir{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+        .form-satir .job-top{align-items:center}
+        .sf{font-size:13px;line-height:1.5}
+        .sf table{width:100%;border-collapse:collapse;margin:8px 0}
+        .sf td,.sf th{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+        .sf th{background:#f8fafc;width:34%;font-size:12px}
+        .sf pre{white-space:pre-wrap;font:inherit;margin:0}
         .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;z-index:60;max-width:92vw}
         @@media (min-width:700px){.modal{align-items:center}.modal-box{border-radius:18px}}
         @@media (max-width:620px){.wrap{padding:12px}.stats{grid-template-columns:repeat(2,1fr)}}
@@ -262,10 +269,20 @@
         <nav class="tabs"><div class="wrap">
             <button class="tab active" id="tabAktif" type="button" onclick="sekme('aktif')">🛠️ Devam Eden</button>
             <button class="tab" id="tabBiten" type="button" onclick="sekme('biten')">✅ Tamamlanan</button>
+            <button class="tab hidden" id="tabFormlar" type="button" onclick="sekme('formlar')">📄 Sipariş Formları</button>
         </div></nav>
     </header>
 
-    <main class="wrap">
+    <main class="wrap hidden" id="formlarBolum">
+        <div class="toolbar">
+            <input id="formAra" class="inp" placeholder="İş no, hasta, hekim veya iş türü ara" oninput="formAraGecikmeli()" />
+            <a class="btn" style="display:inline-grid;place-items:center;text-decoration:none;white-space:nowrap" href="/hekim-portal?mod=teknisyen">＋ Yeni Sipariş</a>
+        </div>
+        <div id="formListe"><div class="empty">Yükleniyor...</div></div>
+        <div id="formDevam" class="hidden" style="text-align:center;margin:10px 0 20px"><button class="btn btn-light" type="button" onclick="formlariYukle(true)">Daha fazla göster</button></div>
+    </main>
+
+    <main class="wrap" id="islerBolum">
         <div class="stats">
             <div class="stat"><b id="stYeni">0</b><span>YENİ / BEKLEYEN</span></div>
             <div class="stat"><b id="stDevam">0</b><span>DEVAM EDEN</span></div>
@@ -585,6 +602,7 @@
         $("appScreen").classList.remove("hidden");
         $("whoName").textContent = ben.adSoyad;
         $("whoTip").textContent = ben.tip === "dis" ? "Dış teknisyen" : "İç teknisyen";
+        $("tabFormlar").classList.toggle("hidden", ben.tip === "dis");
         await yukle();
         clearInterval(yenilemeZamani);
         yenilemeZamani = setInterval(() => { if (!acikModal && document.visibilityState === "visible") yukle(true); }, 60000);
@@ -594,7 +612,77 @@
         gorunum = ad;
         $("tabAktif").classList.toggle("active", ad === "aktif");
         $("tabBiten").classList.toggle("active", ad === "biten");
+        $("tabFormlar").classList.toggle("active", ad === "formlar");
+        $("formlarBolum").classList.toggle("hidden", ad !== "formlar");
+        $("islerBolum").classList.toggle("hidden", ad === "formlar");
+        if (ad === "formlar") { formlariYukle(); return; }
         ciz();
+    }
+
+    // ---------- Sipariş formları (iç teknisyen: tüm işler, fiyatsız) ----------
+    let formlar = [], formSayfa = 0, formZaman = null;
+    function formAraGecikmeli() { clearTimeout(formZaman); formZaman = setTimeout(() => formlariYukle(), 300); }
+    async function formlariYukle(devam) {
+        formSayfa = devam ? formSayfa + 1 : 0;
+        if (!devam) $("formListe").innerHTML = '<div class="empty">Yükleniyor...</div>';
+        try {
+            const d = await api("/api/teknisyen-portal/siparis-formlari?sayfa=" + formSayfa + "&ara=" + encodeURIComponent($("formAra").value.trim()));
+            formlar = devam ? formlar.concat(d.formlar) : d.formlar;
+            $("formDevam").classList.toggle("hidden", !d.devami);
+            $("formListe").innerHTML = formlar.length ? formlar.map(f => `<div class="form-satir">
+                <div class="job-top">
+                    <div><div class="job-name">#${f.id} · ${esc(f.hastaAdi)}</div>
+                    <div class="job-sub">${esc(f.hekimAdi)}${f.klinikAdi ? " · " + esc(f.klinikAdi) : ""} · ${tarih(f.olusturmaTarihi)} · Teslim: ${tarih(f.terminTarihi)}</div>
+                    <div class="job-sub">${esc(f.kalemler || "-")}</div></div>
+                    <span class="badge ${esc(f.onayDurumu === "Gelen Onay" ? "b-Bekliyor" : "b-" + f.durum)}">${esc(f.onayDurumu === "Gelen Onay" ? "Onay bekliyor" : f.onayDurumu === "Reddedildi" ? "Reddedildi" : f.durum)}</span>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-light btn-sm" type="button" onclick="formGoster(${f.id})">📄 Formu Gör / Yazdır</button>
+                    <button class="btn btn-light btn-sm" type="button" onclick="formDosyalari(${f.id})">📎 Dosyalar (${f.dosyaSayisi})</button>
+                </div></div>`).join("") : '<div class="empty">Sipariş formu bulunamadı.</div>';
+        } catch (err) { $("formListe").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+    function formHtml(f) {
+        const satir = (b, v) => `<tr><th>${b}</th><td>${v}</td></tr>`;
+        return `<div class="sf"><table>
+            ${satir("İş no", "#" + f.id)}
+            ${satir("Hekim", esc(f.hekimAdi) + (f.klinikAdi ? " — " + esc(f.klinikAdi) : ""))}
+            ${satir("Hasta", esc(f.hastaAdi))}
+            ${satir("Sipariş tarihi", tarih(f.olusturmaTarihi))}
+            ${satir("Teslim tarihi", tarih(f.terminTarihi))}
+            ${satir("İş / kalemler", esc(f.kalemler || "-"))}
+            ${satir("Dişler", esc(f.disSemasi || "-"))}
+            ${satir("Renk", esc(f.disRengi || "-"))}
+            ${satir("Materyal", esc(f.materyal || "-"))}
+            ${satir("Teknisyen", esc(f.teknisyenAdi || "-"))}
+            ${satir("Durum", esc(f.onayDurumu === "Gelen Onay" ? "Laboratuvar onayı bekliyor" : f.durum))}
+            ${satir("Kaynak", esc(f.kaynak || "-"))}
+            ${satir("Notlar", f.notlar ? "<pre>" + esc(f.notlar) + "</pre>" : "-")}
+        </table></div>`;
+    }
+    function formGoster(id) {
+        const f = formlar.find(x => x.id === id); if (!f) return;
+        acikModal = { tur: "form", id };
+        modalAc(`#${id} · ${f.hastaAdi} — Sipariş Formu`, formHtml(f) +
+            `<div class="actions"><button class="btn btn-sm" type="button" onclick="formYazdir(${id})">🖨️ Yazdır</button></div>`);
+    }
+    function formYazdir(id) {
+        const f = formlar.find(x => x.id === id); if (!f) return;
+        const w = window.open("", "_blank"); if (!w) { bildir("Açılır pencere engellendi."); return; }
+        w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>Sipariş Formu #${f.id}</title><style>
+            body{font-family:Arial,sans-serif;color:#10233e;margin:24px}h1{font-size:18px;margin:0 0 4px}.alt{font-size:11px;color:#64748b;margin-bottom:12px}
+            table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #cbd5e1;padding:7px 9px;text-align:left;vertical-align:top}th{background:#f1f5f9;width:30%}pre{white-space:pre-wrap;font:inherit;margin:0}
+            </style></head><body><h1>PRIMER DENTAL LAB — SİPARİŞ FORMU</h1><div class="alt">Yazdırma: ${new Date().toLocaleString("tr-TR")}</div>${formHtml(f).replace('<div class="sf">', "<div>")}</body></html>`);
+        w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
+    }
+    async function formDosyalari(id) {
+        const f = formlar.find(x => x.id === id); if (!f) return;
+        acikModal = { tur: "formdosya", id };
+        modalAc(`#${id} · ${f.hastaAdi} — Dosyalar`, '<div class="note">Yükleniyor...</div>');
+        try {
+            const list = await api(`/api/teknisyen-portal/jobs/${id}/files`);
+            $("modalIcerik").innerHTML = list.length ? list.map(x => `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${x.id}">${esc(x.orijinalDosyaAdi)}</a><small>${esc(x.dosyaTuru)} · ${boyut(x.boyut)}</small></div>`).join("") : '<div class="note">Bu işte dosya yok.</div>';
+        } catch (err) { $("modalIcerik").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
     }
 
     async function yukle(sessiz) {

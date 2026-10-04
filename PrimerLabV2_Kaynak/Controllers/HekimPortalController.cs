@@ -44,17 +44,23 @@ public sealed class HekimPortalController : ControllerBase
     private readonly IDataProtector _protector;
     private readonly IWebHostEnvironment _environment;
     private readonly IConfiguration _configuration;
+    private readonly IDataProtector _teknisyenProtector;
+    private readonly TeknisyenHesapDeposu _teknisyenHesaplari;
 
     public HekimPortalController(
         PrimerLabDbContext db,
         IDataProtectionProvider dataProtectionProvider,
         IWebHostEnvironment environment,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        TeknisyenHesapDeposu teknisyenHesaplari)
     {
         _db = db;
         _protector = dataProtectionProvider.CreateProtector("PrimerLab.HekimPortal.Session.v1");
+        // Teknisyen Paneli oturum çerezi (iç teknisyenin hekim adına sipariş formu açması için).
+        _teknisyenProtector = dataProtectionProvider.CreateProtector("PrimerLab.TeknisyenPaneli.Session.v1");
         _environment = environment;
         _configuration = configuration;
+        _teknisyenHesaplari = teknisyenHesaplari;
     }
 
     // =========================================================
@@ -672,7 +678,91 @@ public sealed class HekimPortalController : ControllerBase
     {
         var session = await RequireSession(cancellationToken);
         if (session.Error != null) return session.Error;
+        return await IsKaydet(session.HekimId, "Hekim Portalı", null, payload, files, cancellationToken);
+    }
 
+    // =========================================================
+    // İÇ TEKNİSYEN — hekim adına sipariş formu (Teknisyen Paneli > Sipariş Formu)
+    // =========================================================
+
+    [HttpGet("teknisyen/hekimler")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> TeknisyenHekimler(CancellationToken cancellationToken)
+    {
+        var tek = await IcTeknisyen(cancellationToken);
+        if (tek.Error != null) return tek.Error;
+        var liste = await _db.Database.SqlQuery<TeknisyenHekimSatiri>($"""
+            SELECT h."Id", h."AdSoyad", h."KlinikAdi",
+                   (SELECT COUNT(*)::int FROM "HekimFiyatlari" f WHERE f."HekimId"=h."Id" AND f."Aktif"=true) AS "IsTuruSayisi"
+            FROM "Hekimler" h
+            WHERE h."Aktif"=true
+            ORDER BY h."AdSoyad"
+            """).ToListAsync(cancellationToken);
+        return Ok(new { teknisyen = new { adSoyad = tek.Ad }, hekimler = liste });
+    }
+
+    [HttpGet("teknisyen/me")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public async Task<IActionResult> TeknisyenHekimBilgisi([FromQuery] int hekimId, CancellationToken cancellationToken)
+    {
+        var tek = await IcTeknisyen(cancellationToken);
+        if (tek.Error != null) return tek.Error;
+        var hekim = await _db.Hekimler.AsNoTracking()
+            .Where(x => x.Id == hekimId && x.Aktif)
+            .Select(x => new { x.Id, x.AdSoyad, x.KlinikAdi, x.Telefon, x.Email })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (hekim == null) return NotFound("Hekim bulunamadı veya pasif.");
+        var prices = await PortalPriceList(hekimId, cancellationToken);
+        return Ok(new { hekim, isTurleri = prices.Select(x => new { isTuru = x.IsTuru }) });
+    }
+
+    [HttpPost("teknisyen/jobs")]
+    [RequestSizeLimit(MaxRequestSize)]
+    public async Task<IActionResult> TeknisyenIsOlustur(
+        [FromQuery] int hekimId,
+        [FromForm] string payload,
+        [FromForm] List<IFormFile>? files,
+        CancellationToken cancellationToken)
+    {
+        var tek = await IcTeknisyen(cancellationToken);
+        if (tek.Error != null) return tek.Error;
+        var aktif = await _db.Hekimler.AsNoTracking().AnyAsync(x => x.Id == hekimId && x.Aktif, cancellationToken);
+        if (!aktif) return BadRequest("Hekim seçin.");
+        return await IsKaydet(hekimId, "Teknisyen Paneli", tek.Ad, payload, files, cancellationToken);
+    }
+
+    // Teknisyen Paneli çerezinden yalnız aktif İÇ teknisyen kabul edilir (dış teknisyen sipariş açamaz).
+    private async Task<(int Id, string Ad, IActionResult? Error)> IcTeknisyen(CancellationToken cancellationToken)
+    {
+        if (!Request.Cookies.TryGetValue("primer_teknisyen", out var cerez) || string.IsNullOrWhiteSpace(cerez))
+            return (0, "", Unauthorized("Teknisyen oturumu bulunamadı. Teknisyen Paneli'nden giriş yapın."));
+        int tekId;
+        try
+        {
+            using var belge = JsonDocument.Parse(_teknisyenProtector.Unprotect(cerez));
+            tekId = belge.RootElement.GetProperty("TeknisyenId").GetInt32();
+            if (belge.RootElement.GetProperty("Bitis").GetDateTime() <= DateTime.UtcNow)
+                return (0, "", Unauthorized("Teknisyen oturumu sona erdi."));
+        }
+        catch
+        {
+            return (0, "", Unauthorized("Teknisyen oturumu geçersiz."));
+        }
+        var hesap = _teknisyenHesaplari.Getir(tekId);
+        if (hesap == null || !hesap.Aktif) return (0, "", Unauthorized("Teknisyen hesabı pasif."));
+        if (hesap.Tip != TeknisyenHesapDeposu.Ic)
+            return (0, "", StatusCode(StatusCodes.Status403Forbidden, "Sipariş formunu yalnız iç teknisyenler açabilir."));
+        var ad = await _db.Database.SqlQuery<string>($"""
+            SELECT "AdSoyad" AS "Value" FROM "Teknisyenler" WHERE "Id"={tekId} AND COALESCE("Aktif",true)=true
+            """).FirstOrDefaultAsync(cancellationToken);
+        return ad == null ? (0, "", Unauthorized("Teknisyen hesabı pasif.")) : (tekId, ad, null);
+    }
+
+    // Hekim Portalı ve iç teknisyen sipariş formunun ortak kaydı: fiyat hekimin listesinden alınır,
+    // iş "Gelen Onay" olarak laboratuvar onayına düşer.
+    private async Task<IActionResult> IsKaydet(
+        int hekimId, string kaynak, string? teknisyenAdi, string payload, List<IFormFile>? files, CancellationToken cancellationToken)
+    {
         PortalNewJobDto dto;
         try
         {
@@ -702,7 +792,7 @@ public sealed class HekimPortalController : ControllerBase
 
         // Para birimi ve fiyat bilgisi yalnız ana Primer Lab'de kullanılır.
         // Hekim bu bilgileri portalda görmez.
-        var allowedPrices = await PortalPriceList(session.HekimId, cancellationToken);
+        var allowedPrices = await PortalPriceList(hekimId, cancellationToken);
         var priceMap = allowedPrices.ToDictionary(x => x.IsTuru, StringComparer.CurrentCultureIgnoreCase);
 
         // Fiyat hekime tanımlı listeden otomatik alınır; portal istemcisinden fiyat kabul edilmez.
@@ -735,7 +825,8 @@ public sealed class HekimPortalController : ControllerBase
         var teeth = AllTeeth(dto).ToArray();
         var toothText = string.Join(",", teeth);
         var notes = Normalize(dto.Notlar, 4000);
-        var jobNotes = Normalize(BuildJobNotes(dto, cleanItems.Select(x => (x.Price.IsTuru, x.Dto)).ToList(), notes), 8000);
+        var jobNotes = Normalize(BuildJobNotes(dto, cleanItems.Select(x => (x.Price.IsTuru, x.Dto)).ToList(), notes,
+            teknisyenAdi != null ? "[Teknisyen Paneli — " + teknisyenAdi + "]" : "[Hekim Portalı]"), 8000);
         var designSource = dto.TasarimKaynagi == "doctor" ? "doctor" : "lab";
         var portalSubmissionId = Guid.NewGuid();
         var savedPaths = new List<string>();
@@ -758,7 +849,7 @@ public sealed class HekimPortalController : ControllerBase
                         var hasta = new Hasta
                         {
                             AdSoyad = dto.HastaAdi.Trim(),
-                            HekimId = session.HekimId,
+                            HekimId = hekimId,
                             Telefon = null,
                             Notlar = notes,
                             Aktif = true,
@@ -789,7 +880,7 @@ public sealed class HekimPortalController : ControllerBase
                             UPDATE "Siparisler"
                             SET
                                 "OnayDurumu"='Gelen Onay',
-                                "Kaynak"='Hekim Portalı',
+                                "Kaynak"={kaynak},
                                 "TerminTarihi"={termin},
                                 "DisRengi"={Normalize(dto.DisRengi,50)},
                                 "DisSemasi"={Normalize(toothText,250)},
@@ -802,9 +893,12 @@ public sealed class HekimPortalController : ControllerBase
                             WHERE "Id"={siparis.Id}
                             """, cancellationToken);
 
+                        var gonderen = teknisyenAdi != null
+                            ? $"Teknisyen Paneli'nden {teknisyenAdi} tarafından açıldı"
+                            : "Hekim Portalı üzerinden gönderildi";
                         var splitNote = currencyGroups.Count > 1
-                            ? $"Hekim Portalı üzerinden tek talep olarak gönderildi; muhasebe için {currency} grubuna ayrıldı. Gelen İş Onayı bekliyor."
-                            : "Hekim Portalı üzerinden gönderildi; Gelen İş Onayı bekliyor.";
+                            ? $"{gonderen}; tek talep, muhasebe için {currency} grubuna ayrıldı. Gelen İş Onayı bekliyor."
+                            : $"{gonderen}; Gelen İş Onayı bekliyor.";
 
                         await _db.Database.ExecuteSqlInterpolatedAsync($"""
                             INSERT INTO "SiparisDurumGecmisi"
@@ -1045,7 +1139,8 @@ public sealed class HekimPortalController : ControllerBase
     private static string BuildJobNotes(
         PortalNewJobDto dto,
         List<(string IsTuru, PortalNewJobItemDto Item)> items,
-        string? doctorNote)
+        string? doctorNote,
+        string baslik = "[Hekim Portalı]")
     {
         static string? Clean(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim().Replace('\n', ' ').Replace('\r', ' ');
         var lines = new List<string>();
@@ -1072,7 +1167,7 @@ public sealed class HekimPortalController : ControllerBase
         if (Clean(dto.ProvaAsamasi) is { } prova) lines.Add("Prova: " + prova);
         if (doctorNote != null) lines.Add("Hekim notu: " + doctorNote);
 
-        return lines.Count == 0 ? string.Empty : "[Hekim Portalı]\n" + string.Join("\n", lines);
+        return lines.Count == 0 ? string.Empty : baslik + "\n" + string.Join("\n", lines);
     }
 
     private static string? ValidateFile(IFormFile file)
@@ -1393,6 +1488,14 @@ public sealed class PortalPriceRow
     public decimal BirimFiyat { get; set; }
     public string ParaBirimi { get; set; } = "TRY";
     public int Sira { get; set; }
+}
+
+public sealed class TeknisyenHekimSatiri
+{
+    public int Id { get; set; }
+    public string AdSoyad { get; set; } = string.Empty;
+    public string? KlinikAdi { get; set; }
+    public int IsTuruSayisi { get; set; }
 }
 
 public sealed class PortalNewJobDto
