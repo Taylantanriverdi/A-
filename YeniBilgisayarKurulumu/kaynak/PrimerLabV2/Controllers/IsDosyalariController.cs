@@ -19,7 +19,9 @@ public class IsDosyalariController : ControllerBase
         {
             // .dcm Hekim Portalı'nda kabul ediliyordu; laboratuvar ekranında da kabul edilir.
             ".stl", ".obj", ".ply", ".dcm", ".zip", ".rar", ".7z", ".pdf",
-            ".jpg", ".jpeg", ".png", ".webp", ".txt"
+            ".jpg", ".jpeg", ".png", ".webp", ".txt",
+            // Tarayıcı / CAD programlarının sipariş ve proje dosyaları (3Shape, exocad).
+            ".xml", ".3ox", ".3oxz", ".dentalproject", ".constructioninfo"
         };
 
     public IsDosyalariController(PrimerLabDbContext db, IWebHostEnvironment environment)
@@ -91,7 +93,7 @@ public class IsDosyalariController : ControllerBase
 
         var extension = Path.GetExtension(originalName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
-            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP ve TXT kabul edilir.");
+            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP, TXT, XML, 3OX ve exocad proje dosyaları kabul edilir.");
 
         var storedName = Guid.NewGuid().ToString("N") + extension;
         var folder = Path.Combine(StorageRoot(), siparisId.ToString());

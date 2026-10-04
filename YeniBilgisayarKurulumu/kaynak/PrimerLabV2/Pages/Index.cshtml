@@ -3683,6 +3683,7 @@
                         <h1 class="page-title">Dosyalar</h1>
                         <div class="page-subtitle">Hekimden Gelenler → Tasarımdaki İşler → Tasarımı İndirilenler.</div>
                     </div>
+                    <button class="button button-blue" type="button" onclick="openTopluDosyaModal()">📁 Toplu Dosya Yükle</button>
                 </div>
                 <div class="constitution-toolbar" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;">
                     <select id="anFilesTab" onchange="renderAnayasaFiles()">
@@ -4963,6 +4964,42 @@
         </div>
     </div>
 
+    <div id="topluDosyaModal" class="modal-overlay" style="display:none;">
+        <div class="modal-box" style="width:1120px;max-width:96vw;">
+            <div class="modal-header">
+                <div>
+                    <h2>Toplu Dosya Yükleme</h2>
+                    <p>Tarama ve tasarım dosyalarının bulunduğu klasörü seçin. Klasör ve dosya adlarındaki hasta isimleri yazılımdaki işlerle otomatik eşleştirilir; kontrol edip onaylayın.</p>
+                </div>
+                <button type="button" class="modal-close" onclick="closeTopluDosyaModal()">×</button>
+            </div>
+            <div style="padding:22px;">
+                <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;">
+                    <input type="file" id="topluDosyaKlasor" webkitdirectory directory multiple style="display:none" onchange="topluDosyaKlasorSecildi(this.files);this.value=''" />
+                    <input type="file" id="topluDosyaTekli" multiple style="display:none" onchange="topluDosyaKlasorSecildi(this.files);this.value=''" />
+                    <button type="button" class="button button-blue" onclick="document.getElementById('topluDosyaKlasor').click()">📁 Klasör Seç</button>
+                    <button type="button" class="button button-light" onclick="document.getElementById('topluDosyaTekli').click()">📄 Dosya Seç</button>
+                    <span id="topluDosyaOzet" class="price-list-note"></span>
+                </div>
+                <div class="price-list-note" style="margin-bottom:10px;">Her satır bir klasördür. "Eşleşen iş" yanlışsa listeden doğrusunu seçin veya "Başka iş numarası…" ile iş numarasını yazın; yüklenmesini istemediğiniz satırda "Yükleme" seçin. Aynı işe daha önce yüklenmiş aynı dosya tekrar yüklenmez.</div>
+                <div class="table-wrapper" style="max-height:52vh;overflow:auto;">
+                    <table>
+                        <thead><tr><th>Klasör</th><th>Dosyalar</th><th style="min-width:300px">Eşleşen iş</th><th>Tür</th><th>Durum</th></tr></thead>
+                        <tbody id="topluDosyaGovde"><tr><td colspan="5" class="empty">Henüz klasör seçilmedi.</td></tr></tbody>
+                    </table>
+                </div>
+                <div id="topluDosyaIlerleme" style="display:none;margin-top:12px;">
+                    <div style="height:10px;background:#e2e8f0;border-radius:99px;overflow:hidden;"><div id="topluDosyaCubuk" style="height:100%;width:0;background:#1565c0;transition:width .2s"></div></div>
+                    <div id="topluDosyaIlerlemeMetin" class="price-list-note" style="margin-top:6px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="button button-light" onclick="closeTopluDosyaModal()">Kapat</button>
+                    <button type="button" class="button button-blue" id="topluDosyaYukleBtn" onclick="topluDosyaYukle()" disabled>Yükle</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="hekimFiyatModal" class="modal-overlay" style="display:none;">
         <div class="modal-box" style="width:760px;">
             <div class="modal-header">
@@ -5802,7 +5839,7 @@
 
                         <input id="detayDosyaInput"
                                type="file"
-                               accept=".stl,.obj,.ply,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt" />
+                               accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo" />
 
                         <button type="button"
                                 id="detayDosyaYukleBtn"
@@ -12994,6 +13031,192 @@
                 await loadAnayasaData();await loadSiparisler();
                 showSuccess("İş Silinenler'e taşındı.");
             }catch(e){showError(e.message);}
+        }
+
+        // ---------------- Toplu dosya yükleme ----------------
+        // Klasör seçilir; klasör/dosya adlarındaki hasta isimleri işlerle eşleştirilir,
+        // dosya türü (Tarama/Tasarım) adından tahmin edilir; onaydan sonra dosyalar tek tek yüklenir.
+        const TOPLU_UZANTILAR=['stl','obj','ply','dcm','zip','rar','7z','pdf','jpg','jpeg','png','webp','txt','xml','3ox','3oxz','dentalproject','constructioninfo'];
+        const TOPLU_MAX_BOYUT=250*1024*1024;
+        let topluGruplar=[];
+        let topluYukleniyor=false;
+
+        function topluNorm(s){
+            return String(s||'').toLocaleLowerCase('tr-TR')
+                .replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ü/g,'u').replace(/ş/g,'s').replace(/ö/g,'o').replace(/ç/g,'c')
+                .normalize('NFD').replace(/[̀-ͯ]/g,'')
+                .replace(/[^a-z0-9]+/g,' ').trim();
+        }
+
+        function topluTurTahmin(yol){
+            const t=' '+topluNorm(yol)+' ';
+            if(/ (tasarim|tasarimi|design|designs|cad|exocad|construction|constructioninfo|dentalproject|restorasyon|restoration) /.test(t)) return 'Tasarım';
+            const ext=(yol.split('.').pop()||'').toLowerCase();
+            if(/ (tarama|taramalar|scan|scans|trios|itero|medit|primescan|intraoral|upper|lower|ust|alt|bite|kapanis|preparation|prep) /.test(t)||['stl','ply','obj','dcm'].includes(ext)) return 'Tarama';
+            return 'Diger';
+        }
+
+        function topluIsEtiketi(x){ return '#'+Number(x.id)+' · '+(x.hastaAdi||'-')+' · '+(x.hekimAdi||'-')+(x.durum?' · '+x.durum:''); }
+
+        // Klasör yolundaki hasta adını bulur; aynı hastanın birden fazla işi varsa hekim adı yolda geçen,
+        // yoksa en yeni iş önerilir.
+        function topluEslestir(klasorYolu, dosyaAdlari){
+            const segmentler=klasorYolu.split('/').map(topluNorm).filter(Boolean);
+            const tumu=' '+topluNorm(klasorYolu+' '+dosyaAdlari.join(' '))+' ';
+            const isler=(anayasaIsler||[]).filter(x=>!x.silindi && x.hastaAdi);
+            const uyan=function(ad){
+                const h=topluNorm(ad); if(!h) return 0;
+                const p=h.split(' ');
+                if(p.length>=2){
+                    if(tumu.includes(' '+h+' ')) return h.length;
+                    if(p.length===2 && tumu.includes(' '+p[1]+' '+p[0]+' ')) return h.length;
+                    return 0;
+                }
+                return segmentler.includes(h)?h.length:0;   // tek kelimelik isimde klasör adı birebir olmalı
+            };
+            let enIyi=0; const puan=new Map();
+            isler.forEach(x=>{const u=uyan(x.hastaAdi); if(u){puan.set(x.id,u); enIyi=Math.max(enIyi,u);}});
+            let adaylar=isler.filter(x=>puan.get(x.id)===enIyi && enIyi>0);
+            const hastalar=new Set(adaylar.map(x=>topluNorm(x.hastaAdi)));
+            const hekimli=adaylar.filter(x=>x.hekimAdi && tumu.includes(' '+topluNorm(x.hekimAdi).replace(/^dr /,'')+' '));
+            const oneri=(hekimli.length?hekimli:adaylar).slice().sort((a,b)=>Number(b.id)-Number(a.id))[0]||null;
+            let not='';
+            if(!oneri) not='Hasta adı eşleşmedi';
+            else if(hastalar.size>1) not='Birden fazla hasta adı uyuyor — kontrol edin';
+            else if(adaylar.length>1) not='Bu hastanın '+adaylar.length+' işi var; '+(hekimli.length?'hekim adı uyan':'en yeni')+' iş seçildi';
+            return { adaylar: adaylar.sort((a,b)=>Number(b.id)-Number(a.id)), secilen: oneri?Number(oneri.id):0, not };
+        }
+
+        async function openTopluDosyaModal(){
+            if(!Array.isArray(anayasaIsler)||!anayasaIsler.length){ try{ await loadAnayasaData(); }catch{} }
+            topluGruplar=[]; topluDosyaCiz();
+            document.getElementById('topluDosyaOzet').innerText='';
+            document.getElementById('topluDosyaIlerleme').style.display='none';
+            document.getElementById('topluDosyaModal').style.display='flex';
+        }
+
+        function closeTopluDosyaModal(){
+            if(topluYukleniyor && !confirm('Yükleme devam ediyor. Pencere kapatılırsa kalan dosyalar yüklenmez. Kapatılsın mı?')) return;
+            topluYukleniyor=false;
+            document.getElementById('topluDosyaModal').style.display='none';
+            document.getElementById('topluDosyaKlasor').value='';
+            document.getElementById('topluDosyaTekli').value='';
+        }
+
+        function topluDosyaKlasorSecildi(liste){
+            const dosyalar=Array.from(liste||[]);
+            const gruplar=new Map();
+            dosyalar.forEach(f=>{
+                const yol=(f.webkitRelativePath||f.name).replace(/\\/g,'/');
+                const kes=yol.lastIndexOf('/');
+                const klasor=kes>0?yol.slice(0,kes):'(seçilen dosyalar)';
+                if(/^(thumbs\.db|desktop\.ini|\.ds_store)$/i.test(f.name)||f.name.startsWith('~$')) return;
+                const ext=(f.name.split('.').pop()||'').toLowerCase();
+                const neden=!TOPLU_UZANTILAR.includes(ext)?'desteklenmeyen tür':(f.size<=0?'boş dosya':(f.size>TOPLU_MAX_BOYUT?'250 MB üstü':''));
+                if(!gruplar.has(klasor)) gruplar.set(klasor,[]);
+                gruplar.get(klasor).push({ dosya:f, yol, tur:topluTurTahmin(yol), neden, durum:'' });
+            });
+            topluGruplar=Array.from(gruplar.entries()).sort((a,b)=>a[0].localeCompare(b[0],'tr')).map(function([klasor,list]){
+                const e=topluEslestir(klasor, list.map(x=>x.dosya.name));
+                return { klasor, dosyalar:list, adaylar:e.adaylar, secilen:e.secilen, not:e.not, durum:'' };
+            });
+            topluDosyaCiz();
+        }
+
+        function topluDosyaCiz(){
+            const govde=document.getElementById('topluDosyaGovde');
+            if(!topluGruplar.length){ govde.innerHTML='<tr><td colspan="5" class="empty">Henüz klasör seçilmedi.</td></tr>'; topluOzetGuncelle(); return; }
+            govde.innerHTML=topluGruplar.map(function(g,i){
+                const uygun=g.dosyalar.filter(x=>!x.neden);
+                const boyut=uygun.reduce((t,x)=>t+x.dosya.size,0);
+                const atla=g.dosyalar.length-uygun.length;
+                const turler={}; uygun.forEach(x=>{turler[x.tur]=(turler[x.tur]||0)+1;});
+                const secenek=['<option value="0">— Yükleme —</option>']
+                    .concat(g.adaylar.map(x=>'<option value="'+Number(x.id)+'">'+escapeHtml(topluIsEtiketi(x))+'</option>'));
+                if(g.secilen && !g.adaylar.some(x=>Number(x.id)===g.secilen)){
+                    const x=(anayasaIsler||[]).find(y=>Number(y.id)===g.secilen);
+                    if(x) secenek.push('<option value="'+Number(x.id)+'">'+escapeHtml(topluIsEtiketi(x))+'</option>');
+                }
+                secenek.push('<option value="elle">Başka iş numarası…</option>');
+                return '<tr>'
+                    +'<td style="max-width:280px;word-break:break-all;font-size:12px;">'+escapeHtml(g.klasor)+'</td>'
+                    +'<td style="font-size:12px;white-space:nowrap;">'+uygun.length+' dosya · '+(boyut/1048576).toFixed(1)+' MB'+(atla?'<br><span style="color:#b45309">'+atla+' atlanacak</span>':'')+'</td>'
+                    +'<td><select data-grup="'+i+'" onchange="topluIsSecildi('+i+',this)" '+(topluYukleniyor?'disabled':'')+' style="width:100%">'+secenek.join('')+'</select>'
+                    +(g.not?'<div style="font-size:11px;margin-top:3px;color:'+(g.secilen?'#64748b':'#b91c1c')+'">'+escapeHtml(g.not)+'</div>':'')+'</td>'
+                    +'<td style="font-size:12px;white-space:nowrap;">'+(Object.keys(turler).map(t=>(t==='Diger'?'Diğer':t)+' '+turler[t]).join('<br>')||'-')+'</td>'
+                    +'<td style="font-size:12px;" id="topluDurum'+i+'">'+(g.durum||'')+'</td>'
+                    +'</tr>';
+            }).join('');
+            govde.querySelectorAll('select[data-grup]').forEach(s=>{ s.value=String(topluGruplar[Number(s.dataset.grup)].secilen||0); });
+            topluOzetGuncelle();
+        }
+
+        function topluIsSecildi(i,sel){
+            const g=topluGruplar[i]; if(!g) return;
+            if(sel.value==='elle'){
+                const v=prompt('İş numarasını yazın (ör. 125):');
+                const no=Number(String(v||'').replace(/[^0-9]/g,''));
+                const is=(anayasaIsler||[]).find(x=>Number(x.id)===no && !x.silindi);
+                if(v!==null && !is) showError('#'+(no||v)+' numaralı iş bulunamadı.');
+                if(is){ g.secilen=no; g.not='Elle seçildi'; }
+                topluDosyaCiz(); return;
+            }
+            g.secilen=Number(sel.value)||0;
+            g.not=g.secilen?'':'Yüklenmeyecek';
+            topluOzetGuncelle();
+        }
+
+        function topluOzetGuncelle(){
+            const secili=topluGruplar.filter(g=>g.secilen);
+            const n=secili.reduce((t,g)=>t+g.dosyalar.filter(x=>!x.neden).length,0);
+            const eslesmeyen=topluGruplar.filter(g=>!g.secilen).length;
+            const oz=document.getElementById('topluDosyaOzet');
+            if(oz) oz.innerText=topluGruplar.length?(topluGruplar.length+' klasör · '+n+' dosya yüklenecek'+(eslesmeyen?' · '+eslesmeyen+' klasör eşleşmedi/atlanacak':'')):'';
+            const b=document.getElementById('topluDosyaYukleBtn');
+            if(b){ b.disabled=topluYukleniyor||n===0; b.innerText=topluYukleniyor?'Yükleniyor...':(n?n+' Dosyayı Yükle':'Yükle'); }
+        }
+
+        async function topluDosyaYukle(){
+            const isler=topluGruplar.filter(g=>g.secilen);
+            const toplamDosya=isler.reduce((t,g)=>t+g.dosyalar.filter(x=>!x.neden).length,0);
+            if(!toplamDosya||topluYukleniyor) return;
+            if(!confirm(toplamDosya+' dosya '+new Set(isler.map(g=>g.secilen)).size+' işe yüklenecek. Devam edilsin mi?')) return;
+            topluYukleniyor=true; topluDosyaCiz();
+            const ilerleme=document.getElementById('topluDosyaIlerleme'), cubuk=document.getElementById('topluDosyaCubuk'), metin=document.getElementById('topluDosyaIlerlemeMetin');
+            ilerleme.style.display='block';
+            const mevcut=new Map(); let yuklenen=0, atlanan=0, hatali=0, sira=0;
+            for(let i=0;i<topluGruplar.length && topluYukleniyor;i++){
+                const g=topluGruplar[i]; if(!g.secilen) continue;
+                const hucre=()=>document.getElementById('topluDurum'+i);
+                let gy=0, ga=0, gh=0, sonHata='';
+                if(!mevcut.has(g.secilen)){
+                    try{ const r=await fetch('/api/is-dosyalari/siparis/'+g.secilen,{cache:'no-store'}); mevcut.set(g.secilen, r.ok?(await r.json()):[]); }catch{ mevcut.set(g.secilen,[]); }
+                }
+                const varolan=mevcut.get(g.secilen);
+                for(const x of g.dosyalar){
+                    if(!topluYukleniyor) break;
+                    if(x.neden) continue;
+                    sira++;
+                    metin.innerText=sira+' / '+toplamDosya+' · '+x.yol;
+                    cubuk.style.width=Math.round(sira*100/toplamDosya)+'%';
+                    if(varolan.some(v=>(v.orijinalDosyaAdi||v.OrijinalDosyaAdi)===x.dosya.name && Number(v.boyut??v.Boyut)===x.dosya.size)){ ga++; atlanan++; continue; }
+                    const fd=new FormData(); fd.append('dosya',x.dosya,x.dosya.name); fd.append('dosyaTuru',x.tur);
+                    try{
+                        const r=await fetch('/api/is-dosyalari/siparis/'+g.secilen,{method:'POST',body:fd});
+                        if(!r.ok) throw new Error((await r.text())||('HTTP '+r.status));
+                        const kayit=await r.json(); varolan.push(kayit); gy++; yuklenen++;
+                    }catch(e){ gh++; hatali++; sonHata=e.message||String(e); }
+                    if(hucre()) hucre().innerHTML='⏳ '+gy+' yüklendi';
+                }
+                g.durum=(gy?'<span style="color:#15803d">✓ '+gy+' yüklendi</span>':'')+(ga?'<br><span style="color:#64748b">'+ga+' zaten vardı</span>':'')+(gh?'<br><span style="color:#b91c1c" title="'+escapeHtml(sonHata)+'">✗ '+gh+' hata: '+escapeHtml(sonHata.slice(0,80))+'</span>':'');
+                if(hucre()) hucre().innerHTML=g.durum;
+            }
+            const yarim=!topluYukleniyor;
+            topluYukleniyor=false;
+            metin.innerText=(yarim?'Durduruldu. ':'Tamamlandı. ')+yuklenen+' dosya yüklendi'+(atlanan?', '+atlanan+' dosya zaten vardı':'')+(hatali?', '+hatali+' dosyada hata':'')+'.';
+            topluDosyaCiz();
+            try{ await loadAnayasaData(); }catch{}
+            if(hatali) showError(hatali+' dosya yüklenemedi; Durum sütununa bakın.'); else showSuccess(yuklenen+' dosya yüklendi.');
         }
 
         function renderAnayasaTrash(){
