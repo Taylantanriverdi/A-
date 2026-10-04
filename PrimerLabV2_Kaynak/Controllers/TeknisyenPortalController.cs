@@ -87,6 +87,7 @@ public sealed class TeknisyenPortalController : ControllerBase
             hesapVar = hesap != null,
             sonGirisTarihi = hesap?.SonGirisTarihi,
             panelYolu = "/teknisyen",
+            girisKodu = kimlik.AyarlariOku().GiristeEpostaKodu,
             eposta = kimlik.BilgiGetir("teknisyen:" + teknisyenId)?.Email,
             epostaDogrulandi = kimlik.BilgiGetir("teknisyen:" + teknisyenId)?.EmailDogrulamaTarihi != null
         });
@@ -113,8 +114,29 @@ public sealed class TeknisyenPortalController : ControllerBase
             return BadRequest("Parola en az 8 karakter olmalı ve en az bir harf ile bir rakam içermelidir.");
 
         var tip = dto.Tip == TeknisyenHesapDeposu.Dis ? TeknisyenHesapDeposu.Dis : TeknisyenHesapDeposu.Ic;
+
+        // Kullanıcı adı başka bir hesaptaysa: o teknisyen silinmişse hesap sahipsizdir, kendiliğinden
+        // temizlenir; teknisyen duruyorsa kimde olduğu söylenir, yönetici onaylarsa bu teknisyene devredilir.
+        var sahip = _hesaplar.KullaniciAdiyla(kullaniciAdi);
+        if (sahip != null && sahip.TeknisyenId != teknisyenId)
+        {
+            var sahipTek = await TeknisyenGetir(sahip.TeknisyenId, ct);
+            if (sahipTek != null && !dto.Devral)
+                return Conflict(new
+                {
+                    devralinabilir = true,
+                    sahipId = sahipTek.Id,
+                    sahipAdi = sahipTek.AdSoyad,
+                    sahipAktif = sahipTek.Aktif,
+                    message = $"\"{kullaniciAdi}\" kullanıcı adı {sahipTek.AdSoyad} (#{sahipTek.Id}{(sahipTek.Aktif ? "" : ", pasif")}) teknisyeninin panel hesabında kayıtlı."
+                });
+            _hesaplar.Sil(sahip.TeknisyenId);
+        }
+
         if (!_hesaplar.Kaydet(teknisyenId, kullaniciAdi, string.IsNullOrWhiteSpace(parola) ? null : parola, tip, dto.Aktif && tek.Aktif))
             return Conflict("Bu kullanıcı adı başka bir teknisyende kullanılıyor.");
+        if (!tek.Aktif)
+            return Ok(new { message = "Hesap kaydedildi ancak teknisyen kartı pasif olduğu için giriş yapılamaz. Teknisyeni aktif yapın.", kullaniciAdi, tip });
 
         return Ok(new { message = "Teknisyen panel hesabı kaydedildi.", kullaniciAdi, tip });
     }
@@ -153,7 +175,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         bool? dogru = hesap == null ? false : await kimlik.OzetKapisindan(() => TeknisyenHesapDeposu.ParolaDogru(hesap, parola), ct);
         if (dogru == null) return StatusCode(StatusCodes.Status503ServiceUnavailable, PortalKimlik.YogunMesaj);
 
-        if (hesap == null || tek == null || dogru == false || !tek.Aktif)
+        if (hesap == null || tek == null || dogru == false)
         {
             if (ipAnahtar != null) HataKaydet(ipAnahtar);
             if (kullaniciAdi.Length > 0) HataKaydet(kAnahtar);
@@ -165,6 +187,8 @@ public sealed class TeknisyenPortalController : ControllerBase
         GirisDenemeleri.TryRemove(kAnahtar, out _);
 
         var anahtar = "teknisyen:" + tek.Id;
+        if (!tek.Aktif)
+            return StatusCode(StatusCodes.Status403Forbidden, "Teknisyen kaydınız pasif. Lütfen laboratuvarla görüşün.");
         if (!hesap.Aktif)
             return StatusCode(StatusCodes.Status403Forbidden, kimlik.BilgiGetir(anahtar)?.OnayBekliyor == true
                 ? "Kaydınız laboratuvarın onayını bekliyor. Onaylandığında bu bilgilerle giriş yapabilirsiniz."
@@ -250,7 +274,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         var parolaHatasi = PortalKimlik.ParolaKontrol(dto.Parola);
         if (parolaHatasi != null) return BadRequest(parolaHatasi);
         if (!dto.Kvkk) return BadRequest("Devam etmek için bilgilendirme metnini onaylayın.");
-        if (!_hesaplar.KullaniciAdiBos(kullaniciAdi)) return Conflict("Bu kullanıcı adı alınmış. Başka bir kullanıcı adı seçin.");
+        if (!await KullaniciAdiMusait(kullaniciAdi, ct)) return Conflict("Bu kullanıcı adı alınmış. Başka bir kullanıcı adı seçin.");
         var sahip = kimlik.EpostaSahibi(email);
         if (sahip != null && sahip.StartsWith("teknisyen:", StringComparison.Ordinal))
             return Conflict("Bu e-posta ile kayıtlı bir hesap var. Giriş yapın ya da \"Şifremi unuttum\"u kullanın.");
@@ -275,7 +299,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         }
         var v = JsonSerializer.Deserialize<HekimKayitVerisi>(k!.Veri!)!;
         var a = kimlik.AyarlariOku();
-        if (!_hesaplar.KullaniciAdiBos(v.KullaniciAdi))
+        if (!await KullaniciAdiMusait(v.KullaniciAdi, ct))
             return Conflict("Bu kullanıcı adı az önce başka biri tarafından alındı. Lütfen baştan başlayıp başka bir kullanıcı adı seçin.");
 
         var id = (await _db.Database.SqlQuery<int>($"""
@@ -788,6 +812,16 @@ public sealed class TeknisyenPortalController : ControllerBase
             """).SingleAsync(ct) > 0;
     }
 
+    // Silinmiş teknisyende kalmış (sahipsiz) hesap kullanıcı adını tutmasın.
+    private async Task<bool> KullaniciAdiMusait(string kullaniciAdi, CancellationToken ct)
+    {
+        var sahip = _hesaplar.KullaniciAdiyla(kullaniciAdi);
+        if (sahip == null) return true;
+        if (await TeknisyenGetir(sahip.TeknisyenId, ct) != null) return false;
+        _hesaplar.Sil(sahip.TeknisyenId);
+        return true;
+    }
+
     private static string KabulDeseni(int tekId) => KabulOnEki + "%(#" + tekId + ")";
 
     private async Task<bool> KabulEdildi(int tekId, int jobId, CancellationToken ct)
@@ -870,6 +904,7 @@ public sealed class TeknisyenHesapDto
     public string? YeniParola { get; set; }
     public string? Tip { get; set; }
     public bool Aktif { get; set; } = true;
+    public bool Devral { get; set; }
 }
 
 public sealed class TeknisyenGirisDto

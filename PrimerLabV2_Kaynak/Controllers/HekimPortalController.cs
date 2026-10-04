@@ -95,6 +95,7 @@ public sealed class HekimPortalController : ControllerBase
             sonGirisTarihi = account?.SonGirisTarihi,
             guncellemeTarihi = account?.GuncellemeTarihi,
             portalYolu = "/hekim-portal",
+            girisKodu = kimlik.AyarlariOku().GiristeEpostaKodu,
             eposta = kimlik.BilgiGetir("hekim:" + hekim.Id)?.Email ?? hekim.Email,
             epostaDogrulandi = kimlik.BilgiGetir("hekim:" + hekim.Id)?.EmailDogrulamaTarihi != null,
             portalAdresleri = GetPortalUrls(),

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PrimerLabV2.Data;
+using PrimerLabV2.Infrastructure;
 
 namespace PrimerLabV2.Controllers
 {
@@ -10,10 +11,12 @@ namespace PrimerLabV2.Controllers
     public class TeknisyenlerController : ControllerBase
     {
         private readonly PrimerLabDbContext _db;
+        private readonly TeknisyenHesapDeposu _hesaplar;
 
-        public TeknisyenlerController(PrimerLabDbContext db)
+        public TeknisyenlerController(PrimerLabDbContext db, TeknisyenHesapDeposu hesaplar)
         {
             _db = db;
+            _hesaplar = hesaplar;
         }
 
         [HttpGet]
@@ -206,6 +209,8 @@ namespace PrimerLabV2.Controllers
             if (silinen == 0)
                 return Conflict(kullanimdaMesaji);
 
+            // Panel hesabı da silinir; yoksa kullanıcı adı sahipsiz kalır ve yeni hesaba verilemez.
+            _hesaplar.Sil(id);
             return Ok(new { Message = "Teknisyen silindi." });
         }
     }

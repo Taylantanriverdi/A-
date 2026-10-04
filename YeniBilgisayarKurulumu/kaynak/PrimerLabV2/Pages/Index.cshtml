@@ -5203,7 +5203,7 @@
                 <label style="display:flex;gap:8px;align-items:center;font-weight:700;margin-bottom:12px"><input id="teknisyenPanelAktif" type="checkbox" checked style="width:auto" /> Hesap aktif</label>
                 <div class="form-group"><label>Panel adresi</label><div style="display:flex;gap:8px"><input id="teknisyenPanelUrl" type="text" readonly /><button type="button" class="button button-light" onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('teknisyenPanelUrl').value).then(()=>showSuccess('Adres kopyalandı.'))">Kopyala</button></div>
                     <div class="price-list-note" style="margin-top:6px">Teknisyen bu adresi aynı Wi-Fi'deki telefon/bilgisayardan açar. İnternet erişimi açıksa (PORTAL_INTERNET_AC.bat) aynı internet adresinin sonuna /teknisyen yazılarak her yerden girilir.</div></div>
-                <div class="form-group"><label>Giriş kodu e-postası</label><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span id="teknisyenPanelEposta" style="font-size:13px;font-weight:700">-</span><button type="button" class="button button-light" onclick="closeTeknisyenPanelModal();showSection('portalHesaplari')">Portal Hesapları</button></div></div>
+                <div class="form-group"><label>Giriş doğrulaması</label><div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span id="teknisyenPanelEposta" style="font-size:13px;font-weight:700">-</span><button type="button" class="button button-light" onclick="closeTeknisyenPanelModal();showSection('portalHesaplari')">Portal Hesapları</button></div></div>
                 <div id="teknisyenPanelHata" class="form-error" style="display:none;"></div>
                 <div class="modal-footer">
                     <button type="button" class="button button-light" onclick="closeTeknisyenPanelModal()">Kapat</button>
@@ -13975,6 +13975,7 @@
             const el=document.getElementById(tur==='hekim'?'hekimPortalEposta':'teknisyenPanelEposta');
             if(!el) return;
             if(!d){ el.innerText='-'; el.style.color=''; return; }
+            if(d.girisKodu===false){ el.innerText='Girişte kod istenmiyor — kullanıcı adı ve şifreyle doğrudan girer'+(d.eposta?' · e-posta: '+d.eposta:''); el.style.color='#334155'; return; }
             if(d.eposta && d.epostaDogrulandi){ el.innerText=d.eposta+' (doğrulandı ✓)'; el.style.color='#15803d'; }
             else { el.innerText='Kayıtlı değil — ilk girişte kendisi yazıp gelen kodla doğrulayacak'; el.style.color='#b45309'; }
         }
@@ -14062,7 +14063,7 @@
             document.getElementById('teknisyenPanelPass').value='';
         }
 
-        async function saveTeknisyenPanelHesap(){
+        async function saveTeknisyenPanelHesap(devral){
             const id=Number(document.getElementById('teknisyenPanelId').value||0);
             const err=document.getElementById('teknisyenPanelHata'), btn=document.getElementById('teknisyenPanelKaydet');
             err.style.display='none'; btn.disabled=true;
@@ -14071,9 +14072,18 @@
                     kullaniciAdi:document.getElementById('teknisyenPanelUser').value.trim(),
                     yeniParola:document.getElementById('teknisyenPanelPass').value||null,
                     tip:document.getElementById('teknisyenPanelTip').value,
-                    aktif:document.getElementById('teknisyenPanelAktif').checked})});
+                    aktif:document.getElementById('teknisyenPanelAktif').checked,
+                    devral:!!devral})});
+                if(r.status===409 && (r.headers.get('content-type')||'').includes('json')){
+                    const c=await r.json();
+                    if(c.devralinabilir && confirm(c.message+'\n\nBu kullanıcı adı '+(document.getElementById('teknisyenPanelAlt').innerText||'bu teknisyen')+' için kullanılsın mı? '+c.sahipAdi+' (#'+c.sahipId+') teknisyeninin panel hesabı silinir; o kayıt artık panele giremez.')){
+                        btn.disabled=false; return saveTeknisyenPanelHesap(true);
+                    }
+                    throw new Error(c.message+' Başka bir kullanıcı adı yazın ya da devralmayı onaylayın.');
+                }
                 if(!r.ok) throw new Error((await r.text())||'Hesap kaydedilemedi.');
-                showSuccess('Teknisyen panel hesabı kaydedildi.');
+                const s=await r.json().catch(()=>({}));
+                showSuccess(s.message||'Teknisyen panel hesabı kaydedildi.');
                 closeTeknisyenPanelModal();
             }catch(e){ err.innerText=e.message; err.style.display='block'; }
             finally{ btn.disabled=false; }

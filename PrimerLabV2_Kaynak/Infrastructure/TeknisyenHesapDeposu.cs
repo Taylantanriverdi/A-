@@ -144,6 +144,18 @@ public sealed class TeknisyenHesapDeposu
         }
     }
 
+    /// <summary>Hesabı tamamen siler (teknisyen kaydı silindiğinde ya da kullanıcı adı devredildiğinde).</summary>
+    public bool Sil(int teknisyenId)
+    {
+        lock (_kilit)
+        {
+            var liste = Oku();
+            if (liste.RemoveAll(x => x.TeknisyenId == teknisyenId) == 0) return false;
+            Yaz(liste);
+            return true;
+        }
+    }
+
     public bool Pasiflestir(int teknisyenId)
     {
         lock (_kilit)
