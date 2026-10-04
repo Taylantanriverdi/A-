@@ -134,3 +134,25 @@ Mesajlar, Siparis Formu, Tamamlanan Isler, Silinenler.
 Eski Firebase panelleri artik gerekmez. Tasindiktan sonra Firebase projesini
 (primer-dental) kapatmaniz onerilir: eski teknisyen parolalari orada duz metin
 olarak duruyordu.
+
+
+IS AKISI (farkli yerlerdeki hekim, laboratuvar ve teknisyen)
+-----------------------------------------------------------
+1. HEKIM (klinikte, internetten): Hekim Portali'ndan isi, taramasini ve
+   bilgilerini gonderir. Fiyat hekimin fiyat listesinden otomatik hesaplanir.
+2. LABORATUVAR (bu bilgisayar): "Hekimden Gelenler / Onay Bekleyen"de isi
+   kontrol eder, gerekirse fiyati duzenler, onaylar; "Is Yonetim Merkezi"nde
+   teknisyen atar.
+3. TEKNISYEN (her yerden, internetten): Teknisyen Paneli'nde isi kabul eder,
+   taramayi indirir, tasarimi yapar, "Dosyalar"dan tasarimi yukler ve
+   "Tasarimi Laboratuvara Teslim Et"e basar.
+4. LABORATUVAR: "Dosyalar > Tasarimi Gelenler"de (menude sayi rozeti cikar)
+   tasarimi kontrol edip "Uretime Al"a basar; is "Uretime Alinanlar"a gecer.
+   Uretim ve tamamlama laboratuvardadir.
+5. HEKIM: Portalda isin asamasini (Onaylandi > Tasarim > Uretim > Tamamlandi)
+   ve laboratuvar mesajlarini gorur.
+
+Ana program 30 saniyede bir kendini yeniler; yeni is, yuklenen tasarim,
+biten is ve gelen mesaj icin ekranda bildirim cikar.
+Hekim ve teknisyenin internetten girebilmesi icin PORTAL_INTERNET_AC.bat bir
+kez calistirilmis olmali; bu bilgisayar ve Primer Lab acik kalmalidir.

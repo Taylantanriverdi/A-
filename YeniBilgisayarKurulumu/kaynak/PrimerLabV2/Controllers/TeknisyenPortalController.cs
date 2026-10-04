@@ -23,6 +23,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     private const string CookieName = "primer_teknisyen";
     private const long MaxFileSize = 250L * 1024L * 1024L;
     private const string KabulOnEki = "Teknisyen kabul etti";
+    private const string TeslimOnEki = "Tasarım teslim edildi";
 
     private static readonly Regex UsernameRegex =
         new("^[a-zA-Z0-9._-]{3,64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -35,8 +36,13 @@ public sealed class TeknisyenPortalController : ControllerBase
     };
 
     // Teknisyenin seçebileceği durumlar. "Tamamlandı"yı laboratuvar (admin) onaylar.
-    private static readonly string[] TeknisyenDurumlari =
+    // İş akışı: teknisyen taramayı indirir, tasarlar, tasarımı yükleyip laboratuvara teslim eder;
+    // üretime alma laboratuvarın (admin) işidir. Dış teknisyen yalnız tasarım aşamalarını değiştirir;
+    // iç teknisyen (laboratuvar kadrosu) üretim aşamalarını da yürütebilir.
+    private static readonly string[] IcTeknisyenDurumlari =
         { "Bekliyor", "Tasarımda", "Üretimde", "Makyajda", "Tamamlama Onayı" };
+    private static readonly string[] DisTeknisyenDurumlari =
+        { "Bekliyor", "Tasarımda" };
 
     private static readonly ConcurrentDictionary<string, List<DateTime>> GirisDenemeleri = new();
 
@@ -214,6 +220,9 @@ public sealed class TeknisyenPortalController : ControllerBase
                 EXISTS(SELECT 1 FROM "SiparisDurumGecmisi" g
                        WHERE g."SiparisId"=s."Id" AND g."Aciklama" LIKE {kabulDeseni}) AS "Kabul",
                 (SELECT MAX(g."DegisimTarihi") FROM "SiparisDurumGecmisi" g
+                  WHERE g."SiparisId"=s."Id" AND g."Aciklama" LIKE {TeslimOnEki + "%"}) AS "TasarimTeslimTarihi",
+                COALESCE(s."TasarimIndirildi",false) AS "UretimeAlindi",
+                (SELECT MAX(g."DegisimTarihi") FROM "SiparisDurumGecmisi" g
                   WHERE g."SiparisId"=s."Id" AND g."YeniDurum"='Tamamlandı') AS "TamamlanmaTarihi"
             FROM "Siparisler" s
             INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
@@ -255,6 +264,8 @@ public sealed class TeknisyenPortalController : ControllerBase
             x.MesajSayisi,
             Kabul = !dis || x.Kabul,
             x.TamamlanmaTarihi,
+            x.TasarimTeslimTarihi,
+            x.UretimeAlindi,
             Kalemler = isKalemleri.TryGetValue(x.Id, out var k)
                 ? k.Select(i => (object)new { i.IsTuru, i.Adet }).ToArray()
                 : Array.Empty<object>()
@@ -284,7 +295,11 @@ public sealed class TeknisyenPortalController : ControllerBase
         if (o.Hata != null) return o.Hata;
 
         var yeni = (dto.Durum ?? string.Empty).Trim();
-        if (!TeknisyenDurumlari.Contains(yeni)) return BadRequest("Geçersiz durum.");
+        var izinli = o.Tip == TeknisyenHesapDeposu.Dis ? DisTeknisyenDurumlari : IcTeknisyenDurumlari;
+        if (!izinli.Contains(yeni))
+            return BadRequest(o.Tip == TeknisyenHesapDeposu.Dis
+                ? "Tasarımı yükleyip laboratuvara teslim edin; üretime alma laboratuvar tarafından yapılır."
+                : "Geçersiz durum.");
 
         var eski = await IsDurumu(o.Tek!.Id, jobId, ct);
         if (eski == null) return NotFound("İş bulunamadı.");
@@ -292,6 +307,8 @@ public sealed class TeknisyenPortalController : ControllerBase
             return BadRequest("Önce işi kabul edin.");
         if (eski == "Tamamlandı") return BadRequest("Tamamlanmış işin durumu değiştirilemez.");
         if (eski == "Tamamlama Onayı") return BadRequest("İş laboratuvarın tamamlama onayını bekliyor.");
+        if (o.Tip == TeknisyenHesapDeposu.Dis && eski is ("Üretimde" or "Makyajda"))
+            return BadRequest("İş laboratuvarda üretimde; durumu laboratuvar yönetir.");
         if (eski == yeni) return Ok(new { message = "Durum zaten " + yeni + "." });
 
         var aciklama = $"Teknisyen: {o.Tek.AdSoyad}";
@@ -316,6 +333,37 @@ public sealed class TeknisyenPortalController : ControllerBase
 
         await GecmisEkle(jobId, eski, yeni, aciklama, ct);
         return Ok(new { message = yeni == "Tamamlama Onayı" ? "İş tamamlandı olarak bildirildi; laboratuvar onayı bekleniyor." : "Durum güncellendi." });
+    }
+
+    // Tasarım bitti: yüklenen tasarım laboratuvara teslim edilir; laboratuvar "Dosyalar >
+    // Tasarımdaki İşler" ekranından görüp "Üretime Al" ile üretime geçirir.
+    [HttpPost("jobs/{jobId:int}/tasarim-teslim")]
+    public async Task<IActionResult> TasarimTeslim(int jobId, CancellationToken ct)
+    {
+        var o = await Oturum(ct);
+        if (o.Hata != null) return o.Hata;
+        var durum = await IsDurumu(o.Tek!.Id, jobId, ct);
+        if (durum == null) return NotFound("İş bulunamadı.");
+        if (o.Tip == TeknisyenHesapDeposu.Dis && !await KabulEdildi(o.Tek.Id, jobId, ct))
+            return BadRequest("Önce işi kabul edin.");
+        if (durum is "Tamamlandı" or "Tamamlama Onayı" or "Teslim Edildi")
+            return BadRequest("Tamamlanmış işte tasarım teslimi yapılamaz.");
+
+        var tasarimSayisi = await _db.Database.SqlQuery<int>($"""
+            SELECT COUNT(*)::int AS "Value" FROM "IsDosyalari" WHERE "SiparisId"={jobId} AND "DosyaTuru"='Tasarım'
+            """).SingleAsync(ct);
+        if (tasarimSayisi == 0) return BadRequest("Önce tasarım dosyasını yükleyin.");
+
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE "Siparisler" SET "TasarimIndirildi"=false, "TasarimIndirmeTarihi"=NULL
+            WHERE "Id"={jobId} AND "TeknisyenId"={o.Tek.Id}
+            """, ct);
+        await GecmisEkle(jobId, durum, durum, $"{TeslimOnEki}: {o.Tek.AdSoyad} (#{o.Tek.Id}), {tasarimSayisi} tasarım dosyası", ct);
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "IsMesajlari" ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")
+            VALUES ({jobId},{"Teknisyen"},{o.Tek.AdSoyad},{"✔ Tasarım tamamlandı ve yüklendi (" + tasarimSayisi + " dosya). Üretime alınmaya hazır."},{DateTime.UtcNow})
+            """, ct);
+        return Ok(new { message = "Tasarım laboratuvara teslim edildi. Üretime alma laboratuvar tarafından yapılacak." });
     }
 
     // =========================================================
@@ -614,6 +662,8 @@ public sealed class TeknisyenIsSatiri
     public int MesajSayisi { get; set; }
     public bool Kabul { get; set; }
     public DateTime? TamamlanmaTarihi { get; set; }
+    public DateTime? TasarimTeslimTarihi { get; set; }
+    public bool UretimeAlindi { get; set; }
 }
 
 public sealed class TeknisyenKalemSatiri

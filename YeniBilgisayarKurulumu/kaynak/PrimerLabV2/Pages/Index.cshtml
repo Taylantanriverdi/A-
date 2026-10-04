@@ -2665,7 +2665,7 @@
             <button class="menu-item" type="button"
                     onclick="showSection('tamamlananIsler', this)">Tamamlanan İşler</button>
             <button class="menu-item" type="button"
-                    onclick="showSection('anayasaDosyalar', this)">Dosyalar</button>
+                    onclick="showSection('anayasaDosyalar', this)">Dosyalar <span id="menuBadgeDosya" class="menu-badge">0</span></button>
             <button class="menu-item" type="button"
                     onclick="showSection('hekimler', this)">Hekimler</button>
             <button class="menu-item" type="button"
@@ -3681,15 +3681,15 @@
                 <div class="topbar">
                     <div>
                         <h1 class="page-title">Dosyalar</h1>
-                        <div class="page-subtitle">Hekimden Gelenler → Tasarımdaki İşler → Tasarımı İndirilenler.</div>
+                        <div class="page-subtitle">Hekimden gelen tarama → teknisyen tasarımı yükler → "Tasarımı Gelenler"den kontrol edip Üretime Al → Üretime Alınanlar.</div>
                     </div>
                     <button class="button button-blue" type="button" onclick="openTopluDosyaModal()">📁 Toplu Dosya Yükle</button>
                 </div>
                 <div class="constitution-toolbar" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;">
                     <select id="anFilesTab" onchange="renderAnayasaFiles()">
-                        <option value="doctor">Hekimden Gelenler</option>
-                        <option value="design">Tasarımdaki İşler</option>
-                        <option value="tech">Tasarımı İndirilenler</option>
+                        <option value="doctor">Hekimden Gelenler (tarama)</option>
+                        <option value="design">Tasarımı Gelenler (üretime alınmayı bekleyen)</option>
+                        <option value="tech">Üretime Alınanlar</option>
                     </select>
                     <input id="anFilesSearch" type="text" placeholder="Ara..."
                            oninput="renderAnayasaFiles()" />
@@ -12693,6 +12693,35 @@
             }
         }
 
+        // Farklı yerlerdeki hekim portalı ve teknisyen panelinden gelen değişiklikler (yeni iş,
+        // yüklenen tasarım, tamamlanan iş, mesaj) ekranda kendiliğinden görünür. Sipariş formunu
+        // bozmamak için yalnız listeler yeniden çizilir.
+        let anayasaCanliImza = null;
+        function anayasaImza(liste){ return JSON.stringify((liste||[]).map(x=>[x.id,x.durum,x.onayDurumu,x.silindi,x.dosyaSayisi,x.tasarimDosyaSayisi,x.tasarimIndirildi,x.disMesajSayisi])); }
+        async function anayasaCanliYenile(){
+            if(document.visibilityState!=="visible")return;
+            try{
+                const r=await fetch("/api/anayasa/isler",{cache:"no-store"}); if(!r.ok)return;
+                const yeni=await r.json(); const imza=anayasaImza(yeni);
+                if(anayasaCanliImza===null){anayasaCanliImza=imza;return;}
+                if(imza===anayasaCanliImza)return;
+                const eski=new Map((anayasaIsler||[]).map(x=>[x.id,x]));
+                const bildirimler=[];
+                yeni.forEach(function(x){
+                    const o=eski.get(x.id);
+                    if(!o){ if(x.onayDurumu==="Gelen Onay")bildirimler.push("🦷 Yeni iş geldi: #"+x.id+" "+(x.hastaAdi||"")+" ("+(x.hekimAdi||"")+")"); return; }
+                    if(Number(x.tasarimDosyaSayisi||0)>Number(o.tasarimDosyaSayisi||0))bildirimler.push("📐 Tasarım yüklendi: #"+x.id+" "+(x.hastaAdi||""));
+                    if(x.durum==="Tamamlama Onayı"&&o.durum!=="Tamamlama Onayı")bildirimler.push("✅ Teknisyen işi bitirdi: #"+x.id+" "+(x.hastaAdi||""));
+                    if(Number(x.disMesajSayisi||0)>Number(o.disMesajSayisi||0))bildirimler.push("💬 Yeni mesaj: #"+x.id+" "+(x.hastaAdi||""));
+                });
+                anayasaIsler=yeni; anayasaCanliImza=imza;
+                [renderAnayasaHekimGelen,renderAnayasaOnay,renderAnayasaDagitim,renderAnayasaDevam,renderAnayasaDone,renderAnayasaFiles,renderAnayasaTeknisyenler,renderAnayasaTrash,renderAnayasaMesajJobs,renderMenuSayaclari]
+                    .forEach(function(f){ try{f();}catch(e){console.error(e);} });
+                if(bildirimler.length)showSuccess(bildirimler.slice(0,3).join("  •  ")+(bildirimler.length>3?"  (+"+(bildirimler.length-3)+")":""));
+            }catch(e){}
+        }
+        setInterval(anayasaCanliYenile,30000);
+
         function renderAnayasaAll() {
             anayasaHekimSecenekleriDoldur();
             anayasaToothButtons();
@@ -12719,6 +12748,8 @@
             const onay=anayasaIsler.filter(x=>!x.silindi && x.onayDurumu==="Gelen Onay").length;
             const dagitim=aktif.filter(x=>x.onayDurumu==="Onaylandı" && !teknisyenAtamasi(x)?.teknisyenId).length;
             const devam=aktif.filter(x=>x.onayDurumu==="Onaylandı").length;
+            const tasarimGelen=anayasaIsler.filter(x=>!x.silindi && Number(x.tasarimDosyaSayisi||0)>0 && !x.tasarimIndirildi && !["Tamamlandı","Tamamlama Onayı"].includes(anayasaDurum(x.durum))).length;
+            menuBadgeSet("menuBadgeDosya",tasarimGelen);
             menuBadgeSet("menuBadgeHekimden",hekimden); menuBadgeSet("menuBadgeOnay",onay); menuBadgeSet("menuBadgeDagitim",dagitim); menuBadgeSet("menuBadgeDevam",devam); menuBadgeSet("menuBadgeTeknisyen",dagitim);
         }
 
@@ -12995,9 +13026,20 @@
                     <td>${Number(x.taramaDosyaSayisi||0)}</td>
                     <td>${Number(x.tasarimDosyaSayisi||0)}</td>
                     <td>${anayasaDurumRozeti(x.durum)}</td>
-                    <td><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Dosyaları Aç</button></td>
+                    <td><div class="button-group"><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Dosyaları Aç</button>${tab==="design"&&!["Tamamlandı","Tamamlama Onayı"].includes(anayasaDurum(x.durum))?`<button class="button button-blue" onclick="anayasaUretimeAl(${Number(x.id)})">🏭 Üretime Al</button>`:""}</div></td>
                 </tr>`;
             }).join("");
+        }
+
+        // Teknisyenin yüklediği tasarım teslim alınır, iş üretime geçer (Dosyalar > Üretime Alınanlar).
+        async function anayasaUretimeAl(id){
+            if(!confirm("#"+Number(id)+" numaralı işin tasarımı teslim alınıp iş üretime alınsın mı?"))return;
+            try{
+                const r=await fetch("/api/anayasa/isler/"+Number(id)+"/uretime-al",{method:"PATCH"});
+                if(!r.ok)throw new Error((await r.text())||"Üretime alınamadı.");
+                await loadAnayasaData();
+                showSuccess("#"+Number(id)+" üretime alındı.");
+            }catch(e){showError(e.message);}
         }
 
         function toggleTechManagement(forceOpen){

@@ -118,7 +118,8 @@ namespace PrimerLabV2.Controllers
                         s."TasarimIndirmeTarihi",
                         COALESCE(f."DosyaSayisi",0)::int AS "DosyaSayisi",
                         COALESCE(f."TaramaSayisi",0)::int AS "TaramaDosyaSayisi",
-                        COALESCE(f."TasarimSayisi",0)::int AS "TasarimDosyaSayisi"
+                        COALESCE(f."TasarimSayisi",0)::int AS "TasarimDosyaSayisi",
+                        COALESCE(mj."DisMesajSayisi",0)::int AS "DisMesajSayisi"
                     FROM "Siparisler" s
                     LEFT JOIN
                     (
@@ -130,6 +131,14 @@ namespace PrimerLabV2.Controllers
                         FROM "IsDosyalari"
                         GROUP BY "SiparisId"
                     ) f ON f."SiparisId"=s."Id"
+                    LEFT JOIN
+                    (
+                        -- Hekim portalı ve teknisyen panelinden gelen mesaj sayısı (canlı bildirim için)
+                        SELECT "SiparisId", COUNT(*) AS "DisMesajSayisi"
+                        FROM "IsMesajlari"
+                        WHERE COALESCE("GonderenTipi",'Laboratuvar')<>'Laboratuvar'
+                        GROUP BY "SiparisId"
+                    ) mj ON mj."SiparisId"=s."Id"
                     """)
                 .ToListAsync();
 
@@ -165,6 +174,7 @@ namespace PrimerLabV2.Controllers
                     DosyaSayisi = m?.DosyaSayisi ?? 0,
                     TaramaDosyaSayisi = m?.TaramaDosyaSayisi ?? 0,
                     TasarimDosyaSayisi = m?.TasarimDosyaSayisi ?? 0,
+                    DisMesajSayisi = m?.DisMesajSayisi ?? 0,
                     x.ToplamAdet,
                     x.ToplamTutar,
                     x.Kalemler
@@ -616,6 +626,40 @@ namespace PrimerLabV2.Controllers
                 "Admin biten iş onayını verdi.");
 
             return Ok();
+        }
+
+        // Teknisyenin yüklediği tasarım laboratuvarda teslim alınır ve iş üretime geçer.
+        // "Dosyalar > Üretime Alınanlar" sekmesi bu işaretle (TasarimIndirildi) dolar.
+        [HttpPatch("isler/{id:int}/uretime-al")]
+        public async Task<IActionResult> UretimeAl(int id)
+        {
+            var row = await _db.Database
+                .SqlQuery<UretimeAlGuardDto>($"""
+                    SELECT
+                        COALESCE("Durum",'Bekliyor') AS "Durum",
+                        COALESCE("OnayDurumu",'Onaylandı') AS "OnayDurumu",
+                        COALESCE("Silindi",false) AS "Silindi"
+                    FROM "Siparisler"
+                    WHERE "Id"={id}
+                    """)
+                .FirstOrDefaultAsync();
+
+            if (row == null) return NotFound("İş bulunamadı.");
+            if (row.Silindi) return BadRequest("Silinen iş üretime alınamaz.");
+            if (row.OnayDurumu is "Gelen Onay" or "Reddedildi") return BadRequest("İş henüz onaylanmamış.");
+            if (row.Durum is "Tamamlandı" or "Tamamlama Onayı") return BadRequest("İş zaten tamamlanmış veya tamamlama onayında.");
+
+            var yeni = row.Durum is "Makyajda" ? row.Durum : "Üretimde";
+            await _db.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE "Siparisler"
+                SET "Durum"={yeni},
+                    "TasarimIndirildi"=true,
+                    "TasarimIndirmeTarihi"={DateTime.UtcNow}
+                WHERE "Id"={id}
+                """);
+
+            await DurumGecmisiEkle(id, row.Durum, yeni, "Tasarım laboratuvarda teslim alındı; iş üretime alındı.");
+            return Ok(new { durum = yeni });
         }
 
         [HttpPatch("isler/{id:int}/tamamlama-reddet")]
@@ -1106,11 +1150,19 @@ namespace PrimerLabV2.Controllers
         public int DosyaSayisi { get; set; }
         public int TaramaDosyaSayisi { get; set; }
         public int TasarimDosyaSayisi { get; set; }
+        public int DisMesajSayisi { get; set; }
     }
 
     public class AnayasaAktarimGuardDto
     {
         public string Kaynak { get; set; } = string.Empty;
+        public bool Silindi { get; set; }
+    }
+
+    public class UretimeAlGuardDto
+    {
+        public string Durum { get; set; } = "Bekliyor";
+        public string OnayDurumu { get; set; } = "Onaylandı";
         public bool Silindi { get; set; }
     }
 

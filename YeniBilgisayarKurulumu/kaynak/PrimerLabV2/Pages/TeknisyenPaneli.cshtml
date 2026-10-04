@@ -159,7 +159,9 @@
 </div>
 
 <script>
-    const ADIMLAR = ["Bekliyor", "Tasarımda", "Üretimde", "Makyajda", "Tamamlama Onayı"];
+    // İç teknisyen üretim aşamalarını da yürütür; dış teknisyen tasarımı teslim eder, üretimi laboratuvar yapar.
+    const ADIMLAR_IC = ["Bekliyor", "Tasarımda", "Üretimde", "Makyajda", "Tamamlama Onayı"];
+    const ADIMLAR_DIS = ["Bekliyor", "Tasarımda"];
     let ben = null;
     let isler = [];
     let gorunum = "aktif";
@@ -285,7 +287,17 @@
         const kilitli = !j.kabul;
         const bitti = j.durum === "Tamamlandı";
         const onayda = j.durum === "Tamamlama Onayı";
-        const adimlar = bitti ? "" : `<div class="steps">${ADIMLAR.map(a =>
+        const dis = ben && ben.tip === "dis";
+        const labda = dis && (j.durum === "Üretimde" || j.durum === "Makyajda");
+        const teslimEdilebilir = !kilitli && !bitti && !onayda && !labda;
+        const teslimBilgi = j.tasarimTeslimTarihi
+            ? `<div class="note" style="margin-top:10px">✔ Tasarım ${tarih(j.tasarimTeslimTarihi)} tarihinde teslim edildi · ${j.uretimeAlindi ? "<b>laboratuvar üretime aldı</b>" : "laboratuvarın üretime alması bekleniyor"}</div>`
+            : "";
+        const teslimBtn = teslimEdilebilir
+            ? `<button class="btn btn-green btn-sm" type="button" ${j.tasarimSayisi ? "" : "disabled title=\"Önce Dosyalar'dan tasarım dosyasını yükleyin\""} onclick="tasarimTeslim(${j.id})">📤 Tasarımı Laboratuvara Teslim Et</button>`
+            : "";
+        const adimListesi = dis ? ADIMLAR_DIS : ADIMLAR_IC;
+        const adimlar = (bitti || labda) ? "" : `<div class="steps">${adimListesi.map(a =>
             `<button type="button" class="step ${j.durum === a ? "on" : ""}" ${kilitli || onayda || j.durum === a ? "disabled" : ""}
               onclick="durumYap(${j.id},'${a}')">${a === "Tamamlama Onayı" ? "✔ Bitti — onaya gönder" : a}</button>`).join("")}</div>`;
         return `<div class="job ${kilitli || j.durum === "Bekliyor" ? "yeni" : ""}">
@@ -304,12 +316,23 @@
             ${kilitli ? `<div class="actions"><button class="btn btn-green btn-sm" type="button" onclick="kabulEt(${j.id})">✅ İşi Kabul Et</button>
                 <span class="note">Kabul ettikten sonra tarama dosyalarını indirip çalışmaya başlayabilirsiniz.</span></div>` : ""}
             ${onayda ? `<div class="note" style="margin-top:10px">⏳ Laboratuvarın tamamlama onayı bekleniyor.</div>` : ""}
+            ${labda ? `<div class="note" style="margin-top:10px">🏭 İş laboratuvarda ${esc(j.durum.toLocaleLowerCase("tr-TR"))}; durumu laboratuvar yönetir.</div>` : ""}
+            ${teslimBilgi}
             ${adimlar}
             <div class="actions">
+                ${teslimBtn}
                 <button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım)</button>
                 <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}</button>
             </div>
         </div>`;
+    }
+
+    async function tasarimTeslim(id) {
+        const j = isler.find(x => x.id === id);
+        if (!j || !j.tasarimSayisi) { bildir("Önce Dosyalar'dan tasarım dosyasını yükleyin."); return; }
+        if (!confirm(`${j.tasarimSayisi} tasarım dosyası laboratuvara teslim edilsin mi? Laboratuvar işi üretime alacak.`)) return;
+        try { const r = await api(`/api/teknisyen-portal/jobs/${id}/tasarim-teslim`, { method: "POST" }); bildir(r.message || "Tasarım teslim edildi."); if (acikModal) modalKapat(); else await yukle(true); }
+        catch (err) { bildir(err.message); }
     }
 
     async function kabulEt(id) {
@@ -391,6 +414,12 @@
         bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : `${tamam} dosya yüklendi.`);
         await yukle(true);
         await dosyalariCiz(id);
+        const j = isler.find(x => x.id === id);
+        if (tamam && tur === "Tasarım" && j && $("modalIcerik")) {
+            $("modalIcerik").insertAdjacentHTML("beforeend",
+                `<div class="msg ok" style="margin-top:12px">Tasarım yüklendi. Bittiyse laboratuvara teslim edin:
+                 <div style="margin-top:8px"><button class="btn btn-green btn-sm" type="button" onclick="tasarimTeslim(${id})">📤 Tasarımı Laboratuvara Teslim Et</button></div></div>`);
+        }
     }
 
     async function mesajlarAc(id) {
