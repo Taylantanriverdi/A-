@@ -90,7 +90,7 @@ class Otopilot:
         if ayar.motor == "claude":
             self.claude = ClaudeCLI(self.proje, ayar.izin_modu, self._izinler(), ayar.model)
         else:
-            self.claude = DeepSeekMotor(self.proje, ayar.model)
+            self.claude = DeepSeekMotor(self.proje, ayar.model, izleyici=self._arac_olayi)
 
     def _izinler(self) -> list[str]:
         izinler = list(self.a.ek_izinler)
@@ -103,15 +103,17 @@ class Otopilot:
     # ------------------------------------------------------------------ #
 
     def _bekle(self, ne_zamana: dt.datetime, sebep: str) -> None:
+        onceki_asama = self.d.oku().get("asama")
         self.d.yaz(bekle_until=ne_zamana.isoformat(), bekleme_sebebi=sebep)
-        self.d.gunluk(f"⏸  {sebep}. {ne_zamana:%d.%m %H:%M} itibarıyla devam edilecek.")
+        self.d.olay("bekle", f"⏸  {sebep}. {ne_zamana:%d.%m %H:%M} itibarıyla devam edilecek.", asama="bekleme",
+                    bitis=ne_zamana.isoformat(), sebep=sebep)
         while True:
             kalan = (ne_zamana - dt.datetime.now().astimezone()).total_seconds()
             if kalan <= 0:
                 break
             time.sleep(min(60, kalan))  # kısa aralıklar: uyku/hazırda bekletmeden sonra doğru uyanır
         self.d.yaz(bekle_until=None, bekleme_sebebi=None)
-        self.d.gunluk("▶  Devam ediliyor.")
+        self.d.olay("devam", "▶  Devam ediliyor.", asama=onceki_asama if onceki_asama != "bekleme" else None)
 
     def _onceki_beklemeyi_tamamla(self) -> None:
         """Bilgisayar beklerken kapandıysa kalan süreyi bekler."""
@@ -134,11 +136,11 @@ class Otopilot:
             if s.limit:
                 zaman = (s.sifirlanma + LIMIT_PAYI) if s.sifirlanma else dt.datetime.now().astimezone() + BILINMEYEN_LIMIT_BEKLEME
                 if not s.sifirlanma:
-                    self.d.gunluk(f"Bekleme süresi bilinmiyor, 30 dk sonra yeniden denenecek: {s.metin[:200]!r}")
+                    self.d.olay("bilgi", f"Bekleme süresi bilinmiyor, 30 dk sonra yeniden denenecek: {s.metin[:200]!r}")
                 self._bekle(zaman, s.hata or "Kullanım limiti doldu")
                 hata_sayisi = 0
                 continue
-            self.d.gunluk(f"⚠  Kodlayıcı hatası: {s.hata[:300]}")
+            self.d.olay("hata", f"⚠  Kodlayıcı hatası: {s.hata[:300]}")
             if hata_sayisi >= len(HATA_BEKLEME_DK):
                 return s  # kalıcı hata: çağıran taraf karar versin
             bekleme = HATA_BEKLEME_DK[hata_sayisi]
@@ -168,12 +170,12 @@ class Otopilot:
                                  f"`git checkout {self.a.dal}` yapıp tekrar başlat.")
             var = pj.git(self.proje, "branch", "--list", self.a.dal)
             pj.git(self.proje, "checkout", "-q", *([self.a.dal] if var else ["-b", self.a.dal]))
-            self.d.gunluk(f"Çalışma dalı: {self.a.dal} (temel: {mevcut_dal})")
+            self.d.olay("bilgi", f"Çalışma dalı: {self.a.dal} (temel: {mevcut_dal})")
 
         if not self.a.test_komutu:
             self.a.test_komutu = pj.test_komutunu_bul(self.proje)
             if self.a.test_komutu:
-                self.d.gunluk(f"Test komutu otomatik bulundu: {self.a.test_komutu}")
+                self.d.olay("bilgi", f"Test komutu otomatik bulundu: {self.a.test_komutu}")
                 self.d.ayarlari_yaz(self.a)
                 self.claude.ek_izinler = self._izinler()
 
@@ -182,14 +184,14 @@ class Otopilot:
         gorevler = self.d.gorevleri_oku()
         bitti = [m for d, m in gorevler if d == "x"][-30:]
         basarisiz = [m for d, m in gorevler if d == "!"][-15:]
-        self.d.gunluk("🧭 Yeni görevler planlanıyor...")
+        self.d.olay("plan", "🧭 Yeni görevler planlanıyor...", asama="planlama")
         s = self.claude_cagir(PLANLA.format(
             hedef=self.a.hedef, n_bitti=len(bitti),
             bitti="\n".join(f"- {m}" for m in bitti) or "(yok)",
             basarisiz="\n".join(f"- {m}" for m in basarisiz) or "(yok)",
         ), sema=PLAN_SEMASI)
         if not s.basarili or s.yapisal is None:
-            self.d.gunluk(f"Planlama başarısız: {(s.hata or s.metin)[:300]}")
+            self.d.olay("hata", f"Planlama başarısız: {(s.hata or s.metin)[:300]}")
             return None
         plan = s.yapisal
         yeni = [g for g in plan.get("gorevler", []) if isinstance(g, str) and g.strip()]
@@ -197,18 +199,19 @@ class Otopilot:
             self.a.test_komutu = plan["test_komutu"].strip()
             self.d.ayarlari_yaz(self.a)
             self.claude.ek_izinler = self._izinler()
-            self.d.gunluk(f"Test komutu (plandan): {self.a.test_komutu}")
+            self.d.olay("bilgi", f"Test komutu (plandan): {self.a.test_komutu}")
         if plan.get("aciklama"):
-            self.d.gunluk(f"Plan: {plan['aciklama'][:400]}")
+            self.d.olay("plan", f"Plan: {plan['aciklama'][:400]}")
         if not yeni:
             return False if plan.get("hedef_tamamlandi") else None
         self.d.gorev_ekle(yeni, baslik=f"Plan · {dt.datetime.now():%Y-%m-%d %H:%M}")
         for g in yeni:
-            self.d.gunluk(f"   + {g}")
+            self.d.olay("plan_gorev", f"   + {g}", gorev=g)
         return True
 
     def gorevi_yurut(self, g: AktifGorev) -> None:
-        self.d.gunluk(f"🔧 Görev: {g.satir}")
+        self.d.olay("gorev_basla", f"🔧 Görev: {g.satir}", asama="uygulama" if g.asama == "uygula" else "test",
+                    gorev=g.satir)
         devam = DEVAM.format(gorev=g.satir)
 
         if g.asama == "uygula":
@@ -225,17 +228,22 @@ class Otopilot:
                 s = self.claude_cagir(istem, devam_istemi=devam)
             g.oturum, g.asama, g.son_test = s.oturum, "test", s.metin[-1500:]
             self.d.aktif_gorev_yaz(g)
+            self._kodlayici_ozeti(s)
 
         while True:
+            self.d.olay("test_basla", f"🧪 Doğrulama çalışıyor: {self.a.test_komutu or '(test komutu yok)'}",
+                        asama="test")
             t = pj.testleri_calistir(self.proje, self.a.test_komutu)
             if t.gecti:
+                self.d.olay("test_gecti", "✔  Doğrulama geçti.", cikti=t.cikti[-1500:])
                 break
             g.deneme += 1
             if g.deneme > self.a.max_deneme:
-                self.d.gunluk("❌ Doğrulama yine başarısız; deneme hakkı bitti.")
+                self.d.olay("test_kaldi", "❌ Doğrulama yine başarısız; deneme hakkı bitti.", cikti=t.cikti[-1500:])
                 self._basarisiz(g, t.cikti)
                 return
-            self.d.gunluk(f"❌ Doğrulama başarısız, kodlayıcı düzeltiyor (deneme {g.deneme}/{self.a.max_deneme}).")
+            self.d.olay("test_kaldi", f"❌ Doğrulama başarısız, kodlayıcı düzeltiyor (deneme {g.deneme}/{self.a.max_deneme}).",
+                        asama="duzeltme", deneme=g.deneme, cikti=t.cikti[-1500:])
             self.d.aktif_gorev_yaz(g)
             s = self.claude_cagir(
                 DUZELT.format(gorev=g.satir, komut=t.komut, deneme=g.deneme, max_deneme=self.a.max_deneme, cikti=t.cikti),
@@ -243,19 +251,35 @@ class Otopilot:
             )
             g.oturum, g.son_test = s.oturum, s.metin[-1500:]
             self.d.aktif_gorev_yaz(g)
+            self._kodlayici_ozeti(s)
 
+        self.d.yaz(asama="commit", asama_zamani=dt.datetime.now().isoformat(timespec="seconds"))
         ozet = " ".join((g.son_test or "").split())
         if pj.hepsini_commit_et(self.proje, f"{g.satir}\n\n{ozet[:1500]}\n\nOtopilot ({self.a.motor}) tarafından yapıldı."):
             self.d.gorevi_isaretle(g.satir, "x", ozet[:400])
-            self.d.gunluk(f"✅ Bitti ve commit edildi: {g.satir}")
+            self.d.olay("commit", f"✅ Bitti ve commit edildi: {g.satir}", gorev=g.satir,
+                        hash=pj.git(self.proje, "rev-parse", "--short", "HEAD"))
         elif pj.git(self.proje, "rev-parse", "HEAD") != g.baslangic:
             self.d.gorevi_isaretle(g.satir, "x", ozet[:400])
-            self.d.gunluk(f"✅ Bitti: {g.satir}")
+            self.d.olay("commit", f"✅ Bitti: {g.satir}", gorev=g.satir)
         else:
             self.d.gorevi_isaretle(g.satir, "x", "Değişiklik gerekmedi. " + ozet[:300])
-            self.d.gunluk(f"✅ Değişiklik gerekmedi: {g.satir}")
+            self.d.olay("commit", f"✅ Değişiklik gerekmedi: {g.satir}", gorev=g.satir)
         self.d.yaz(taban_hatasi=None)
         self.d.aktif_gorev_yaz(None)
+
+    def _kodlayici_ozeti(self, s: Sonuc) -> None:
+        if s.metin.strip():
+            self.d.olay("kodlayici", "💬 " + " ".join(s.metin.split())[:600])
+
+    def _arac_olayi(self, ad: str, girdi: dict) -> None:
+        if ad == "bash":
+            mesaj = f"   $ {girdi.get('command', '(kabuk yeniden başlatıldı)')}"
+        elif ad == "dosya":
+            mesaj = f"   ✎ {girdi.get('command')} {girdi.get('path')}"
+        else:
+            mesaj = f"   • {ad}"
+        self.d.olay("arac", mesaj[:300])
 
     def _basarisiz(self, g: AktifGorev, cikti: str) -> None:
         ad = re.sub(r"[^A-Za-z0-9]+", "-", g.satir.translate(str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")))
@@ -265,7 +289,7 @@ class Otopilot:
         son = cikti.strip().splitlines()[-1][:200] if cikti.strip() else ""
         self.d.gorevi_isaretle(g.satir, "!", f"{self.a.max_deneme} denemede testler geçmedi, geri alındı. "
                                              f"Yama: {yama.name}. Son hata: {son}")
-        self.d.gunluk(f"🛑 Başarısız, değişiklikler geri alındı (yama: {yama}).")
+        self.d.olay("basarisiz", f"🛑 Başarısız, değişiklikler geri alındı: {g.satir}", gorev=g.satir, yama=str(yama))
         self.d.aktif_gorev_yaz(None)
 
     # ------------------------------------------------------------------ #
@@ -276,14 +300,14 @@ class Otopilot:
         try:
             self.hazirla()
             self._onceki_beklemeyi_tamamla()
-            self.d.gunluk(f"🚀 Otopilot başladı: {self.proje} · motor {self.a.motor} · dal {self.a.dal} · "
-                          f"test: {self.a.test_komutu or 'yok'}")
+            self.d.olay("baslat", f"🚀 Otopilot başladı: {self.proje} · motor {self.a.motor} · dal {self.a.dal} · "
+                                  f"test: {self.a.test_komutu or 'yok'}", asama="hazirlik")
 
             if not self.d.aktif_gorev():
                 taban = pj.testleri_calistir(self.proje, self.a.test_komutu)
                 self.d.yaz(taban_hatasi=None if taban.gecti else taban.cikti[-3000:])
                 if not taban.gecti:
-                    self.d.gunluk("Başlangıçta doğrulama zaten başarısız; ilk görevde bu da düzeltilecek.")
+                    self.d.olay("bilgi", "Başlangıçta doğrulama zaten başarısız; ilk görevde bu da düzeltilecek.")
 
             while True:
                 g = self.d.aktif_gorev()
@@ -291,12 +315,12 @@ class Otopilot:
                     sira = self.d.siradaki_gorev()
                     if not sira:
                         if not self.a.hedef:
-                            self.d.gunluk("Bekleyen görev yok ve hedef tanımlı değil. "
-                                          "`otopilot gorev` ile görev ekle veya --hedef ver.")
+                            self.d.olay("bitti", "Bekleyen görev yok ve hedef tanımlı değil. Görev ekle veya hedef ver.",
+                                        asama="bitti")
                             return
                         sonuc = self.planla()
                         if sonuc is False:
-                            self.d.gunluk("🎯 Planlayıcı hedefin tamamlandığını bildirdi.")
+                            self.d.olay("bitti", "🎯 Planlayıcı hedefin tamamlandığını bildirdi.", asama="bitti")
                             return
                         if sonuc is None:
                             self._bekle(dt.datetime.now().astimezone() + dt.timedelta(minutes=30),
@@ -308,6 +332,13 @@ class Otopilot:
                 if self.tek_sefer:
                     return
         except KeyboardInterrupt:
-            self.d.gunluk("Durduruldu. Yeniden başlatınca kaldığı yerden devam eder.")
+            self.d.olay("durdu", "Durduruldu. Yeniden başlatınca kaldığı yerden devam eder.", asama="durdu")
+        except SystemExit as e:
+            if e.code not in (None, 0):
+                self.d.olay("hata", f"Otopilot durdu: {e.code}", asama="hata")
+            raise
+        except Exception as e:
+            self.d.olay("hata", f"Beklenmeyen hata: {type(e).__name__}: {e}", asama="hata")
+            raise
         finally:
             self.d.kilidi_birak()

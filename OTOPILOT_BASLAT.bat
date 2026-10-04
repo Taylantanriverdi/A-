@@ -142,11 +142,14 @@ if errorlevel 2 goto calistir
 %PY% -m otopilot otomatik-kur "%PROJE%"
 
 :calistir
+REM Canli izleme panelini arka planda ac (zaten aciksa sadece tarayicida gosterir)
+start "Otopilot Panel" /min %PY% -m otopilot arayuz
 echo.
 echo ==========================================================
-echo  Otopilot calisiyor. Bu pencereyi kapatirsan durur; tekrar
-echo  actiginda kaldigi yerden devam eder. Ilerleme icin:
-echo  %VERI%  klasorundeki gorevler.md ve gunluk.log
+echo  Otopilot calisiyor. Islem akisini tarayicida acilan
+echo  panelden izleyebilirsin: http://127.0.0.1:8765
+echo  Bu pencereyi kapatirsan durur; tekrar actiginda (ya da
+echo  paneldeki Baslat ile) kaldigi yerden devam eder.
 echo ==========================================================
 echo.
 %PY% -m otopilot baslat "%PROJE%" --motor deepseek

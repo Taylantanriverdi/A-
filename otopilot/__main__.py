@@ -5,6 +5,7 @@
     python -m otopilot durum  C:\\projeler\\uygulama
     python -m otopilot otomatik-kur C:\\projeler\\uygulama     # bilgisayar açılınca kendiliğinden başlasın
     python -m otopilot otomatik-kaldir C:\\projeler\\uygulama
+    python -m otopilot arayuz                                # canlı izleme paneli (tarayıcıda)
 """
 
 from __future__ import annotations
@@ -57,7 +58,12 @@ def baslat(args) -> None:
         while not a.hedef:
             a.hedef = input("Hedef: ").strip()
         d.ayarlari_yaz(a)
-    Otopilot(d, a, tek_sefer=args.tek_sefer).calistir()
+    try:
+        otopilot = Otopilot(d, a, tek_sefer=args.tek_sefer)
+    except SystemExit as e:  # ör. API anahtarı yok, Claude Code yok — arayüzde de görünsün
+        d.olay("hata", f"Otopilot başlatılamadı: {e.code}", asama="hata")
+        raise
+    otopilot.calistir()
 
 
 def gorev(args) -> None:
@@ -114,6 +120,12 @@ def otomatik_kaldir(args) -> None:
         print("crontab -e ile @reboot satırını sil.")
 
 
+def arayuz(args) -> None:
+    from . import arayuz as ui
+
+    ui.calistir(args.port, tarayici=not args.tarayicisiz)
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="otopilot", description="DeepSeek API veya Claude Code ile projeni otomatik geliştirir.")
     alt = p.add_subparsers(dest="komut", required=True)
@@ -150,6 +162,11 @@ def main(argv: list[str] | None = None) -> None:
     ka = alt.add_parser("otomatik-kaldir", help="otomatik başlatmayı kaldır")
     ka.add_argument("proje")
     ka.set_defaults(f=otomatik_kaldir)
+
+    ui = alt.add_parser("arayuz", help="tarayıcıda canlı izleme ve kontrol paneli")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--tarayicisiz", action="store_true", help="tarayıcıyı otomatik açma")
+    ui.set_defaults(f=arayuz)
 
     args = p.parse_args(argv)
     args.f(args)

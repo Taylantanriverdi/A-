@@ -91,6 +91,7 @@ class Ajan:
         boyut = (self.bilgisayar.goruntu_w, self.bilgisayar.goruntu_h) if self.bilgisayar else None
         self.araclar = arac_tanimlari(boyut)
         self.mesajlar: list[dict] = [{"role": "system", "content": self._sistem_istemi()}]
+        self.izleyici = None  # isteğe bağlı: her araç çağrısında izleyici(ad, girdi) çağrılır
         self._dusunce_geri_gonder = True
 
     def _ekrani_baslat(self) -> None:
@@ -305,6 +306,11 @@ class Ajan:
         if not isinstance(girdi, dict):
             raise AracHatasi("Araç argümanları bir JSON nesnesi olmalı.")
         self.guvenlik.gunluge_yaz("arac", {"ad": ad, "girdi": _ozet(girdi)})
+        if self.izleyici:
+            try:
+                self.izleyici(ad, girdi)
+            except Exception:
+                pass
 
         if ad == "bilgisayar":
             if not self.bilgisayar:

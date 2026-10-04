@@ -52,6 +52,7 @@ class Durum:
         self.durum_dosyasi = self.dizin / "durum.json"
         self.gunluk_dosyasi = self.dizin / "gunluk.log"
         self.kilit_dosyasi = self.dizin / "kilit"
+        self.olay_dosyasi = self.dizin / "olaylar.jsonl"
 
     # --- ayarlar ---------------------------------------------------------------
 
@@ -131,6 +132,40 @@ class Durum:
         print(satir, flush=True)
         with self.gunluk_dosyasi.open("a", encoding="utf-8") as f:
             f.write(satir + "\n")
+
+    def olay(self, tur: str, mesaj: str, asama: str | None = None, **ek) -> None:
+        """Arayüz için yapısal olay: günlüğe yazar, olaylar.jsonl'a ekler, gerekirse aşamayı günceller."""
+        self.gunluk(mesaj)
+        kayit = {"zaman": dt.datetime.now().isoformat(timespec="seconds"), "tur": tur, "mesaj": mesaj.strip(), **ek}
+        if asama:
+            kayit["asama"] = asama
+        with self.olay_dosyasi.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(kayit, ensure_ascii=False, default=str) + "\n")
+        if asama:
+            self.yaz(asama=asama, asama_zamani=kayit["zaman"])
+
+    def son_olaylar(self, adet: int = 200) -> list[dict]:
+        if not self.olay_dosyasi.exists():
+            return []
+        with self.olay_dosyasi.open("rb") as f:  # büyük dosyada yalnızca sonunu oku
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 400_000))
+            satirlar = f.read().decode("utf-8", errors="replace").splitlines()[-adet:]
+        sonuc = []
+        for s in satirlar:
+            try:
+                sonuc.append(json.loads(s))
+            except json.JSONDecodeError:
+                continue
+        return sonuc
+
+    def calisiyor_mu(self) -> int | None:
+        """Otopilot bu proje için çalışıyorsa PID'ini döner."""
+        try:
+            pid = int(self.kilit_dosyasi.read_text().strip())
+        except (OSError, ValueError):
+            return None
+        return pid if _surec_yasiyor(pid) else None
 
     # --- tek örnek kilidi ----------------------------------------------------------
 

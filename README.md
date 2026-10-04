@@ -66,6 +66,22 @@ Tek dosya her şeyi yapar:
 
 Sonraki çift tıklamalarda son projeyle kaldığı yerden devam eder.
 
+### Canlı izleme paneli
+
+`OTOPILOT_BASLAT.bat` başlarken tarayıcıda **canlı paneli** de açar (yalnızca `OTOPILOT_PANEL.bat` ile de
+açılabilir): <http://127.0.0.1:8765>
+
+- **Şu an:** ne yapıldığını düz Türkçe anlatır ("Testler başarısız — DeepSeek düzeltiyor, deneme 2/3"),
+  üzerinde çalışılan görevi ve o adımda geçen süreyi gösterir; limit/bakiye beklemesinde geri sayım çıkar.
+- **İşlem akışı:** Planla → Uygula → Test → Kaydet döngüsü, Düzelt ve Geri al dalları ile Bekle durumu;
+  o anki adım yanıp söner, görevde tamamlanan adımlar yeşil, başarısız olan kırmızı görünür.
+- **Görevler:** biten / bekleyen / başarısız görevler ve notları; panelden yeni görev eklenebilir, hedef düzenlenebilir.
+- **Canlı akış:** her adım, kodlayıcının çalıştırdığı komutlar ve düzenlediği dosyalar, test çıktıları.
+- **Son commit'ler** ve özet sayılar.
+- **Başlat / Durdur** düğmeleri. Durdurulan otopilot yeniden başlatılınca kaldığı yerden devam eder.
+
+Panel yalnızca bu bilgisayardan açılabilir; değişiklik isteklerini sayfaya gömülü rastgele bir anahtarla doğrular.
+
 ### Komut satırından kullanım
 
 Ya da:
@@ -85,7 +101,7 @@ otopilot.bat otomatik-kur C:\projeler\uygulama
 otopilot.bat otomatik-kaldir C:\projeler\uygulama
 ```
 
-Linux/macOS'ta aynı komutlar: `python -m otopilot baslat ~/projeler/uygulama --hedef "..."`.
+Linux/macOS'ta aynı komutlar: `python -m otopilot baslat ~/projeler/uygulama --hedef "..."`, panel için `python -m otopilot arayuz`.
 
 Görev listesini istediğin zaman `~/.otopilot/<proje>/gorevler.md` dosyasından düzenleyebilirsin:
 `- [ ]` bekliyor, `- [x]` bitti, `- [!]` başarısız. İşi incelemek için `git log otopilot/gelistirme`;
@@ -268,8 +284,11 @@ otopilot/
   claude.py     Claude Code motoru (CLI sarmalayıcı)
   limit.py      limit mesajından sıfırlanma saatini çıkarma
   proje.py      git ve test komutu
-  durum.py      kalıcı durum, görev listesi, kilit
-OTOPILOT_BASLAT.bat  tek tıkla kurulum + başlatma
+  durum.py      kalıcı durum, görev listesi, olaylar, kilit
+  arayuz.py     canlı izleme paneli sunucusu (127.0.0.1:8765)
+  arayuz.html   panel sayfası
+OTOPILOT_BASLAT.bat  tek tıkla kurulum + başlatma (paneli de açar)
+OTOPILOT_PANEL.bat   yalnızca canlı izleme panelini açar
 otopilot.bat    Windows komut satırı başlatıcı
 asistan/
   __main__.py   komut satırı (sohbet, ogren, otonom)

@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="otopilot-anahtar" content="__ANAHTAR__">
+<title>Otopilot Paneli</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --bg: #f4f5f7; --panel: #ffffff; --panel-2: #f8f9fb; --border: #e3e6eb;
+  --text: #1c2330; --muted: #667085; --faint: #98a2b3;
+  --accent: #3b5bdb; --accent-soft: #e7ecff;
+  --ok: #1f8a4c; --ok-soft: #e3f5ea; --warn: #b26a00; --warn-soft: #fff3dc;
+  --bad: #c4352b; --bad-soft: #fde8e6; --info: #2b6cb0; --info-soft: #e5f0fb;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1218; --panel: #171b23; --panel-2: #1c212b; --border: #2a303c;
+    --text: #e6e9ef; --muted: #9aa4b5; --faint: #6b7586;
+    --accent: #7c95ff; --accent-soft: #1f2747;
+    --ok: #4cc27f; --ok-soft: #15301f; --warn: #f0b04a; --warn-soft: #33270f;
+    --bad: #f07167; --bad-soft: #3a1815; --info: #6aaef0; --info-soft: #132538;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px; padding: 10px 20px; flex-wrap: wrap; }
+.logo { font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px; }
+.logo svg { color: var(--accent); }
+select, input, textarea, button { font: inherit; color: inherit; }
+select, input[type=text], textarea { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; min-width: 0; }
+select { max-width: 280px; }
+button { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; padding: 7px 14px;
+  cursor: pointer; font-weight: 600; }
+button:hover { background: var(--panel-2); }
+button.ana { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.ana:hover { filter: brightness(1.08); }
+button.tehlike { color: var(--bad); }
+button:disabled { opacity: .5; cursor: default; }
+.bosluk { flex: 1; }
+.rozet { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px;
+  font-weight: 600; font-size: 13px; background: var(--panel-2); color: var(--muted); }
+.rozet i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; display: inline-block; }
+.rozet.calisiyor { background: var(--ok-soft); color: var(--ok); }
+.rozet.calisiyor i { animation: nabiz 1.4s infinite; }
+.rozet.bekliyor { background: var(--warn-soft); color: var(--warn); }
+.rozet.hata { background: var(--bad-soft); color: var(--bad); }
+.rozet.bitti { background: var(--info-soft); color: var(--info); }
+@keyframes nabiz { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+
+main { max-width: 1280px; margin: 0 auto; padding: 20px; display: grid; gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.kart { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
+  padding: 16px 18px; min-width: 0; }
+.tam { grid-column: 1 / -1; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 12px;
+  display: flex; align-items: center; gap: 8px; }
+h2 .sayi { background: var(--panel-2); border-radius: 999px; padding: 0 8px; font-size: 12px; }
+
+/* Şu an */
+.suan { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+.suan-baslik { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.suan-gorev { font-size: 15px; color: var(--text); background: var(--panel-2); border-left: 3px solid var(--accent);
+  padding: 8px 12px; border-radius: 6px; margin: 10px 0 0; overflow-wrap: anywhere; }
+.suan-alt { color: var(--muted); }
+.sayac { text-align: right; min-width: 150px; }
+.sayac b { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
+.sayac span { color: var(--muted); font-size: 12px; }
+.sayac.bekle b { color: var(--warn); }
+.hedef { margin-top: 14px; display: flex; gap: 8px; align-items: flex-start; color: var(--muted); }
+.hedef p { margin: 0; flex: 1; color: var(--text); overflow-wrap: anywhere; }
+.hedef textarea { flex: 1; min-height: 60px; resize: vertical; }
+
+/* Akış diyagramı */
+.akis-kap { overflow-x: auto; }
+.akis svg { width: 100%; height: auto; display: block; }
+.dugum rect { fill: var(--panel-2); stroke: var(--border); stroke-width: 1.5; }
+.dugum .ad { fill: var(--text); font-weight: 700; font-size: 15px; }
+.dugum .alt { fill: var(--muted); font-size: 11.5px; }
+.dugum .ikon { font-size: 15px; }
+.dugum.aktif rect { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2.5; }
+.dugum.aktif .ad { fill: var(--accent); }
+.dugum.aktif.canli rect { animation: parla 1.6s ease-in-out infinite; }
+.dugum.tamam rect { fill: var(--ok-soft); stroke: var(--ok); }
+.dugum.tamam .ad { fill: var(--ok); }
+.dugum.hata rect { fill: var(--bad-soft); stroke: var(--bad); }
+.dugum.hata .ad { fill: var(--bad); }
+.dugum.bekle.aktif rect { fill: var(--warn-soft); stroke: var(--warn); }
+.dugum.bekle.aktif .ad { fill: var(--warn); }
+.dugum.bekle rect { stroke-dasharray: 5 4; }
+@keyframes parla { 0%,100% { stroke-opacity: 1 } 50% { stroke-opacity: .35 } }
+.kenar { fill: none; stroke: var(--faint); stroke-width: 1.8; }
+.kenar.aktif { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: 7 5; animation: akim 0.8s linear infinite; }
+@keyframes akim { to { stroke-dashoffset: -12 } }
+.etiket { fill: var(--muted); font-size: 11px; }
+.ok-ucu { fill: var(--faint); }
+.aciklama { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.aciklama span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+  margin-right: 6px; vertical-align: -1px; border: 1.5px solid; }
+.aciklama .a::before { background: var(--accent-soft); border-color: var(--accent); }
+.aciklama .t::before { background: var(--ok-soft); border-color: var(--ok); }
+.aciklama .h::before { background: var(--bad-soft); border-color: var(--bad); }
+.aciklama .b::before { background: var(--warn-soft); border-color: var(--warn); }
+
+/* İstatistik */
+.istatistik { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.kutu { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px;
+  box-shadow: var(--shadow); min-width: 0; }
+.kutu span { color: var(--muted); font-size: 12px; display: block; }
+.kutu b { font-size: 24px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kutu.ok b { color: var(--ok); } .kutu.bad b { color: var(--bad); } .kutu.acc b { color: var(--accent); }
+.kutu b.kucuk { font-size: 16px; }
+
+/* Görevler */
+.gorev-ekle { display: flex; gap: 8px; margin-bottom: 12px; }
+.gorev-ekle input { flex: 1; }
+.liste { position: relative; max-height: 520px; overflow: auto; margin: 0 -6px; padding: 0 6px; }
+.grup { font-size: 12px; color: var(--faint); margin: 12px 0 4px; font-weight: 600; }
+.gorev { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; padding: 8px 8px; border-radius: 8px; }
+.gorev + .gorev { border-top: 1px solid var(--border); }
+.gorev .i { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+  font-weight: 700; margin-top: 1px; border: 1.5px solid var(--faint); color: var(--faint); }
+.gorev.bitti .i { background: var(--ok); border-color: var(--ok); color: #fff; }
+.gorev.basarisiz .i { background: var(--bad); border-color: var(--bad); color: #fff; }
+.gorev.aktif { background: var(--accent-soft); }
+.gorev.aktif .i { border-color: var(--accent); color: var(--accent); }
+.gorev.bitti .m { color: var(--muted); }
+.gorev .m { overflow-wrap: anywhere; }
+.gorev .n { font-size: 12px; color: var(--faint); margin-top: 2px; overflow-wrap: anywhere; }
+
+/* Olay akışı */
+.olaylar { max-height: 560px; overflow: auto; font-size: 13px; margin: 0 -6px; padding: 0 6px; }
+.olay { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 10px; padding: 5px 4px;
+  border-bottom: 1px solid var(--border); }
+.olay time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 1px; }
+.olay .m { overflow-wrap: anywhere; white-space: pre-wrap; }
+.olay.arac .m { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.olay.kodlayici .m { color: var(--muted); font-style: italic; }
+.olay.hata .m, .olay.basarisiz .m, .olay.test_kaldi .m { color: var(--bad); }
+.olay.commit .m, .olay.test_gecti .m { color: var(--ok); }
+.olay.bekle .m { color: var(--warn); }
+.olay.gorev_basla .m, .olay.plan .m, .olay.baslat .m { font-weight: 600; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; margin-top: 2px; }
+pre { font-family: var(--mono); font-size: 12px; background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px; overflow: auto; max-height: 280px; white-space: pre-wrap; margin: 6px 0 0; }
+
+/* Commitler */
+.commit { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; padding: 6px 0;
+  border-bottom: 1px solid var(--border); align-items: baseline; }
+.commit code { font-family: var(--mono); color: var(--accent); font-size: 12px; }
+.commit span { overflow-wrap: anywhere; } .commit time { color: var(--faint); font-size: 12px; white-space: nowrap; }
+
+.bos { color: var(--faint); text-align: center; padding: 24px 8px; }
+.uyari { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+.alt-bilgi { grid-column: 1 / -1; color: var(--faint); font-size: 12px; text-align: center; overflow-wrap: anywhere; }
+#bildirim { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text);
+  color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; opacity: 0; transition: opacity .2s;
+  pointer-events: none; max-width: calc(100% - 32px); }
+#bildirim.goster { opacity: 1; }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .istatistik { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .suan { grid-template-columns: minmax(0, 1fr); }
+  .sayac { text-align: left; }
+  header { padding: 10px 16px; }
+  header select { order: 5; flex: 1 1 100%; max-width: none; }
+  .akis svg { min-width: 640px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/><path d="M9 12l2 2 4-4"/></svg>
+    Otopilot
+  </div>
+  <select id="proje" aria-label="Proje"></select>
+  <span id="rozet" class="rozet"><i></i><span>Yükleniyor</span></span>
+  <span class="bosluk"></span>
+  <button id="baslatBtn" class="ana" hidden>▶ Başlat</button>
+  <button id="durdurBtn" class="tehlike" hidden>⏹ Durdur</button>
+</header>
+
+<main id="ana">
+  <section class="kart tam">
+    <div class="suan">
+      <div>
+        <h2>Şu an</h2>
+        <p class="suan-baslik" id="suanBaslik">—</p>
+        <div class="suan-alt" id="suanAlt"></div>
+        <div class="suan-gorev" id="suanGorev" hidden></div>
+      </div>
+      <div class="sayac" id="sayac"><span id="sayacEtiket"></span><b id="sayacDeger"></b></div>
+    </div>
+    <div class="hedef" id="hedefKutu">
+      <strong>Hedef:</strong>
+      <p id="hedefMetin"></p>
+      <button id="hedefDuzenle">Düzenle</button>
+    </div>
+    <div id="konsol"></div>
+  </section>
+
+  <section class="kart tam akis" aria-label="İşlem akışı">
+    <h2>İşlem akışı</h2>
+    <div class="akis-kap">
+    <svg viewBox="0 0 830 250" role="img" aria-label="Planla, uygula, test et, düzelt, kaydet döngüsü">
+      <defs>
+        <marker id="ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path class="ok-ucu" d="M0,0 L10,5 L0,10 z"/></marker>
+        <marker id="okAktif" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path style="fill: var(--accent)" d="M0,0 L10,5 L0,10 z"/></marker>
+      </defs>
+      <path class="kenar" data-k="planla-uygula" d="M170,82 L228,82" marker-end="url(#ok)"/>
+      <path class="kenar" data-k="uygula-test" d="M380,82 L438,82" marker-end="url(#ok)"/>
+      <path class="kenar" data-k="test-kaydet" d="M590,82 L648,82" marker-end="url(#ok)"/>
+      <text class="etiket" x="619" y="74" text-anchor="middle">geçti</text>
+      <path class="kenar" data-k="test-duzelt" d="M495,114 L495,168" marker-end="url(#ok)"/>
+      <text class="etiket" x="489" y="146" text-anchor="end">kaldı</text>
+      <path class="kenar" data-k="duzelt-test" d="M535,168 L535,116" marker-end="url(#ok)"/>
+      <text class="etiket" x="541" y="146">tekrar test</text>
+      <path class="kenar" data-k="kaydet-uygula" d="M725,50 C725,8 305,8 305,48" marker-end="url(#ok)"/>
+      <text class="etiket" x="515" y="12" text-anchor="middle">sıradaki görev</text>
+
+      <g class="dugum" data-d="planla"><rect x="20" y="50" width="150" height="64" rx="12"/>
+        <text class="ikon" x="38" y="78">🧭</text><text class="ad" x="60" y="78">Planla</text>
+        <text class="alt" x="38" y="99">hedeften görev üretir</text></g>
+      <g class="dugum" data-d="uygula"><rect x="230" y="50" width="150" height="64" rx="12"/>
+        <text class="ikon" x="248" y="78">🛠️</text><text class="ad" x="270" y="78">Uygula</text>
+        <text class="alt" x="248" y="99" id="uygulaAlt">kodlayıcı kod yazar</text></g>
+      <g class="dugum" data-d="test"><rect x="440" y="50" width="150" height="64" rx="12"/>
+        <text class="ikon" x="458" y="78">🧪</text><text class="ad" x="480" y="78">Test</text>
+        <text class="alt" x="458" y="99">doğrulama çalışır</text></g>
+      <g class="dugum" data-d="kaydet"><rect x="650" y="50" width="150" height="64" rx="12"/>
+        <text class="ikon" x="668" y="78">💾</text><text class="ad" x="690" y="78">Kaydet</text>
+        <text class="alt" x="668" y="99">git commit</text></g>
+      <g class="dugum" data-d="duzelt"><rect x="440" y="170" width="150" height="64" rx="12"/>
+        <text class="ikon" x="458" y="198">🔁</text><text class="ad" x="480" y="198">Düzelt</text>
+        <text class="alt" x="458" y="219" id="duzeltAlt">hata kodlayıcıya döner</text></g>
+      <g class="dugum bekle" data-d="bekle"><rect x="20" y="170" width="150" height="64" rx="12"/>
+        <text class="ikon" x="38" y="198">⏸️</text><text class="ad" x="60" y="198">Bekle</text>
+        <text class="alt" x="38" y="219">limit / bakiye dolunca</text></g>
+      <g class="dugum" data-d="geri"><rect x="650" y="170" width="150" height="64" rx="12"/>
+        <text class="ikon" x="668" y="198">↩️</text><text class="ad" x="690" y="198">Geri al</text>
+        <text class="alt" x="668" y="219">deneme hakkı biterse</text></g>
+      <path class="kenar" data-k="duzelt-geri" d="M590,202 L648,202" marker-end="url(#ok)"/>
+    </svg>
+    </div>
+    <div class="aciklama"><span class="a">şu anki adım</span><span class="t">bu görevde tamamlandı</span>
+      <span class="h">başarısız</span><span class="b">bekleme</span></div>
+  </section>
+
+  <section class="istatistik tam">
+    <div class="kutu ok"><span>Biten görev</span><b id="sBitti">0</b></div>
+    <div class="kutu acc"><span>Bekleyen</span><b id="sBekliyor">0</b></div>
+    <div class="kutu bad"><span>Başarısız</span><b id="sBasarisiz">0</b></div>
+    <div class="kutu"><span>Bugün biten</span><b id="sBugun">0</b></div>
+    <div class="kutu"><span>Motor / dal</span><b class="kucuk" id="sMotor">—</b></div>
+  </section>
+
+  <section class="kart">
+    <h2>Görevler <span class="sayi" id="gorevSayi">0</span></h2>
+    <form class="gorev-ekle" id="gorevForm">
+      <input type="text" id="gorevGirdi" placeholder="Yeni görev yaz, ör. Giriş sayfasına şifre sıfırlama ekle"
+             aria-label="Yeni görev">
+      <button class="ana" type="submit">Ekle</button>
+    </form>
+    <div class="liste" id="gorevler"></div>
+  </section>
+
+  <section class="kart">
+    <h2>Canlı akış <span class="sayi" id="olaySayi">0</span></h2>
+    <div class="olaylar" id="olaylar"></div>
+  </section>
+
+  <section class="kart tam">
+    <h2>Son commit'ler</h2>
+    <div id="commitler"></div>
+  </section>
+
+  <div class="alt-bilgi" id="altBilgi"></div>
+</main>
+<div id="bildirim" role="status"></div>
+
+<script>
+const ANAHTAR = document.querySelector('meta[name="otopilot-anahtar"]').content;
+const $ = (id) => document.getElementById(id);
+let seciliAd = localStorageOku('otopilot-proje') || '';
+let son = null, saatFarki = 0, olayImzasi = '', gorevImzasi = '', hedefDuzenleniyor = false;
+
+function localStorageOku(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function localStorageYaz(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+function el(etiket, sinif, metin) {
+  const e = document.createElement(etiket);
+  if (sinif) e.className = sinif;
+  if (metin !== undefined) e.textContent = metin;
+  return e;
+}
+function bildir(metin) {
+  const b = $('bildirim'); b.textContent = metin; b.classList.add('goster');
+  clearTimeout(bildir.t); bildir.t = setTimeout(() => b.classList.remove('goster'), 2800);
+}
+function saat(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+function sure(sn) {
+  sn = Math.max(0, Math.floor(sn));
+  const s = Math.floor(sn / 3600), d = Math.floor((sn % 3600) / 60), n = sn % 60;
+  const iki = (x) => String(x).padStart(2, '0');
+  return s ? `${s}:${iki(d)}:${iki(n)}` : `${iki(d)}:${iki(n)}`;
+}
+function once(iso) {
+  const fark = (Date.now() + saatFarki - new Date(iso).getTime()) / 1000;
+  if (fark < 60) return 'az önce';
+  if (fark < 3600) return `${Math.floor(fark / 60)} dk önce`;
+  if (fark < 86400) return `${Math.floor(fark / 3600)} sa önce`;
+  return `${Math.floor(fark / 86400)} gün önce`;
+}
+
+async function istek(yol, govde) {
+  const r = await fetch(yol, govde === undefined ? {} : {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Otopilot-Anahtar': ANAHTAR },
+    body: JSON.stringify(govde),
+  });
+  const veri = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(veri.hata || `Hata ${r.status}`);
+  return veri;
+}
+
+async function projeleriYukle() {
+  const liste = await istek('/api/projeler');
+  const s = $('proje');
+  s.replaceChildren(...liste.map(p => {
+    const o = el('option', '', `${p.calisiyor ? '● ' : ''}${p.proje.split(/[\\/]/).pop()}`);
+    o.value = p.ad; o.title = p.proje; return o;
+  }));
+  if (!liste.length) return false;
+  if (!liste.some(p => p.ad === seciliAd)) seciliAd = liste[0].ad;
+  s.value = seciliAd;
+  return true;
+}
+
+// ---------------------------------------------------------------- durum yorumlama
+const AKTIF_ASAMALAR = ['hazirlik', 'planlama', 'uygulama', 'test', 'duzeltme', 'commit', 'bekleme'];
+
+function genelDurum(v) {
+  const a = v.durum.asama;
+  if (v.calisiyor) return a === 'bekleme' ? ['bekliyor', 'Bekliyor'] : ['calisiyor', 'Çalışıyor'];
+  if (a === 'hata') return ['hata', 'Hata ile durdu'];
+  if (a === 'bitti') return ['bitti', 'Tamamlandı'];
+  return ['', 'Durdu'];
+}
+
+function suanMetni(v) {
+  const d = v.durum, a = d.asama, aktif = d.aktif, motor = (v.ayarlar.motor || 'deepseek');
+  const kodlayici = motor === 'claude' ? 'Claude Code' : 'DeepSeek';
+  const maks = v.ayarlar.max_deneme || 3;
+  if (!v.calisiyor) {
+    if (a === 'hata') return ['Hata nedeniyle durdu', 'Aşağıdaki son mesajlara bak, sorunu giderip yeniden başlat.'];
+    if (a === 'bitti') return ['Yapılacak iş kalmadı', 'Hedef tamamlandı ya da bekleyen görev yok. Yeni görev veya hedef ekleyebilirsin.'];
+    if (aktif) return ['Duraklatıldı', 'Yarım kalan bir görev var. Başlatınca kaldığı yerden devam eder.'];
+    return ['Çalışmıyor', 'Başlatmak için sağ üstteki Başlat düğmesine bas.'];
+  }
+  switch (a) {
+    case 'hazirlik': return ['Hazırlanıyor', 'Proje ve git dalı kontrol ediliyor, başlangıç testleri çalışıyor.'];
+    case 'planlama': return ['Yeni görevler planlanıyor', `${kodlayici} projeyi inceleyip hedefe göre sıradaki görevleri çıkarıyor.`];
+    case 'uygulama': return [`${kodlayici} görevi uyguluyor`, 'Kodu okuyor, değişiklikleri yapıyor. Yaptığı işlemler canlı akışta görünür.'];
+    case 'test': return ['Testler çalışıyor', `Doğrulama komutu: ${v.ayarlar.test_komutu || '(yok)'}`];
+    case 'duzeltme': return [`Testler başarısız — ${kodlayici} düzeltiyor`, `Deneme ${aktif ? aktif.deneme : '?'} / ${maks}. Hata çıktısı kodlayıcıya verildi.`];
+    case 'commit': return ['Değişiklikler kaydediliyor', 'Testler geçti, git commit atılıyor.'];
+    case 'bekleme': return [d.bekleme_sebebi || 'Bekleniyor', 'Süre dolunca kaldığı yerden kendiliğinden devam edecek.'];
+    default: return ['Çalışıyor', ''];
+  }
+}
+
+function akisDurumu(v) {
+  // her düğüm için: '', 'aktif', 'tamam', 'hata'
+  const a = v.durum.asama, s = {};
+  const set = (k, x) => (s[k] = x);
+  if (a === 'planlama') set('planla', 'aktif');
+  if (a === 'uygulama') set('uygula', 'aktif');
+  if (a === 'test') { set('uygula', 'tamam'); set('test', 'aktif'); }
+  if (a === 'duzeltme') { set('uygula', 'tamam'); set('test', 'hata'); set('duzelt', 'aktif'); }
+  if (a === 'commit') { set('uygula', 'tamam'); set('test', 'tamam'); set('kaydet', 'aktif'); }
+  if (a === 'bekleme') set('bekle', 'aktif');
+  const sonOlay = [...v.olaylar].reverse().find(o => ['commit', 'basarisiz', 'gorev_basla'].includes(o.tur));
+  if (!v.calisiyor || a === 'hazirlik') {
+    if (sonOlay && sonOlay.tur === 'basarisiz') set('geri', 'hata');
+  }
+  const kenarlar = {
+    planlama: [], uygulama: ['planla-uygula', 'kaydet-uygula'], test: ['uygula-test', 'duzelt-test'],
+    duzeltme: ['test-duzelt'], commit: ['test-kaydet'],
+  }[a] || [];
+  return { dugum: s, kenar: v.calisiyor ? kenarlar : [] };
+}
+
+// ---------------------------------------------------------------- çizim
+function ciz(v) {
+  son = v;
+  saatFarki = new Date(v.simdi).getTime() - Date.now();
+  const [sinif, yazi] = genelDurum(v);
+  const r = $('rozet'); r.className = 'rozet ' + sinif; r.lastElementChild.textContent = yazi;
+  $('baslatBtn').hidden = v.calisiyor; $('durdurBtn').hidden = !v.calisiyor;
+
+  const [baslik, alt] = suanMetni(v);
+  $('suanBaslik').textContent = baslik; $('suanAlt').textContent = alt;
+  const aktif = v.durum.aktif;
+  $('suanGorev').hidden = !aktif; $('suanGorev').textContent = aktif ? '📌 ' + aktif.satir : '';
+  if (!hedefDuzenleniyor) $('hedefMetin').textContent = v.ayarlar.hedef || '(hedef yok — Düzenle ile ekleyebilirsin)';
+
+  const konsol = $('konsol'); konsol.replaceChildren();
+  if (!v.calisiyor && v.konsol && v.durum.asama === 'hata') {
+    const k = el('div', 'uyari'); k.append(el('strong', '', 'Son çalıştırmanın çıktısı:'), el('pre', '', v.konsol));
+    konsol.append(k);
+  }
+
+  // akış
+  const ak = akisDurumu(v);
+  document.querySelectorAll('.dugum').forEach(g => {
+    const k = g.dataset.d, durum = ak.dugum[k] || '';
+    g.classList.remove('aktif', 'tamam', 'hata', 'canli');
+    if (durum) g.classList.add(durum);
+    if (durum === 'aktif' && v.calisiyor) g.classList.add('canli');
+  });
+  document.querySelectorAll('.kenar').forEach(p => {
+    const aktifMi = ak.kenar.includes(p.dataset.k);
+    p.classList.toggle('aktif', aktifMi);
+    p.setAttribute('marker-end', aktifMi ? 'url(#okAktif)' : 'url(#ok)');
+  });
+  const maks = v.ayarlar.max_deneme || 3;
+  $('duzeltAlt').textContent = aktif && aktif.deneme ? `deneme ${aktif.deneme} / ${maks}` : `en fazla ${maks} deneme`;
+  $('uygulaAlt').textContent = (v.ayarlar.motor === 'claude' ? 'Claude Code' : 'DeepSeek') + ' kod yazar';
+
+  // istatistik
+  const s = v.istatistik;
+  $('sBitti').textContent = s.bitti; $('sBekliyor').textContent = s.bekliyor;
+  $('sBasarisiz').textContent = s.basarisiz; $('sBugun').textContent = s.bugun;
+  $('sMotor').textContent = `${v.ayarlar.motor || 'deepseek'}${v.ayarlar.model ? ' · ' + v.ayarlar.model : ''} / ${v.ayarlar.dal || ''}`;
+
+  gorevleriCiz(v); olaylariCiz(v); commitleriCiz(v);
+  $('altBilgi').textContent = `Proje: ${v.proje} · Veriler: ${v.veri_dizini}`;
+  sayaciGuncelle();
+}
+
+function gorevleriCiz(v) {
+  const aktifSatir = v.durum.aktif ? v.durum.aktif.satir : '';
+  const imza = JSON.stringify([v.gorevler, aktifSatir]);
+  if (imza === gorevImzasi) return;
+  gorevImzasi = imza;
+  $('gorevSayi').textContent = v.gorevler.length;
+  const kap = $('gorevler'); kap.replaceChildren();
+  if (!v.gorevler.length) { kap.append(el('div', 'bos', 'Henüz görev yok. Yukarıdan ekle ya da hedef ver; otopilot planlar.')); return; }
+  let grup = null;
+  for (const g of v.gorevler) {
+    if (g.baslik !== grup) { grup = g.baslik; if (grup) kap.append(el('div', 'grup', grup)); }
+    const aktifMi = g.durum === 'bekliyor' && g.metin === aktifSatir;
+    const satir = el('div', `gorev ${g.durum}${aktifMi ? ' aktif' : ''}`);
+    satir.append(el('span', 'i', { bitti: '✓', basarisiz: '✕' }[g.durum] || (aktifMi ? '▶' : '')));
+    const govde = el('div'); govde.append(el('div', 'm', g.metin));
+    if (aktifMi) govde.append(el('div', 'n', 'şu an üzerinde çalışılıyor'));
+    else if (g.not) govde.append(el('div', 'n', g.not));
+    satir.append(govde); kap.append(satir);
+    if (aktifMi) requestAnimationFrame(() => {  // yalnızca liste içinde kaydır, sayfayı oynatma
+      if (kap.scrollHeight > kap.clientHeight) kap.scrollTop = Math.max(0, satir.offsetTop - 60);
+    });
+  }
+}
+
+function olaylariCiz(v) {
+  const sonOlay = v.olaylar[v.olaylar.length - 1];
+  const imza = v.olaylar.length + '|' + (sonOlay ? sonOlay.zaman + sonOlay.mesaj : '');
+  if (imza === olayImzasi) return;
+  olayImzasi = imza;
+  $('olaySayi').textContent = v.olaylar.length;
+  const kap = $('olaylar'); kap.replaceChildren();
+  if (!v.olaylar.length) { kap.append(el('div', 'bos', 'Henüz olay yok. Otopilot başlayınca adımlar burada canlı görünür.')); return; }
+  for (const o of [...v.olaylar].reverse()) {
+    const satir = el('div', 'olay ' + (o.tur || ''));
+    const t = el('time', '', saat(o.zaman)); t.title = o.zaman; satir.append(t);
+    const m = el('div', 'm', o.mesaj);
+    if (o.cikti) {
+      const d = el('details'); d.append(el('summary', '', 'çıktıyı göster'), el('pre', '', o.cikti)); m.append(d);
+    }
+    satir.append(m); kap.append(satir);
+  }
+}
+
+function commitleriCiz(v) {
+  const kap = $('commitler'); kap.replaceChildren();
+  if (!v.commitler.length) { kap.append(el('div', 'bos', 'Henüz commit yok.')); return; }
+  for (const c of v.commitler) {
+    const satir = el('div', 'commit');
+    const t = el('time', '', once(c.zaman)); t.title = c.zaman;
+    satir.append(el('code', '', c.hash), el('span', '', c.mesaj), t); kap.append(satir);
+  }
+}
+
+function sayaciGuncelle() {
+  if (!son) return;
+  const d = son.durum, simdi = Date.now() + saatFarki, kutu = $('sayac');
+  if (son.calisiyor && d.asama === 'bekleme' && d.bekle_until) {
+    kutu.className = 'sayac bekle';
+    $('sayacEtiket').textContent = 'devam etmesine';
+    $('sayacDeger').textContent = sure((new Date(d.bekle_until).getTime() - simdi) / 1000);
+  } else if (son.calisiyor && d.asama_zamani) {
+    kutu.className = 'sayac';
+    $('sayacEtiket').textContent = 'bu adımda geçen süre';
+    $('sayacDeger').textContent = sure((simdi - new Date(d.asama_zamani).getTime()) / 1000);
+  } else {
+    kutu.className = 'sayac'; $('sayacEtiket').textContent = ''; $('sayacDeger').textContent = '';
+  }
+}
+
+// ---------------------------------------------------------------- döngü ve olaylar
+async function yenile() {
+  try {
+    if (!(await projeleriYukle())) {
+      $('ana').replaceChildren(el('section', 'kart tam bos',
+        'Henüz proje yok. OTOPILOT_BASLAT.bat ile bir proje seç; burada otomatik görünecek.'));
+      return;
+    }
+    ciz(await istek('/api/durum?ad=' + encodeURIComponent(seciliAd)));
+  } catch (e) {
+    const r = $('rozet'); if (r) { r.className = 'rozet hata'; r.lastElementChild.textContent = 'Bağlantı yok'; }
+  }
+}
+
+$('proje').addEventListener('change', (e) => {
+  seciliAd = e.target.value; localStorageYaz('otopilot-proje', seciliAd);
+  olayImzasi = gorevImzasi = ''; yenile();
+});
+$('baslatBtn').addEventListener('click', async () => {
+  try { bildir((await istek('/api/baslat', { ad: seciliAd })).mesaj); setTimeout(yenile, 1200); }
+  catch (e) { bildir(e.message); }
+});
+$('durdurBtn').addEventListener('click', async () => {
+  if (!confirm('Otopilot durdurulsun mu? Yeniden başlatınca kaldığı yerden devam eder.')) return;
+  try { bildir((await istek('/api/durdur', { ad: seciliAd })).mesaj); setTimeout(yenile, 1200); }
+  catch (e) { bildir(e.message); }
+});
+$('gorevForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const metin = $('gorevGirdi').value.trim(); if (!metin) return;
+  try { bildir((await istek('/api/gorev', { ad: seciliAd, metin })).mesaj); $('gorevGirdi').value = ''; yenile(); }
+  catch (err) { bildir(err.message); }
+});
+$('hedefDuzenle').addEventListener('click', async () => {
+  const kutu = $('hedefKutu'), btn = $('hedefDuzenle');
+  if (!hedefDuzenleniyor) {
+    hedefDuzenleniyor = true;
+    const ta = el('textarea'); ta.id = 'hedefGirdi'; ta.value = son ? (son.ayarlar.hedef || '') : '';
+    $('hedefMetin').replaceWith(ta); ta.focus(); btn.textContent = 'Kaydet'; btn.classList.add('ana');
+    return;
+  }
+  const hedef = $('hedefGirdi').value.trim();
+  try { bildir((await istek('/api/hedef', { ad: seciliAd, hedef })).mesaj); }
+  catch (e) { bildir(e.message); return; }
+  hedefDuzenleniyor = false;
+  const p = el('p'); p.id = 'hedefMetin'; $('hedefGirdi').replaceWith(p);
+  btn.textContent = 'Düzenle'; btn.classList.remove('ana'); yenile();
+});
+
+yenile();
+setInterval(yenile, 2000);
+setInterval(sayaciGuncelle, 1000);
+</script>
+</body>
+</html>

@@ -39,11 +39,12 @@ def _json_cikar(metin: str) -> dict | None:
 
 
 class DeepSeekMotor:
-    def __init__(self, proje: Path, model: str | None = None, **_):
+    def __init__(self, proje: Path, model: str | None = None, izleyici=None, **_):
         from asistan.ayarlar import Ayarlar
 
         self.proje = proje
         self.model = model
+        self.izleyici = izleyici  # her araç çağrısında (ad, girdi) ile çağrılır — arayüz için
         self.ek_izinler: list[str] = []  # Claude motoruyla uyumluluk için; burada kullanılmaz
         self._ayarlar = Ayarlar
         self._oturumlar: dict = {}
@@ -61,6 +62,7 @@ class DeepSeekMotor:
         if self.model:
             a.model = self.model
         ajan = Ajan(a)
+        ajan.izleyici = self.izleyici
         ajan.terminal.cwd = str(self.proje)
         return ajan
 
