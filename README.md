@@ -1,4 +1,91 @@
-# A- · Kişisel Yapay Zeka Asistanı
+# A-
+
+Bu depoda iki araç var:
+
+1. **[Otopilot](#otopilot--claude-code-ile-otomatik-proje-geliştirme)** — Claude Code'u yöneterek projeni
+   senin yerine geliştirir; limit dolunca bekler, açılınca kaldığı yerden devam eder.
+2. **[Kişisel Yapay Zeka Asistanı](#kişisel-yapay-zeka-asistanı)** — bilgisayarını senin gibi kullanan
+   asistan (DeepSeek API).
+
+---
+
+## Otopilot · Claude Code ile otomatik proje geliştirme
+
+Otopilot, bilgisayarındaki **Claude Code**'a (kendi Claude aboneliğinle) talimat verip projeni durmadan geliştirir:
+
+```
+görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Claude'a geri ver → commit → sıradaki
+          ↘ görev kalmadıysa hedefe göre yeni görevler planlat
+          ↘ Claude limiti dolduysa sıfırlanma saatine kadar bekle → kaldığı yerden devam
+```
+
+- **Talimat verir:** Senin hedefini somut görevlere böler ve Claude'a tek tek yaptırır. Ekleme de çıkarma da
+  yapar (gereksiz kodu siler).
+- **Test eder:** Testleri Claude değil otopilot çalıştırır; sonuç başarısızsa çıktıyı aynı Claude oturumuna
+  verip düzeltmesini ister (varsayılan 3 deneme). Yine olmazsa değişiklikleri geri alır, yamayı saklar,
+  görevi `[!]` işaretler ve sıradakine geçer.
+- **Limitte durur, açılınca devam eder:** Claude "limit doldu" dediğinde mesajdaki sıfırlanma saatini okur,
+  o saate kadar bekler ve aynı oturumu sürdürür. Saat okunamazsa 30 dakikada bir yeniden dener.
+- **Bilgisayar kapansa da kaybolmaz:** Kaldığı yeri `~/.otopilot/<proje>/` altına yazar. `otomatik-kur` ile
+  Windows her açıldığında kendiliğinden başlar.
+- **Güvenli:** Yalnızca `otopilot/gelistirme` dalında çalışır, her görevi ayrı commit'ler, asla push yapmaz.
+  Senin commit edilmemiş değişikliklerin varsa başlamaz.
+
+### Gereksinimler
+
+- Python 3.10+ (ek paket gerekmez)
+- [Claude Code](https://claude.com/claude-code) kurulu ve giriş yapılmış (bir kez `claude` yazıp giriş yap)
+- Projenin bir git deposu olması
+
+### Kullanım (Windows)
+
+`otopilot.bat`'a çift tıkla; proje klasörünü ve hedefi sorar. Ya da:
+
+```bat
+:: İlk çalıştırma: hedefi ver (ayarlar kaydedilir, sonraki çalıştırmalarda gerekmez)
+otopilot.bat baslat C:\projeler\uygulama --hedef "Hekim portalına randevu sistemi ve bildirimler ekle"
+
+:: Belirli görevler ekle (hedefle birlikte veya hedefsiz kullanılabilir)
+otopilot.bat gorev C:\projeler\uygulama "Giriş sayfasına şifre sıfırlama ekle" "Kullanılmayan eski API'yi kaldır"
+
+:: Durumu gör
+otopilot.bat durum C:\projeler\uygulama
+
+:: Windows açılınca otomatik başlasın / kaldır
+otopilot.bat otomatik-kur C:\projeler\uygulama
+otopilot.bat otomatik-kaldir C:\projeler\uygulama
+```
+
+Linux/macOS'ta aynı komutlar: `python -m otopilot baslat ~/projeler/uygulama --hedef "..."`.
+
+Görev listesini istediğin zaman `~/.otopilot/<proje>/gorevler.md` dosyasından düzenleyebilirsin:
+`- [ ]` bekliyor, `- [x]` bitti, `- [!]` başarısız. İşi incelemek için `git log otopilot/gelistirme`;
+beğendiğinde dalı ana dalına birleştir.
+
+### Seçenekler (`baslat`)
+
+| Seçenek | Açıklama |
+|---|---|
+| `--hedef "..."` | Genel hedef; görevler buna göre planlanır, hedef bitince otopilot durur |
+| `--gorev "..." ...` | Başlamadan önce görev ekle |
+| `--test "npm test"` | Doğrulama komutu. Verilmezse projeden bulunur (npm/pytest/go/cargo/dotnet/maven/gradle) |
+| `--dal ad` | Çalışma dalı (varsayılan `otopilot/gelistirme`) |
+| `--model opus` | Claude modeli |
+| `--max-deneme 3` | Test başarısız olursa düzeltme denemesi |
+| `--izin "Bash(npm *)"` | Claude'a ek komut izni (ör. paket kurmak için) |
+| `--tam-yetki` | Claude her komutu sormadan çalıştırır. Yalnızca güvendiğin projede/sanal makinede |
+| `--tek-sefer` | Tek görev yapıp çık |
+
+**İzinler:** Varsayılan olarak Claude dosya okuyup düzenleyebilir, `git status/diff/log` ve test komutunu
+çalıştırabilir; başka bir komut isterse sormadan reddedilir, süreç asla takılı kalmaz. Projen derleme veya
+paket kurulumu gerektiriyorsa `--izin "Bash(npm *)"` gibi ekle.
+
+**Limitler hakkında:** Otopilot Claude'un limitlerini aşmaz, yalnızca dolduğunda bekler. Limit tüm Claude
+kullanımınla ortaktır; otopilot çalışırken Claude'u başka işlerde de kullanırsan limit daha çabuk dolar.
+
+---
+
+# Kişisel Yapay Zeka Asistanı
 
 Bilgisayarını senin gibi kullanan, uygulamaları açıp kullanan, değişiklik yapan ve zamanla
 senin adına yazılım geliştirmeye devam eden bir asistan. **DeepSeek API** (OpenAI uyumlu) ile çalışır;
@@ -142,6 +229,14 @@ Her modda:
 ## Proje yapısı
 
 ```
+otopilot/
+  __main__.py   komut satırı (baslat, gorev, durum, otomatik-kur)
+  dongu.py      ana döngü: planla, uygula, test et, düzelt, commit, limitte bekle
+  claude.py     Claude Code CLI sarmalayıcı
+  limit.py      limit mesajından sıfırlanma saatini çıkarma
+  proje.py      git ve test komutu
+  durum.py      kalıcı durum, görev listesi, kilit
+otopilot.bat    Windows başlatıcı
 asistan/
   __main__.py   komut satırı (sohbet, ogren, otonom)
   ajan.py       ajan döngüsü ve sistem istemi
