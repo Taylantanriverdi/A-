@@ -1053,7 +1053,7 @@
         .onz-dosya.secili{border-color:#93c5fd;background:#eff6ff}
         .onz-dosya span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
         .onz-dosya a{color:#1565c0;font-weight:900;text-decoration:none;white-space:nowrap}
-        .ref-stl{padding:10px 12px}.ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}.ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}.ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}.ref-stl img{width:100%;height:auto;display:block}.ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}.ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ref-stl{padding:10px 12px}.ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}.ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}.ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}.ref-stl img{width:100%;height:auto;display:block}.ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}.ref-stl-ara{height:10px}.ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .ref-order-paper{max-width:760px;margin:0 auto;background:#fff;border:1px solid #dbe3ef;box-shadow:0 8px 28px rgba(15,23,42,.08);padding:24px}
         .ref-order-brand{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:20px;border-bottom:2px solid #172033;padding-bottom:14px;margin-bottom:14px}
         .ref-order-logo{font-size:34px;font-weight:1000;letter-spacing:-2px;text-align:center;color:#0b1d36}
@@ -13971,13 +13971,17 @@
             return nor;
         }
         const STL_RENK_UST=[0.93,0.86,0.76], STL_RENK_ALT=[0.86,0.88,0.93], STL_RENK_KAPANIS=[0.80,0.83,0.90];
+        // Tasarım parçası (altın sarısı) ve tasarımın altındaki model (açık gri) ayırt edilsin.
+        const STL_RENK_TASARIM=[0.96,0.70,0.28], STL_RENK_MODEL=[0.84,0.85,0.86];
         async function stlGorselleriHazirla(isId){
             const kutu=document.getElementById('anStlGorseller'); if(!kutu) return;
             stlGorselAlaniTemizle();
             const r=await fetch('/api/is-dosyalari/siparis/'+Number(isId),{cache:'no-store'}); if(!r.ok) return;
-            const dosyalar=(await r.json()).filter(f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||'') && (f.dosyaTuru||'')!=='Tasarım');
-            if(!dosyalar.length) return;
-            showSuccess('Tarama görüntüleri hazırlanıyor...');
+            const tumu=(await r.json()).filter(f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||''));
+            const dosyalar=tumu.filter(f=>(f.dosyaTuru||'')!=='Tasarım');
+            const tasarimDosyalari=tumu.filter(f=>(f.dosyaTuru||'')==='Tasarım').slice(0,8);
+            if(!dosyalar.length && !tasarimDosyalari.length) return;
+            showSuccess('Tarama ve tasarım görüntüleri hazırlanıyor...');
             const tur={ust:null,alt:null,kapanis:null}, diger=[];
             for(const f of dosyalar){ const t=stlTurBul(f.orijinalDosyaAdi); if(t && !tur[t]) tur[t]=f; else diger.push(f); }
             // Adı tanınmayan dosyalar sırayla boş yerlere (üst, alt) yerleşir; ad yine altta yazar.
@@ -13985,6 +13989,7 @@
             const mesh={};
             for(const k of ['ust','alt','kapanis']) if(tur[k]){ try{ mesh[k]=await stlHamMesh(Number(tur[k].id)); }catch(e){ console.warn(e); } }
             const merkez=m=>{ const p=m.p; let c=[0,0,0]; for(let i=0;i<p.length;i+=3){ c[0]+=p[i]; c[1]+=p[i+1]; c[2]+=p[i+2]; } return stlV.sc(c,3/p.length); };
+            const sinir=m=>{ const p=m.p, a=[Infinity,Infinity,Infinity], b=[-Infinity,-Infinity,-Infinity]; for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<a[k])a[k]=p[i+k]; if(p[i+k]>b[k])b[k]=p[i+k]; } return {a,b}; };
             const mU=mesh.ust?merkez(mesh.ust):null, mA=mesh.alt?merkez(mesh.alt):null;
             // Çene eksenleri: önce taramaların kapanış konumunda olup olmadığı karşı çeneye göre denetlenir.
             let eu=mesh.ust?stlCeneEksen(mesh.ust,mA):null, ea=mesh.alt?stlCeneEksen(mesh.alt,mU):null;
@@ -13994,12 +13999,14 @@
             // Tepeden (okluzal) görünüm, kesici dişler yukarıda.
             if(mesh.ust){ resimler.push({ad:'ÜST ÇENE',dosya:tur.ust.orijinalDosyaAdi,src:stlCizer.ciz([{m:mesh.ust,renk:STL_RENK_UST}],stlV.sc(eu.dik,-1),eu.der)}); }
             if(mesh.alt){ resimler.push({ad:'ALT ÇENE',dosya:tur.alt.orijinalDosyaAdi,src:stlCizer.ciz([{m:mesh.alt,renk:STL_RENK_ALT}],stlV.sc(ea.dik,-1),ea.der)}); }
+            let onYukari=null, onIleri=null;
             if(mesh.ust && mesh.alt){
                 // Kapanış: iki çene dişleri birbirine oturmuş, önden; üst çene yukarıda.
                 let pu=mesh.ust, pa=mesh.alt, yukari, ileri;
                 if(kapanisKonumu){
                     yukari=stlV.ny([eu.c[0]-ea.c[0],eu.c[1]-ea.c[1],eu.c[2]-ea.c[2]]);
                     ileri=stlV.sc(eu.der,-1); ileri=stlV.ny(stlV.ad(ileri,stlV.sc(yukari,-stlV.dot(ileri,yukari))));
+                    onYukari=yukari; onIleri=ileri;
                 } else {
                     const o=stlKapanisaOturt(mesh.ust,eu,mesh.alt,ea); pu=o.ust; pa=o.alt;
                     yukari=[0,0,1]; ileri=[0,-1,0];
@@ -14009,10 +14016,64 @@
                 const e=stlCeneEksen(mesh.kapanis);
                 resimler.push({ad:'KAPANIŞ',dosya:tur.kapanis.orijinalDosyaAdi,src:stlCizer.ciz([{m:mesh.kapanis,renk:STL_RENK_KAPANIS}],stlV.sc(e.der,-1),e.dik)});
             }
-            const gecerli=resimler.filter(x=>x.src);
-            if(!gecerli.length) return;
-            kutu.style.setProperty('--stl-adet',String(gecerli.length));
-            kutu.innerHTML='<div class="ref-stl-baslik">TARAMA GÖRÜNTÜLERİ</div><div class="ref-stl-izgara">'+gecerli.map(x=>`<figure><img src="${x.src}" alt="${escapeHtml(x.ad)}" /><figcaption>${escapeHtml(x.ad)}<small>${escapeHtml(x.dosya||'')}</small></figcaption></figure>`).join('')+'</div>';
+
+            // ---- Tasarım dosyaları: tarama ile aynı koordinatlardaysa kendi çenesinin üzerinde, değilse tek başına.
+            const tasarimResimleri=[];
+            const tMesh=[];
+            for(const f of tasarimDosyalari){ try{ tMesh.push({f,m:await stlHamMesh(Number(f.id))}); }catch(e){ console.warn(e); } }
+            if(tMesh.length){
+                const cene={ust:[],alt:[]}, serbest=[];
+                const kutuU=mesh.ust?sinir(mesh.ust):null, kutuA=mesh.alt?sinir(mesh.alt):null;
+                const icinde=(c,k)=>k&&[0,1,2].every(i=>c[i]>=k.a[i]-6&&c[i]<=k.b[i]+6);
+                for(const t of tMesh){
+                    const c=merkez(t.m), ad=stlTurBul(t.f.orijinalDosyaAdi);
+                    let hedef=null;
+                    if(ad==='ust'&&icinde(c,kutuU)) hedef='ust';
+                    else if(ad==='alt'&&icinde(c,kutuA)) hedef='alt';
+                    else {
+                        const u=icinde(c,kutuU), a=icinde(c,kutuA);
+                        if(u&&a) hedef=Math.hypot(...stlV.ad(c,stlV.sc(mU,-1)))<=Math.hypot(...stlV.ad(c,stlV.sc(mA,-1)))?'ust':'alt';
+                        else hedef=u?'ust':a?'alt':null;
+                    }
+                    if(hedef) cene[hedef].push(t); else serbest.push(t);
+                }
+                const adlar=l=>l.map(t=>t.f.orijinalDosyaAdi).join(', ');
+                const parca=l=>l.map(t=>({m:t.m,renk:STL_RENK_TASARIM}));
+                if(cene.ust.length) tasarimResimleri.push({ad:'TASARIM · ÜST ÇENE',dosya:adlar(cene.ust),src:stlCizer.ciz([{m:mesh.ust,renk:STL_RENK_MODEL},...parca(cene.ust)],stlV.sc(eu.dik,-1),eu.der)});
+                if(cene.alt.length) tasarimResimleri.push({ad:'TASARIM · ALT ÇENE',dosya:adlar(cene.alt),src:stlCizer.ciz([{m:mesh.alt,renk:STL_RENK_MODEL},...parca(cene.alt)],stlV.sc(ea.dik,-1),ea.der)});
+                // Önden: kapanış konumundaki çeneler ya da tasarımın oturduğu çene
+                if(cene.ust.length||cene.alt.length){
+                    let parcalar=[], yukari, ileri;
+                    if(onYukari){ parcalar=[{m:mesh.ust,renk:STL_RENK_MODEL},{m:mesh.alt,renk:STL_RENK_MODEL}]; yukari=onYukari; ileri=onIleri; }
+                    else { const k=cene.ust.length?'ust':'alt', e=k==='ust'?eu:ea; parcalar=[{m:mesh[k],renk:STL_RENK_MODEL}];
+                        yukari=k==='ust'?e.dik:stlV.sc(e.dik,-1); ileri=stlV.sc(e.der,-1); }
+                    tasarimResimleri.push({ad:'TASARIM · ÖNDEN',dosya:'Tasarım modelin üzerinde',src:stlCizer.ciz([...parcalar,...parca(cene.ust),...parca(cene.alt)],ileri,yukari)});
+                }
+                if(serbest.length){
+                    // Tek başına: tüm tasarım parçalarının ana eksenlerine göre üstten ve yandan.
+                    const nokta=[]; serbest.forEach(t=>{ const p=t.m.p, ad=Math.max(1,Math.floor(p.length/3/20000)); for(let i=0;i<p.length;i+=3*ad) nokta.push([p[i],p[i+1],p[i+2]]); });
+                    const c=stlV.sc(nokta.reduce((t,v)=>stlV.ad(t,v),[0,0,0]),1/nokta.length);
+                    const C=[[0,0,0],[0,0,0],[0,0,0]]; nokta.forEach(v=>{ const d=stlV.ad(v,stlV.sc(c,-1)); for(let a=0;a<3;a++)for(let b=0;b<3;b++)C[a][b]+=d[a]*d[b]; });
+                    const e=stlOzvektor(C);
+                    // Çiğneme yüzü: dışa dönük yüzey normallerinin alan ağırlıklı toplamı (kron kabuğu alttan açıktır).
+                    let n=[0,0,0];
+                    serbest.forEach(t=>{ const p=t.m.p, ix=t.m.idx; for(let i=0;i<ix.length;i+=3){ const a=ix[i]*3,b=ix[i+1]*3,d=ix[i+2]*3;
+                        n=stlV.ad(n,stlV.cr([p[b]-p[a],p[b+1]-p[a+1],p[b+2]-p[a+2]],[p[d]-p[a],p[d+1]-p[a+1],p[d+2]-p[a+2]])); } });
+                    let ust=Math.hypot(...n)>1e-6?stlV.ny(n):e[2].v;
+                    // Uzun eksen (köprü boyu) yatay kalsın; yan görünüm uzun eksene ve yukarıya dik yönden.
+                    let boy=stlV.ny(stlV.ad(e[0].v,stlV.sc(ust,-stlV.dot(e[0].v,ust))));
+                    if(!isFinite(boy[0])) boy=e[1].v;
+                    const yan=stlV.ny(stlV.cr(ust,boy));
+                    const yer=Math.max(0,3-tasarimResimleri.length);
+                    if(yer>=1) tasarimResimleri.push({ad:'TASARIM · ÜSTTEN',dosya:adlar(serbest),src:stlCizer.ciz(parca(serbest),stlV.sc(ust,-1),yan)});
+                    if(yer>=2) tasarimResimleri.push({ad:'TASARIM · YANDAN',dosya:adlar(serbest),src:stlCizer.ciz(parca(serbest),yan,ust)});
+                }
+            }
+
+            const gecerli=resimler.filter(x=>x.src), tGecerli=tasarimResimleri.filter(x=>x.src);
+            if(!gecerli.length && !tGecerli.length) return;
+            const satir=(baslik,l)=>l.length?`<div class="ref-stl-baslik">${baslik}</div><div class="ref-stl-izgara" style="--stl-adet:3">`+l.map(x=>`<figure><img src="${x.src}" alt="${escapeHtml(x.ad)}" /><figcaption>${escapeHtml(x.ad)}<small>${escapeHtml(x.dosya||'')}</small></figcaption></figure>`).join('')+'</div>':'';
+            kutu.innerHTML=satir('TARAMA GÖRÜNTÜLERİ',gecerli)+(gecerli.length&&tGecerli.length?'<div class="ref-stl-ara"></div>':'')+satir('TASARIM GÖRÜNTÜLERİ',tGecerli);
             kutu.style.display='block';
             // Resimler yüklenmeden ölçü alınmasın.
             await Promise.all([...kutu.querySelectorAll('img')].map(i=>i.complete?null:new Promise(ok=>{i.onload=ok;i.onerror=ok;})));

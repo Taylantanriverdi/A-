@@ -359,3 +359,14 @@ MAIL: Mail satirina tiklayinca mail metni, AI'nin cikardigi tum alanlar ve ekler
   AI'ya gonderilmez (gereksiz API ucreti onlendi).
 Gmail baglantisi: yonetici girisi eklendikten sonra Google donusu engelleniyordu;
   duzeltildi.
+
+SIPARIS FORMU CIKTISINDA TASARIM GORUNTULERI (V29)
+-------------------------------------------------
+Yazdirirken tarama goruntulerinin altina TASARIM GORUNTULERI satiri eklenir
+(isin "Tasarim" turundeki STL/PLY/OBJ dosyalari):
+- Tasarim taramayla ayni koordinatlarda ise (exocad/3Shape ciktilari) kendi
+  cenesinin uzerinde altin sarisi renkte gosterilir: TASARIM - UST/ALT CENE
+  (tepeden) ve TASARIM - ONDEN (kapanista).
+- Tarama yoksa ya da tasarim taramayla ortusmuyorsa tasarim tek basina
+  ustten (cigneme yuzu) ve yandan cizilir.
+Tum goruntuler ayni boyuttadir (satir basina 3); form tek A5 sayfaya sigar.
