@@ -64,8 +64,9 @@ public sealed class PrimerLabSecurityMiddleware
             if (!(doctorPortalRequest && IsPrivateNetwork(remoteAddress)))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await context.Response.WriteAsync(
-                    "Primer Lab yönetim ekranı bu cihazdan erişime kapalıdır.");
+                await context.Response.WriteAsync(doctorPortalRequest
+                    ? "Bu adres yalnız laboratuvarla aynı ağdan çalışır. Başka bir konumdan Hekim Portalı / Teknisyen Paneli'ne laboratuvarın verdiği internet adresinden (https://...) girin."
+                    : "Primer Lab yönetim ekranı bu cihazdan erişime kapalıdır.");
                 return;
             }
         }
@@ -171,7 +172,7 @@ public sealed class PrimerLabSecurityMiddleware
             return;
         }
 
-        if (IsMutation(context.Request.Method) && IsCrossSiteBrowserRequest(context))
+        if (IsMutation(context.Request.Method) && IsCrossSiteBrowserRequest(context, tunelden: true))
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;
             await context.Response.WriteAsync("Çapraz site isteği güvenlik nedeniyle engellendi.");
@@ -261,6 +262,8 @@ public sealed class PrimerLabSecurityMiddleware
             if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) return true;
             if (b[0] == 192 && b[1] == 168) return true;
             if (b[0] == 169 && b[1] == 254) return true;
+            // 100.64.0.0/10: Tailscale / ZeroTier gibi VPN'lerin adresleri (uzak klinik ve teknisyenler).
+            if (b[0] == 100 && b[1] >= 64 && b[1] <= 127) return true;
         }
 
         if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
@@ -282,22 +285,43 @@ public sealed class PrimerLabSecurityMiddleware
         HttpMethods.IsPatch(method) ||
         HttpMethods.IsDelete(method);
 
-    private static bool IsCrossSiteBrowserRequest(HttpContext context)
+    private static bool IsCrossSiteBrowserRequest(HttpContext context, bool tunelden = false)
     {
         var origin = context.Request.Headers.Origin.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(origin)) return false;
 
+        // Tarayıcının kendi bildirdiği kaynak (sayfalar taklit edemez): aynı kaynaktan gelen istek
+        // her zaman serbesttir. Tüneller (Cloudflare / Tailscale) isteği çoğu kurulumda
+        // "Host: localhost:5170" olarak iletir; alan adı karşılaştırması bu durumda girişi
+        // yanlışlıkla engelliyordu (portal yalnız başka konumlardan açılamıyordu).
+        var fetchSite = context.Request.Headers["Sec-Fetch-Site"].FirstOrDefault();
+        if (string.Equals(fetchSite, "same-origin", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fetchSite, "none", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (string.Equals(fetchSite, "cross-site", StringComparison.OrdinalIgnoreCase)) return true;
+
         if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)) return true;
 
         var requestHost = context.Request.Host.Host;
-        if (!string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(uri.Host, requestHost, StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            var requestPort = context.Request.Host.Port;
+            var originPort = uri.IsDefaultPort ? (int?)null : uri.Port;
+            if (requestPort == originPort) return false;
         }
 
-        var requestPort = context.Request.Host.Port;
-        var originPort = uri.IsDefaultPort ? (int?)null : uri.Port;
-        return requestPort != originPort;
+        // Tünelden gelen istekte tarayıcının gördüğü adres X-Forwarded-Host / X-Original-Host'tadır.
+        if (tunelden)
+        {
+            foreach (var baslik in new[] { "X-Forwarded-Host", "X-Original-Host" })
+            {
+                var deger = context.Request.Headers[baslik].FirstOrDefault()?.Split(',')[0].Trim();
+                if (string.IsNullOrEmpty(deger)) continue;
+                var konak = deger.Contains(':') && !deger.StartsWith('[') ? deger[..deger.LastIndexOf(':')] : deger;
+                if (string.Equals(uri.Host, konak, StringComparison.OrdinalIgnoreCase)) return false;
+            }
+        }
+        return true;
     }
 
     private static void ApplySecurityHeaders(HttpResponse response)
