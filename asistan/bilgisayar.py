@@ -20,7 +20,7 @@ import time
 import mss
 import pyautogui
 import pyperclip
-from PIL import Image
+from PIL import Image, ImageDraw
 
 # Fareyi ekranın bir köşesine hızla götürmek her şeyi anında durdurur.
 pyautogui.FAILSAFE = True
@@ -120,19 +120,36 @@ def olcek_hesapla(genislik: int, yukseklik: int) -> float:
     return min(1.0, uzun_kenar_olcek, piksel_olcek)
 
 
-def _png_base64(img: Image.Image) -> str:
+def _gorsel_blok(img: Image.Image, bicim: str = "png") -> list[dict]:
     tampon = io.BytesIO()
-    img.save(tampon, format="PNG", optimize=True)
-    return base64.standard_b64encode(tampon.getvalue()).decode()
-
-
-def _gorsel_blok(img: Image.Image) -> list[dict]:
+    if bicim == "jpeg":
+        img.convert("RGB").save(tampon, format="JPEG", quality=80)
+    else:
+        img.save(tampon, format="PNG", optimize=True)
     return [
         {
             "type": "image",
-            "source": {"type": "base64", "media_type": "image/png", "data": _png_base64(img)},
+            "source": {
+                "type": "base64",
+                "media_type": f"image/{bicim}",
+                "data": base64.standard_b64encode(tampon.getvalue()).decode(),
+            },
         }
     ]
+
+
+def izgara_ciz(img: Image.Image, aralik: int = 100) -> Image.Image:
+    """Koordinatları tahmin etmeyi kolaylaştırmak için etiketli soluk bir ızgara çizer."""
+    img = img.convert("RGB")
+    katman = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    cizim = ImageDraw.Draw(katman)
+    for x in range(aralik, img.width, aralik):
+        cizim.line([(x, 0), (x, img.height)], fill=(255, 0, 255, 70), width=1)
+        cizim.text((x + 2, 2), str(x), fill=(255, 0, 255, 230))
+    for y in range(aralik, img.height, aralik):
+        cizim.line([(0, y), (img.width, y)], fill=(255, 0, 255, 70), width=1)
+        cizim.text((2, y + 2), str(y), fill=(255, 0, 255, 230))
+    return Image.alpha_composite(img.convert("RGBA"), katman).convert("RGB")
 
 
 def _metin_blok(metin: str) -> list[dict]:
@@ -142,10 +159,15 @@ def _metin_blok(metin: str) -> list[dict]:
 class Bilgisayar:
     """Ana ekranı kontrol eden yürütücü."""
 
-    def __init__(self) -> None:
+    def __init__(self, maks_uzun_kenar: int | None = None, bicim: str = "png",
+                 izgara: bool = False) -> None:
+        self.bicim = bicim  # gönderilen görüntü biçimi: "png" veya "jpeg"
+        self.izgara = izgara  # ekran görüntüsüne koordinat ızgarası çizilsin mi
         # pyautogui'nin mantıksal ekran boyutu (tıklamalar bu uzayda yapılır).
         self.ekran_g, self.ekran_y = pyautogui.size()
         self.olcek = olcek_hesapla(self.ekran_g, self.ekran_y)
+        if maks_uzun_kenar:
+            self.olcek = min(self.olcek, maks_uzun_kenar / max(self.ekran_g, self.ekran_y))
         # Claude'a gönderilen görüntünün boyutu.
         self.goruntu_g = max(1, round(self.ekran_g * self.olcek))
         self.goruntu_y = max(1, round(self.ekran_y * self.olcek))
@@ -178,7 +200,8 @@ class Bilgisayar:
             return Image.frombytes("RGB", ham.size, ham.bgra, "raw", "BGRX")
 
     def ekran_goruntusu(self) -> Image.Image:
-        return self._ham_goruntu().resize((self.goruntu_g, self.goruntu_y), Image.LANCZOS)
+        img = self._ham_goruntu().resize((self.goruntu_g, self.goruntu_y), Image.LANCZOS)
+        return izgara_ciz(img) if self.izgara else img
 
     def yakinlastir(self, bolge) -> Image.Image:
         if not isinstance(bolge, (list, tuple)) or len(bolge) != 4:
@@ -251,10 +274,10 @@ class Bilgisayar:
         girdi = girdi or {}
 
         if eylem == "screenshot":
-            return _gorsel_blok(self.ekran_goruntusu())
+            return _gorsel_blok(self.ekran_goruntusu(), self.bicim)
 
         if eylem == "zoom":
-            return _gorsel_blok(self.yakinlastir(girdi.get("region")))
+            return _gorsel_blok(self.yakinlastir(girdi.get("region")), self.bicim)
 
         if eylem in ("left_click", "right_click", "middle_click"):
             self._tikla(girdi, eylem.split("_")[0], 1)

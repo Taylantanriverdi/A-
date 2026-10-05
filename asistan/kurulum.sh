@@ -70,18 +70,18 @@ main() {
   "$HEDEF/.venv/bin/python" -m pip install -q --disable-pip-version-check -r "$HEDEF/requirements.txt"
 
   # 4) API anahtarı
-  echo "[4/5] API anahtarı..."
-  if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
-    echo "     Kayıtlı bir API anahtarı bulundu."
+  echo "[4/5] DeepSeek API anahtarı..."
+  if [ -n "${DEEPSEEK_API_KEY:-}" ] || grep -q DEEPSEEK_API_KEY "$HEDEF/anahtar.env" 2>/dev/null; then
+    echo "     Kayıtlı bir DeepSeek API anahtarı bulundu."
   else
-    echo "     Anahtarını https://console.anthropic.com adresinden 'API Keys' bölümünde oluşturabilirsin."
+    echo "     Anahtarını https://platform.deepseek.com/api_keys adresinden oluşturabilirsin."
     ANAHTAR=""
     while [ -z "$ANAHTAR" ]; do
-      read -r -p "     API anahtarını yapıştır ve Enter'a bas: " ANAHTAR </dev/tty
+      read -r -p "     DeepSeek API anahtarını yapıştır ve Enter'a bas: " ANAHTAR </dev/tty
     done
     # Anahtar sadece bu kullanıcının okuyabileceği bir dosyada saklanır.
-    ( umask 077; printf 'export ANTHROPIC_API_KEY=%q\n' "$ANAHTAR" > "$HEDEF/anahtar.env" )
-    export ANTHROPIC_API_KEY="$ANAHTAR"
+    ( umask 077; printf 'export DEEPSEEK_API_KEY=%q\n' "$ANAHTAR" >> "$HEDEF/anahtar.env" )
+    export DEEPSEEK_API_KEY="$ANAHTAR"
     echo "     Anahtar kaydedildi."
   fi
 

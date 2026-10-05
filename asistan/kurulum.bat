@@ -80,18 +80,18 @@ if errorlevel 1 (
 )
 
 rem ---- 4) API anahtarı ------------------------------------------------------
-echo [4/5] API anahtarı...
-if defined ANTHROPIC_API_KEY (
-    echo      Kayıtlı bir API anahtarı bulundu.
+echo [4/5] DeepSeek API anahtarı...
+if defined DEEPSEEK_API_KEY (
+    echo      Kayıtlı bir DeepSeek API anahtarı bulundu.
     goto anahtar_tamam
 )
-echo      Anahtarını https://console.anthropic.com adresinden "API Keys" bölümünde oluşturabilirsin.
+echo      Anahtarını https://platform.deepseek.com/api_keys adresinden oluşturabilirsin.
 :anahtar_sor
 set "ANAHTAR="
-set /p "ANAHTAR=     API anahtarını yapıştır ve Enter'a bas: "
+set /p "ANAHTAR=     DeepSeek API anahtarını yapıştır ve Enter'a bas: "
 if not defined ANAHTAR goto anahtar_sor
-setx ANTHROPIC_API_KEY "%ANAHTAR%" >nul
-set "ANTHROPIC_API_KEY=%ANAHTAR%"
+setx DEEPSEEK_API_KEY "%ANAHTAR%" >nul
+set "DEEPSEEK_API_KEY=%ANAHTAR%"
 set "ANAHTAR="
 echo      Anahtar kaydedildi.
 :anahtar_tamam

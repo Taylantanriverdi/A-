@@ -4,8 +4,9 @@ Ne istediğini yazıyorsun, asistan da **bilgisayarını bir insan gibi kullanar
 ekrana bakıyor, fareyi oynatıp tıklıyor, klavyeyle yazıyor, uygulamaları açıyor,
 web'de geziniyor, dosyalarla çalışıyor.
 
-Arkada Claude'un **computer use** özelliği çalışıyor: asistan ekran görüntüsü alıyor,
-ne gördüğünü anlıyor, bir sonraki fare/klavye hareketine karar veriyor ve bunu iş bitene kadar tekrarlıyor.
+Arkada **DeepSeek** yapay zekası (`deepseek-flash`, resimleri görebilen model) çalışıyor: asistan ekran
+görüntüsü alıyor, ne gördüğünü anlıyor, bir sonraki fare/klavye hareketine karar veriyor ve bunu iş bitene
+kadar tekrarlıyor. İstersen Claude ile de çalıştırabilirsin (aşağıda "Ayarlar").
 
 ```
 👤 Sen: Chrome'u aç, yarın İstanbul'da hava nasıl olacak bak
@@ -26,9 +27,9 @@ ne gördüğünü anlıyor, bir sonraki fare/klavye hareketine karar veriyor ve 
 
 ## Kurulum (tek tıkla)
 
-Önce [console.anthropic.com](https://console.anthropic.com) adresinden bir hesap aç ve **API Keys** bölümünden
-bir anahtar oluştur. Kurulum sırasında bu anahtar sorulacak. (Kullanım ücretlidir, her ekran görüntüsü token harcar.
-Konsoldan harcama limiti koyabilirsin.)
+Önce [platform.deepseek.com](https://platform.deepseek.com) adresinden bir hesap aç, biraz bakiye yükle ve
+**API Keys** bölümünden bir anahtar oluştur. Kurulum sırasında bu anahtar sorulacak.
+(Kullanım ücretlidir ama DeepSeek oldukça ucuzdur; her ekran görüntüsü token harcar.)
 
 ### Windows
 
@@ -96,7 +97,7 @@ Daha temkinli başlamak istersen: `./baslat.sh --onay` (her hareketten önce sor
 - Komut satırı komutları **her zaman** çalışmadan önce sana gösterilir ve onayın beklenir.
 - Web sayfalarında veya e-postalarda gördüğü talimatlara uymaz, sadece senin isteklerini yapar.
 - Asistan çalışırken fareyi/klavyeyi kullanma; ikiniz aynı anda kullanırsanız karışır.
-- Ekran görüntüleri işlenmek üzere Anthropic'e gönderilir. Gizli bir şey açıkken görev verme.
+- Ekran görüntüleri işlenmek üzere yapay zeka sağlayıcısına (DeepSeek veya Anthropic) gönderilir. Gizli bir şey açıkken görev verme.
 
 > Not: Bu tür yapay zeka ajanları hâlâ hata yapabilir. Önemli işlerde (para, iş yazışmaları,
 > önemli dosyalar) ne yaptığını izle; ilk denemeleri `--onay` modunda yapman iyi olur.
@@ -105,14 +106,24 @@ Daha temkinli başlamak istersen: `./baslat.sh --onay` (her hareketten önce sor
 
 | Değişken | Varsayılan | Açıklama |
 |---|---|---|
-| `ASISTAN_MODEL` | `claude-opus-5-5` | Kullanılacak model. Daha ucuz/hızlı için `claude-sonnet-5-5` |
-| `ASISTAN_EFOR` | `high` | Düşünme düzeyi: `low`, `medium`, `high`, `xhigh`, `max`. Basit işlerde `medium` daha hızlı ve ucuz |
+| `ASISTAN_SAGLAYICI` | otomatik | `deepseek` veya `claude`. Boşsa `DEEPSEEK_API_KEY` varsa DeepSeek, yoksa Claude kullanılır |
+| `DEEPSEEK_MODEL` | `deepseek-flash` | DeepSeek modeli (resim görebilen bir model olmalı) |
+| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` | DeepSeek API adresi |
+| `ASISTAN_GORUNTU_SAYISI` | `3` | DeepSeek'e geçmişte gönderilen en fazla ekran görüntüsü (az = ucuz) |
 | `ASISTAN_MAKS_ADIM` | `80` | Tek bir görevde en fazla kaç tur çalışacağı |
-| `ASISTAN_YEDEK` | `1` | Model bir isteği güvenlik nedeniyle reddederse sunucunun otomatik olarak başka bir modelle devam etmesi. Kapatmak için `0` |
+| `ASISTAN_MODEL` | `claude-opus-5-5` | Claude kullanılırken model |
+| `ASISTAN_EFOR` | `high` | Claude kullanılırken düşünme düzeyi |
+| `ASISTAN_YEDEK` | `1` | Claude bir isteği reddederse sunucunun başka bir modelle devam etmesi |
+
+**DeepSeek ile Claude farkı:** Claude'un bilgisayar kullanmak için özel eğitilmiş bir aracı var, DeepSeek'te yok;
+DeepSeek ekran görüntüsünün üzerine çizilen koordinat ızgarasıyla nereye tıklayacağını tahmin ediyor.
+DeepSeek çok daha ucuz, ama karmaşık ekranlarda daha sık yanlış yere tıklayabilir.
 
 ## Dosyalar
 
-- `asistan.py` — sohbet döngüsü, Claude ile iletişim, komut onayları
+- `asistan.py` — sohbet penceresi ve Claude motoru
+- `deepseek_motor.py` — DeepSeek motoru
+- `ortak.py` — ortak parçalar (talimatlar, komut onayı)
 - `bilgisayar.py` — ekran görüntüsü, fare ve klavye kontrolü (koordinat ölçekleme, Türkçe karakter desteği)
 - `guncelle.py` — otomatik güncelleyici
 - `kurulum.bat` / `kurulum.sh` — tek tıkla kurulum

@@ -19,8 +19,11 @@ if errorlevel 2 exit /b 0
 if exist "%HEDEF%" rmdir /s /q "%HEDEF%"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "foreach ($k in @([Environment]::GetFolderPath('Desktop'), [Environment]::GetFolderPath('Programs'))) { Remove-Item -ErrorAction SilentlyContinue (Join-Path $k 'Kisisel Asistan.lnk') }"
 
-choice /c EH /m "Kayıtlı API anahtarı da silinsin mi? (E=Evet, H=Hayır)"
-if not errorlevel 2 reg delete "HKCU\Environment" /v ANTHROPIC_API_KEY /f >nul 2>&1
+choice /c EH /m "Kayıtlı API anahtarları da silinsin mi? (E=Evet, H=Hayır)"
+if not errorlevel 2 (
+    reg delete "HKCU\Environment" /v DEEPSEEK_API_KEY /f >nul 2>&1
+    reg delete "HKCU\Environment" /v ANTHROPIC_API_KEY /f >nul 2>&1
+)
 
 echo.
 echo Kaldırma tamamlandı.
