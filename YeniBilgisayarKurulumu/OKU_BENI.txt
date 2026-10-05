@@ -320,3 +320,20 @@ e-posta, web sitesi, vergi dairesi/no, adres, siparis formu alt notu ve logo
 Bilgiler App_Data\firma-bilgileri.json ve App_Data\firma-logo.* icindedir;
 yeni bilgisayara App_Data ile birlikte tasinir. Hekim portali ve teknisyen
 panelinde degisiklik sayfa yenilenince gorunur.
+
+YONETICI SIFRESI (ANA PROGRAM GIRISI)
+------------------------------------
+Ana program (localhost:5169) yonetici sifresiyle acilir. Hekim Portali ve
+Teknisyen Paneli kendi sifreleriyle calismaya devam eder.
+Ilk acilis (kurulum veya bu guncellemeden sonra):
+  1) Yonetici sifresi belirleyin (en az 8 karakter, harf ve rakam; iki kez).
+  2) Ekranda bir kez gosterilen KURTARMA KODUNU kagida yazin veya yazdirin.
+  3) "Kodu kaydettim" kutusunu isaretleyip Programa Gir'e basin.
+Sonraki acilislarda yalniz sifre sorulur ("30 gun hatirla" secilebilir).
+Sifremi unuttum: giris ekraninda kurtarma kodu + yeni sifre; yeni bir
+kurtarma kodu verilir (eskisi gecersiz olur).
+Kurtarma kodu da yoksa: C:\PrimerLab\PrimerLab_SifreSifirla.bat calistirilir;
+yalniz yonetici sifresi silinir (veriler korunur), ilk sifre ekrani yeniden acilir.
+Sifre degistirme ve yeni kurtarma kodu: Ayarlar > Yonetici Sifresi.
+Cikis: sol menunun en altindaki Cikis dugmesi. 5 hatali denemede 10 dakika beklenir.
+Sifre ozeti App_Data\yonetici-giris.json icindedir (duz metin yok).

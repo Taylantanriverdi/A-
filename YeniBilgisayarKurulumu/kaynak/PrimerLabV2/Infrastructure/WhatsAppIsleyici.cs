@@ -30,10 +30,11 @@ public sealed class WhatsAppIsleyici
     private readonly PrimerAjan _ajan;
     private readonly PrimerLabDbContext _db;
     private readonly IHttpClientFactory _http;
+    private readonly YoneticiGirisi _giris;
     private readonly ILogger<WhatsAppIsleyici> _log;
 
     public WhatsAppIsleyici(WhatsAppServisi wa, YapayZekaServisi ai, PrimerAjan ajan, PrimerLabDbContext db,
-        IHttpClientFactory http, ILogger<WhatsAppIsleyici> log)
+        IHttpClientFactory http, ILogger<WhatsAppIsleyici> log, YoneticiGirisi giris)
     {
         _wa = wa;
         _ai = ai;
@@ -41,6 +42,7 @@ public sealed class WhatsAppIsleyici
         _db = db;
         _http = http;
         _log = log;
+        _giris = giris;
     }
 
     private const string KanalTalimati = """
@@ -252,6 +254,8 @@ Kısayollar: *ÖZET* (günün özeti), *YENİ* (yeni sohbet), *YARDIM*.
         var http = _http.CreateClient();
         http.BaseAddress = new Uri(Environment.GetEnvironmentVariable("PRIMERLAB_YEREL_ADRES") ?? "http://127.0.0.1:5169");
         http.Timeout = TimeSpan.FromSeconds(60);
+        // Ana programın yönetici girişi bu yerel çağrılar için süreç anahtarıyla aşılır.
+        http.DefaultRequestHeaders.Add(YoneticiGirisi.IcBaslik, _giris.IcJeton);
         var id = S("jobId");
         HttpResponseMessage r = S("type") switch
         {

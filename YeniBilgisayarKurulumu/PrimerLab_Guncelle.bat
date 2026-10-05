@@ -70,6 +70,7 @@ popd
 if not "%DERLEME%"=="0" goto GERI_AL
 
 copy /Y "%KIT%PORTAL_INTERNET_AC.bat" "%HEDEF%\PORTAL_INTERNET_AC.bat" >nul 2>&1
+copy /Y "%KIT%PrimerLab_SifreSifirla.bat" "%HEDEF%\PrimerLab_SifreSifirla.bat" >nul 2>&1
 echo [4/4] Primer Lab baslatiliyor...
 rem Program yonetici olarak degil, normal kullanici yetkisiyle baslatilir.
 explorer.exe "%HEDEF%\PrimerLab_Baslat.bat"

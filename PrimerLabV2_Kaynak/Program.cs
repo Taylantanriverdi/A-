@@ -32,6 +32,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<YapayZekaServisi>();
 builder.Services.AddSingleton<TeknisyenHesapDeposu>();
 builder.Services.AddSingleton<FirmaServisi>();
+builder.Services.AddSingleton<YoneticiGirisi>();
 builder.Services.AddSingleton<EpostaServisi>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EpostaServisi>());
 builder.Services.AddSingleton<PortalKimlik>();

@@ -9,6 +9,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>@Firma.Ad — Primer Lab</title>
     <script>window.FIRMA = @Html.Raw(Firma.IstemciJson());</script>
+    <script>
+        // Yönetici oturumu düşerse (süre doldu, şifre başka yerde değişti) giriş ekranına dönülür.
+        (function () {
+            const asil = window.fetch.bind(window);
+            window.fetch = async function (...a) {
+                const r = await asil(...a);
+                if (r.status === 401 && r.headers.get("X-Yonetici-Giris") === "gerekli")
+                    location.href = "/giris?r=" + encodeURIComponent(location.pathname + location.search);
+                return r;
+            };
+        })();
+    </script>
 
     <style>
         * {
@@ -1051,6 +1063,11 @@
         .ref-firma-il{text-align:center;font-size:9.5px;color:#334155;margin-top:6px;line-height:1.45;font-weight:600}
         .ref-firma-alt{margin-top:10px;padding-top:6px;border-top:1px solid #cbd5e1;font-size:9.5px;color:#475569;text-align:center;white-space:pre-wrap}
         .sb-firma-logo{display:block;max-width:190px;max-height:56px;object-fit:contain;background:#fff;border-radius:8px;padding:4px;margin-bottom:8px}
+        .cikis-btn{margin-top:14px;border-top:1px solid rgba(255,255,255,.12)!important;padding-top:14px!important;color:#fca5a5!important}
+        .ys-izgara{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
+        .ys-kod{margin-top:12px;padding:12px 14px;border:2px dashed #94a3b8;border-radius:12px;background:#f8fafc;font-weight:700}
+        .ys-kod b{display:block;font-family:Consolas,monospace;font-size:22px;letter-spacing:2px;margin:6px 0}
+        @@media(max-width:900px){.ys-izgara{grid-template-columns:1fr}}
         .firma-izgara{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:16px}
         .firma-panel{padding:18px 20px}
         .firma-alanlar{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
@@ -2738,6 +2755,7 @@
                     onclick="showSection('firmaBilgileri', this)">Firma Bilgileri</button>
             <button class="menu-item" type="button"
                     onclick="showSection('ayarlar', this)">Ayarlar</button>
+            <button class="menu-item cikis-btn" type="button" onclick="yoneticiCikis()">⎋ Çıkış</button>
         </aside>
 
         <main class="main">
@@ -4596,6 +4614,26 @@
                     </div>
                 </div>
 
+                <div class="panel" style="padding:18px 20px;margin-bottom:16px">
+                    <div class="panel-header" style="padding:0;margin-bottom:12px">
+                        <div>
+                            <div class="panel-title">🔒 Yönetici Şifresi</div>
+                            <div class="page-subtitle">Ana programı açarken sorulan şifre. <span id="ysSonDegisim"></span></div>
+                        </div>
+                    </div>
+                    <div class="ys-izgara">
+                        <div class="form-group" style="margin:0"><label for="ysMevcut">Mevcut şifre</label><input id="ysMevcut" type="password" autocomplete="current-password" /></div>
+                        <div class="form-group" style="margin:0"><label for="ysYeni">Yeni şifre</label><input id="ysYeni" type="password" autocomplete="new-password" placeholder="En az 8 karakter, harf ve rakam" /></div>
+                        <div class="form-group" style="margin:0"><label for="ysTekrar">Yeni şifre (tekrar)</label><input id="ysTekrar" type="password" autocomplete="new-password" /></div>
+                    </div>
+                    <div class="button-group" style="margin-top:12px;flex-wrap:wrap">
+                        <button class="button button-blue" type="button" onclick="yoneticiSifreDegistir()">Şifreyi Değiştir</button>
+                        <button class="button button-light" type="button" onclick="yoneticiKurtarmaYenile()">Yeni Kurtarma Kodu Oluştur</button>
+                    </div>
+                    <div id="ysKod" class="ys-kod" style="display:none"></div>
+                    <div class="price-list-note" style="margin-top:10px">Şifre değişince diğer tarayıcı ve cihazlardaki oturumlar kapanır. Kurtarma kodunu kaybettiyseniz mevcut şifrenizle yenisini oluşturun; eski kod geçersiz olur.</div>
+                </div>
+
 
                 <div class="panel backup-panel" style="border-color:#c7d2fe;">
                     <div class="panel-header">
@@ -6302,6 +6340,7 @@
 
             if (id === "ayarlar") {
                 renderTeknisyenler();
+                yoneticiDurumYukle();
             }
 
             if (id === "portalHesaplari") {
@@ -14116,6 +14155,46 @@
         }
 
         document.addEventListener("DOMContentLoaded", firmaUygula);
+
+        // ---------------- Yönetici şifresi ----------------
+        async function yoneticiCikis(){
+            if(!confirm("Çıkış yapılsın mı? Tekrar girmek için yönetici şifresi gerekir.")) return;
+            try{ await fetch("/api/yonetici-giris/cikis",{method:"POST"}); }catch{}
+            location.href="/giris";
+        }
+        async function yoneticiDurumYukle(){
+            try{
+                const d=await (await fetch("/api/yonetici-giris/durum",{cache:"no-store"})).json();
+                const el=document.getElementById("ysSonDegisim");
+                if(el) el.innerText=d.sonDegisim?"Son değişiklik: "+new Date(d.sonDegisim).toLocaleString("tr-TR"):"";
+            }catch{}
+        }
+        async function yoneticiSifreDegistir(){
+            const g=id=>document.getElementById(id).value;
+            if(!g("ysMevcut")) return showError("Mevcut şifrenizi yazın.");
+            if(g("ysYeni")!==g("ysTekrar")) return showError("Yeni şifreler birbirinin aynısı değil.");
+            try{
+                const r=await fetch("/api/yonetici-giris/sifre-degistir",{method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({parola:g("ysMevcut"),yeniParola:g("ysYeni"),yeniParolaTekrar:g("ysTekrar")})});
+                const t=await r.text(); if(!r.ok) throw new Error(t||"Şifre değiştirilemedi.");
+                ["ysMevcut","ysYeni","ysTekrar"].forEach(id=>document.getElementById(id).value="");
+                let m="Şifre değiştirildi."; try{ m=JSON.parse(t).message||m; }catch{}
+                showSuccess(m); yoneticiDurumYukle();
+            }catch(e){ showError(e.message); }
+        }
+        async function yoneticiKurtarmaYenile(){
+            const mevcut=document.getElementById("ysMevcut").value;
+            if(!mevcut) return showError("Yeni kurtarma kodu için önce 'Mevcut şifre' alanına şifrenizi yazın.");
+            if(!confirm("Yeni kurtarma kodu oluşturulsun mu? Eski kod geçersiz olur.")) return;
+            try{
+                const r=await fetch("/api/yonetici-giris/kurtarma-yenile",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({parola:mevcut})});
+                const t=await r.text(); if(!r.ok) throw new Error(t||"Kod oluşturulamadı.");
+                const kod=JSON.parse(t).kurtarmaKodu;
+                const k=document.getElementById("ysKod");
+                k.innerHTML="Yeni kurtarma kodunuz (bir kez gösterilir, güvenli bir yere yazın):<b>"+escapeHtml(kod)+"</b>Eski kod artık geçersiz.";
+                k.style.display="block"; document.getElementById("ysMevcut").value="";
+            }catch(e){ showError(e.message); }
+        }
 
         function epostaDurumGoster(tur, d){
             const el=document.getElementById(tur==='hekim'?'hekimPortalEposta':'teknisyenPanelEposta');

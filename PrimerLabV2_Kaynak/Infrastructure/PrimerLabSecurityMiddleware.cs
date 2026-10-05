@@ -83,6 +83,29 @@ public sealed class PrimerLabSecurityMiddleware
             context.Response.Headers.Pragma = "no-cache";
         }
 
+        // Yönetim ekranı ve yönetim API'leri yönetici girişi ister (Hekim Portalı ve Teknisyen Paneli
+        // kendi oturumlarını kullanır; onların yönetici uçları ise burada korunur).
+        var yonetimIstegi = !doctorPortalRequest ||
+            context.Request.Path.StartsWithSegments("/api/hekim-portal/admin") ||
+            context.Request.Path.StartsWithSegments("/api/teknisyen-portal/admin");
+        if (yonetimIstegi && !GirisSerbest(context.Request.Path))
+        {
+            var giris = context.RequestServices.GetRequiredService<YoneticiGirisi>();
+            if (!giris.OturumGecerli(context) && !giris.IcCagri(context))
+            {
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.Headers["X-Yonetici-Giris"] = "gerekli";
+                    await context.Response.WriteAsync("Yönetici girişi gerekli. Sayfayı yenileyip şifrenizle giriş yapın.");
+                    return;
+                }
+                var hedef = context.Request.Path + context.Request.QueryString;
+                context.Response.Redirect("/giris" + (hedef == "/" ? "" : "?r=" + Uri.EscapeDataString(hedef)));
+                return;
+            }
+        }
+
         if (!context.Request.Headers.ContainsKey("X-Request-ID"))
         {
             context.Response.Headers["X-Request-ID"] = context.TraceIdentifier;
@@ -90,6 +113,11 @@ public sealed class PrimerLabSecurityMiddleware
 
         await _next(context);
     }
+
+    private static bool GirisSerbest(PathString path) =>
+        path.StartsWithSegments("/giris") ||
+        path.StartsWithSegments("/api/yonetici-giris") ||
+        path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// İnternet tünelinin bağlandığı portun numarası (0 = kapalı). Varsayılan 5170.
