@@ -199,12 +199,14 @@ public sealed class IsAkisiController : ControllerBase
     [HttpPost("isler/{id:int}/reddet")]
     public Task<IActionResult> Reddet(int id, CancellationToken ct) => Vekil(HttpMethod.Patch, $"/api/anayasa/isler/{id}/gelen-reddet", null, ct);
 
+    /// <summary>
+    /// Panelden "Tamamlandı" seçilirse iş doğrudan tamamlanmaz, "Tamamlama Onayı"na düşer;
+    /// gerçek tamamlama yalnız ana programda (admin) onaylanınca olur.
+    /// </summary>
     [HttpPost("isler/{id:int}/durum")]
     public Task<IActionResult> Durum(int id, [FromBody] IsAkisiDurumDto dto, CancellationToken ct) =>
-        Vekil(HttpMethod.Patch, $"/api/anayasa/isler/{id}/durum", new { durum = dto.Durum }, ct);
-
-    [HttpPost("isler/{id:int}/tamamlama-onayla")]
-    public Task<IActionResult> TamamlamaOnayla(int id, CancellationToken ct) => Vekil(HttpMethod.Patch, $"/api/anayasa/isler/{id}/tamamlama-onayla", null, ct);
+        Vekil(HttpMethod.Patch, $"/api/anayasa/isler/{id}/durum",
+            new { durum = dto.Durum == "Tamamlandı" ? "Tamamlama Onayı" : dto.Durum }, ct);
 
     [HttpPost("isler/{id:int}/teknisyen")]
     public Task<IActionResult> TeknisyenAta(int id, [FromBody] IsAkisiAtamaDto dto, CancellationToken ct) =>

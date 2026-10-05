@@ -236,6 +236,8 @@ IS AKISI PANELI (fiyatsiz is takibi - sekreter / is takipcisi icin)
   Kaydedilen is onayli olarak "Bekliyor" sutununa duser.
 - Is detayinda STL/PLY/OBJ dosyasinin uzerine fareyle gelince 3B onizleme
   acilir (kendiliginden doner, surukleyerek cevrilir).
+- Panelde "Tamamlandi" secilince is "Tamamlama Onayi"na (Admin Onayinda) duser;
+  gercek "Tamamlandi" yalniz ana programda admin onay verince olur.
 - FIYAT BILGISI HIC GOSTERILMEZ (sunucu fiyat alanlarini panele hic gondermez).
 - Ana programla ayni veritabanini kullanir; her degisiklik aninda iki tarafta
   da gorunur. Panel 30 saniyede bir kendini yeniler.

@@ -192,7 +192,7 @@
         { k: "bekliyor", ad: "⏳ Bekliyor" },
         { k: "tasarim", ad: "📐 Tasarımda" },
         { k: "uretim", ad: "🏭 Üretimde" },
-        { k: "kontrol", ad: "✅ Tamamlama Onayı" }
+        { k: "kontrol", ad: "✅ Admin Onayında" }
     ];
     const KAYNAK = { Hekim: "🦷 Hekim Portalı", Mail: "📧 Mail", Manuel: "✍️ Manuel", Teknisyen: "🛠 Teknisyen" };
     function sutun(x) {
@@ -323,15 +323,18 @@
         const x = isler.find(i => i.id === acikIs) || tumIsler.find(i => i.id === acikIs); if (!x) { cekmeceKapat(); return; }
         const s = sutun(x);
         const tekSecenek = `<option value="">— Atanmamış —</option>` + teknisyenler.filter(t => t.aktif || t.id === x.teknisyenId).map(t => `<option value="${t.id}" ${t.id === x.teknisyenId ? "selected" : ""}>${esc(t.adSoyad)}</option>`).join("");
-        const durumSecenek = durumlar.filter(d => d !== "Tamamlama Onayı" || x.durum === d).map(d => `<option ${d === x.durum ? "selected" : ""}>${esc(d)}</option>`).join("");
+        // "Tamamlandı" seçilince iş admin onayına (Tamamlama Onayı) gönderilir; gerçek tamamlama ana programda.
+        const durumSecenek = durumlar.filter(d => d !== "Tamamlama Onayı" || x.durum === d)
+            .filter(d => d !== "Tamamlandı" || x.durum !== "Tamamlama Onayı")
+            .map(d => `<option value="${esc(d)}" ${d === x.durum ? "selected" : ""}>${esc(d === "Tamamlandı" && x.durum !== "Tamamlandı" ? "Tamamlandı (admin onayına gönder)" : d)}</option>`).join("");
         $("cekmece").innerHTML = `
             <div class="c-ust"><div><div style="font-size:12px;color:var(--muted);font-weight:800">#${x.id} · ${KAYNAK[x.kaynak] || esc(x.kaynak)}</div><h2>${esc(x.hastaAdi)}</h2></div>
                 <div style="display:flex;gap:6px;align-items:flex-start"><button class="btn btn-light" type="button" onclick="formYazdir(${x.id})">🖨 Form</button><button class="btn btn-light" type="button" onclick="cekmeceKapat()">✕</button></div></div>
             <div class="c-ic">
                 ${s === "onay" ? `<div class="bolum" style="background:var(--amber-soft);border-color:#fde68a"><h3>📥 Bu iş onay bekliyor</h3>
                     <div class="satir"><button class="btn btn-green" type="button" onclick="islem(${x.id},'onayla')">✓ Onayla</button><button class="btn btn-red" type="button" onclick="islem(${x.id},'reddet')">Reddet</button></div></div>` : ""}
-                ${x.durum === "Tamamlama Onayı" ? `<div class="bolum" style="background:var(--green-soft);border-color:#86efac"><h3>✅ Teknisyen işi bitirdi, onayınızı bekliyor</h3>
-                    <div class="satir"><button class="btn btn-green" type="button" onclick="islem(${x.id},'tamamlama-onayla')">Tamamlandı olarak onayla</button></div></div>` : ""}
+                ${x.durum === "Tamamlama Onayı" ? `<div class="bolum" style="background:var(--green-soft);border-color:#86efac"><h3>✅ İş bitti — admin onayı bekliyor</h3>
+                    <div style="font-size:13px">İş, ana programda (admin) "Tamamlama Onayı" verilince gerçek anlamda <b>Tamamlandı</b>'ya geçer.</div></div>` : ""}
                 <div class="bolum"><h3>Durum ve teknisyen</h3>
                     ${s === "onay" ? '<div style="color:var(--muted);font-size:13px">Önce işi onaylayın.</div>' : `
                     <div class="satir"><select id="dDurum" class="inp">${durumSecenek}</select><button class="btn" type="button" onclick="durumKaydet(${x.id})">Durumu Kaydet</button></div>`}
@@ -373,11 +376,12 @@
     }
     async function islem(id, ad) {
         if (ad === "reddet" && !confirm("#" + id + " reddedilsin mi? İş Silinenler'e taşınır.")) return;
-        try { await post(`/api/is-akisi/isler/${id}/${ad}`); toast(ad === "onayla" ? "İş onaylandı." : ad === "reddet" ? "İş reddedildi." : "İş tamamlandı."); if (ad === "reddet") cekmeceKapat(); await yukle(); }
+        try { await post(`/api/is-akisi/isler/${id}/${ad}`); toast(ad === "onayla" ? "İş onaylandı." : "İş reddedildi."); if (ad === "reddet") cekmeceKapat(); await yukle(); }
         catch (err) { toast(err.message, true); }
     }
     async function durumKaydet(id) {
-        try { await post(`/api/is-akisi/isler/${id}/durum`, { durum: $("dDurum").value }); toast("Durum güncellendi."); await yukle(); }
+        const v = $("dDurum").value;
+        try { await post(`/api/is-akisi/isler/${id}/durum`, { durum: v }); toast(v === "Tamamlandı" ? "İş admin onayına gönderildi (Tamamlama Onayı)." : "Durum güncellendi."); await yukle(); }
         catch (err) { toast(err.message, true); }
     }
     async function teknisyenAta(id) {
