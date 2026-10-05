@@ -595,7 +595,7 @@ public sealed class TeknisyenPortalController : ControllerBase
             return BadRequest("Tamamlanmış işte tasarım teslimi yapılamaz.");
 
         var tasarimSayisi = await _db.Database.SqlQuery<int>($"""
-            SELECT COUNT(*)::int AS "Value" FROM "IsDosyalari" WHERE "SiparisId"={jobId} AND "DosyaTuru"='Tasarım'
+            SELECT COUNT(*)::int AS "Value" FROM "IsDosyalari" WHERE "SiparisId"={jobId} AND "DosyaTuru" IN ('Tasarım','Yazıcı')
             """).SingleAsync(ct);
         if (tasarimSayisi == 0) return BadRequest("Önce tasarım dosyasını yükleyin.");
 

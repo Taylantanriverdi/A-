@@ -99,6 +99,21 @@
         .step:disabled{opacity:.45;cursor:not-allowed}
         .step.on:disabled{opacity:1;cursor:default}
         .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+        /* İş masası: indir → yükle → teslim et (tek ekranda) */
+        .masa{display:grid;grid-template-columns:1fr 1.2fr .8fr;gap:10px;margin-top:12px}
+        @@media(max-width:820px){.masa{grid-template-columns:1fr}}
+        .adim{border:1px solid var(--line);border-radius:14px;padding:11px;background:#fbfdff;min-width:0}
+        .adim.ok{border-color:#86efac;background:#f0fdf4}
+        .adim-b{font-weight:900;font-size:13px;margin-bottom:8px;display:flex;gap:6px;align-items:center}
+        .adim-no{width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+        .adim.ok .adim-no{background:var(--green)}
+        .md{display:flex;justify-content:space-between;gap:6px;align-items:center;padding:7px 9px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;margin-top:5px;font-size:13px;color:inherit;text-decoration:none;min-width:0}
+        .md:hover{border-color:var(--blue)}
+        .md span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .md small{color:var(--muted);white-space:nowrap}
+        .birak{display:block;border:2px dashed #93c5fd;background:var(--blue-soft);border-radius:12px;padding:14px 10px;text-align:center;color:var(--blue);font-weight:800;cursor:pointer;font-size:13px}
+        .birak.ustunde{background:#dbeafe;border-color:var(--blue)}
+        .teslim-btn{width:100%;height:56px;font-size:15px}
         .note{font-size:12px;color:var(--muted)}
         .empty{text-align:center;color:var(--muted);padding:34px 10px;background:#fff;border:1px dashed var(--line);border-radius:16px}
         .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50}
@@ -629,7 +644,7 @@
         } else if (serit) serit.remove();
         await yukle();
         clearInterval(yenilemeZamani);
-        yenilemeZamani = setInterval(() => { if (!acikModal && document.visibilityState === "visible") yukle(true); }, 60000);
+        yenilemeZamani = setInterval(() => { if (!acikModal && !masaMesgul && document.visibilityState === "visible") { masaDosya.clear(); yukle(true); } }, 60000);
     }
 
     function sekme(ad) {
@@ -800,19 +815,93 @@
             ${onayda ? `<div class="note" style="margin-top:10px">⏳ Laboratuvarın tamamlama onayı bekleniyor.</div>` : ""}
             ${labda ? `<div class="note" style="margin-top:10px">🏭 İş laboratuvarda ${esc(j.durum.toLocaleLowerCase("tr-TR"))}; durumu laboratuvar yönetir.</div>` : ""}
             ${teslimBilgi}
+            ${kilitli ? "" : masaHtml(j, teslimEdilebilir)}
             ${adimlar}
             <div class="actions">
-                ${teslimBtn}
-                <button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım${j.linkSayisi ? " · 🔗 " + j.linkSayisi + " link" : ""})</button>
+                ${kilitli ? `<button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım${j.linkSayisi ? " · 🔗 " + j.linkSayisi + " link" : ""})</button>` : ""}
                 <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni</span>` : ""}</button>
             </div>
         </div>`;
     }
 
+    // ---------- İş masası ----------
+    const masaDosya = new Map();   // iş no -> { dosyalar, linkler }
+    let masaMesgul = false;
+    const TASARIM_TURLERI = ["Tasarım", "Yazıcı", "Üretim"];
+    function masaHtml(j, teslimEdilebilir) {
+        const d = masaDosya.get(j.id);
+        if (!d) setTimeout(() => masaYukle(j.id), 0);
+        const gelen = d ? d.dosyalar.filter(f => !TASARIM_TURLERI.includes(f.dosyaTuru)) : null;
+        const benim = d ? d.dosyalar.filter(f => TASARIM_TURLERI.includes(f.dosyaTuru)) : null;
+        const ikon = t => t === "Tasarım" ? "📐" : t === "Yazıcı" ? "🖨️" : t === "Üretim" ? "🏭" : t === "Tarama" ? "🦷" : "📎";
+        const satir = f => `<a class="md" href="/api/teknisyen-portal/jobs/${j.id}/files/${f.id}" title="${esc(f.orijinalDosyaAdi)} — indir"><span>${ikon(f.dosyaTuru)} ${esc(f.orijinalDosyaAdi)}</span><small>${boyut(f.boyut)} ⬇</small></a>`;
+        const bitti = j.durum === "Tamamlandı";
+        const tasarimVar = (j.tasarimSayisi || 0) > 0 || (benim && benim.some(f => f.dosyaTuru !== "Üretim"));
+        const teslimEdildi = !!j.tasarimTeslimTarihi;
+        return `<div class="masa">
+            <div class="adim ${gelen && gelen.length ? "ok" : ""}"><div class="adim-b"><span class="adim-no">1</span> Taramaları indir</div>
+                ${!d ? '<div class="note">Yükleniyor...</div>' : (gelen.length ? gelen.map(satir).join("") + (gelen.length > 1 ? `<button class="btn btn-light btn-sm" type="button" style="width:100%;margin-top:6px" onclick="hepsiniIndir(${j.id})">⬇ Tümünü indir (${gelen.length})</button>` : "") : (d.linkler.length ? "" : '<div class="note">Hekimden dosya gelmedi.</div>'))
+                  + (d && d.linkler.length ? d.linkler.map(l => `<a class="md" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"><span>🔗 ${esc(l.servis)} linki</span><small>aç ↗</small></a>`).join("") : "")}
+            </div>
+            <div class="adim ${tasarimVar ? "ok" : ""}"><div class="adim-b"><span class="adim-no">2</span> Tasarımı yükle</div>
+                ${bitti ? "" : `<label class="birak" id="birak${j.id}" ondragover="event.preventDefault();this.classList.add('ustunde')" ondragleave="this.classList.remove('ustunde')" ondrop="event.preventDefault();this.classList.remove('ustunde');masaDosyaYukle(${j.id},event.dataTransfer.files)">
+                    📤 Tasarım / CTB dosyalarını buraya sürükleyin<br><span style="font-weight:600">veya tıklayıp seçin</span>
+                    <input type="file" multiple class="hidden" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo,.ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode" onchange="masaDosyaYukle(${j.id},this.files);this.value=''" /></label>
+                <div style="display:flex;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--muted)">Tür: <select id="masaTur${j.id}" class="inp" style="height:32px;padding:0 8px;width:auto;font-size:12px"><option value="Tasarım">Tasarım</option><option value="Yazıcı">Yazıcı (CTB)</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select> <span>CTB vb. kendiliğinden "Yazıcı" olur</span></div>
+                <div class="progress hidden" id="masaCubuk${j.id}"><div></div></div><div class="note" id="masaDurum${j.id}"></div>`}
+                ${benim && benim.length ? benim.map(satir).join("") : ""}
+            </div>
+            <div class="adim ${teslimEdildi ? "ok" : ""}"><div class="adim-b"><span class="adim-no">3</span> Laboratuvara gönder</div>
+                ${teslimEdilebilir ? `<button class="btn btn-green teslim-btn" type="button" ${tasarimVar ? "" : "disabled"} onclick="tasarimTeslim(${j.id})">📤 Tasarımı Teslim Et</button>
+                    <div class="note" style="margin-top:6px">${tasarimVar ? (teslimEdildi ? "Yeni dosya yüklediyseniz tekrar teslim edebilirsiniz." : "Laboratuvar kontrol edip üretime alır; hekim tasarım/CTB dosyasını portalda görür.") : "Önce 2. adımda tasarım dosyasını yükleyin."}</div>`
+                  : `<div class="note">${teslimEdildi ? "✔ Teslim edildi." : bitti ? "İş tamamlandı." : "Bu aşamada teslim gerekmez."}</div>`}
+            </div>
+        </div>`;
+    }
+    async function masaYukle(id, yeniden) {
+        if (masaDosya.has(id) && !yeniden) return;
+        try {
+            const [dosyalar, linkler] = await Promise.all([api(`/api/teknisyen-portal/jobs/${id}/files`), api(`/api/teknisyen-portal/jobs/${id}/links`).catch(() => [])]);
+            masaDosya.set(id, { dosyalar, linkler });
+        } catch { masaDosya.set(id, { dosyalar: [], linkler: [] }); }
+        if (!masaMesgul) ciz();
+    }
+    function hepsiniIndir(id) {
+        const d = masaDosya.get(id); if (!d) return;
+        d.dosyalar.filter(f => !TASARIM_TURLERI.includes(f.dosyaTuru)).forEach((f, i) => setTimeout(() => {
+            const a = document.createElement("a"); a.href = `/api/teknisyen-portal/jobs/${id}/files/${f.id}`; a.download = ""; document.body.appendChild(a); a.click(); a.remove();
+        }, i * 700));
+    }
+    async function masaDosyaYukle(id, liste) {
+        const secim = Array.from(liste || []); if (!secim.length) return;
+        const tur = ($("masaTur" + id) || {}).value || "Tasarım";
+        const cubuk = $("masaCubuk" + id), ic = cubuk.firstElementChild, durum = $("masaDurum" + id);
+        masaMesgul = true; cubuk.classList.remove("hidden");
+        let tamam = 0, hata = "";
+        for (const f of secim) {
+            durum.textContent = `${tamam + 1} / ${secim.length} · ${f.name}`;
+            await new Promise(res => {
+                const fd = new FormData(); fd.append("dosya", f, f.name); fd.append("dosyaTuru", tur);
+                const x = new XMLHttpRequest();
+                x.open("POST", `/api/teknisyen-portal/jobs/${id}/files`); x.withCredentials = true;
+                x.upload.onprogress = ev => { if (ev.lengthComputable) ic.style.width = Math.round((tamam + ev.loaded / ev.total) * 100 / secim.length) + "%"; };
+                x.onload = () => { if (x.status >= 200 && x.status < 300) tamam++; else hata = x.responseText || ("HTTP " + x.status); res(); };
+                x.onerror = () => { hata = "Bağlantı koptu."; res(); };
+                x.send(fd);
+            });
+        }
+        masaMesgul = false;
+        bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : `✔ ${tamam} dosya yüklendi. Bittiyse "Tasarımı Teslim Et"e basın.`);
+        await yukle(true);
+        await masaYukle(id, true);
+    }
+
     async function tasarimTeslim(id) {
         const j = isler.find(x => x.id === id);
-        if (!j || !j.tasarimSayisi) { bildir("Önce Dosyalar'dan tasarım dosyasını yükleyin."); return; }
-        if (!confirm(`${j.tasarimSayisi} tasarım dosyası laboratuvara teslim edilsin mi? Laboratuvar işi üretime alacak.`)) return;
+        const md = masaDosya.get(id);
+        const tasarimVar = j && ((j.tasarimSayisi || 0) > 0 || (md && md.dosyalar.some(f => f.dosyaTuru === "Tasarım" || f.dosyaTuru === "Yazıcı")));
+        if (!j || !tasarimVar) { bildir("Önce 2. adımda tasarım dosyasını yükleyin."); return; }
+        if (!confirm("Tasarım laboratuvara teslim edilsin mi? Laboratuvar kontrol edip işi üretime alacak.")) return;
         try { const r = await api(`/api/teknisyen-portal/jobs/${id}/tasarim-teslim`, { method: "POST" }); bildir(r.message || "Tasarım teslim edildi."); if (acikModal) modalKapat(); else await yukle(true); }
         catch (err) { bildir(err.message); }
     }
