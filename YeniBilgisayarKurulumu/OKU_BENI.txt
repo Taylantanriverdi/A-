@@ -373,3 +373,13 @@ Tum goruntuler ayni boyuttadir (satir basina 3); form tek A5 sayfaya sigar.
 V30: Goruntuler kare cizilir; kagitta en fazla 7 x 7 cm. A5'te satir basina 3
 goruntu 3 x 7 cm'ye sigmadigi icin hepsi ayni oranda kuculur (tek satirda ~3,7 cm,
 tarama + tasarim iki satirda ~3,1 cm); form yine tek A5 sayfaya sigar.
+
+V32 - CIKTIDA GORUNTULER:
+- Hekim portalda "Tasarim dosyasini ben gonderiyorum" secilince taramalar da
+  "Tasarim" turuyle kaydediliyordu ve ciktidan dusuyordu. Artik dosyanin gercek
+  boyutuna bakilir: tam cene buyuklugundeki model tarama, kron/kopru tasarim sayilir.
+- Goruntuler is forma yuklenir yuklenmez (Hekimden Gelenler'den aktarinca veya
+  Onaya Gonder'den sonra) hazirlanir ve formda ekranda da gorunur; Yazdir dugmesi
+  ya da Ctrl+P ile alinan ciktiya girer.
+- Bir dosya okunamazsa digerleri yine cizilir; kagitta tum ekli dosyalarin adlari yazar.
+- Notlar kagitta kaydirma cubugu olmadan tam basilir.

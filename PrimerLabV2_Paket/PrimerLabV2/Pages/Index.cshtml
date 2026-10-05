@@ -1053,7 +1053,7 @@
         .onz-dosya.secili{border-color:#93c5fd;background:#eff6ff}
         .onz-dosya span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
         .onz-dosya a{color:#1565c0;font-weight:900;text-decoration:none;white-space:nowrap}
-        .ref-stl{padding:10px 12px}.ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}.ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}.ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}.ref-stl img{width:100%;max-width:var(--stl-max,100%);aspect-ratio:1/1;object-fit:contain;height:auto;display:block;margin:0 auto}.ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}.ref-stl-ara{height:10px}.ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ref-stl{padding:10px 12px}.ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}.ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}.ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}.ref-stl img{width:100%;max-width:var(--stl-max,100%);aspect-ratio:1/1;object-fit:contain;height:auto;display:block;margin:0 auto}.ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}.ref-stl-ara{height:10px}.ref-stl-dosyalar{font-size:9.5px;color:#334155;margin-top:8px;line-height:1.45;word-break:break-word}.ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .ref-order-paper{max-width:760px;margin:0 auto;background:#fff;border:1px solid #dbe3ef;box-shadow:0 8px 28px rgba(15,23,42,.08);padding:24px}
         .ref-order-brand{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:20px;border-bottom:2px solid #172033;padding-bottom:14px;margin-bottom:14px}
         .ref-order-logo{font-size:34px;font-weight:1000;letter-spacing:-2px;text-align:center;color:#0b1d36}
@@ -1211,7 +1211,7 @@
             body.print-a5 .ref-order-paper,
             body.print-a5 .ref-order-paper *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
             body.print-a5 .ref-order-paper .ref-box{break-inside:avoid}
-            body.print-a5 .ref-order-paper textarea{resize:none}
+            body.print-a5 .ref-order-paper textarea{resize:none;overflow:hidden!important}
             /* Yalnız ekranda işe yarayan öğeler kâğıda basılmaz: "+ Kalem Ekle", para birimi açıklaması,
                kalem silme düğmesi; açılır liste okları ve tarih alanının takvim simgesi. */
             body.print-a5 .ref-order-paper .ref-add-line,
@@ -13143,6 +13143,7 @@
                 anayasaYazdirIsId = portalAktarimiydi ? anayasaAktarilanPortalSiparisId : Number(sonuc?.siparisler?.[0]?.id || sonuc?.aktarilanSiparisId || 0) || null;
                 anayasaAktarilanPortalSiparisId = null;
                 anayasaFormOnayaGonderildi = true;
+                if (anayasaYazdirIsId && stlHazirIsId !== Number(anayasaYazdirIsId)) stlGorselleriArkada(anayasaYazdirIsId);
                 if (anMailKaynakId) {
                     const idler = (sonuc?.siparisler || []).map(x => Number(x.id)).filter(Boolean);
                     if (!idler.length && anayasaYazdirIsId) idler.push(Number(anayasaYazdirIsId));
@@ -13314,6 +13315,8 @@
             anayasaFormButonDurumu();
             window.scrollTo({top:0,behavior:"smooth"});
             showSuccess("Portal işi Sipariş Formuna aktarıldı. Kontrol edip onaya gönder.");
+            // Hekimin eklediği tarama/tasarım dosyaları formda hemen görünsün (çıktıya da girer).
+            stlGorselleriArkada(Number(x.id));
         }
 
         function renderAnayasaOnay() {
@@ -13811,7 +13814,16 @@
         // Dosya adından tanınır (upper/üst/maxilla, lower/alt/mandible, bite/kapanış). Taramalar kapanış
         // konumunda gelmediyse (ayrı ayrı dışa aktarılmış) iki çene kesici uçları ve orta hatları
         // hizalanıp dişler temas edecek şekilde üst üste oturtulur.
-        function stlGorselAlaniTemizle(){ const k=document.getElementById('anStlGorseller'); if(k){ k.innerHTML=''; k.style.display='none'; } }
+        // Görüntüler iş forma yüklenince hazırlanır (ekranda da görünür); yazdırırken aynı iş için yeniden çizilmez.
+        var stlHazirIsId=null, stlHazirlaniyor=null;
+        function stlGorselAlaniTemizle(){ stlHazirIsId=null; const k=document.getElementById('anStlGorseller'); if(k){ k.innerHTML=''; k.style.display='none'; } }
+        function stlGorselleriArkada(isId){
+            if(!isId) return Promise.resolve();
+            stlHazirlaniyor=stlGorselleriHazirla(isId).then(()=>{ stlHazirIsId=Number(isId); })
+                .catch(e=>{ console.warn('Tarama görüntüleri hazırlanamadı',e); showError('Tarama/tasarım görüntüleri hazırlanamadı: '+(e.message||e)); })
+                .finally(()=>{ stlHazirlaniyor=null; });
+            return stlHazirlaniyor;
+        }
         function stlTurBul(ad){
             const a=String(ad||'').toLocaleLowerCase('tr').replace(/ü/g,'u').replace(/ı/g,'i').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ö/g,'o');
             if(/(bite|kapanis|occlus|okluz|buccal|bukkal|registr)/.test(a)) return 'kapanis';
@@ -13984,17 +13996,36 @@
             const kutu=document.getElementById('anStlGorseller'); if(!kutu) return;
             stlGorselAlaniTemizle();
             const r=await fetch('/api/is-dosyalari/siparis/'+Number(isId),{cache:'no-store'}); if(!r.ok) return;
-            const tumu=(await r.json()).filter(f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||''));
-            const dosyalar=tumu.filter(f=>(f.dosyaTuru||'')!=='Tasarım');
-            const tasarimDosyalari=tumu.filter(f=>(f.dosyaTuru||'')==='Tasarım').slice(0,8);
-            if(!dosyalar.length && !tasarimDosyalari.length) return;
+            const tumDosyalar=await r.json();
+            const tumu=tumDosyalar.filter(f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||''));
+            // Görüntü çizilemeyen dosyalar da kâğıtta adıyla görünsün.
+            const dosyaListesi=()=>tumDosyalar.length?`<div class="ref-stl-dosyalar"><b>Ekli dosyalar:</b> ${tumDosyalar.map(f=>escapeHtml(f.orijinalDosyaAdi)+(f.dosyaTuru&&f.dosyaTuru!=='Diger'?' ('+escapeHtml(f.dosyaTuru)+')':'')).join(' · ')}</div>`:'';
+            if(!tumu.length){ if(tumDosyalar.length){ kutu.innerHTML=dosyaListesi(); kutu.style.display='block'; } return; }
+            // Tüm modeller önce okunur; tür etiketine değil gerçek boyuta bakılır: hekim "tasarımı ben
+            // gönderiyorum" seçtiğinde ağız içi taramalar da "Tasarım" türüyle kaydedilir. Tam çene büyüklüğündeki
+            // model (en uzun kenar ≥ 35 mm) tarama, kron/köprü gibi küçük parçalar tasarım sayılır.
+            const hatalar=[];
+            const yuklu=[];
+            for(const f of tumu.slice(0,12)){
+                try{
+                    const m=await stlHamMesh(Number(f.id)), p=m.p, a=[Infinity,Infinity,Infinity], b=[-Infinity,-Infinity,-Infinity];
+                    for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<a[k])a[k]=p[i+k]; if(p[i+k]>b[k])b[k]=p[i+k]; }
+                    yuklu.push({f,m,boy:Math.max(b[0]-a[0],b[1]-a[1],b[2]-a[2])});
+                }catch(e){ console.warn(e); hatalar.push(f.orijinalDosyaAdi+': '+(e.message||e)); }
+            }
+            // Gerçek taramalar (tarama türlü) zaten iki çeneyi karşılıyorsa büyük "Tasarım" dosyası tam çene tasarımıdır.
+            const gercekTarama=yuklu.filter(x=>(x.f.dosyaTuru||'')!=='Tasarım').length;
+            const tasarimMi=x=>(x.f.dosyaTuru||'')==='Tasarım' && (x.boy<35 || gercekTarama>=2);
+            const taramaYuklu=yuklu.filter(x=>!tasarimMi(x)), tasarimYuklu=yuklu.filter(tasarimMi);
+            const dosyalar=taramaYuklu.map(x=>x.f);
+            const meshBul=f=>yuklu.find(x=>x.f===f)?.m;
             showSuccess('Tarama ve tasarım görüntüleri hazırlanıyor...');
             const tur={ust:null,alt:null,kapanis:null}, diger=[];
             for(const f of dosyalar){ const t=stlTurBul(f.orijinalDosyaAdi); if(t && !tur[t]) tur[t]=f; else diger.push(f); }
             // Adı tanınmayan dosyalar sırayla boş yerlere (üst, alt) yerleşir; ad yine altta yazar.
             for(const f of diger){ if(!tur.ust) tur.ust=f; else if(!tur.alt) tur.alt=f; }
             const mesh={};
-            for(const k of ['ust','alt','kapanis']) if(tur[k]){ try{ mesh[k]=await stlHamMesh(Number(tur[k].id)); }catch(e){ console.warn(e); } }
+            for(const k of ['ust','alt','kapanis']) if(tur[k]) mesh[k]=meshBul(tur[k]);
             const merkez=m=>{ const p=m.p; let c=[0,0,0]; for(let i=0;i<p.length;i+=3){ c[0]+=p[i]; c[1]+=p[i+1]; c[2]+=p[i+2]; } return stlV.sc(c,3/p.length); };
             const sinir=m=>{ const p=m.p, a=[Infinity,Infinity,Infinity], b=[-Infinity,-Infinity,-Infinity]; for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<a[k])a[k]=p[i+k]; if(p[i+k]>b[k])b[k]=p[i+k]; } return {a,b}; };
             const mU=mesh.ust?merkez(mesh.ust):null, mA=mesh.alt?merkez(mesh.alt):null;
@@ -14003,9 +14034,10 @@
             const kapanisKonumu=!!(eu&&ea) && stlKapanisKonumunda(mesh.ust,eu,mesh.alt,ea);
             if(eu&&ea&&!kapanisKonumu){ eu=stlCeneEksen(mesh.ust); ea=stlCeneEksen(mesh.alt); }
             const resimler=[];
+            const guvenli=(ad,f)=>{ try{ return f(); }catch(e){ console.warn(e); hatalar.push(ad+': '+(e.message||e)); return null; } };
             // Tepeden (okluzal) görünüm, kesici dişler yukarıda.
-            if(mesh.ust){ resimler.push({ad:'ÜST ÇENE',dosya:tur.ust.orijinalDosyaAdi,src:stlCizer.ciz([{m:mesh.ust,renk:STL_RENK_UST}],stlV.sc(eu.dik,-1),eu.der)}); }
-            if(mesh.alt){ resimler.push({ad:'ALT ÇENE',dosya:tur.alt.orijinalDosyaAdi,src:stlCizer.ciz([{m:mesh.alt,renk:STL_RENK_ALT}],stlV.sc(ea.dik,-1),ea.der)}); }
+            if(mesh.ust){ resimler.push({ad:'ÜST ÇENE',dosya:tur.ust.orijinalDosyaAdi,src:guvenli('Üst çene',()=>stlCizer.ciz([{m:mesh.ust,renk:STL_RENK_UST}],stlV.sc(eu.dik,-1),eu.der))}); }
+            if(mesh.alt){ resimler.push({ad:'ALT ÇENE',dosya:tur.alt.orijinalDosyaAdi,src:guvenli('Alt çene',()=>stlCizer.ciz([{m:mesh.alt,renk:STL_RENK_ALT}],stlV.sc(ea.dik,-1),ea.der))}); }
             let onYukari=null, onIleri=null;
             if(mesh.ust && mesh.alt){
                 // Kapanış: iki çene dişleri birbirine oturmuş, önden; üst çene yukarıda.
@@ -14027,7 +14059,8 @@
             // ---- Tasarım dosyaları: tarama ile aynı koordinatlardaysa kendi çenesinin üzerinde, değilse tek başına.
             const tasarimResimleri=[];
             const tMesh=[];
-            for(const f of tasarimDosyalari){ try{ tMesh.push({f,m:await stlHamMesh(Number(f.id))}); }catch(e){ console.warn(e); } }
+            try{
+            tasarimYuklu.slice(0,8).forEach(x=>tMesh.push({f:x.f,m:x.m}));
             if(tMesh.length){
                 const cene={ust:[],alt:[]}, serbest=[];
                 const kutuU=mesh.ust?sinir(mesh.ust):null, kutuA=mesh.alt?sinir(mesh.alt):null;
@@ -14076,11 +14109,13 @@
                     if(yer>=2) tasarimResimleri.push({ad:'TASARIM · YANDAN',dosya:adlar(serbest),src:stlCizer.ciz(parca(serbest),yan,ust)});
                 }
             }
+            }catch(e){ console.warn(e); hatalar.push('Tasarım: '+(e.message||e)); }
 
             const gecerli=resimler.filter(x=>x.src), tGecerli=tasarimResimleri.filter(x=>x.src);
-            if(!gecerli.length && !tGecerli.length) return;
+            if(hatalar.length) showError('Bazı dosyaların görüntüsü çizilemedi: '+hatalar.join(' | '));
+            if(!gecerli.length && !tGecerli.length){ kutu.innerHTML=dosyaListesi(); kutu.style.display=tumDosyalar.length?'block':'none'; return; }
             const satir=(baslik,l)=>l.length?`<div class="ref-stl-baslik">${baslik}</div><div class="ref-stl-izgara" style="--stl-adet:3">`+l.map(x=>`<figure><img src="${x.src}" alt="${escapeHtml(x.ad)}" /><figcaption>${escapeHtml(x.ad)}<small>${escapeHtml(x.dosya||'')}</small></figcaption></figure>`).join('')+'</div>':'';
-            kutu.innerHTML=satir('TARAMA GÖRÜNTÜLERİ',gecerli)+(gecerli.length&&tGecerli.length?'<div class="ref-stl-ara"></div>':'')+satir('TASARIM GÖRÜNTÜLERİ',tGecerli);
+            kutu.innerHTML=satir('TARAMA GÖRÜNTÜLERİ',gecerli)+(gecerli.length&&tGecerli.length?'<div class="ref-stl-ara"></div>':'')+satir('TASARIM GÖRÜNTÜLERİ',tGecerli)+dosyaListesi();
             kutu.style.display='block';
             // Resimler yüklenmeden ölçü alınmasın.
             await Promise.all([...kutu.querySelectorAll('img')].map(i=>i.complete?null:new Promise(ok=>{i.onload=ok;i.onerror=ok;})));
@@ -16103,9 +16138,11 @@
             if(!paper){ window.print(); return; }
             // Hekimin yüklediği taramalar (üst çene / alt çene / kapanış) forma resim olarak eklenir.
             if(anayasaYazdirIsId){
-                try{ await stlGorselleriHazirla(anayasaYazdirIsId); }
-                catch(e){ console.warn('Tarama görüntüleri hazırlanamadı', e); }
+                if(stlHazirlaniyor) await stlHazirlaniyor;
+                if(stlHazirIsId!==Number(anayasaYazdirIsId)) await stlGorselleriArkada(anayasaYazdirIsId);
             }
+            // Notlar kâğıtta kaydırma çubuğuyla kesilmesin: alan içeriğe göre uzatılır.
+            paper.querySelectorAll('textarea').forEach(t=>{ t.dataset.eskiYukseklik=t.style.height||''; t.style.height=Math.max(t.offsetHeight,t.scrollHeight+4)+'px'; });
 
             // Çıktı, ekrandaki formun birebir aynısı olarak tek bir A5 (148 x 210 mm) dikey
             // sayfaya basılır: form ekrandaki genişliğini korur, yalnız orantılı küçültülür.
@@ -16141,6 +16178,7 @@
                 paper.style.removeProperty('--a5-zoom');
                 paper.style.removeProperty('--a5-width');
                 document.getElementById('anStlGorseller')?.style.removeProperty('--stl-max');
+                paper.querySelectorAll('textarea').forEach(t=>{ t.style.height=t.dataset.eskiYukseklik||''; });
                 document.getElementById('a5YazdirmaSayfasi')?.remove();
                 window.removeEventListener('afterprint',temizle);
             };
