@@ -503,11 +503,11 @@ public sealed class MailIntegrationService
                     await db.Database.ExecuteSqlInterpolatedAsync($"""
                         UPDATE "MailGelenler"
                         SET "Dosyalar"={JsonSerializer.Serialize(savedFiles)},
-                            "IncelemeGerekli"=CASE WHEN {ekNotu} IS NULL THEN "IncelemeGerekli" ELSE true END,
+                            "IncelemeGerekli"=CASE WHEN {ekNotu}::text IS NULL THEN "IncelemeGerekli" ELSE true END,
                             "Notlar"=CASE
-                                WHEN {ekNotu} IS NULL THEN "Notlar"
-                                WHEN COALESCE("Notlar",'')='' THEN {ekNotu}
-                                ELSE "Notlar" || E'\n' || {ekNotu}
+                                WHEN {ekNotu}::text IS NULL THEN "Notlar"
+                                WHEN COALESCE("Notlar",'')='' THEN {ekNotu}::text
+                                ELSE "Notlar" || E'\n' || {ekNotu}::text
                             END
                         WHERE "Id"={mailId}
                         """, runToken);
