@@ -185,14 +185,18 @@ public sealed class MailIntegrationController : ControllerBase
     {
         take = Math.Clamp(take, 1, 500);
         var d = durum is "bekleyen" or "aktarilan" ? durum : "";
+        try
+        {
         var rows = await _db.Database.SqlQuery<MailListRow>($"""
             SELECT
-                m."Id",m."Tarih",m."Gonderen",m."Konu",m."HekimId",
-                h."AdSoyad" AS "HekimAdi",h."KlinikAdi",
-                m."HastaAdi",m."IsTuru",m."DisRengi",m."Materyal",m."Notlar",
-                m."Klinik",m."UyeSayisi",m."DisNo",m."ReferansKodu",
-                m."MesajId",m."Dosyalar",m."WetransferLinkleri",
-                m."AnalizKaynagi",m."Guven",m."IncelemeGerekli",m."Aktarildi",
+                -- Türler açıkça belirtilir: tablo eski bir sürümde farklı türlerle oluşturulmuş olsa da liste okunur.
+                m."Id"::int AS "Id",m."Tarih"::timestamptz AS "Tarih",m."Gonderen"::text AS "Gonderen",m."Konu"::text AS "Konu",m."HekimId"::int AS "HekimId",
+                h."AdSoyad"::text AS "HekimAdi",h."KlinikAdi"::text AS "KlinikAdi",
+                m."HastaAdi"::text AS "HastaAdi",m."IsTuru"::text AS "IsTuru",m."DisRengi"::text AS "DisRengi",m."Materyal"::text AS "Materyal",m."Notlar"::text AS "Notlar",
+                m."Klinik"::text AS "Klinik",CASE WHEN m."UyeSayisi"::text ~ '^\s*[0-9]+\s*$' AND length(btrim(m."UyeSayisi"::text)) < 7 THEN btrim(m."UyeSayisi"::text)::int END AS "UyeSayisi",m."DisNo"::text AS "DisNo",m."ReferansKodu"::text AS "ReferansKodu",
+                m."MesajId"::text AS "MesajId",m."Dosyalar"::text AS "Dosyalar",m."WetransferLinkleri"::text AS "WetransferLinkleri",
+                m."AnalizKaynagi"::text AS "AnalizKaynagi",CASE WHEN m."Guven"::text ~ '^\s*-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?\s*$' THEN btrim(m."Guven"::text)::float8 END AS "Guven",
+                COALESCE(m."IncelemeGerekli"::boolean,false) AS "IncelemeGerekli",COALESCE(m."Aktarildi"::boolean,false) AS "Aktarildi",
                 (SELECT COUNT(*)::int FROM "MailDosyalari" f WHERE f."MailId"=m."Id") AS "DosyaSayisi"
             FROM "MailGelenler" m
             LEFT JOIN "Hekimler" h ON h."Id"=m."HekimId"
@@ -210,13 +214,19 @@ public sealed class MailIntegrationController : ControllerBase
             """).ToListAsync();
 
         return Ok(rows);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Genel "500" yerine gerçek neden gösterilir (destek için).
+            return StatusCode(StatusCodes.Status500InternalServerError, "Mail listesi okunamadı: " + ex.GetBaseException().Message);
+        }
     }
 
     [HttpGet("mail/{id:int}/files")]
     public async Task<IActionResult> Files(int id)
     {
         var rows = await _db.Database.SqlQuery<MailFileListRow>($"""
-            SELECT "Id","MailId","DosyaAdi","Boyut","MimeType"
+            SELECT "Id"::int AS "Id","MailId"::int AS "MailId",COALESCE("DosyaAdi"::text,'dosya') AS "DosyaAdi",COALESCE("Boyut"::bigint,0) AS "Boyut",COALESCE("MimeType"::text,'application/octet-stream') AS "MimeType"
             FROM "MailDosyalari"
             WHERE "MailId"={id}
             ORDER BY "Id"
@@ -229,7 +239,7 @@ public sealed class MailIntegrationController : ControllerBase
     public async Task<IActionResult> Download(int mailId, int fileId, CancellationToken cancellationToken)
     {
         var row = await _db.Database.SqlQuery<MailFileListRow>($"""
-            SELECT "Id","MailId","DosyaAdi","Boyut","MimeType"
+            SELECT "Id"::int AS "Id","MailId"::int AS "MailId",COALESCE("DosyaAdi"::text,'dosya') AS "DosyaAdi",COALESCE("Boyut"::bigint,0) AS "Boyut",COALESCE("MimeType"::text,'application/octet-stream') AS "MimeType"
             FROM "MailDosyalari"
             WHERE "Id"={fileId} AND "MailId"={mailId}
             """).FirstOrDefaultAsync(cancellationToken);
@@ -259,7 +269,7 @@ public sealed class MailIntegrationController : ControllerBase
             return NotFound("Mail kaydı bulunamadı.");
 
         var files = await _db.Database.SqlQuery<MailFileListRow>($"""
-            SELECT "Id","MailId","DosyaAdi","Boyut","MimeType"
+            SELECT "Id"::int AS "Id","MailId"::int AS "MailId",COALESCE("DosyaAdi"::text,'dosya') AS "DosyaAdi",COALESCE("Boyut"::bigint,0) AS "Boyut",COALESCE("MimeType"::text,'application/octet-stream') AS "MimeType"
             FROM "MailDosyalari"
             WHERE "MailId"={mailId}
             ORDER BY "Id"
@@ -377,16 +387,19 @@ public sealed class MailIntegrationController : ControllerBase
     public async Task<IActionResult> Detay(int id, CancellationToken ct)
     {
         var m = await _db.Database.SqlQuery<MailDetaySatiri>($"""
-            SELECT m."Id", m."Tarih", m."Gonderen", m."Konu", left(COALESCE(m."Gövde",''), 30000) AS "Govde",
-                   m."HekimId", h."AdSoyad" AS "HekimAdi", m."Klinik", m."HastaAdi", m."IsTuru", m."DisRengi", m."Materyal",
-                   m."Notlar", m."UyeSayisi", m."DisNo", m."ReferansKodu", m."WetransferLinkleri", m."AnalizKaynagi",
-                   m."Guven", COALESCE(m."IncelemeGerekli",false) AS "IncelemeGerekli", m."Aktarildi"
+            SELECT m."Id"::int AS "Id", m."Tarih"::timestamptz AS "Tarih", m."Gonderen"::text AS "Gonderen", m."Konu"::text AS "Konu",
+                   left(COALESCE(m."Gövde"::text,''), 30000) AS "Govde",
+                   m."HekimId"::int AS "HekimId", h."AdSoyad"::text AS "HekimAdi", m."Klinik"::text AS "Klinik", m."HastaAdi"::text AS "HastaAdi",
+                   m."IsTuru"::text AS "IsTuru", m."DisRengi"::text AS "DisRengi", m."Materyal"::text AS "Materyal",
+                   m."Notlar"::text AS "Notlar", CASE WHEN m."UyeSayisi"::text ~ '^\s*[0-9]+\s*$' AND length(btrim(m."UyeSayisi"::text)) < 7 THEN btrim(m."UyeSayisi"::text)::int END AS "UyeSayisi", m."DisNo"::text AS "DisNo", m."ReferansKodu"::text AS "ReferansKodu",
+                   m."WetransferLinkleri"::text AS "WetransferLinkleri", m."AnalizKaynagi"::text AS "AnalizKaynagi",
+                   CASE WHEN m."Guven"::text ~ '^\s*-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?\s*$' THEN btrim(m."Guven"::text)::float8 END AS "Guven", COALESCE(m."IncelemeGerekli"::boolean,false) AS "IncelemeGerekli", COALESCE(m."Aktarildi"::boolean,false) AS "Aktarildi"
             FROM "MailGelenler" m LEFT JOIN "Hekimler" h ON h."Id"=m."HekimId"
             WHERE m."Id"={id}
             """).FirstOrDefaultAsync(ct);
         if (m == null) return NotFound("Mail bulunamadı.");
         var dosyalar = await _db.Database.SqlQuery<MailFileListRow>($"""
-            SELECT "Id","MailId","DosyaAdi","Boyut",COALESCE("MimeType",'application/octet-stream') AS "MimeType"
+            SELECT "Id"::int AS "Id","MailId"::int AS "MailId",COALESCE("DosyaAdi"::text,'dosya') AS "DosyaAdi",COALESCE("Boyut"::bigint,0) AS "Boyut",COALESCE("MimeType"::text,'application/octet-stream') AS "MimeType"
             FROM "MailDosyalari" WHERE "MailId"={id} ORDER BY "Id"
             """).ToListAsync(ct);
         return Ok(new { mail = m, dosyalar });
@@ -420,7 +433,7 @@ public sealed class MailIntegrationController : ControllerBase
             """).ToListAsync(ct);
         if (mevcut.Count == 0) return NotFound("Sipariş bulunamadı.");
         var dosyalar = await _db.Database.SqlQuery<MailFileListRow>($"""
-            SELECT "Id","MailId","DosyaAdi","Boyut",COALESCE("MimeType",'application/octet-stream') AS "MimeType"
+            SELECT "Id"::int AS "Id","MailId"::int AS "MailId",COALESCE("DosyaAdi"::text,'dosya') AS "DosyaAdi",COALESCE("Boyut"::bigint,0) AS "Boyut",COALESCE("MimeType"::text,'application/octet-stream') AS "MimeType"
             FROM "MailDosyalari" WHERE "MailId"={id} ORDER BY "Id"
             """).ToListAsync(ct);
 
