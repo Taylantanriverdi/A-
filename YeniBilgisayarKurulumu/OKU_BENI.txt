@@ -160,21 +160,22 @@ kez calistirilmis olmali; bu bilgisayar ve Primer Lab acik kalmalidir.
 
 OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
 ------------------------------------------------------------------------
-1. Ayarlar > "Otomatik Yazdirma": "Acik" isaretleyin, kopya sayisini ve
-   hangi kaynaklardan gelen islerin basilacagini secin (varsayilan: Hekim
-   Portali), Kaydet'e basin.
-2. Masaustundeki "Primer Lab Yazici Istasyonu" kisayolunu acin
-   (C:\PrimerLab\PrimerLab_YaziciIstasyonu.bat). Ilk acilista yonetici
-   sifresini bir kez girin; bu pencere icin 1 yil hatirlanir.
-3. Bu pencere ACIK kalmalidir (simge durumuna kucultulebilir). Program
-   Baslat ile acildiginda, ozellik aciksa istasyon da kendiliginden acilir.
+1. Ayarlar > "Otomatik Yazdirma": "Otomatik yazdirma acik" kutusunu
+   isaretleyin, kopya sayisini ve hangi islerin basilacagini secin
+   (varsayilan: Hekimden gelen), Kaydet'e basin. Baska bir sey gerekmez.
+2. Primer Lab, sessiz yazdiran "Yazici Istasyonu" penceresini KENDISI acar
+   (sifre sormaz). Pencere kapanirsa yaklasik 1-2 dakikada yeniden acar.
+   Pencereyi kucultebilirsiniz.
+- Ayarlar ekraninda sag ustte "Istasyon acik" yazmalidir. Yazmiyorsa
+  "Istasyonu Simdi Ac" dugmesine ya da masaustundeki "Primer Lab Yazici
+  Istasyonu" kisayoluna basin.
 - Hekim isi gonderdiginde en gec ~10 saniye icinde siparis formu (ekli tarama
   ve tasarim gorselleriyle) Windows'un VARSAYILAN yazicisindan, hicbir sey
   sormadan cikar. Yazici secimi Windows Ayarlari > Yazicilar'dan yapilir.
 - Ozellik acilmadan once gelen isler basilmaz; bir is iki kez basilmaz.
-- Ayarlar > Otomatik Yazdirma'da son basilanlar listelenir; "Tekrar yazdir"
-  ile bir is yeniden bastirilabilir. Istasyon durumu (cevrimici/kapali) da
-  orada gorunur.
+- Normal tarayicida acilan istasyon sekmesi is basmaz (yazdirma penceresi
+  cikmasin diye); yalniz programin actigi pencere basar.
+- "Son baskilar" listesinde "Tekrar yazdir" ile bir is yeniden bastirilir.
 - Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
 
 DOSYA SIMGELERI VE 3B ONIZLEME

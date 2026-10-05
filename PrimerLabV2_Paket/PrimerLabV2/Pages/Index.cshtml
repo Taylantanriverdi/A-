@@ -4800,11 +4800,12 @@
                     </div>
                     <div class="button-group" style="margin-top:12px;flex-wrap:wrap">
                         <button class="button button-blue" type="button" onclick="oyKaydet()">Kaydet</button>
-                        <button class="button button-light" type="button" onclick="window.open('/?istasyon=1','primerIstasyon')" title="Bu tarayıcıda açılırsa her baskıda yazdırma penceresi sorulur">İstasyonu bu tarayıcıda aç (deneme)</button>
+                        <button class="button button-light" type="button" onclick="oyIstasyonAc()">🖨️ İstasyonu Şimdi Aç</button>
                     </div>
                     <div class="oy-not">
-                        <b>Sessiz baskı için:</b> masaüstündeki <b>"Primer Lab Yazıcı İstasyonu"</b> kısayolunu (ya da <code>C:\PrimerLab\PrimerLab_YaziciIstasyonu.bat</code>) açın. Edge ayrı bir pencerede sessiz yazdırma kipinde açılır; yönetici şifresini bir kez girin (bir yıl hatırlanır). Pencere açık kaldıkça yeni işler Windows'un <b>varsayılan yazıcısından</b> otomatik çıkar. Otomatik yazdırma açıksa istasyon Primer Lab ile birlikte kendiliğinden açılır. Özellik açıldığı andan önceki işler basılmaz.
+                        <b>Nasıl çalışır:</b> Otomatik yazdırma açıkken Primer Lab, sessiz yazdıran <b>"Yazıcı İstasyonu"</b> penceresini <b>kendisi açar</b> (şifre sormaz) ve kapanırsa yeniden açar. Yeni işler Windows'un <b>varsayılan yazıcısından</b> sorulmadan çıkar. Pencereyi küçültebilirsiniz. Özellik açıldığı andan önceki işler basılmaz.
                     </div>
+                    <div id="oyHata" class="oy-not" style="display:none;background:#fef2f2;border-color:#fecaca;color:#991b1b;margin-top:8px"></div>
                     <div id="oySonlar" style="margin-top:12px"></div>
                 </div>
 
@@ -14584,6 +14585,8 @@
                 document.getElementById("oyKaynaklar").innerHTML=(d.secilebilirKaynaklar||[]).map(k=>`<label><input type="checkbox" value="${escapeHtml(k)}" ${(d.kaynaklar||[]).includes(k)?"checked":""}/> ${escapeHtml(k==="Hekim Portalı"?"Hekimden gelen (Hekim Portalı)":k==="Teknisyen Paneli"?"Teknisyenin açtığı":"Laboratuvarın kendi formları")}</label>`).join("");
                 const st=document.getElementById("oyIstasyon");
                 st.innerText=d.istasyonCevrimici?"● İstasyon açık":"○ İstasyon kapalı"; st.style.background=d.istasyonCevrimici?"#dcfce7":"#fef3c7"; st.style.color=d.istasyonCevrimici?"#15803d":"#92400e";
+                if(!d.istasyonCevrimici && d.aktif){ st.innerText=d.istasyonHata?"⚠ İstasyon açılamadı":"○ İstasyon açılıyor..."; }
+                const oyH=document.getElementById("oyHata"); if(oyH){ oyH.style.display=d.istasyonHata&&!d.istasyonCevrimici?"block":"none"; oyH.innerText=d.istasyonHata||""; }
                 st.title=d.istasyonSonSinyal?"Son bağlantı: "+tarihSaatGoster(d.istasyonSonSinyal):"İstasyon hiç bağlanmadı";
                 document.getElementById("oySonlar").innerHTML=(d.sonBasilanlar||[]).length?'<div style="font-weight:900;font-size:12px;color:#64748b;margin-bottom:4px">SON BASKILAR</div>'+d.sonBasilanlar.map(x=>`<div class="oy-satir"><span>${x.basarili?"✓":"✕"} #${Number(x.id)} ${escapeHtml(x.hastaAdi||"")} · ${escapeHtml(x.hekimAdi||"")} <small class="ops-mini">${tarihSaatGoster(x.tarih)}${x.hata&&x.hata!=="tekrar"?" · "+escapeHtml(x.hata):x.hata==="tekrar"?" · tekrar sırada":""}</small></span><button class="button button-light" type="button" onclick="oyTekrar(${Number(x.id)})">Tekrar yazdır</button></div>`).join(""):'<div class="ops-mini">Henüz otomatik baskı yapılmadı.</div>';
             }catch(e){ showError(e.message||"Otomatik yazdırma ayarları alınamadı."); }
@@ -14596,6 +14599,9 @@
                 showSuccess(document.getElementById("oyAktif").checked?"Otomatik yazdırma açıldı. Bundan sonra gelen işler yazıcı istasyonundan çıkar.":"Otomatik yazdırma kapatıldı.");
                 oyYukle();
             }catch(e){ showError(e.message); }
+        }
+        async function oyIstasyonAc(){
+            try{ const r=await fetch("/api/otomatik-yazdir/istasyon-baslat",{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); setTimeout(oyYukle,8000); }catch(e){ showError(e.message); }
         }
         async function oyTekrar(id){
             try{ const r=await fetch("/api/otomatik-yazdir/tekrar/"+Number(id),{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); oyYukle(); }catch(e){ showError(e.message); }
@@ -14649,12 +14655,16 @@
             }
         }
         async function istasyonTur(){
-            if(istasyonMesgul) return; istasyonMesgul=true;
+            // Yazdırırken de "çalışıyorum" sinyali (program ikinci pencere açmasın).
+            if(istasyonMesgul){ fetch("/api/otomatik-yazdir/sinyal",{method:"POST"}).catch(()=>{}); return; }
+            istasyonMesgul=true;
             try{
                 const r=await fetch("/api/otomatik-yazdir/bekleyen",{cache:"no-store"});
-                if(r.status===401){ istasyonDurum("Oturum kapandı — sayfa yenilenip şifre sorulacak","hata"); setTimeout(()=>location.reload(),5000); return; }
+                // Oturum düştüyse (ör. şifre değişti) bu pencere kapanır; program yenisini şifresiz açar.
+                if(r.status===401){ istasyonDurum("Oturum kapandı — pencere yenileniyor","hata"); setTimeout(()=>{ window.close(); setTimeout(()=>location.reload(),3000); },3000); return; }
                 if(!r.ok) throw new Error(await r.text());
                 const d=await r.json();
+                if(d.istasyonDegil){ istasyonDurum("Bu pencere sessiz yazdırma penceresi değil; iş basmaz. Kapatabilirsiniz — Primer Lab istasyonu kendisi açar.","kapali"); return; }
                 if(!d.aktif && !d.isler.length){ istasyonDurum("Otomatik yazdırma KAPALI (Ayarlar > Otomatik Yazdırma)","kapali"); }
                 else istasyonDurum(d.isler.length?d.isler.length+" iş yazdırılacak...":"Hazır — yeni iş bekleniyor · bugün basılan: "+istasyonSayac,"ok");
                 for(const id of d.isler) await istasyonBas(Number(id),Number(d.kopya||1));

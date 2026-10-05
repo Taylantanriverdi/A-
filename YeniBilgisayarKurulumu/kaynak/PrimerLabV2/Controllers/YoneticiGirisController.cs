@@ -51,7 +51,28 @@ public sealed class YoneticiGirisController : ControllerBase
         _giris.HatalariTemizle();
         // Yazıcı istasyonu (sürekli açık, sessiz yazdırma penceresi) bir yıl hatırlanır.
         _giris.OturumAc(HttpContext, dto.Hatirla, dto.Istasyon ? TimeSpan.FromDays(365) : null);
+        if (dto.Istasyon) YaziciIstasyonuServisi.IstasyonIsaretle(HttpContext);
         return Ok(new { message = "Giriş yapıldı." });
+    }
+
+    // Programın kendi açtığı yazıcı istasyonu penceresi: tek kullanımlık anahtarla, şifre sormadan girer.
+    [HttpGet("istasyon")]
+    public IActionResult Istasyon([FromQuery] string? jeton, [FromServices] YaziciIstasyonuServisi istasyon)
+    {
+        if (!GuvenlikController.AnaBilgisayar(HttpContext) || !_giris.Kurulu || !istasyon.JetonKullan(jeton))
+            return Redirect("/giris?r=" + Uri.EscapeDataString("/?istasyon=1"));
+        _giris.OturumAc(HttpContext, true, TimeSpan.FromDays(365));
+        YaziciIstasyonuServisi.IstasyonIsaretle(HttpContext);
+        return Redirect("/?istasyon=1");
+    }
+
+    // Masaüstü kısayolu (PrimerLab_YaziciIstasyonu.bat) istasyonu programa açtırır.
+    [HttpPost("istasyon-ac")]
+    public IActionResult IstasyonAc([FromServices] YaziciIstasyonuServisi istasyon)
+    {
+        if (!GuvenlikController.AnaBilgisayar(HttpContext)) return GuvenlikController.Yasak();
+        var hata = istasyon.Baslat();
+        return hata == null ? Ok(new { message = "Yazıcı istasyonu açıldı." }) : BadRequest(hata);
     }
 
     [HttpPost("cikis")]

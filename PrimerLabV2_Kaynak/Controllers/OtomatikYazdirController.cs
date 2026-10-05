@@ -12,11 +12,13 @@ public sealed class OtomatikYazdirController : ControllerBase
 {
     private readonly OtomatikYazdirma _oy;
     private readonly PrimerLabDbContext _db;
+    private readonly YaziciIstasyonuServisi _istasyon;
 
-    public OtomatikYazdirController(OtomatikYazdirma oy, PrimerLabDbContext db)
+    public OtomatikYazdirController(OtomatikYazdirma oy, PrimerLabDbContext db, YaziciIstasyonuServisi istasyon)
     {
         _oy = oy;
         _db = db;
+        _istasyon = istasyon;
     }
 
     [HttpGet("ayarlar")]
@@ -36,6 +38,8 @@ public sealed class OtomatikYazdirController : ControllerBase
             a.Aktif, a.Kopya, a.Kaynaklar, a.BaslangicTarihi,
             secilebilirKaynaklar = OtomatikYazdirma.SecilebilirKaynaklar,
             istasyonCevrimici = d.Cevrimici, istasyonSonSinyal = d.Son, sonHata = d.SonHata,
+            istasyonHata = _istasyon.SonHata,
+            otomatikAcilir = YaziciIstasyonuServisi.TarayiciBul() != null,
             sonBasilanlar = sonlar.Select(x =>
             {
                 var i = adlar.FirstOrDefault(y => y.Id == x.Id);
@@ -48,6 +52,8 @@ public sealed class OtomatikYazdirController : ControllerBase
     public async Task<IActionResult> AyarKaydet([FromBody] OtomatikYazdirDto dto, CancellationToken ct)
     {
         _oy.Kaydet(dto.Aktif, dto.Kopya, dto.Kaynaklar);
+        // Açılınca istasyon beklemeden açılır (kullanıcının kısayolu açması gerekmez).
+        if (dto.Aktif && !_oy.IstasyonDurumu().Cevrimici && GuvenlikController.AnaBilgisayar(HttpContext)) _istasyon.BaslatGerekirse();
         return await Ayarlar(ct);
     }
 
@@ -55,8 +61,10 @@ public sealed class OtomatikYazdirController : ControllerBase
     [HttpGet("bekleyen")]
     public async Task<IActionResult> Bekleyen(CancellationToken ct)
     {
-        _oy.Sinyal();
         var a = _oy.Oku();
+        if (!YaziciIstasyonuServisi.IstasyonMu(HttpContext))
+            return Ok(new { aktif = a.Aktif, kopya = a.Kopya, isler = Array.Empty<int>(), istasyonDegil = true });
+        _oy.Sinyal();
         var tekrar = _oy.TekrarIstenenler();
         if (!a.Aktif && tekrar.Count == 0) return Ok(new { aktif = false, kopya = a.Kopya, isler = Array.Empty<int>() });
         var bas = a.BaslangicTarihi ?? DateTime.UtcNow;
@@ -83,6 +91,22 @@ public sealed class OtomatikYazdirController : ControllerBase
         if (dto.Id <= 0) return BadRequest();
         _oy.BasildiKaydet(dto.Id, dto.Basarili, dto.Hata is { Length: > 300 } h ? h[..300] : dto.Hata);
         return Ok();
+    }
+
+    /// <summary>İstasyon iş yazdırırken de "çalışıyorum" sinyali verir (program ikinci pencere açmasın).</summary>
+    [HttpPost("sinyal")]
+    public IActionResult Sinyal()
+    {
+        if (YaziciIstasyonuServisi.IstasyonMu(HttpContext)) _oy.Sinyal();
+        return Ok();
+    }
+
+    [HttpPost("istasyon-baslat")]
+    public IActionResult IstasyonBaslat()
+    {
+        if (!GuvenlikController.AnaBilgisayar(HttpContext)) return GuvenlikController.Yasak();
+        var hata = _istasyon.Baslat();
+        return hata == null ? Ok(new { message = "Yazıcı istasyonu açılıyor; birkaç saniye içinde \"İstasyon açık\" görünür." }) : BadRequest(hata);
     }
 
     [HttpPost("tekrar/{id:int}")]
