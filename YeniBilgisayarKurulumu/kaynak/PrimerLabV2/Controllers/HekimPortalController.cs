@@ -770,10 +770,13 @@ public sealed class HekimPortalController : ControllerBase
         if (!Request.Cookies.TryGetValue("primer_teknisyen", out var cerez) || string.IsNullOrWhiteSpace(cerez))
             return (0, "", Unauthorized("Teknisyen oturumu bulunamadı. Teknisyen Paneli'nden giriş yapın."));
         int tekId;
+        var yonetici = false;
         try
         {
             using var belge = JsonDocument.Parse(_teknisyenProtector.Unprotect(cerez));
             tekId = belge.RootElement.GetProperty("TeknisyenId").GetInt32();
+            // Yönetici, ana programdan bu teknisyenin paneline girdiyse (yönetici görünümü).
+            yonetici = belge.RootElement.TryGetProperty("Yonetici", out var y) && y.ValueKind == JsonValueKind.True;
             if (belge.RootElement.GetProperty("Bitis").GetDateTime() <= DateTime.UtcNow)
                 return (0, "", Unauthorized("Teknisyen oturumu sona erdi."));
         }
@@ -782,13 +785,15 @@ public sealed class HekimPortalController : ControllerBase
             return (0, "", Unauthorized("Teknisyen oturumu geçersiz."));
         }
         var hesap = _teknisyenHesaplari.Getir(tekId);
-        if (hesap == null || !hesap.Aktif) return (0, "", Unauthorized("Teknisyen hesabı pasif."));
-        if (hesap.Tip != TeknisyenHesapDeposu.Ic)
+        // Yönetici görünümünde panel hesabı olmayan ya da pasif hesaplı teknisyen adına da form açılır.
+        if (!yonetici && (hesap == null || !hesap.Aktif))
+            return (0, "", Unauthorized("Teknisyenin panel hesabı pasif. Laboratuvardan hesabın açılmasını isteyin."));
+        if ((hesap?.Tip ?? TeknisyenHesapDeposu.Ic) != TeknisyenHesapDeposu.Ic)
             return (0, "", StatusCode(StatusCodes.Status403Forbidden, "Sipariş formunu yalnız iç teknisyenler açabilir."));
         var ad = await _db.Database.SqlQuery<string>($"""
-            SELECT "AdSoyad" AS "Value" FROM "Teknisyenler" WHERE "Id"={tekId} AND COALESCE("Aktif",true)=true
+            SELECT "AdSoyad" AS "Value" FROM "Teknisyenler" WHERE "Id"={tekId} AND (COALESCE("Aktif",true)=true OR {yonetici})
             """).FirstOrDefaultAsync(cancellationToken);
-        return ad == null ? (0, "", Unauthorized("Teknisyen hesabı pasif.")) : (tekId, ad, null);
+        return ad == null ? (0, "", Unauthorized("Teknisyen kaydı pasif. Teknisyenler ekranından aktif yapın.")) : (tekId, ad, null);
     }
 
     // Hekim Portalı ve iç teknisyen sipariş formunun ortak kaydı: fiyat hekimin listesinden alınır,
