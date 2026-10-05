@@ -319,6 +319,8 @@ copy /Y "%KIT%PrimerLab_Baslat.bat" "%HEDEF%\PrimerLab_Baslat.bat" >nul
 copy /Y "%KIT%PrimerLab_Durdur.bat" "%HEDEF%\PrimerLab_Durdur.bat" >nul
 copy /Y "%KIT%PORTAL_INTERNET_AC.bat" "%HEDEF%\PORTAL_INTERNET_AC.bat" >nul
 copy /Y "%KIT%PrimerLab_SifreSifirla.bat" "%HEDEF%\PrimerLab_SifreSifirla.bat" >nul
+copy /Y "%KIT%PrimerLab_YaziciIstasyonu.bat" "%HEDEF%\PrimerLab_YaziciIstasyonu.bat" >nul
+powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Primer Lab Yazici Istasyonu.lnk'); $s.TargetPath='%HEDEF%\PrimerLab_YaziciIstasyonu.bat'; $s.WorkingDirectory='%HEDEF%'; $s.WindowStyle=7; $s.IconLocation='%SystemRoot%\System32\shell32.dll,16'; $s.Save()"
 powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Primer Lab.lnk'); $s.TargetPath='%HEDEF%\PrimerLab_Baslat.bat'; $s.WorkingDirectory='%HEDEF%'; $s.WindowStyle=7; $s.IconLocation='%SystemRoot%\System32\shell32.dll,13'; $s.Save()"
 rem Hekim Portali ayni Wi-Fi'deki cihazlardan acilabilsin (yalniz "Ozel" ag profili).
 netsh advfirewall firewall delete rule name="Primer Lab 5169" >nul 2>&1

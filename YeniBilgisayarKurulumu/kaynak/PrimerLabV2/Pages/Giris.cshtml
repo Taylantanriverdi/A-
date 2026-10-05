@@ -244,7 +244,7 @@
         e.preventDefault(); const b = $("gBtn");
         if (!$("gSifre").value) { mesaj("Şifrenizi yazın."); return; }
         b.disabled = true; b.textContent = "Giriş yapılıyor..."; mesaj("");
-        try { await post("giris", { parola: $("gSifre").value, hatirla: $("gHatirla").checked }); location.replace(hedef()); }
+        try { await post("giris", { parola: $("gSifre").value, hatirla: $("gHatirla").checked, istasyon: hedef().includes("istasyon=1") }); location.replace(hedef()); }
         catch (err) { mesaj(err.message); $("gSifre").select(); b.disabled = false; b.textContent = "Giriş Yap"; }
     }
     async function kurtar(e) {
@@ -256,6 +256,10 @@
         } catch (err) { mesaj(err.message); b.disabled = false; }
     }
 
+    if (hedef().includes("istasyon=1")) {
+        document.querySelector("#ekranGiris h1").textContent = "Yazıcı istasyonu girişi";
+        document.querySelector("#ekranGiris .aciklama").textContent = "Otomatik yazdırma penceresi için yönetici şifresini bir kez girin; bu pencere bir yıl hatırlanır.";
+    }
     (async function basla() {
         kuralCiz("k"); kuralCiz("r");
         try {

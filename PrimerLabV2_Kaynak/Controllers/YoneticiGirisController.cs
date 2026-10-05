@@ -49,7 +49,8 @@ public sealed class YoneticiGirisController : ControllerBase
             return Unauthorized("Şifre hatalı.");
         }
         _giris.HatalariTemizle();
-        _giris.OturumAc(HttpContext, dto.Hatirla);
+        // Yazıcı istasyonu (sürekli açık, sessiz yazdırma penceresi) bir yıl hatırlanır.
+        _giris.OturumAc(HttpContext, dto.Hatirla, dto.Istasyon ? TimeSpan.FromDays(365) : null);
         return Ok(new { message = "Giriş yapıldı." });
     }
 
@@ -117,4 +118,5 @@ public sealed class YoneticiSifreDto
     public string? YeniParolaTekrar { get; set; }
     public string? KurtarmaKodu { get; set; }
     public bool Hatirla { get; set; }
+    public bool Istasyon { get; set; }
 }

@@ -71,6 +71,9 @@ if not "%DERLEME%"=="0" goto GERI_AL
 
 copy /Y "%KIT%PORTAL_INTERNET_AC.bat" "%HEDEF%\PORTAL_INTERNET_AC.bat" >nul 2>&1
 copy /Y "%KIT%PrimerLab_SifreSifirla.bat" "%HEDEF%\PrimerLab_SifreSifirla.bat" >nul 2>&1
+copy /Y "%KIT%PrimerLab_YaziciIstasyonu.bat" "%HEDEF%\PrimerLab_YaziciIstasyonu.bat" >nul 2>&1
+copy /Y "%KIT%PrimerLab_Baslat.bat" "%HEDEF%\PrimerLab_Baslat.bat" >nul 2>&1
+powershell -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\Primer Lab Yazici Istasyonu.lnk'); $s.TargetPath='%HEDEF%\PrimerLab_YaziciIstasyonu.bat'; $s.WorkingDirectory='%HEDEF%'; $s.WindowStyle=7; $s.IconLocation='%SystemRoot%\System32\shell32.dll,16'; $s.Save()" >nul 2>&1
 echo [4/4] Primer Lab baslatiliyor...
 rem Program yonetici olarak degil, normal kullanici yetkisiyle baslatilir.
 explorer.exe "%HEDEF%\PrimerLab_Baslat.bat"

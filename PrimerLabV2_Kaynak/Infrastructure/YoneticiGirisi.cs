@@ -139,11 +139,15 @@ public sealed class YoneticiGirisi
 
     // ------------------------------------------------------------------ oturum
 
-    public void OturumAc(HttpContext ctx, bool hatirla)
+    public void OturumAc(HttpContext ctx, bool hatirla) => OturumAc(ctx, hatirla, null);
+
+    /// <summary>sure: yazıcı istasyonu gibi sürekli açık pencereler için daha uzun oturum.</summary>
+    public void OturumAc(HttpContext ctx, bool hatirla, TimeSpan? sure)
     {
         string damga;
         lock (_kilit) damga = Oku()?.Damga ?? "";
-        var bitis = DateTime.UtcNow + (hatirla ? HatirlaSuresi : OturumSuresi);
+        var bitis = DateTime.UtcNow + (sure ?? (hatirla ? HatirlaSuresi : OturumSuresi));
+        if (sure != null) hatirla = true;
         var deger = _koruma.Protect(JsonSerializer.Serialize(new Oturum { Bitis = bitis, Damga = damga }));
         ctx.Response.Cookies.Append(CerezAdi, deger, new CookieOptions
         {

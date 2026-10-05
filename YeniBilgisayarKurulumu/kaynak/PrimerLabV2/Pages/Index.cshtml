@@ -1063,6 +1063,23 @@
         .ref-firma-il{text-align:center;font-size:9.5px;color:#334155;margin-top:6px;line-height:1.45;font-weight:600}
         .ref-firma-alt{margin-top:10px;padding-top:6px;border-top:1px solid #cbd5e1;font-size:9.5px;color:#475569;text-align:center;white-space:pre-wrap}
         .sb-firma-logo{display:block;max-width:190px;max-height:56px;object-fit:contain;background:#fff;border-radius:8px;padding:4px;margin-bottom:8px}
+        .oy-izgara{display:grid;grid-template-columns:auto 160px 1fr;gap:12px 18px;align-items:end}
+        .oy-onay{display:flex;gap:8px;align-items:center;font-size:14px;padding-bottom:10px}
+        .oy-onay input{width:18px;height:18px}
+        .oy-kaynaklar{display:flex;gap:12px;flex-wrap:wrap;padding:8px 0}
+        .oy-kaynaklar label{display:flex;gap:6px;align-items:center;font-weight:700;font-size:13px}
+        .oy-kaynaklar input{width:auto}
+        .oy-not{margin-top:12px;padding:10px 12px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;font-size:12px;line-height:1.55;color:#334155}
+        .oy-satir{display:flex;justify-content:space-between;gap:10px;align-items:center;border-bottom:1px solid #f1f5f9;padding:6px 0;font-size:13px}
+        @@media(max-width:900px){.oy-izgara{grid-template-columns:1fr}}
+        /* Yazıcı istasyonu: durum paneli ekranı kaplar; form arkada yazdırılır, panel kâğıda çıkmaz. */
+        .istasyon-panel{position:fixed;inset:0;z-index:9500;background:#f3f6fb;display:flex;flex-direction:column;align-items:center;padding:30px 16px;font-family:inherit;overflow:auto}
+        .istasyon-kutu{background:#fff;border:1px solid #dbe3ef;border-radius:18px;padding:22px 26px;width:min(720px,100%);box-shadow:0 10px 30px rgba(16,35,62,.08)}
+        .istasyon-durum{font-size:15px;font-weight:900;margin:8px 0 14px}
+        .istasyon-durum.ok{color:#15803d}.istasyon-durum.kapali{color:#b45309}.istasyon-durum.hata{color:#dc2626}
+        .istasyon-log{max-height:60vh;overflow:auto;font-size:13px}
+        .istasyon-log div{padding:6px 0;border-bottom:1px solid #f1f5f9}
+        @@media print{.istasyon-panel{display:none!important}}
         .cikis-btn{margin-top:14px;border-top:1px solid rgba(255,255,255,.12)!important;padding-top:14px!important;color:#fca5a5!important}
         .ys-izgara{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 14px}
         .ys-kod{margin-top:12px;padding:12px 14px;border:2px dashed #94a3b8;border-radius:12px;background:#f8fafc;font-weight:700}
@@ -4768,6 +4785,29 @@
                     </div>
                 </div>
 
+                <div class="panel" style="padding:18px 20px;margin-bottom:16px" id="oyPanel">
+                    <div class="panel-header" style="padding:0;margin-bottom:12px">
+                        <div>
+                            <div class="panel-title">🖨️ Otomatik Yazdırma</div>
+                            <div class="page-subtitle">Hekim iş gönderince sipariş formu (tarama/tasarım görüntüleriyle) sormadan varsayılan yazıcıdan çıkar.</div>
+                        </div>
+                        <span id="oyIstasyon" class="status">Kontrol...</span>
+                    </div>
+                    <div class="oy-izgara">
+                        <label class="oy-onay"><input id="oyAktif" type="checkbox" /> <b>Otomatik yazdırma açık</b></label>
+                        <div class="form-group" style="margin:0"><label for="oyKopya">Kopya</label><select id="oyKopya"><option value="1">1 kopya</option><option value="2">2 kopya</option><option value="3">3 kopya</option></select></div>
+                        <div class="form-group" style="margin:0"><label>Hangi işler basılsın</label><div id="oyKaynaklar" class="oy-kaynaklar"></div></div>
+                    </div>
+                    <div class="button-group" style="margin-top:12px;flex-wrap:wrap">
+                        <button class="button button-blue" type="button" onclick="oyKaydet()">Kaydet</button>
+                        <button class="button button-light" type="button" onclick="window.open('/?istasyon=1','primerIstasyon')" title="Bu tarayıcıda açılırsa her baskıda yazdırma penceresi sorulur">İstasyonu bu tarayıcıda aç (deneme)</button>
+                    </div>
+                    <div class="oy-not">
+                        <b>Sessiz baskı için:</b> masaüstündeki <b>"Primer Lab Yazıcı İstasyonu"</b> kısayolunu (ya da <code>C:\PrimerLab\PrimerLab_YaziciIstasyonu.bat</code>) açın. Edge ayrı bir pencerede sessiz yazdırma kipinde açılır; yönetici şifresini bir kez girin (bir yıl hatırlanır). Pencere açık kaldıkça yeni işler Windows'un <b>varsayılan yazıcısından</b> otomatik çıkar. Otomatik yazdırma açıksa istasyon Primer Lab ile birlikte kendiliğinden açılır. Özellik açıldığı andan önceki işler basılmaz.
+                    </div>
+                    <div id="oySonlar" style="margin-top:12px"></div>
+                </div>
+
                 <div class="panel" style="padding:18px 20px;margin-bottom:16px">
                     <div class="panel-header" style="padding:0;margin-bottom:12px">
                         <div>
@@ -6495,6 +6535,7 @@
             if (id === "ayarlar") {
                 renderTeknisyenler();
                 yoneticiDurumYukle();
+                oyYukle();
             }
 
             if (id === "portalHesaplari") {
@@ -14532,6 +14573,105 @@
         }
 
         document.addEventListener("DOMContentLoaded", firmaUygula);
+
+        // ---------------- Otomatik yazdırma (ayarlar) ----------------
+        async function oyYukle(){
+            try{
+                const r=await fetch("/api/otomatik-yazdir/ayarlar",{cache:"no-store"}); if(!r.ok) throw new Error(await r.text());
+                const d=await r.json();
+                document.getElementById("oyAktif").checked=!!d.aktif;
+                document.getElementById("oyKopya").value=String(d.kopya||1);
+                document.getElementById("oyKaynaklar").innerHTML=(d.secilebilirKaynaklar||[]).map(k=>`<label><input type="checkbox" value="${escapeHtml(k)}" ${(d.kaynaklar||[]).includes(k)?"checked":""}/> ${escapeHtml(k==="Hekim Portalı"?"Hekimden gelen (Hekim Portalı)":k==="Teknisyen Paneli"?"Teknisyenin açtığı":"Laboratuvarın kendi formları")}</label>`).join("");
+                const st=document.getElementById("oyIstasyon");
+                st.innerText=d.istasyonCevrimici?"● İstasyon açık":"○ İstasyon kapalı"; st.style.background=d.istasyonCevrimici?"#dcfce7":"#fef3c7"; st.style.color=d.istasyonCevrimici?"#15803d":"#92400e";
+                st.title=d.istasyonSonSinyal?"Son bağlantı: "+tarihSaatGoster(d.istasyonSonSinyal):"İstasyon hiç bağlanmadı";
+                document.getElementById("oySonlar").innerHTML=(d.sonBasilanlar||[]).length?'<div style="font-weight:900;font-size:12px;color:#64748b;margin-bottom:4px">SON BASKILAR</div>'+d.sonBasilanlar.map(x=>`<div class="oy-satir"><span>${x.basarili?"✓":"✕"} #${Number(x.id)} ${escapeHtml(x.hastaAdi||"")} · ${escapeHtml(x.hekimAdi||"")} <small class="ops-mini">${tarihSaatGoster(x.tarih)}${x.hata&&x.hata!=="tekrar"?" · "+escapeHtml(x.hata):x.hata==="tekrar"?" · tekrar sırada":""}</small></span><button class="button button-light" type="button" onclick="oyTekrar(${Number(x.id)})">Tekrar yazdır</button></div>`).join(""):'<div class="ops-mini">Henüz otomatik baskı yapılmadı.</div>';
+            }catch(e){ showError(e.message||"Otomatik yazdırma ayarları alınamadı."); }
+        }
+        async function oyKaydet(){
+            const kaynaklar=[...document.querySelectorAll("#oyKaynaklar input:checked")].map(i=>i.value);
+            try{
+                const r=await fetch("/api/otomatik-yazdir/ayarlar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({aktif:document.getElementById("oyAktif").checked,kopya:Number(document.getElementById("oyKopya").value),kaynaklar})});
+                if(!r.ok) throw new Error(await r.text());
+                showSuccess(document.getElementById("oyAktif").checked?"Otomatik yazdırma açıldı. Bundan sonra gelen işler yazıcı istasyonundan çıkar.":"Otomatik yazdırma kapatıldı.");
+                oyYukle();
+            }catch(e){ showError(e.message); }
+        }
+        async function oyTekrar(id){
+            try{ const r=await fetch("/api/otomatik-yazdir/tekrar/"+Number(id),{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); oyYukle(); }catch(e){ showError(e.message); }
+        }
+
+        // ---------------- Yazıcı istasyonu (/?istasyon=1) ----------------
+        // Edge "--kiosk-printing" ile açıldığında window.print() pencere göstermeden varsayılan yazıcıya basar.
+        const ISTASYON=new URLSearchParams(location.search).get("istasyon")==="1";
+        let istasyonMesgul=false, istasyonSayac=0;
+        function istasyonLog(t,tur){
+            const l=document.getElementById("istasyonLog"); if(!l) return;
+            const d=document.createElement("div"); d.innerHTML=`<b>${new Date().toLocaleTimeString("tr-TR")}</b> · ${tur==="hata"?"⚠️ ":tur==="ok"?"🖨️ ":""}${escapeHtml(t)}`;
+            l.prepend(d); while(l.children.length>200) l.lastChild.remove();
+        }
+        function istasyonDurum(t,c){ const e=document.getElementById("istasyonDurum"); if(e){ e.innerText=t; e.className="istasyon-durum "+(c||""); } }
+        function istasyonBaskiBitti(){ return new Promise(res=>{ const t=setTimeout(res,10000); window.addEventListener("afterprint",()=>{ clearTimeout(t); setTimeout(res,600); },{once:true}); }); }
+        async function istasyonFormDoldur(x){
+            anayasaSiparisFormTemizle(true);
+            const hekim=document.getElementById("anHekim"); if(hekim) hekim.value=String(x.hekimId||"");
+            document.getElementById("anHasta").value=x.hastaAdi||"";
+            document.getElementById("anTermin").value=x.terminTarihi?String(x.terminTarihi).slice(0,10):"";
+            document.getElementById("anDisRengi").value=x.disRengi||"";
+            document.getElementById("anMateryal").value=x.materyal||"";
+            if(typeof anayasaMateryalRadioSync==="function") anayasaMateryalRadioSync();
+            document.getElementById("anNot").value=x.notlar||"";
+            anayasaSeciliDisler.clear();
+            String(x.disSemasi||"").split(",").map(v=>v.trim()).filter(Boolean).forEach(v=>anayasaSeciliDisler.add(v));
+            anayasaToothButtons();
+            await anayasaHekimDegisti();
+            const host=document.getElementById("anKalemler"); if(host) host.innerHTML="";
+            const kalemler=Array.isArray(x.kalemler)?x.kalemler:[];
+            kalemler.forEach(k=>anayasaKalemEkle({isTuru:k.isTuru||"",adet:Number(k.adet||1),birimFiyat:Number(k.birimFiyat||0),paraBirimi:x.paraBirimi||"TRY"}));
+            if(!kalemler.length) anayasaKalemEkle();
+            anayasaYazdirIsId=Number(x.id);
+            anayasaFormOnayaGonderildi=true;
+        }
+        async function istasyonBas(id,kopya){
+            await loadAnayasaData();
+            const x=anayasaIsler.find(i=>Number(i.id)===Number(id));
+            if(!x){ await fetch("/api/otomatik-yazdir/basildi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,basarili:false,hata:"İş bulunamadı"})}); istasyonLog("#"+id+" bulunamadı","hata"); return; }
+            istasyonDurum("Yazdırılıyor: #"+id+" "+(x.hastaAdi||""),"ok");
+            try{
+                await istasyonFormDoldur(x);
+                for(let k=0;k<Math.max(1,kopya);k++){ const bitti=istasyonBaskiBitti(); await anayasaSiparisYazdir(); await bitti; }
+                await fetch("/api/otomatik-yazdir/basildi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,basarili:true})});
+                istasyonSayac++;
+                istasyonLog(`#${id} ${x.hastaAdi||""} · ${x.hekimAdi||""} basıldı${kopya>1?" ("+kopya+" kopya)":""}`,"ok");
+            }catch(e){
+                await fetch("/api/otomatik-yazdir/basildi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,basarili:false,hata:String(e.message||e)})});
+                istasyonLog("#"+id+" basılamadı: "+(e.message||e),"hata");
+            }
+        }
+        async function istasyonTur(){
+            if(istasyonMesgul) return; istasyonMesgul=true;
+            try{
+                const r=await fetch("/api/otomatik-yazdir/bekleyen",{cache:"no-store"});
+                if(r.status===401){ istasyonDurum("Oturum kapandı — sayfa yenilenip şifre sorulacak","hata"); setTimeout(()=>location.reload(),5000); return; }
+                if(!r.ok) throw new Error(await r.text());
+                const d=await r.json();
+                if(!d.aktif && !d.isler.length){ istasyonDurum("Otomatik yazdırma KAPALI (Ayarlar > Otomatik Yazdırma)","kapali"); }
+                else istasyonDurum(d.isler.length?d.isler.length+" iş yazdırılacak...":"Hazır — yeni iş bekleniyor · bugün basılan: "+istasyonSayac,"ok");
+                for(const id of d.isler) await istasyonBas(Number(id),Number(d.kopya||1));
+                if(d.isler.length) istasyonDurum("Hazır — yeni iş bekleniyor · bugün basılan: "+istasyonSayac,"ok");
+            }catch(e){ istasyonDurum("Bağlantı hatası: "+(e.message||e),"hata"); }
+            finally{ istasyonMesgul=false; }
+        }
+        if(ISTASYON) document.addEventListener("DOMContentLoaded",()=>{
+            document.title="Yazıcı İstasyonu — "+((window.FIRMA||{}).ad||"Primer Lab");
+            const p=document.createElement("div"); p.className="istasyon-panel";
+            p.innerHTML=`<div class="istasyon-kutu"><div style="font-size:20px;font-weight:900">🖨️ Yazıcı İstasyonu</div>
+                <div class="ops-mini">${escapeHtml((window.FIRMA||{}).ad||"")} · Bu pencere açık kaldıkça hekimden gelen işler otomatik yazdırılır. Kapatmayın; küçültebilirsiniz.</div>
+                <div id="istasyonDurum" class="istasyon-durum">Başlatılıyor...</div>
+                <div style="font-weight:900;font-size:12px;color:#64748b;margin-bottom:4px">KAYIT</div><div id="istasyonLog" class="istasyon-log"></div></div>`;
+            document.body.appendChild(p);
+            setTimeout(()=>{ try{ showSection("siparisFormu"); }catch{} istasyonTur(); setInterval(istasyonTur,10000); },2500);
+        });
 
         // ---------------- Yönetici şifresi ----------------
         async function yoneticiCikis(){

@@ -21,4 +21,7 @@ if errorlevel 1 (
     exit /b 1
 )
 if /i not "%~1"=="sessiz" start "" "%URL%"
+rem Otomatik yazdirma aciksa yazici istasyonu da acilir.
+findstr /c:"\"Aktif\": true" "%UYGULAMA%\App_Data\otomatik-yazdir.json" >nul 2>&1
+if not errorlevel 1 if exist "C:\PrimerLab\PrimerLab_YaziciIstasyonu.bat" start "" /min cmd /c "C:\PrimerLab\PrimerLab_YaziciIstasyonu.bat"
 exit /b 0

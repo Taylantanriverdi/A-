@@ -158,6 +158,25 @@ Hekim ve teknisyenin internetten girebilmesi icin PORTAL_INTERNET_AC.bat bir
 kez calistirilmis olmali; bu bilgisayar ve Primer Lab acik kalmalidir.
 
 
+OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
+------------------------------------------------------------------------
+1. Ayarlar > "Otomatik Yazdirma": "Acik" isaretleyin, kopya sayisini ve
+   hangi kaynaklardan gelen islerin basilacagini secin (varsayilan: Hekim
+   Portali), Kaydet'e basin.
+2. Masaustundeki "Primer Lab Yazici Istasyonu" kisayolunu acin
+   (C:\PrimerLab\PrimerLab_YaziciIstasyonu.bat). Ilk acilista yonetici
+   sifresini bir kez girin; bu pencere icin 1 yil hatirlanir.
+3. Bu pencere ACIK kalmalidir (simge durumuna kucultulebilir). Program
+   Baslat ile acildiginda, ozellik aciksa istasyon da kendiliginden acilir.
+- Hekim isi gonderdiginde en gec ~10 saniye icinde siparis formu (ekli tarama
+  ve tasarim gorselleriyle) Windows'un VARSAYILAN yazicisindan, hicbir sey
+  sormadan cikar. Yazici secimi Windows Ayarlari > Yazicilar'dan yapilir.
+- Ozellik acilmadan once gelen isler basilmaz; bir is iki kez basilmaz.
+- Ayarlar > Otomatik Yazdirma'da son basilanlar listelenir; "Tekrar yazdir"
+  ile bir is yeniden bastirilabilir. Istasyon durumu (cevrimici/kapali) da
+  orada gorunur.
+- Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
+
 DOSYA SIMGELERI VE 3B ONIZLEME
 ------------------------------
 Is listelerinde (Devam Eden, Hekimden Gelenler, Onay, Dosyalar, Tamamlanan,
