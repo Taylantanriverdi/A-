@@ -1212,6 +1212,13 @@
             body.print-a5 .ref-order-paper *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
             body.print-a5 .ref-order-paper .ref-box{break-inside:avoid}
             body.print-a5 .ref-order-paper textarea{resize:none}
+            /* Yalnız ekranda işe yarayan öğeler kâğıda basılmaz: "+ Kalem Ekle", para birimi açıklaması,
+               kalem silme düğmesi; açılır liste okları ve tarih alanının takvim simgesi. */
+            body.print-a5 .ref-order-paper .ref-add-line,
+            body.print-a5 .ref-order-paper .ref-help,
+            body.print-a5 .ref-order-paper .an-kalem-sil{display:none!important}
+            body.print-a5 .ref-order-paper select{-webkit-appearance:none!important;appearance:none!important;background-image:none!important}
+            body.print-a5 .ref-order-paper input[type=date]::-webkit-calendar-picker-indicator{display:none!important}
             /* Diğer çıktı alanları (iş fişi, teslim fişi, günlük plan) sipariş formunun üstüne binmesin. */
             body.print-a5 .job-slip,
             body.print-a5 .delivery-slip{display:none!important}
@@ -16020,7 +16027,7 @@
                     <option value="USD"${currency==='USD'?' selected':''}>USD</option>
                 </select>
                 <div class="order-line-total" style="display:none">0</div>
-                <button type="button" title="Kalemi kaldır"
+                <button type="button" class="an-kalem-sil" title="Kalemi kaldır"
                         onclick="this.closest('.an-job-line').remove();anayasaKalemToplamGuncelle();">×</button>`;
             host.appendChild(row);
             if(!hasPrefill) anayasaAkilliAdetleriGuncelle();
