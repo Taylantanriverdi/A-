@@ -78,11 +78,13 @@ public sealed class IsAkisiController : ControllerBase
     // ------------------------------------------------------------------ okuma (fiyatsız)
 
     [HttpGet("isler")]
-    public async Task<IActionResult> Isler([FromQuery] int tamamlananGun = 60, CancellationToken ct = default)
+    public async Task<IActionResult> Isler([FromQuery] int tamamlananGun = 60, [FromQuery] bool tumu = false, CancellationToken ct = default)
     {
         if (Kullanici() == null) return Unauthorized("Giriş gerekli.");
         tamamlananGun = Math.Clamp(tamamlananGun, 1, 3650);
-        var sinir = DateTime.UtcNow.AddDays(-tamamlananGun);
+        // tumu=true: geçmişteki tüm sipariş formları (tamamlananlar dahil, tarih sınırı yok).
+        var sinir = tumu ? new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc) : DateTime.UtcNow.AddDays(-tamamlananGun);
+        var enFazla = tumu ? 20000 : 1500;
         var rows = await _db.Database.SqlQuery<IsAkisiSatiri>($"""
             SELECT s."Id",
                    COALESCE(ha."AdSoyad",'-') AS "HastaAdi",
@@ -101,7 +103,7 @@ public sealed class IsAkisiController : ControllerBase
             WHERE COALESCE(s."Silindi",false)=false
               AND (COALESCE(s."Durum",'')<>'Tamamlandı' OR COALESCE(s."TeslimTarihi",s."OlusturmaTarihi") >= {sinir} OR s."OlusturmaTarihi" >= {sinir})
             ORDER BY s."Id" DESC
-            LIMIT 1500
+            LIMIT {enFazla}
             """).ToListAsync(ct);
         var ids = rows.Select(x => x.Id).ToArray();
         var kalemler = ids.Length == 0 ? new List<IsAkisiKalemSatiri>() : await _db.Database.SqlQuery<IsAkisiKalemSatiri>($"""
@@ -214,11 +216,17 @@ public sealed class IsAkisiController : ControllerBase
             new { mesaj = dto.Mesaj, kanal = dto.Kanal == "teknisyen" ? "teknisyen" : "hekim", gonderenAdi = "Laboratuvar" }, ct);
 
     [HttpGet("dosya/{dosyaId:int}")]
-    public async Task<IActionResult> DosyaIndir(int dosyaId, CancellationToken ct)
+    public Task<IActionResult> DosyaIndir(int dosyaId, CancellationToken ct) => DosyaVekil($"/api/is-dosyalari/{dosyaId}/indir", ct);
+
+    /// <summary>STL/PLY/OBJ 3B önizleme verisi (ana programın sadeleştirilmiş modeli).</summary>
+    [HttpGet("dosya/{dosyaId:int}/onizleme")]
+    public Task<IActionResult> DosyaOnizleme(int dosyaId, CancellationToken ct) => DosyaVekil($"/api/is-dosyalari/{dosyaId}/onizleme", ct);
+
+    private async Task<IActionResult> DosyaVekil(string yol, CancellationToken ct)
     {
         if (Kullanici() == null) return Unauthorized("Giriş gerekli.");
         var http = IcIstemci();
-        var r = await http.GetAsync($"/api/is-dosyalari/{dosyaId}/indir", HttpCompletionOption.ResponseHeadersRead, ct);
+        var r = await http.GetAsync(yol, HttpCompletionOption.ResponseHeadersRead, ct);
         if (!r.IsSuccessStatusCode) return StatusCode((int)r.StatusCode, await r.Content.ReadAsStringAsync(ct));
         var ad = r.Content.Headers.ContentDisposition?.FileNameStar ?? r.Content.Headers.ContentDisposition?.FileName?.Trim('"') ?? "dosya";
         HttpContext.Response.RegisterForDispose(r);

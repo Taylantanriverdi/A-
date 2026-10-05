@@ -617,7 +617,7 @@
 
     // ---------- Oturum ----------
     function girisEkrani() {
-        if (TEK) { tekHata("Teknisyen oturumu sona erdi. Teknisyen Paneli'nden tekrar giriş yapın."); return; }
+        if (TEK) { tekHata(DON_AD + " oturumu sona erdi. " + DON_AD + "'nden tekrar giriş yapın."); return; }
         $("appScreen").classList.add("hidden");
         pkEkran("login");
         setTimeout(() => $("loginUser").focus(), 50);
@@ -880,18 +880,22 @@
 
     // ---------- İç teknisyen modu (/hekim-portal?mod=teknisyen) ----------
     // Teknisyen Paneli oturumuyla girilir; hekim seçilir, form aynı, kayıt laboratuvar onayına düşer.
-    const TEK = new URLSearchParams(location.search).get("mod") === "teknisyen";
+    // ?mod=akis: İş Akışı Paneli'nden laboratuvar personeli açar (fiyatsız form; iş onaylı kaydedilir).
+    const AKIS = new URLSearchParams(location.search).get("mod") === "akis";
+    const TEK = AKIS || new URLSearchParams(location.search).get("mod") === "teknisyen";
+    const TEK_Q = AKIS ? "mod=akis&" : "";
+    const DON_ADRES = AKIS ? "/is-akisi" : "/teknisyen", DON_AD = AKIS ? "İş Akışı Paneli" : "Teknisyen Paneli";
     let tekHekimler = [];
     function tekHata(metin) {
         $("loginScreen").classList.add("hidden"); $("kayitScreen").classList.add("hidden"); $("sifreScreen").classList.add("hidden");
         $("appScreen").classList.add("hidden");
-        document.body.insertAdjacentHTML("beforeend", `<section class="login"><div class="login-card"><h1>Sipariş formu açılamadı</h1><div class="msg err">${esc(metin)}</div><a class="btn btn-block" style="display:grid;place-items:center;text-decoration:none" href="/teknisyen">Teknisyen Paneli'ne dön</a></div></section>`);
+        document.body.insertAdjacentHTML("beforeend", `<section class="login"><div class="login-card"><h1>Sipariş formu açılamadı</h1><div class="msg err">${esc(metin)}</div><a class="btn btn-block" style="display:grid;place-items:center;text-decoration:none" href="${DON_ADRES}">${DON_AD}'ne dön</a></div></section>`);
     }
     async function tekBasla() {
         let d;
         try {
-            const r = await fetch("/api/hekim-portal/teknisyen/hekimler", { cache: "no-store", credentials: "same-origin" });
-            if (!r.ok) { tekHata((await r.text()) || "Teknisyen Paneli'nden giriş yapın."); return; }
+            const r = await fetch("/api/hekim-portal/teknisyen/hekimler?" + TEK_Q, { cache: "no-store", credentials: "same-origin" });
+            if (!r.ok) { tekHata((await r.text()) || (DON_AD + "'nden giriş yapın.")); return; }
             d = await r.json();
         } catch { tekHata("Bağlantı kurulamadı."); return; }
         tekHekimler = d.hekimler || [];
@@ -899,7 +903,7 @@
         document.querySelector("#appScreen .brand-sub").textContent = "SİPARİŞ FORMU";
         document.querySelector("#appScreen .tabs").classList.add("hidden");
         $("whoName").textContent = (d.teknisyen && d.teknisyen.adSoyad) || "";
-        $("whoClinic").innerHTML = '<a class="link-btn" href="/teknisyen">← Teknisyen Paneli</a>';
+        $("whoClinic").innerHTML = `<a class="link-btn" href="${DON_ADRES}">← ${DON_AD}</a>`;
         document.querySelector("#appScreen .who > button").classList.add("hidden");
         $("tekHekimKart").classList.remove("hidden");
         $("gonderBtn").textContent = "Siparişi Kaydet";
@@ -927,7 +931,7 @@
         const id = Number($("tekHekim").value || 0);
         isTurleri = [];
         if (id) {
-            try { const d = await api("/api/hekim-portal/teknisyen/me?hekimId=" + id); isTurleri = (d.isTurleri || []).map(x => x.isTuru).filter(Boolean); }
+            try { const d = await api("/api/hekim-portal/teknisyen/me?" + TEK_Q + "hekimId=" + id); isTurleri = (d.isTurleri || []).map(x => x.isTuru).filter(Boolean); }
             catch (err) { mesaj("formMsg", err.message); }
         }
         $("listeYokMsg").textContent = "Bu hekime tanımlı iş listesi yok. Ana programda Hekimler > Fiyat Listesi'nden tanımlanmalı.";
@@ -1231,7 +1235,7 @@
         bar.classList.remove("hidden"); ic.style.width = "0%";
 
         const xhr = new XMLHttpRequest();
-        xhr.open("POST", TEK ? "/api/hekim-portal/teknisyen/jobs?hekimId=" + Number($("tekHekim").value) : "/api/hekim-portal/jobs");
+        xhr.open("POST", TEK ? "/api/hekim-portal/teknisyen/jobs?" + TEK_Q + "hekimId=" + Number($("tekHekim").value) : "/api/hekim-portal/jobs");
         xhr.withCredentials = true;
         xhr.upload.onprogress = ev => {
             if (!ev.lengthComputable) return;
@@ -1242,12 +1246,12 @@
         const bitir = () => { btn.disabled = false; btn.textContent = TEK ? "Siparişi Kaydet" : "Laboratuvara Gönder"; bar.classList.add("hidden"); };
         xhr.onload = () => {
             bitir();
-            if (xhr.status === 401 && TEK) { mesaj("formMsg", "Teknisyen oturumu sona erdi. Başka sekmede Teknisyen Paneli'ne giriş yapıp Kaydet'e tekrar basın; form duruyor."); return; }
+            if (xhr.status === 401 && TEK) { mesaj("formMsg", DON_AD + " oturumu sona erdi. Başka sekmede " + DON_AD + "'ne giriş yapıp Kaydet'e tekrar basın; form duruyor."); return; }
             if (xhr.status === 401) { girisEkrani(); mesaj("loginMsg", "Oturum sona erdi. Giriş yaptıktan sonra Gönder'e tekrar basın; formunuz duruyor."); return; }
             if (xhr.status === 413) { mesaj("formMsg", "Dosyalar çok büyük. ZIP yapıp küçültün veya ikiye bölerek gönderin."); return; }
             if (xhr.status < 200 || xhr.status >= 300) { mesaj("formMsg", xhr.responseText || ("Gönderilemedi (" + xhr.status + ")")); return; }
             let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
-            $("gonderildiMsg").textContent = (TEK ? "#" + (d.siparisIds || [d.siparisId]).join(", #") + " numaralı sipariş açıldı; laboratuvarın Onay Bekleyen listesine düştü." : (d.message || "İş laboratuvara gönderildi.")) + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "") + (d.linkSayisi ? " " + d.linkSayisi + " link eklendi." : "");
+            $("gonderildiMsg").textContent = (AKIS ? "#" + (d.siparisIds || [d.siparisId]).join(", #") + " numaralı sipariş açıldı ve onaylandı; İş Akışı Paneli'nde 'Bekliyor' sütununda." : TEK ? "#" + (d.siparisIds || [d.siparisId]).join(", #") + " numaralı sipariş açıldı; laboratuvarın Onay Bekleyen listesine düştü." : (d.message || "İş laboratuvara gönderildi.")) + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "") + (d.linkSayisi ? " " + d.linkSayisi + " link eklendi." : "");
             $("isFormu").classList.add("hidden");
             $("gonderildi").classList.remove("hidden");
             kalemler = []; dosyalar = []; $("linkInput").value = "";

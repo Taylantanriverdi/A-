@@ -226,6 +226,16 @@ IS AKISI PANELI (fiyatsiz is takibi - sekreter / is takipcisi icin)
 - Is kartina tiklayinca: onayla/reddet, durum degistir, teknisyen ata,
   tamamlamayi onayla, dosya indir, linkler, hekime/teknisyene mesaj, fiyatsiz
   siparis formu yazdir.
+- Tamamlanan isler panoda gosterilmez; ustteki "Tamamlananlar" dugmesiyle
+  ayri listede acilir.
+- "Siparis Formlari": gecmiste acilmis tum siparis formlari (tamamlananlar
+  dahil); hasta/hekim/is no ile arama, durum, kaynak ve tarih araligi suzgeci;
+  her satirdan fiyatsiz form yazdirilir.
+- "+ Yeni Siparis": panelden manuel siparis formu acar (hekim secilir; fiyat
+  hekimin fiyat listesinden ana programda hesaplanir, panelde gorunmez).
+  Kaydedilen is onayli olarak "Bekliyor" sutununa duser.
+- Is detayinda STL/PLY/OBJ dosyasinin uzerine fareyle gelince 3B onizleme
+  acilir (kendiliginden doner, surukleyerek cevrilir).
 - FIYAT BILGISI HIC GOSTERILMEZ (sunucu fiyat alanlarini panele hic gondermez).
 - Ana programla ayni veritabanini kullanir; her degisiklik aninda iki tarafta
   da gorunur. Panel 30 saniyede bir kendini yeniler.

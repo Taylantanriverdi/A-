@@ -761,12 +761,22 @@ public sealed class HekimPortalController : ControllerBase
         if (tek.Error != null) return tek.Error;
         var aktif = await _db.Hekimler.AsNoTracking().AnyAsync(x => x.Id == hekimId && x.Aktif, cancellationToken);
         if (!aktif) return BadRequest("Hekim seçin.");
+        // İş Akışı Paneli'nden laboratuvar personeli açar: kaynak "Sipariş Formu (İş Akışı)", iş onaylı açılır.
+        if (tek.Id == 0) return await IsKaydet(hekimId, "Sipariş Formu (İş Akışı)", tek.Ad, payload, files, cancellationToken, akis: true);
         return await IsKaydet(hekimId, "Teknisyen Paneli", tek.Ad, payload, files, cancellationToken);
     }
 
     // Teknisyen Paneli çerezinden yalnız aktif İÇ teknisyen kabul edilir (dış teknisyen sipariş açamaz).
     private async Task<(int Id, string Ad, IActionResult? Error)> IcTeknisyen(CancellationToken cancellationToken)
     {
+        // İş Akışı Paneli (?mod=akis): panel kullanıcısı ya da yönetici; Id = 0 ile döner.
+        if (Request.Query["mod"] == "akis" || Request.Headers["X-Form-Kipi"] == "akis")
+        {
+            var akis = HttpContext.RequestServices.GetRequiredService<IsAkisiHesaplari>().OturumHesabi(HttpContext);
+            if (akis != null) return (0, akis.AdSoyad, null);
+            if (HttpContext.RequestServices.GetRequiredService<YoneticiGirisi>().OturumGecerli(HttpContext)) return (0, "Yönetici", null);
+            return (0, "", Unauthorized("İş Akışı Paneli oturumu bulunamadı. Panele tekrar giriş yapın."));
+        }
         if (!Request.Cookies.TryGetValue("primer_teknisyen", out var cerez) || string.IsNullOrWhiteSpace(cerez))
             return (0, "", Unauthorized("Teknisyen oturumu bulunamadı. Teknisyen Paneli'nden giriş yapın."));
         int tekId;
@@ -799,7 +809,7 @@ public sealed class HekimPortalController : ControllerBase
     // Hekim Portalı ve iç teknisyen sipariş formunun ortak kaydı: fiyat hekimin listesinden alınır,
     // iş "Gelen Onay" olarak laboratuvar onayına düşer.
     private async Task<IActionResult> IsKaydet(
-        int hekimId, string kaynak, string? teknisyenAdi, string payload, List<IFormFile>? files, CancellationToken cancellationToken)
+        int hekimId, string kaynak, string? teknisyenAdi, string payload, List<IFormFile>? files, CancellationToken cancellationToken, bool akis = false)
     {
         PortalNewJobDto dto;
         try
@@ -869,11 +879,11 @@ public sealed class HekimPortalController : ControllerBase
         var toothText = string.Join(",", teeth);
         var notes = Normalize(dto.Notlar, 4000);
         var jobNotes = Normalize(BuildJobNotes(dto, cleanItems.Select(x => (x.Price.IsTuru, x.Dto)).ToList(), notes,
-            teknisyenAdi != null ? "[Teknisyen Paneli — " + teknisyenAdi + "]" : "[Hekim Portalı]"), 8000);
+            akis ? "[İş Akışı Paneli — " + teknisyenAdi + "]" : teknisyenAdi != null ? "[Teknisyen Paneli — " + teknisyenAdi + "]" : "[Hekim Portalı]"), 8000);
         var designSource = dto.TasarimKaynagi == "doctor" ? "doctor" : "lab";
         var portalSubmissionId = Guid.NewGuid();
         var hekimAdiKayit = await _db.Hekimler.AsNoTracking().Where(x => x.Id == hekimId).Select(x => x.AdSoyad).FirstOrDefaultAsync(cancellationToken) ?? "Hekim";
-        var yukleyenTipi = teknisyenAdi != null ? "Teknisyen" : "Hekim";
+        var yukleyenTipi = akis ? "Laboratuvar" : teknisyenAdi != null ? "Teknisyen" : "Hekim";
         var yukleyenAdi = teknisyenAdi != null ? teknisyenAdi + " (" + hekimAdiKayit + " adına)" : hekimAdiKayit;
         var savedPaths = new List<string>();
         var createdJobIds = new List<int>();
@@ -925,7 +935,7 @@ public sealed class HekimPortalController : ControllerBase
                         await _db.Database.ExecuteSqlInterpolatedAsync($"""
                             UPDATE "Siparisler"
                             SET
-                                "OnayDurumu"='Gelen Onay',
+                                "OnayDurumu"={(akis ? "Onaylandı" : "Gelen Onay")},
                                 "Kaynak"={kaynak},
                                 "TerminTarihi"={termin},
                                 "DisRengi"={Normalize(dto.DisRengi,50)},
@@ -939,10 +949,11 @@ public sealed class HekimPortalController : ControllerBase
                             WHERE "Id"={siparis.Id}
                             """, cancellationToken);
 
-                        var gonderen = teknisyenAdi != null
+                        var gonderen = akis ? $"İş Akışı Paneli'nden {teknisyenAdi} tarafından açıldı (onaylı)"
+                            : teknisyenAdi != null
                             ? $"Teknisyen Paneli'nden {teknisyenAdi} tarafından açıldı"
                             : "Hekim Portalı üzerinden gönderildi";
-                        var splitNote = currencyGroups.Count > 1
+                        var splitNote = akis ? gonderen : currencyGroups.Count > 1
                             ? $"{gonderen}; tek talep, muhasebe için {currency} grubuna ayrıldı. Gelen İş Onayı bekliyor."
                             : $"{gonderen}; Gelen İş Onayı bekliyor.";
 
@@ -989,7 +1000,7 @@ public sealed class HekimPortalController : ControllerBase
         return Ok(new
         {
             linkSayisi = linkler.Count,
-            message = createdJobIds.Count > 1
+            message = akis ? "Sipariş açıldı ve onaylandı." : createdJobIds.Count > 1
                 ? "İş laboratuvara gönderildi. Farklı muhasebe para birimleri ana sistemde otomatik olarak ayrı iş kayıtlarına ayrıldı."
                 : "İş laboratuvara gönderildi ve Gelen İş Onayı kuyruğuna eklendi.",
             siparisId = createdJobIds.FirstOrDefault(),
