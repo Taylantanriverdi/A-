@@ -1040,6 +1040,8 @@
         .dsimge{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle;flex-wrap:nowrap}
         .dsb{border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;border-radius:7px;padding:1px 6px;font-size:11px;font-weight:900;cursor:pointer;line-height:18px;white-space:nowrap}
         .dsb:hover{filter:brightness(.95);box-shadow:0 0 0 2px rgba(4,120,87,.15)}
+        .tech-gir{margin-left:8px;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;background:#eef2ff;color:#3730a3;font-size:15px;cursor:pointer;flex-shrink:0}
+        .tech-gir:hover{background:#c7d2fe}
         .dsb.dsb-link{background:#ede9fe;color:#5b21b6;border-color:#ddd6fe}
         .link-satir{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;background:#fff}
         .link-satir a:not(.button){word-break:break-all;color:#1d4ed8;text-decoration:none}
@@ -13644,6 +13646,7 @@
                     <span class="tech-avatar">${escapeHtml(String(name).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('tr-TR'))}</span>
                     <span class="tech-person"><strong>${escapeHtml(name)}</strong><small class="${t.aktif===false?'tech-passive':''}">${t.aktif===false?'Pasif':'● Aktif'}</small></span>
                     <span class="tech-row-numbers"><b>${active}</b><small>aktif iş</small></span>
+                    <span class="tech-gir" role="button" tabindex="0" title="${escapeHtml(name)} paneline gir (yeni sekme)" onclick="event.stopPropagation();teknisyenPaneleGir(${id})">👁</span>
                 </button>`;
             }).join("");
             if(techCenterSelectedId&&!list.some(x=>Number(x.id)===techCenterSelectedId))techCenterSelectedId=0;
@@ -13660,7 +13663,7 @@
             const rows=active.slice(0,8).map(x=>`<tr><td>#${Number(x.id)}</td><td><b>${escapeHtml(x.hekimAdi||'-')}</b><div class="ops-mini">${escapeHtml(x.hastaAdi||'-')}${dosyaSimge(x.id)}</div></td><td>${escapeHtml((x.isKalemleri||[]).map(k=>k.isTuru||k.ad||'').filter(Boolean).join(', ')||'-')}</td><td>${anayasaDurumRozeti(x.durum)}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):'-'}</td><td><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button></td></tr>`).join('');
             box.style.display="block";
             const initials=String(name).trim().split(/\s+/).slice(0,2).map(x=>x[0]||'').join('').toLocaleUpperCase('tr-TR');
-            box.innerHTML=`<div class="tech-detail-hero"><div class="tech-detail-identity"><div class="tech-detail-avatar">${escapeHtml(initials)}</div><div><div class="tech-detail-name">${escapeHtml(name)}</div><div class="tech-status-pill ${t.aktif===false?'passive':''}">${t.aktif===false?'Pasif':'● Aktif'}</div></div></div><div class="tech-profile-actions"><button class="button button-blue" onclick="openTeknisyenPanelModal(${Number(id)})">🔑 Panel Hesabı</button><button class="button button-light" onclick="openTeknisyenDuzenleModal(${Number(id)})">✎ Düzenle</button><button class="button ${t.aktif===false?'button-blue':'button-light'}" onclick="teknisyenAktifDegistir(${Number(id)},${t.aktif===false?'true':'false'})">${t.aktif===false?'Aktif Yap':'Pasife Al'}</button><button class="button tech-danger-button" onclick="teknisyenSil(${Number(id)})">Sil</button></div></div>
+            box.innerHTML=`<div class="tech-detail-hero"><div class="tech-detail-identity"><div class="tech-detail-avatar">${escapeHtml(initials)}</div><div><div class="tech-detail-name">${escapeHtml(name)}</div><div class="tech-status-pill ${t.aktif===false?'passive':''}">${t.aktif===false?'Pasif':'● Aktif'}</div></div></div><div class="tech-profile-actions"><button class="button button-blue" onclick="teknisyenPaneleGir(${Number(id)})" title="Teknisyen Paneli'ni bu teknisyenin gözünden yeni sekmede açar (şifre gerekmez)">👁 Paneline Gir</button><button class="button button-light" onclick="openTeknisyenPanelModal(${Number(id)})">🔑 Panel Hesabı</button><button class="button button-light" onclick="openTeknisyenDuzenleModal(${Number(id)})">✎ Düzenle</button><button class="button ${t.aktif===false?'button-blue':'button-light'}" onclick="teknisyenAktifDegistir(${Number(id)},${t.aktif===false?'true':'false'})">${t.aktif===false?'Aktif Yap':'Pasife Al'}</button><button class="button tech-danger-button" onclick="teknisyenSil(${Number(id)})">Sil</button></div></div>
                 <div class="tech-detail-kpis"><div><span>Aktif İş</span><b>${active.length}</b></div><div><span>Tamamlanan</span><b>${done.length}</b></div><div><span>Toplam İş</span><b>${active.length+done.length}</b></div></div>
                 <div class="tech-detail-title">Aktif İşler</div><div class="table-wrap"><table><thead><tr><th>İş</th><th>Hekim / Hasta</th><th>İş Kalemi</th><th>Durum</th><th>Termin</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="empty">Bu teknisyene atanmış aktif iş bulunmuyor.</td></tr>'}</tbody></table></div>`;
         }
@@ -14902,6 +14905,16 @@
         }
 
         // ---------------- Teknisyen Paneli hesabı ----------------
+        // Tek tıkla teknisyenin paneline gir: yönetici görünümü oturumu açılır, panel yeni sekmede açılır.
+        async function teknisyenPaneleGir(id){
+            const w=window.open("about:blank","_blank");
+            try{
+                const r=await fetch("/api/teknisyen-portal/admin/gir/"+Number(id),{method:"POST"});
+                if(!r.ok) throw new Error(await r.text()||"Panele girilemedi.");
+                const d=await r.json();
+                if(w) w.location.href=d.adres||"/teknisyen"; else location.href=d.adres||"/teknisyen";
+            }catch(e){ if(w) w.close(); showError(e.message); }
+        }
         async function openTeknisyenPanelModal(id){
             const t=teknisyenler.find(x=>Number(x.id)===Number(id)); if(!t) return;
             const err=document.getElementById('teknisyenPanelHata'); err.style.display='none';

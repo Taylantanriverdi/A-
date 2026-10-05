@@ -601,8 +601,11 @@
     }
 
     async function cikisYap() {
+        const yonetici = !!(ben && ben.yoneticiGorunumu);
         try { await fetch("/api/teknisyen-portal/logout", { method: "POST", credentials: "same-origin" }); } catch {}
+        document.getElementById("yoneticiSerit")?.remove();
         ben = null; bilinenIsler = null; girisEkrani();
+        if (yonetici) window.close();
     }
 
     async function basla() {
@@ -616,6 +619,14 @@
         $("whoName").textContent = ben.adSoyad;
         $("whoTip").textContent = ben.tip === "dis" ? "Dış teknisyen" : "İç teknisyen";
         $("tabFormlar").classList.toggle("hidden", ben.tip === "dis");
+        // Yönetici ana programdan bu teknisyenin paneline girdiyse üstte uyarı şeridi.
+        let serit = document.getElementById("yoneticiSerit");
+        if (ben.yoneticiGorunumu) {
+            if (!serit) { serit = document.createElement("div"); serit.id = "yoneticiSerit"; document.body.prepend(serit); }
+            serit.style.cssText = "background:#4338ca;color:#fff;padding:9px 14px;font-size:13px;font-weight:700;text-align:center;position:sticky;top:0;z-index:50";
+            serit.innerHTML = `👁 Yönetici görünümü — <b>${esc(ben.adSoyad)}</b> adlı teknisyenin paneli. İşlemler bu teknisyen adına yapılır; yazdığınız mesajlar laboratuvardan gider. <button type="button" onclick="cikisYap()" style="margin-left:10px;background:#fff;color:#4338ca;border:0;border-radius:6px;padding:3px 10px;font-weight:800;cursor:pointer">Görünümden çık</button>`;
+            $("whoTip").textContent = (ben.tip === "dis" ? "Dış teknisyen" : "İç teknisyen") + " · yönetici görünümü";
+        } else if (serit) serit.remove();
         await yukle();
         clearInterval(yenilemeZamani);
         yenilemeZamani = setInterval(() => { if (!acikModal && document.visibilityState === "visible") yukle(true); }, 60000);

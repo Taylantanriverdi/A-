@@ -419,7 +419,7 @@ public sealed class TeknisyenPortalController : ControllerBase
     {
         var o = await Oturum(ct);
         if (o.Hata != null) return o.Hata;
-        return Ok(new { teknisyenId = o.Tek!.Id, adSoyad = o.Tek.AdSoyad, tip = o.Tip });
+        return Ok(new { teknisyenId = o.Tek!.Id, adSoyad = o.Tek.AdSoyad, tip = o.Tip, yoneticiGorunumu = _yoneticiGorunumu });
     }
 
     // =========================================================
@@ -693,7 +693,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         if (!System.IO.File.Exists(yol)) return NotFound("Dosyanın fiziksel kopyası bulunamadı.");
         if (!new FileExtensionContentTypeProvider().TryGetContentType(row.OrijinalDosyaAdi, out var tur))
             tur = "application/octet-stream";
-        _takip.Indirildi(new[] { row.Id }, "Teknisyen: " + o.Tek.AdSoyad);
+        _takip.Indirildi(new[] { row.Id }, _yoneticiGorunumu ? "Yönetici (" + o.Tek.AdSoyad + " paneli)" : "Teknisyen: " + o.Tek.AdSoyad);
         return PhysicalFile(yol, tur, Path.GetFileName(row.OrijinalDosyaAdi), enableRangeProcessing: true);
     }
 
@@ -759,7 +759,7 @@ public sealed class TeknisyenPortalController : ControllerBase
             FROM "IsMesajlari" WHERE "SiparisId"={jobId}
             ORDER BY "Tarih","Id"
             """).ToListAsync(ct)).Where(m => !dis || m.GonderenTipi != "Laboratuvar").ToList();
-        if (rows.Count > 0) _takip.MesajOkundu("teknisyen:" + o.Tek.Id, jobId, rows.Max(x => x.Id));
+        if (rows.Count > 0 && !_yoneticiGorunumu) _takip.MesajOkundu("teknisyen:" + o.Tek.Id, jobId, rows.Max(x => x.Id));
         return Ok(rows.Select(m => new
         {
             m.Id,
@@ -785,10 +785,11 @@ public sealed class TeknisyenPortalController : ControllerBase
 
         var yeniId = (await _db.Database.SqlQuery<int>($"""
             INSERT INTO "IsMesajlari" ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")
-            VALUES ({jobId},{"Teknisyen"},{o.Tek.AdSoyad},{mesaj},{DateTime.UtcNow})
+            VALUES ({jobId},{(_yoneticiGorunumu ? "Lab-Teknisyen" : "Teknisyen")},{(_yoneticiGorunumu ? "Laboratuvar" : o.Tek.AdSoyad)},{mesaj},{DateTime.UtcNow})
             RETURNING "Id" AS "Value"
             """).ToListAsync(ct)).Single();
-        _takip.MesajOkundu("teknisyen:" + o.Tek.Id, jobId, yeniId);
+        // Yönetici yazdıysa mesaj laboratuvardan gitmiş sayılır; teknisyen için okunmamış kalır.
+        if (!_yoneticiGorunumu) _takip.MesajOkundu("teknisyen:" + o.Tek.Id, jobId, yeniId);
         return Ok(new { message = "Mesaj gönderildi." });
     }
 
@@ -810,6 +811,12 @@ public sealed class TeknisyenPortalController : ControllerBase
 
         var hesap = _hesaplar.Getir(oturum.TeknisyenId);
         var tek = await TeknisyenGetir(oturum.TeknisyenId, ct);
+        // Yönetici görünümü panel hesabı olmayan ya da pasif teknisyen için de açılır.
+        if (oturum.Yonetici && tek != null)
+        {
+            _yoneticiGorunumu = true;
+            return (tek, hesap?.Tip ?? TeknisyenHesapDeposu.Ic, null);
+        }
         if (hesap == null || !hesap.Aktif || tek == null || !tek.Aktif)
             return (null, "", Unauthorized("Hesap pasif."));
 
@@ -926,6 +933,35 @@ public sealed class TeknisyenPortalController : ControllerBase
     {
         public int TeknisyenId { get; set; }
         public DateTime Bitis { get; set; }
+        /// <summary>Yönetici, ana programdan bu teknisyenin paneline girdi (giriş/okundu kayıtları değişmez).</summary>
+        public bool Yonetici { get; set; }
+    }
+
+    // Bu istekteki oturum yönetici görünümü mü (Oturum() doldurur).
+    private bool _yoneticiGorunumu;
+
+    /// <summary>
+    /// Ana programdan tek tıkla teknisyenin paneline giriş: yönetici oturumu (ara katman) gerekir,
+    /// yalnız laboratuvar bilgisayarından çalışır; 4 saat geçerli, teknisyenin şifresi gerekmez.
+    /// </summary>
+    [HttpPost("admin/gir/{teknisyenId:int}")]
+    public async Task<IActionResult> YoneticiGirisi(int teknisyenId, CancellationToken ct)
+    {
+        if (!GuvenlikController.AnaBilgisayar(HttpContext)) return GuvenlikController.Yasak();
+        var tek = await TeknisyenGetir(teknisyenId, ct);
+        if (tek == null) return NotFound("Teknisyen bulunamadı.");
+        var bitis = DateTime.UtcNow.AddHours(4);
+        var oturum = JsonSerializer.Serialize(new TeknisyenOturum { TeknisyenId = tek.Id, Bitis = bitis, Yonetici = true });
+        Response.Cookies.Append(CookieName, _protector.Protect(oturum), new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            Expires = bitis,
+            IsEssential = true,
+            Path = "/"
+        });
+        return Ok(new { teknisyenId = tek.Id, adSoyad = tek.AdSoyad, adres = "/teknisyen" });
     }
 }
 
