@@ -134,6 +134,38 @@
         .done .big{font-size:46px}
         .done h2{margin:8px 0}
 
+        /* Ana sayfa (iş takibi) */
+        .ana-ust{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:linear-gradient(135deg,#0f2a4a,#1565c0);color:#fff;border-radius:16px;padding:18px 20px;margin-bottom:12px}
+        .ana-selam{font-size:20px;font-weight:900}
+        .ana-alt{font-size:13px;opacity:.85;margin-top:3px}
+        .ana-yeni{background:#fff;color:#1565c0;height:48px;font-size:15px}
+        .ozet-kutular{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+        .ozet-kutu{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+        .ozet-kutu b{display:block;font-size:24px;font-weight:900;line-height:1.1}
+        .ozet-kutu span{font-size:12px;color:var(--muted);font-weight:800}
+        .ozet-kutu.on{border-color:var(--blue);box-shadow:0 0 0 3px rgba(21,101,192,.15)}
+        .ozet-kutu.vurgu b{color:var(--green)}
+        .ozet-kutu.kirmizi b{color:var(--red)}
+        @@media(max-width:640px){.ozet-kutular{grid-template-columns:repeat(2,1fr)}.ana-yeni{width:100%}}
+        .is-kart{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:12px;padding:14px 16px}
+        .is-kart.dikkat{border-color:#6ee7b7;box-shadow:0 0 0 3px rgba(5,150,105,.08)}
+        .is-ust{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .is-hasta{font-size:17px;font-weight:900}
+        .is-bilgi{font-size:12px;color:var(--muted);margin-top:2px}
+        .is-teslim{font-size:13px;margin:8px 0 2px;color:#334155}
+        .dosya-gruplar{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+        @@media(max-width:720px){.dosya-gruplar{grid-template-columns:1fr}}
+        .dosya-grup{border:1px solid var(--line);border-radius:12px;padding:9px 10px;background:#f8fafc;min-width:0}
+        .dosya-grup.dolu{background:#fff}
+        .dosya-grup.yeni{border-color:#6ee7b7;background:#f0fdf4}
+        .dg-baslik{font-size:12px;font-weight:900;color:#334155;margin-bottom:6px;display:flex;justify-content:space-between;gap:6px}
+        .dg-bos{font-size:12px;color:#94a3b8}
+        .dg-dosya{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;background:#fff;border:1px solid #cbd5e1;color:#0f172a;text-decoration:none;font-size:12px;margin-top:4px;min-width:0}
+        .dg-dosya:hover{border-color:#2563eb;color:#1d4ed8}
+        .dg-dosya span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+        .dg-dosya small{color:#64748b;white-space:nowrap}
+        .is-alt{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+        .is-alt .btn{height:38px;font-size:13px}
         /* İşlerim */
         .toolbar{display:flex;gap:8px;margin-bottom:12px}
         .job{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
@@ -337,14 +369,14 @@
             <div class="who"><b id="whoName">-</b><span id="whoClinic"></span> <button class="link-btn" type="button" onclick="cikisYap()">Çıkış</button></div>
         </div>
         <nav class="tabs"><div class="wrap">
-            <button class="tab active" id="tabYeni" type="button" onclick="sekme('yeni')">＋ Yeni İş Gönder</button>
-            <button class="tab" id="tabIsler" type="button" onclick="sekme('isler')">📋 İşlerim</button>
+            <button class="tab active" id="tabIsler" type="button" onclick="sekme('isler')">🏠 Ana Sayfa</button>
+            <button class="tab" id="tabYeni" type="button" onclick="sekme('yeni')">＋ Yeni İş Gönder</button>
         </div></nav>
     </header>
 
     <main class="wrap">
         <!-- YENİ İŞ -->
-        <section id="yeniBolum">
+        <section id="yeniBolum" class="hidden">
             <div id="formMsg" class="msg err hidden"></div>
             <div id="listeYokMsg" class="msg info hidden">Size tanımlı iş listesi henüz bulunmuyor. Lütfen laboratuvarı arayın; liste tanımlandığında buradan iş gönderebilirsiniz.</div>
 
@@ -523,16 +555,21 @@
                 <p id="gonderildiMsg" class="hint"></p>
                 <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px">
                     <button class="btn" type="button" onclick="yeniForm()">Yeni iş gönder</button>
-                    <button class="btn btn-light" type="button" onclick="sekme('isler')">İşlerime git</button>
+                    <button class="btn btn-light" type="button" onclick="sekme('isler')">Ana sayfaya dön</button>
                 </div>
             </div>
         </section>
 
         <!-- İŞLERİM -->
-        <section id="islerBolum" class="hidden">
+        <section id="islerBolum">
+            <div class="ana-ust">
+                <div><div class="ana-selam" id="anaSelam">Hoş geldiniz</div><div class="ana-alt">İşlerinizin durumu, taramalarınız, hazır tasarım ve 3D yazıcı dosyaları burada.</div></div>
+                <button class="btn ana-yeni" type="button" onclick="sekme('yeni')">＋ Yeni İş Gönder</button>
+            </div>
+            <div class="ozet-kutular" id="ozetKutular"></div>
             <div class="toolbar">
-                <input id="isAra" class="inp" placeholder="Hasta adı veya iş türü ara" oninput="isleriCiz()" />
-                <button class="btn btn-light" type="button" onclick="isleriYukle()">Yenile</button>
+                <input id="isAra" class="inp" placeholder="🔍 Hasta adı veya iş türü ara" oninput="isleriCiz()" />
+                <button class="btn btn-light" type="button" onclick="isleriYukle()" title="Listeyi yenile">⟳</button>
             </div>
             <div id="islerListe"><div class="empty">Yükleniyor...</div></div>
         </section>
@@ -874,6 +911,8 @@
         isTurleri = [];
         tekHekimleriCiz();
         yeniForm();
+        // Teknisyen kipinde yalnız sipariş formu kullanılır (ana sayfa gösterilmez).
+        $("yeniBolum").classList.remove("hidden"); $("islerBolum").classList.add("hidden");
         $("gonderBtn").disabled = true;
     }
     function tekHekimleriCiz() {
@@ -914,7 +953,10 @@
         $("gonderBtn").disabled = isTurleri.length === 0;
         if (!kalemler.length) yeniForm();
         else kalemleriCiz();
-        if (!$("islerBolum").classList.contains("hidden")) isleriYukle();
+        $("anaSelam").textContent = "Merhaba " + ((me.hekim && me.hekim.adSoyad) || "") + " 👋";
+        // Ana sayfa: iş takibi. Form yarıda kaldıysa (oturum düşüp tekrar girildi) form açık kalır.
+        if (!$("yeniBolum").classList.contains("hidden") && kalemler.some(k => k.isTuru)) return;
+        sekme("isler");
     }
 
     function sekme(ad) {
@@ -1237,23 +1279,67 @@
         return [d, "prod"];
     }
 
+    // Ana sayfa süzgeci: hepsi / devam / hazir / mesaj / tamam
+    let anaFiltre = "hepsi";
+    function isTamam(j) { return durum(j)[1] === "done"; }
+    function isIptal(j) { return durum(j)[1] === "cancel"; }
+    function hazirYeni(j) { return (j.hazirDosyalar || []).some(f => f.yeni); }
+    function filtreSec(f) { anaFiltre = anaFiltre === f ? "hepsi" : f; isleriCiz(); }
+    function ozetCizAna() {
+        const k = (ad, deger, etiket, cls) => `<button type="button" class="ozet-kutu ${cls || ""} ${anaFiltre === ad ? "on" : ""}" onclick="filtreSec('${ad}')"><b>${deger}</b><span>${etiket}</span></button>`;
+        $("ozetKutular").innerHTML =
+            k("devam", isler.filter(j => !isTamam(j) && !isIptal(j)).length, "Devam eden iş") +
+            k("hazir", isler.filter(j => (j.hazirDosyalar || []).length).length, "Dosyası hazır" + (isler.some(hazirYeni) ? " · YENİ" : ""), isler.some(hazirYeni) ? "vurgu" : "") +
+            k("mesaj", isler.reduce((t, j) => t + (j.okunmamisMesaj || 0), 0), "Yeni mesaj", isler.some(j => j.okunmamisMesaj) ? "kirmizi" : "") +
+            k("tamam", isler.filter(isTamam).length, "Tamamlanan");
+    }
+    function dosyaGrup(j, baslik, liste, bosMetin, ekBaslik) {
+        const yeni = liste.some(f => f.yeni);
+        return `<div class="dosya-grup ${liste.length ? "dolu" : ""} ${yeni ? "yeni" : ""}"><div class="dg-baslik"><span>${baslik}</span>${ekBaslik || ""}</div>${liste.length ? liste.map(f =>
+            `<a class="dg-dosya" href="/api/hekim-portal/jobs/${j.id}/files/${f.id}" onclick="hazirIndirildi(${j.id},${f.id})" title="${esc(f.orijinalDosyaAdi)} — indir"><span>${esc(f.orijinalDosyaAdi)}</span><small>${boyut(f.boyut)}</small>${f.yeni ? '<span class="hazir-yeni" style="flex:none">YENİ</span>' : ""}⬇</a>`).join("") : `<div class="dg-bos">${bosMetin}</div>`}</div>`;
+    }
+
     function isleriCiz() {
+        ozetCizAna();
         const q = $("isAra").value.trim().toLocaleLowerCase("tr-TR");
-        const liste = isler.filter(j => !q ||
+        const liste = isler.filter(j => (!q ||
             (j.hastaAdi || "").toLocaleLowerCase("tr-TR").includes(q) ||
-            (j.kalemler || []).some(k => (k.isTuru || "").toLocaleLowerCase("tr-TR").includes(q)));
-        if (!liste.length) { $("islerListe").innerHTML = `<div class="empty">${isler.length ? "Aramaya uyan iş yok." : "Henüz gönderilmiş işiniz yok."}</div>`; return; }
+            (j.kalemler || []).some(k => (k.isTuru || "").toLocaleLowerCase("tr-TR").includes(q))) &&
+            (anaFiltre === "hepsi" ||
+             (anaFiltre === "devam" && !isTamam(j) && !isIptal(j)) ||
+             (anaFiltre === "hazir" && (j.hazirDosyalar || []).length) ||
+             (anaFiltre === "mesaj" && j.okunmamisMesaj) ||
+             (anaFiltre === "tamam" && isTamam(j))));
+        if (!liste.length) {
+            $("islerListe").innerHTML = `<div class="empty">${!isler.length ? "Henüz gönderilmiş işiniz yok.<br><br><button class='btn' type='button' onclick=\"sekme('yeni')\">＋ İlk işinizi gönderin</button>" : anaFiltre !== "hepsi" ? "Bu grupta iş yok. <button class='pk-link' type='button' onclick=\"filtreSec('hepsi')\">Tümünü göster</button>" : "Aramaya uyan iş yok."}</div>`;
+            return;
+        }
         $("islerListe").innerHTML = liste.map(j => {
             const [d, c] = durum(j);
             const kal = (j.kalemler || []).map(k => esc(k.isTuru) + " × " + k.adet).join(", ");
-            return `<div class="job">
-                <div class="job-head" onclick="isAc(${j.id})">
-                    <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}${j.mesajSayisi ? " · 💬 " + j.mesajSayisi : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni mesaj</span>` : ""}</div></div>
+            const hazir = j.hazirDosyalar || [];
+            const tasarim = hazir.filter(f => f.dosyaTuru !== "Yazıcı"), yazici = hazir.filter(f => f.dosyaTuru === "Yazıcı");
+            const tarama = Math.max(0, (j.dosyaSayisi || 0) - hazir.length);
+            const acik = acikIs === j.id;
+            return `<div class="is-kart ${hazirYeni(j) || j.okunmamisMesaj ? "dikkat" : ""}">
+                <div class="is-ust">
+                    <div style="min-width:0"><div class="is-hasta">${esc(j.hastaAdi)}</div><div class="is-bilgi">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}</div></div>
                     <span class="badge ${c}">${esc(d)}</span>
                 </div>
-                ${hazirDosyaSerit(j)}
-                ${acikIs === j.id ? `<div class="job-body" id="isDetay${j.id}">
-                    ${asamaCiz(j)}
+                ${asamaCiz(j)}
+                <div class="is-teslim">📅 Teslim: <b>${tarih(j.terminTarihi)}</b> · Renk: <b>${esc(j.disRengi || "-")}</b> · Materyal: <b>${esc(j.materyal || "-")}</b></div>
+                <div class="dosya-gruplar">
+                    <div class="dosya-grup ${tarama || j.linkSayisi ? "dolu" : ""}"><div class="dg-baslik"><span>🦷 Taramalarım</span></div>
+                        <div class="dg-bos" style="color:#334155">${tarama ? tarama + " dosya gönderildi" : "Dosya yok"}${j.linkSayisi ? " · 🔗 " + j.linkSayisi + " link" : ""}</div>
+                        <button class="pk-link" type="button" onclick="isAc(${j.id})">${acik ? "Gizle" : "Dosyaları gör / link ekle"}</button></div>
+                    ${dosyaGrup(j, "📐 Tasarım", tasarim, "Tasarım hazır olunca burada indirilir")}
+                    ${dosyaGrup(j, "🖨️ 3D Yazıcı", yazici, "Baskı dosyası (CTB vb.) hazır olunca burada")}
+                </div>
+                <div class="is-alt">
+                    <button class="btn ${j.okunmamisMesaj ? "" : "btn-light"}" type="button" onclick="isAc(${j.id})">💬 Mesajlar${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni</span>` : (j.mesajSayisi ? " (" + j.mesajSayisi + ")" : "")}</button>
+                    <button class="btn btn-light" type="button" onclick="isAc(${j.id})">${acik ? "▴ Detayı kapat" : "▾ Detay"}</button>
+                </div>
+                ${acik ? `<div class="job-body" id="isDetay${j.id}" style="margin-top:10px;border:1px solid var(--line);border-radius:12px">
                     <div><b>Teslim:</b> ${tarih(j.terminTarihi)} · <b>Renk:</b> ${esc(j.disRengi || "-")} · <b>Materyal:</b> ${esc(j.materyal || "-")}</div>
                     <div><b>Dişler:</b> ${esc(j.disSemasi || "-")}</div>
                     ${j.notlar ? `<div><b>Notlar:</b><pre>${esc(j.notlar)}</pre></div>` : ""}
@@ -1299,7 +1385,7 @@
     }
     function okunmamisOzet() {
         const n = isler.reduce((t, j) => t + (j.okunmamisMesaj || 0), 0);
-        const b = $("tabIsler"); if (b) b.innerHTML = "📋 İşlerim" + (n ? ` <span class="yeni-mesaj">${n}</span>` : "");
+        const b = $("tabIsler"); if (b) b.innerHTML = "🏠 Ana Sayfa" + (n ? ` <span class="yeni-mesaj">${n}</span>` : "");
     }
 
     async function mesajGonder(id) {
@@ -1313,17 +1399,6 @@
         } catch (err) { alert(err.message); }
     }
 
-    // Laboratuvarın / teknisyenin hazırladığı tasarım ve yazıcı (CTB) dosyaları: iş kartında tek tıkla indir.
-    function hazirDosyaSerit(j) {
-        const l = j.hazirDosyalar || [];
-        if (!l.length) return "";
-        const yeni = l.some(f => f.yeni);
-        return `<div class="hazir-serit${yeni ? " yeni" : ""}">
-            <div class="hazir-baslik">${yeni ? '<span class="hazir-yeni">YENİ</span>' : ""} 📦 Hazır dosyalar — indirip kullanabilirsiniz</div>
-            <div class="hazir-liste">${l.map(f => `<a class="hazir-btn" href="/api/hekim-portal/jobs/${j.id}/files/${f.id}" onclick="hazirIndirildi(${j.id},${f.id})" title="${esc(f.orijinalDosyaAdi)} · ${boyut(f.boyut)}">
-                ${f.dosyaTuru === "Yazıcı" ? "🖨️ Yazıcı" : "📐 Tasarım"} · <b>${esc(f.orijinalDosyaAdi)}</b> <small>${boyut(f.boyut)}</small>${f.yeni ? ' <span class="hazir-nokta"></span>' : ""} ⬇</a>`).join("")}</div>
-        </div>`;
-    }
     function hazirIndirildi(isId, dosyaId) {
         const j = isler.find(x => x.id === isId); const f = j && (j.hazirDosyalar || []).find(x => x.id === dosyaId);
         if (f && f.yeni) { f.yeni = false; setTimeout(isleriCiz, 300); }
