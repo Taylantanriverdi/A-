@@ -99,7 +99,7 @@ public sealed class EpostaServisi : BackgroundService
         a.Ssl = yeni.Ssl;
         a.Kullanici = yeni.Kullanici?.Trim();
         a.GonderenAdres = string.IsNullOrWhiteSpace(yeni.GonderenAdres) ? a.Kullanici : yeni.GonderenAdres.Trim();
-        a.GonderenAd = string.IsNullOrWhiteSpace(yeni.GonderenAd) ? "Primer Dental Lab" : yeni.GonderenAd.Trim();
+        a.GonderenAd = string.IsNullOrWhiteSpace(yeni.GonderenAd) ? FirmaServisi.VarsayilanAd : yeni.GonderenAd.Trim();
         a.DakikadaEnFazla = Math.Clamp(yeni.DakikadaEnFazla, 1, 120);
         a.GundeEnFazla = Math.Clamp(yeni.GundeEnFazla, 10, 10_000);
         if (!string.IsNullOrEmpty(parola)) a.SifreliParola = _koruma.Protect(parola);
@@ -279,7 +279,10 @@ public sealed class EpostaServisi : BackgroundService
     {
         var parola = _koruma.Unprotect(a.SifreliParola!);
         var mesaj = new MimeKit.MimeMessage();
-        mesaj.From.Add(new MimeKit.MailboxAddress(a.GonderenAd, a.GonderenAdres));
+        // Gönderen adı varsayılan bırakıldıysa Firma Bilgileri'ndeki firma adı kullanılır.
+        var gonderenAd = string.IsNullOrWhiteSpace(a.GonderenAd) || a.GonderenAd == FirmaServisi.VarsayilanAd
+            ? FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd : a.GonderenAd;
+        mesaj.From.Add(new MimeKit.MailboxAddress(gonderenAd, a.GonderenAdres));
         mesaj.To.Add(MimeKit.MailboxAddress.Parse(ileti.Alici));
         mesaj.Subject = ileti.Konu;
         mesaj.Body = new MimeKit.TextPart(MimeKit.Text.TextFormat.Html) { Text = ileti.Html };
@@ -296,7 +299,10 @@ public sealed class EpostaServisi : BackgroundService
 
     public static string Sablon(string baslik, string govdeHtml) =>
         "<div style=\"font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#10233e\">" +
-        "<div style=\"font-size:13px;font-weight:bold;color:#64748b;letter-spacing:.5px\">PRIMER DENTAL LAB</div>" +
+        "<div style=\"font-size:13px;font-weight:bold;color:#64748b;letter-spacing:.5px\">" +
+        WebUtility.HtmlEncode(FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd) + "</div>" +
         "<h2 style=\"margin:8px 0 14px\">" + WebUtility.HtmlEncode(baslik) + "</h2>" + govdeHtml +
-        "<p style=\"font-size:12px;color:#64748b;margin-top:22px\">Bu işlemi siz yapmadıysanız bu e-postayı dikkate almayın; kodu kimseyle paylaşmayın.</p></div>";
+        "<p style=\"font-size:12px;color:#64748b;margin-top:22px\">Bu işlemi siz yapmadıysanız bu e-postayı dikkate almayın; kodu kimseyle paylaşmayın.</p>" +
+        (string.IsNullOrEmpty(FirmaServisi.Ornek?.IletisimSatiri()) ? "" :
+            "<p style=\"font-size:11px;color:#94a3b8;margin-top:10px\">" + WebUtility.HtmlEncode(FirmaServisi.Ornek!.IletisimSatiri()) + "</p>") + "</div>";
 }

@@ -176,7 +176,7 @@ Araç sonuçları sana <ARAC_SONUCLARI> içinde verilir. Araçlar:
     {
         var tr = DateTime.UtcNow.AddHours(3);
         return $"""
-Sen "Primer AI"sın: Primer Dental Lab (diş protez laboratuvarı) iş takip ve ön muhasebe yazılımının içine yerleşmiş, çok yetenekli bir operasyon ajanısın.
+Sen "Primer AI"sın: {FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd} (diş protez laboratuvarı) iş takip ve ön muhasebe yazılımının içine yerleşmiş, çok yetenekli bir operasyon ajanısın.
 Bugün: {tr:dd.MM.yyyy dddd HH:mm} (Türkiye saati). Türkçe konuş; net, doğru ve işe yarar ol.
 
 NASIL ÇALIŞIRSIN:

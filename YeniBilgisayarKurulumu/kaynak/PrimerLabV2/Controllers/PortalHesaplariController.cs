@@ -282,7 +282,7 @@ public sealed class PortalHesaplariController : ControllerBase
         _eposta.Kaydet(new EpostaServisi.Ayarlar
         {
             Sunucu = dto.Sunucu, Port = dto.Port, Ssl = dto.Ssl, Kullanici = dto.Kullanici,
-            GonderenAdres = gonderen, GonderenAd = dto.GonderenAd ?? "Primer Dental Lab",
+            GonderenAdres = gonderen, GonderenAd = dto.GonderenAd ?? FirmaServisi.VarsayilanAd,
             DakikadaEnFazla = dto.DakikadaEnFazla, GundeEnFazla = dto.GundeEnFazla
         }, dto.Parola);
         return Ok(_eposta.Durum());

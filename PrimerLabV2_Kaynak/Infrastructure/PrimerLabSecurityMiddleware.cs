@@ -162,15 +162,19 @@ public sealed class PrimerLabSecurityMiddleware
         context.Response.StatusCode = StatusCodes.Status200OK;
         context.Response.ContentType = "text/html; charset=utf-8";
         context.Response.Headers.CacheControl = "no-store";
-        return context.Response.WriteAsync("""
+        var ad = System.Net.WebUtility.HtmlEncode(FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd);
+        var adBuyuk = ad;
+        var logo = FirmaServisi.Ornek?.LogoDataUrl();
+        var logoHtml = logo == null ? "" : $"<img src=\"{logo}\" alt=\"\" style=\"max-height:64px;max-width:200px;display:block;margin-bottom:12px\">";
+        return context.Response.WriteAsync($$"""
             <!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>Primer Dental Lab</title>
+            <title>{{ad}}</title>
             <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f3f6fb;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#10233e}
             .k{width:min(92vw,380px);background:#fff;border:1px solid #dbe3ef;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
             h1{font-size:18px;margin:0 0 4px}p{color:#64748b;font-size:13px;margin:0 0 18px}
             a{display:block;text-decoration:none;text-align:center;font-weight:900;padding:14px;border-radius:12px;margin-top:10px;background:#1565c0;color:#fff}
             a.t{background:#10233e}</style></head>
-            <body><div class="k"><h1>PRIMER DENTAL LAB</h1><p>Girmek istediğiniz bölümü seçin.</p>
+            <body><div class="k">{{logoHtml}}<h1>{{adBuyuk}}</h1><p>Girmek istediğiniz bölümü seçin.</p>
             <a href="/hekim-portal">🦷 Hekim Portalı</a><a class="t" href="/teknisyen">🛠️ Teknisyen Paneli</a></div></body></html>
             """);
     }

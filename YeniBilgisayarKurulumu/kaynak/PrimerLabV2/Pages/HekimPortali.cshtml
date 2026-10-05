@@ -1,6 +1,13 @@
 @page "/hekim-portal"
+@inject PrimerLabV2.Infrastructure.FirmaServisi Firma
 @{
     Layout = null;
+    // Firma Bilgileri (ana program > Firma Bilgileri): ad, logo ve iletişim bilgisi.
+    var firmaAd = Firma.Ad;
+    var firmaBuyuk = firmaAd; // girildiği gibi (Türkçe büyük harf "Studio"yu "STUDİO" yapardı)
+    var firmaLogo = Firma.LogoDataUrl();
+    var firmaKisa = PrimerLabV2.Infrastructure.FirmaServisi.Kisaltma(firmaAd);
+    var firmaIletisim = Firma.IletisimSatiri();
 }
 <!DOCTYPE html>
 <html lang="tr">
@@ -9,7 +16,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex,nofollow" />
     <meta name="theme-color" content="#10233e" />
-    <title>Primer Lab Hekim Portalı</title>
+    <title>@firmaAd — Hekim Portalı</title>
     <style>
         :root{--ink:#10233e;--muted:#64748b;--line:#dbe3ef;--bg:#f3f6fb;--card:#fff;--blue:#1565c0;--blue-soft:#eff6ff;--green:#15803d;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb}
         *{box-sizing:border-box}
@@ -19,6 +26,8 @@
         .wrap{max-width:860px;margin:0 auto;padding:16px}
         .brand{display:flex;align-items:center;gap:10px}
         .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900;font-size:15px;letter-spacing:.5px}
+        .brand-img{height:40px;max-width:150px;object-fit:contain;border-radius:8px;background:#fff;padding:2px}
+        .firma-iletisim{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
         .brand-name{font-weight:900;font-size:16px;line-height:1.1}
         .brand-sub{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px}
 
@@ -165,8 +174,8 @@
 <section id="loginScreen" class="login hidden">
     <form class="login-card" onsubmit="girisYap(event)">
         <div class="brand">
-            <div class="brand-logo">PL</div>
-            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
+            @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+            <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">HEKİM PORTALI</div></div>
         </div>
         <h1>Hoş geldiniz</h1>
         <p>Kullanıcı adınız ve şifrenizle giriş yapın. Hesabınız yoksa aşağıdan kendiniz kayıt olabilirsiniz.</p>
@@ -205,6 +214,7 @@
             <button type="button" class="pk-link" id="pkKayitLink" onclick="pkAc('kayit')">Hesabınız yok mu? <b>Kayıt olun</b></button>
         </div>
         <button id="pkGirisGeri" class="pk-link pk-geri hidden" type="button" onclick="pkGirisSifirla();pkMsg('loginMsg','')">&larr; Kullanıcı adı ve şifreye dön</button>
+        @if (!string.IsNullOrEmpty(firmaIletisim)) { <div class="firma-iletisim">@firmaIletisim</div> }
     </form>
 </section>
 
@@ -212,8 +222,8 @@
 <section id="kayitScreen" class="login hidden">
     <form class="login-card" onsubmit="pkKayit(event)">
         <div class="brand">
-            <div class="brand-logo">PL</div>
-            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
+            @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+            <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">HEKİM PORTALI</div></div>
         </div>
         <h1>Yeni hesap</h1>
         <p>Bilgilerinizi doldurun; e-postanıza gelen kodla hesabınızı onaylayın. Kullanıcı adınızı ve şifrenizi kendiniz belirlersiniz.</p>
@@ -253,7 +263,7 @@
             </div>
             <p class="pk-bilgi" style="margin-top:-4px">Şifre en az 8 karakter; en az bir harf ve bir rakam.</p>
             <div class="pk-gizli" aria-hidden="true"><label>Web sitesi <input id="kWebsite" tabindex="-1" autocomplete="off" /></label></div>
-            <label class="pk-onay"><input id="kKvkk" type="checkbox" /> <span>Ad, telefon ve e-posta bilgilerimin iş takibi ve iletişim amacıyla Primer Dental Lab tarafından işlenmesini kabul ediyorum.</span></label>
+            <label class="pk-onay"><input id="kKvkk" type="checkbox" /> <span>Ad, telefon ve e-posta bilgilerimin iş takibi ve iletişim amacıyla @firmaAd tarafından işlenmesini kabul ediyorum.</span></label>
         </div>
         <div id="kayitKodAlani" class="hidden">
             <p id="kayitKodBilgi" class="pk-bilgi"></p>
@@ -271,8 +281,8 @@
 <section id="sifreScreen" class="login hidden">
     <form class="login-card" onsubmit="pkSifre(event)">
         <div class="brand">
-            <div class="brand-logo">PL</div>
-            <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
+            @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+            <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">HEKİM PORTALI</div></div>
         </div>
         <h1>Şifremi unuttum</h1>
         <p>Kullanıcı adınızı veya kayıtlı e-posta adresinizi yazın; e-postanıza şifre yenileme kodu gönderelim.</p>
@@ -310,8 +320,8 @@
     <header class="topbar">
         <div class="wrap">
             <div class="brand">
-                <div class="brand-logo">PL</div>
-                <div><div class="brand-name">PRIMER DENTAL LAB</div><div class="brand-sub">HEKİM PORTALI</div></div>
+                @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+                <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">HEKİM PORTALI</div></div>
             </div>
             <div class="who"><b id="whoName">-</b><span id="whoClinic"></span> <button class="link-btn" type="button" onclick="cikisYap()">Çıkış</button></div>
         </div>

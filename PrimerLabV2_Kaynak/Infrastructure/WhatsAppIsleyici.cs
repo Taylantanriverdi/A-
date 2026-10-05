@@ -334,7 +334,7 @@ Kısayollar: *ÖZET* (günün özeti), *YENİ* (yeni sohbet), *YARDIM*.
 
         var gecmis = Gecmis(numara);
         var sistem = $$"""
-Sen Primer Dental Lab'ın WhatsApp asistanısın. Karşındaki kişi laboratuvarın müşterisi olan hekim: {{hekimAdi}}.
+Sen {{FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd}} laboratuvarının WhatsApp asistanısın. Karşındaki kişi laboratuvarın müşterisi olan hekim: {{hekimAdi}}.
 Bugün {{DateTime.UtcNow.AddHours(3):dd.MM.yyyy}}. Türkçe, nazik ve kısa cevap ver (en fazla ~600 karakter). Kalın için *yıldız* kullan.
 YALNIZ aşağıdaki HEKIM_ISLERI verisini kullan; burada olmayan bilgiyi uydurma. Fiyat, borç, başka hekim veya hasta hakkında bilgi verme.
 İş durumları: Bekliyor → Tasarımda → Üretimde → Makyajda → Tamamlama Onayı → Tamamlandı. "Gelen Onay": laboratuvar henüz işe almadı.

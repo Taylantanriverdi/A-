@@ -305,3 +305,18 @@ vardir (dis teknisyenlerde yoktur):
   acilir ve yazdirilir; "Dosyalar" ile isin dosyalari indirilir.
 Hekime is listesi tanimli degilse o hekim icin siparis acilamaz
 (Hekimler > Fiyat Listesi).
+
+FIRMA BILGILERI (LOGO, AD, ADRES, TELEFON, E-POSTA)
+-------------------------------------------------
+Ana program > Yonetim > Firma Bilgileri: firma adi, alt baslik, telefon,
+e-posta, web sitesi, vergi dairesi/no, adres, siparis formu alt notu ve logo
+(PNG/JPG/WEBP, en fazla 1 MB) girilir. Bu bilgiler sunlarda gorunur:
+- Siparis Takip Formu (logo, ad, iletisim satiri, alt not) ve A5 ciktisi
+- Cari hesap / cari ekstre / alacak bildirimi / tahsilat makbuzu / teslim
+  formu / aylik rapor ve hekimden gelenler ciktilari
+- Hekim Portali ve Teknisyen Paneli (logo, ad, giris ekraninda iletisim)
+- Teknisyenin yazdirdigi siparis formu, e-posta sablonlari (gonderen adi
+  varsayilan birakildiysa firma adi), WhatsApp bildirimleri, Primer AI
+Bilgiler App_Data\firma-bilgileri.json ve App_Data\firma-logo.* icindedir;
+yeni bilgisayara App_Data ile birlikte tasinir. Hekim portali ve teknisyen
+panelinde degisiklik sayfa yenilenince gorunur.

@@ -1,4 +1,5 @@
 ﻿@page
+@inject PrimerLabV2.Infrastructure.FirmaServisi Firma
 
 <!DOCTYPE html>
 <html lang="tr">
@@ -6,7 +7,8 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Primer Lab V2</title>
+    <title>@Firma.Ad — Primer Lab</title>
+    <script>window.FIRMA = @Html.Raw(Firma.IstemciJson());</script>
 
     <style>
         * {
@@ -1044,6 +1046,21 @@
         .ref-order-brand{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:20px;border-bottom:2px solid #172033;padding-bottom:14px;margin-bottom:14px}
         .ref-order-logo{font-size:34px;font-weight:1000;letter-spacing:-2px;text-align:center;color:#0b1d36}
         .ref-order-logo small{display:block;font-size:9px;letter-spacing:.4px;font-weight:800;margin-top:2px}
+        .ref-order-logo .ref-firma-img{display:block;max-width:100%;max-height:72px;object-fit:contain;margin:0 auto 4px}
+        .ref-order-logo small.ref-firma-ad{font-size:11.5px;letter-spacing:.1px;font-weight:1000}
+        .ref-firma-il{text-align:center;font-size:9.5px;color:#334155;margin-top:6px;line-height:1.45;font-weight:600}
+        .ref-firma-alt{margin-top:10px;padding-top:6px;border-top:1px solid #cbd5e1;font-size:9.5px;color:#475569;text-align:center;white-space:pre-wrap}
+        .sb-firma-logo{display:block;max-width:190px;max-height:56px;object-fit:contain;background:#fff;border-radius:8px;padding:4px;margin-bottom:8px}
+        .firma-izgara{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:16px}
+        .firma-panel{padding:18px 20px}
+        .firma-alanlar{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
+        .firma-alanlar .form-group{margin:0}
+        .firma-alanlar .firma-genis{grid-column:1/-1}
+        .firma-alanlar textarea{width:100%;resize:vertical;font-family:inherit}
+        .firma-logo-kutu{height:150px;border:1px dashed #cbd5e1;border-radius:12px;display:grid;place-items:center;background:#f8fafc;overflow:hidden}
+        .firma-logo-kutu img{max-width:90%;max-height:130px;object-fit:contain}
+        .firma-logo-kutu .bas-harf{font-size:44px;font-weight:1000;color:#0b1d36;letter-spacing:-2px}
+        @@media(max-width:900px){.firma-izgara,.firma-alanlar{grid-template-columns:1fr}}
         .ref-tooth-mini{display:grid;grid-template-columns:1fr 1fr;border-left:1px solid #26364d;border-right:1px solid #26364d}
         .ref-tooth-mini .quad{padding:5px;display:flex;gap:3px;justify-content:center;flex-wrap:wrap}
         .ref-tooth-mini .quad:nth-child(1),.ref-tooth-mini .quad:nth-child(2){border-bottom:1px solid #26364d}
@@ -2673,8 +2690,8 @@
     <div class="app">
 
         <aside class="sidebar">
-            <div class="logo">Primer Lab</div>
-            <div class="logo-sub">İş Takip & Ön Muhasebe</div>
+            <div id="sbFirma"><div class="logo">@Firma.Ad</div></div>
+            <div class="logo-sub">Primer Lab · İş Takip & Ön Muhasebe</div>
 
             <div class="menu-title">Laboratuvar</div>
 
@@ -2717,6 +2734,8 @@
                     onclick="showSection('silinenlerAnayasa', this)">Silinenler</button>
             <button class="menu-item" type="button"
                     onclick="showSection('legacyArsiv', this)">Yedek Arşivi</button>
+            <button class="menu-item" type="button"
+                    onclick="showSection('firmaBilgileri', this)">Firma Bilgileri</button>
             <button class="menu-item" type="button"
                     onclick="showSection('ayarlar', this)">Ayarlar</button>
         </aside>
@@ -3460,14 +3479,11 @@
 
                     <div class="ref-order-paper">
                         <div class="ref-order-brand">
-                            <div class="ref-order-logo">
-                                PL
-                                <small>PRIMER DENTAL LAB</small>
-                                <small>İŞ TAKİP & ÖN MUHASEBE</small>
-                            </div>
+                            <div class="ref-order-logo" id="anFirmaLogo"></div>
                             <div>
                                 <div id="anDisSemasi" class="ref-tooth-mini"></div>
                                 <div class="ref-form-title">SİPARİŞ TAKİP FORMU</div>
+                                <div id="anFirmaIletisim" class="ref-firma-il"></div>
                             </div>
                         </div>
 
@@ -3530,6 +3546,7 @@
                         <div id="anStlGorseller" class="ref-box ref-stl" style="display:none"></div>
 
                         <div id="anSelectedTeeth" class="ref-selected-teeth">Seçilen Dişler: —</div>
+                        <div id="anFirmaAltNot" class="ref-firma-alt" style="display:none"></div>
 
                         <div style="display:none">
                             <span id="anOrderLineCount">0</span>
@@ -4530,6 +4547,46 @@
                     </div>
                 </div>
             </section>
+
+<section id="firmaBilgileri" class="section">
+                <div class="topbar">
+                    <div>
+                        <h1 class="page-title">Firma Bilgileri</h1>
+                        <div class="page-subtitle">Logonuz ve iletişim bilgileriniz sipariş formunda, cari/makbuz/bildirim çıktılarında, hekim portalında, teknisyen panelinde, e-postalarda ve WhatsApp mesajlarında görünür.</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="button button-blue" type="button" onclick="firmaKaydet()">Kaydet</button>
+                    </div>
+                </div>
+                <div class="firma-izgara">
+                    <div class="panel firma-panel">
+                        <div class="panel-title" style="margin-bottom:12px">Firma ve iletişim</div>
+                        <div class="firma-alanlar">
+                            <div class="form-group firma-genis"><label for="fbAd">Firma adı *</label><input id="fbAd" maxlength="120" placeholder="Örn. Primer Dental Lab" /></div>
+                            <div class="form-group firma-genis"><label for="fbAlt">Alt başlık</label><input id="fbAlt" maxlength="120" placeholder="Örn. Diş Protez Laboratuvarı" /></div>
+                            <div class="form-group"><label for="fbTel">Telefon</label><input id="fbTel" maxlength="60" placeholder="0212 000 00 00" /></div>
+                            <div class="form-group"><label for="fbEposta">E-posta</label><input id="fbEposta" type="email" maxlength="150" placeholder="info@@firma.com" /></div>
+                            <div class="form-group"><label for="fbWeb">Web sitesi</label><input id="fbWeb" maxlength="150" placeholder="www.firma.com" /></div>
+                            <div class="form-group"><label for="fbVd">Vergi dairesi / no</label><div style="display:flex;gap:6px"><input id="fbVd" maxlength="80" placeholder="Vergi dairesi" /><input id="fbVn" maxlength="30" placeholder="Vergi no" style="max-width:140px" /></div></div>
+                            <div class="form-group firma-genis"><label for="fbAdres">Adres</label><textarea id="fbAdres" maxlength="300" rows="2" placeholder="Mahalle, cadde, no, ilçe / il"></textarea></div>
+                            <div class="form-group firma-genis"><label for="fbNot">Sipariş formu alt notu</label><textarea id="fbNot" maxlength="400" rows="2" placeholder="İsteğe bağlı: çalışma saatleri, teslim koşulları, IBAN..."></textarea></div>
+                        </div>
+                    </div>
+                    <div class="panel firma-panel">
+                        <div class="panel-title" style="margin-bottom:12px">Logo</div>
+                        <div id="fbLogoKutu" class="firma-logo-kutu"></div>
+                        <div class="button-group" style="margin-top:12px;flex-wrap:wrap">
+                            <label class="button button-blue" style="cursor:pointer">Logo Yükle<input id="fbLogoDosya" type="file" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="firmaLogoYukle(this)" /></label>
+                            <button class="button button-light" type="button" onclick="firmaLogoSil()">Logoyu Kaldır</button>
+                        </div>
+                        <div class="price-list-note" style="margin-top:10px">PNG, JPG veya WEBP · en fazla 1 MB. Yatay, arka planı beyaz ya da şeffaf logo en iyi sonucu verir. Logo yoksa firma adının baş harfleri kullanılır.</div>
+                    </div>
+                </div>
+                <div class="panel firma-panel" style="margin-top:16px">
+                    <div class="panel-title" style="margin-bottom:12px">Çıktı başlığı önizlemesi</div>
+                    <div id="fbOnizleme" style="background:#fff;border:1px dashed #cbd5e1;border-radius:10px;padding:16px"></div>
+                </div>
+</section>
 
 <section id="ayarlar" class="section">
                 <div class="topbar">
@@ -6249,6 +6306,10 @@
 
             if (id === "portalHesaplari") {
                 portalHesaplariYukle();
+            }
+
+            if (id === "firmaBilgileri") {
+                firmaYukle();
             }
 
             if (id === "operasyon") {
@@ -8471,7 +8532,7 @@
             area.innerHTML = `
                 <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start;">
                     <div>
-                        <h1 style="margin:0;">Primer Lab</h1>
+                        ${firmaBaskiBasligi(true)}
                         <h2 style="margin:6px 0 0;">Teslim Formu</h2>
                     </div>
                     <div style="text-align:right;">
@@ -11426,7 +11487,7 @@
             lines.push(
                 "",
                 "Cari dönemdeki tamamlanan iş sayısı: "+(d.isler?.length||0),
-                "Primer Lab"
+                firmaImza()
             );
 
             document.getElementById("cariBildirimMetni").innerText=lines.join("\n");
@@ -11460,7 +11521,7 @@
             const text=document.getElementById("cariBildirimMetni").innerText;
             const w=window.open("","_blank","width=760,height=640");
             if(!w)return showError("Yazdırma penceresi açılamadı.");
-            w.document.write(`<html><head><title>Alacak Bildirimi</title><style>body{font-family:Arial;padding:32px;white-space:pre-wrap;line-height:1.6;color:#0f172a}</style></head><body>${escapeHtml(text)}<script>window.onload=()=>window.print();<\/script></body></html>`);
+            w.document.write(`<html><head><title>Alacak Bildirimi</title><style>body{font-family:Arial;padding:32px;white-space:pre-wrap;line-height:1.6;color:#0f172a}</style></head><body>${firmaBaskiBasligi()}${escapeHtml(text)}<script>window.onload=()=>window.print();<\/script></body></html>`);
             w.document.close();
         }
 
@@ -11468,7 +11529,7 @@
             if(!cariDetayData)return;
             const d=cariDetayData;
             const w=window.open("","_blank","width=900,height=750");
-            w.document.write(`<html><head><title>Cari Hesap - ${escapeHtml(d.hekim.adSoyad||"")}</title><style>body{font-family:Arial;padding:28px}h1{margin-bottom:4px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}</style></head><body><h1>Primer Lab Cari Hesap</h1><div class="muted">${escapeHtml(d.hekim.adSoyad||"")} ${escapeHtml(d.hekim.klinikAdi||"")}</div><h3>Kalan Bakiye</h3><div>${cariMoneyStack(d.bakiyeler,true)}</div><table><thead><tr><th>Hasta</th><th>İş</th><th>Tutar</th><th>Geliş Tarihi</th></tr></thead><tbody>${(d.isler||[]).map(x=>`<tr><td>${escapeHtml(x.hastaAdi||"")}</td><td>${escapeHtml(x.isTuru||"")}</td><td>${cariPara(x.tutar,x.paraBirimi)}</td><td>${tarihGoster(x.teslimTarihi)}</td></tr>`).join("")}</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>`);
+            w.document.write(`<html><head><title>Cari Hesap - ${escapeHtml(d.hekim.adSoyad||"")}</title><style>body{font-family:Arial;padding:28px}h1{margin-bottom:4px}.muted{color:#666}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}</style></head><body>${firmaBaskiBasligi()}<h1>Cari Hesap</h1><div class="muted">${escapeHtml(d.hekim.adSoyad||"")} ${escapeHtml(d.hekim.klinikAdi||"")}</div><h3>Kalan Bakiye</h3><div>${cariMoneyStack(d.bakiyeler,true)}</div><table><thead><tr><th>Hasta</th><th>İş</th><th>Tutar</th><th>Geliş Tarihi</th></tr></thead><tbody>${(d.isler||[]).map(x=>`<tr><td>${escapeHtml(x.hastaAdi||"")}</td><td>${escapeHtml(x.isTuru||"")}</td><td>${cariPara(x.tutar,x.paraBirimi)}</td><td>${tarihGoster(x.teslimTarihi)}</td></tr>`).join("")}</tbody></table><script>window.onload=()=>window.print();<\/script></body></html>`);
             w.document.close();
         }
 
@@ -11873,7 +11934,7 @@
             if(!kaTahsilatDogrula(d,true))return;
 
             document.getElementById("kaTahsilatMakbuz").innerHTML=`
-                <div class="ka-receipt-logo">PRIMER LAB</div>
+                ${(window.FIRMA||{}).logo?`<img src="${window.FIRMA.logo}" alt="" style="max-height:48px;max-width:170px;object-fit:contain;display:block;margin-bottom:6px">`:""}<div class="ka-receipt-logo">${escapeHtml((window.FIRMA||{}).ad||"")}</div>
                 <div class="ka-receipt-sub">Tahsilat Makbuzu Önizlemesi</div>
                 <div class="ka-receipt-amount">${kaPara(d.tutar,d.paraBirimi)}</div>
                 <div class="ka-receipt-row"><span>Hekim / Klinik</span><strong>${escapeHtml(d.hekimAdi||"-")}${d.klinikAdi&&d.klinikAdi!==d.hekimAdi?`<br><small>${escapeHtml(d.klinikAdi)}</small>`:""}</strong></div>
@@ -12105,7 +12166,7 @@
             lines.push(
                 "",
                 "Tamamlanan iş sayısı: "+Number(kaDetay.isler?.length||0),
-                "Primer Lab"
+                firmaImza()
             );
 
             document.getElementById("kaBildirimMetni").innerText=lines.join("\n");
@@ -12149,7 +12210,7 @@
 
             w.document.write(`<html><head><title>Alacak Bildirimi</title>
                 <style>body{font-family:Arial;padding:32px;white-space:pre-wrap;line-height:1.7;color:#0f172a}</style>
-                </head><body>${escapeHtml(text)}<script>window.onload=()=>window.print();<\/script></body></html>`);
+                </head><body>${firmaBaskiBasligi()}${escapeHtml(text)}<script>window.onload=()=>window.print();<\/script></body></html>`);
             w.document.close();
         }
 
@@ -12175,7 +12236,7 @@
                     th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}
                 </style>
                 </head><body>
-                <h1>Primer Lab Cari Hesap</h1>
+                ${firmaBaskiBasligi()}<h1>Cari Hesap</h1>
                 <div class="muted">${escapeHtml(d.hekim.adSoyad||"")} ${escapeHtml(d.hekim.klinikAdi||"")}</div>
                 <p><strong>TRY:</strong> ${kaPara(d.bakiye?.TRY||0,"TRY")} &nbsp;
                    <strong>EUR:</strong> ${kaPara(d.bakiye?.EUR||0,"EUR")} &nbsp;
@@ -12999,7 +13060,7 @@
             if(!hgSonListe.length){body.innerHTML='<tr><td colspan="10" class="empty">Seçilen filtrelere uygun portal işi yok.</td></tr>';return;}
             body.innerHTML=hgSonListe.map(x=>{const kat=hgKategori(x),cls=kat==="yeni"?"hg-new":kat==="devam"?"hg-run":"hg-done";return `<tr><td><strong>#${Number(x.id)}</strong></td><td>${hgTarih(x)?tarihGoster(hgTarih(x)):"-"}</td><td>${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</td><td>${escapeHtml(x.hekimAdi||"-")}<div class="ops-mini">${escapeHtml(x.klinikAdi||"")}</div></td><td>${anayasaKalemOzet(x)}</td><td>${escapeHtml(x.disRengi||"-")}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td><span class="hg-status ${cls}">${escapeHtml(anayasaDurum(x.durum)||kat)}</span></td><td>${Number(x.dosyaSayisi||0)>0?`<button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">${Number(x.dosyaSayisi)} dosya</button>`:"-"}</td><td><div class="button-group">${kat==="yeni"?`<button class="button hg-green" onclick="anayasaPortalSiparisFormaAktar(${Number(x.id)})">Siparişe Aktar</button>`:""}<button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Detay</button><button class="button" style="background:#fee2e2;color:#991b1b;" onclick="anayasaSil(${Number(x.id)})">Sil</button></div></td></tr>`}).join("");
         }
-        function anayasaHekimGelenPdf(){ if(!hgSonListe.length)return showError("PDF için listede kayıt yok."); const baslik=hgAktifSekme==="yeni"?"Yeni Gelenler":hgAktifSekme==="devam"?"Onaylanan / Devam Eden":"Tamamlananlar"; const rows=hgSonListe.map(x=>`<tr><td>#${Number(x.id)}</td><td>${hgTarih(x)?tarihGoster(hgTarih(x)):"-"}</td><td>${escapeHtml(x.hastaAdi||"-")}</td><td>${escapeHtml(x.hekimAdi||"-")}</td><td>${anayasaKalemOzet(x)}</td><td>${escapeHtml(x.disRengi||"-")}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td>${escapeHtml(anayasaDurum(x.durum)||"-")}</td></tr>`).join(""); const w=window.open("","_blank","width=1100,height=800"); if(!w)return showError("PDF penceresi tarayıcı tarafından engellendi."); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Primer Lab - ${baslik}</title><style>body{font-family:Arial,sans-serif;color:#0f172a;padding:28px}h1{margin:0}p{color:#64748b}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:11px}th,td{border-bottom:1px solid #dbe4ef;padding:8px;text-align:left}th{background:#eff6ff}@@page{size:landscape;margin:12mm}.no-price{font-size:10px;color:#94a3b8}</style></head><body><h1>Primer Lab — ${baslik}</h1><p>${hgSonListe.length} kayıt • ${new Date().toLocaleString("tr-TR")}</p><div class="no-price">Bu rapor operasyon takibi içindir; finansal bilgi içermez.</div><table><thead><tr><th>İş No</th><th>Geliş</th><th>Hasta</th><th>Hekim</th><th>İş</th><th>Renk</th><th>Termin</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close(); }
+        function anayasaHekimGelenPdf(){ if(!hgSonListe.length)return showError("PDF için listede kayıt yok."); const baslik=hgAktifSekme==="yeni"?"Yeni Gelenler":hgAktifSekme==="devam"?"Onaylanan / Devam Eden":"Tamamlananlar"; const rows=hgSonListe.map(x=>`<tr><td>#${Number(x.id)}</td><td>${hgTarih(x)?tarihGoster(hgTarih(x)):"-"}</td><td>${escapeHtml(x.hastaAdi||"-")}</td><td>${escapeHtml(x.hekimAdi||"-")}</td><td>${anayasaKalemOzet(x)}</td><td>${escapeHtml(x.disRengi||"-")}</td><td>${x.terminTarihi?tarihGoster(x.terminTarihi):"-"}</td><td>${escapeHtml(anayasaDurum(x.durum)||"-")}</td></tr>`).join(""); const w=window.open("","_blank","width=1100,height=800"); if(!w)return showError("PDF penceresi tarayıcı tarafından engellendi."); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml((window.FIRMA||{}).ad||"")} - ${baslik}</title><style>body{font-family:Arial,sans-serif;color:#0f172a;padding:28px}h1{margin:0}p{color:#64748b}table{width:100%;border-collapse:collapse;margin-top:20px;font-size:11px}th,td{border-bottom:1px solid #dbe4ef;padding:8px;text-align:left}th{background:#eff6ff}@@page{size:landscape;margin:12mm}.no-price{font-size:10px;color:#94a3b8}</style></head><body>${firmaBaskiBasligi()}<h1>${baslik}</h1><p>${hgSonListe.length} kayıt • ${new Date().toLocaleString("tr-TR")}</p><div class="no-price">Bu rapor operasyon takibi içindir; finansal bilgi içermez.</div><table><thead><tr><th>İş No</th><th>Geliş</th><th>Hasta</th><th>Hekim</th><th>İş</th><th>Renk</th><th>Termin</th><th>Durum</th></tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>{window.print();}<\/script></body></html>`);w.document.close(); }
 
         async function anayasaPortalSiparisFormaAktar(id) {
             const x = anayasaIsler.find(function(item){ return Number(item.id) === Number(id); });
@@ -13971,6 +14032,91 @@
         }
 
         // ---------------- Portal hesabı e-posta durumu (hesap pencerelerinde) ----------------
+        // ---------------- Firma Bilgileri ----------------
+        // window.FIRMA sayfa açılırken sunucudan gömülür; kaydedince güncellenip ekrana uygulanır.
+        function firmaIletisim(){ const F=window.FIRMA||{}; return [F.adres,F.telefon,F.eposta,F.web].filter(Boolean).join(" · "); }
+        function firmaImza(){ const F=window.FIRMA||{}; return [F.ad, F.telefon?"Tel: "+F.telefon:"", F.eposta||""].filter(Boolean).join("\n"); }
+        // Çıktı pencereleri için hazır başlık (stiller satır içi; her pencerede çalışır).
+        function firmaBaskiBasligi(kucuk){
+            const F=window.FIRMA||{};
+            const il=[F.adres,F.telefon,F.eposta,F.web].filter(Boolean).map(escapeHtml).join(" · ");
+            const vergi=[F.vergiDairesi,F.vergiNo].filter(Boolean).map(escapeHtml).join(" / ");
+            return `<div style="display:flex;align-items:center;gap:14px;${kucuk?"":"border-bottom:2px solid #10233e;padding-bottom:10px;margin-bottom:16px;"}white-space:normal;line-height:1.35;font-family:Arial,sans-serif">`+
+                (F.logo?`<img src="${F.logo}" alt="" style="max-height:${kucuk?46:62}px;max-width:180px;object-fit:contain">`:"")+
+                `<div><div style="font-size:${kucuk?16:19}px;font-weight:900;color:#10233e">${escapeHtml(F.ad||"")}</div>`+
+                (F.altBaslik?`<div style="font-size:11px;color:#475569">${escapeHtml(F.altBaslik)}</div>`:"")+
+                (il?`<div style="font-size:11px;color:#475569;margin-top:2px">${il}</div>`:"")+
+                (vergi?`<div style="font-size:10px;color:#64748b">V.D. / No: ${vergi}</div>`:"")+`</div></div>`;
+        }
+        function firmaUygula(){
+            const F=window.FIRMA||{};
+            document.title=(F.ad||"Primer Lab")+" — Primer Lab";
+            const sb=document.getElementById("sbFirma");
+            if(sb) sb.innerHTML=(F.logo?`<img class="sb-firma-logo" src="${F.logo}" alt="">`:"")+`<div class="logo">${escapeHtml(F.ad||"Primer Lab")}</div>`;
+            const lg=document.getElementById("anFirmaLogo");
+            if(lg) lg.innerHTML=(F.logo?`<img class="ref-firma-img" src="${F.logo}" alt="">`:escapeHtml(F.kisaltma||""))+
+                `<small class="ref-firma-ad">${escapeHtml(F.ad||"")}</small>`+(F.altBaslik?`<small>${escapeHtml(F.altBaslik)}</small>`:"");
+            const il=document.getElementById("anFirmaIletisim");
+            if(il){ const v=[F.vergiDairesi,F.vergiNo].filter(Boolean).join(" / "); il.innerText=[firmaIletisim(), v?"V.D. / No: "+v:""].filter(Boolean).join("\n"); }
+            const an=document.getElementById("anFirmaAltNot");
+            if(an){ an.innerText=F.formAltNotu||""; an.style.display=F.formAltNotu?"block":"none"; }
+            const oz=document.getElementById("fbOnizleme"); if(oz) oz.innerHTML=firmaBaskiBasligi();
+            const lk=document.getElementById("fbLogoKutu");
+            if(lk) lk.innerHTML=F.logo?`<img src="${F.logo}" alt="Logo">`:`<span class="bas-harf">${escapeHtml(F.kisaltma||"")}</span>`;
+        }
+        function firmaVeriAl(d){
+            window.FIRMA={ad:d.firmaAdi,altBaslik:d.altBaslik,adres:d.adres,telefon:d.telefon,eposta:d.eposta,web:d.webSitesi,
+                vergiDairesi:d.vergiDairesi,vergiNo:d.vergiNo,formAltNotu:d.formAltNotu,kisaltma:d.kisaltma,logo:d.logo};
+            firmaUygula();
+        }
+        let firmaSurum=0; // geç dönen eski yanıt, sonradan kaydedilen bilgilerin üzerine yazmasın
+        async function firmaYukle(){
+            const surum=++firmaSurum;
+            try{
+                const r=await fetch("/api/firma",{cache:"no-store"}); if(!r.ok) throw new Error(await r.text());
+                const d=await r.json();
+                if(surum!==firmaSurum) return;
+                const set=(id,v)=>{const e=document.getElementById(id); if(e) e.value=v||"";};
+                set("fbAd",d.firmaAdi); set("fbAlt",d.altBaslik); set("fbTel",d.telefon); set("fbEposta",d.eposta); set("fbWeb",d.webSitesi);
+                set("fbVd",d.vergiDairesi); set("fbVn",d.vergiNo); set("fbAdres",d.adres); set("fbNot",d.formAltNotu);
+                firmaVeriAl(d);
+            }catch(e){ showError(e.message||"Firma bilgileri alınamadı."); }
+        }
+        async function firmaKaydet(){
+            const g=id=>document.getElementById(id).value.trim()||null;
+            if(!g("fbAd")) return showError("Firma adını yazın.");
+            firmaSurum++;
+            try{
+                const r=await fetch("/api/firma",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+                    firmaAdi:g("fbAd"),altBaslik:g("fbAlt"),telefon:g("fbTel"),eposta:g("fbEposta"),webSitesi:g("fbWeb"),
+                    vergiDairesi:g("fbVd"),vergiNo:g("fbVn"),adres:g("fbAdres"),formAltNotu:g("fbNot")})});
+                if(!r.ok) throw new Error((await r.text())||"Kaydedilemedi.");
+                firmaVeriAl(await r.json());
+                showSuccess("Firma bilgileri kaydedildi. Hekim portalı ve teknisyen panelinde sayfa yenilenince görünür.");
+            }catch(e){ showError(e.message); }
+        }
+        async function firmaLogoYukle(input){
+            const f=input.files&&input.files[0]; input.value=""; if(!f) return;
+            firmaSurum++;
+            if(f.size>1024*1024) return showError("Logo en fazla 1 MB olabilir.");
+            const fd=new FormData(); fd.append("dosya",f,f.name);
+            try{
+                const r=await fetch("/api/firma/logo",{method:"POST",body:fd});
+                if(!r.ok) throw new Error((await r.text())||"Logo yüklenemedi.");
+                firmaVeriAl(await r.json()); showSuccess("Logo kaydedildi.");
+            }catch(e){ showError(e.message); }
+        }
+        async function firmaLogoSil(){
+            if(!(window.FIRMA||{}).logo) return showError("Kayıtlı logo yok.");
+            if(!confirm("Logo kaldırılsın mı?")) return;
+            try{
+                const r=await fetch("/api/firma/logo",{method:"DELETE"}); if(!r.ok) throw new Error(await r.text());
+                firmaVeriAl(await r.json()); showSuccess("Logo kaldırıldı.");
+            }catch(e){ showError(e.message); }
+        }
+
+        document.addEventListener("DOMContentLoaded", firmaUygula);
+
         function epostaDurumGoster(tur, d){
             const el=document.getElementById(tur==='hekim'?'hekimPortalEposta':'teknisyenPanelEposta');
             if(!el) return;
@@ -14375,7 +14521,7 @@
             try{
                 const r=await fetch("/api/anayasa/mesajlar/"+anayasaMesajAktifIsId,{
                     method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({gonderenTipi:"Laboratuvar",gonderenAdi:"Primer Lab",mesaj})
+                    body:JSON.stringify({gonderenTipi:"Laboratuvar",gonderenAdi:(window.FIRMA||{}).ad||"Laboratuvar",mesaj})
                 });
                 if(!r.ok)throw new Error(await r.text());
                 input.value="";
@@ -14697,8 +14843,7 @@
                 th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:11px}
                 th{background:#f5f7fa}
             </style></head><body>
-                <h1>Primer Lab — ${escapeHtml(title)}</h1>
-                <div class="sub">İş Takip & Ön Muhasebe</div>
+                ${firmaBaskiBasligi()}<h1>${escapeHtml(title)}</h1>
                 <div class="cards">
                     <div class="card"><div class="label">İş Sayısı</div><div class="value">${Number(s.isSayisi||0)}</div></div>
                     <div class="card"><div class="label">Tamamlanan</div><div class="value">${escapeHtml(arMoneyText(s.tamamlanan))}</div></div>
@@ -16597,7 +16742,7 @@ function togglePrimerAi(){
                     </style>
                 </head>
                 <body>
-                    <h1>Primer Lab - Cari Ekstre</h1>
+                    ${firmaBaskiBasligi()}<h1>Cari Ekstre</h1>
 
                     <div class="sub">
                         ${escapeHtml(hekim.adSoyad || "-")}
@@ -16845,7 +16990,8 @@ function togglePrimerAi(){
                     <div class="receipt">
                         <div class="header">
                             <div>
-                                <div class="brand">Primer Lab</div>
+                                ${(window.FIRMA||{}).logo?`<img src="${window.FIRMA.logo}" alt="" style="max-height:48px;max-width:170px;object-fit:contain;display:block;margin-bottom:6px">`:""}<div class="brand">${escapeHtml((window.FIRMA||{}).ad||"")}</div>
+                                <div class="subtitle">${escapeHtml(firmaIletisim())}</div>
                                 <div class="subtitle">
                                     Tahsilat Makbuzu
                                 </div>

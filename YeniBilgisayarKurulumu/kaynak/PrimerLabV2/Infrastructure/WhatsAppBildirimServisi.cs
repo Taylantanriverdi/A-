@@ -119,7 +119,7 @@ public sealed class WhatsAppBildirimServisi : BackgroundService
                 {
                     var termin = s.Termin is { } t ? " Termin: " + t.AddHours(3).ToString("dd.MM.yyyy") + "." : "";
                     await _wa.GonderAsync(ttel,
-                        $"Primer Dental Lab: Size yeni iş atandı — #{s.Id} {Hasta(s.Hasta, a.HastaAdiKisalt)} ({s.Kalemler ?? "-"}).{termin} Ayrıntılar ve dosyalar Teknisyen Paneli'nde.",
+                        $"{FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd}: Size yeni iş atandı — #{s.Id} {Hasta(s.Hasta, a.HastaAdiKisalt)} ({s.Kalemler ?? "-"}).{termin} Ayrıntılar ve dosyalar Teknisyen Paneli'nde.",
                         true, ct);
                 }
             }
@@ -150,7 +150,7 @@ public sealed class WhatsAppBildirimServisi : BackgroundService
             "Üretimde" => "üretime alındı",
             _ => "tamamlandı, teslime hazır"
         };
-        return $"Primer Dental Lab: #{isId} numaralı {Hasta(hasta, kisalt)} işiniz {ne}. Sorularınız için bu numaraya yazabilirsiniz.";
+        return $"{FirmaServisi.Ornek?.Ad ?? FirmaServisi.VarsayilanAd}: #{isId} numaralı {Hasta(hasta, kisalt)} işiniz {ne}. Sorularınız için bu numaraya yazabilirsiniz.";
     }
 
     /// <summary>Günün özeti (tek satır; şablonla da gönderilebilir).</summary>
