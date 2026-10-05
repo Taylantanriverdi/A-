@@ -1053,7 +1053,7 @@
         .onz-dosya.secili{border-color:#93c5fd;background:#eff6ff}
         .onz-dosya span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
         .onz-dosya a{color:#1565c0;font-weight:900;text-decoration:none;white-space:nowrap}
-        .ref-stl{padding:10px 12px}.ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}.ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}.ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}.ref-stl img{width:100%;height:auto;display:block}.ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}.ref-stl-ara{height:10px}.ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ref-stl{padding:10px 12px}.ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}.ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}.ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}.ref-stl img{width:100%;max-width:var(--stl-max,100%);aspect-ratio:1/1;object-fit:contain;height:auto;display:block;margin:0 auto}.ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}.ref-stl-ara{height:10px}.ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .ref-order-paper{max-width:760px;margin:0 auto;background:#fff;border:1px solid #dbe3ef;box-shadow:0 8px 28px rgba(15,23,42,.08);padding:24px}
         .ref-order-brand{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:20px;border-bottom:2px solid #172033;padding-bottom:14px;margin-bottom:14px}
         .ref-order-logo{font-size:34px;font-weight:1000;letter-spacing:-2px;text-align:center;color:#0b1d36}
@@ -13889,7 +13889,7 @@
             const fs='precision mediump float;varying vec3 vn;uniform vec3 c;void main(){vec3 N=normalize(vn);float d=abs(dot(N,vec3(0.0,0.0,1.0)));float d2=abs(dot(N,normalize(vec3(-0.4,0.6,0.7))));float s=pow(d2,28.0)*0.22;gl_FragColor=vec4(c*(0.30+0.50*d+0.25*d2)+vec3(s),1.0);}';
             function hazirla(){
                 if(gl) return true;
-                tuval=document.createElement('canvas'); tuval.width=900; tuval.height=640;
+                tuval=document.createElement('canvas'); tuval.width=800; tuval.height=800; // kare: kâğıtta 7x7 cm kare çerçeve
                 gl=tuval.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
                 if(!gl) return false;
                 ext=gl.getExtension('OES_element_index_uint');
@@ -16113,6 +16113,10 @@
             const olcek=Math.min(1,138*mm/genislik,200*mm/yukseklik)*0.98;
             paper.style.setProperty('--a5-width',genislik+'px');
             paper.style.setProperty('--a5-zoom',String(olcek));
+            // Tarama/tasarım görüntüleri kâğıtta en fazla 7 x 7 cm kare; sığmazsa hepsi aynı oranda küçülür
+            // (form sayfaya sığdırılırken uygulanan ölçek hesaba katılır).
+            const stlKutu=document.getElementById('anStlGorseller');
+            if(stlKutu) stlKutu.style.setProperty('--stl-max',(70*mm/olcek).toFixed(1)+'px');
             // Sayfa (veya içerik paneli) aşağı kaydırılmışsa formun üstü kesilmesin diye
             // yazdırma süresince başa alınır, sonra eski konuma dönülür.
             const kaydirmalar=[];
@@ -16129,6 +16133,7 @@
                 document.body.classList.remove('print-a5');
                 paper.style.removeProperty('--a5-zoom');
                 paper.style.removeProperty('--a5-width');
+                document.getElementById('anStlGorseller')?.style.removeProperty('--stl-max');
                 document.getElementById('a5YazdirmaSayfasi')?.remove();
                 window.removeEventListener('afterprint',temizle);
             };

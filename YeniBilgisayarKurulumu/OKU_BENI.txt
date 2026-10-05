@@ -370,3 +370,6 @@ Yazdirirken tarama goruntulerinin altina TASARIM GORUNTULERI satiri eklenir
 - Tarama yoksa ya da tasarim taramayla ortusmuyorsa tasarim tek basina
   ustten (cigneme yuzu) ve yandan cizilir.
 Tum goruntuler ayni boyuttadir (satir basina 3); form tek A5 sayfaya sigar.
+V30: Goruntuler kare cizilir; kagitta en fazla 7 x 7 cm. A5'te satir basina 3
+goruntu 3 x 7 cm'ye sigmadigi icin hepsi ayni oranda kuculur (tek satirda ~3,7 cm,
+tarama + tasarim iki satirda ~3,1 cm); form yine tek A5 sayfaya sigar.
