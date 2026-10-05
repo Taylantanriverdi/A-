@@ -19,6 +19,40 @@ public sealed class MailIntegrationService
     private readonly SemaphoreSlim _runLock = new(1, 1);
     private readonly object _statusLock = new();
     private readonly MailRuntimeStatus _runtimeStatus = new();
+    // "Yalnız kayıtlı hekimler" açıkken atlanan mailler kaydedilmez; her sorguda yeniden indirilip
+    // AI'ya yeniden analiz ettirilmesinler diye kimlikleri hatırlanır.
+    private HashSet<string>? _atlananlar;
+    private readonly object _atlananKilit = new();
+    private string AtlananDosyasi => Path.Combine(_env.ContentRootPath, "App_Data", "mail-atlanan.json");
+
+    private bool Atlandi(string id)
+    {
+        lock (_atlananKilit)
+        {
+            if (_atlananlar == null)
+            {
+                try { _atlananlar = File.Exists(AtlananDosyasi) ? JsonSerializer.Deserialize<HashSet<string>>(File.ReadAllText(AtlananDosyasi)) ?? new() : new(); }
+                catch { _atlananlar = new(); }
+            }
+            return _atlananlar.Contains(id);
+        }
+    }
+
+    private void AtlanaEkle(string id)
+    {
+        lock (_atlananKilit)
+        {
+            if (_atlananlar == null) Atlandi(id);
+            if (!_atlananlar!.Add(id)) return;
+            if (_atlananlar.Count > 20000) _atlananlar = _atlananlar.Skip(_atlananlar.Count - 15000).ToHashSet();
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(AtlananDosyasi)!);
+                File.WriteAllText(AtlananDosyasi, JsonSerializer.Serialize(_atlananlar));
+            }
+            catch (IOException) { }
+        }
+    }
     private CancellationTokenSource? _activeRunCts;
 
     public MailIntegrationService(
@@ -81,6 +115,9 @@ public sealed class MailIntegrationService
         settings.Query = (settings.Query ?? string.Empty).Trim();
         settings.TimeScope = NormalizeScope(settings.TimeScope);
         settings.ReviewThreshold = Math.Clamp(settings.ReviewThreshold, 0.10, 0.95);
+        // "Yalnız kayıtlı hekimler" kapatılınca daha önce bu yüzden atlanan mailler yeniden değerlendirilir.
+        if (!settings.KnownDoctorsOnly)
+            lock (_atlananKilit) { _atlananlar = new(); try { File.Delete(AtlananDosyasi); } catch (IOException) { } }
         settings.StartHour = Math.Clamp(settings.StartHour, 0, 23);
         settings.EndHour = Math.Clamp(settings.EndHour, 0, 23);
 
@@ -345,7 +382,7 @@ public sealed class MailIntegrationService
                     WHERE "MesajId"={id}
                     """).SingleAsync(runToken);
 
-                if (exists > 0)
+                if (exists > 0 || (!previewOnly && Atlandi(id)))
                 {
                     result.Skipped++;
                     continue;
@@ -385,6 +422,7 @@ public sealed class MailIntegrationService
 
                 if (settings.KnownDoctorsOnly && doctor == null)
                 {
+                    AtlanaEkle(id);
                     result.Skipped++;
                     continue;
                 }

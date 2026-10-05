@@ -46,14 +46,17 @@ public sealed class HekimPortalController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly IDataProtector _teknisyenProtector;
     private readonly TeknisyenHesapDeposu _teknisyenHesaplari;
+    private readonly IcerikTakip _takip;
 
     public HekimPortalController(
         PrimerLabDbContext db,
         IDataProtectionProvider dataProtectionProvider,
         IWebHostEnvironment environment,
         IConfiguration configuration,
-        TeknisyenHesapDeposu teknisyenHesaplari)
+        TeknisyenHesapDeposu teknisyenHesaplari,
+        IcerikTakip takip)
     {
+        _takip = takip;
         _db = db;
         _protector = dataProtectionProvider.CreateProtector("PrimerLab.HekimPortal.Session.v1");
         // Teknisyen Paneli oturum çerezi (iç teknisyenin hekim adına sipariş formu açması için).
@@ -622,7 +625,7 @@ public sealed class HekimPortalController : ControllerBase
                 COALESCE(s."ParaBirimi",'TRY') AS "ParaBirimi",
                 COALESCE((SELECT SUM(k."Adet") FROM "SiparisKalemleri" k WHERE k."SiparisId"=s."Id"),0)::int AS "ToplamAdet",
                 COALESCE((SELECT COUNT(*) FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id"),0)::int AS "DosyaSayisi",
-                COALESCE((SELECT COUNT(*) FROM "IsMesajlari" m WHERE m."SiparisId"=s."Id"),0)::int AS "MesajSayisi"
+                COALESCE((SELECT COUNT(*) FROM "IsMesajlari" m WHERE m."SiparisId"=s."Id" AND m."GonderenTipi" IN ('Hekim','Laboratuvar')),0)::int AS "MesajSayisi"
             FROM "Siparisler" s
             INNER JOIN "Hastalar" p ON p."Id"=s."HastaId"
             WHERE p."HekimId"={session.HekimId}
@@ -648,8 +651,17 @@ public sealed class HekimPortalController : ControllerBase
 
         var byJob = items.GroupBy(x => x.SiparisId).ToDictionary(g => g.Key, g => g.ToList());
 
+        // Laboratuvardan gelen, hekimin henüz okumadığı mesajlar.
+        var labMesajlari = ids.Length == 0 ? new List<MesajNoSatiri>() : await _db.Database.SqlQuery<MesajNoSatiri>($"""
+            SELECT "SiparisId","Id","GonderenTipi" FROM "IsMesajlari"
+            WHERE "SiparisId" = ANY({ids}) AND "GonderenTipi"='Laboratuvar'
+            """).ToListAsync(cancellationToken);
+        var sinir = _takip.OkunmaSiniri("hekim:" + session.HekimId);
+        var okunmamis = labMesajlari.Where(m => m.Id > sinir(m.SiparisId)).GroupBy(m => m.SiparisId).ToDictionary(g => g.Key, g => g.Count());
+
         return Ok(rows.Select(x => new
         {
+            OkunmamisMesaj = okunmamis.TryGetValue(x.Id, out var om) ? om : 0,
             x.Id,
             x.HastaAdi,
             x.Durum,
@@ -830,6 +842,9 @@ public sealed class HekimPortalController : ControllerBase
             teknisyenAdi != null ? "[Teknisyen Paneli — " + teknisyenAdi + "]" : "[Hekim Portalı]"), 8000);
         var designSource = dto.TasarimKaynagi == "doctor" ? "doctor" : "lab";
         var portalSubmissionId = Guid.NewGuid();
+        var hekimAdiKayit = await _db.Hekimler.AsNoTracking().Where(x => x.Id == hekimId).Select(x => x.AdSoyad).FirstOrDefaultAsync(cancellationToken) ?? "Hekim";
+        var yukleyenTipi = teknisyenAdi != null ? "Teknisyen" : "Hekim";
+        var yukleyenAdi = teknisyenAdi != null ? teknisyenAdi + " (" + hekimAdiKayit + " adına)" : hekimAdiKayit;
         var savedPaths = new List<string>();
         var createdJobIds = new List<int>();
 
@@ -911,7 +926,7 @@ public sealed class HekimPortalController : ControllerBase
                         // ayrı fiziksel kopyası kaydedilir; böylece hangi sipariş açılırsa açılsın dosya erişimi eksiksizdir.
                         foreach (var file in files)
                         {
-                            var saved = await SavePortalFile(siparis.Id, file, designSource, cancellationToken);
+                            var saved = await SavePortalFile(siparis.Id, file, designSource, yukleyenTipi, yukleyenAdi, cancellationToken);
                             savedPaths.Add(saved.FullPath);
                         }
                     }
@@ -955,11 +970,13 @@ public sealed class HekimPortalController : ControllerBase
         if (session.Error != null) return session.Error;
         if (!await OwnsJob(session.HekimId, jobId, cancellationToken)) return NotFound("İş bulunamadı.");
 
+        // Yalnız hekim ↔ laboratuvar kanalı; laboratuvar ile teknisyen arasındaki iç yazışma hekime gösterilmez.
         var rows = await _db.Database.SqlQuery<IsMesajSatiri>($"""
             SELECT "Id","GonderenTipi","GonderenAdi","Mesaj","Tarih"
-            FROM "IsMesajlari" WHERE "SiparisId"={jobId}
+            FROM "IsMesajlari" WHERE "SiparisId"={jobId} AND "GonderenTipi" IN ('Hekim','Laboratuvar')
             ORDER BY "Tarih","Id"
             """).ToListAsync(cancellationToken);
+        if (rows.Count > 0) _takip.MesajOkundu("hekim:" + session.HekimId, jobId, rows.Max(x => x.Id));
 
         // Laboratuvar içi kişiler (teknisyen adları) hekime gösterilmez.
         return Ok(rows.Select(m => new
@@ -987,10 +1004,12 @@ public sealed class HekimPortalController : ControllerBase
             .Where(x => x.Id == session.HekimId).Select(x => x.AdSoyad)
             .FirstOrDefaultAsync(cancellationToken) ?? "Hekim";
 
-        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+        var yeniId = (await _db.Database.SqlQuery<int>($"""
             INSERT INTO "IsMesajlari" ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")
             VALUES ({jobId},{"Hekim"},{hekimAdi},{mesaj},{DateTime.UtcNow})
-            """, cancellationToken);
+            RETURNING "Id" AS "Value"
+            """).ToListAsync(cancellationToken)).Single();
+        _takip.MesajOkundu("hekim:" + session.HekimId, jobId, yeniId);
         return Ok(new { message = "Mesaj gönderildi." });
     }
 
@@ -1032,6 +1051,7 @@ public sealed class HekimPortalController : ControllerBase
         var provider = new FileExtensionContentTypeProvider();
         if (!provider.TryGetContentType(row.OrijinalDosyaAdi, out var contentType))
             contentType = "application/octet-stream";
+        _takip.Indirildi(new[] { row.Id }, "Hekim");
 
         return PhysicalFile(fullPath, contentType, Path.GetFileName(row.OrijinalDosyaAdi), enableRangeProcessing: true);
     }
@@ -1191,6 +1211,8 @@ public sealed class HekimPortalController : ControllerBase
         int siparisId,
         IFormFile file,
         string designSource,
+        string yukleyenTipi,
+        string yukleyenAdi,
         CancellationToken cancellationToken)
     {
         var originalName = Path.GetFileName(file.FileName.Trim());
@@ -1211,11 +1233,13 @@ public sealed class HekimPortalController : ControllerBase
 
         try
         {
-            await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            var dosyaId = (await _db.Database.SqlQuery<int>($"""
                 INSERT INTO "IsDosyalari"
                 ("SiparisId","DosyaTuru","OrijinalDosyaAdi","SaklananDosyaAdi","Uzanti","Boyut","YuklemeTarihi")
                 VALUES ({siparisId},{fileType},{originalName},{storedName},{extension},{file.Length},{now})
-                """, cancellationToken);
+                RETURNING "Id" AS "Value"
+                """).ToListAsync(cancellationToken)).Single();
+            _takip.DosyaYuklendi(dosyaId, yukleyenTipi, yukleyenAdi);
         }
         catch
         {

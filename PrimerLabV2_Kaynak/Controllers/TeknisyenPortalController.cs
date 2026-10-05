@@ -50,13 +50,16 @@ public sealed class TeknisyenPortalController : ControllerBase
     private readonly IDataProtector _protector;
     private readonly IWebHostEnvironment _environment;
     private readonly TeknisyenHesapDeposu _hesaplar;
+    private readonly IcerikTakip _takip;
 
     public TeknisyenPortalController(
         PrimerLabDbContext db,
         IDataProtectionProvider dataProtectionProvider,
         IWebHostEnvironment environment,
-        TeknisyenHesapDeposu hesaplar)
+        TeknisyenHesapDeposu hesaplar,
+        IcerikTakip takip)
     {
+        _takip = takip;
         _db = db;
         _protector = dataProtectionProvider.CreateProtector("PrimerLab.TeknisyenPaneli.Session.v1");
         _environment = environment;
@@ -446,7 +449,8 @@ public sealed class TeknisyenPortalController : ControllerBase
                 COALESCE((SELECT COUNT(*) FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id" AND f."DosyaTuru"='Tarama'),0)::int AS "TaramaSayisi",
                 COALESCE((SELECT COUNT(*) FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id" AND f."DosyaTuru"='Tasarım'),0)::int AS "TasarimSayisi",
                 COALESCE((SELECT COUNT(*) FROM "IsDosyalari" f WHERE f."SiparisId"=s."Id"),0)::int AS "DosyaSayisi",
-                COALESCE((SELECT COUNT(*) FROM "IsMesajlari" m WHERE m."SiparisId"=s."Id"),0)::int AS "MesajSayisi",
+                COALESCE((SELECT COUNT(*) FROM "IsMesajlari" m WHERE m."SiparisId"=s."Id"
+                          AND ({o.Tip}='ic' OR m."GonderenTipi"<>'Laboratuvar')),0)::int AS "MesajSayisi",
                 EXISTS(SELECT 1 FROM "SiparisDurumGecmisi" g
                        WHERE g."SiparisId"=s."Id" AND g."Aciklama" LIKE {kabulDeseni}) AS "Kabul",
                 (SELECT MAX(g."DegisimTarihi") FROM "SiparisDurumGecmisi" g
@@ -476,6 +480,14 @@ public sealed class TeknisyenPortalController : ControllerBase
         var isKalemleri = kalemler.GroupBy(x => x.SiparisId).ToDictionary(g => g.Key, g => g.ToList());
         var dis = o.Tip == TeknisyenHesapDeposu.Dis;
 
+        // Teknisyenin okumadığı mesajlar: laboratuvarın ona yazdıkları ve hekim mesajları (kendi yazdıkları hariç).
+        var gelenMesaj = ids.Length == 0 ? new List<MesajNoSatiri>() : await _db.Database.SqlQuery<MesajNoSatiri>($"""
+            SELECT "SiparisId","Id","GonderenTipi" FROM "IsMesajlari"
+            WHERE "SiparisId" = ANY({ids}) AND "GonderenTipi" IN ('Lab-Teknisyen','Hekim')
+            """).ToListAsync(ct);
+        var sinir = _takip.OkunmaSiniri("teknisyen:" + tekId);
+        var okunmamis = gelenMesaj.Where(m => m.Id > sinir(m.SiparisId)).GroupBy(m => m.SiparisId).ToDictionary(g => g.Key, g => g.Count());
+
         return Ok(rows.Select(x => new
         {
             x.Id,
@@ -492,6 +504,7 @@ public sealed class TeknisyenPortalController : ControllerBase
             x.TasarimSayisi,
             x.DosyaSayisi,
             x.MesajSayisi,
+            OkunmamisMesaj = okunmamis.TryGetValue(x.Id, out var om) ? om : 0,
             Kabul = !dis || x.Kabul,
             x.TamamlanmaTarihi,
             x.TasarimTeslimTarihi,
@@ -669,6 +682,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         if (!System.IO.File.Exists(yol)) return NotFound("Dosyanın fiziksel kopyası bulunamadı.");
         if (!new FileExtensionContentTypeProvider().TryGetContentType(row.OrijinalDosyaAdi, out var tur))
             tur = "application/octet-stream";
+        _takip.Indirildi(new[] { row.Id }, "Teknisyen: " + o.Tek.AdSoyad);
         return PhysicalFile(yol, tur, Path.GetFileName(row.OrijinalDosyaAdi), enableRangeProcessing: true);
     }
 
@@ -699,11 +713,13 @@ public sealed class TeknisyenPortalController : ControllerBase
             await using (var akis = new FileStream(yol, FileMode.CreateNew, FileAccess.Write, FileShare.None, 128 * 1024, useAsync: true))
                 await dosya.CopyToAsync(akis, ct);
 
-            await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            var dosyaId = (await _db.Database.SqlQuery<int>($"""
                 INSERT INTO "IsDosyalari"
                 ("SiparisId","DosyaTuru","OrijinalDosyaAdi","SaklananDosyaAdi","Uzanti","Boyut","YuklemeTarihi")
                 VALUES ({jobId},{tur},{ad},{saklanan},{uzanti},{dosya.Length},{DateTime.UtcNow})
-                """, ct);
+                RETURNING "Id" AS "Value"
+                """).ToListAsync(ct)).Single();
+            _takip.DosyaYuklendi(dosyaId, "Teknisyen", o.Tek.AdSoyad);
         }
         catch
         {
@@ -725,17 +741,19 @@ public sealed class TeknisyenPortalController : ControllerBase
         if (o.Hata != null) return o.Hata;
         if (await IsDurumu(o.Tek!.Id, jobId, ct) == null) return NotFound("İş bulunamadı.");
 
-        var rows = await _db.Database.SqlQuery<IsMesajSatiri>($"""
+        var dis = o.Tip == TeknisyenHesapDeposu.Dis;
+        // Dış teknisyen laboratuvarın hekime yazdıklarını (fiyat vb. olabilir) görmez.
+        var rows = (await _db.Database.SqlQuery<IsMesajSatiri>($"""
             SELECT "Id","GonderenTipi","GonderenAdi","Mesaj","Tarih"
             FROM "IsMesajlari" WHERE "SiparisId"={jobId}
             ORDER BY "Tarih","Id"
-            """).ToListAsync(ct);
-
-        var dis = o.Tip == TeknisyenHesapDeposu.Dis;
+            """).ToListAsync(ct)).Where(m => !dis || m.GonderenTipi != "Laboratuvar").ToList();
+        if (rows.Count > 0) _takip.MesajOkundu("teknisyen:" + o.Tek.Id, jobId, rows.Max(x => x.Id));
         return Ok(rows.Select(m => new
         {
             m.Id,
-            m.GonderenTipi,
+            GonderenTipi = m.GonderenTipi == "Lab-Teknisyen" ? "Laboratuvar" : m.GonderenTipi,
+            Kanal = m.GonderenTipi is "Hekim" or "Laboratuvar" ? "hekim" : "ic",
             GonderenAdi = dis && m.GonderenTipi == "Hekim" ? Maskele(m.GonderenAdi) : m.GonderenAdi,
             m.Mesaj,
             m.Tarih,
@@ -754,10 +772,12 @@ public sealed class TeknisyenPortalController : ControllerBase
         if (mesaj.Length == 0) return BadRequest("Mesaj boş olamaz.");
         if (mesaj.Length > 4000) return BadRequest("Mesaj en fazla 4000 karakter olabilir.");
 
-        await _db.Database.ExecuteSqlInterpolatedAsync($"""
+        var yeniId = (await _db.Database.SqlQuery<int>($"""
             INSERT INTO "IsMesajlari" ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")
             VALUES ({jobId},{"Teknisyen"},{o.Tek.AdSoyad},{mesaj},{DateTime.UtcNow})
-            """, ct);
+            RETURNING "Id" AS "Value"
+            """).ToListAsync(ct)).Single();
+        _takip.MesajOkundu("teknisyen:" + o.Tek.Id, jobId, yeniId);
         return Ok(new { message = "Mesaj gönderildi." });
     }
 

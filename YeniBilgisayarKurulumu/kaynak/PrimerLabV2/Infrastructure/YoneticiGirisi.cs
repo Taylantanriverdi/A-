@@ -149,7 +149,9 @@ public sealed class YoneticiGirisi
         {
             HttpOnly = true,
             Secure = ctx.Request.IsHttps,
-            SameSite = SameSiteMode.Strict,
+            // Lax: dış bağlantıdan (ör. Gmail onayı dönüşü) gelince oturum korunur; veri değiştiren
+            // çapraz site istekleri güvenlik ara katmanında zaten engellenir.
+            SameSite = SameSiteMode.Lax,
             IsEssential = true,
             Path = "/",
             // "Hatırla" seçilmezse tarayıcı kapanınca biter (en geç 12 saat).

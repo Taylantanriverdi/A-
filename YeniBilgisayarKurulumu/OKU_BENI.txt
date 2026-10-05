@@ -337,3 +337,25 @@ yalniz yonetici sifresi silinir (veriler korunur), ilk sifre ekrani yeniden acil
 Sifre degistirme ve yeni kurtarma kodu: Ayarlar > Yonetici Sifresi.
 Cikis: sol menunun en altindaki Cikis dugmesi. 5 hatali denemede 10 dakika beklenir.
 Sifre ozeti App_Data\yonetici-giris.json icindedir (duz metin yok).
+
+DOSYALAR, MESAJLAR VE MAIL (V28)
+-------------------------------
+DOSYALAR: "Tum Dosyalar" sekmesi tum islerin dosyalarini tek listede gosterir:
+  tur / tarih / "yalniz yeni" suzgeci, kimin yukledigi (hekim, teknisyen, mail eki,
+  laboratuvar), laboratuvarin indirip indirmedigi (YENI etiketi), indirme gecmisi.
+  Secilen dosyalar tek zip olarak indirilir veya "gorundu" isaretlenir. Menu rozeti
+  yeni gelen ve uretime alinacak dosyalari sayar. Is bazli eski gorunumler sekmelerde.
+MESAJLAR: Iki ayri kanal vardir. Hekim <-> Laboratuvar (hekim portalinda gorunur) ve
+  Laboratuvar <-> Teknisyen (ic; hekim gormez). Onceden teknisyenin ic notlari hekime
+  de gorunuyordu; duzeltildi. Dis teknisyen laboratuvarin hekime yazdiklarini gormez.
+  Konusmalar son mesaja gore siralanir; okunmamis sayisi, arama, hazir yanitlar,
+  menude okunmamis rozeti. Hekim portali ve teknisyen panelinde de okunmamis gosterilir.
+MAIL: Mail satirina tiklayinca mail metni, AI'nin cikardigi tum alanlar ve ekler
+  acilir. Bekleyen / Inceleme / Islenen sekmeleri. "Forma Aktar" hekimi, is turunu
+  (hekim listesinden), uye sayisini, dis numaralarini, materyali ve referansi doldurur.
+  Mail ancak siparis kaydedilince "islendi" sayilir ve ekleri (STL vb.) isin
+  dosyalarina kopyalanir. Siparis gerekmeyen mailler "islendi" isaretlenebilir.
+  "Yalniz kayitli hekimler" acikken eslesmeyen mailler artik her sorguda yeniden
+  AI'ya gonderilmez (gereksiz API ucreti onlendi).
+Gmail baglantisi: yonetici girisi eklendikten sonra Google donusu engelleniyordu;
+  duzeltildi.

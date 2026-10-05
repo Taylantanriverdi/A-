@@ -26,6 +26,7 @@
         .wrap{max-width:860px;margin:0 auto;padding:16px}
         .brand{display:flex;align-items:center;gap:10px}
         .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900;font-size:15px;letter-spacing:.5px}
+        .yeni-mesaj{display:inline-block;background:#dc2626;color:#fff;border-radius:99px;padding:1px 8px;font-size:11px;font-weight:900;margin-left:4px}
         .brand-img{height:40px;max-width:150px;object-fit:contain;border-radius:8px;background:#fff;padding:2px}
         .firma-iletisim{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
         .brand-name{font-weight:900;font-size:16px;line-height:1.1}
@@ -1191,6 +1192,7 @@
         try {
             isler = await api("/api/hekim-portal/jobs");
             isleriCiz();
+            okunmamisOzet();
         } catch (err) {
             $("islerListe").innerHTML = `<div class="msg err">${esc(err.message)}</div>`;
         }
@@ -1217,7 +1219,7 @@
             const kal = (j.kalemler || []).map(k => esc(k.isTuru) + " × " + k.adet).join(", ");
             return `<div class="job">
                 <div class="job-head" onclick="isAc(${j.id})">
-                    <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}${j.mesajSayisi ? " · 💬 " + j.mesajSayisi : ""}</div></div>
+                    <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}${j.mesajSayisi ? " · 💬 " + j.mesajSayisi : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni mesaj</span>` : ""}</div></div>
                     <span class="badge ${c}">${esc(d)}</span>
                 </div>
                 ${acikIs === j.id ? `<div class="job-body" id="isDetay${j.id}">
@@ -1257,7 +1259,13 @@
                 `<div class="msg-b ${m.benim ? "me" : ""}"><small>${esc(m.gonderen)} · ${new Date(m.tarih).toLocaleString("tr-TR")}</small>${esc(m.mesaj)}</div>`).join("")
                 : '<span class="hint">Henüz mesaj yok.</span>';
             el.scrollTop = el.scrollHeight;
+            const j = isler.find(x => x.id === id);
+            if (j && j.okunmamisMesaj) { j.okunmamisMesaj = 0; okunmamisOzet(); }
         } catch (err) { el.textContent = err.message; }
+    }
+    function okunmamisOzet() {
+        const n = isler.reduce((t, j) => t + (j.okunmamisMesaj || 0), 0);
+        const b = $("tabIsler"); if (b) b.innerHTML = "📋 İşlerim" + (n ? ` <span class="yeni-mesaj">${n}</span>` : "");
     }
 
     async function mesajGonder(id) {

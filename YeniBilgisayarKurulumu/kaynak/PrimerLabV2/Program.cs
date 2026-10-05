@@ -33,6 +33,7 @@ builder.Services.AddSingleton<YapayZekaServisi>();
 builder.Services.AddSingleton<TeknisyenHesapDeposu>();
 builder.Services.AddSingleton<FirmaServisi>();
 builder.Services.AddSingleton<YoneticiGirisi>();
+builder.Services.AddSingleton<IcerikTakip>();
 builder.Services.AddSingleton<EpostaServisi>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EpostaServisi>());
 builder.Services.AddSingleton<PortalKimlik>();
@@ -98,5 +99,22 @@ app.UseMiddleware<MutationAuditMiddleware>();
 
 app.MapControllers();
 app.MapRazorPages();
+
+// Dosya takibi: bu sürümden önce yüklenmiş dosyalar "yeni" sayılmasın (yalnız ilk açılışta).
+try
+{
+    using var takipKapsam = app.Services.CreateScope();
+    var takipDb = takipKapsam.ServiceProvider.GetRequiredService<PrimerLabV2.Data.PrimerLabDbContext>();
+    var enBuyuk = takipDb.Database.SqlQuery<int>(
+        $"SELECT COALESCE(MAX(\"Id\"),0)::int AS \"Value\" FROM \"IsDosyalari\"").AsEnumerable().Single();
+    app.Services.GetRequiredService<IcerikTakip>().BaslangicAyarla(() => enBuyuk);
+    var enBuyukMesaj = takipDb.Database.SqlQuery<int>(
+        $"SELECT COALESCE(MAX(\"Id\"),0)::int AS \"Value\" FROM \"IsMesajlari\"").AsEnumerable().Single();
+    app.Services.GetRequiredService<IcerikTakip>().MesajBaslangicAyarla(enBuyukMesaj);
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Dosya takibi başlangıç sınırı belirlenemedi.");
+}
 
 app.Run();

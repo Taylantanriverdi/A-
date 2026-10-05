@@ -117,6 +117,8 @@ public sealed class PrimerLabSecurityMiddleware
     private static bool GirisSerbest(PathString path) =>
         path.StartsWithSegments("/giris") ||
         path.StartsWithSegments("/api/yonetici-giris") ||
+        // Google OAuth dönüşü: Google'dan gelen yönlendirme; kendi "state" çereziyle doğrulanır.
+        path.StartsWithSegments("/api/mail-v2/oauth/callback") ||
         path.Equals("/favicon.ico", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>

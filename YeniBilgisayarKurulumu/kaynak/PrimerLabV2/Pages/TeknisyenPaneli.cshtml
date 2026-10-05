@@ -26,6 +26,8 @@
         .wrap{max-width:980px;margin:0 auto;padding:16px}
         .brand{display:flex;align-items:center;gap:10px}
         .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900;font-size:15px}
+        .yeni-mesaj{display:inline-block;background:#dc2626;color:#fff;border-radius:99px;padding:0 7px;font-size:11px;font-weight:900;margin-left:4px}
+        .msg-b.hk{background:#fffbeb;border-color:#fde68a}
         .brand-img{height:40px;max-width:150px;object-fit:contain;border-radius:8px;background:#fff;padding:2px}
         .firma-iletisim{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
         .brand-name{font-weight:900;font-size:16px;line-height:1.1}
@@ -323,6 +325,7 @@
     let gorunum = "aktif";
     let acikModal = null;
     let yenilemeZamani = null;
+    let sonOkunmamis = null;
     let bilinenIsler = null;
 
     const $ = id => document.getElementById(id);
@@ -711,6 +714,9 @@
                 if (yeni) bildir("🔔 Size " + yeni + " yeni iş atandı.");
             }
             bilinenIsler = idler;
+            const okunmamis = isler.reduce((t, x) => t + (x.okunmamisMesaj || 0), 0);
+            if (sonOkunmamis !== null && okunmamis > sonOkunmamis) bildir("💬 " + (okunmamis - sonOkunmamis) + " yeni mesajınız var.");
+            sonOkunmamis = okunmamis;
             ciz();
         } catch (err) { if (!sessiz) $("liste").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
     }
@@ -786,7 +792,7 @@
             <div class="actions">
                 ${teslimBtn}
                 <button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım)</button>
-                <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}</button>
+                <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni</span>` : ""}</button>
             </div>
         </div>`;
     }
@@ -891,7 +897,7 @@
         acikModal = { tur: "mesaj", id };
         modalAc(`#${id} · ${j.hastaAdi} — Mesajlar`, `
             <div class="msgs" id="mesajListe"><div class="note">Yükleniyor...</div></div>
-            <div style="display:flex;gap:8px"><textarea id="mesajYaz" class="inp" maxlength="4000" placeholder="Laboratuvara / hekime mesaj yazın..."></textarea>
+            <div style="display:flex;gap:8px"><textarea id="mesajYaz" class="inp" maxlength="4000" placeholder="Laboratuvara mesaj yazın (hekim görmez)..."></textarea>
             <button class="btn btn-sm" type="button" style="height:auto" onclick="mesajGonder(${id})">Gönder</button></div>`);
         await mesajlariCiz(id);
     }
@@ -900,9 +906,10 @@
         const el = $("mesajListe"); if (!el) return;
         try {
             const list = await api(`/api/teknisyen-portal/jobs/${id}/messages`);
-            el.innerHTML = list.length ? list.map(m => `<div class="msg-b ${m.benim ? "me" : ""}"><small>${esc(m.gonderenAdi || m.gonderenTipi)} · ${new Date(m.tarih).toLocaleString("tr-TR")}</small>${esc(m.mesaj)}</div>`).join("")
+            el.innerHTML = list.length ? list.map(m => `<div class="msg-b ${m.benim ? "me" : ""} ${m.kanal === "hekim" ? "hk" : ""}"><small>${m.kanal === "hekim" ? "🦷 Hekim yazışması · " : ""}${esc(m.gonderenAdi || m.gonderenTipi)} · ${new Date(m.tarih).toLocaleString("tr-TR")}</small>${esc(m.mesaj)}</div>`).join("")
                 : '<div class="note">Henüz mesaj yok.</div>';
             el.scrollTop = el.scrollHeight;
+            const j = isler.find(x => x.id === id); if (j) j.okunmamisMesaj = 0;
         } catch (err) { el.innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
     }
 

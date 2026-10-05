@@ -1068,6 +1068,90 @@
         .ys-kod{margin-top:12px;padding:12px 14px;border:2px dashed #94a3b8;border-radius:12px;background:#f8fafc;font-weight:700}
         .ys-kod b{display:block;font-family:Consolas,monospace;font-size:22px;letter-spacing:2px;margin:6px 0}
         @@media(max-width:900px){.ys-izgara{grid-template-columns:1fr}}
+        .an-mail-bant{max-width:760px;margin:0 auto 10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;gap:10px;align-items:center}
+        .an-mail-bant button{border:0;background:none;color:#1e40af;font-weight:900;cursor:pointer}
+        .mailv2-satir{cursor:pointer}.mailv2-satir:hover td{background:#f8fafc}
+        .md-izgara{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 14px;margin:12px 0}
+        .md-izgara div{background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:8px 10px}
+        .md-izgara span{display:block;font-size:10px;font-weight:900;color:#64748b;letter-spacing:.4px;text-transform:uppercase}
+        .md-izgara b{font-size:13px;color:#0f172a;word-break:break-word}
+        .md-govde{white-space:pre-wrap;background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px;max-height:280px;overflow:auto;font-size:13px;line-height:1.55}
+        .md-ek{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid #eef2f7;border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:13px}
+        .md-ek a{font-weight:800;color:#1565c0;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .md-katman{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:7000;display:flex;align-items:center;justify-content:center;padding:16px}
+        .md-kutu{background:#fff;border-radius:16px;width:min(860px,100%);max-height:92vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+        .md-ust{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+        .md-ust h2{margin:0;font-size:18px}
+        @@media(max-width:800px){.md-izgara{grid-template-columns:1fr 1fr}}
+        .mk-yerlesim{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;height:calc(100vh - 190px);min-height:520px}
+        .mk-sol,.mk-sag{background:#fff;border:1px solid #e2e8f0;border-radius:14px;display:flex;flex-direction:column;overflow:hidden}
+        .mk-ara{padding:10px;border-bottom:1px solid #eef2f7}.mk-ara input{width:100%}
+        .mk-filtre{display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid #eef2f7;flex-wrap:wrap}
+        .mk-filtre button{border:1px solid #e2e8f0;background:#fff;border-radius:99px;padding:5px 10px;font-size:12px;font-weight:800;cursor:pointer;color:#334155}
+        .mk-filtre button.on{background:#10233e;color:#fff;border-color:#10233e}
+        .mk-filtre b{background:#dc2626;color:#fff;border-radius:99px;padding:0 6px;font-size:10px;margin-left:2px}
+        .mk-filtre b:empty{display:none}
+        .mk-liste{flex:1;overflow:auto}
+        .mk-oge{padding:11px 12px;border-bottom:1px solid #f1f5f9;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:2px 8px}
+        .mk-oge:hover{background:#f8fafc}.mk-oge.on{background:#eff6ff;box-shadow:inset 3px 0 0 #1565c0}
+        .mk-oge .ust{font-weight:900;font-size:13px;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .mk-oge .zaman{font-size:11px;color:#94a3b8;white-space:nowrap;text-align:right}
+        .mk-oge .alt{font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .mk-oge.okunmamis .alt{color:#0f172a;font-weight:700}
+        .mk-rozet{background:#dc2626;color:#fff;font-size:10px;font-weight:900;border-radius:99px;padding:1px 7px;justify-self:end}
+        .mk-ayrac{padding:8px 12px;font-size:11px;font-weight:900;color:#94a3b8;letter-spacing:.4px;background:#f8fafc;border-bottom:1px solid #f1f5f9}
+        .mk-baslik{padding:12px 16px;border-bottom:1px solid #eef2f7;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+        .mk-baslik .ad{font-weight:900;font-size:15px}.mk-baslik .bilgi{font-size:12px;color:#64748b;margin-top:2px}
+        .mk-bos-baslik{color:#64748b;font-size:13px}
+        .mk-govde{flex:1;overflow:auto;padding:14px 16px;background:#f8fafc;display:flex;flex-direction:column;gap:8px}
+        .mk-bos{margin:auto;text-align:center;color:#94a3b8;font-size:34px}.mk-bos div{font-size:13px;font-weight:700;margin-top:6px}
+        .mk-gun{align-self:center;font-size:11px;font-weight:900;color:#64748b;background:#e2e8f0;border-radius:99px;padding:3px 10px;margin:6px 0}
+        .mk-balon{max-width:72%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.5;white-space:pre-wrap;word-break:break-word;border:1px solid #e2e8f0;background:#fff;align-self:flex-start}
+        .mk-balon .kim{display:block;font-size:11px;font-weight:900;margin-bottom:2px;color:#475569}
+        .mk-balon .saat{display:block;font-size:10px;color:#94a3b8;margin-top:3px;text-align:right}
+        .mk-balon.Laboratuvar{align-self:flex-end;background:#1565c0;border-color:#1565c0;color:#fff}
+        .mk-balon.Lab-Teknisyen{align-self:flex-end;background:#4c1d95;border-color:#4c1d95;color:#fff}
+        .mk-balon.Laboratuvar .kim,.mk-balon.Lab-Teknisyen .kim,.mk-balon.Laboratuvar .saat,.mk-balon.Lab-Teknisyen .saat{color:rgba(255,255,255,.8)}
+        .mk-balon.Teknisyen{background:#f5f3ff;border-color:#ddd6fe}
+        .mk-yaz{border-top:1px solid #eef2f7;padding:10px 12px;background:#fff}
+        .mk-kanal{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center}
+        .mk-kanal button{border:1px solid #e2e8f0;background:#fff;border-radius:99px;padding:5px 12px;font-size:12px;font-weight:800;cursor:pointer}
+        .mk-kanal button.on[data-k=hekim]{background:#1565c0;color:#fff;border-color:#1565c0}
+        .mk-kanal button.on[data-k=teknisyen]{background:#4c1d95;color:#fff;border-color:#4c1d95}
+        .mk-kanal button:disabled{opacity:.4;cursor:not-allowed}
+        .mk-kanal select{margin-left:auto;max-width:220px;font-size:12px}
+        .mk-yaz-satir{display:flex;gap:8px}.mk-yaz-satir textarea{flex:1;resize:vertical;min-height:44px;max-height:180px;font-family:inherit}
+        .mk-alt{display:flex;justify-content:space-between;font-size:11px;color:#94a3b8;margin-top:5px}
+        @@media(max-width:900px){.mk-yerlesim{grid-template-columns:1fr;height:auto}.mk-sol{max-height:360px}.mk-govde{min-height:360px}}
+        .dm-kartlar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+        .dm-kart{all:unset;box-sizing:border-box;cursor:pointer;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:3px}
+        .dm-kart:hover{border-color:#93c5fd;box-shadow:0 4px 14px rgba(21,101,192,.08)}
+        .dm-kart.pasif{cursor:default}.dm-kart.pasif:hover{border-color:#e2e8f0;box-shadow:none}
+        .dm-kart span{font-size:11px;font-weight:900;letter-spacing:.4px;color:#64748b;text-transform:uppercase}
+        .dm-kart b{font-size:26px;color:#0f172a}.dm-kart small{font-size:11px;color:#94a3b8}
+        .dm-kart.vurgu b{color:#1565c0}
+        .dm-sekmeler{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+        .dm-sekmeler button{border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:9px 14px;font-weight:800;cursor:pointer;color:#334155}
+        .dm-sekmeler button.on{background:#10233e;border-color:#10233e;color:#fff}
+        .dm-arac{background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+        .dm-arac input[type=search]{flex:1;min-width:220px}
+        .dm-onay{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;white-space:nowrap;flex:none}
+        .dm-onay input{width:auto!important;flex:none;margin:0}
+        .dm-secim{display:none;align-items:center;gap:8px;margin-left:auto}.dm-secim.goster{display:flex}
+        .dm-secim span{font-weight:800;font-size:12px;color:#1565c0}
+        .dm-tablo td{vertical-align:middle}
+        .dm-ad{display:flex;align-items:center;gap:8px;max-width:340px}
+        .dm-ad a{font-weight:800;color:#0f172a;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .dm-ad a:hover{color:#1565c0;text-decoration:underline}
+        .dm-yeni{background:#1565c0;color:#fff;font-size:9px;font-weight:900;padding:2px 6px;border-radius:99px;letter-spacing:.4px;flex:none}
+        .dm-tur{font-size:11px;font-weight:900;padding:3px 8px;border-radius:99px;background:#f1f5f9;color:#334155;white-space:nowrap}
+        .dm-tur.Tarama{background:#ecfeff;color:#0e7490}.dm-tur.Tasarım{background:#f5f3ff;color:#6d28d9}.dm-tur.Üretim{background:#ecfdf5;color:#15803d}
+        .dm-indirme{font-size:12px;white-space:nowrap}.dm-indirme.yok{color:#b45309;font-weight:800}.dm-indirme.var{color:#15803d;font-weight:700}
+        .dm-satir-yeni td{background:#f8fbff}
+        .dm-ikon{border:1px solid #e2e8f0;background:#fff;border-radius:8px;width:32px;height:32px;cursor:pointer;font-size:14px}
+        .dm-ikon:hover{background:#eff6ff;border-color:#93c5fd}
+        .dm-ikon.sil:hover{background:#fef2f2;border-color:#fca5a5}
+        @@media(max-width:900px){.dm-kartlar{grid-template-columns:repeat(2,minmax(0,1fr))}}
         .firma-izgara{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:16px}
         .firma-panel{padding:18px 20px}
         .firma-alanlar{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px}
@@ -2735,12 +2819,12 @@
             <button class="menu-item" type="button"
                     onclick="showSection('portalHesaplari', this)">Portal Hesapları <span id="menuBadgePortal" class="menu-badge amber">0</span></button>
             <button class="menu-item" type="button"
-                    onclick="showSection('mesajlar', this)">Mesajlar</button>
+                    onclick="showSection('mesajlar', this)">Mesajlar <span id="menuBadgeMesaj" class="menu-badge">0</span></button>
 
             <div class="menu-title">Yönetim</div>
 
             <button class="menu-item" type="button"
-                    onclick="showSection('mailKutusu', this)">Mail Kutusu</button>
+                    onclick="showSection('mailKutusu', this)">Mail Kutusu <span id="menuBadgeMail" class="menu-badge">0</span></button>
             <button class="menu-item" type="button"
                     onclick="showSection('muhasebe', this)">Kasa / Arşiv</button>
             <button class="menu-item" type="button"
@@ -3495,6 +3579,7 @@
                         </div>
                     </div>
 
+                    <div id="anMailKaynakBant" class="an-mail-bant" style="display:none"></div>
                     <div class="ref-order-paper">
                         <div class="ref-order-brand">
                             <div class="ref-order-logo" id="anFirmaLogo"></div>
@@ -3625,23 +3710,35 @@
                 <div class="topbar">
                     <div>
                         <h1 class="page-title">Mesajlar</h1>
-                        <div class="page-subtitle">Yalnız yeni açılan işlerin konuşmaları burada görünür.</div>
+                        <div class="page-subtitle">Hekim ve teknisyenlerle iş bazında yazışma. Hekim yalnız kendisiyle olan yazışmayı görür; teknisyenle yazışma laboratuvar içidir.</div>
                     </div>
+                    <div class="button-group"><button class="button button-light" type="button" onclick="mkYukle(true)">Yenile</button></div>
                 </div>
-                <div class="msg-layout">
-                    <div id="anMsgJobs" class="msg-list"></div>
-                    <div class="msg-conv">
-                        <div id="anMsgHead" class="msg-head">Bir iş seç</div>
-                        <div id="anMsgBody" class="msg-body">
-                            <div class="empty">Konuşmayı görmek için soldan iş seç.</div>
+                <div class="mk-yerlesim">
+                    <aside class="mk-sol">
+                        <div class="mk-ara"><input id="mkAra" type="search" placeholder="İş no, hasta, hekim veya mesaj ara..." oninput="mkAraGecikmeli()" /></div>
+                        <div class="mk-filtre" id="mkFiltre">
+                            <button type="button" data-f="hepsi" class="on" onclick="mkFiltre('hepsi')">Tümü</button>
+                            <button type="button" data-f="okunmamis" onclick="mkFiltre('okunmamis')">Okunmamış <b id="mkOkSayi"></b></button>
+                            <button type="button" data-f="hekim" onclick="mkFiltre('hekim')">🦷 Hekim</button>
+                            <button type="button" data-f="teknisyen" onclick="mkFiltre('teknisyen')">🛠 Teknisyen</button>
                         </div>
-                        <div class="msg-send">
-                            <input id="anMsgInput" type="text"
-                                   maxlength="2000"
-                                   placeholder="Mesaj yaz..."
-                                   onkeydown="if(event.key==='Enter'){event.preventDefault();anayasaMesajGonder();}" />
-                            <button class="button button-blue"
-                                    onclick="anayasaMesajGonder()">Gönder</button>
+                        <div id="mkListe" class="mk-liste"><div class="empty">Yükleniyor...</div></div>
+                    </aside>
+                    <div class="mk-sag">
+                        <div id="mkBaslik" class="mk-baslik"><div class="mk-bos-baslik">Soldan bir konuşma seçin ya da iş numarası/hasta arayarak yeni konuşma başlatın.</div></div>
+                        <div id="mkGovde" class="mk-govde"><div class="mk-bos">💬<div>Konuşma seçilmedi</div></div></div>
+                        <div class="mk-yaz" id="mkYaz" style="display:none">
+                            <div class="mk-kanal" id="mkKanal">
+                                <button type="button" data-k="hekim" class="on" onclick="mkKanalSec('hekim')">🦷 Hekime yaz</button>
+                                <button type="button" data-k="teknisyen" onclick="mkKanalSec('teknisyen')">🛠 Teknisyene yaz (iç)</button>
+                                <select id="mkHazir" onchange="mkHazirEkle(this)"><option value="">Hazır yanıt...</option></select>
+                            </div>
+                            <div class="mk-yaz-satir">
+                                <textarea id="mkMetin" rows="2" maxlength="4000" placeholder="Mesaj yazın... (Enter gönderir, Shift+Enter alt satır)" oninput="mkSayac()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();mkGonder();}"></textarea>
+                                <button class="button button-blue" type="button" id="mkGonderBtn" onclick="mkGonder()">Gönder</button>
+                            </div>
+                            <div class="mk-alt"><span id="mkKanalNot">Hekim bu mesajı Hekim Portalı'nda görür.</span><span id="mkSayac">0 / 4000</span></div>
                         </div>
                     </div>
                 </div>
@@ -3748,28 +3845,72 @@
                 <div class="topbar">
                     <div>
                         <h1 class="page-title">Dosyalar</h1>
-                        <div class="page-subtitle">Hekimden gelen tarama → teknisyen tasarımı yükler → "Tasarımı Gelenler"den kontrol edip Üretime Al → Üretime Alınanlar. 🦷/📐 simgesine tıklayınca dosyalar iner, üzerine gelince 3B önizleme açılır.</div>
+                        <div class="page-subtitle">Hekimden gelen taramalar, teknisyen tasarımları ve tüm iş dosyaları; kimin yüklediği, kimin ne zaman indirdiği.</div>
+                    </div>
+                    <div class="button-group">
+                        <button class="button button-light" type="button" onclick="dmYukle()">Yenile</button>
+                        <button class="button button-blue" type="button" onclick="openTopluDosyaModal()">📁 Toplu Dosya Yükle</button>
                     </div>
                 </div>
-                <div class="constitution-toolbar" style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:14px;">
-                    <select id="anFilesTab" onchange="renderAnayasaFiles()">
-                        <option value="doctor">Hekimden Gelenler (tarama)</option>
-                        <option value="design">Tasarımı Gelenler (üretime alınmayı bekleyen)</option>
-                        <option value="tech">Üretime Alınanlar</option>
-                    </select>
-                    <input id="anFilesSearch" type="text" placeholder="Ara..."
-                           oninput="renderAnayasaFiles()" />
-                    <button class="button button-blue" type="button" onclick="openTopluDosyaModal()" style="margin-left:auto">📁 Toplu Dosya Yükle</button>
+
+                <div class="dm-kartlar">
+                    <button type="button" class="dm-kart vurgu" onclick="dmHizli('yeni')"><span>Yeni (indirilmemiş)</span><b id="dmYeni">0</b><small>Laboratuvarın henüz açmadığı</small></button>
+                    <button type="button" class="dm-kart" onclick="dmHizli('bugun')"><span>Bugün gelen</span><b id="dmBugun">0</b><small>Bugün yüklenen dosyalar</small></button>
+                    <button type="button" class="dm-kart" onclick="dmSekme('design')"><span>Üretime alınacak tasarım</span><b id="dmTasarimBekleyen">0</b><small>Teknisyen tasarımı yükledi</small></button>
+                    <div class="dm-kart pasif"><span>Toplam</span><b id="dmToplam">0</b><small id="dmBoyut">0 MB</small></div>
                 </div>
-                <div class="panel">
-                    <div class="table-wrapper">
-                        <table>
-                            <thead><tr>
-                                <th>İş</th><th>Hekim / Hasta</th><th>Teknisyen</th>
-                                <th>Tarama</th><th>Tasarım</th><th>Durum</th><th>İşlem</th>
-                            </tr></thead>
-                            <tbody id="anFilesBody"></tbody>
-                        </table>
+
+                <div class="dm-sekmeler" id="dmSekmeler">
+                    <button type="button" data-s="all" class="on" onclick="dmSekme('all')">📥 Tüm Dosyalar</button>
+                    <button type="button" data-s="doctor" onclick="dmSekme('doctor')">🦷 Hekimden Gelenler</button>
+                    <button type="button" data-s="design" onclick="dmSekme('design')">📐 Tasarımı Gelenler</button>
+                    <button type="button" data-s="tech" onclick="dmSekme('tech')">🏭 Üretime Alınanlar</button>
+                </div>
+
+                <div id="dmTumBolum">
+                    <div class="constitution-toolbar dm-arac">
+                        <select id="dmTur" onchange="dmYukle()"><option value="">Tüm türler</option><option value="Tarama">Tarama</option><option value="Tasarım">Tasarım</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
+                        <select id="dmGun" onchange="dmYukle()"><option value="0">Tüm zamanlar</option><option value="1">Bugün / son 1 gün</option><option value="7">Son 7 gün</option><option value="30" selected>Son 30 gün</option><option value="90">Son 90 gün</option></select>
+                        <label class="dm-onay"><input id="dmYalnizYeni" type="checkbox" onchange="dmYukle()" /> Yalnız yeni</label>
+                        <input id="dmAra" type="search" placeholder="İş no, hasta, hekim veya dosya adı..." oninput="dmAraGecikmeli()" />
+                        <div class="dm-secim" id="dmSecimAlan">
+                            <span id="dmSeciliSayi">0 seçili</span>
+                            <button class="button button-blue" type="button" onclick="dmSeciliIndir()">⬇ Seçilenleri İndir</button>
+                            <button class="button button-light" type="button" onclick="dmSeciliGoruldu()">✓ Görüldü</button>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <div class="table-wrapper">
+                            <table class="dm-tablo">
+                                <thead><tr>
+                                    <th style="width:34px"><input type="checkbox" id="dmHepsi" onchange="dmHepsiniSec(this.checked)" title="Tümünü seç" /></th>
+                                    <th>Dosya</th><th>İş / Hasta</th><th>Tür</th><th>Boyut</th><th>Yükleyen</th><th>Yüklenme</th><th>İndirme</th><th></th>
+                                </tr></thead>
+                                <tbody id="dmBody"><tr><td colspan="9" class="empty">Yükleniyor...</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div id="dmDevam" style="display:none;text-align:center;padding:12px"><button class="button button-light" type="button" onclick="dmYukle(true)">Daha fazla göster</button></div>
+                    </div>
+                </div>
+
+                <div id="dmIsBolum" style="display:none">
+                    <div class="constitution-toolbar dm-arac">
+                        <input id="anFilesSearch" type="search" placeholder="İş no, hasta veya hekim ara..." oninput="renderAnayasaFiles()" />
+                        <select id="anFilesTab" onchange="renderAnayasaFiles()" style="display:none">
+                            <option value="doctor">Hekimden Gelenler</option><option value="design">Tasarımı Gelenler</option><option value="tech">Üretime Alınanlar</option>
+                        </select>
+                        <div class="ops-mini" id="dmIsAciklama" style="margin-left:auto"></div>
+                    </div>
+                    <div class="panel">
+                        <div class="table-wrapper">
+                            <table>
+                                <thead><tr>
+                                    <th>İş</th><th>Hekim / Hasta</th><th>Teknisyen</th>
+                                    <th>Tarama</th><th>Tasarım</th><th>Durum</th><th>İşlem</th>
+                                </tr></thead>
+                                <tbody id="anFilesBody"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -3919,8 +4060,14 @@
                             <div class="page-subtitle">AI tarafından çıkarılan iş bilgileri; düşük güvenli kayıtlar ayrıca işaretlenir.</div>
                         </div>
                         <div class="mailv2-results-tools">
-                            <input id="mailV2Search" class="mailv2-search" type="search" placeholder="Hekim, hasta veya konu ara..." oninput="mailV2LoadMails()" />
-                            <label class="mailv2-filter-check"><input id="mailV2ReviewOnly" type="checkbox" onchange="mailV2LoadMails()" /> Yalnız inceleme gereken</label>
+                            <div class="mk-filtre" id="mailV2Durumlar" style="border:0;padding:0">
+                                <button type="button" data-d="bekleyen" class="on" onclick="mailV2DurumSec('bekleyen')">Bekleyen <b id="mailV2SayBekleyen"></b></button>
+                                <button type="button" data-d="inceleme" onclick="mailV2DurumSec('inceleme')">İnceleme gereken <b id="mailV2SayInceleme"></b></button>
+                                <button type="button" data-d="aktarilan" onclick="mailV2DurumSec('aktarilan')">İşlenen</button>
+                                <button type="button" data-d="" onclick="mailV2DurumSec('')">Tümü</button>
+                            </div>
+                            <input id="mailV2Search" class="mailv2-search" type="search" placeholder="Hekim, hasta veya konu ara..." oninput="mailV2AraGecikmeli()" />
+                            <input id="mailV2ReviewOnly" type="checkbox" style="display:none" />
                         </div>
                     </div>
                     <div class="table-wrapper">
@@ -6380,6 +6527,12 @@
             }
             if (id === "mailKutusu") {
                 mailV2LoadAll();
+            }
+            if (id === "anayasaDosyalar") {
+                dmYukle();
+            }
+            if (id === "mesajlar") {
+                mkYukle();
             }
             if (id === "aylikRaporAnayasa") {
                 arInit();
@@ -12983,6 +13136,18 @@
                 anayasaYazdirIsId = portalAktarimiydi ? anayasaAktarilanPortalSiparisId : Number(sonuc?.siparisler?.[0]?.id || sonuc?.aktarilanSiparisId || 0) || null;
                 anayasaAktarilanPortalSiparisId = null;
                 anayasaFormOnayaGonderildi = true;
+                if (anMailKaynakId) {
+                    const idler = (sonuc?.siparisler || []).map(x => Number(x.id)).filter(Boolean);
+                    if (!idler.length && anayasaYazdirIsId) idler.push(Number(anayasaYazdirIsId));
+                    const mailId = anMailKaynakId; anMailKaynakId = null; anMailKaynakBant(null);
+                    if (idler.length) {
+                        try {
+                            const mr = await fetch(`/api/mail-v2/mail/${mailId}/ise-aktar`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ siparisIdler: idler }) });
+                            const md = await mr.json().catch(() => ({}));
+                            if (mr.ok && md.message) setTimeout(() => showSuccess(md.message), 2500);
+                        } catch { }
+                    }
+                }
                 await loadAnayasaData();
                 anayasaFormButonDurumu();
                 renderAnayasaFormHistory();
@@ -13077,7 +13242,7 @@
             const dagitim=aktif.filter(x=>x.onayDurumu==="Onaylandı" && !teknisyenAtamasi(x)?.teknisyenId).length;
             const devam=aktif.filter(x=>x.onayDurumu==="Onaylandı").length;
             const tasarimGelen=anayasaIsler.filter(x=>!x.silindi && Number(x.tasarimDosyaSayisi||0)>0 && !x.tasarimIndirildi && !["Tamamlandı","Tamamlama Onayı"].includes(anayasaDurum(x.durum))).length;
-            menuBadgeSet("menuBadgeDosya",tasarimGelen);
+            menuBadgeSet("menuBadgeDosya",tasarimGelen+(typeof dmYeniSayisi==="number"?dmYeniSayisi:0));
             menuBadgeSet("menuBadgeHekimden",hekimden); menuBadgeSet("menuBadgeOnay",onay); menuBadgeSet("menuBadgeDagitim",dagitim); menuBadgeSet("menuBadgeDevam",devam); menuBadgeSet("menuBadgeTeknisyen",dagitim);
         }
 
@@ -13354,7 +13519,7 @@
                     <td>${Number(x.taramaDosyaSayisi||0)}</td>
                     <td>${Number(x.tasarimDosyaSayisi||0)}</td>
                     <td>${anayasaDurumRozeti(x.durum)}</td>
-                    <td><div class="button-group"><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Dosyaları Aç</button>${tab==="design"&&!["Tamamlandı","Tamamlama Onayı"].includes(anayasaDurum(x.durum))?`<button class="button button-blue" onclick="anayasaUretimeAl(${Number(x.id)})">🏭 Üretime Al</button>`:""}</div></td>
+                    <td><div class="button-group"><button class="button button-light" onclick="openIsDetayModal(${Number(x.id)})">Aç</button>${Number(x.taramaDosyaSayisi||0)>0?`<button class="button button-light" title="Taramaları indir" onclick="dosyaHepsiniIndir(${Number(x.id)},'Tarama');setTimeout(dmRozetGuncelle,1500)">⬇ Tarama</button>`:""}${Number(x.tasarimDosyaSayisi||0)>0?`<button class="button button-light" title="Tasarımları indir" onclick="dosyaHepsiniIndir(${Number(x.id)},'Tasarım');setTimeout(dmRozetGuncelle,1500)">⬇ Tasarım</button>`:""}${tab==="design"&&!["Tamamlandı","Tamamlama Onayı"].includes(anayasaDurum(x.durum))?`<button class="button button-blue" onclick="anayasaUretimeAl(${Number(x.id)})">🏭 Üretime Al</button>`:""}</div></td>
                 </tr>`;
             }).join("");
         }
@@ -13444,6 +13609,115 @@
             const b=(tur,cls,ikon,n,ad)=>`<button type="button" class="dsb ${cls}" title="${ad} (${n}) — tıkla: tümünü indir" onclick="event.stopPropagation();dosyaHepsiniIndir(${Number(id)},'${tur}')" onmouseenter="onizlemeGoster(this,${Number(id)},'${tur}')" onmouseleave="onizlemeGizleGecikmeli()">${ikon} ${n}</button>`;
             return '<span class="dsimge">'+(t?b('Tarama','dsb-tarama','🦷',t,'Tarama dosyaları'):'')+(d?b('Tasarım','dsb-tasarim','📐',d,'Tasarım dosyaları'):'')+(o?b('Diger','dsb-diger','📎',o,'Diğer dosyalar'):'')+'</span>';
         }
+
+        // ---------------- Dosya merkezi ----------------
+        let dmSekmeAd="all", dmListe=[], dmSayfa=0, dmAraZaman=null;
+        const dmSecili=new Set();
+        function dmBoyut(b){ b=Number(b||0); return b>=1073741824?(b/1073741824).toFixed(2)+" GB":b>=1048576?(b/1048576).toFixed(1)+" MB":Math.max(1,Math.round(b/1024))+" KB"; }
+        function dmIkon(u){ u=String(u||"").toLowerCase(); return [".stl",".ply",".obj"].includes(u)?"🧊":[".zip",".rar",".7z"].includes(u)?"🗜️":[".jpg",".jpeg",".png",".webp"].includes(u)?"🖼️":u===".pdf"?"📄":[".dcm"].includes(u)?"🩻":"📎"; }
+        function dmGoreli(t){ const d=(Date.now()-new Date(t).getTime())/60000; if(d<1)return "az önce"; if(d<60)return Math.round(d)+" dk önce"; if(d<1440)return Math.round(d/60)+" sa önce"; if(d<10080)return Math.round(d/1440)+" gün önce"; return tarihGoster(t); }
+        function dmSekme(ad){
+            dmSekmeAd=ad;
+            document.querySelectorAll("#dmSekmeler button").forEach(b=>b.classList.toggle("on",b.dataset.s===ad));
+            document.getElementById("dmTumBolum").style.display=ad==="all"?"block":"none";
+            document.getElementById("dmIsBolum").style.display=ad==="all"?"none":"block";
+            if(ad!=="all"){
+                document.getElementById("anFilesTab").value=ad;
+                document.getElementById("dmIsAciklama").innerText={doctor:"Hekimin yüklediği taramaları olan işler.",design:"Teknisyen tasarımı yükledi; kontrol edip Üretime Al.",tech:"Tasarımı teslim alınıp üretime alınan işler."}[ad]||"";
+                renderAnayasaFiles();
+            } else dmYukle();
+        }
+        function dmHizli(t){
+            dmSekme("all");
+            if(t==="yeni"){ document.getElementById("dmYalnizYeni").checked=true; document.getElementById("dmGun").value="0"; }
+            if(t==="bugun"){ document.getElementById("dmYalnizYeni").checked=false; document.getElementById("dmGun").value="1"; }
+            dmYukle();
+        }
+        function dmAraGecikmeli(){ clearTimeout(dmAraZaman); dmAraZaman=setTimeout(()=>dmYukle(),300); }
+        async function dmYukle(devam){
+            if(dmSekmeAd!=="all"){ renderAnayasaFiles(); return; }
+            const body=document.getElementById("dmBody"); if(!body) return;
+            dmSayfa=devam?dmSayfa+1:0;
+            if(!devam){ dmSecili.clear(); dmSecimGuncelle(); }
+            const q=new URLSearchParams({tur:document.getElementById("dmTur").value,gun:document.getElementById("dmGun").value,
+                yeni:String(document.getElementById("dmYalnizYeni").checked),ara:document.getElementById("dmAra").value.trim(),sayfa:String(dmSayfa)});
+            try{
+                const r=await fetch("/api/is-dosyalari/liste?"+q,{cache:"no-store"}); if(!r.ok) throw new Error(await r.text());
+                const d=await r.json();
+                dmListe=devam?dmListe.concat(d.dosyalar):d.dosyalar;
+                const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerText=v;};
+                set("dmYeni",d.ozet.yeni); set("dmBugun",d.ozet.bugun); set("dmToplam",d.ozet.toplam); set("dmBoyut",dmBoyut(d.ozet.toplamBoyut)+" · seçili döneme göre");
+                set("dmTasarimBekleyen",anayasaIsler.filter(x=>!x.silindi&&Number(x.tasarimDosyaSayisi||0)>0&&!x.tasarimIndirildi&&!["Tamamlandı","Tamamlama Onayı"].includes(anayasaDurum(x.durum))).length);
+                document.getElementById("dmDevam").style.display=d.devami?"block":"none";
+                dmCiz();
+            }catch(e){ body.innerHTML='<tr><td colspan="9" class="empty">'+escapeHtml(e.message)+'</td></tr>'; }
+        }
+        function dmCiz(){
+            const body=document.getElementById("dmBody");
+            if(!dmListe.length){ body.innerHTML='<tr><td colspan="9" class="empty">Bu süzgece uyan dosya yok.</td></tr>'; return; }
+            body.innerHTML=dmListe.map(f=>{
+                const onz=[".stl",".ply",".obj"].includes(String(f.uzanti||"").toLowerCase());
+                const tur=f.dosyaTuru==="Diger"?"Diğer":f.dosyaTuru;
+                const gecmis=(f.indirmeler||[]).map(i=>i.kim+" · "+tarihSaatGoster(i.tarih)).join("\n");
+                const indirme=f.labIndirmeSayisi>0
+                    ?`<span class="dm-indirme var" title="${escapeHtml(gecmis)}">✓ ${f.labIndirmeSayisi} kez · ${dmGoreli(f.sonLabIndirme)}</span>`
+                    :(f.yeni?'<span class="dm-indirme yok">İndirilmedi</span>':`<span class="dm-indirme" title="${escapeHtml(gecmis)}">${(f.indirmeler||[]).length?"Başkası indirdi":"—"}</span>`);
+                return `<tr class="${f.yeni?"dm-satir-yeni":""}">
+                    <td><input type="checkbox" ${dmSecili.has(f.id)?"checked":""} onchange="dmSec(${Number(f.id)},this.checked)" /></td>
+                    <td><div class="dm-ad"><span>${dmIkon(f.uzanti)}</span><a href="/api/is-dosyalari/${Number(f.id)}/indir" download onclick="dmIndirildiIsaretle(${Number(f.id)})" title="${escapeHtml(f.orijinalDosyaAdi)}" ${onz?`onmouseenter="onizlemeGoster(this,${Number(f.siparisId)},'${escapeHtml(f.dosyaTuru)}')" onmouseleave="onizlemeGizleGecikmeli()"`:""}>${escapeHtml(f.orijinalDosyaAdi)}</a>${f.yeni?'<span class="dm-yeni">YENİ</span>':""}</div></td>
+                    <td><a href="#" onclick="openIsDetayModal(${Number(f.siparisId)});return false;" style="font-weight:800">#${Number(f.siparisId)}</a> ${escapeHtml(f.hastaAdi)}<div class="ops-mini">${escapeHtml(f.hekimAdi)}${f.teknisyenAdi?" · 🛠 "+escapeHtml(f.teknisyenAdi):""}</div></td>
+                    <td><span class="dm-tur ${escapeHtml(f.dosyaTuru)}">${escapeHtml(tur)}</span></td>
+                    <td style="white-space:nowrap">${dmBoyut(f.boyut)}</td>
+                    <td>${escapeHtml(f.yukleyen||"—")}${f.yukleyenTipi?`<div class="ops-mini">${escapeHtml(f.yukleyenTipi)}</div>`:""}</td>
+                    <td style="white-space:nowrap" title="${escapeHtml(tarihSaatGoster(f.yuklemeTarihi))}">${dmGoreli(f.yuklemeTarihi)}</td>
+                    <td>${indirme}</td>
+                    <td style="white-space:nowrap"><a class="dm-ikon" style="display:inline-grid;place-items:center;text-decoration:none" href="/api/is-dosyalari/${Number(f.id)}/indir" download onclick="dmIndirildiIsaretle(${Number(f.id)})" title="İndir">⬇</a>
+                        <button class="dm-ikon sil" type="button" title="Sil" onclick="dmSil(${Number(f.id)})">🗑</button></td>
+                </tr>`;
+            }).join("");
+            const h=document.getElementById("dmHepsi"); if(h) h.checked=dmListe.length>0&&dmListe.every(f=>dmSecili.has(f.id));
+        }
+        function dmIndirildiIsaretle(id){
+            const f=dmListe.find(x=>x.id===id); if(!f) return;
+            setTimeout(()=>{ f.yeni=false; f.labIndirmeSayisi=(f.labIndirmeSayisi||0)+1; f.sonLabIndirme=new Date().toISOString(); dmCiz(); dmRozetGuncelle(); },400);
+        }
+        function dmSec(id,on){ if(on) dmSecili.add(id); else dmSecili.delete(id); dmSecimGuncelle(); }
+        function dmHepsiniSec(on){ dmListe.forEach(f=>on?dmSecili.add(f.id):dmSecili.delete(f.id)); dmSecimGuncelle(); dmCiz(); }
+        function dmSecimGuncelle(){
+            const a=document.getElementById("dmSecimAlan"); if(!a) return;
+            a.classList.toggle("goster",dmSecili.size>0);
+            document.getElementById("dmSeciliSayi").innerText=dmSecili.size+" seçili";
+        }
+        function dmSeciliIndir(){
+            if(!dmSecili.size) return;
+            const f=document.createElement("form"); f.method="POST"; f.action="/api/is-dosyalari/zip"; f.style.display="none";
+            const i=document.createElement("input"); i.name="idler"; i.value=[...dmSecili].join(","); f.appendChild(i);
+            document.body.appendChild(f); f.submit(); f.remove();
+            showSuccess(dmSecili.size+" dosya zip olarak hazırlanıyor...");
+            setTimeout(()=>dmYukle(),2500);
+        }
+        async function dmSeciliGoruldu(){
+            if(!dmSecili.size) return;
+            try{
+                const r=await fetch("/api/is-dosyalari/gorundu",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({idler:[...dmSecili]})});
+                if(!r.ok) throw new Error(await r.text());
+                showSuccess((await r.json()).message); dmYukle(); dmRozetGuncelle();
+            }catch(e){ showError(e.message); }
+        }
+        async function dmSil(id){
+            const f=dmListe.find(x=>x.id===id); if(!f) return;
+            if(!confirm(`"${f.orijinalDosyaAdi}" dosyası (#${f.siparisId} ${f.hastaAdi}) kalıcı olarak silinsin mi?`)) return;
+            try{
+                const r=await fetch("/api/is-dosyalari/"+Number(id),{method:"DELETE"}); if(!r.ok) throw new Error((await r.text())||"Silinemedi.");
+                showSuccess("Dosya silindi."); dmYukle(); loadAnayasaData();
+            }catch(e){ showError(e.message); }
+        }
+        var dmYeniSayisi=0;
+        async function dmRozetGuncelle(){
+            try{ const r=await fetch("/api/is-dosyalari/yeni-sayisi",{cache:"no-store"}); if(r.ok){ dmYeniSayisi=(await r.json()).yeni||0; renderMenuSayaclari(); } }catch{}
+        }
+        setInterval(()=>{ if(document.visibilityState==="visible") dmRozetGuncelle(); },60000);
+        document.addEventListener("DOMContentLoaded",()=>setTimeout(dmRozetGuncelle,1500));
 
         function dosyaHepsiniIndir(id,tur){
             const a=document.createElement('a');
@@ -14532,81 +14806,110 @@
             }catch(e){showError(e.message);}
         }
 
-        function primerMesajBaselineAl(){
-            let raw=localStorage.getItem(PRIMER_MESAJ_BASELINE_KEY);
-            if(raw===null){
-                const mevcutMax=anayasaIsler.reduce((m,x)=>Math.max(m,Number(x.id)||0),0);
-                localStorage.setItem(PRIMER_MESAJ_BASELINE_KEY,String(mevcutMax));
-                return mevcutMax;
-            }
-            const n=Number(raw);
-            return Number.isFinite(n)?n:0;
+        // ---------------- Mesaj kutusu ----------------
+        // Kanallar: Hekim ↔ Laboratuvar (hekim görür) ve Laboratuvar ↔ Teknisyen (iç; hekim görmez).
+        let mkKonusmalar=[], mkFiltreAd="hepsi", mkKanalAd="hekim", mkAraZaman=null, mkSonMesajId=0, mkOkunmamisToplam=0;
+        const MK_HAZIR=["Mesajınız alındı, teşekkür ederiz.","İşiniz üretimde; belirtilen teslim tarihinde hazır olacak.","İşiniz tamamlandı, teslime hazır.","Tarama dosyası eksik ya da okunamadı; yeniden gönderebilir misiniz?","Renk bilgisini teyit edebilir misiniz?","Prova için uygun gününüzü iletebilir misiniz?"];
+        function mkGoreli(t){ const d=new Date(t), n=new Date(); if(d.toDateString()===n.toDateString()) return d.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"}); const y=new Date(n); y.setDate(n.getDate()-1); if(d.toDateString()===y.toDateString()) return "Dün"; return d.toLocaleDateString("tr-TR",{day:"2-digit",month:"2-digit"}); }
+        function mkTipEtiket(t,ad){ return t==="Hekim"?"🦷 "+(ad||"Hekim"):t==="Teknisyen"?"🛠 "+(ad||"Teknisyen")+" (iç)":t==="Lab-Teknisyen"?"Siz → teknisyene":"Siz → hekime"; }
+        function mkAraGecikmeli(){ clearTimeout(mkAraZaman); mkAraZaman=setTimeout(()=>mkYukle(),300); }
+        function mkFiltre(f){ mkFiltreAd=f; document.querySelectorAll("#mkFiltre button").forEach(b=>b.classList.toggle("on",b.dataset.f===f)); mkListeCiz(); }
+        async function mkYukle(zorla){
+            try{
+                const q=document.getElementById("mkAra")?.value.trim()||"";
+                const r=await fetch("/api/anayasa/mesaj-kutusu?ara="+encodeURIComponent(q),{cache:"no-store"}); if(!r.ok) throw new Error(await r.text());
+                mkKonusmalar=await r.json();
+                mkListeCiz();
+                if(anayasaMesajAktifIsId){ const k=mkKonusmalar.find(x=>x.siparisId===anayasaMesajAktifIsId); if(zorla||(k&&k.sonMesajId>mkSonMesajId)) await anayasaMesajlariYukle(); }
+                mkRozetGuncelle();
+            }catch(e){ const l=document.getElementById("mkListe"); if(l) l.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>'; }
         }
-
-        function renderAnayasaMesajJobs(){
-            const host=document.getElementById("anMsgJobs");if(!host)return;
-            const baseline=primerMesajBaselineAl();
-            const list=anayasaIsler
-                .filter(x=>!x.silindi && Number(x.id)>baseline)
-                .sort((a,b)=>Number(b.id)-Number(a.id))
-                .slice(0,120);
-            if(anayasaMesajAktifIsId && !list.some(x=>Number(x.id)===Number(anayasaMesajAktifIsId))){
-                anayasaMesajAktifIsId=null;
-                const head=document.getElementById("anMsgHead");
-                const body=document.getElementById("anMsgBody");
-                if(head)head.innerText="Bir iş seç";
-                if(body)body.innerHTML='<div class="empty">Konuşmayı görmek için soldan yeni bir iş seç.</div>';
+        function mkListeCiz(){
+            const host=document.getElementById("mkListe"); if(!host) return;
+            const q=(document.getElementById("mkAra")?.value||"").trim().toLocaleLowerCase("tr-TR");
+            let list=mkKonusmalar.slice();
+            if(mkFiltreAd==="okunmamis") list=list.filter(x=>x.okunmamis>0);
+            if(mkFiltreAd==="hekim") list=list.filter(x=>x.okunmamisHekim>0||["Hekim","Laboratuvar"].includes(x.sonGonderenTipi));
+            if(mkFiltreAd==="teknisyen") list=list.filter(x=>x.okunmamisTeknisyen>0||["Teknisyen","Lab-Teknisyen"].includes(x.sonGonderenTipi));
+            const ok=mkKonusmalar.reduce((t,x)=>t+(x.okunmamis>0?1:0),0); const b=document.getElementById("mkOkSayi"); if(b) b.innerText=ok?String(ok):"";
+            let html=list.map(x=>`<div class="mk-oge ${x.siparisId===anayasaMesajAktifIsId?"on":""} ${x.okunmamis>0?"okunmamis":""}" onclick="anayasaMesajAc(${Number(x.siparisId)})">
+                <div class="ust">#${Number(x.siparisId)} ${escapeHtml(x.hastaAdi)}</div><div class="zaman">${mkGoreli(x.sonTarih)}</div>
+                <div class="alt">${escapeHtml(x.hekimAdi)}${x.teknisyenAdi?" · 🛠 "+escapeHtml(x.teknisyenAdi):""}</div><div>${x.okunmamis>0?`<span class="mk-rozet">${x.okunmamis}</span>`:""}</div>
+                <div class="alt" style="grid-column:1/-1">${escapeHtml(mkTipEtiket(x.sonGonderenTipi,x.sonGonderenAdi).replace(/ \(iç\)$/,""))}: ${escapeHtml(x.sonMesaj)}</div>
+            </div>`).join("");
+            // Aramada mesajı olmayan işler: yeni konuşma başlatmak için
+            if(q){
+                const var_=new Set(mkKonusmalar.map(x=>x.siparisId));
+                const diger=anayasaIsler.filter(x=>!x.silindi&&!var_.has(Number(x.id))&&(String(x.id)===q.replace("#","")||String(x.hastaAdi||"").toLocaleLowerCase("tr-TR").includes(q)||String(x.hekimAdi||"").toLocaleLowerCase("tr-TR").includes(q))).slice(0,15);
+                if(diger.length) html+='<div class="mk-ayrac">YENİ KONUŞMA BAŞLAT</div>'+diger.map(x=>`<div class="mk-oge" onclick="anayasaMesajAc(${Number(x.id)})"><div class="ust">#${Number(x.id)} ${escapeHtml(x.hastaAdi||"-")}</div><div class="zaman">＋</div><div class="alt" style="grid-column:1/-1">${escapeHtml(x.hekimAdi||"-")} · ${escapeHtml(anayasaDurum(x.durum))}</div></div>`).join("");
             }
-            host.innerHTML=list.length?list.map(function(x){
-                return `<div class="msg-job${Number(anayasaMesajAktifIsId)===Number(x.id)?' active':''}"
-                    onclick="anayasaMesajAc(${Number(x.id)})">
-                    <strong>#${Number(x.id)} ${escapeHtml(x.hastaAdi||"-")}${dosyaSimge(x.id)}</strong>
-                    <div class="ops-mini">${escapeHtml(x.hekimAdi||"-")} • ${escapeHtml(anayasaDurum(x.durum))}</div>
-                </div>`;
-            }).join(""):'<div class="empty" style="padding:28px 16px;line-height:1.6"><strong>Mesaj listesi temiz.</strong><br>Bu sürümden sonra açılan yeni işler burada otomatik oluşacak.</div>';
+            host.innerHTML=html||`<div class="empty" style="padding:28px 16px;line-height:1.6">${q?"Aramaya uyan konuşma yok.":mkFiltreAd==="okunmamis"?"Okunmamış mesaj yok. 👍":"Henüz mesaj yok. Yukarıdan iş numarası veya hasta arayarak konuşma başlatabilirsiniz."}</div>`;
         }
-
+        // Eski çağrılar (canlı yenileme, renderAnayasaAll) için: bölüm açıksa listeyi tazele.
+        function renderAnayasaMesajJobs(){ if(document.getElementById("mesajlar")?.classList.contains("active")) mkYukle(); }
         async function anayasaMesajAc(id){
-            anayasaMesajAktifIsId=Number(id);
-            renderAnayasaMesajJobs();
-            const item=anayasaIsler.find(x=>Number(x.id)===Number(id));
-            const head=document.getElementById("anMsgHead");
-            if(head)head.innerText="#"+Number(id)+" • "+(item?.hastaAdi||"-")+" • "+(item?.hekimAdi||"-");
+            anayasaMesajAktifIsId=Number(id); mkSonMesajId=0;
+            if(!document.getElementById("mesajlar")?.classList.contains("active")) showSection("mesajlar");
+            const x=anayasaIsler.find(i=>Number(i.id)===Number(id))||{};
+            const k=mkKonusmalar.find(i=>i.siparisId===Number(id))||{};
+            const tekAdi=k.teknisyenAdi||(typeof teknisyenAtamasi==="function"?teknisyenAtamasi(x)?.teknisyenAdi:"")||"";
+            document.getElementById("mkBaslik").innerHTML=`<div><div class="ad">#${Number(id)} · ${escapeHtml(x.hastaAdi||k.hastaAdi||"-")}</div>
+                <div class="bilgi">🦷 ${escapeHtml(x.hekimAdi||k.hekimAdi||"-")} · ${tekAdi?"🛠 "+escapeHtml(tekAdi):"Teknisyen atanmamış"} · ${escapeHtml(anayasaDurum(x.durum||k.durum||""))}</div></div>
+                <div class="button-group"><button class="button button-light" type="button" onclick="openIsDetayModal(${Number(id)})">İşi Aç</button></div>`;
+            document.getElementById("mkYaz").style.display="block";
+            const tb=document.querySelector('#mkKanal button[data-k="teknisyen"]'); if(tb){ tb.disabled=!tekAdi; tb.title=tekAdi?"":"Bu işe teknisyen atanmamış"; }
+            if(!tekAdi&&mkKanalAd==="teknisyen") mkKanalSec("hekim");
+            mkListeCiz();
             await anayasaMesajlariYukle();
+            document.getElementById("mkMetin")?.focus();
         }
-
         async function anayasaMesajlariYukle(){
-            const body=document.getElementById("anMsgBody");if(!body||!anayasaMesajAktifIsId)return;
+            const body=document.getElementById("mkGovde"); if(!body||!anayasaMesajAktifIsId) return;
             try{
-                const r=await fetch("/api/anayasa/mesajlar/"+anayasaMesajAktifIsId,{cache:"no-store"});
-                if(!r.ok)throw new Error(await r.text());
+                const r=await fetch("/api/anayasa/mesajlar/"+anayasaMesajAktifIsId+"?okundu=true",{cache:"no-store"});
+                if(!r.ok) throw new Error(await r.text());
                 const list=await r.json();
-                body.innerHTML=list.length?list.map(function(m){
-                    return `<div class="msg-bubble ${m.gonderenTipi==='Laboratuvar'?'admin':''}">
-                        <strong>${escapeHtml(m.gonderenAdi||m.gonderenTipi||"-")}</strong><br/>
-                        ${escapeHtml(m.mesaj||"")}
-                        <div class="ops-mini">${tarihSaatGoster(m.tarih)}</div>
-                    </div>`;
-                }).join(""):'<div class="empty">Henüz mesaj yok.</div>';
+                mkSonMesajId=list.reduce((m,x)=>Math.max(m,x.id),0);
+                let gun="";
+                body.innerHTML=list.length?list.map(m=>{
+                    const g=new Date(m.tarih).toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"});
+                    const ayrac=g!==gun?`<div class="mk-gun">${g}</div>`:""; gun=g;
+                    return ayrac+`<div class="mk-balon ${escapeHtml(m.gonderenTipi)}"><span class="kim">${escapeHtml(mkTipEtiket(m.gonderenTipi,m.gonderenAdi))}</span>${escapeHtml(m.mesaj||"")}<span class="saat">${new Date(m.tarih).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}</span></div>`;
+                }).join(""):'<div class="mk-bos">💬<div>Henüz mesaj yok — ilk mesajı aşağıdan yazın.</div></div>';
                 body.scrollTop=body.scrollHeight;
-            }catch(e){body.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>';}
+                const k=mkKonusmalar.find(x=>x.siparisId===anayasaMesajAktifIsId); if(k&&k.okunmamis){ k.okunmamis=0; k.okunmamisHekim=0; k.okunmamisTeknisyen=0; mkListeCiz(); mkRozetGuncelle(); }
+            }catch(e){ body.innerHTML='<div class="empty">'+escapeHtml(e.message)+'</div>'; }
         }
-
-        async function anayasaMesajGonder(){
-            if(!anayasaMesajAktifIsId)return showError("Önce bir iş seç.");
-            const input=document.getElementById("anMsgInput");
-            const mesaj=input?.value.trim()||"";
-            if(!mesaj)return;
+        function mkKanalSec(k){
+            mkKanalAd=k; document.querySelectorAll("#mkKanal button").forEach(b=>b.classList.toggle("on",b.dataset.k===k));
+            document.getElementById("mkKanalNot").innerText=k==="hekim"?"Hekim bu mesajı Hekim Portalı'nda görür.":"Yalnız işin teknisyeni görür; hekim görmez.";
+        }
+        function mkSayac(){ const t=document.getElementById("mkMetin"); document.getElementById("mkSayac").innerText=(t.value.length)+" / 4000"; }
+        function mkHazirEkle(sel){ if(!sel.value) return; const t=document.getElementById("mkMetin"); t.value=(t.value?t.value+" ":"")+sel.value; sel.value=""; mkSayac(); t.focus(); }
+        async function anayasaMesajGonder(){ return mkGonder(); }
+        async function mkGonder(){
+            if(!anayasaMesajAktifIsId) return showError("Önce bir konuşma seçin.");
+            const t=document.getElementById("mkMetin"), mesaj=t.value.trim(); if(!mesaj) return;
+            const b=document.getElementById("mkGonderBtn"); b.disabled=true;
             try{
-                const r=await fetch("/api/anayasa/mesajlar/"+anayasaMesajAktifIsId,{
-                    method:"POST",headers:{"Content-Type":"application/json"},
-                    body:JSON.stringify({gonderenTipi:"Laboratuvar",gonderenAdi:(window.FIRMA||{}).ad||"Laboratuvar",mesaj})
-                });
-                if(!r.ok)throw new Error(await r.text());
-                input.value="";
-                await anayasaMesajlariYukle();
-            }catch(e){showError(e.message);}
+                const r=await fetch("/api/anayasa/mesajlar/"+anayasaMesajAktifIsId,{method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({kanal:mkKanalAd,gonderenAdi:(window.FIRMA||{}).ad||"Laboratuvar",mesaj})});
+                if(!r.ok) throw new Error(await r.text());
+                t.value=""; mkSayac();
+                await anayasaMesajlariYukle(); mkYukle();
+            }catch(e){ showError(e.message); } finally{ b.disabled=false; t.focus(); }
         }
+        async function mkRozetGuncelle(){
+            try{ const r=await fetch("/api/anayasa/mesaj-ozet",{cache:"no-store"}); if(r.ok){ const d=await r.json(); mkOkunmamisToplam=d.okunmamis||0; menuBadgeSet("menuBadgeMesaj",mkOkunmamisToplam); } }catch{}
+        }
+        document.addEventListener("DOMContentLoaded",()=>{
+            const h=document.getElementById("mkHazir"); if(h) h.innerHTML+='' + MK_HAZIR.map(x=>`<option value="${escapeHtml(x)}">${escapeHtml(x.length>40?x.slice(0,40)+"…":x)}</option>`).join("");
+            setTimeout(mkRozetGuncelle,1200);
+        });
+        setInterval(()=>{
+            if(document.visibilityState!=="visible") return;
+            if(document.getElementById("mesajlar")?.classList.contains("active")) mkYukle(); else mkRozetGuncelle();
+        },15000);
 
         function anayasaBugunIso(){
             const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
@@ -15234,40 +15537,51 @@
             el.style.color=ok?"#065f46":"#9a3412";
         }
 
+        let mailV2Durum="bekleyen", mailV2AraZaman=null;
+        function mailV2AraGecikmeli(){ clearTimeout(mailV2AraZaman); mailV2AraZaman=setTimeout(mailV2LoadMails,300); }
+        function mailV2DurumSec(d){ mailV2Durum=d; document.querySelectorAll("#mailV2Durumlar button").forEach(b=>b.classList.toggle("on",b.dataset.d===d)); mailV2LoadMails(); }
+        async function mailV2OzetYukle(){
+            try{
+                const r=await fetch("/api/mail-v2/ozet",{cache:"no-store"}); if(!r.ok) return;
+                const d=await r.json();
+                const set=(id,v)=>{const e=document.getElementById(id); if(e) e.innerText=v?String(v):"";};
+                set("mailV2SayBekleyen",d.bekleyen); set("mailV2SayInceleme",d.inceleme);
+                menuBadgeSet("menuBadgeMail",d.bekleyen||0);
+            }catch{}
+        }
         async function mailV2LoadMails(){
             const body=document.getElementById("mailV2Body");if(!body)return;
             const q=new URLSearchParams();
             const search=document.getElementById("mailV2Search")?.value||"";
-            const review=!!document.getElementById("mailV2ReviewOnly")?.checked;
             if(search)q.set("search",search);
-            q.set("reviewOnly",String(review));
+            q.set("reviewOnly",String(mailV2Durum==="inceleme"));
+            q.set("durum",mailV2Durum==="inceleme"?"bekleyen":mailV2Durum);
             q.set("take","250");
-
+            mailV2OzetYukle();
             try{
                 const r=await fetch("/api/mail-v2/mails?"+q.toString(),{cache:"no-store"});
                 if(!r.ok)throw new Error(await r.text());
                 mailV2Rows=await r.json();
-
                 if(!mailV2Rows.length){
-                    body.innerHTML='<tr><td colspan="9" class="empty">Henüz analiz edilmiş mail yok.</td></tr>';
+                    body.innerHTML=`<tr><td colspan="9" class="empty">${mailV2Durum==="bekleyen"?"Bekleyen mail yok. 👍":"Bu süzgece uyan mail yok."}</td></tr>`;
                     return;
                 }
-
                 body.innerHTML=mailV2Rows.map(m=>{
                     const conf=Number(m.guven||0);
                     const review=!!m.incelemeGerekli;
-                    const hekim=m.hekimAdi||m.klinikAdi||"Hekim eşleşmedi";
-                    return `<tr class="${m.aktarildi?'mailv2-transferred':''}">
+                    const hekim=m.hekimAdi||m.klinikAdi||m.klinik||"Hekim eşleşmedi";
+                    return `<tr class="mailv2-satir ${m.aktarildi?'mailv2-transferred':''}" onclick="if(!event.target.closest('button,a'))mailV2Detay(${Number(m.id)})">
                         <td>${tarihSaatGoster(m.tarih)}</td>
-                        <td><div class="mailv2-sender">${escapeHtml(hekim)}</div><div class="mailv2-sub">${escapeHtml(m.gonderen||"-")}</div><div class="mailv2-sub">${escapeHtml(m.konu||"-")}</div></td>
+                        <td><div class="mailv2-sender">${escapeHtml(hekim)}${m.hekimId?"":' <span class="mailv2-confidence warn" title="Gönderen kayıtlı bir hekimle eşleşmedi">?</span>'}</div><div class="mailv2-sub">${escapeHtml(m.gonderen||"-")}</div><div class="mailv2-sub">${escapeHtml(m.konu||"-")}</div></td>
                         <td>${escapeHtml(m.hastaAdi||"-")}</td>
-                        <td>${escapeHtml(m.isTuru||"-")}</td>
+                        <td>${escapeHtml(m.isTuru||"-")}${m.uyeSayisi?`<div class="mailv2-sub">${Number(m.uyeSayisi)} üye${m.disNo?" · "+escapeHtml(m.disNo):""}</div>`:""}</td>
                         <td>${escapeHtml(m.disRengi||"-")}</td>
                         <td>${escapeHtml(m.materyal||"-")}</td>
                         <td>${mailV2FileAction(m)}</td>
                         <td><span class="mailv2-confidence ${review?'warn':''}">${review?'İncele':'%'+Math.round(conf*100)}</span><div class="mailv2-sub">${escapeHtml(m.analizKaynagi||"")}</div></td>
                         <td><div class="button-group">
-                            <button class="button button-blue" onclick="mailV2ToForm(${Number(m.id)})">Forma Aktar</button>
+                            ${m.aktarildi?`<button class="button button-light" onclick="mailV2DurumDegistir(${Number(m.id)},false)" title="Bekleyenlere geri al">↺ Geri al</button>`
+                              :`<button class="button button-blue" onclick="mailV2ToForm(${Number(m.id)})">Forma Aktar</button><button class="button button-light" title="Sipariş gerekmiyor; işlendi say" onclick="mailV2DurumDegistir(${Number(m.id)},true)">✓</button>`}
                             ${mailV2TransferButton(m)}
                         </div></td>
                     </tr>`;
@@ -15276,6 +15590,50 @@
                 body.innerHTML='<tr><td colspan="9" class="empty">'+escapeHtml(e.message)+'</td></tr>';
             }
         }
+        async function mailV2DurumDegistir(id,aktarildi){
+            try{
+                const r=await fetch(`/api/mail-v2/mail/${Number(id)}/aktarildi`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({aktarildi})});
+                if(!r.ok) throw new Error((await r.text())||"Güncellenemedi.");
+                showSuccess(aktarildi?"Mail işlendi olarak işaretlendi.":"Mail bekleyenlere geri alındı.");
+                document.getElementById("mailDetayKatman")?.remove();
+                mailV2LoadMails();
+            }catch(e){ showError(e.message); }
+        }
+        async function mailV2Detay(id){
+            try{
+                const r=await fetch(`/api/mail-v2/mail/${Number(id)}`,{cache:"no-store"}); if(!r.ok) throw new Error((await r.text())||"Mail açılamadı.");
+                const {mail:m,dosyalar}=await r.json();
+                let linkler=[]; try{ linkler=JSON.parse(m.wetransferLinkleri||"[]"); }catch{}
+                const alan=(b,v)=>`<div><span>${b}</span><b>${escapeHtml(v==null||v===""?"—":String(v))}</b></div>`;
+                document.getElementById("mailDetayKatman")?.remove();
+                const k=document.createElement("div"); k.id="mailDetayKatman"; k.className="md-katman";
+                k.onclick=e=>{ if(e.target===k) k.remove(); };
+                k.innerHTML=`<div class="md-kutu">
+                    <div class="md-ust"><div><h2>${escapeHtml(m.konu||"(konu yok)")}</h2>
+                        <div class="ops-mini">${escapeHtml(m.gonderen||"-")} · ${tarihSaatGoster(m.tarih)} · ${m.aktarildi?"✓ İşlendi":"Bekliyor"}${m.incelemeGerekli?" · ⚠️ İnceleme gerekli":""}</div></div>
+                        <button class="button button-light" type="button" onclick="document.getElementById('mailDetayKatman').remove()">✕</button></div>
+                    <div class="md-izgara">
+                        ${alan("Hekim",m.hekimAdi||(m.hekimId?"":"Eşleşmedi"))}${alan("Klinik",m.klinik)}${alan("Hasta",m.hastaAdi)}
+                        ${alan("İş türü",m.isTuru)}${alan("Üye sayısı",m.uyeSayisi)}${alan("Diş no",m.disNo)}
+                        ${alan("Renk",m.disRengi)}${alan("Materyal",m.materyal)}${alan("Referans",m.referansKodu)}
+                        ${alan("Analiz",(m.analizKaynagi||"")+(m.guven!=null?" · %"+Math.round(Number(m.guven)*100):""))}
+                    </div>
+                    ${m.notlar?`<div style="margin-bottom:10px"><b>AI notu:</b> ${escapeHtml(m.notlar)}</div>`:""}
+                    <div style="font-weight:900;margin:6px 0">Mail metni</div>
+                    <div class="md-govde">${escapeHtml(m.govde||"(metin yok)")}</div>
+                    <div style="font-weight:900;margin:12px 0 6px">Ekler (${dosyalar.length})</div>
+                    ${dosyalar.length?dosyalar.map(f=>`<div class="md-ek"><a href="/api/mail-v2/mail/${Number(m.id)}/file/${Number(f.id)}" download title="${escapeHtml(f.dosyaAdi)}">${dmIkon((f.dosyaAdi.match(/\.[^.]+$/)||[""])[0])} ${escapeHtml(f.dosyaAdi)}</a><small>${dmBoyut(f.boyut)}</small></div>`).join("")
+                        +(dosyalar.length>1?`<a class="button button-light" style="display:inline-block;margin-top:4px;text-decoration:none" href="/api/mail-v2/mail/${Number(m.id)}/download-all">⬇ Tüm ekleri indir</a>`:""):'<div class="ops-mini">Ek yok.</div>'}
+                    ${linkler.length?`<div style="font-weight:900;margin:12px 0 6px">Aktarım bağlantıları</div>`+linkler.map(l=>`<div class="md-ek"><a href="${escapeHtml(l)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l)}</a></div>`).join(""):""}
+                    <div class="button-group" style="margin-top:16px;justify-content:flex-end">
+                        ${m.aktarildi?`<button class="button button-light" type="button" onclick="mailV2DurumDegistir(${Number(m.id)},false)">↺ Bekleyenlere geri al</button>`
+                          :`<button class="button button-light" type="button" onclick="mailV2DurumDegistir(${Number(m.id)},true)">✓ Sipariş gerekmiyor (işlendi)</button><button class="button button-blue" type="button" onclick="document.getElementById('mailDetayKatman').remove();mailV2ToForm(${Number(m.id)})">Forma Aktar</button>`}
+                    </div></div>`;
+                document.body.appendChild(k);
+            }catch(e){ showError(e.message); }
+        }
+        setInterval(()=>{ if(document.visibilityState==="visible") mailV2OzetYukle(); },60000);
+        document.addEventListener("DOMContentLoaded",()=>setTimeout(mailV2OzetYukle,1800));
 
         function mailV2TransferLinks(m){
             try{
@@ -15382,22 +15740,46 @@
             return (bytes/1024/1024).toFixed(1)+" MB";
         }
 
+        // Mailden sipariş formu doldurulur; mail ancak sipariş kaydedilince "işlendi" sayılır ve ekleri işe eklenir.
+        var anMailKaynakId=null;
+        function anMailKaynakBant(m){
+            const b=document.getElementById("anMailKaynakBant"); if(!b) return;
+            if(!m){ b.style.display="none"; b.innerHTML=""; return; }
+            b.innerHTML=`<span>📧 Bu form mailden dolduruldu: ${escapeHtml(m.konu||m.gonderen||"")} — kaydedince maildeki ekler (${Number(m.dosyaSayisi||0)}) işin dosyalarına eklenir.</span><button type="button" onclick="anMailKaynakId=null;anMailKaynakBant(null)">Bağlantıyı kaldır ✕</button>`;
+            b.style.display="flex";
+        }
         async function mailV2ToForm(id){
             const m=mailV2Rows.find(x=>Number(x.id)===Number(id));
             if(!m)return;
 
             showSection("siparisFormu");
-            if(m.hekimId)document.getElementById("anHekim").value=String(m.hekimId);
+            if(typeof anayasaSiparisFormTemizle==="function") anayasaSiparisFormTemizle(true);
+            const hk=document.getElementById("anHekim");
+            if(m.hekimId&&hk){ hk.value=String(m.hekimId); await anayasaHekimDegisti(); }
             document.getElementById("anHasta").value=m.hastaAdi||"";
             document.getElementById("anDisRengi").value=m.disRengi||"";
+            // Materyal: seçeneklerden en yakını işaretlenir
+            const mat=String(m.materyal||"").toLocaleLowerCase("tr-TR");
             document.getElementById("anMateryal").value=m.materyal||"";
-            document.getElementById("anNot").value=m.notlar||"";
+            if(mat) document.querySelectorAll('input[name="anMateryalRadio"]').forEach(r=>{ const v=String(r.value||"").toLocaleLowerCase("tr-TR"); if(v&&(mat.includes(v)||v.includes(mat))){ r.checked=true; r.dispatchEvent(new Event("change",{bubbles:true})); } });
+            // Diş numaraları (FDI 11-48)
+            const disler=String(m.disNo||"").match(/\b[1-4][1-8]\b/g)||[];
+            if(disler.length&&typeof anayasaSeciliDisler!=="undefined"){ disler.forEach(d=>anayasaSeciliDisler.add(Number(d))); anayasaToothButtons(); }
+            const ek=[m.referansKodu?"Referans: "+m.referansKodu:"", m.klinik&&!m.hekimId?"Klinik: "+m.klinik:"", m.disNo?"Diş no (mail): "+m.disNo:""].filter(Boolean).join(" · ");
+            document.getElementById("anNot").value=[m.notlar||"",ek].filter(Boolean).join("\n");
 
+            // İş türü: hekimin listesindeki en yakın kalem; adet mailden
             const host=document.getElementById("anKalemler");
             if(host)host.innerHTML="";
-            anayasaKalemEkle({isTuru:m.isTuru||"",birimFiyat:0});
+            const tur=String(m.isTuru||"").toLocaleLowerCase("tr-TR");
+            const liste=(typeof anayasaHekimFiyatlari!=="undefined"&&anayasaHekimFiyatlari)||[];
+            const es=liste.find(x=>String(x.isTuru||"").toLocaleLowerCase("tr-TR")===tur)||liste.find(x=>{const v=String(x.isTuru||"").toLocaleLowerCase("tr-TR"); return tur&&v&&(tur.includes(v)||v.includes(tur));});
+            anayasaKalemEkle(es?{...es,adet:Number(m.uyeSayisi||disler.length||0)||undefined}:{isTuru:m.isTuru||"",birimFiyat:0,adet:Number(m.uyeSayisi||0)||undefined});
+            if(typeof anayasaKalemToplamGuncelle==="function") anayasaKalemToplamGuncelle();
+            if(!m.hekimId) showError("Mail gönderen kayıtlı bir hekimle eşleşmedi; hekimi formdan seçin.");
 
-            fetch(`/api/mail-v2/mail/${Number(id)}/aktarildi`,{method:"PATCH"}).catch(()=>{});
+            anMailKaynakId=Number(id);
+            anMailKaynakBant(m);
             window.scrollTo({top:0,behavior:"smooth"});
         }
 
@@ -15727,7 +16109,7 @@
             }).join('');
         }
 
-        function anayasaSiparisFormTemizle(forceNew){anayasaFormOnayaGonderildi=false;anayasaAktarilanPortalSiparisId=null;anayasaYazdirIsId=null;stlGorselAlaniTemizle();['anHasta','anTermin','anDisRengi','anMateryal','anNot'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('input[name="anMateryalRadio"]').forEach(r=>r.checked=false);anayasaSeciliDisler.clear();anayasaToothButtons();const host=document.getElementById('anKalemler');if(host)host.innerHTML='';anayasaHekimFiyatlari=[];const h=document.getElementById('anHekim');if(h&&forceNew)h.value='';anayasaKalemToplamGuncelle();anayasaFormButonDurumu();}
+        function anayasaSiparisFormTemizle(forceNew){anMailKaynakId=null;if(typeof anMailKaynakBant==="function")anMailKaynakBant(null);anayasaFormOnayaGonderildi=false;anayasaAktarilanPortalSiparisId=null;anayasaYazdirIsId=null;stlGorselAlaniTemizle();['anHasta','anTermin','anDisRengi','anMateryal','anNot'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});document.querySelectorAll('input[name="anMateryalRadio"]').forEach(r=>r.checked=false);anayasaSeciliDisler.clear();anayasaToothButtons();const host=document.getElementById('anKalemler');if(host)host.innerHTML='';anayasaHekimFiyatlari=[];const h=document.getElementById('anHekim');if(h&&forceNew)h.value='';anayasaKalemToplamGuncelle();anayasaFormButonDurumu();}
 
         function primerAiBicim(t){return escapeHtml(t||'').replace(/\*\*([^*\n]+)\*\*/g,'<b>$1</b>').replace(/(^|\s)#(\d{1,7})\b/g,'$1<a href="#" onclick="openIsDetayModal($2);return false;">#$2</a>');}
         function primerAiAppend(role,msg,actions,steps){const h=document.getElementById('primerAiMessages');if(!h)return;const r=document.createElement('div');r.className='ai-row '+(role==='user'?'user':'bot');const b=document.createElement('div');b.className='ai-bubble-v30';if(role==='user')b.textContent=msg||'';else b.innerHTML=primerAiBicim(msg);r.appendChild(b);h.appendChild(r);if(role!=='user'&&Array.isArray(actions)&&actions.length){const box=document.createElement('div');box.className='ai-actions';actions.forEach(function(a,i){const btn=document.createElement('button');btn.type='button';btn.className='ai-action-btn';btn.textContent=primerAiActionLabel(a);btn.onclick=()=>primerAiExecuteAction(i);box.appendChild(btn);});h.appendChild(box);}h.scrollTop=h.scrollHeight;}

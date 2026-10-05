@@ -13,6 +13,7 @@ public class IsDosyalariController : ControllerBase
 {
     private readonly PrimerLabDbContext _db;
     private readonly IWebHostEnvironment _environment;
+    private readonly IcerikTakip _takip;
 
     private const long MaxFileSize = 250L * 1024L * 1024L;
 
@@ -26,10 +27,11 @@ public class IsDosyalariController : ControllerBase
             ".xml", ".3ox", ".3oxz", ".dentalproject", ".constructioninfo"
         };
 
-    public IsDosyalariController(PrimerLabDbContext db, IWebHostEnvironment environment)
+    public IsDosyalariController(PrimerLabDbContext db, IWebHostEnvironment environment, IcerikTakip takip)
     {
         _db = db;
         _environment = environment;
+        _takip = takip;
     }
 
     private string StorageRoot()
@@ -121,6 +123,7 @@ public class IsDosyalariController : ControllerBase
                 RETURNING "Id" AS "Value"
                 """)
                 .ToListAsync(cancellationToken)).Single();
+            _takip.DosyaYuklendi(id, "Laboratuvar", "Laboratuvar");
 
             return Ok(new
             {
@@ -160,6 +163,7 @@ public class IsDosyalariController : ControllerBase
             .ToList();
 
         if (files.Count == 0) return NotFound("İndirilecek dosya bulunamadı.");
+        _takip.Indirildi(files.Select(x => x.Kayit.Id), "Laboratuvar");
 
         var provider = new FileExtensionContentTypeProvider();
         if (files.Count == 1)
@@ -192,6 +196,143 @@ public class IsDosyalariController : ControllerBase
         var zipAdi = $"{siparisId}_{GuvenliAd(hasta[0])}_{(tumu ? "dosyalar" : secilenTur == "Tasarım" ? "tasarim" : secilenTur == "Tarama" ? "tarama" : "dosyalar")}.zip";
         var akis = new FileStream(gecici, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, 1 << 16, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
         return File(akis, "application/zip", zipAdi);
+    }
+
+    // ------------------------------------------------------------------ Dosya merkezi
+
+    /// <summary>
+    /// Tüm işlerin dosyaları tek listede: tür, "yalnız yeni" (laboratuvarın henüz indirmediği/görmediği),
+    /// tarih ve metin süzgeci; kimin yüklediği ve indirme geçmişiyle.
+    /// </summary>
+    [HttpGet("liste")]
+    public async Task<IActionResult> Liste(
+        [FromQuery] string? tur, [FromQuery] bool yeni = false, [FromQuery] int gun = 0,
+        [FromQuery] string? ara = null, [FromQuery] int sayfa = 0, CancellationToken ct = default)
+    {
+        var q = (ara ?? "").Trim();
+        if (q.Length > 80) q = q[..80];
+        var desen = "%" + q.Replace("\\", "").Replace("%", "").Replace("_", "") + "%";
+        var no = int.TryParse(q.TrimStart('#'), out var n) ? n : -1;
+        var turFiltre = string.IsNullOrWhiteSpace(tur) || tur == "Hepsi" ? "" : NormalizeType(tur);
+        var baslangic = gun > 0 ? DateTime.UtcNow.AddDays(-Math.Min(gun, 3650)) : new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var rows = await _db.Database.SqlQuery<DosyaMerkeziSatiri>($"""
+            SELECT f."Id", f."SiparisId", f."DosyaTuru", f."OrijinalDosyaAdi", f."Uzanti", f."Boyut", f."YuklemeTarihi",
+                   COALESCE(ha."AdSoyad",'-') AS "HastaAdi", COALESCE(h."AdSoyad",'-') AS "HekimAdi",
+                   t."AdSoyad" AS "TeknisyenAdi", COALESCE(s."Durum",'Bekliyor') AS "Durum",
+                   COALESCE(s."OnayDurumu",'Onaylandı') AS "OnayDurumu", COALESCE(s."Silindi",false) AS "Silindi"
+            FROM "IsDosyalari" f
+            JOIN "Siparisler" s ON s."Id"=f."SiparisId"
+            LEFT JOIN "Hastalar" ha ON ha."Id"=s."HastaId"
+            LEFT JOIN "Hekimler" h ON h."Id"=ha."HekimId"
+            LEFT JOIN "Teknisyenler" t ON t."Id"=s."TeknisyenId"
+            WHERE COALESCE(s."Silindi",false)=false
+              AND ({turFiltre}='' OR f."DosyaTuru"={turFiltre})
+              AND f."YuklemeTarihi" >= {baslangic}
+              AND ({q}='' OR f."SiparisId"={no} OR f."OrijinalDosyaAdi" ILIKE {desen} OR ha."AdSoyad" ILIKE {desen} OR h."AdSoyad" ILIKE {desen})
+            ORDER BY f."YuklemeTarihi" DESC, f."Id" DESC
+            LIMIT 3000
+            """).ToListAsync(ct);
+
+        var bilgi = _takip.DosyaBilgileri(rows.Select(x => x.Id));
+        var tumu = rows.Select(x =>
+        {
+            bilgi.TryGetValue(x.Id, out var b);
+            var labIndirme = b?.Indirmeler.Where(i => i.Kim == "Laboratuvar").ToList() ?? new();
+            return new
+            {
+                x.Id, x.SiparisId, x.DosyaTuru, x.OrijinalDosyaAdi, x.Uzanti, x.Boyut, x.YuklemeTarihi,
+                x.HastaAdi, x.HekimAdi, x.TeknisyenAdi, x.Durum, x.OnayDurumu,
+                Yukleyen = b?.Yukleyen ?? (x.DosyaTuru == "Tarama" ? "Hekim / laboratuvar" : x.DosyaTuru == "Tasarım" ? "Teknisyen / laboratuvar" : null),
+                YukleyenTipi = b?.YukleyenTipi,
+                Yeni = _takip.LabIcinYeni(x.Id),
+                LabIndirmeSayisi = labIndirme.Count,
+                SonLabIndirme = labIndirme.LastOrDefault()?.Tarih,
+                Indirmeler = b?.Indirmeler.TakeLast(6).Reverse().Select(i => new { i.Kim, i.Tarih }).ToList()
+            };
+        }).ToList();
+
+        var liste = yeni ? tumu.Where(x => x.Yeni).ToList() : tumu;
+        var bugun = DateTime.UtcNow.AddHours(3).Date.AddHours(-3);
+        sayfa = Math.Max(0, sayfa);
+        return Ok(new
+        {
+            ozet = new
+            {
+                yeni = tumu.Count(x => x.Yeni),
+                bugun = tumu.Count(x => x.YuklemeTarihi >= bugun),
+                toplam = tumu.Count,
+                toplamBoyut = tumu.Sum(x => x.Boyut),
+                tarama = tumu.Count(x => x.DosyaTuru == "Tarama"),
+                tasarim = tumu.Count(x => x.DosyaTuru == "Tasarım")
+            },
+            dosyalar = liste.Skip(sayfa * 100).Take(100),
+            devami = liste.Count > (sayfa + 1) * 100,
+            sonuc = liste.Count
+        });
+    }
+
+    /// <summary>Menü rozeti: laboratuvarın henüz görmediği yeni dosya sayısı.</summary>
+    [HttpGet("yeni-sayisi")]
+    public async Task<IActionResult> YeniSayisi(CancellationToken ct)
+    {
+        var sinir = _takip.BaslangicDosyaId;
+        if (sinir == int.MaxValue) return Ok(new { yeni = 0 });
+        var idler = await _db.Database.SqlQuery<int>($"""
+            SELECT f."Id" AS "Value" FROM "IsDosyalari" f JOIN "Siparisler" s ON s."Id"=f."SiparisId"
+            WHERE f."Id" > {sinir} AND COALESCE(s."Silindi",false)=false
+            """).ToListAsync(ct);
+        return Ok(new { yeni = idler.Count(_takip.LabIcinYeni) });
+    }
+
+    /// <summary>İndirmeden "görüldü" işaretler.</summary>
+    [HttpPost("gorundu")]
+    public IActionResult Gorundu([FromBody] DosyaSecimDto dto)
+    {
+        var ids = (dto.Idler ?? new()).Take(5000).ToList();
+        if (ids.Count == 0) return BadRequest("Dosya seçin.");
+        _takip.LabGordu(ids);
+        return Ok(new { message = ids.Count + " dosya görüldü olarak işaretlendi." });
+    }
+
+    /// <summary>Seçilen dosyalar tek zip (iş numarası ve hasta adıyla klasörlenir).</summary>
+    [HttpPost("zip")]
+    public async Task<IActionResult> SeciliZip([FromForm] string idler, CancellationToken ct)
+    {
+        var ids = (idler ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(x => int.TryParse(x, out var v) ? v : 0).Where(x => x > 0).Distinct().Take(500).ToArray();
+        if (ids.Length == 0) return BadRequest("Dosya seçin.");
+        var files = (await _db.Database.SqlQuery<SeciliDosyaSatiri>($"""
+            SELECT f."Id", f."SiparisId", f."DosyaTuru", f."OrijinalDosyaAdi", f."SaklananDosyaAdi", COALESCE(ha."AdSoyad",'hasta') AS "HastaAdi"
+            FROM "IsDosyalari" f JOIN "Siparisler" s ON s."Id"=f."SiparisId" LEFT JOIN "Hastalar" ha ON ha."Id"=s."HastaId"
+            WHERE f."Id" = ANY({ids})
+            ORDER BY f."SiparisId", f."Id"
+            """).ToListAsync(ct))
+            .Select(f => (Kayit: f, Yol: TryPath(new IsDosyasiKayitDto { SiparisId = f.SiparisId, SaklananDosyaAdi = f.SaklananDosyaAdi })))
+            .Where(x => x.Yol != null && System.IO.File.Exists(x.Yol))
+            .ToList();
+        if (files.Count == 0) return NotFound("İndirilecek dosya bulunamadı.");
+        _takip.Indirildi(files.Select(x => x.Kayit.Id), "Laboratuvar");
+
+        var gecici = Path.Combine(Path.GetTempPath(), "primerlab_" + Guid.NewGuid().ToString("N") + ".zip");
+        await using (var zipAkis = new FileStream(gecici, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, 1 << 16, useAsync: true))
+        using (var zip = new ZipArchive(zipAkis, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            var kullanilan = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (k, yol) in files)
+            {
+                var ad = $"{k.SiparisId}_{GuvenliAd(k.HastaAdi)}/{k.DosyaTuru}/{Path.GetFileName(k.OrijinalDosyaAdi)}";
+                var aday = ad; var i = 2;
+                while (!kullanilan.Add(aday))
+                    aday = ad[..^Path.GetExtension(ad).Length] + $" ({i++})" + Path.GetExtension(ad);
+                var giris = zip.CreateEntry(aday, CompressionLevel.Fastest);
+                await using var hedef = giris.Open();
+                await using var kaynak = new FileStream(yol!, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 16, useAsync: true);
+                await kaynak.CopyToAsync(hedef, ct);
+            }
+        }
+        var akis = new FileStream(gecici, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, 1 << 16, FileOptions.DeleteOnClose | FileOptions.Asynchronous);
+        return File(akis, "application/zip", $"dosyalar_{DateTime.UtcNow.AddHours(3):yyyyMMdd_HHmm}.zip");
     }
 
     // Fare ile üzerine gelindiğinde gösterilen hafif 3B önizleme (STL / PLY / OBJ).
@@ -245,6 +386,7 @@ public class IsDosyalariController : ControllerBase
         catch { return StatusCode(500, "Dosya yolu güvenlik kontrolünden geçemedi."); }
 
         if (!System.IO.File.Exists(fullPath)) return NotFound("Dosyanın fiziksel kopyası bulunamadı.");
+        _takip.Indirildi(new[] { id }, "Laboratuvar");
 
         var provider = new FileExtensionContentTypeProvider();
         if (!provider.TryGetContentType(file.OrijinalDosyaAdi, out var contentType))
@@ -270,6 +412,7 @@ public class IsDosyalariController : ControllerBase
             DELETE FROM "IsDosyalari" WHERE "Id"={id}
             """);
         if (count == 0) return NotFound("Dosya kaydı bulunamadı.");
+        _takip.DosyaSilindi(id);
 
         if (fullPath != null)
         {
@@ -294,6 +437,38 @@ public class IsDosyasiListeDto
     public string Uzanti { get; set; } = string.Empty;
     public long Boyut { get; set; }
     public DateTime YuklemeTarihi { get; set; }
+}
+
+public sealed class DosyaSecimDto
+{
+    public List<int>? Idler { get; set; }
+}
+
+public sealed class SeciliDosyaSatiri
+{
+    public int Id { get; set; }
+    public int SiparisId { get; set; }
+    public string DosyaTuru { get; set; } = "";
+    public string OrijinalDosyaAdi { get; set; } = "";
+    public string SaklananDosyaAdi { get; set; } = "";
+    public string HastaAdi { get; set; } = "";
+}
+
+public sealed class DosyaMerkeziSatiri
+{
+    public int Id { get; set; }
+    public int SiparisId { get; set; }
+    public string DosyaTuru { get; set; } = "";
+    public string OrijinalDosyaAdi { get; set; } = "";
+    public string Uzanti { get; set; } = "";
+    public long Boyut { get; set; }
+    public DateTime YuklemeTarihi { get; set; }
+    public string HastaAdi { get; set; } = "";
+    public string HekimAdi { get; set; } = "";
+    public string? TeknisyenAdi { get; set; }
+    public string Durum { get; set; } = "";
+    public string OnayDurumu { get; set; } = "";
+    public bool Silindi { get; set; }
 }
 
 public sealed class IsDosyasiKayitDto : IsDosyasiListeDto

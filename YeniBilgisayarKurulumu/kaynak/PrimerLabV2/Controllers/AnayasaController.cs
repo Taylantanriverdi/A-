@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PrimerLabV2.Data;
+using PrimerLabV2.Infrastructure;
 using PrimerLabV2.Models;
 
 namespace PrimerLabV2.Controllers
@@ -24,11 +25,15 @@ namespace PrimerLabV2.Controllers
             "Tamamlandı"
         };
 
+        private readonly IcerikTakip _takip;
+
         public AnayasaController(
             PrimerLabDbContext db,
             IConfiguration config,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            IcerikTakip takip)
         {
+            _takip = takip;
             _db = db;
             _config = config;
             _environment = environment;
@@ -818,8 +823,77 @@ namespace PrimerLabV2.Controllers
             return NoContent();
         }
 
+        // ---------------------------------------------------------------- Mesaj kutusu
+        // Kanallar (GonderenTipi): "Hekim" → laboratuvara, "Laboratuvar" → hekime,
+        // "Teknisyen" → laboratuvara (iç), "Lab-Teknisyen" → teknisyene (iç; hekim görmez).
+        public static readonly string[] GelenTipler = { "Hekim", "Teknisyen" };
+
+        /// <summary>Konuşmalar: son mesaja göre sıralı, okunmamış sayısıyla.</summary>
+        [HttpGet("mesaj-kutusu")]
+        public async Task<IActionResult> MesajKutusu([FromQuery] string? ara, CancellationToken ct)
+        {
+            var q = (ara ?? "").Trim();
+            if (q.Length > 80) q = q[..80];
+            var desen = "%" + q.Replace("%", "").Replace("_", "") + "%";
+            var no = int.TryParse(q.TrimStart('#'), out var n) ? n : -1;
+            var rows = await _db.Database.SqlQuery<KonusmaSatiri>($"""
+                WITH son AS (
+                    SELECT DISTINCT ON (m."SiparisId") m."SiparisId", m."Id", m."GonderenTipi", m."GonderenAdi", m."Mesaj", m."Tarih"
+                    FROM "IsMesajlari" m ORDER BY m."SiparisId", m."Id" DESC)
+                SELECT s."Id" AS "SiparisId", COALESCE(ha."AdSoyad",'-') AS "HastaAdi", COALESCE(h."AdSoyad",'-') AS "HekimAdi",
+                       t."AdSoyad" AS "TeknisyenAdi", COALESCE(s."Durum",'Bekliyor') AS "Durum", COALESCE(s."OnayDurumu",'Onaylandı') AS "OnayDurumu",
+                       son."Id" AS "SonMesajId", son."GonderenTipi" AS "SonGonderenTipi", son."GonderenAdi" AS "SonGonderenAdi",
+                       left(son."Mesaj", 160) AS "SonMesaj", son."Tarih" AS "SonTarih",
+                       (SELECT COUNT(*)::int FROM "IsMesajlari" x WHERE x."SiparisId"=s."Id") AS "MesajSayisi"
+                FROM son
+                JOIN "Siparisler" s ON s."Id"=son."SiparisId"
+                LEFT JOIN "Hastalar" ha ON ha."Id"=s."HastaId"
+                LEFT JOIN "Hekimler" h ON h."Id"=ha."HekimId"
+                LEFT JOIN "Teknisyenler" t ON t."Id"=s."TeknisyenId"
+                WHERE COALESCE(s."Silindi",false)=false
+                  AND ({q}='' OR s."Id"={no} OR ha."AdSoyad" ILIKE {desen} OR h."AdSoyad" ILIKE {desen} OR son."Mesaj" ILIKE {desen})
+                ORDER BY son."Tarih" DESC, son."Id" DESC
+                LIMIT 300
+                """).ToListAsync(ct);
+
+            var ids = rows.Select(x => x.SiparisId).ToArray();
+            var gelen = ids.Length == 0 ? new List<MesajNoSatiri>() : await _db.Database.SqlQuery<MesajNoSatiri>($"""
+                SELECT "SiparisId","Id","GonderenTipi" FROM "IsMesajlari"
+                WHERE "SiparisId" = ANY({ids}) AND "GonderenTipi" IN ('Hekim','Teknisyen')
+                """).ToListAsync(ct);
+            var sinir = _takip.OkunmaSiniri(IcerikTakip.Laboratuvar);
+            var okunmamis = gelen.Where(m => m.Id > sinir(m.SiparisId))
+                .GroupBy(m => m.SiparisId).ToDictionary(g => g.Key, g => (Hekim: g.Count(x => x.GonderenTipi == "Hekim"), Teknisyen: g.Count(x => x.GonderenTipi == "Teknisyen")));
+
+            return Ok(rows.Select(x =>
+            {
+                okunmamis.TryGetValue(x.SiparisId, out var o);
+                return new
+                {
+                    x.SiparisId, x.HastaAdi, x.HekimAdi, x.TeknisyenAdi, x.Durum, x.OnayDurumu,
+                    x.SonMesajId, x.SonGonderenTipi, x.SonGonderenAdi, x.SonMesaj, x.SonTarih, x.MesajSayisi,
+                    OkunmamisHekim = o.Hekim, OkunmamisTeknisyen = o.Teknisyen, Okunmamis = o.Hekim + o.Teknisyen
+                };
+            }));
+        }
+
+        /// <summary>Menü rozeti: laboratuvarın okumadığı gelen mesaj sayısı.</summary>
+        [HttpGet("mesaj-ozet")]
+        public async Task<IActionResult> MesajOzet(CancellationToken ct)
+        {
+            var gelen = await _db.Database.SqlQuery<MesajNoSatiri>($"""
+                SELECT m."SiparisId", m."Id", m."GonderenTipi" FROM "IsMesajlari" m
+                JOIN "Siparisler" s ON s."Id"=m."SiparisId"
+                WHERE m."GonderenTipi" IN ('Hekim','Teknisyen') AND COALESCE(s."Silindi",false)=false
+                  AND m."Tarih" > now() - interval '180 days'
+                """).ToListAsync(ct);
+            var sinir = _takip.OkunmaSiniri(IcerikTakip.Laboratuvar);
+            var o = gelen.Where(m => m.Id > sinir(m.SiparisId)).ToList();
+            return Ok(new { okunmamis = o.Count, konusma = o.Select(x => x.SiparisId).Distinct().Count() });
+        }
+
         [HttpGet("mesajlar/{siparisId:int}")]
-        public async Task<IActionResult> Mesajlar(int siparisId)
+        public async Task<IActionResult> Mesajlar(int siparisId, [FromQuery] bool okundu = false)
         {
             var rows = await _db.Database
                 .SqlQuery<MesajDto>($"""
@@ -836,7 +910,12 @@ namespace PrimerLabV2.Controllers
                     """)
                 .ToListAsync();
 
-            return Ok(rows);
+            if (okundu && rows.Count > 0) _takip.MesajOkundu(IcerikTakip.Laboratuvar, siparisId, rows.Max(x => x.Id));
+            return Ok(rows.Select(m => new
+            {
+                m.Id, m.SiparisId, m.GonderenTipi, m.GonderenAdi, m.Mesaj, m.Tarih,
+                Kanal = m.GonderenTipi is "Teknisyen" or "Lab-Teknisyen" ? "teknisyen" : "hekim"
+            }));
         }
 
         [HttpPost("mesajlar/{siparisId:int}")]
@@ -857,18 +936,25 @@ namespace PrimerLabV2.Controllers
             if (!exists)
                 return NotFound("İş bulunamadı.");
 
-            var tip = Normalize(dto.GonderenTipi, 40) ?? "Laboratuvar";
+            // Laboratuvar ekranından yazılan mesaj kanala göre hekime ya da teknisyene gider.
+            var tip = dto.Kanal == "teknisyen" ? "Lab-Teknisyen"
+                : dto.Kanal == "hekim" ? "Laboratuvar"
+                : Normalize(dto.GonderenTipi, 40) ?? "Laboratuvar";
+            if (tip is not ("Laboratuvar" or "Lab-Teknisyen")) tip = "Laboratuvar";
             var ad = Normalize(dto.GonderenAdi, 150);
             var mesaj = dto.Mesaj.Trim();
 
-            await _db.Database.ExecuteSqlInterpolatedAsync($"""
+            var yeniId = (await _db.Database.SqlQuery<int>($"""
                 INSERT INTO "IsMesajlari"
                 ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")
                 VALUES
                 ({siparisId},{tip},{ad},{mesaj},{DateTime.UtcNow})
-                """);
+                RETURNING "Id" AS "Value"
+                """).ToListAsync()).Single();
+            // Kendi yazdığı mesaj ve öncekiler okunmuş sayılır.
+            _takip.MesajOkundu(IcerikTakip.Laboratuvar, siparisId, yeniId);
 
-            return Ok();
+            return Ok(new { id = yeniId });
         }
 
         [HttpGet("giderler")]
@@ -1188,8 +1274,33 @@ namespace PrimerLabV2.Controllers
         public DateTime Tarih { get; set; }
     }
 
+    public sealed class KonusmaSatiri
+    {
+        public int SiparisId { get; set; }
+        public string HastaAdi { get; set; } = "";
+        public string HekimAdi { get; set; } = "";
+        public string? TeknisyenAdi { get; set; }
+        public string Durum { get; set; } = "";
+        public string OnayDurumu { get; set; } = "";
+        public int SonMesajId { get; set; }
+        public string SonGonderenTipi { get; set; } = "";
+        public string? SonGonderenAdi { get; set; }
+        public string SonMesaj { get; set; } = "";
+        public DateTime SonTarih { get; set; }
+        public int MesajSayisi { get; set; }
+    }
+
+    public sealed class MesajNoSatiri
+    {
+        public int SiparisId { get; set; }
+        public int Id { get; set; }
+        public string GonderenTipi { get; set; } = "";
+    }
+
     public class MesajKaydetDto
     {
+        /// <summary>"hekim" (varsayılan) ya da "teknisyen".</summary>
+        public string? Kanal { get; set; }
         public string? GonderenTipi { get; set; }
         public string? GonderenAdi { get; set; }
         public string Mesaj { get; set; } = string.Empty;

@@ -15,14 +15,26 @@ public sealed class MailIntegrationController : ControllerBase
 {
     private readonly MailIntegrationService _service;
     private readonly PrimerLabDbContext _db;
+    private readonly IWebHostEnvironment _env;
+    private readonly IcerikTakip _takip;
 
     public MailIntegrationController(
         MailIntegrationService service,
-        PrimerLabDbContext db)
+        PrimerLabDbContext db,
+        IWebHostEnvironment env,
+        IcerikTakip takip)
     {
         _service = service;
         _db = db;
+        _env = env;
+        _takip = takip;
     }
+
+    private static readonly HashSet<string> IsDosyasiUzantilari = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".stl", ".obj", ".ply", ".dcm", ".zip", ".rar", ".7z", ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".txt",
+        ".xml", ".3ox", ".3oxz", ".dentalproject", ".constructioninfo"
+    };
 
     [HttpGet("status")]
     public async Task<IActionResult> Status() => Ok(await _service.GetStatusAsync());
@@ -150,24 +162,42 @@ public sealed class MailIntegrationController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    /// <summary>Mail sayaçları (menü rozeti ve süzgeç sekmeleri).</summary>
+    [HttpGet("ozet")]
+    public async Task<IActionResult> Ozet(CancellationToken ct)
+    {
+        var d = await _db.Database.SqlQuery<MailOzetSatiri>($"""
+            SELECT COUNT(*) FILTER (WHERE "Aktarildi"=false)::int AS "Bekleyen",
+                   COUNT(*) FILTER (WHERE "Aktarildi"=false AND COALESCE("IncelemeGerekli",false))::int AS "Inceleme",
+                   COUNT(*) FILTER (WHERE "Aktarildi"=true)::int AS "Aktarilan",
+                   COUNT(*)::int AS "Toplam"
+            FROM "MailGelenler"
+            """).SingleAsync(ct);
+        return Ok(d);
+    }
+
     [HttpGet("mails")]
     public async Task<IActionResult> Mails(
         [FromQuery] string? search = null,
         [FromQuery] bool reviewOnly = false,
-        [FromQuery] int take = 200)
+        [FromQuery] int take = 200,
+        [FromQuery] string? durum = null)
     {
         take = Math.Clamp(take, 1, 500);
+        var d = durum is "bekleyen" or "aktarilan" ? durum : "";
         var rows = await _db.Database.SqlQuery<MailListRow>($"""
             SELECT
                 m."Id",m."Tarih",m."Gonderen",m."Konu",m."HekimId",
                 h."AdSoyad" AS "HekimAdi",h."KlinikAdi",
                 m."HastaAdi",m."IsTuru",m."DisRengi",m."Materyal",m."Notlar",
+                m."Klinik",m."UyeSayisi",m."DisNo",m."ReferansKodu",
                 m."MesajId",m."Dosyalar",m."WetransferLinkleri",
                 m."AnalizKaynagi",m."Guven",m."IncelemeGerekli",m."Aktarildi",
                 (SELECT COUNT(*)::int FROM "MailDosyalari" f WHERE f."MailId"=m."Id") AS "DosyaSayisi"
             FROM "MailGelenler" m
             LEFT JOIN "Hekimler" h ON h."Id"=m."HekimId"
             WHERE ({reviewOnly}=false OR COALESCE(m."IncelemeGerekli",false)=true)
+              AND ({d}='' OR ({d}='bekleyen' AND m."Aktarildi"=false) OR ({d}='aktarilan' AND m."Aktarildi"=true))
               AND (
                     {string.IsNullOrWhiteSpace(search)}=true OR
                     COALESCE(m."Gonderen",'') ILIKE {'%' + (search ?? "") + '%'} OR
@@ -342,16 +372,104 @@ public sealed class MailIntegrationController : ControllerBase
         return Guid.NewGuid().ToString("N") + extension;
     }
 
-    [HttpPatch("mail/{id:int}/aktarildi")]
-    public async Task<IActionResult> MarkTransferred(int id)
+    /// <summary>Mailin tüm ayrıntısı: gövde metni, AI'nın çıkardığı alanlar, ekler.</summary>
+    [HttpGet("mail/{id:int}")]
+    public async Task<IActionResult> Detay(int id, CancellationToken ct)
     {
+        var m = await _db.Database.SqlQuery<MailDetaySatiri>($"""
+            SELECT m."Id", m."Tarih", m."Gonderen", m."Konu", left(COALESCE(m."Gövde",''), 30000) AS "Govde",
+                   m."HekimId", h."AdSoyad" AS "HekimAdi", m."Klinik", m."HastaAdi", m."IsTuru", m."DisRengi", m."Materyal",
+                   m."Notlar", m."UyeSayisi", m."DisNo", m."ReferansKodu", m."WetransferLinkleri", m."AnalizKaynagi",
+                   m."Guven", COALESCE(m."IncelemeGerekli",false) AS "IncelemeGerekli", m."Aktarildi"
+            FROM "MailGelenler" m LEFT JOIN "Hekimler" h ON h."Id"=m."HekimId"
+            WHERE m."Id"={id}
+            """).FirstOrDefaultAsync(ct);
+        if (m == null) return NotFound("Mail bulunamadı.");
+        var dosyalar = await _db.Database.SqlQuery<MailFileListRow>($"""
+            SELECT "Id","MailId","DosyaAdi","Boyut",COALESCE("MimeType",'application/octet-stream') AS "MimeType"
+            FROM "MailDosyalari" WHERE "MailId"={id} ORDER BY "Id"
+            """).ToListAsync(ct);
+        return Ok(new { mail = m, dosyalar });
+    }
+
+    /// <summary>İşlendi (aktarıldı) işaretini koyar ya da kaldırır (gövdesiz çağrı: işlendi).</summary>
+    [HttpPatch("mail/{id:int}/aktarildi")]
+    public async Task<IActionResult> MarkTransferred(int id, [FromBody] MailDurumDto? dto = null)
+    {
+        var deger = dto?.Aktarildi ?? true;
         var count = await _db.Database.ExecuteSqlInterpolatedAsync($"""
             UPDATE "MailGelenler"
-            SET "Aktarildi"=true
+            SET "Aktarildi"={deger}
             WHERE "Id"={id}
             """);
 
-        return count == 0 ? NotFound() : Ok();
+        return count == 0 ? NotFound() : Ok(new { aktarildi = deger });
+    }
+
+    /// <summary>
+    /// Mailden oluşturulan siparişe mailin eklerini iş dosyası olarak kopyalar (3B dosyalar "Tarama")
+    /// ve maili işlendi olarak işaretler. Sipariş para birimine göre bölündüyse her işe kopyalanır.
+    /// </summary>
+    [HttpPost("mail/{id:int}/ise-aktar")]
+    public async Task<IActionResult> IseAktar(int id, [FromBody] MailIseAktarDto dto, CancellationToken ct)
+    {
+        var isler = (dto.SiparisIdler ?? new()).Where(x => x > 0).Distinct().Take(10).ToList();
+        if (isler.Count == 0) return BadRequest("Sipariş numarası gerekli.");
+        var mevcut = await _db.Database.SqlQuery<int>($"""
+            SELECT "Id" AS "Value" FROM "Siparisler" WHERE "Id" = ANY({isler.ToArray()})
+            """).ToListAsync(ct);
+        if (mevcut.Count == 0) return NotFound("Sipariş bulunamadı.");
+        var dosyalar = await _db.Database.SqlQuery<MailFileListRow>($"""
+            SELECT "Id","MailId","DosyaAdi","Boyut",COALESCE("MimeType",'application/octet-stream') AS "MimeType"
+            FROM "MailDosyalari" WHERE "MailId"={id} ORDER BY "Id"
+            """).ToListAsync(ct);
+
+        int kopyalanan = 0, atlanan = 0;
+        var gonderen = await _db.Database.SqlQuery<string>($"""
+            SELECT COALESCE(h."AdSoyad", m."Gonderen", 'Mail') AS "Value"
+            FROM "MailGelenler" m LEFT JOIN "Hekimler" h ON h."Id"=m."HekimId" WHERE m."Id"={id}
+            """).FirstOrDefaultAsync(ct) ?? "Mail";
+        foreach (var f in dosyalar)
+        {
+            var uzanti = Path.GetExtension(f.DosyaAdi).ToLowerInvariant();
+            var kaynak = await _service.GetStoredFilePathAsync(id, f.Id, ct);
+            if (kaynak == null || !IsDosyasiUzantilari.Contains(uzanti)) { atlanan++; continue; }
+            var tur = uzanti is ".stl" or ".obj" or ".ply" or ".dcm" or ".zip" or ".rar" or ".7z" or ".3ox" or ".3oxz" or ".xml" ? "Tarama" : "Diger";
+            var ad = Path.GetFileName(f.DosyaAdi);
+            if (ad.Length > 240) ad = ad[^240..];
+            foreach (var siparisId in mevcut)
+            {
+                var klasor = Path.GetFullPath(Path.Combine(_env.ContentRootPath, "App_Data", "IsDosyalari", siparisId.ToString()));
+                Directory.CreateDirectory(klasor);
+                var saklanan = Guid.NewGuid().ToString("N") + uzanti;
+                var hedef = Path.Combine(klasor, saklanan);
+                System.IO.File.Copy(kaynak, hedef);
+                try
+                {
+                    var dosyaId = (await _db.Database.SqlQuery<int>($"""
+                        INSERT INTO "IsDosyalari" ("SiparisId","DosyaTuru","OrijinalDosyaAdi","SaklananDosyaAdi","Uzanti","Boyut","YuklemeTarihi")
+                        VALUES ({siparisId},{tur},{ad},{saklanan},{uzanti},{new FileInfo(hedef).Length},{DateTime.UtcNow})
+                        RETURNING "Id" AS "Value"
+                        """).ToListAsync(ct)).Single();
+                    _takip.DosyaYuklendi(dosyaId, "Mail", gonderen + " (mail eki)");
+                    kopyalanan++;
+                }
+                catch
+                {
+                    try { System.IO.File.Delete(hedef); } catch { }
+                    throw;
+                }
+            }
+        }
+
+        await _db.Database.ExecuteSqlInterpolatedAsync($"""UPDATE "MailGelenler" SET "Aktarildi"=true WHERE "Id"={id}""", ct);
+        return Ok(new
+        {
+            kopyalanan, atlanan,
+            message = kopyalanan > 0
+                ? $"{kopyalanan} mail eki siparişin dosyalarına eklendi." + (atlanan > 0 ? $" {atlanan} ek (desteklenmeyen tür ya da diskte yok) atlandı." : "")
+                : dosyalar.Count == 0 ? "Mailde kayıtlı ek yok." : "Ekler aktarılamadı (desteklenmeyen tür ya da diskte yok)."
+        });
     }
 }
 
@@ -385,6 +503,53 @@ public sealed class MailListRow
     public bool IncelemeGerekli { get; set; }
     public bool Aktarildi { get; set; }
     public int DosyaSayisi { get; set; }
+    public string? Klinik { get; set; }
+    public int? UyeSayisi { get; set; }
+    public string? DisNo { get; set; }
+    public string? ReferansKodu { get; set; }
+}
+
+public sealed class MailOzetSatiri
+{
+    public int Bekleyen { get; set; }
+    public int Inceleme { get; set; }
+    public int Aktarilan { get; set; }
+    public int Toplam { get; set; }
+}
+
+public sealed class MailDurumDto
+{
+    public bool? Aktarildi { get; set; }
+}
+
+public sealed class MailIseAktarDto
+{
+    public List<int>? SiparisIdler { get; set; }
+}
+
+public sealed class MailDetaySatiri
+{
+    public int Id { get; set; }
+    public DateTime Tarih { get; set; }
+    public string? Gonderen { get; set; }
+    public string? Konu { get; set; }
+    public string? Govde { get; set; }
+    public int? HekimId { get; set; }
+    public string? HekimAdi { get; set; }
+    public string? Klinik { get; set; }
+    public string? HastaAdi { get; set; }
+    public string? IsTuru { get; set; }
+    public string? DisRengi { get; set; }
+    public string? Materyal { get; set; }
+    public string? Notlar { get; set; }
+    public int? UyeSayisi { get; set; }
+    public string? DisNo { get; set; }
+    public string? ReferansKodu { get; set; }
+    public string? WetransferLinkleri { get; set; }
+    public string? AnalizKaynagi { get; set; }
+    public double? Guven { get; set; }
+    public bool IncelemeGerekli { get; set; }
+    public bool Aktarildi { get; set; }
 }
 
 public sealed class MailFileListRow
