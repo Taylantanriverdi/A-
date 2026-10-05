@@ -4796,6 +4796,24 @@
                     </div>
                 </div>
 
+                <div class="panel" style="padding:18px 20px;margin-bottom:16px" id="iaPanel">
+                    <div class="panel-header" style="padding:0;margin-bottom:12px">
+                        <div>
+                            <div class="panel-title">🗂️ İş Akışı Paneli</div>
+                            <div class="page-subtitle">Hekimden, mailden ve elle gelen tüm işlerin akışını (onay, durum, teknisyen ataması, dosyalar, mesajlar, sipariş formu) yöneten ayrı panel. <b>Fiyat bilgisi göstermez.</b> Ana programla anlık senkrondur.</div>
+                        </div>
+                        <button class="button button-blue" type="button" onclick="window.open('/is-akisi','_blank')">Paneli Aç ↗</button>
+                    </div>
+                    <div class="ops-mini" style="margin-bottom:10px">Adres: bu bilgisayarda <code>http://localhost:5169/is-akisi</code> · aynı ağdaki bilgisayarlardan <code>http://<span id="iaIp">bu-bilgisayarin-ip</span>:5169/is-akisi</code> · internet portalı açıksa <code>https://…/is-akisi</code>. Yönetici olarak oturumunuz açıkken şifresiz girersiniz; diğer kullanıcılar aşağıda açtığınız hesapla girer.</div>
+                    <div class="ys-izgara">
+                        <div class="form-group" style="margin:0"><label for="iaAd">Ad soyad</label><input id="iaAd" type="text" placeholder="Örn. Ayşe Yılmaz (sekreter)" /></div>
+                        <div class="form-group" style="margin:0"><label for="iaKu">Kullanıcı adı</label><input id="iaKu" type="text" autocomplete="off" spellcheck="false" placeholder="ayse" /></div>
+                        <div class="form-group" style="margin:0"><label for="iaSifre">Şifre</label><input id="iaSifre" type="text" autocomplete="off" placeholder="En az 8 karakter, harf ve rakam" /></div>
+                    </div>
+                    <div class="button-group" style="margin-top:10px"><button class="button button-blue" type="button" onclick="iaHesapEkle()">+ Hesap Aç</button></div>
+                    <div id="iaListe" style="margin-top:12px"></div>
+                </div>
+
                 <div class="panel" style="padding:18px 20px;margin-bottom:16px" id="oyPanel">
                     <div class="panel-header" style="padding:0;margin-bottom:12px">
                         <div>
@@ -6568,6 +6586,7 @@
                 renderTeknisyenler();
                 yoneticiDurumYukle();
                 oyYukle();
+                iaYukle();
             }
 
             if (id === "portalHesaplari") {
@@ -13188,7 +13207,7 @@
                         materyal: document.getElementById("anMateryal")?.value.trim() || null,
                         disSemasi: Array.from(anayasaSeciliDisler).join(","),
                         notlar: document.getElementById("anNot")?.value.trim() || null,
-                        kaynak: anayasaAktarilanPortalSiparisId ? "Sipariş Formu (Hekim Portalı)" : "Sipariş Formu",
+                        kaynak: anayasaAktarilanPortalSiparisId ? "Sipariş Formu (Hekim Portalı)" : (anMailKaynakId ? "Mail" : "Sipariş Formu"),
                         aktarilanSiparisId: anayasaAktarilanPortalSiparisId,
                         // Her iş kalemi kendi para birimini taşır.
                         // Sunucu farklı para birimlerini güvenli biçimde ayrı iş kayıtlarına böler.
@@ -14682,6 +14701,29 @@
         async function oyIstasyonAc(){
             try{ const r=await fetch("/api/otomatik-yazdir/istasyon-baslat",{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); setTimeout(oyYukle,8000); }catch(e){ showError(e.message); }
         }
+        // ---------------- İş Akışı Paneli hesapları ----------------
+        async function iaYukle(){
+            const k=document.getElementById("iaListe"); if(!k) return;
+            try{
+                const r=await fetch("/api/is-akisi/admin/hesaplar",{cache:"no-store"}); if(!r.ok) throw new Error(await r.text());
+                const l=await r.json();
+                k.innerHTML=l.length?`<div class="table-wrap"><table><thead><tr><th>Ad soyad</th><th>Kullanıcı adı</th><th>Durum</th><th>Son giriş</th><th></th></tr></thead><tbody>${l.map(h=>`<tr><td><b>${escapeHtml(h.adSoyad)}</b></td><td>${escapeHtml(h.kullaniciAdi)}</td><td>${h.aktif?'<span class="status" style="background:#dcfce7;color:#15803d">Aktif</span>':'<span class="status">Pasif</span>'}</td><td>${h.sonGiris?tarihSaatGoster(h.sonGiris):'-'}</td>
+                    <td style="white-space:nowrap"><button class="button button-light" type="button" onclick="iaSifre(${Number(h.id)})">Şifre</button> <button class="button button-light" type="button" onclick="iaAktif(${Number(h.id)},${h.aktif?'false':'true'})">${h.aktif?'Pasife Al':'Aktif Yap'}</button> <button class="button button-light" type="button" onclick="iaSil(${Number(h.id)})">Sil</button></td></tr>`).join("")}</tbody></table></div>`:'<div class="ops-mini">Henüz hesap yok. İş akışını yönetecek kişi için yukarıdan hesap açın.</div>';
+            }catch(e){ k.innerHTML='<div class="ops-mini">'+escapeHtml(e.message||"Hesaplar alınamadı.")+'</div>'; }
+            try{ const h=location.hostname; const ip=document.getElementById("iaIp"); if(ip&&h&&h!=="localhost"&&h!=="127.0.0.1") ip.textContent=h; }catch{}
+        }
+        async function iaIstek(url,yontem,govde,basari){
+            try{ const r=await fetch(url,{method:yontem,headers:{"Content-Type":"application/json"},body:govde?JSON.stringify(govde):undefined}); if(!r.ok) throw new Error(await r.text()); if(basari) showSuccess(basari); iaYukle(); return true; }
+            catch(e){ showError(e.message); return false; }
+        }
+        async function iaHesapEkle(){
+            const ad=document.getElementById("iaAd").value.trim(), ku=document.getElementById("iaKu").value.trim(), sf=document.getElementById("iaSifre").value;
+            if(await iaIstek("/api/is-akisi/admin/hesaplar","POST",{adSoyad:ad,kullaniciAdi:ku,parola:sf},"Hesap açıldı. Kullanıcı adı ve şifreyi kişiye iletin.")){ ["iaAd","iaKu","iaSifre"].forEach(i=>document.getElementById(i).value=""); }
+        }
+        function iaSifre(id){ const p=prompt("Yeni şifre (en az 8 karakter, harf ve rakam):"); if(p) iaIstek("/api/is-akisi/admin/hesaplar/"+Number(id),"PATCH",{parola:p},"Şifre değiştirildi; açık oturumlar kapandı."); }
+        function iaAktif(id,a){ iaIstek("/api/is-akisi/admin/hesaplar/"+Number(id),"PATCH",{aktif:a},a?"Hesap aktif.":"Hesap pasife alındı; oturumu kapandı."); }
+        function iaSil(id){ if(confirm("Hesap silinsin mi?")) iaIstek("/api/is-akisi/admin/hesaplar/"+Number(id),"DELETE",null,"Hesap silindi."); }
+
         async function oyIstasyonAyar(){
             try{ const r=await fetch("/api/otomatik-yazdir/istasyon-ayar",{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); }catch(e){ showError(e.message); }
         }

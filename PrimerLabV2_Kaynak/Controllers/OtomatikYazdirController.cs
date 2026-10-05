@@ -82,7 +82,7 @@ public sealed class OtomatikYazdirController : ControllerBase
             LIMIT 200
             """).ToListAsync(ct);
         var basilan = _oy.BasilanIdler();
-        bool KaynakUygun(string k) => a.Kaynaklar.Any(x => k == x || (x == "Hekim Portalı" && k.Contains("Hekim Portalı")));
+        bool KaynakUygun(string k) => a.Kaynaklar.Any(x => k == x || (x == "Hekim Portalı" && k.Contains("Hekim Portalı")) || (x == "Sipariş Formu" && k == "Mail"));
         var isler = adaylar.Where(x => tekrar.Contains(x.Id) || (!basilan.Contains(x.Id) && KaynakUygun(x.Kaynak)))
             .Select(x => x.Id).Take(5).ToArray();
         isler = _oy.Ayir(isler);

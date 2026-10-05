@@ -45,7 +45,10 @@ public sealed class PrimerLabSecurityMiddleware
             context.Request.Path.StartsWithSegments("/hekim-portal") ||
             context.Request.Path.StartsWithSegments("/api/hekim-portal") ||
             context.Request.Path.StartsWithSegments("/teknisyen") ||
-            context.Request.Path.StartsWithSegments("/api/teknisyen-portal");
+            context.Request.Path.StartsWithSegments("/api/teknisyen-portal") ||
+            // İş Akışı Paneli: kendi kullanıcı/şifresi var (fiyat göstermez).
+            context.Request.Path.StartsWithSegments("/is-akisi") ||
+            context.Request.Path.StartsWithSegments("/api/is-akisi");
 
         if (!IsRemoteAccessAllowed() && !IsLoopback(remoteAddress))
         {
@@ -88,7 +91,8 @@ public sealed class PrimerLabSecurityMiddleware
         // kendi oturumlarını kullanır; onların yönetici uçları ise burada korunur).
         var yonetimIstegi = !doctorPortalRequest ||
             context.Request.Path.StartsWithSegments("/api/hekim-portal/admin") ||
-            context.Request.Path.StartsWithSegments("/api/teknisyen-portal/admin");
+            context.Request.Path.StartsWithSegments("/api/teknisyen-portal/admin") ||
+            context.Request.Path.StartsWithSegments("/api/is-akisi/admin");
         if (yonetimIstegi && !GirisSerbest(context.Request.Path))
         {
             var giris = context.RequestServices.GetRequiredService<YoneticiGirisi>();
@@ -162,6 +166,8 @@ public sealed class PrimerLabSecurityMiddleware
             (path.StartsWithSegments("/api/hekim-portal") && !path.StartsWithSegments("/api/hekim-portal/admin")) ||
             path.StartsWithSegments("/teknisyen") ||
             (path.StartsWithSegments("/api/teknisyen-portal") && !path.StartsWithSegments("/api/teknisyen-portal/admin")) ||
+            path.StartsWithSegments("/is-akisi") ||
+            (path.StartsWithSegments("/api/is-akisi") && !path.StartsWithSegments("/api/is-akisi/admin")) ||
             // WhatsApp (Meta) webhook'u: istekler Meta imzasıyla doğrulanır.
             path.Equals("/api/whatsapp/webhook", StringComparison.OrdinalIgnoreCase);
 

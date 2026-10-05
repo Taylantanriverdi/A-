@@ -212,6 +212,24 @@ TASARIM VE YAZICI (CTB) DOSYASINI HEKIME VERME
 - Yonetici, Teknisyenler ekraninda "Paneline Gir" (ya da listede goz simgesi)
   ile herhangi bir teknisyenin paneline sifresiz girebilir (yonetici gorunumu).
 
+IS AKISI PANELI (fiyatsiz is takibi - sekreter / is takipcisi icin)
+-------------------------------------------------------------------
+- Adres: bu bilgisayarda http://localhost:5169/is-akisi ; ayni agdaki
+  bilgisayarlardan http://BU-BILGISAYARIN-IP:5169/is-akisi ; internet portali
+  aciksa https://.../is-akisi
+- Hesap: ana program > Ayarlar > "Is Akisi Paneli" bolumunden ad soyad,
+  kullanici adi ve sifre ile acilir (pasife alinabilir, sifresi degistirilebilir).
+  Yonetici oturumu acikken panel sifresiz acilir ("Paneli Ac").
+- Hekim Portali, mail ve elle girilen tum isler kaynagiyla birlikte panoda
+  gorunur: Onay Bekleyen > Bekliyor > Tasarimda > Uretimde > Tamamlama Onayi >
+  Tamamlandi. Suzgecler: kaynak, atanmamis, geciken, bugun teslim, yeni mesaj.
+- Is kartina tiklayinca: onayla/reddet, durum degistir, teknisyen ata,
+  tamamlamayi onayla, dosya indir, linkler, hekime/teknisyene mesaj, fiyatsiz
+  siparis formu yazdir.
+- FIYAT BILGISI HIC GOSTERILMEZ (sunucu fiyat alanlarini panele hic gondermez).
+- Ana programla ayni veritabanini kullanir; her degisiklik aninda iki tarafta
+  da gorunur. Panel 30 saniyede bir kendini yeniler.
+
 DOSYA SIMGELERI VE 3B ONIZLEME
 ------------------------------
 Is listelerinde (Devam Eden, Hekimden Gelenler, Onay, Dosyalar, Tamamlanan,
