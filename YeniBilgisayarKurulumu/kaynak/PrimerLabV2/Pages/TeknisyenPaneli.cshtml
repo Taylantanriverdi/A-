@@ -701,7 +701,8 @@
         modalAc(`#${id} · ${f.hastaAdi} — Dosyalar`, '<div class="note">Yükleniyor...</div>');
         try {
             const list = await api(`/api/teknisyen-portal/jobs/${id}/files`);
-            $("modalIcerik").innerHTML = list.length ? list.map(x => `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${x.id}">${esc(x.orijinalDosyaAdi)}</a><small>${esc(x.dosyaTuru)} · ${boyut(x.boyut)}</small></div>`).join("") : '<div class="note">Bu işte dosya yok.</div>';
+            const linkler = await linkHtml(id, true);
+            $("modalIcerik").innerHTML = (list.length ? list.map(x => `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${x.id}">${esc(x.orijinalDosyaAdi)}</a><small>${esc(x.dosyaTuru)} · ${boyut(x.boyut)}</small></div>`).join("") : (linkler ? "" : '<div class="note">Bu işte dosya yok.</div>')) + linkler;
         } catch (err) { $("modalIcerik").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
     }
 
@@ -791,7 +792,7 @@
             ${adimlar}
             <div class="actions">
                 ${teslimBtn}
-                <button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım)</button>
+                <button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım${j.linkSayisi ? " · 🔗 " + j.linkSayisi + " link" : ""})</button>
                 <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni</span>` : ""}</button>
             </div>
         </div>`;
@@ -838,6 +839,16 @@
         await dosyalariCiz(id);
     }
 
+    // Hekimin dosya yerine paylaştığı linkler (WeTransfer, Drive...). Kabul edilmemiş işte tıklanamaz.
+    async function linkHtml(id, tiklanir) {
+        let l = [];
+        try { l = await api(`/api/teknisyen-portal/jobs/${id}/links`); } catch { return ""; }
+        if (!l.length) return "";
+        return `<div style="margin:10px 0 4px;font-weight:900">🔗 Dosya linkleri</div>` + l.map(x => tiklanir
+            ? `<div class="file"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.servis)} — ${esc(x.url.length > 70 ? x.url.slice(0, 70) + "…" : x.url)}</a><small>${esc(x.ekleyenTipi)}</small></div>`
+            : `<div class="file"><span>${esc(x.servis)} linki</span><small>${esc(x.ekleyenTipi)}</small></div>`).join("");
+    }
+
     async function dosyalariCiz(id) {
         const j = isler.find(x => x.id === id); if (!j || !acikModal || acikModal.id !== id) return;
         let list = [];
@@ -846,9 +857,10 @@
         const satir = f => j.kabul
             ? `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${f.id}">${esc(f.orijinalDosyaAdi)}</a><small>${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</small></div>`
             : `<div class="file"><span>${esc(f.orijinalDosyaAdi)}</span><small>${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</small></div>`;
+        const linkler = await linkHtml(id, j.kabul);
         $("modalIcerik").innerHTML =
             (j.kabul ? "" : '<div class="msg err">Dosyaları indirmek için önce işi kabul edin.</div>') +
-            (list.length ? list.map(satir).join("") : '<div class="note">Bu işte henüz dosya yok.</div>') +
+            (list.length ? list.map(satir).join("") : (linkler ? "" : '<div class="note">Bu işte henüz dosya yok.</div>')) + linkler +
             (j.kabul && j.durum !== "Tamamlandı" ? `
             <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
                 <label class="lbl">Dosya yükle (tasarım / üretim)</label>

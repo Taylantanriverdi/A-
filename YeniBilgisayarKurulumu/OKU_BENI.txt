@@ -187,6 +187,18 @@ OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
 - Program guncellenince acik istasyon kendini yeniler (eski sablonla basmaz).
 - Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
 
+DOSYA LINKLERI (WeTransfer, Google Drive, Dropbox, iCloud, 3Shape...)
+--------------------------------------------------------------------
+- Hekim, Hekim Portali'nda is gonderirken dosya yuklemek yerine (ya da
+  dosyayla birlikte) "veya dosya linki paylasin" alanina linki yapistirir.
+  Birden fazla link alt alta yazilir (en fazla 10). Sonradan da "Islerim" >
+  is > "Link Ekle" ile link ekleyebilir.
+- Laboratuvar: is listelerinde hasta adinin yaninda mor "🔗 n" simgesi cikar;
+  tiklayinca linkler acilir (Ac / Kopyala / Sil, yeni link ekleme).
+- Teknisyen Paneli: is > Dosyalar penceresinde "Dosya linkleri" listelenir.
+- Basilan siparis formunda "Dosya linkleri" satiri yer alir.
+- Linklerin suresi dolabilir; dosyalari zamaninda indirin.
+
 DOSYA SIMGELERI VE 3B ONIZLEME
 ------------------------------
 Is listelerinde (Devam Eden, Hekimden Gelenler, Onay, Dosyalar, Tamamlanan,

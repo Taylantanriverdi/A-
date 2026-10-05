@@ -659,6 +659,7 @@ public sealed class HekimPortalController : ControllerBase
         var sinir = _takip.OkunmaSiniri("hekim:" + session.HekimId);
         var okunmamis = labMesajlari.Where(m => m.Id > sinir(m.SiparisId)).GroupBy(m => m.SiparisId).ToDictionary(g => g.Key, g => g.Count());
 
+        var linkSayilari = HttpContext.RequestServices.GetRequiredService<IsLinkleri>().Sayilar();
         return Ok(rows.Select(x => new
         {
             OkunmamisMesaj = okunmamis.TryGetValue(x.Id, out var om) ? om : 0,
@@ -675,6 +676,7 @@ public sealed class HekimPortalController : ControllerBase
             x.TasarimKaynagi,
             x.ToplamAdet,
             x.DosyaSayisi,
+            LinkSayisi = linkSayilari.TryGetValue(x.Id, out var ls) ? ls : 0,
             x.MesajSayisi,
             kalemler = byJob.TryGetValue(x.Id, out var list)
                 ? list.Select(k => (object)new { k.IsTuru, k.Adet }).ToArray()
@@ -794,6 +796,11 @@ public sealed class HekimPortalController : ControllerBase
 
         files ??= new List<IFormFile>();
         if (files.Count > 8) return BadRequest("Bir iş için en fazla 8 dosya yüklenebilir.");
+        // Linkler iş kaydedilmeden önce denetlenir (hatalı link yüzünden yarım kayıt oluşmasın).
+        var linkler = (dto.Linkler ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct().ToList();
+        if (linkler.Count > IsLinkleri.IsBasinaEnFazla) return BadRequest($"Bir işe en fazla {IsLinkleri.IsBasinaEnFazla} link eklenebilir.");
+        foreach (var l in linkler)
+            if (IsLinkleri.Dogrula(l, out var linkHata) == null) return BadRequest(linkHata);
         if (files.Sum(x => x.Length) > MaxRequestSize - (2L * 1024L * 1024L))
             return BadRequest("Toplam dosya boyutu çok yüksek.");
 
@@ -949,8 +956,16 @@ public sealed class HekimPortalController : ControllerBase
             throw;
         }
 
+        if (linkler.Count > 0)
+        {
+            var linkDeposu = HttpContext.RequestServices.GetRequiredService<IsLinkleri>();
+            foreach (var isId in createdJobIds)
+                linkDeposu.Ekle(isId, linkler, null, teknisyenAdi != null ? "Teknisyen" : "Hekim", teknisyenAdi);
+        }
+
         return Ok(new
         {
+            linkSayisi = linkler.Count,
             message = createdJobIds.Count > 1
                 ? "İş laboratuvara gönderildi. Farklı muhasebe para birimleri ana sistemde otomatik olarak ayrı iş kayıtlarına ayrıldı."
                 : "İş laboratuvara gönderildi ve Gelen İş Onayı kuyruğuna eklendi.",
@@ -1011,6 +1026,42 @@ public sealed class HekimPortalController : ControllerBase
             """).ToListAsync(cancellationToken)).Single();
         _takip.MesajOkundu("hekim:" + session.HekimId, jobId, yeniId);
         return Ok(new { message = "Mesaj gönderildi." });
+    }
+
+    // Dosya yerine paylaşılan linkler: hekim görür, sonradan ekler, kendi eklediğini siler.
+    [HttpGet("jobs/{jobId:int}/links")]
+    public async Task<IActionResult> JobLinks(int jobId, [FromServices] IsLinkleri linkler, CancellationToken cancellationToken)
+    {
+        var session = await RequireSession(cancellationToken);
+        if (session.Error != null) return session.Error;
+        if (!await OwnsJob(session.HekimId, jobId, cancellationToken)) return NotFound("İş bulunamadı.");
+        return Ok(linkler.Liste(jobId).Select(x => new
+        {
+            x.Id, x.Url, x.Aciklama, x.Tarih, servis = IsLinkleri.Servis(x.Url),
+            Ekleyen = x.EkleyenTipi == "Hekim" ? "Siz" : "Laboratuvar", Benim = x.EkleyenTipi == "Hekim"
+        }));
+    }
+
+    [HttpPost("jobs/{jobId:int}/links")]
+    public async Task<IActionResult> AddJobLinks(int jobId, [FromBody] IsLinkEkleDto dto, [FromServices] IsLinkleri linkler, CancellationToken cancellationToken)
+    {
+        var session = await RequireSession(cancellationToken);
+        if (session.Error != null) return session.Error;
+        if (!await OwnsJob(session.HekimId, jobId, cancellationToken)) return NotFound("İş bulunamadı.");
+        var liste = (dto.Linkler ?? new()).Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+        if (liste.Count == 0) return BadRequest("Link girin.");
+        var hata = linkler.Ekle(jobId, liste, dto.Aciklama, "Hekim", null);
+        if (hata != null) return BadRequest(hata);
+        return Ok(new { message = "Link işe eklendi; laboratuvar görebilir." });
+    }
+
+    [HttpDelete("jobs/{jobId:int}/links/{linkId:int}")]
+    public async Task<IActionResult> DeleteJobLink(int jobId, int linkId, [FromServices] IsLinkleri linkler, CancellationToken cancellationToken)
+    {
+        var session = await RequireSession(cancellationToken);
+        if (session.Error != null) return session.Error;
+        if (!await OwnsJob(session.HekimId, jobId, cancellationToken)) return NotFound("İş bulunamadı.");
+        return linkler.Sil(jobId, linkId, "Hekim") ? Ok() : NotFound("Link bulunamadı.");
     }
 
     [HttpGet("jobs/{jobId:int}/files")]
@@ -1542,6 +1593,14 @@ public sealed class PortalNewJobDto
     public string? BaglantiTipi { get; set; }
     public string? TaramaCihazi { get; set; }
     public string? ProvaAsamasi { get; set; }
+    /// <summary>Dosya yerine (ya da dosyayla birlikte) paylaşılan bağlantılar: WeTransfer, Drive, Dropbox...</summary>
+    public List<string>? Linkler { get; set; }
+}
+
+public sealed class IsLinkEkleDto
+{
+    public List<string>? Linkler { get; set; }
+    public string? Aciklama { get; set; }
 }
 
 public sealed class PortalNewJobItemDto

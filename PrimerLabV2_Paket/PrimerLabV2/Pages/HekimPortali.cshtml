@@ -466,6 +466,11 @@
                     <input id="dosyaInput" type="file" multiple class="hidden" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt" onchange="dosyaEkle(this.files);this.value=''" />
                     <div class="files" id="dosyalar"></div>
                     <div class="hint" id="dosyaUyari"></div>
+                    <div style="margin-top:12px">
+                        <label class="lbl" for="linkInput">🔗 veya dosya linki paylaşın <span class="hint" style="font-weight:400">(WeTransfer, Google Drive, Dropbox, iCloud, 3Shape...)</span></label>
+                        <textarea id="linkInput" class="inp" rows="2" maxlength="6000" autocapitalize="none" spellcheck="false" placeholder="https://we.tl/...   — birden fazla linki alt alta yazın" oninput="ozetCiz()"></textarea>
+                        <div class="hint">Dosyaları yüklemek yerine paylaşım linkini yapıştırabilirsiniz. Linkin süresi dolmadan laboratuvar dosyaları indirir.</div>
+                    </div>
                 </div>
 
                 <div class="card">
@@ -920,6 +925,7 @@
         $("implantVar").checked = false;
         materyal = "";
         dosyalar = [];
+        if ($("linkInput")) $("linkInput").value = "";
         kalemler = [];
         sayac = 0;
         kalemEkle();
@@ -1068,6 +1074,16 @@
         dosyalariCiz();
     }
 
+    // Dosya linkleri: satır, boşluk ya da virgülle ayrılmış adresler.
+    function linkleriOku() {
+        return Array.from(new Set(($("linkInput")?.value || "").split(/[\s,]+/).map(x => x.trim()).filter(Boolean)));
+    }
+    function linkHatasi(list) {
+        if (list.length > 10) return "En fazla 10 link eklenebilir.";
+        const kotu = list.find(u => !/^(https?:\/\/)?[^\s\/.]+(\.[^\s\/.]+)+(\/\S*)?$/i.test(u));
+        return kotu ? "Geçersiz link: " + kotu + " (https:// ile başlayan bir adres girin)." : null;
+    }
+
     function dosyaSil(i) { dosyalar.splice(i, 1); dosyalariCiz(); }
 
     function dosyalariCiz() {
@@ -1100,7 +1116,7 @@
             `<div><b>İşler:</b> ${satir.length ? satir.join("<br>") : "-"}</div>` +
             `<div><b>Renk / materyal:</b> ${esc($("disRengi").value.trim() || "-")} / ${esc(secilenMateryal() || "-")}</div>` +
             ($("implantVar").checked ? `<div><b>İmplant:</b> ${esc($("implantMarka").value.trim() || "-")} ${esc($("implantPlatform").value.trim())}</div>` : "") +
-            `<div><b>Dosya:</b> ${dosyalar.length ? dosyalar.length + " dosya" : "yok"} · <b>Teslim:</b> ${esc($("termin").value ? tarih($("termin").value + "T12:00:00") : "-")}</div>` +
+            `<div><b>Dosya:</b> ${dosyalar.length ? dosyalar.length + " dosya" : "yok"}${linkleriOku().length ? " · <b>Link:</b> " + linkleriOku().length : ""} · <b>Teslim:</b> ${esc($("termin").value ? tarih($("termin").value + "T12:00:00") : "-")}</div>` +
             `<div class="hint">Fiyatlandırma, laboratuvarın sizinle anlaştığı fiyat listesine göre otomatik yapılır.</div>`;
     }
 
@@ -1130,6 +1146,8 @@
             return;
         }
         if (TEK && !$("tekHekim").value) { mesaj("formMsg", "Hekim seçin."); $("tekHekim").focus(); return; }
+        const linkHata = linkHatasi(linkleriOku());
+        if (linkHata) { mesaj("formMsg", linkHata); $("linkInput").focus(); return; }
         mesaj("formMsg", "");
         const dolu = kalemler.filter(k => k.isTuru);
         const payload = {
@@ -1149,7 +1167,8 @@
             baglantiTipi: $("implantVar").checked ? ($("baglantiTipi").value || null) : null,
             taramaCihazi: $("taramaCihazi").value || null,
             provaAsamasi: $("prova").value || null,
-            kalemler: dolu.map(k => ({ isTuru: k.isTuru, adet: k.adet, disler: k.disler }))
+            kalemler: dolu.map(k => ({ isTuru: k.isTuru, adet: k.adet, disler: k.disler })),
+            linkler: linkleriOku()
         };
         const fd = new FormData();
         fd.append("payload", JSON.stringify(payload));
@@ -1176,10 +1195,10 @@
             if (xhr.status === 413) { mesaj("formMsg", "Dosyalar çok büyük. ZIP yapıp küçültün veya ikiye bölerek gönderin."); return; }
             if (xhr.status < 200 || xhr.status >= 300) { mesaj("formMsg", xhr.responseText || ("Gönderilemedi (" + xhr.status + ")")); return; }
             let d = {}; try { d = JSON.parse(xhr.responseText); } catch {}
-            $("gonderildiMsg").textContent = (TEK ? "#" + (d.siparisIds || [d.siparisId]).join(", #") + " numaralı sipariş açıldı; laboratuvarın Onay Bekleyen listesine düştü." : (d.message || "İş laboratuvara gönderildi.")) + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "");
+            $("gonderildiMsg").textContent = (TEK ? "#" + (d.siparisIds || [d.siparisId]).join(", #") + " numaralı sipariş açıldı; laboratuvarın Onay Bekleyen listesine düştü." : (d.message || "İş laboratuvara gönderildi.")) + (d.dosyaSayisi ? " " + d.dosyaSayisi + " dosya yüklendi." : "") + (d.linkSayisi ? " " + d.linkSayisi + " link eklendi." : "");
             $("isFormu").classList.add("hidden");
             $("gonderildi").classList.remove("hidden");
-            kalemler = []; dosyalar = [];
+            kalemler = []; dosyalar = []; $("linkInput").value = "";
             window.scrollTo(0, 0);
         };
         xhr.onerror = () => { bitir(); mesaj("formMsg", "Bağlantı koptu, iş gönderilemedi. İnternetinizi kontrol edip tekrar deneyin; formunuz duruyor."); };
@@ -1228,6 +1247,10 @@
                     <div><b>Dişler:</b> ${esc(j.disSemasi || "-")}</div>
                     ${j.notlar ? `<div><b>Notlar:</b><pre>${esc(j.notlar)}</pre></div>` : ""}
                     <div><b>Dosyalar:</b> <span id="isDosya${j.id}">${j.dosyaSayisi ? "yükleniyor..." : "yok"}</span></div>
+                    <div><b>🔗 Linkler:</b> <span id="isLink${j.id}">${j.linkSayisi ? "yükleniyor..." : "yok"}</span>
+                        <div class="msg-form" style="margin-top:6px"><input id="isLinkYaz${j.id}" class="inp" autocapitalize="none" spellcheck="false" placeholder="Dosya linki ekleyin: https://..." />
+                        <button class="btn btn-sm" type="button" style="height:42px;white-space:nowrap" onclick="linkEkle(${j.id})">Link Ekle</button></div>
+                    </div>
                     <div style="margin-top:10px"><b>💬 Laboratuvarla yazışma</b>
                         <div class="msgs" id="isMesaj${j.id}"><span class="hint">Yükleniyor...</span></div>
                         <div class="msg-form"><textarea id="isMesajYaz${j.id}" maxlength="4000" placeholder="Bu iş hakkında laboratuvara yazın..."></textarea>
@@ -1236,7 +1259,7 @@
                 </div>` : ""}
             </div>`;
         }).join("");
-        if (acikIs) { dosyalariGetir(acikIs); mesajlariGetir(acikIs); }
+        if (acikIs) { dosyalariGetir(acikIs); linkleriGetir(acikIs); mesajlariGetir(acikIs); }
     }
 
     // Eski portaldaki aşama göstergesi: Gönderildi → Onaylandı → Tasarım → Üretim → Tamamlandı
@@ -1290,6 +1313,32 @@
             el.innerHTML = list.length ? list.map(f =>
                 `<div><a href="/api/hekim-portal/jobs/${id}/files/${f.id}">${esc(f.orijinalDosyaAdi)}</a> <span class="hint">${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</span></div>`).join("") : "yok";
         } catch (err) { el.textContent = err.message; }
+    }
+
+    async function linkleriGetir(id) {
+        const el = $("isLink" + id); if (!el) return;
+        const j = isler.find(x => x.id === id);
+        if (!j || !j.linkSayisi) { el.textContent = "yok"; return; }
+        try {
+            const list = await api(`/api/hekim-portal/jobs/${id}/links`);
+            el.innerHTML = list.length ? list.map(l =>
+                `<div><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.servis)} — ${esc(l.url.length > 60 ? l.url.slice(0, 60) + "…" : l.url)}</a> <span class="hint">${esc(l.ekleyen)} · ${tarih(l.tarih)}</span>${l.benim ? ` <button class="btn btn-sm" type="button" style="padding:2px 8px" title="Linki kaldır" onclick="linkSil(${id},${l.id})">×</button>` : ""}</div>`).join("") : "yok";
+        } catch (err) { el.textContent = err.message; }
+    }
+    async function linkEkle(id) {
+        const inp = $("isLinkYaz" + id); const list = (inp.value || "").split(/[\s,]+/).map(x => x.trim()).filter(Boolean);
+        const hata = list.length ? linkHatasi(list) : "Link girin.";
+        if (hata) { alert(hata); inp.focus(); return; }
+        try {
+            await api(`/api/hekim-portal/jobs/${id}/links`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ linkler: list }) });
+            const j = isler.find(x => x.id === id); if (j) j.linkSayisi = (j.linkSayisi || 0) + list.length;
+            inp.value = ""; linkleriGetir(id);
+        } catch (err) { alert(err.message); }
+    }
+    async function linkSil(id, linkId) {
+        if (!confirm("Bu link kaldırılsın mı?")) return;
+        try { await api(`/api/hekim-portal/jobs/${id}/links/${linkId}`, { method: "DELETE" }); const j = isler.find(x => x.id === id); if (j) j.linkSayisi = Math.max(0, (j.linkSayisi || 1) - 1); linkleriGetir(id); }
+        catch (err) { alert(err.message); }
     }
 
     // Renk ve implant önerileri

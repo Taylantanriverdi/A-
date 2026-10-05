@@ -28,6 +28,8 @@ done
 cp "$KOK/PrimerLabV2_Kaynak/Program.cs" "$HEDEF/Program.cs"
 esitle "$KOK/PrimerLabV2_Paket/PrimerLabV2/Pages" "$HEDEF/Pages"
 cp "$KOK/PrimerLabV2_Kaynak/DB/V33_TAM_KURULUM_SEMA.sql" "$KIT/kaynak/DB/V33_TAM_KURULUM_SEMA.sql"
+# Programın gösterdiği sürüm (sağ üstteki etiket) paket sürümüyle aynı olsun.
+sed -i -E 's/(public const string Version = ")[^"]*(";)/\1'"$SURUM"'\2/' "$HEDEF/Infrastructure/PrimerLabInfo.cs"
 
 # .bat dosyaları Windows için ASCII + CRLF olmalı (aksi halde komutlar bozulur)
 for b in "$KIT"/*.bat; do

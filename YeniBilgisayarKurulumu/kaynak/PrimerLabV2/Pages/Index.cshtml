@@ -1040,6 +1040,9 @@
         .dsimge{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle;flex-wrap:nowrap}
         .dsb{border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;border-radius:7px;padding:1px 6px;font-size:11px;font-weight:900;cursor:pointer;line-height:18px;white-space:nowrap}
         .dsb:hover{filter:brightness(.95);box-shadow:0 0 0 2px rgba(4,120,87,.15)}
+        .dsb.dsb-link{background:#ede9fe;color:#5b21b6;border-color:#ddd6fe}
+        .link-satir{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:8px;background:#fff}
+        .link-satir a:not(.button){word-break:break-all;color:#1d4ed8;text-decoration:none}
         .dsb.dsb-tasarim{border-color:#c7d2fe;background:#eef2ff;color:#4338ca}
         .dsb.dsb-diger{border-color:#e2e8f0;background:#f8fafc;color:#475569}
         .onz-pop{position:fixed;z-index:9999;width:620px;max-width:calc(100vw - 16px);background:#fff;border:1px solid #dbe3ef;border-radius:14px;box-shadow:0 18px 40px rgba(15,23,42,.22);padding:10px;display:none;font-size:12px}
@@ -2806,7 +2809,7 @@
 
 <body>
     <div class="version-badge" title="Kurulu Primer Lab sürümü">
-        Primer Lab V33.07.22.7
+        Primer Lab @PrimerLabV2.Infrastructure.PrimerLabInfo.Version
     </div>
     <button type="button" class="global-new-job" onclick="openAnayasaYeniIs()">+ Yeni İş</button>
     <button type="button" class="ai-fab" title="Primer AI" onclick="togglePrimerAi()">✦</button>
@@ -6234,6 +6237,23 @@
                         Değişiklikleri Kaydet
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="linkModal" class="modal-overlay" style="display:none;" onclick="if(event.target===this)linkModalKapat()">
+        <div class="modal-box" style="max-width:760px">
+            <div class="modal-header">
+                <div><h2>🔗 Dosya Linkleri</h2><p id="linkModalBaslik"></p></div>
+                <button type="button" class="modal-close" onclick="linkModalKapat()">×</button>
+            </div>
+            <div style="padding:18px 22px 22px">
+                <div id="linkModalListe"></div>
+                <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+                    <input id="linkModalYeni" type="text" autocomplete="off" spellcheck="false" placeholder="Link ekle: https://we.tl/... (birden fazlaysa boşlukla ayırın)" style="flex:1;min-width:260px" onkeydown="if(event.key==='Enter')linkModalEkle()" />
+                    <button class="button button-blue" type="button" onclick="linkModalEkle()">Link Ekle</button>
+                </div>
+                <div class="ops-mini" style="margin-top:8px">Hekimin WeTransfer, Google Drive, Dropbox, iCloud, 3Shape gibi servislerden paylaştığı bağlantılar. Linklerin süresi dolabilir; dosyaları zamanında indirin.</div>
             </div>
         </div>
     </div>
@@ -13664,11 +13684,50 @@
         // Dosyası olan işin satırında: 🦷 tarama, 📐 tasarım, 📎 diğer. Tıkla: o türün tümünü indir; üzerine gel: önizleme.
         function dosyaSimge(id){
             const x=isDosyaKaydi(id); if(!x) return '';
-            const t=Number(x.taramaDosyaSayisi||0), d=Number(x.tasarimDosyaSayisi||0), o=Math.max(0,Number(x.dosyaSayisi||0)-t-d);
-            if(!t&&!d&&!o) return '';
+            const t=Number(x.taramaDosyaSayisi||0), d=Number(x.tasarimDosyaSayisi||0), o=Math.max(0,Number(x.dosyaSayisi||0)-t-d), l=Number(x.linkSayisi||0);
+            if(!t&&!d&&!o&&!l) return '';
             const b=(tur,cls,ikon,n,ad)=>`<button type="button" class="dsb ${cls}" title="${ad} (${n}) — tıkla: tümünü indir" onclick="event.stopPropagation();dosyaHepsiniIndir(${Number(id)},'${tur}')" onmouseenter="onizlemeGoster(this,${Number(id)},'${tur}')" onmouseleave="onizlemeGizleGecikmeli()">${ikon} ${n}</button>`;
-            return '<span class="dsimge">'+(t?b('Tarama','dsb-tarama','🦷',t,'Tarama dosyaları'):'')+(d?b('Tasarım','dsb-tasarim','📐',d,'Tasarım dosyaları'):'')+(o?b('Diger','dsb-diger','📎',o,'Diğer dosyalar'):'')+'</span>';
+            return '<span class="dsimge">'+(t?b('Tarama','dsb-tarama','🦷',t,'Tarama dosyaları'):'')+(d?b('Tasarım','dsb-tasarim','📐',d,'Tasarım dosyaları'):'')+(o?b('Diger','dsb-diger','📎',o,'Diğer dosyalar'):'')+(l?`<button type="button" class="dsb dsb-link" title="Dosya linkleri (${l}) — tıkla: aç" onclick="event.stopPropagation();isLinkleriAc(${Number(id)})">🔗 ${l}</button>`:'')+'</span>';
         }
+
+        // ---------------- Dosya linkleri (WeTransfer, Drive, Dropbox...) ----------------
+        let linkModalIs=null;
+        async function isLinkleriAc(id){
+            linkModalIs=Number(id);
+            const x=isDosyaKaydi(id);
+            document.getElementById("linkModalBaslik").innerText="#"+Number(id)+(x?" · "+(x.hastaAdi||"")+" — "+(x.hekimAdi||""):"")+" · Dosya linkleri";
+            document.getElementById("linkModalYeni").value="";
+            document.getElementById("linkModal").style.display="flex";
+            await linkModalYukle();
+        }
+        function linkModalKapat(){ document.getElementById("linkModal").style.display="none"; linkModalIs=null; }
+        async function linkModalYukle(){
+            const k=document.getElementById("linkModalListe"); if(!k||!linkModalIs) return;
+            k.innerHTML='<div class="ops-mini">Yükleniyor...</div>';
+            try{
+                const r=await fetch("/api/is-linkleri/"+linkModalIs,{cache:"no-store"}); if(!r.ok) throw new Error(await r.text());
+                const l=await r.json();
+                linkSayisiGuncelle(linkModalIs,l.length);
+                k.innerHTML=l.length?l.map(x=>`<div class="link-satir"><div style="min-width:0"><a href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer"><b>${escapeHtml(x.servis)}</b> — ${escapeHtml(x.url)}</a>
+                    <div class="ops-mini">${escapeHtml(x.ekleyenTipi==="Hekim"?"Hekim":x.ekleyenTipi==="Teknisyen"?"Teknisyen"+(x.ekleyenAdi?" ("+x.ekleyenAdi+")":""):"Laboratuvar")} · ${tarihSaatGoster(x.tarih)}${x.aciklama?" · "+escapeHtml(x.aciklama):""}</div></div>
+                    <div style="display:flex;gap:6px;flex-shrink:0"><a class="button button-blue" href="${escapeHtml(x.url)}" target="_blank" rel="noopener noreferrer">Aç</a><button class="button button-light" type="button" onclick="linkKopyala(${JSON.stringify(x.url).replace(/"/g,'&quot;')})">Kopyala</button><button class="button button-light" type="button" onclick="linkSil(${Number(x.id)})">Sil</button></div></div>`).join(""):'<div class="ops-mini">Bu işte link yok.</div>';
+            }catch(e){ k.innerHTML='<div class="ops-mini">'+escapeHtml(e.message||"Linkler alınamadı.")+'</div>'; }
+        }
+        function linkSayisiGuncelle(id,n){ const x=isDosyaKaydi(id); if(x) x.linkSayisi=n; }
+        async function linkModalEkle(){
+            const v=document.getElementById("linkModalYeni").value.split(/[\s,]+/).map(x=>x.trim()).filter(Boolean);
+            if(!v.length){ showError("Link girin."); return; }
+            try{
+                const r=await fetch("/api/is-linkleri/"+linkModalIs,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({linkler:v})});
+                if(!r.ok) throw new Error(await r.text());
+                document.getElementById("linkModalYeni").value=""; showSuccess("Link eklendi."); await linkModalYukle();
+            }catch(e){ showError(e.message); }
+        }
+        async function linkSil(linkId){
+            if(!confirm("Bu link silinsin mi?")) return;
+            try{ const r=await fetch("/api/is-linkleri/"+linkModalIs+"/"+Number(linkId),{method:"DELETE"}); if(!r.ok) throw new Error(await r.text()); await linkModalYukle(); }catch(e){ showError(e.message); }
+        }
+        async function linkKopyala(u){ try{ await navigator.clipboard.writeText(u); showSuccess("Link kopyalandı."); }catch{ prompt("Linki kopyalayın:",u); } }
 
         // ---------------- Dosya merkezi ----------------
         let dmSekmeAd="all", dmListe=[], dmSayfa=0, dmAraZaman=null;
@@ -14052,10 +14111,12 @@
             stlGorselAlaniTemizle();
             const r=await fetch('/api/is-dosyalari/siparis/'+Number(isId),{cache:'no-store'}); if(!r.ok) return;
             const tumDosyalar=await r.json();
+            const linkler=await fetch('/api/is-linkleri/'+Number(isId),{cache:'no-store'}).then(x=>x.ok?x.json():[]).catch(()=>[]);
             const tumu=tumDosyalar.filter(f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||''));
-            // Görüntü çizilemeyen dosyalar da kâğıtta adıyla görünsün.
-            const dosyaListesi=()=>tumDosyalar.length?`<div class="ref-stl-dosyalar"><b>Ekli dosyalar:</b> ${tumDosyalar.map(f=>escapeHtml(f.orijinalDosyaAdi)+(f.dosyaTuru&&f.dosyaTuru!=='Diger'?' ('+escapeHtml(f.dosyaTuru)+')':'')).join(' · ')}</div>`:'';
-            if(!tumu.length){ if(tumDosyalar.length){ kutu.innerHTML=dosyaListesi(); kutu.style.display='block'; } return; }
+            // Görüntü çizilemeyen dosyalar ve hekimin paylaştığı linkler de kâğıtta görünsün.
+            const dosyaListesi=()=>(tumDosyalar.length?`<div class="ref-stl-dosyalar"><b>Ekli dosyalar:</b> ${tumDosyalar.map(f=>escapeHtml(f.orijinalDosyaAdi)+(f.dosyaTuru&&f.dosyaTuru!=='Diger'?' ('+escapeHtml(f.dosyaTuru)+')':'')).join(' · ')}</div>`:'')
+                +(linkler.length?`<div class="ref-stl-dosyalar" style="word-break:break-all"><b>Dosya linkleri:</b> ${linkler.map(l=>escapeHtml(l.servis)+': '+escapeHtml(l.url)).join(' · ')}</div>`:'');
+            if(!tumu.length){ if(tumDosyalar.length||linkler.length){ kutu.innerHTML=dosyaListesi(); kutu.style.display='block'; } return; }
             // Tüm modeller önce okunur; tür etiketine değil gerçek boyuta bakılır: hekim "tasarımı ben
             // gönderiyorum" seçtiğinde ağız içi taramalar da "Tasarım" türüyle kaydedilir. Tam çene büyüklüğündeki
             // model (en uzun kenar ≥ 35 mm) tarama, kron/köprü gibi küçük parçalar tasarım sayılır.

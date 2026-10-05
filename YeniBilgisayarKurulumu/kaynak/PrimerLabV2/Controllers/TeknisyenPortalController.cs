@@ -487,6 +487,7 @@ public sealed class TeknisyenPortalController : ControllerBase
             """).ToListAsync(ct);
         var sinir = _takip.OkunmaSiniri("teknisyen:" + tekId);
         var okunmamis = gelenMesaj.Where(m => m.Id > sinir(m.SiparisId)).GroupBy(m => m.SiparisId).ToDictionary(g => g.Key, g => g.Count());
+        var linkSayilari = HttpContext.RequestServices.GetRequiredService<IsLinkleri>().Sayilar();
 
         return Ok(rows.Select(x => new
         {
@@ -503,6 +504,7 @@ public sealed class TeknisyenPortalController : ControllerBase
             x.TaramaSayisi,
             x.TasarimSayisi,
             x.DosyaSayisi,
+            LinkSayisi = linkSayilari.TryGetValue(x.Id, out var ls) ? ls : 0,
             x.MesajSayisi,
             OkunmamisMesaj = okunmamis.TryGetValue(x.Id, out var om) ? om : 0,
             Kabul = !dis || x.Kabul,
@@ -647,6 +649,15 @@ public sealed class TeknisyenPortalController : ControllerBase
     // =========================================================
     // DOSYALAR
     // =========================================================
+
+    [HttpGet("jobs/{jobId:int}/links")]
+    public async Task<IActionResult> Linkler(int jobId, [FromServices] IsLinkleri linkler, CancellationToken ct)
+    {
+        var o = await Oturum(ct);
+        if (o.Hata != null) return o.Hata;
+        if (!await OkumaErisimi(o.Tek!.Id, o.Tip, jobId, ct)) return NotFound("İş bulunamadı.");
+        return Ok(linkler.Liste(jobId).Select(IsLinkleri.Gorunum));
+    }
 
     [HttpGet("jobs/{jobId:int}/files")]
     public async Task<IActionResult> Dosyalar(int jobId, CancellationToken ct)

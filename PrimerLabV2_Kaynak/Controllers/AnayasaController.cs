@@ -148,6 +148,7 @@ namespace PrimerLabV2.Controllers
                 .ToListAsync();
 
             var map = metas.ToDictionary(x => x.SiparisId);
+            var linkSayilari = HttpContext.RequestServices.GetRequiredService<IsLinkleri>().Sayilar();
 
             return Ok(baseRows.Select(x =>
             {
@@ -179,6 +180,7 @@ namespace PrimerLabV2.Controllers
                     DosyaSayisi = m?.DosyaSayisi ?? 0,
                     TaramaDosyaSayisi = m?.TaramaDosyaSayisi ?? 0,
                     TasarimDosyaSayisi = m?.TasarimDosyaSayisi ?? 0,
+                    LinkSayisi = linkSayilari.TryGetValue(x.Id, out var ls) ? ls : 0,
                     DisMesajSayisi = m?.DisMesajSayisi ?? 0,
                     x.ToplamAdet,
                     x.ToplamTutar,
