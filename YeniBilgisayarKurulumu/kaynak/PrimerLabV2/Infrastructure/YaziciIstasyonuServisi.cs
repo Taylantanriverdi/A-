@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace PrimerLabV2.Infrastructure;
 
@@ -34,6 +36,12 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
     private readonly object _kilit = new();
     private DateTime _sonBaslatma = DateTime.MinValue;
     private int _sonucsuzDeneme;
+    // "Yazıcı ayarını elle yap" penceresi açıkken (sessiz olmayan kip) istasyon kendiliğinden açılmaz.
+    private DateTime _ayarKipiBitis = DateTime.MinValue;
+    private bool _ayarKipiKapatilacak;
+
+    /// <summary>Sunucu her açıldığında değişir; istasyon sayfası güncellemeden sonra kendini yeniler.</summary>
+    public static readonly string Surum = Environment.ProcessId + "-" + DateTime.UtcNow.Ticks;
 
     public YaziciIstasyonuServisi(OtomatikYazdirma oy, IWebHostEnvironment env, ILogger<YaziciIstasyonuServisi> log)
     {
@@ -81,8 +89,97 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
         if (DateTime.UtcNow - _sonBaslatma > TimeSpan.FromSeconds(60)) Baslat();
     }
 
+    /// <summary>
+    /// Edge/Chrome sessiz yazdırmada yazdırma penceresinin son kullanılan ("yapışkan") ayarlarını uygular.
+    /// Elle yazdırmadaki "Renk: Siyah-beyaz" ve "Arka plan grafikleri" seçimleri burada profile yazılır;
+    /// böylece otomatik baskı elle baskıyla aynı çıkar. Profildeki diğer seçimler (kâğıt, yazıcı) korunur.
+    /// Tarayıcı kapalıyken yazılmalıdır (açıkken kapanışta üzerine yazar).
+    /// </summary>
+    private void TercihleriYaz()
+    {
+        try
+        {
+            var renksiz = _oy.Oku().Renksiz;
+            var klasor = Path.Combine(_profil, "Default");
+            Directory.CreateDirectory(klasor);
+            var dosya = Path.Combine(klasor, "Preferences");
+            JsonObject kok;
+            try { kok = File.Exists(dosya) ? JsonNode.Parse(File.ReadAllText(dosya)) as JsonObject ?? new JsonObject() : new JsonObject(); }
+            catch (JsonException) { kok = new JsonObject(); }
+            var yazdirma = kok["printing"] as JsonObject ?? new JsonObject();
+            kok["printing"] = yazdirma;
+            var yapiskan = yazdirma["print_preview_sticky_settings"] as JsonObject ?? new JsonObject();
+            yazdirma["print_preview_sticky_settings"] = yapiskan;
+            JsonObject durum;
+            try { durum = JsonNode.Parse(yapiskan["appState"]?.GetValue<string>() ?? "{}") as JsonObject ?? new JsonObject(); }
+            catch (Exception) { durum = new JsonObject(); }
+            durum["version"] = 2;
+            durum["isColorEnabled"] = !renksiz;
+            durum["isCssBackgroundEnabled"] = true;
+            durum["isHeaderFooterEnabled"] = false;
+            durum["isLandscapeEnabled"] = false;
+            // Kâğıt: A5 (form A5 olarak tasarlandı; elle baskıdaki gibi kâğıdı doldurur). Windows'ta A5 = 11.
+            durum["mediaSize"] = new JsonObject
+            {
+                ["name"] = "ISO_A5", ["custom_display_name"] = "A5", ["vendor_id"] = "11",
+                ["width_microns"] = 148000, ["height_microns"] = 210000, ["is_default"] = false
+            };
+            durum["scalingType"] = 0;      // varsayılan ölçek (%100)
+            durum["scaling"] = "100";
+            durum["marginsType"] = 0;      // varsayılan kenar boşluğu (sayfa CSS'i belirler)
+            yapiskan["appState"] = durum.ToJsonString();
+            File.WriteAllText(dosya, kok.ToJsonString());
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Yazıcı istasyonu yazdırma tercihleri yazılamadı."); }
+    }
+
+    /// <summary>İstasyon profiliyle açık tarayıcı pencerelerini kapatır (yalnız Windows).</summary>
+    public void Kapat()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            var psi = new ProcessStartInfo("powershell") { UseShellExecute = false, CreateNoWindow = true };
+            foreach (var a in new[] { "-NoProfile", "-Command",
+                "Get-CimInstance Win32_Process -Filter \"Name='msedge.exe' or Name='chrome.exe'\" | Where-Object { $_.CommandLine -like '*" +
+                _profil.Replace("'", "''") + "*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" })
+                psi.ArgumentList.Add(a);
+            using var p = Process.Start(psi);
+            p?.WaitForExit(15000);
+            Thread.Sleep(1500);
+        }
+        catch (Exception ex) { _log.LogWarning(ex, "Yazıcı istasyonu kapatılamadı."); }
+    }
+
+    /// <summary>Ayar değişince istasyon kapatılıp yeni ayarlarla açılır.</summary>
+    public string? YenidenBaslat()
+    {
+        Kapat();
+        return Baslat();
+    }
+
+    /// <summary>
+    /// Yedek yol: istasyon profili sessiz olmayan kipte açılır; kullanıcı deneme baskısında yazdırma
+    /// penceresinden Siyah-beyaz / A5 / Arka plan grafikleri seçer. Seçimler profilde kalır ve
+    /// sessiz baskı da bunları kullanır.
+    /// </summary>
+    public string? AyarKipiBaslat()
+    {
+        Kapat();
+        _ayarKipiBitis = DateTime.UtcNow.AddMinutes(10);
+        _ayarKipiKapatilacak = true;
+        return Baslat(ayarKipi: true);
+    }
+
+    public void AyarKipiBitti()
+    {
+        _ayarKipiBitis = DateTime.UtcNow;
+        // Sessiz istasyon yaklaşık 20 sn sonra açılır (ayar penceresi kapanıp tercihler kaydedilsin).
+        _sonBaslatma = DateTime.UtcNow - Bekleme + TimeSpan.FromSeconds(20);
+    }
+
     /// <summary>İstasyon penceresini açar. Hata varsa açıklamasını döner.</summary>
-    public string? Baslat()
+    public string? Baslat(bool ayarKipi = false)
     {
         lock (_kilit)
         {
@@ -96,10 +193,11 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
             try
             {
                 Directory.CreateDirectory(_profil);
+                TercihleriYaz();
                 var psi = new ProcessStartInfo(tarayici) { UseShellExecute = false };
+                if (!ayarKipi) psi.ArgumentList.Add("--kiosk-printing");
                 foreach (var a in new[]
                 {
-                    "--kiosk-printing",
                     "--user-data-dir=" + _profil,
                     "--no-first-run",
                     "--no-default-browser-check",
@@ -111,7 +209,7 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
                     "--window-size=1400,1000",
                     "--window-position=30,30",
                     "--disable-session-crashed-bubble",
-                    "--app=" + Adres + "/api/yonetici-giris/istasyon?jeton=" + jeton
+                    "--app=" + Adres + "/api/yonetici-giris/istasyon?jeton=" + jeton + (ayarKipi ? "&kip=ayar" : "")
                 }) psi.ArgumentList.Add(a);
                 using var _ = Process.Start(psi);
                 _sonBaslatma = DateTime.UtcNow;
@@ -141,6 +239,7 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
 
     private void Denetle()
     {
+        if (DateTime.UtcNow < _ayarKipiBitis) return;
         var a = _oy.Oku();
         var durum = _oy.IstasyonDurumu();
         // Sinyal 45 sn içindeyse istasyon çalışıyor.
@@ -154,6 +253,8 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
         var bekle = _sonucsuzDeneme >= 3 ? UzunBekleme : Bekleme;
         if (DateTime.UtcNow - _sonBaslatma < bekle) return;
         _sonucsuzDeneme++;
+        // Ayar penceresi hâlâ açıksa kapatılır; yoksa yeni pencere sessiz olmayan kipe katılırdı.
+        if (_ayarKipiKapatilacak) { _ayarKipiKapatilacak = false; Kapat(); }
         Baslat();
         if (_sonucsuzDeneme >= 3 && SonHata == null)
             SonHata = "İstasyon penceresi açıldı ama bağlanamadı. Masaüstündeki \"Primer Lab Yazici Istasyonu\" kısayolunu deneyin.";

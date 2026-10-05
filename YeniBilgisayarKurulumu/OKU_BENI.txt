@@ -176,6 +176,15 @@ OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
 - Normal tarayicida acilan istasyon sekmesi is basmaz (yazdirma penceresi
   cikmasin diye); yalniz programin actigi pencere basar.
 - "Son baskilar" listesinde "Tekrar yazdir" ile bir is yeniden bastirilir.
+- "Siyah-beyaz bas" (onerilen, varsayilan acik): otomatik baski, elle
+  yazdirmadaki "Renk: Siyah-beyaz" ile ayni cikar; tarama goruntuleri ve
+  dis semasi siyah murekkeple net basilir. Kagit A5, olcek %100.
+- Otomatik cikti elle ciktidan hala farkliysa: Ayarlar > Otomatik Yazdirma >
+  "Yazici Ayarini Elle Yap". Acilan pencerede "Deneme Yazdir"a basin;
+  yazdirma penceresinde Renk: Siyah-beyaz, Diger ayarlar: Kagit boyutu A5,
+  Arka plan grafikleri isaretli secip Yazdir'a basin. Secimler kaydedilir,
+  otomatik baski bundan sonra ayni ayarlarla cikar.
+- Program guncellenince acik istasyon kendini yeniler (eski sablonla basmaz).
 - Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
 
 DOSYA SIMGELERI VE 3B ONIZLEME

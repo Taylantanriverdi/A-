@@ -4804,9 +4804,11 @@
                         <div class="form-group" style="margin:0"><label for="oyKopya">Kopya</label><select id="oyKopya"><option value="1">1 kopya</option><option value="2">2 kopya</option><option value="3">3 kopya</option></select></div>
                         <div class="form-group" style="margin:0"><label>Hangi işler basılsın</label><div id="oyKaynaklar" class="oy-kaynaklar"></div></div>
                     </div>
+                    <label class="oy-onay" style="margin-top:10px" title="Elle yazdırırken açılan pencerede 'Renk: Siyah-beyaz' seçmekle aynıdır. Kapalıysa renkli basılır; renkli mürekkep azsa gri tonlar ve tarama görüntüleri soluk çıkar."><input id="oyRenksiz" type="checkbox" /> <b>Siyah-beyaz bas</b> <span class="ops-mini">(önerilen — elle yazdırmadaki "Renk: Siyah-beyaz" ile aynı; tarama görüntüleri siyah mürekkeple net çıkar)</span></label>
                     <div class="button-group" style="margin-top:12px;flex-wrap:wrap">
                         <button class="button button-blue" type="button" onclick="oyKaydet()">Kaydet</button>
                         <button class="button button-light" type="button" onclick="oyIstasyonAc()">🖨️ İstasyonu Şimdi Aç</button>
+                        <button class="button button-light" type="button" onclick="oyIstasyonAyar()" title="Otomatik çıktı hâlâ elle çıktıdan farklıysa: bir kez deneme baskısı alıp yazdırma penceresinde Siyah-beyaz / A5 / Arka plan grafikleri seçersiniz; otomatik baskı bundan sonra aynı ayarları kullanır.">⚙️ Yazıcı Ayarını Elle Yap</button>
                     </div>
                     <div class="oy-not">
                         <b>Nasıl çalışır:</b> Otomatik yazdırma açıkken Primer Lab, sessiz yazdıran <b>"Yazıcı İstasyonu"</b> penceresini <b>kendisi açar</b> (şifre sormaz) ve kapanırsa yeniden açar. Yeni işler Windows'un <b>varsayılan yazıcısından</b> sorulmadan çıkar. Pencereyi küçültebilirsiniz. Özellik açıldığı andan önceki işler basılmaz.
@@ -14593,6 +14595,7 @@
                 const d=await r.json();
                 document.getElementById("oyAktif").checked=!!d.aktif;
                 document.getElementById("oyKopya").value=String(d.kopya||1);
+                document.getElementById("oyRenksiz").checked=d.renksiz!==false;
                 document.getElementById("oyKaynaklar").innerHTML=(d.secilebilirKaynaklar||[]).map(k=>`<label><input type="checkbox" value="${escapeHtml(k)}" ${(d.kaynaklar||[]).includes(k)?"checked":""}/> ${escapeHtml(k==="Hekim Portalı"?"Hekimden gelen (Hekim Portalı)":k==="Teknisyen Paneli"?"Teknisyenin açtığı":"Laboratuvarın kendi formları")}</label>`).join("");
                 const st=document.getElementById("oyIstasyon");
                 st.innerText=d.istasyonCevrimici?"● İstasyon açık":"○ İstasyon kapalı"; st.style.background=d.istasyonCevrimici?"#dcfce7":"#fef3c7"; st.style.color=d.istasyonCevrimici?"#15803d":"#92400e";
@@ -14605,7 +14608,7 @@
         async function oyKaydet(){
             const kaynaklar=[...document.querySelectorAll("#oyKaynaklar input:checked")].map(i=>i.value);
             try{
-                const r=await fetch("/api/otomatik-yazdir/ayarlar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({aktif:document.getElementById("oyAktif").checked,kopya:Number(document.getElementById("oyKopya").value),kaynaklar})});
+                const r=await fetch("/api/otomatik-yazdir/ayarlar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({aktif:document.getElementById("oyAktif").checked,kopya:Number(document.getElementById("oyKopya").value),kaynaklar,renksiz:document.getElementById("oyRenksiz").checked})});
                 if(!r.ok) throw new Error(await r.text());
                 showSuccess(document.getElementById("oyAktif").checked?"Otomatik yazdırma açıldı. Bundan sonra gelen işler yazıcı istasyonundan çıkar.":"Otomatik yazdırma kapatıldı.");
                 oyYukle();
@@ -14613,6 +14616,9 @@
         }
         async function oyIstasyonAc(){
             try{ const r=await fetch("/api/otomatik-yazdir/istasyon-baslat",{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); setTimeout(oyYukle,8000); }catch(e){ showError(e.message); }
+        }
+        async function oyIstasyonAyar(){
+            try{ const r=await fetch("/api/otomatik-yazdir/istasyon-ayar",{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); }catch(e){ showError(e.message); }
         }
         async function oyTekrar(id){
             try{ const r=await fetch("/api/otomatik-yazdir/tekrar/"+Number(id),{method:"POST"}); if(!r.ok) throw new Error(await r.text()); showSuccess((await r.json()).message); oyYukle(); }catch(e){ showError(e.message); }
@@ -14675,6 +14681,8 @@
                 if(r.status===401){ istasyonDurum("Oturum kapandı — pencere yenileniyor","hata"); setTimeout(()=>{ window.close(); setTimeout(()=>location.reload(),3000); },3000); return; }
                 if(!r.ok) throw new Error(await r.text());
                 const d=await r.json();
+                // Program güncellenip yeniden açıldıysa istasyon da yeni sayfayı (yeni şablon ve görüntüler) yükler.
+                if(d.surum){ if(window.__istasyonSurum && window.__istasyonSurum!==d.surum){ istasyonDurum("Program güncellendi — istasyon yenileniyor","ok"); setTimeout(()=>location.reload(),1500); return; } window.__istasyonSurum=d.surum; }
                 if(d.istasyonDegil){ istasyonDurum("Bu pencere sessiz yazdırma penceresi değil; iş basmaz. Kapatabilirsiniz — Primer Lab istasyonu kendisi açar.","kapali"); return; }
                 if(!d.aktif && !d.isler.length){ istasyonDurum("Otomatik yazdırma KAPALI (Ayarlar > Otomatik Yazdırma)","kapali"); }
                 else istasyonDurum(d.isler.length?d.isler.length+" iş yazdırılacak...":"Hazır — yeni iş bekleniyor · bugün basılan: "+istasyonSayac,"ok");
@@ -14683,7 +14691,42 @@
             }catch(e){ istasyonDurum("Bağlantı hatası: "+(e.message||e),"hata"); }
             finally{ istasyonMesgul=false; }
         }
-        if(ISTASYON) document.addEventListener("DOMContentLoaded",()=>{
+        // Yedek yol: "Yazıcı Ayarını Elle Yap" — istasyon profili yazdırma penceresi gösteren kipte açılır;
+        // burada seçilen Renk / Kâğıt / Arka plan grafikleri sessiz baskıda da kullanılır.
+        const ISTASYON_AYAR=ISTASYON && new URLSearchParams(location.search).get("ayar")==="1";
+        async function istasyonAyarDeneme(){
+            const btn=document.getElementById("istasyonAyarBtn"); if(btn) btn.disabled=true;
+            try{
+                await loadAnayasaData();
+                let id=null;
+                try{ const r=await fetch("/api/otomatik-yazdir/ayarlar",{cache:"no-store"}); if(r.ok){ const d=await r.json(); id=(d.sonBasilanlar||[])[0]?.id||null; } }catch{}
+                let x=id?anayasaIsler.find(i=>Number(i.id)===Number(id)):null;
+                if(!x) x=anayasaIsler.slice().sort((a,b)=>Number(b.id)-Number(a.id))[0];
+                if(!x){ istasyonDurum("Deneme için kayıtlı iş bulunamadı.","hata"); return; }
+                await istasyonFormDoldur(x);
+                const bitti=new Promise(res=>window.addEventListener("afterprint",res,{once:true}));
+                await anayasaSiparisYazdir();
+                await bitti;
+                await fetch("/api/otomatik-yazdir/ayar-bitti",{method:"POST"}).catch(()=>{});
+                istasyonDurum("Ayarlar kaydedildi. Bu pencere kapanıyor; sessiz istasyon birazdan kendiliğinden açılır.","ok");
+                setTimeout(()=>window.close(),5000);
+            }catch(e){ istasyonDurum("Deneme yazdırılamadı: "+(e.message||e),"hata"); }
+            finally{ if(btn) btn.disabled=false; }
+        }
+        if(ISTASYON_AYAR) document.addEventListener("DOMContentLoaded",()=>{
+            document.title="Yazıcı Ayarı — "+((window.FIRMA||{}).ad||"Primer Lab");
+            const p=document.createElement("div"); p.className="istasyon-panel";
+            p.innerHTML=`<div class="istasyon-kutu"><div style="font-size:20px;font-weight:900">⚙️ Yazıcı Ayarı (bir kez)</div>
+                <div style="font-size:13px;line-height:1.6;margin:8px 0">1. Aşağıdaki <b>Deneme Yazdır</b>'a basın; yazdırma penceresi açılır.<br>
+                2. <b>Yazıcı</b>: kullandığınız yazıcı · <b>Renk</b>: <b>Siyah-beyaz</b><br>
+                3. <b>Diğer ayarlar</b>'ı açın: <b>Kağıt boyutu: A5</b>, <b>Ölçek: Varsayılan</b>, <b>Arka plan grafikleri</b> işaretli<br>
+                4. <b>Yazdır</b>'a basın. Seçimleriniz kaydedilir; otomatik baskı bundan sonra aynı ayarlarla çıkar.</div>
+                <button id="istasyonAyarBtn" class="button button-blue" type="button" onclick="istasyonAyarDeneme()">🖨️ Deneme Yazdır</button>
+                <div id="istasyonDurum" class="istasyon-durum">Hazır</div></div>`;
+            document.body.appendChild(p);
+            setTimeout(()=>{ try{ showSection("siparisFormu"); }catch{} },1500);
+        });
+        if(ISTASYON && !ISTASYON_AYAR) document.addEventListener("DOMContentLoaded",()=>{
             document.title="Yazıcı İstasyonu — "+((window.FIRMA||{}).ad||"Primer Lab");
             const p=document.createElement("div"); p.className="istasyon-panel";
             p.innerHTML=`<div class="istasyon-kutu"><div style="font-size:20px;font-weight:900">🖨️ Yazıcı İstasyonu</div>

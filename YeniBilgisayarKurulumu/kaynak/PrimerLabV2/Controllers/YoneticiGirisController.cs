@@ -57,13 +57,13 @@ public sealed class YoneticiGirisController : ControllerBase
 
     // Programın kendi açtığı yazıcı istasyonu penceresi: tek kullanımlık anahtarla, şifre sormadan girer.
     [HttpGet("istasyon")]
-    public IActionResult Istasyon([FromQuery] string? jeton, [FromServices] YaziciIstasyonuServisi istasyon)
+    public IActionResult Istasyon([FromQuery] string? jeton, [FromQuery] string? kip, [FromServices] YaziciIstasyonuServisi istasyon)
     {
         if (!GuvenlikController.AnaBilgisayar(HttpContext) || !_giris.Kurulu || !istasyon.JetonKullan(jeton))
             return Redirect("/giris?r=" + Uri.EscapeDataString("/?istasyon=1"));
         _giris.OturumAc(HttpContext, true, TimeSpan.FromDays(365));
         YaziciIstasyonuServisi.IstasyonIsaretle(HttpContext);
-        return Redirect("/?istasyon=1");
+        return Redirect(kip == "ayar" ? "/?istasyon=1&ayar=1" : "/?istasyon=1");
     }
 
     // Masaüstü kısayolu (PrimerLab_YaziciIstasyonu.bat) istasyonu programa açtırır.

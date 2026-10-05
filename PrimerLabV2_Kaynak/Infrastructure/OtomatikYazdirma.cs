@@ -37,6 +37,8 @@ public sealed class OtomatikYazdirma
     {
         public bool Aktif { get; set; }
         public int Kopya { get; set; } = 1;
+        /// <summary>Elle yazdırmadaki "Renk: Siyah-beyaz" gibi: gri tonlar ve görüntüler siyah mürekkeple basılır.</summary>
+        public bool Renksiz { get; set; } = true;
         public List<string> Kaynaklar { get; set; } = new() { "Hekim Portalı" };
         /// <summary>Bu tarihten önce oluşturulan işler otomatik basılmaz (özellik açıldığı an).</summary>
         public DateTime? BaslangicTarihi { get; set; }
@@ -54,7 +56,7 @@ public sealed class OtomatikYazdirma
         }
     }
 
-    public Ayarlar Kaydet(bool aktif, int kopya, IEnumerable<string>? kaynaklar)
+    public Ayarlar Kaydet(bool aktif, int kopya, IEnumerable<string>? kaynaklar, bool? renksiz = null)
     {
         lock (_kilit)
         {
@@ -63,6 +65,7 @@ public sealed class OtomatikYazdirma
             if (aktif && (!a.Aktif || a.BaslangicTarihi == null)) a.BaslangicTarihi = DateTime.UtcNow;
             a.Aktif = aktif;
             a.Kopya = Math.Clamp(kopya, 1, 3);
+            if (renksiz != null) a.Renksiz = renksiz.Value;
             var k = (kaynaklar ?? Array.Empty<string>()).Where(x => SecilebilirKaynaklar.Contains(x)).Distinct().ToList();
             a.Kaynaklar = k.Count > 0 ? k : new List<string> { "Hekim Portalı" };
             Yaz();

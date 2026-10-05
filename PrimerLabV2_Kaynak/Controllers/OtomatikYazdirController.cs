@@ -35,7 +35,7 @@ public sealed class OtomatikYazdirController : ControllerBase
             """).ToListAsync(ct);
         return Ok(new
         {
-            a.Aktif, a.Kopya, a.Kaynaklar, a.BaslangicTarihi,
+            a.Aktif, a.Kopya, a.Renksiz, a.Kaynaklar, a.BaslangicTarihi,
             secilebilirKaynaklar = OtomatikYazdirma.SecilebilirKaynaklar,
             istasyonCevrimici = d.Cevrimici, istasyonSonSinyal = d.Son, sonHata = d.SonHata,
             istasyonHata = _istasyon.SonHata,
@@ -51,9 +51,13 @@ public sealed class OtomatikYazdirController : ControllerBase
     [HttpPost("ayarlar")]
     public async Task<IActionResult> AyarKaydet([FromBody] OtomatikYazdirDto dto, CancellationToken ct)
     {
-        _oy.Kaydet(dto.Aktif, dto.Kopya, dto.Kaynaklar);
+        var eskiRenksiz = _oy.Oku().Renksiz;
+        _oy.Kaydet(dto.Aktif, dto.Kopya, dto.Kaynaklar, dto.Renksiz);
+        var anaBilgisayar = GuvenlikController.AnaBilgisayar(HttpContext);
+        // Renk ayarı tarayıcı profiline yazılır; açık istasyon kapatılıp yeni ayarla açılır.
+        if (dto.Aktif && anaBilgisayar && dto.Renksiz != null && dto.Renksiz != eskiRenksiz) _istasyon.YenidenBaslat();
         // Açılınca istasyon beklemeden açılır (kullanıcının kısayolu açması gerekmez).
-        if (dto.Aktif && !_oy.IstasyonDurumu().Cevrimici && GuvenlikController.AnaBilgisayar(HttpContext)) _istasyon.BaslatGerekirse();
+        else if (dto.Aktif && !_oy.IstasyonDurumu().Cevrimici && anaBilgisayar) _istasyon.BaslatGerekirse();
         return await Ayarlar(ct);
     }
 
@@ -63,7 +67,7 @@ public sealed class OtomatikYazdirController : ControllerBase
     {
         var a = _oy.Oku();
         if (!YaziciIstasyonuServisi.IstasyonMu(HttpContext))
-            return Ok(new { aktif = a.Aktif, kopya = a.Kopya, isler = Array.Empty<int>(), istasyonDegil = true });
+            return Ok(new { aktif = a.Aktif, kopya = a.Kopya, isler = Array.Empty<int>(), istasyonDegil = true, surum = YaziciIstasyonuServisi.Surum });
         _oy.Sinyal();
         var tekrar = _oy.TekrarIstenenler();
         if (!a.Aktif && tekrar.Count == 0) return Ok(new { aktif = false, kopya = a.Kopya, isler = Array.Empty<int>() });
@@ -82,7 +86,7 @@ public sealed class OtomatikYazdirController : ControllerBase
         var isler = adaylar.Where(x => tekrar.Contains(x.Id) || (!basilan.Contains(x.Id) && KaynakUygun(x.Kaynak)))
             .Select(x => x.Id).Take(5).ToArray();
         isler = _oy.Ayir(isler);
-        return Ok(new { aktif = a.Aktif, kopya = a.Kopya, isler });
+        return Ok(new { aktif = a.Aktif, kopya = a.Kopya, isler, surum = YaziciIstasyonuServisi.Surum });
     }
 
     [HttpPost("basildi")]
@@ -109,6 +113,22 @@ public sealed class OtomatikYazdirController : ControllerBase
         return hata == null ? Ok(new { message = "Yazıcı istasyonu açılıyor; birkaç saniye içinde \"İstasyon açık\" görünür." }) : BadRequest(hata);
     }
 
+    /// <summary>Yedek yol: istasyon profili yazdırma penceresi gösteren kipte açılır (renk/kâğıt bir kez elle seçilir).</summary>
+    [HttpPost("istasyon-ayar")]
+    public IActionResult IstasyonAyar()
+    {
+        if (!GuvenlikController.AnaBilgisayar(HttpContext)) return GuvenlikController.Yasak();
+        var hata = _istasyon.AyarKipiBaslat();
+        return hata == null ? Ok(new { message = "Ayar penceresi açılıyor. Oradaki \"Deneme Yazdır\" düğmesine basın." }) : BadRequest(hata);
+    }
+
+    [HttpPost("ayar-bitti")]
+    public IActionResult AyarBitti()
+    {
+        _istasyon.AyarKipiBitti();
+        return Ok();
+    }
+
     [HttpPost("tekrar/{id:int}")]
     public IActionResult Tekrar(int id)
     {
@@ -122,6 +142,7 @@ public sealed class OtomatikYazdirDto
     public bool Aktif { get; set; }
     public int Kopya { get; set; } = 1;
     public List<string>? Kaynaklar { get; set; }
+    public bool? Renksiz { get; set; }
 }
 
 public sealed class YazdirSonucDto
