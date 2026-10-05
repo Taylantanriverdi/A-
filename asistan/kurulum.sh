@@ -50,9 +50,16 @@ main() {
   echo "     Python hazır: $PY"
 
   # 2) Dosyalar
-  echo "[2/5] Asistan dosyaları indiriliyor..."
+  echo "[2/5] Asistan dosyaları hazırlanıyor..."
   mkdir -p "$HEDEF"
-  curl -fsSL "https://raw.githubusercontent.com/$DEPO/$DAL/asistan/guncelle.py" -o "$HEDEF/guncelle.py"
+  KAYNAK="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd)"
+  if [ -f "$KAYNAK/asistan.py" ] && [ "$KAYNAK" != "$HEDEF" ]; then
+    # ZIP'ten çıkarılmış klasörden çalışıyor: dosyaları oradan kopyala.
+    cp "$KAYNAK"/*.py "$KAYNAK"/*.sh "$KAYNAK"/*.bat "$KAYNAK"/*.txt "$KAYNAK"/*.md "$HEDEF"/ 2>/dev/null || true
+    chmod +x "$HEDEF"/*.sh
+  else
+    curl -fsSL "https://raw.githubusercontent.com/$DEPO/$DAL/asistan/guncelle.py" -o "$HEDEF/guncelle.py"
+  fi
   "$PY" "$HEDEF/guncelle.py"
   [ -f "$HEDEF/asistan.py" ] || { echo "HATA: Dosyalar indirilemedi. İnternet bağlantını kontrol et."; exit 1; }
 

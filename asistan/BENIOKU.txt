@@ -1,0 +1,32 @@
+KİŞİSEL ASİSTAN - HIZLI KURULUM
+================================
+
+Önce: https://console.anthropic.com adresinden hesap aç, "API Keys" bölümünden
+bir anahtar oluştur (sk-ant-... ile başlar). Kurulum bunu soracak.
+
+WINDOWS
+  1. Bu ZIP'e sağ tıkla > "Tümünü ayıkla" (ZIP'in içinden çalıştırma!).
+  2. Çıkan klasörde "kurulum.bat" dosyasına çift tıkla.
+     "Windows bilgisayarınızı korudu" uyarısı çıkarsa: "Ek bilgi" > "Yine de çalıştır".
+  3. Sorulduğunda API anahtarını yapıştır (sağ tık = yapıştır) ve Enter'a bas.
+  4. Bitti! Masaüstündeki "Kisisel Asistan" kısayolu ile aç.
+
+MAC
+  1. ZIP'e çift tıklayıp aç.
+  2. "Mac-Kurulum.command" dosyasına SAĞ TIKLA > "Aç" > tekrar "Aç".
+  3. API anahtarını yapıştır (Cmd+V) ve Enter'a bas.
+  4. Sistem Ayarları > Gizlilik ve Güvenlik altında Terminal'e
+     "Erişilebilirlik" ve "Ekran Kaydı" izni ver, Terminal'i yeniden başlat.
+  5. Masaüstündeki "Kisisel Asistan" dosyasına çift tıklayarak aç.
+
+KULLANIM
+  Açılan pencereye ne istediğini yaz, örn: "Chrome'u aç ve yarınki hava durumuna bak"
+  ACİL DURDURMA: fareyi hızla ekranın bir KÖŞESİNE götür ya da Ctrl+C'ye bas.
+  /yeni = yeni sohbet   /onay = her hareketten önce onay sor   /cikis = çık
+
+GÜNCELLEME
+  Her açılışta otomatik olarak en yeni sürüm indirilir. Bir şey yapmana gerek yok.
+
+KALDIRMA
+  Windows: %LOCALAPPDATA%\KisiselAsistan\kaldir.bat
+  Mac:     ~/.kisisel-asistan/kaldir.sh

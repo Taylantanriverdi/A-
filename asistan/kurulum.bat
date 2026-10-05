@@ -46,11 +46,15 @@ exit /b 1
 echo      Python hazır: %PYEXE%
 
 rem ---- 2) Dosyalar ----------------------------------------------------------
-echo [2/5] Asistan dosyaları indiriliyor...
+echo [2/5] Asistan dosyaları hazırlanıyor...
 if not exist "%HEDEF%" mkdir "%HEDEF%"
-"%PYEXE%" -c "import urllib.request as u; u.urlretrieve('https://raw.githubusercontent.com/%DEPO%/%ASISTAN_DAL%/asistan/guncelle.py', r'%HEDEF%\guncelle.py')"
-if not exist "%HEDEF%\guncelle.py" (
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing 'https://raw.githubusercontent.com/%DEPO%/%ASISTAN_DAL%/asistan/guncelle.py' -OutFile '%HEDEF%\guncelle.py'"
+rem ZIP'ten çıkarılmış klasörden çalışıyorsa dosyaları oradan kopyala.
+if exist "%~dp0asistan.py" (
+    if /i not "%~dp0"=="%HEDEF%\" (
+        for %%F in ("%~dp0*.py" "%~dp0*.bat" "%~dp0*.sh" "%~dp0*.txt" "%~dp0*.md") do copy /y "%%~F" "%HEDEF%\" >nul
+    )
+) else (
+    "%PYEXE%" -c "import urllib.request as u; u.urlretrieve('https://raw.githubusercontent.com/%DEPO%/%ASISTAN_DAL%/asistan/guncelle.py', r'%HEDEF%\guncelle.py')"
 )
 if not exist "%HEDEF%\guncelle.py" (
     echo HATA: Dosyalar indirilemedi. İnternet bağlantını kontrol et.
