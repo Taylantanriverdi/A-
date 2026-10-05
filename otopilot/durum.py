@@ -30,7 +30,7 @@ VARSAYILAN_HEDEF = (
 class ProjeAyarlari:
     proje: str
     hedef: str = ""
-    motor: str = "deepseek"  # deepseek (DeepSeek API) | claude (Claude Code CLI)
+    motor: str = "deepseek"  # deepseek (DeepSeek API) | ollama (yerel model) | claude (Claude Code CLI)
     test_komutu: str | None = None
     dal: str = "otopilot/gelistirme"
     izin_modu: str = "acceptEdits"
@@ -194,6 +194,22 @@ class Durum:
                 self.kilit_dosyasi.unlink()
         except OSError:
             pass
+
+
+def genel_ayarlar() -> dict:
+    """Tüm projeler için ortak tercihler (yeni eklenen projelerin kodlayıcısı ve modeli)."""
+    try:
+        return json.loads((KOK / "genel.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def genel_ayarlari_yaz(**degerler) -> dict:
+    v = genel_ayarlar()
+    v.update({k: d for k, d in degerler.items() if d is not None})
+    KOK.mkdir(parents=True, exist_ok=True)
+    (KOK / "genel.json").write_text(json.dumps(v, ensure_ascii=False, indent=2), encoding="utf-8")
+    return v
 
 
 def tum_projeler() -> list[Durum]:

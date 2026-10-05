@@ -179,6 +179,11 @@ dialog::backdrop { background: rgba(15,18,25,.45); }
 .bulunan label > div { min-width: 0; }
 .bulunan .isim { font-weight: 600; } .bulunan .yol { color: var(--faint); font-size: 12px; overflow-wrap: anywhere; }
 .bulunan .etiket { margin-left: auto; font-size: 11px; color: var(--muted); background: var(--soft); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.motor-satiri { display: grid; grid-template-columns: minmax(0, 250px) minmax(0, 1fr); gap: 8px; }
+select { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; width: 100%; }
+.ipucu { font-size: 12px; margin-top: 6px; color: var(--muted); }
+.ipucu.uyari { color: var(--warn); }
+.motor-etiket { margin-left: auto; color: var(--faint); }
 .not { font-size: 12px; color: var(--muted); background: var(--soft); border-radius: 8px; padding: 8px 10px; }
 .alt-butonlar { display: flex; justify-content: flex-end; gap: 8px; }
 #bildirim { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg);
@@ -187,6 +192,7 @@ dialog::backdrop { background: rgba(15,18,25,.45); }
 #bildirim.goster { opacity: 1; }
 
 @media (max-width: 860px) {
+  .motor-satiri { grid-template-columns: minmax(0, 1fr); }
   .yerlesim { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 16px; }
   header { padding: 10px 16px; flex-wrap: wrap; }
   .genel { order: 5; flex: 1 1 100%; }
@@ -233,6 +239,7 @@ dialog::backdrop { background: rgba(15,18,25,.45); }
       <div class="bilgi" style="margin-top:6px">Tek bir projenin klasörünü ya da birçok projenin bulunduğu üst klasörü seç; içindeki projeler otomatik bulunur.</div>
     </div>
     <div id="taramaSonucu"></div>
+    <div id="pencereMotor"></div>
     <div>
       <label for="hedefGirdi" style="font-weight:600">Hedef <span class="bilgi">(isteğe bağlı)</span></label>
       <textarea id="hedefGirdi" placeholder="Boş bırakırsan: hataları düzelt, yarım özellikleri tamamla, kullanılabilirliği ve kaliteyi artır."></textarea>
@@ -245,6 +252,7 @@ dialog::backdrop { background: rgba(15,18,25,.45); }
     </div>
   </form>
 </dialog>
+<datalist id="ollamaModelleri"></datalist>
 <div id="bildirim" role="status"></div>
 
 <script>
@@ -279,7 +287,43 @@ function once(iso) { const f = (simdi() - new Date(iso).getTime()) / 1000;
   if (f < 86400) return `${Math.floor(f / 3600)} sa önce`; return `${Math.floor(f / 86400)} gün önce`; }
 
 // ------------------------------------------------------------ durum metinleri
-const kodlayici = (p) => (p.ayarlar && p.ayarlar.motor === 'claude') ? 'Claude Code' : 'DeepSeek';
+const MOTOR_ADI = { deepseek: 'DeepSeek', ollama: 'Ollama (yerel)', claude: 'Claude Code' };
+const kodlayici = (p) => MOTOR_ADI[(p.ayarlar && p.ayarlar.motor) || p.motor] || 'DeepSeek';
+
+// Kodlayıcı + model seçimi (Ayarlar sekmesi ve proje ekleme penceresi ortak kullanır)
+function motorAlani(motor, model, onekId) {
+  const kap = el('div');
+  const satir = el('div', 'motor-satiri');
+  const sec = el('select'); sec.id = onekId + 'Motor'; sec.setAttribute('aria-label', 'Kodlayıcı');
+  for (const [k, ad] of [['deepseek', 'DeepSeek (bulut API)'], ['ollama', 'Ollama (yerel, ücretsiz)'], ['claude', 'Claude Code']]) {
+    const o = el('option', '', ad); o.value = k; sec.append(o);
+  }
+  sec.value = motor || 'deepseek';
+  const mod = el('input'); mod.type = 'text'; mod.id = onekId + 'Model'; mod.value = model || '';
+  mod.setAttribute('list', 'ollamaModelleri'); mod.setAttribute('aria-label', 'Model');
+  const ipucu = el('div', 'ipucu');
+  const guncelle = () => {
+    const m = sec.value, o = (genel && genel.ollama) || {};
+    mod.placeholder = { deepseek: 'deepseek-chat (boş = varsayılan)', ollama: 'ör. qwen2.5-coder:14b-otopilot', claude: 'opus / sonnet (boş = varsayılan)' }[m];
+    ipucu.className = 'ipucu';
+    if (m === 'ollama') {
+      if (!o.kurulu && !o.calisiyor) { ipucu.classList.add('uyari'); ipucu.textContent = 'Ollama kurulu görünmüyor. OTOPILOT_BASLAT.bat ile kurabilir ya da https://ollama.com adresinden indirebilirsin.'; }
+      else if (!o.calisiyor) { ipucu.classList.add('uyari'); ipucu.textContent = 'Ollama şu an çalışmıyor; Ollama uygulamasını başlat.'; }
+      else if (!o.modeller.length) { ipucu.classList.add('uyari'); ipucu.textContent = 'Yüklü model yok. Komut satırında: otopilot.bat ollama-kur'; }
+      else ipucu.textContent = `Yüklü modeller: ${o.modeller.join(', ')}. "-otopilot" ile bitenler uzun bağlamla hazırlanmıştır (önerilir).`;
+    } else if (m === 'deepseek') ipucu.textContent = 'DeepSeek API anahtarı (DEEPSEEK_API_KEY) ve bakiye gerekir.';
+    else ipucu.textContent = 'Bilgisayarda Claude Code kurulu ve giriş yapılmış olmalı.';
+  };
+  sec.addEventListener('change', () => { if (sec.value !== motor) mod.value = sec.value === 'ollama' ? ollamaOnerisi() : ''; guncelle(); });
+  guncelle();
+  satir.append(sec, mod); kap.append(satir, ipucu);
+  return { kap, sec, mod };
+}
+function ollamaOnerisi() {
+  const v = (genel && genel.varsayilan) || {}, liste = (genel && genel.ollama && genel.ollama.modeller) || [];
+  if (v.motor === 'ollama' && v.model) return v.model;
+  return liste.find(m => m.endsWith('-otopilot')) || liste[0] || '';
+}
 function projeDurumu(p, yoneticiAcik) {
   // [nokta sınıfı, kısa durum, ikon, açıklama]
   const a = p.asama, maks = (p.ayarlar && p.ayarlar.max_deneme) || 3;
@@ -312,6 +356,11 @@ function genelCiz() {
     $('genelYazi').textContent = aktif ? `Çalışıyor · şu an: ${aktif.isim}` : (y.not_ || 'Çalışıyor');
   } else { $('genelNokta').className = 'nokta'; $('genelYazi').textContent = genel.projeler.length ? 'Durdu' : 'Henüz proje yok'; }
 
+  const dl = $('ollamaModelleri'), modeller = (genel.ollama && genel.ollama.modeller) || [];
+  if (dl.dataset.imza !== modeller.join('|')) {
+    dl.dataset.imza = modeller.join('|');
+    dl.replaceChildren(...modeller.map(m => { const o = el('option'); o.value = m; return o; }));
+  }
   const imza = JSON.stringify([genel.projeler, y.aktif, y.calisiyor, secili]);
   if (imza === imzalar.liste) return; imzalar.liste = imza;
   const kap = $('projeler'); kap.replaceChildren();
@@ -329,6 +378,7 @@ function genelCiz() {
     const say = el('div', 'sayilar');
     say.append(el('span', 'ok', `✓ ${p.sayilar.bitti} bitti`), el('span', '', `${p.sayilar.bekliyor} sırada`));
     if (p.sayilar.basarisiz) say.append(el('span', 'bad', `✕ ${p.sayilar.basarisiz} başarısız`));
+    say.append(el('span', 'motor-etiket', (MOTOR_ADI[p.motor] || 'DeepSeek').replace(' (yerel)', '')));
     kart.append(ust, el('div', 'durum', kisa), say);
     const sec = () => { secili = p.ad; ls.koy('otopilot-secili', secili); imzalar = {}; duzenleniyor = false; yenile(); };
     kart.addEventListener('click', sec);
@@ -399,7 +449,7 @@ function sekmeCiz() {
   document.querySelectorAll('.sekmeler button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.k === sekme)));
   const p = detay, ic = $('sekmeIcerik');
   const veri = { gorevler: [p.gorevler, p.aktif_gorev, p.ayarlar.hedef], akis: [p.olaylar.length, p.olaylar.at(-1), ayrintiGoster],
-                 gecmis: [p.commitler], ayarlar: [p.ayarlar] }[sekme];
+                 gecmis: [p.commitler], ayarlar: [p.ayarlar, genel.ollama] }[sekme];
   const imza = p.ad + sekme + JSON.stringify(veri);
   if (imza === imzalar.sekme || (sekme === 'ayarlar' && duzenleniyor)) return;
   imzalar.sekme = imza;
@@ -470,6 +520,16 @@ function ayarlarSekmesi(p) {
     b.addEventListener('click', async () => { duzenleniyor = false; await kaydet(girdi.value); });
     e.append(b); k.append(l, el('p', '', aciklama), girdi, e); return k;
   };
+  const mk = el('div', 'ayar'); const ml = el('label', 'b', 'Kodlayıcı ve model'); ml.htmlFor = 'ayarMotor';
+  const alanM = motorAlani(p.ayarlar.motor, p.ayarlar.model, 'ayar');
+  alanM.sec.addEventListener('change', () => { duzenleniyor = true; });
+  alanM.mod.addEventListener('input', () => { duzenleniyor = true; });
+  const me = el('div', 'eylem'); const mb = el('button', 'ana', 'Kodlayıcıyı kaydet'); mb.type = 'button';
+  mb.addEventListener('click', async () => { duzenleniyor = false;
+    await ayarKaydet(p.ad, { motor: alanM.sec.value, model: alanM.mod.value }, 'Kodlayıcı kaydedildi; sıradaki görevden itibaren kullanılacak.'); });
+  me.append(mb); mk.append(ml, el('p', '', 'Bu projede kodu yazacak yapay zeka. Ollama bilgisayarında ücretsiz çalışır; kalite seçtiğin modele ve donanıma bağlıdır.'), alanM.kap, me);
+  out.push(mk);
+
   const ta = el('textarea'); ta.id = 'ayarHedef'; ta.value = p.ayarlar.hedef || '';
   out.push(alan('Hedef', 'Görevler bu hedefe göre planlanır. Hedef tamamlanınca otopilot bu projeyi bekletir.', ta, 'Hedefi kaydet',
                 (v) => ayarKaydet(p.ad, { hedef: v }, 'Hedef kaydedildi.')));
@@ -539,7 +599,12 @@ async function yenile() {
 }
 
 // ------------------------------------------------------------ proje ekleme penceresi
+let pencereMotor = null;
 function pencereAc() {
+  const v = (genel && genel.varsayilan) || {};
+  pencereMotor = motorAlani(v.motor || 'deepseek', v.model || (v.motor === 'ollama' ? ollamaOnerisi() : ''), 'yeni');
+  const baslik = el('label', '', 'Kodlayıcı'); baslik.htmlFor = 'yeniMotor'; baslik.style.fontWeight = '600';
+  $('pencereMotor').replaceChildren(baslik, pencereMotor.kap);
   $('yolGirdi').value = ''; $('hedefGirdi').value = ''; $('taramaSonucu').replaceChildren();
   $('ekleOnayBtn').disabled = true; $('ekleOnayBtn').textContent = 'Ekle'; $('pencere').showModal(); $('yolGirdi').focus();
 }
@@ -580,9 +645,11 @@ $('gozatBtn').addEventListener('click', async () => {
 });
 $('ekleForm').addEventListener('submit', async (e) => {
   e.preventDefault(); const yollar = secilenler(); if (!yollar.length) return;
+  if (pencereMotor.sec.value === 'ollama' && !pencereMotor.mod.value.trim()) { bildir('Ollama için bir model seç.'); pencereMotor.mod.focus(); return; }
   const b = $('ekleOnayBtn'); b.disabled = true; b.textContent = 'Ekleniyor…';
   try {
-    const r = await api('/api/proje-ekle', { yollar, hedef: $('hedefGirdi').value.trim() });
+    const r = await api('/api/proje-ekle', { yollar, hedef: $('hedefGirdi').value.trim(),
+                                             motor: pencereMotor.sec.value, model: pencereMotor.mod.value.trim() });
     const tamam = r.sonuc.filter(s => s.tamam), hatali = r.sonuc.filter(s => !s.tamam);
     $('pencere').close();
     if (hatali.length) alert('Eklenemeyenler:\n' + hatali.map(h => `• ${h.yol}: ${h.not}`).join('\n'));

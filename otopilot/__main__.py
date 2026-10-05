@@ -16,7 +16,7 @@ import platform
 import sys
 from pathlib import Path
 
-from .durum import VARSAYILAN_HEDEF, Durum, ProjeAyarlari
+from .durum import VARSAYILAN_HEDEF, Durum, ProjeAyarlari, genel_ayarlar, genel_ayarlari_yaz, tum_projeler
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -26,7 +26,8 @@ def _baslangic_dosyasi(durum: Durum | None) -> Path:
     return baslangic / (f"otopilot-{durum.dizin.name}.bat" if durum else "otopilot-hepsi.bat")
 
 
-def proje_ekle(yol: Path, hedef: str = "", motor: str | None = None) -> tuple[Durum, list[str]]:
+def proje_ekle(yol: Path, hedef: str = "", motor: str | None = None,
+               model: str | None = None) -> tuple[Durum, list[str]]:
     """Klasörü otopilota ekler (git hazırlığı dahil). Arayüz ve komut satırı ortak kullanır."""
     from . import proje as pj
 
@@ -42,8 +43,13 @@ def proje_ekle(yol: Path, hedef: str = "", motor: str | None = None) -> tuple[Du
     yapilan = pj.projeyi_hazirla(yol, a.dal)
     a.hedef = hedef.strip() or a.hedef or VARSAYILAN_HEDEF
     a.otomatik = True
-    if motor:
-        a.motor = motor
+    yeni_proje = not d.ayar_dosyasi.exists()
+    genel = genel_ayarlar()
+    if motor or yeni_proje:  # yeni projeler varsayılan kodlayıcıyı (ör. Ollama) devralır
+        a.motor = motor or genel.get("motor") or a.motor
+        a.model = model or (genel.get("model") if a.motor == genel.get("motor") else None) or a.model
+    elif model:
+        a.model = model
     d.ayarlari_yaz(a)
     d.olay("bilgi", "➕ Proje otopilota eklendi" + (f" ({', '.join(yapilan)})" if yapilan else "") + ".")
     return d, yapilan
@@ -52,10 +58,55 @@ def proje_ekle(yol: Path, hedef: str = "", motor: str | None = None) -> tuple[Du
 def ekle(args) -> None:
     for yol in args.yollar:
         try:
-            d, yapilan = proje_ekle(Path(yol), args.hedef or "", args.motor)
+            d, yapilan = proje_ekle(Path(yol), args.hedef or "", args.motor, args.model)
             print(f"✓ {d.proje}" + (f"  ({', '.join(yapilan)})" if yapilan else ""))
         except (ValueError, OSError) as e:
             print(f"✗ {yol}: {e}")
+
+
+def ollama_kur(args) -> None:
+    """Ollama'yı otopilot için hazırlar: model indirir, uzun bağlamlı türev oluşturur, varsayılan yapar."""
+    from . import ollama
+
+    if not ollama.ollama_komutu():
+        raise SystemExit("Ollama kurulu değil. https://ollama.com/download adresinden kur (Windows'ta "
+                         "OTOPILOT_BASLAT.bat bunu senin için yapabilir).")
+    if not ollama.calisiyor_mu():
+        raise SystemExit("Ollama çalışmıyor. Ollama uygulamasını başlatıp tekrar dene.")
+    model = args.model
+    if not model:
+        yuklu = [m for m in ollama.modeller() if not m.endswith(ollama.TUREV_EKI)]
+        print("\nOtopilot için bir kodlama modeli seç (araç kullanmayı desteklemeli):")
+        secenekler = [(ad, aciklama) for ad, aciklama in ollama.ONERILEN_MODELLER]
+        secenekler += [(m, "yüklü") for m in yuklu if m not in {a for a, _ in secenekler}]
+        for i, (ad, aciklama) in enumerate(secenekler, 1):
+            print(f"  {i}) {ad:28} {aciklama}{'  [yüklü]' if ad in yuklu and aciklama != 'yüklü' else ''}")
+        while not model:
+            cevap = input(f"Seçim [1-{len(secenekler)}] (Enter = 2): ").strip() or "2"
+            if cevap.isdigit() and 1 <= int(cevap) <= len(secenekler):
+                model = secenekler[int(cevap) - 1][0]
+    if not ollama.model_var_mi(model):
+        ollama.indir(model)
+    if ollama.arac_destegi(model) is False:
+        raise SystemExit(f"'{model}' araç kullanmayı desteklemiyor; başka bir model seç.")
+    turev = ollama.turev_olustur(model, args.baglam)
+    genel_ayarlari_yaz(motor="ollama", model=turev)
+    guncellenen = 0
+    if args.tum_projeler:
+        for d in tum_projeler():
+            a = d.ayarlari_oku()
+            a.motor, a.model = "ollama", turev
+            d.ayarlari_yaz(a)
+            guncellenen += 1
+    print(f"\nTamam. Ollama modeli hazır: {turev} (bağlam {args.baglam} token)."
+          f"\nYeni eklenen projeler bu modeli kullanacak{f'; {guncellenen} mevcut proje de güncellendi' if guncellenen else ''}.")
+
+
+def varsayilan(args) -> None:
+    """Varsayılan kodlayıcıyı yazdırır ya da ayarlar (bat dosyaları için)."""
+    if args.ayarla:
+        genel_ayarlari_yaz(motor=args.ayarla)
+    print(genel_ayarlar().get("motor", ""))
 
 
 def hepsi(args) -> None:
@@ -173,8 +224,8 @@ def main(argv: list[str] | None = None) -> None:
     b.add_argument("--gorev", nargs="*", help="başlamadan önce eklenecek görevler")
     b.add_argument("--test", help="doğrulama komutu (ör. 'npm test'); verilmezse otomatik bulunur")
     b.add_argument("--dal", help="çalışma dalı (varsayılan otopilot/gelistirme)")
-    b.add_argument("--motor", choices=["deepseek", "claude"],
-                   help="kodlayıcı: deepseek (DeepSeek API, varsayılan) veya claude (Claude Code)")
+    b.add_argument("--motor", choices=["deepseek", "ollama", "claude"],
+                   help="kodlayıcı: deepseek (DeepSeek API), ollama (yerel model) veya claude (Claude Code)")
     b.add_argument("--model", help="model adı (DeepSeek: deepseek-chat / deepseek-reasoner; Claude: opus, sonnet)")
     b.add_argument("--max-deneme", type=int, help="test başarısız olursa düzeltme deneme sayısı (varsayılan 3)")
     b.add_argument("--izin", nargs="*", help="Claude'a ek izin, ör. \"Bash(npm *)\" \"Bash(python *)\"")
@@ -195,8 +246,19 @@ def main(argv: list[str] | None = None) -> None:
     e = alt.add_parser("ekle", help="bir veya daha fazla proje klasörünü otopilota ekle")
     e.add_argument("yollar", nargs="+")
     e.add_argument("--hedef", help="hedef (boşsa genel geliştirme hedefi kullanılır)")
-    e.add_argument("--motor", choices=["deepseek", "claude"])
+    e.add_argument("--motor", choices=["deepseek", "ollama", "claude"])
+    e.add_argument("--model")
     e.set_defaults(f=ekle)
+
+    o = alt.add_parser("ollama-kur", help="yerel Ollama modelini otopilot için hazırla ve varsayılan yap")
+    o.add_argument("--model", help="ör. qwen2.5-coder:14b (verilmezse sorulur)")
+    o.add_argument("--baglam", type=int, default=32768, help="bağlam uzunluğu (token)")
+    o.add_argument("--tum-projeler", action="store_true", help="mevcut tüm projeleri de bu modele geçir")
+    o.set_defaults(f=ollama_kur)
+
+    v = alt.add_parser("varsayilan", help="yeni projelerin varsayılan kodlayıcısını yazdır/ayarla")
+    v.add_argument("--ayarla", choices=["deepseek", "ollama", "claude"])
+    v.set_defaults(f=varsayilan)
 
     h = alt.add_parser("hepsi", help="otomatik geliştirmesi açık tüm projeleri sırayla geliştir")
     h.set_defaults(f=hepsi)

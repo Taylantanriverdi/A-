@@ -25,15 +25,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import ollama
 from . import proje as pj
 from . import yonetici
-from .durum import GOREV, KOK, Durum, tum_projeler
+from .durum import GOREV, KOK, Durum, genel_ayarlar, genel_ayarlari_yaz, tum_projeler
 
 REPO = Path(__file__).resolve().parent.parent
 HTML = Path(__file__).with_name("arayuz.html")
 ANAHTAR = secrets.token_urlsafe(24)
 WINDOWS = platform.system() == "Windows"
 _git_onbellek: dict[str, tuple[float, list]] = {}
+_ollama_onbellek: list = [0.0, {}]
+MOTORLAR = ("deepseek", "ollama", "claude")
+
+
+def ollama_durumu() -> dict:
+    if time.time() - _ollama_onbellek[0] > 10:
+        acik = ollama.calisiyor_mu()
+        _ollama_onbellek[:] = [time.time(), {"calisiyor": acik, "modeller": ollama.modeller() if acik else [],
+                                             "kurulu": bool(ollama.ollama_komutu())}]
+    return _ollama_onbellek[1]
 
 
 class Hata(Exception):
@@ -92,6 +103,8 @@ def proje_ozeti(d: Durum, simdi: dt.datetime) -> dict:
         "isim": d.proje.name,
         "proje": str(d.proje),
         "otomatik": bool(ayar and ayar.otomatik),
+        "motor": ayar.motor if ayar else None,
+        "model": ayar.model if ayar else None,
         "asama": v.get("asama"),
         "calisiyor": bool(d.calisiyor_mu()),
         "aktif_gorev": (v.get("aktif") or {}).get("satir"),
@@ -107,6 +120,8 @@ def genel_veri() -> dict:
     simdi = dt.datetime.now().astimezone()
     return {"yonetici": yonetici.yonetici_durumu(),
             "projeler": [proje_ozeti(d, simdi) for d in tum_projeler()],
+            "varsayilan": genel_ayarlar(),
+            "ollama": ollama_durumu(),
             "simdi": simdi.isoformat(timespec="seconds")}
 
 
@@ -285,10 +300,14 @@ class Isleyici(BaseHTTPRequestHandler):
             tur = pj.proje_turu(kok)
             return {"projeler": bulunan, "kendisi_proje": bool(tur), "tur": tur}
         if yol == "/api/proje-ekle":
+            motor = v.get("motor") if v.get("motor") in MOTORLAR else None
+            model = str(v.get("model") or "").strip() or None
+            if motor:  # seçilen kodlayıcı sonraki eklemeler için de varsayılan olsun
+                genel_ayarlari_yaz(motor=motor, model=model)
             sonuc = []
             for p in v.get("yollar") or []:
                 try:
-                    d, yapilan = proje_ekle(Path(str(p)), str(v.get("hedef") or ""))
+                    d, yapilan = proje_ekle(Path(str(p)), str(v.get("hedef") or ""), motor, model)
                     sonuc.append({"yol": str(d.proje), "ad": d.dizin.name, "tamam": True, "not": ", ".join(yapilan)})
                 except (ValueError, OSError, pj.GitHatasi) as e:
                     sonuc.append({"yol": str(p), "tamam": False, "not": str(e)})
@@ -309,8 +328,16 @@ class Isleyici(BaseHTTPRequestHandler):
                 a.otomatik = bool(v["otomatik"])
             if "test_komutu" in v:
                 a.test_komutu = str(v["test_komutu"]).strip() or None
+            if "motor" in v:
+                if v["motor"] not in MOTORLAR:
+                    raise Hata("Geçersiz kodlayıcı.")
+                a.motor = v["motor"]
+            if "model" in v:
+                a.model = str(v["model"]).strip() or None
+            if a.motor == "ollama" and not a.model:
+                raise Hata("Ollama için model seç.")
             d.ayarlari_yaz(a)
-            if "otomatik" in v or "hedef" in v:
+            if v.keys() & {"otomatik", "hedef", "motor", "model"}:
                 d.yaz(dinlen_until=None)  # kullanıcı dokunduysa beklemeden yeniden değerlendirilsin
             return {"mesaj": "Kaydedildi."}
         if yol == "/api/proje-cikar":

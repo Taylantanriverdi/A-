@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import proje as pj
 from .claude import ClaudeCLI, Sonuc
-from .deepseek import DeepSeekMotor
+from .deepseek import DeepSeekMotor, OllamaMotor
 from .durum import AktifGorev, Durum, ProjeAyarlari
 
 LIMIT_PAYI = dt.timedelta(minutes=3)  # sıfırlanmadan sonra güvenlik payı
@@ -89,6 +89,8 @@ class Otopilot:
         self.tek_sefer = tek_sefer
         if ayar.motor == "claude":
             self.claude = ClaudeCLI(self.proje, ayar.izin_modu, self._izinler(), ayar.model)
+        elif ayar.motor == "ollama":
+            self.claude = OllamaMotor(self.proje, ayar.model, izleyici=self._arac_olayi)
         else:
             self.claude = DeepSeekMotor(self.proje, ayar.model, izleyici=self._arac_olayi)
 

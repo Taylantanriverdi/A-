@@ -15,10 +15,37 @@ Otopilot, bir yapay zeka kodlayıcısına talimat verip projeni durmadan gelişt
 
 | Motor | Ne gerekir | Seçim |
 |---|---|---|
-| **DeepSeek** (varsayılan) | DeepSeek API anahtarı (`DEEPSEEK_API_KEY`) ve bakiye | `--motor deepseek` |
+| **DeepSeek** | DeepSeek API anahtarı (`DEEPSEEK_API_KEY`) ve bakiye | `--motor deepseek` |
+| **Ollama** (yerel, ücretsiz) | Bilgisayarında [Ollama](https://ollama.com) ve araç destekli bir model | `--motor ollama` |
 | **Claude Code** | Kurulu ve giriş yapılmış Claude Code (Claude aboneliği) | `--motor claude` |
 
-Motor proje ayarlarına kaydedilir; bir kez seçmen yeter.
+Motor proje ayarlarına kaydedilir; panelde her projenin *Ayarlar* sekmesinden değiştirilebilir. Yeni eklenen
+projeler varsayılan kodlayıcıyı kullanır.
+
+### Ollama ile (internetsiz, ücretsiz)
+
+`OTOPILOT_BASLAT.bat` ilk açılışta "Kodu hangi yapay zeka yazsın?" diye sorar; **O** seçersen:
+
+1. Ollama kurulu değilse kurar (winget), kapalıysa başlatır.
+2. Bir kodlama modeli seçtirir ve indirir:
+
+   | Model | Donanım |
+   |---|---|
+   | `qwen2.5-coder:7b` | 8 GB ekran kartı / 16 GB RAM — hızlı, basit işler |
+   | `qwen2.5-coder:14b` | 12-16 GB ekran kartı — önerilen |
+   | `qwen2.5-coder:32b` | 24 GB+ ekran kartı — en iyi kalite |
+
+3. Modelin **uzun bağlamlı türevini** (`<model>-otopilot`, 32K token) oluşturur. Ollama'nın varsayılan bağlamı
+   kısadır; talimatlar ve araç tanımları kırpılırsa model işi yarım bırakır.
+
+Elle: `otopilot.bat ollama-kur` (model sorar), `otopilot.bat ollama-kur --model qwen2.5-coder:14b --tum-projeler`.
+
+Ollama kapanırsa otopilot işi başarısız saymaz; 2 dakikada bir yeniden dener ve Ollama açılınca devam eder.
+Model yüklü değilse ya da araç (tool) kullanmayı desteklemiyorsa panelde açıkça yazar.
+
+> **Kalite notu:** Yerel modeller büyük bulut modellerinden zayıftır. Küçük ve net görevlerde iyi sonuç verir;
+> büyük özelliklerde başarısız görev oranı artabilir (başarısız görevler geri alınır, projen bozulmaz).
+> Önemli projeleri DeepSeek veya Claude ile, diğerlerini Ollama ile geliştirmek iyi bir denge olur.
 
 ```
 görev seç → Claude'a talimat ver → testleri çalıştır → hata varsa Claude'a geri ver → commit → sıradaki
@@ -112,6 +139,7 @@ otopilot.bat ekle C:\eski\proje1 C:\eski\proje2 --hedef "..."   :: hedef isteğe
 otopilot.bat hepsi                                                :: otomatik açık tüm projeler
 otopilot.bat arayuz                                               :: panel
 otopilot.bat otomatik-kur                                         :: açılışta "hepsi" başlasın
+otopilot.bat ollama-kur                                           :: yerel Ollama modelini hazırla
 ```
 
 Linux/macOS'ta aynı komutlar `python -m otopilot ...` ile çalışır.
@@ -293,7 +321,8 @@ Her modda:
 otopilot/
   __main__.py   komut satırı (baslat, gorev, durum, otomatik-kur)
   dongu.py      ana döngü: planla, uygula, test et, düzelt, commit, limitte bekle
-  deepseek.py   DeepSeek motoru (asistan/ araçlarını kullanır)
+  deepseek.py   DeepSeek ve Ollama motorları (asistan/ araçlarını kullanır)
+  ollama.py     Ollama bağlantısı, model indirme, uzun bağlamlı model türevi
   claude.py     Claude Code motoru (CLI sarmalayıcı)
   limit.py      limit mesajından sıfırlanma saatini çıkarma
   proje.py      git ve test komutu

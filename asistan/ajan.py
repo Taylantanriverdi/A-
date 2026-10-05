@@ -78,9 +78,12 @@ def _kucuk_png() -> str:
 class Ajan:
     def __init__(self, ayarlar: Ayarlar):
         self.ayarlar = ayarlar
-        if not ayarlar.api_anahtari:
+        yerel = any(h in ayarlar.api_url for h in ("localhost", "127.0.0.1", "[::1]"))
+        if not ayarlar.api_anahtari and not yerel:
             raise SystemExit("DEEPSEEK_API_KEY tanımlı değil. https://platform.deepseek.com adresinden anahtar al.")
-        self.istemci = openai.OpenAI(api_key=ayarlar.api_anahtari, base_url=ayarlar.api_url)
+        # Yerel sunucular (Ollama gibi) anahtar istemez ama istemci boş anahtar kabul etmez
+        self.istemci = openai.OpenAI(api_key=ayarlar.api_anahtari or "yerel", base_url=ayarlar.api_url,
+                                     timeout=ayarlar.zaman_asimi, max_retries=1 if yerel else 2)
         self.guvenlik = Guvenlik(ayarlar)
         self.terminal = Terminal(ayarlar.komut_zaman_asimi)
         self.duzenleyici = Duzenleyici(ayarlar, self.guvenlik)

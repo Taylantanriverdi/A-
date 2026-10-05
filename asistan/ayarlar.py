@@ -22,6 +22,8 @@ class Ayarlar:
     max_tokens: int = int(os.environ.get("ASISTAN_MAX_TOKENS", "8192"))
     # Geçmişte tutulacak en fazla ekran görüntüsü (eskiler metne çevrilir; maliyeti düşürür)
     max_goruntu: int = int(os.environ.get("ASISTAN_MAX_GORUNTU", "3"))
+    # Tek bir model yanıtı için bekleme süresi (sn); yerel modeller yavaş olabilir
+    zaman_asimi: float = float(os.environ.get("ASISTAN_ZAMAN_ASIMI", "600"))
 
     # onayli  : terminal komutları ve dosya değişiklikleri için onay ister (varsayılan)
     # tam     : fare/klavye dahil her eylem için onay ister
