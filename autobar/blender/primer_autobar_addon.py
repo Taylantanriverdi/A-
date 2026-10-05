@@ -73,16 +73,29 @@ def read_stl(path, name, collection):
 
 
 # ---------------------------------------------------------------- properties
+def _load_config():
+    """KURULUM.bat'in eklentinin yanına yazdığı ayarlar (Python yolu, paket klasörü)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "primer_autobar_addon_config.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+_CFG = _load_config()
+
+
 class AutoBarSettings(bpy.types.PropertyGroup):
     restoration: bpy.props.PointerProperty(
         name="Restorasyon", type=bpy.types.Object, poll=lambda self, o: o.type == "MESH")
     implants: bpy.props.PointerProperty(name="İmplantlar", type=bpy.types.Collection)
     python_exe: bpy.props.StringProperty(
-        name="Python", default="python3" if os.name != "nt" else "python",
+        name="Python", default=_CFG.get("python_exe", "python3" if os.name != "nt" else "python"),
         description="trimesh, manifold3d, scipy kurulu Python yorumlayıcısı")
     package_dir: bpy.props.StringProperty(
         name="Paket klasörü", subtype="DIR_PATH",
-        default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        default=_CFG.get("package_dir", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
         description="İçinde primer_autobar/ klasörü bulunan 'autobar' klasörü")
 
     bar_width: bpy.props.FloatProperty(name="Bar genişliği", default=3.5, min=1.5, max=8, unit="NONE")

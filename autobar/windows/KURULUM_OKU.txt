@@ -1,0 +1,37 @@
+PRIMER AUTO BAR V1 - Windows kurulumu
+=====================================
+
+1) Zip'i bir klasöre çıkarın (ör. C:\PrimerAutoBar). Masaüstü de olur.
+2) windows\KURULUM.bat dosyasına çift tıklayın.
+   - Python yoksa otomatik kurmayı teklif eder (winget). Olmazsa python.org'dan
+     Python 3.12 kurun ve "Add python.exe to PATH" kutusunu işaretleyin.
+   - Gerekli paketleri internetten indirir (birkaç dakika).
+   - İsterseniz Blender eklentisini de kurar.
+3) Denemek için: windows\DEMO_CALISTIR.bat
+   Sentetik All-on-4 vakasında bar açar, sonuç klasörünü açar.
+
+KENDİ VAKANIZ
+-------------
+Restorasyon STL'i + implants.json (+ isterseniz params.json) dosyalarını birlikte
+seçip windows\BAR_OLUSTUR.bat üzerine sürükleyip bırakın.
+Çıktı, STL'in yanında "<dosyaadı>_bar" klasörüne yazılır:
+  bar.stl              -> üretime gidecek Ti bar
+  restoration_cut.stl  -> içi bar için oyulmuş hibrit
+  qa_report.txt        -> PASS/FAIL ve bölge bölge kontrol
+
+implants.json örneği : examples\implants.json
+params.json örneği   : examples\params.json  (dosya adında "param" geçmeli)
+
+BLENDER
+-------
+windows\BLENDER_EKLENTI_KUR.bat eklentiyi bilgisayardaki tüm Blender sürümlerine kurar.
+Blender > Edit > Preferences > Add-ons > "PRIMER AUTO BAR" kutusunu işaretleyin.
+3D görünümde N > AutoBar sekmesi:
+  - Restorasyon mesh'ini seçin.
+  - İmplantlar: her implant için bir Empty (Z ekseni = implant ekseni, adı = diş no).
+  - "Barı Oluştur".
+Birim: 1 Blender birimi = 1 mm.
+
+Ayrıntılar: README.md
+
+UYARI: Çıktı tıbbi cihaz parçasıdır; üretimden önce teknisyen/hekim onayı gerekir.

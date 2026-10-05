@@ -30,6 +30,22 @@ Restorasyon STL + implant eksenleri
 
 ## Kurulum
 
+### Windows (tek tık)
+
+1. `PRIMER_AUTO_BAR_V1.zip` dosyasını bir klasöre çıkar.
+2. `windows\KURULUM.bat` dosyasına çift tıkla. Python yoksa kurmayı teklif eder, paketleri indirir
+   ve istersen Blender eklentisini de kurar.
+3. Denemek için `windows\DEMO_CALISTIR.bat` dosyasını çalıştır.
+4. Kendi vakan için STL ve `implants.json` dosyalarını (isteğe bağlı olarak `params.json` ile)
+   birlikte seçip `windows\BAR_OLUSTUR.bat` üzerine sürükle. Çıktı STL'in yanındaki
+   `<ad>_bar` klasörüne yazılır.
+5. `windows\BLENDER_EKLENTI_KUR.bat` eklentiyi bilgisayardaki tüm Blender sürümlerine kurar ve
+   Python yolunu kendisi ayarlar.
+
+Ayrıntılar: [`windows/KURULUM_OKU.txt`](windows/KURULUM_OKU.txt)
+
+### Elle (Windows/macOS/Linux)
+
 Python 3.10+:
 
 ```bash
@@ -37,7 +53,7 @@ cd autobar
 pip install -r requirements.txt
 ```
 
-`embreex` opsiyoneldir ama analizi belirgin hızlandırır.
+İsteğe bağlı olarak `pip install embreex` analizi belirgin hızlandırır.
 
 ## Kullanım
 
