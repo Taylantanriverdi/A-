@@ -1,0 +1,3 @@
+# .bat dosyaları Windows satır sonlarıyla (CRLF) saklanır; GitHub "raw" indirmelerinde de bozulmazlar.
+*.bat -text
+*.sh text eol=lf
