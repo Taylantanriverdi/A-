@@ -107,6 +107,9 @@ public sealed class YaziciIstasyonuServisi : BackgroundService
                     "--disable-renderer-backgrounding",
                     "--disable-backgrounding-occluded-windows",
                     "--hide-crash-restore-bubble",
+                    // Dar pencerede form mobil düzene geçmesin.
+                    "--window-size=1400,1000",
+                    "--window-position=30,30",
                     "--disable-session-crashed-bubble",
                     "--app=" + Adres + "/api/yonetici-giris/istasyon?jeton=" + jeton
                 }) psi.ArgumentList.Add(a);

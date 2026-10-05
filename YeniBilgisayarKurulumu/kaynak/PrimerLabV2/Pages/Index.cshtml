@@ -1209,6 +1209,12 @@
         .ref-history-search{max-width:220px;height:34px;border:1px solid #dbe3ef;border-radius:8px;padding:0 10px}
         .ref-member-count{font-size:15px;font-weight:1000;text-align:center;padding:5px;border-bottom:1px dotted #8b9bb0;color:#10233e}
         @@media(max-width:800px){.ref-order-top{flex-direction:column}.ref-order-actions{justify-content:flex-start}.ref-order-paper{padding:12px}.ref-order-brand{grid-template-columns:1fr}.ref-grid-2{grid-template-columns:1fr}.ref-grid-2>*:first-child{border-right:0;border-bottom:1px solid #23354d}}
+        /* Yazdırırken form, pencere dar olsa da (ör. yazıcı istasyonu) masaüstü düzeninde ölçülür;
+           böylece kâğıttaki şablon hangi pencereden basılırsa basılsın aynı çıkar. */
+        body.a5-olcum #siparisFormu .ref-order-paper{width:760px!important;max-width:none!important;padding:24px!important}
+        body.a5-olcum .ref-order-paper .ref-order-brand{grid-template-columns:150px 1fr!important}
+        body.a5-olcum .ref-order-paper .ref-grid-2{grid-template-columns:1fr 1fr!important}
+        body.a5-olcum .ref-order-paper .ref-grid-2>*:first-child{border-right:1px solid #23354d!important;border-bottom:0!important}
         @@media print{
             body *{visibility:hidden!important}
             #siparisFormu,#siparisFormu *{visibility:visible!important}
@@ -16296,6 +16302,7 @@
                 if(stlHazirlaniyor) await stlHazirlaniyor;
                 if(stlHazirIsId!==Number(anayasaYazdirIsId)) await stlGorselleriArkada(anayasaYazdirIsId);
             }
+            document.body.classList.add('a5-olcum');
             // Notlar kâğıtta kaydırma çubuğuyla kesilmesin: alan içeriğe göre uzatılır.
             paper.querySelectorAll('textarea').forEach(t=>{ t.dataset.eskiYukseklik=t.style.height||''; t.style.height=Math.max(t.offsetHeight,t.scrollHeight+4)+'px'; });
 
@@ -16329,7 +16336,7 @@
             const temizle=function(){
                 kaydirmalar.forEach(function(k){ k[0].scrollTop=k[1]; k[0].scrollLeft=k[2]; });
                 window.scrollTo(pencereKaydirma[0],pencereKaydirma[1]);
-                document.body.classList.remove('print-a5');
+                document.body.classList.remove('print-a5','a5-olcum');
                 paper.style.removeProperty('--a5-zoom');
                 paper.style.removeProperty('--a5-width');
                 document.getElementById('anStlGorseller')?.style.removeProperty('--stl-max');
@@ -16338,6 +16345,8 @@
                 window.removeEventListener('afterprint',temizle);
             };
             window.addEventListener('afterprint',temizle);
+            // Sormadan basan istasyonda yazıcı beklemez: görüntüler tam yüklenmeden basılmasın.
+            await Promise.all([...paper.querySelectorAll('img')].map(i=>i.decode?i.decode().catch(()=>{}):null));
             window.print();
         }
 
