@@ -24,44 +24,51 @@ ne gördüğünü anlıyor, bir sonraki fare/klavye hareketine karar veriyor ve 
 - Komut satırında komut çalıştırmak (**her komut senin onayınla**)
 - Sohbeti hatırlar: "şimdi bunu masaüstüne kaydet" gibi devam eden istekler verebilirsin
 
-## Kurulum
+## Kurulum (tek tıkla)
 
-### 1. API anahtarı al
-[console.anthropic.com](https://console.anthropic.com) adresinden bir hesap aç ve **API Keys** bölümünden bir anahtar oluştur.
-(Kullanım ücretlidir; her ekran görüntüsü token harcar. Konsoldan harcama limiti koyabilirsin.)
+Önce [console.anthropic.com](https://console.anthropic.com) adresinden bir hesap aç ve **API Keys** bölümünden
+bir anahtar oluştur. Kurulum sırasında bu anahtar sorulacak. (Kullanım ücretlidir, her ekran görüntüsü token harcar.
+Konsoldan harcama limiti koyabilirsin.)
 
-### 2. Python kur
-Python 3.10 veya üstü gerekli: [python.org/downloads](https://www.python.org/downloads/)
-(Windows'ta kurarken **"Add Python to PATH"** kutusunu işaretle.)
+### Windows
 
-### 3. Anahtarı tanıt
+1. [`kurulum.bat`](https://raw.githubusercontent.com/Taylantanriverdi/A-/main/asistan/kurulum.bat) bağlantısına sağ tıkla → **Bağlantıyı farklı kaydet**.
+   (Ya da GitHub'da yeşil **Code → Download ZIP** ile tüm depoyu indir, `asistan` klasörüne gir.)
+2. `kurulum.bat` dosyasına çift tıkla. Windows "bilinmeyen yayımcı" uyarısı verirse **Ek bilgi → Yine de çalıştır** de.
+3. Kurulum şunları kendisi yapar:
+   - Python yoksa kurar (winget ya da python.org üzerinden)
+   - Asistan dosyalarını `%LOCALAPPDATA%\KisiselAsistan` klasörüne indirir
+   - Gerekli kütüphaneleri kurar
+   - API anahtarını sorar ve kaydeder
+   - Masaüstüne ve Başlat menüsüne **Kisisel Asistan** kısayolu ekler
 
-**Windows** (PowerShell):
+Ya da PowerShell'e şunu yapıştır:
 ```powershell
-setx ANTHROPIC_API_KEY "sk-ant-...senin-anahtarın..."
+irm https://raw.githubusercontent.com/Taylantanriverdi/A-/main/asistan/kurulum.bat -OutFile $env:TEMP\kurulum.bat; & $env:TEMP\kurulum.bat
 ```
-Ardından terminali kapatıp yeniden aç.
 
-**macOS / Linux**:
+### macOS / Linux
+
+Terminale yapıştır:
 ```bash
-echo 'export ANTHROPIC_API_KEY="sk-ant-...senin-anahtarın..."' >> ~/.zshrc   # bash kullanıyorsan ~/.bashrc
-source ~/.zshrc
+curl -fsSL https://raw.githubusercontent.com/Taylantanriverdi/A-/main/asistan/kurulum.sh | bash
 ```
+Dosyalar `~/.kisisel-asistan` klasörüne kurulur. macOS'ta masaüstüne, Linux'ta uygulama menüsüne kısayol eklenir.
 
-### 4. İşletim sistemine özel izinler
+- **macOS:** *Sistem Ayarları → Gizlilik ve Güvenlik* altında Terminal'e **Erişilebilirlik** ve
+  **Ekran Kaydı** izni ver, sonra Terminal'i yeniden başlat. Python yoksa ve Homebrew varsa otomatik kurulur.
+- **Linux:** X11 oturumu gerekir (Wayland desteklenmez). Eksik paketler (`python3-tk`, `xclip` …) otomatik kurulur.
 
-- **macOS:** *Sistem Ayarları → Gizlilik ve Güvenlik* altında, asistanı çalıştırdığın Terminal uygulamasına
-  **Erişilebilirlik** (fare/klavye) ve **Ekran Kaydı** (ekran görüntüsü) izni ver. İzin verdikten sonra Terminal'i yeniden başlat.
-- **Linux:** X11 oturumu gerekir (Wayland desteklenmez). Gerekli paketler:
-  `sudo apt install python3-tk python3-dev python3-venv xclip`
-- **Windows:** Ek bir şey gerekmez.
+### 🔄 Otomatik güncelleme
 
-### 5. Başlat
+Asistanı her açtığında (`baslat.bat` / `baslat.sh` / kısayol) en yeni sürüm GitHub'dan kontrol edilir,
+değişen dosyalar indirilir, gerekirse yeni kütüphaneler kurulur. İnternet yoksa mevcut sürümle açılır.
+Kapatmak için `ASISTAN_GUNCELLEME=0` ortam değişkenini ayarla.
 
-- **Windows:** `asistan` klasöründeki **`baslat.bat`** dosyasına çift tıkla.
-- **macOS / Linux:** terminalde `./baslat.sh`
+### Kaldırma
 
-İlk çalıştırmada gerekli kütüphaneler otomatik kurulur.
+- **Windows:** kurulum klasöründeki `kaldir.bat` (`%LOCALAPPDATA%\KisiselAsistan\kaldir.bat`)
+- **macOS / Linux:** `~/.kisisel-asistan/kaldir.sh`
 
 ## Kullanım
 
@@ -107,4 +114,7 @@ Daha temkinli başlamak istersen: `./baslat.sh --onay` (her hareketten önce sor
 
 - `asistan.py` — sohbet döngüsü, Claude ile iletişim, komut onayları
 - `bilgisayar.py` — ekran görüntüsü, fare ve klavye kontrolü (koordinat ölçekleme, Türkçe karakter desteği)
-- `baslat.bat` / `baslat.sh` — tek tıkla kurulum + başlatma
+- `guncelle.py` — otomatik güncelleyici
+- `kurulum.bat` / `kurulum.sh` — tek tıkla kurulum
+- `baslat.bat` / `baslat.sh` — güncelleyip başlatır
+- `kaldir.bat` / `kaldir.sh` — kaldırma

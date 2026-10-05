@@ -73,8 +73,7 @@ main() {
       read -r -p "     API anahtarını yapıştır ve Enter'a bas: " ANAHTAR </dev/tty
     done
     # Anahtar sadece bu kullanıcının okuyabileceği bir dosyada saklanır.
-    umask 077
-    printf 'export ANTHROPIC_API_KEY=%q\n' "$ANAHTAR" > "$HEDEF/anahtar.env"
+    ( umask 077; printf 'export ANTHROPIC_API_KEY=%q\n' "$ANAHTAR" > "$HEDEF/anahtar.env" )
     export ANTHROPIC_API_KEY="$ANAHTAR"
     echo "     Anahtar kaydedildi."
   fi
