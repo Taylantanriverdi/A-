@@ -876,10 +876,11 @@
             <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
                 <label class="lbl">Dosya yükle (tasarım / üretim)</label>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <select id="yukTur" class="inp" style="width:auto"><option value="Tasarım">Tasarım</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
-                    <input id="yukDosya" type="file" multiple class="inp" style="flex:1;padding-top:9px" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo" />
+                    <select id="yukTur" class="inp" style="width:auto"><option value="Tasarım">Tasarım</option><option value="Yazıcı">Yazıcı (Elegoo CTB vb.)</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
+                    <input id="yukDosya" type="file" multiple class="inp" style="flex:1;padding-top:9px" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo,.ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode" />
                     <button class="btn btn-sm" type="button" style="height:44px" onclick="dosyaYukle(${id})">Yükle</button>
                 </div>
+                <div class="note" style="margin-top:6px">📐 <b>Tasarım</b> ve 🖨️ <b>Yazıcı (CTB)</b> dosyaları yüklenince hekim bunları Hekim Portalı'nda iş kartından doğrudan indirebilir ve bilgilendirilir.</div>
                 <div class="progress hidden" id="yukCubuk"><div></div></div>
                 <div class="note" id="yukDurum"></div>
             </div>` : "");

@@ -28,12 +28,12 @@ public sealed class TeknisyenPortalController : ControllerBase
     private static readonly Regex UsernameRegex =
         new("^[a-zA-Z0-9._-]{3,64}$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> AllowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         ".stl", ".obj", ".ply", ".dcm", ".zip", ".rar", ".7z", ".pdf",
         ".jpg", ".jpeg", ".png", ".webp", ".txt",
         ".xml", ".3ox", ".3oxz", ".dentalproject", ".constructioninfo"
-    };
+    }.Concat(HekimPaylasimi.YaziciUzantilari).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     // Teknisyenin seçebileceği durumlar. "Tamamlandı"yı laboratuvar (admin) onaylar.
     // İş akışı: teknisyen taramayı indirir, tasarlar, tasarımı yükleyip laboratuvara teslim eder;
@@ -714,7 +714,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         var uzanti = Path.GetExtension(ad).ToLowerInvariant();
         if (!AllowedExtensions.Contains(uzanti)) return BadRequest("Desteklenmeyen dosya türü.");
 
-        var tur = dosyaTuru == "Diger" ? "Diger" : (dosyaTuru == "Üretim" ? "Üretim" : "Tasarım");
+        var tur = HekimPaylasimi.TurBelirle(dosyaTuru switch { "Diger" => "Diger", "Üretim" => "Üretim", "Yazıcı" => "Yazıcı", _ => "Tasarım" }, uzanti);
         var saklanan = Guid.NewGuid().ToString("N") + uzanti;
         var yol = GuvenliYol(jobId, saklanan);
         Directory.CreateDirectory(Path.GetDirectoryName(yol)!);
@@ -731,6 +731,9 @@ public sealed class TeknisyenPortalController : ControllerBase
                 RETURNING "Id" AS "Value"
                 """).ToListAsync(ct)).Single();
             _takip.DosyaYuklendi(dosyaId, "Teknisyen", o.Tek.AdSoyad);
+            // Tasarım ve yazıcı (Elegoo CTB vb.) dosyası yüklenince hekim doğrudan indirebilir.
+            await HttpContext.RequestServices.GetRequiredService<HekimPaylasimi>()
+                .HekimeAcAsync(_db, dosyaId, jobId, ad, tur, "Teknisyen", o.Tek.AdSoyad, ct);
         }
         catch
         {
@@ -738,7 +741,11 @@ public sealed class TeknisyenPortalController : ControllerBase
             throw;
         }
 
-        return Ok(new { message = "Dosya yüklendi.", dosyaTuru = tur, orijinalDosyaAdi = ad });
+        return Ok(new
+        {
+            message = HekimPaylasimi.HekimeHazir(tur) ? "Dosya yüklendi; hekim Hekim Portalı'ndan indirebilir." : "Dosya yüklendi.",
+            dosyaTuru = tur, orijinalDosyaAdi = ad
+        });
     }
 
     // =========================================================

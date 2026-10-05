@@ -660,8 +660,26 @@ public sealed class HekimPortalController : ControllerBase
         var okunmamis = labMesajlari.Where(m => m.Id > sinir(m.SiparisId)).GroupBy(m => m.SiparisId).ToDictionary(g => g.Key, g => g.Count());
 
         var linkSayilari = HttpContext.RequestServices.GetRequiredService<IsLinkleri>().Sayilar();
+        // Laboratuvar / teknisyenin yüklediği tasarım ve yazıcı (CTB) dosyaları iş kartında doğrudan indirilir.
+        var hazir = ids.Length == 0 ? new List<HazirDosyaSatiri>() : await _db.Database.SqlQuery<HazirDosyaSatiri>($"""
+            SELECT "Id","SiparisId","DosyaTuru","OrijinalDosyaAdi","Boyut","YuklemeTarihi"
+            FROM "IsDosyalari"
+            WHERE "SiparisId" = ANY({ids}) AND "DosyaTuru" IN ('Tasarım','Yazıcı')
+            ORDER BY "YuklemeTarihi" DESC,"Id" DESC
+            """).ToListAsync(cancellationToken);
+        var paylasim = HttpContext.RequestServices.GetRequiredService<HekimPaylasimi>().Tumu();
+        var yukleyenler = _takip.DosyaBilgileri(hazir.Select(f => f.Id));
+        var hazirIs = hazir
+            .Where(f => !(yukleyenler.TryGetValue(f.Id, out var yb) && yb.YukleyenTipi == "Hekim"))
+            .GroupBy(f => f.SiparisId)
+            .ToDictionary(g => g.Key, g => g.Select(f => new
+            {
+                f.Id, f.DosyaTuru, f.OrijinalDosyaAdi, f.Boyut, f.YuklemeTarihi,
+                Yeni = paylasim.TryGetValue(f.Id, out var pk) && pk.HekimIndirdi == null
+            }).ToList());
         return Ok(rows.Select(x => new
         {
+            HazirDosyalar = hazirIs.TryGetValue(x.Id, out var hd) ? (object)hd : Array.Empty<object>(),
             OkunmamisMesaj = okunmamis.TryGetValue(x.Id, out var om) ? om : 0,
             x.Id,
             x.HastaAdi,
@@ -1095,6 +1113,7 @@ public sealed class HekimPortalController : ControllerBase
             """).FirstOrDefaultAsync(cancellationToken);
 
         if (row == null) return NotFound("Dosya bulunamadı.");
+        HttpContext.RequestServices.GetRequiredService<HekimPaylasimi>().HekimIndirdi(fileId);
 
         var fullPath = SafeStoredPath(jobId, row.SaklananDosyaAdi);
         if (!System.IO.File.Exists(fullPath)) return NotFound("Dosyanın fiziksel kopyası bulunamadı.");
@@ -1595,6 +1614,16 @@ public sealed class PortalNewJobDto
     public string? ProvaAsamasi { get; set; }
     /// <summary>Dosya yerine (ya da dosyayla birlikte) paylaşılan bağlantılar: WeTransfer, Drive, Dropbox...</summary>
     public List<string>? Linkler { get; set; }
+}
+
+public sealed class HazirDosyaSatiri
+{
+    public int Id { get; set; }
+    public int SiparisId { get; set; }
+    public string DosyaTuru { get; set; } = "";
+    public string OrijinalDosyaAdi { get; set; } = "";
+    public long Boyut { get; set; }
+    public DateTime YuklemeTarihi { get; set; }
 }
 
 public sealed class IsLinkEkleDto

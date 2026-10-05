@@ -3904,7 +3904,7 @@
 
                 <div id="dmTumBolum">
                     <div class="constitution-toolbar dm-arac">
-                        <select id="dmTur" onchange="dmYukle()"><option value="">Tüm türler</option><option value="Tarama">Tarama</option><option value="Tasarım">Tasarım</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
+                        <select id="dmTur" onchange="dmYukle()"><option value="">Tüm türler</option><option value="Tarama">Tarama</option><option value="Tasarım">Tasarım</option><option value="Yazıcı">Yazıcı (CTB)</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
                         <select id="dmGun" onchange="dmYukle()"><option value="0">Tüm zamanlar</option><option value="1">Bugün / son 1 gün</option><option value="7">Son 7 gün</option><option value="30" selected>Son 30 gün</option><option value="90">Son 90 gün</option></select>
                         <label class="dm-onay"><input id="dmYalnizYeni" type="checkbox" onchange="dmYukle()" /> Yalnız yeni</label>
                         <input id="dmAra" type="search" placeholder="İş no, hasta, hekim veya dosya adı..." oninput="dmAraGecikmeli()" />
@@ -6402,13 +6402,14 @@
                     <div class="file-upload-row">
                         <select id="detayDosyaTuru">
                             <option value="Tarama">Tarama</option>
-                            <option value="Tasarım">Tasarım</option>
+                            <option value="Tasarım">Tasarım (hekim indirebilir)</option>
+                            <option value="Yazıcı">Yazıcı — Elegoo CTB vb. (hekim indirebilir)</option>
                             <option value="Diger">Diğer</option>
                         </select>
 
                         <input id="detayDosyaInput"
                                type="file"
-                               accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo" />
+                               accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo,.ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode" />
 
                         <button type="button"
                                 id="detayDosyaYukleBtn"

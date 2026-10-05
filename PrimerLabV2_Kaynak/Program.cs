@@ -36,6 +36,7 @@ builder.Services.AddSingleton<YoneticiGirisi>();
 builder.Services.AddSingleton<IcerikTakip>();
 builder.Services.AddSingleton<OtomatikYazdirma>();
 builder.Services.AddSingleton<IsLinkleri>();
+builder.Services.AddSingleton<HekimPaylasimi>();
 builder.Services.AddSingleton<YaziciIstasyonuServisi>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<YaziciIstasyonuServisi>());
 builder.Services.AddSingleton<EpostaServisi>();

@@ -18,14 +18,14 @@ public class IsDosyalariController : ControllerBase
     private const long MaxFileSize = 250L * 1024L * 1024L;
 
     private static readonly HashSet<string> AllowedExtensions =
-        new(StringComparer.OrdinalIgnoreCase)
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             // .dcm Hekim Portalı'nda kabul ediliyordu; laboratuvar ekranında da kabul edilir.
             ".stl", ".obj", ".ply", ".dcm", ".zip", ".rar", ".7z", ".pdf",
             ".jpg", ".jpeg", ".png", ".webp", ".txt",
             // Tarayıcı / CAD programlarının sipariş ve proje dosyaları (3Shape, exocad).
             ".xml", ".3ox", ".3oxz", ".dentalproject", ".constructioninfo"
-        };
+        }.Concat(HekimPaylasimi.YaziciUzantilari).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
     public IsDosyalariController(PrimerLabDbContext db, IWebHostEnvironment environment, IcerikTakip takip)
     {
@@ -60,6 +60,7 @@ public class IsDosyalariController : ControllerBase
         "Tarama" => "Tarama",
         "Tasarım" => "Tasarım",
         "Üretim" => "Üretim",
+        "Yazıcı" => "Yazıcı",
         _ => "Diger"
     };
 
@@ -97,7 +98,7 @@ public class IsDosyalariController : ControllerBase
 
         var extension = Path.GetExtension(originalName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
-            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP, TXT, XML, 3OX ve exocad proje dosyaları kabul edilir.");
+            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP, TXT, XML, 3OX, exocad proje dosyaları ve yazıcı dosyaları (CTB, GOO, PWMX...) kabul edilir.");
 
         var storedName = Guid.NewGuid().ToString("N") + extension;
         var folder = Path.Combine(StorageRoot(), siparisId.ToString());
@@ -112,7 +113,7 @@ public class IsDosyalariController : ControllerBase
                 await stream.FlushAsync(cancellationToken);
             }
 
-            var type = NormalizeType(dosyaTuru);
+            var type = HekimPaylasimi.TurBelirle(NormalizeType(dosyaTuru), extension);
             var now = DateTime.UtcNow;
             // SingleAsync() INSERT ... RETURNING sorgusunu alt sorguya sarmaya çalışıp
             // her çağrıda hata veriyordu (EF Core 8+); ToListAsync() SQL'i olduğu gibi çalıştırır.
@@ -124,6 +125,9 @@ public class IsDosyalariController : ControllerBase
                 """)
                 .ToListAsync(cancellationToken)).Single();
             _takip.DosyaYuklendi(id, "Laboratuvar", "Laboratuvar");
+            // Tasarım ve yazıcı (CTB) dosyası hekime açılır ve bildirilir.
+            await HttpContext.RequestServices.GetRequiredService<HekimPaylasimi>()
+                .HekimeAcAsync(_db, id, siparisId, originalName, type, "Laboratuvar", "Laboratuvar", cancellationToken);
 
             return Ok(new
             {
@@ -413,6 +417,7 @@ public class IsDosyalariController : ControllerBase
             """);
         if (count == 0) return NotFound("Dosya kaydı bulunamadı.");
         _takip.DosyaSilindi(id);
+        HttpContext.RequestServices.GetRequiredService<HekimPaylasimi>().DosyaSilindi(id);
 
         if (fullPath != null)
         {

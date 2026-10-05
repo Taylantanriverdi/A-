@@ -138,6 +138,16 @@
         .toolbar{display:flex;gap:8px;margin-bottom:12px}
         .job{background:#fff;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden}
         .job-head{display:flex;justify-content:space-between;gap:10px;padding:12px 14px;cursor:pointer;align-items:center}
+        .hazir-serit{margin:0 14px 12px;padding:10px 12px;border-radius:12px;background:#eff6ff;border:1px solid #bfdbfe}
+        .hazir-serit.yeni{background:#ecfdf5;border-color:#6ee7b7}
+        .hazir-baslik{font-size:12px;font-weight:900;color:#1e3a8a;margin-bottom:6px}
+        .hazir-serit.yeni .hazir-baslik{color:#065f46}
+        .hazir-yeni{background:#059669;color:#fff;border-radius:999px;padding:1px 8px;font-size:10px;margin-right:4px}
+        .hazir-liste{display:flex;flex-wrap:wrap;gap:6px}
+        .hazir-btn{display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:9px;background:#fff;border:1px solid #cbd5e1;color:#0f172a;text-decoration:none;font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .hazir-btn:hover{border-color:#2563eb;color:#1d4ed8}
+        .hazir-btn small{color:#64748b}
+        .hazir-nokta{width:8px;height:8px;border-radius:50%;background:#059669;display:inline-block}
         .job-name{font-weight:900}
         .job-sub{font-size:12px;color:var(--muted);margin-top:3px}
         .badge{border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;white-space:nowrap;background:#e2e8f0;color:#334155}
@@ -1241,6 +1251,7 @@
                     <div><div class="job-name">${esc(j.hastaAdi)}</div><div class="job-sub">#${j.id} · ${tarih(j.olusturmaTarihi)} · ${kal || "-"}${j.mesajSayisi ? " · 💬 " + j.mesajSayisi : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni mesaj</span>` : ""}</div></div>
                     <span class="badge ${c}">${esc(d)}</span>
                 </div>
+                ${hazirDosyaSerit(j)}
                 ${acikIs === j.id ? `<div class="job-body" id="isDetay${j.id}">
                     ${asamaCiz(j)}
                     <div><b>Teslim:</b> ${tarih(j.terminTarihi)} · <b>Renk:</b> ${esc(j.disRengi || "-")} · <b>Materyal:</b> ${esc(j.materyal || "-")}</div>
@@ -1300,6 +1311,22 @@
             const j = isler.find(x => x.id === id); if (j) j.mesajSayisi = (j.mesajSayisi || 0) + 1;
             await mesajlariGetir(id);
         } catch (err) { alert(err.message); }
+    }
+
+    // Laboratuvarın / teknisyenin hazırladığı tasarım ve yazıcı (CTB) dosyaları: iş kartında tek tıkla indir.
+    function hazirDosyaSerit(j) {
+        const l = j.hazirDosyalar || [];
+        if (!l.length) return "";
+        const yeni = l.some(f => f.yeni);
+        return `<div class="hazir-serit${yeni ? " yeni" : ""}">
+            <div class="hazir-baslik">${yeni ? '<span class="hazir-yeni">YENİ</span>' : ""} 📦 Hazır dosyalar — indirip kullanabilirsiniz</div>
+            <div class="hazir-liste">${l.map(f => `<a class="hazir-btn" href="/api/hekim-portal/jobs/${j.id}/files/${f.id}" onclick="hazirIndirildi(${j.id},${f.id})" title="${esc(f.orijinalDosyaAdi)} · ${boyut(f.boyut)}">
+                ${f.dosyaTuru === "Yazıcı" ? "🖨️ Yazıcı" : "📐 Tasarım"} · <b>${esc(f.orijinalDosyaAdi)}</b> <small>${boyut(f.boyut)}</small>${f.yeni ? ' <span class="hazir-nokta"></span>' : ""} ⬇</a>`).join("")}</div>
+        </div>`;
+    }
+    function hazirIndirildi(isId, dosyaId) {
+        const j = isler.find(x => x.id === isId); const f = j && (j.hazirDosyalar || []).find(x => x.id === dosyaId);
+        if (f && f.yeni) { f.yeni = false; setTimeout(isleriCiz, 300); }
     }
 
     function isAc(id) { acikIs = acikIs === id ? null : id; isleriCiz(); }
