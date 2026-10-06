@@ -714,7 +714,7 @@ public sealed class TeknisyenPortalController : ControllerBase
         var uzanti = Path.GetExtension(ad).ToLowerInvariant();
         if (!AllowedExtensions.Contains(uzanti)) return BadRequest("Desteklenmeyen dosya türü.");
 
-        var tur = HekimPaylasimi.TurBelirle(dosyaTuru switch { "Diger" => "Diger", "Üretim" => "Üretim", "Yazıcı" => "Yazıcı", _ => "Tasarım" }, uzanti);
+        var tur = HekimPaylasimi.TurBelirle(dosyaTuru switch { "Diger" => "Diger", "Üretim" => "Üretim", "Yazıcı" or "3D Printer" => HekimPaylasimi.PrinterTuru, _ => "Tasarım" }, uzanti);
         var saklanan = Guid.NewGuid().ToString("N") + uzanti;
         var yol = GuvenliYol(jobId, saklanan);
         Directory.CreateDirectory(Path.GetDirectoryName(yol)!);

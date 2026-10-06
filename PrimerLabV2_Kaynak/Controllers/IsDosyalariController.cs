@@ -60,7 +60,7 @@ public class IsDosyalariController : ControllerBase
         "Tarama" => "Tarama",
         "Tasarım" => "Tasarım",
         "Üretim" => "Üretim",
-        "Yazıcı" => "Yazıcı",
+        "Yazıcı" or "3D Printer" => HekimPaylasimi.PrinterTuru,
         _ => "Diger"
     };
 
@@ -98,7 +98,7 @@ public class IsDosyalariController : ControllerBase
 
         var extension = Path.GetExtension(originalName).ToLowerInvariant();
         if (!AllowedExtensions.Contains(extension))
-            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP, TXT, XML, 3OX, exocad proje dosyaları ve yazıcı dosyaları (CTB, GOO, PWMX...) kabul edilir.");
+            return BadRequest("Desteklenmeyen dosya türü. STL, OBJ, PLY, DCM, ZIP, RAR, 7Z, PDF, JPG, PNG, WEBP, TXT, XML, 3OX, exocad proje dosyaları ve 3D printer dosyaları (CTB, GOO, PWMX...) kabul edilir.");
 
         var storedName = Guid.NewGuid().ToString("N") + extension;
         var folder = Path.Combine(StorageRoot(), siparisId.ToString());

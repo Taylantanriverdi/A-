@@ -137,8 +137,8 @@ public sealed class IsAkisiController : ControllerBase
                 Kalemler = kalemHarita.TryGetValue(x.Id, out var kl) ? kl.Select(k => new { k.IsTuru, k.Adet }).ToArray() : Array.Empty<object>(),
                 Tarama = df.Count(d => d.DosyaTuru == "Tarama"),
                 Tasarim = df.Count(d => d.DosyaTuru == "Tasarım"),
-                Yazici = df.Count(d => d.DosyaTuru == "Yazıcı"),
-                Diger = df.Count(d => d.DosyaTuru is not ("Tarama" or "Tasarım" or "Yazıcı")),
+                Yazici = df.Count(d => HekimPaylasimi.PrinterMi(d.DosyaTuru)),
+                Diger = df.Count(d => d.DosyaTuru is not ("Tarama" or "Tasarım") && !HekimPaylasimi.PrinterMi(d.DosyaTuru)),
                 LinkSayisi = linkSayilari.TryGetValue(x.Id, out var ls) ? ls : 0,
                 MesajSayisi = mj.Count,
                 OkunmamisMesaj = mj.Count(m => m.GonderenTipi is "Hekim" or "Teknisyen" && m.Id > okSinir(x.Id))

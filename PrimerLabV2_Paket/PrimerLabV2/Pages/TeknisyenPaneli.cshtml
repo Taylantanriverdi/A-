@@ -831,15 +831,16 @@
     // ---------- İş masası ----------
     const masaDosya = new Map();   // iş no -> { dosyalar, linkler }
     let masaMesgul = false;
-    const TASARIM_TURLERI = ["Tasarım", "Yazıcı", "Üretim"];
+    const TASARIM_TURLERI = ["Tasarım", "3D Printer", "Yazıcı", "Üretim"];
+    const printerMi = t => t === "3D Printer" || t === "Yazıcı";
     function masaHtml(j, teslimEdilebilir) {
         const d = masaDosya.get(j.id);
         if (!d) setTimeout(() => masaYukle(j.id), 0);
         const gelen = d ? d.dosyalar.filter(f => !TASARIM_TURLERI.includes(f.dosyaTuru)) : null;
         const benim = d ? d.dosyalar.filter(f => TASARIM_TURLERI.includes(f.dosyaTuru)) : [];
         // Tasarım (CAD çıktısı) ile yazıcı dosyası (dilimlenmiş CTB vb.) ayrı tutulur; teslim için tasarım gerekir.
-        const tasarimlar = (benim || []).filter(f => f.dosyaTuru !== "Yazıcı"), yazicilar = (benim || []).filter(f => f.dosyaTuru === "Yazıcı");
-        const ikon = t => t === "Tasarım" ? "📐" : t === "Yazıcı" ? "🖨️" : t === "Üretim" ? "🏭" : t === "Tarama" ? "🦷" : "📎";
+        const tasarimlar = (benim || []).filter(f => !printerMi(f.dosyaTuru)), yazicilar = (benim || []).filter(f => printerMi(f.dosyaTuru));
+        const ikon = t => t === "Tasarım" ? "📐" : printerMi(t) ? "🖨️" : t === "Üretim" ? "🏭" : t === "Tarama" ? "🦷" : "📎";
         const satir = f => `<a class="md" href="/api/teknisyen-portal/jobs/${j.id}/files/${f.id}" title="${esc(f.orijinalDosyaAdi)} — indir"><span>${ikon(f.dosyaTuru)} ${esc(f.orijinalDosyaAdi)}</span><small>${boyut(f.boyut)} ⬇</small></a>`;
         const bitti = j.durum === "Tamamlandı";
         const tasarimVar = (j.tasarimSayisi || 0) > 0 || tasarimlar.some(f => f.dosyaTuru === "Tasarım");
@@ -853,9 +854,9 @@
                 ${bitti ? "" : birakAlani(j.id, "Tasarım", "📐 Tasarım dosyalarını buraya sürükleyin", ".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo")}
                 ${tasarimlar.length ? tasarimlar.map(satir).join("") : ""}
             </div>
-            <div class="adim yazici ${yazicilar.length ? "ok" : ""}"><div class="adim-b"><span class="adim-no">3</span> 🖨️ Yazıcı dosyası (CTB) <span class="note" style="font-weight:600">· isteğe bağlı</span></div>
-                ${bitti ? "" : birakAlani(j.id, "Yazıcı", "🖨️ Elegoo CTB / baskı dosyasını buraya sürükleyin", ".ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode")}
-                ${yazicilar.length ? yazicilar.map(satir).join("") : '<div class="note" style="margin-top:6px">Baskıya hazır dosya (CTB, GOO, PWMX...) hekimin 3D yazıcısı için. Tasarım değildir.</div>'}
+            <div class="adim yazici ${yazicilar.length ? "ok" : ""}"><div class="adim-b"><span class="adim-no">3</span> 🖨️ 3D Printer dosyası (CTB) <span class="note" style="font-weight:600">· isteğe bağlı</span></div>
+                ${bitti ? "" : birakAlani(j.id, "3D Printer", "🖨️ Elegoo CTB / 3D printer dosyasını buraya sürükleyin", ".ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode")}
+                ${yazicilar.length ? yazicilar.map(satir).join("") : '<div class="note" style="margin-top:6px">3D printer için baskıya hazır dosya (CTB, GOO, PWMX...). Tasarım değildir.</div>'}
             </div>
             <div class="adim ${teslimEdildi ? "ok" : ""}"><div class="adim-b"><span class="adim-no">4</span> Laboratuvara gönder</div>
                 ${teslimEdilebilir ? `<button class="btn btn-green teslim-btn" type="button" ${tasarimVar ? "" : "disabled"} onclick="tasarimTeslim(${j.id})">📤 Tasarımı Teslim Et</button>
@@ -865,10 +866,10 @@
         </div>`;
     }
     function birakAlani(id, tur, metin, kabul) {
-        return `<label class="birak ${tur === "Yazıcı" ? "yz" : ""}" ondragover="event.preventDefault();this.classList.add('ustunde')" ondragleave="this.classList.remove('ustunde')" ondrop="event.preventDefault();this.classList.remove('ustunde');masaDosyaYukle(${id},event.dataTransfer.files,'${tur}')">
+        return `<label class="birak ${tur === "3D Printer" ? "yz" : ""}" ondragover="event.preventDefault();this.classList.add('ustunde')" ondragleave="this.classList.remove('ustunde')" ondrop="event.preventDefault();this.classList.remove('ustunde');masaDosyaYukle(${id},event.dataTransfer.files,'${tur}')">
             ${metin}<br><span style="font-weight:600">veya tıklayıp seçin</span>
             <input type="file" multiple class="hidden" accept="${kabul}" onchange="masaDosyaYukle(${id},this.files,'${tur}');this.value=''" /></label>
-            <div class="progress hidden" id="masaCubuk${tur === "Yazıcı" ? "Y" : "T"}${id}"><div></div></div><div class="note" id="masaDurum${tur === "Yazıcı" ? "Y" : "T"}${id}"></div>`;
+            <div class="progress hidden" id="masaCubuk${tur === "3D Printer" ? "Y" : "T"}${id}"><div></div></div><div class="note" id="masaDurum${tur === "3D Printer" ? "Y" : "T"}${id}"></div>`;
     }
     const YAZICI_UZ = /\.(ctb|cbddlp|photon|photons|pwmx|pwma|pwms|pws|pw0|pwmo|pwmb|pwx|dlp|goo|prz|sl1|sl1s|jxs|fdg|zcode|cws|gcode)$/i;
     async function masaYukle(id, yeniden) {
@@ -888,15 +889,15 @@
     async function masaDosyaYukle(id, liste, tur) {
         let secim = Array.from(liste || []); if (!secim.length) return;
         // Yanlış alana bırakılan dosyalar ayıklanır: CTB tasarım değildir, tasarım da yazıcı dosyası değildir.
-        const yanlis = secim.filter(f => tur === "Yazıcı" ? !YAZICI_UZ.test(f.name) : YAZICI_UZ.test(f.name));
+        const yanlis = secim.filter(f => tur === "3D Printer" ? !YAZICI_UZ.test(f.name) : YAZICI_UZ.test(f.name));
         if (yanlis.length) {
-            bildir(tur === "Yazıcı"
-                ? "Yazıcı bölümüne yalnız CTB / GOO / PWMX gibi baskı dosyaları yüklenir: " + yanlis.map(f => f.name).join(", ")
-                : "CTB / baskı dosyaları tasarım değildir; 3. adımdaki 🖨️ Yazıcı bölümüne yükleyin: " + yanlis.map(f => f.name).join(", "));
+            bildir(tur === "3D Printer"
+                ? "3D Printer bölümüne yalnız CTB / GOO / PWMX gibi baskı dosyaları yüklenir: " + yanlis.map(f => f.name).join(", ")
+                : "CTB / baskı dosyaları tasarım değildir; 3. adımdaki 🖨️ 3D Printer bölümüne yükleyin: " + yanlis.map(f => f.name).join(", "));
             secim = secim.filter(f => !yanlis.includes(f));
             if (!secim.length) return;
         }
-        const ek = tur === "Yazıcı" ? "Y" : "T";
+        const ek = tur === "3D Printer" ? "Y" : "T";
         const cubuk = $("masaCubuk" + ek + id), ic = cubuk.firstElementChild, durum = $("masaDurum" + ek + id);
         masaMesgul = true; cubuk.classList.remove("hidden");
         let tamam = 0, hata = "";
@@ -913,7 +914,7 @@
             });
         }
         masaMesgul = false;
-        bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : tur === "Yazıcı" ? `✔ ${tamam} yazıcı dosyası yüklendi; hekim portalda "3D Yazıcı" bölümünden indirebilir.` : `✔ ${tamam} tasarım dosyası yüklendi. Bittiyse "Tasarımı Teslim Et"e basın.`);
+        bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : tur === "3D Printer" ? `✔ ${tamam} 3D printer dosyası yüklendi; hekim portalda "3D Printer" bölümünden indirebilir.` : `✔ ${tamam} tasarım dosyası yüklendi. Bittiyse "Tasarımı Teslim Et"e basın.`);
         await yukle(true);
         await masaYukle(id, true);
     }
@@ -987,11 +988,11 @@
             <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
                 <label class="lbl">Dosya yükle (tasarım / üretim)</label>
                 <div style="display:flex;gap:8px;flex-wrap:wrap">
-                    <select id="yukTur" class="inp" style="width:auto"><option value="Tasarım">Tasarım</option><option value="Yazıcı">Yazıcı (Elegoo CTB vb.)</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
+                    <select id="yukTur" class="inp" style="width:auto"><option value="Tasarım">Tasarım</option><option value="3D Printer">3D Printer (Elegoo CTB vb.)</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
                     <input id="yukDosya" type="file" multiple class="inp" style="flex:1;padding-top:9px" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo,.ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode" />
                     <button class="btn btn-sm" type="button" style="height:44px" onclick="dosyaYukle(${id})">Yükle</button>
                 </div>
-                <div class="note" style="margin-top:6px">📐 <b>Tasarım</b> ve 🖨️ <b>Yazıcı (CTB)</b> dosyaları yüklenince hekim bunları Hekim Portalı'nda iş kartından doğrudan indirebilir ve bilgilendirilir.</div>
+                <div class="note" style="margin-top:6px">📐 <b>Tasarım</b> ve 🖨️ <b>3D Printer (CTB)</b> dosyaları yüklenince hekim bunları Hekim Portalı'nda iş kartından doğrudan indirebilir ve bilgilendirilir.</div>
                 <div class="progress hidden" id="yukCubuk"><div></div></div>
                 <div class="note" id="yukDurum"></div>
             </div>` : "");

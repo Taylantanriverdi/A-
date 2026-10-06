@@ -16,6 +16,12 @@ public sealed class HekimPaylasimi
         ".pwx", ".dlp", ".goo", ".prz", ".sl1", ".sl1s", ".jxs", ".fdg", ".zcode", ".cws", ".gcode"
     };
 
+    /// <summary>3D printer (reçine yazıcı) baskı dosyalarının dosya türü. Eski kayıtlarda "Yazıcı" olarak geçer.</summary>
+    public const string PrinterTuru = "3D Printer";
+
+    /// <summary>Eski "Yazıcı" adı da 3D Printer sayılır.</summary>
+    public static bool PrinterMi(string? tur) => tur is PrinterTuru or "Yazıcı";
+
     private readonly string _dosya;
     private readonly object _kilit = new();
     private Dictionary<int, Kayit>? _veri;
@@ -74,10 +80,10 @@ public sealed class HekimPaylasimi
     public void DosyaSilindi(int dosyaId) => Kaldir(dosyaId);
 
     /// <summary>Uzantı yazıcı dosyasıysa tür "Yazıcı" olur; değilse istenen tür korunur.</summary>
-    public static string TurBelirle(string tur, string uzanti) => YaziciUzantilari.Contains(uzanti) ? "Yazıcı" : tur;
+    public static string TurBelirle(string tur, string uzanti) => YaziciUzantilari.Contains(uzanti) || PrinterMi(tur) ? PrinterTuru : tur;
 
     /// <summary>Tasarım ve yazıcı dosyaları hekimin indirebileceği "hazır dosyalar"dır.</summary>
-    public static bool HekimeHazir(string? tur) => tur is "Tasarım" or "Yazıcı";
+    public static bool HekimeHazir(string? tur) => tur == "Tasarım" || PrinterMi(tur);
 
     /// <summary>
     /// Teknisyen ya da laboratuvar tasarım/yazıcı dosyası yükleyince hekime açılır ve hekime
@@ -88,8 +94,8 @@ public sealed class HekimPaylasimi
     {
         if (!HekimeHazir(tur)) return;
         Paylas(dosyaId, siparisId, tip, kim);
-        var mesaj = tur == "Yazıcı"
-            ? $"🖨️ Yazıcı dosyası hazır: {ad} — Hekim Portalı'nda bu işin üzerinden indirebilirsiniz."
+        var mesaj = PrinterMi(tur)
+            ? $"🖨️ 3D Printer dosyası hazır: {ad} — Hekim Portalı'nda bu işin üzerinden indirebilirsiniz."
             : $"📐 Tasarım dosyası hazır: {ad} — Hekim Portalı'nda bu işin üzerinden indirebilirsiniz.";
         await Microsoft.EntityFrameworkCore.RelationalDatabaseFacadeExtensions.ExecuteSqlInterpolatedAsync(db.Database, $"""
             INSERT INTO "IsMesajlari" ("SiparisId","GonderenTipi","GonderenAdi","Mesaj","Tarih")

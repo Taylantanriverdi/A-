@@ -664,7 +664,7 @@ public sealed class HekimPortalController : ControllerBase
         var hazir = ids.Length == 0 ? new List<HazirDosyaSatiri>() : await _db.Database.SqlQuery<HazirDosyaSatiri>($"""
             SELECT "Id","SiparisId","DosyaTuru","OrijinalDosyaAdi","Boyut","YuklemeTarihi"
             FROM "IsDosyalari"
-            WHERE "SiparisId" = ANY({ids}) AND "DosyaTuru" IN ('Tasarım','Yazıcı')
+            WHERE "SiparisId" = ANY({ids}) AND "DosyaTuru" IN ('Tasarım','3D Printer','Yazıcı')
             ORDER BY "YuklemeTarihi" DESC,"Id" DESC
             """).ToListAsync(cancellationToken);
         var paylasim = HttpContext.RequestServices.GetRequiredService<HekimPaylasimi>().Tumu();

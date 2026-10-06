@@ -123,4 +123,16 @@ catch (Exception ex)
     app.Logger.LogWarning(ex, "Dosya takibi başlangıç sınırı belirlenemedi.");
 }
 
+// 3D baskı dosyalarının türü "Yazıcı" yerine "3D Printer" olarak adlandırıldı; eski kayıtlar bir kez çevrilir.
+try
+{
+    using var turKapsam = app.Services.CreateScope();
+    var turDb = turKapsam.ServiceProvider.GetRequiredService<PrimerLabV2.Data.PrimerLabDbContext>();
+    turDb.Database.ExecuteSqlRaw("UPDATE \"IsDosyalari\" SET \"DosyaTuru\"='3D Printer' WHERE \"DosyaTuru\"='Yazıcı'");
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning(ex, "Dosya türü dönüşümü yapılamadı.");
+}
+
 app.Run();

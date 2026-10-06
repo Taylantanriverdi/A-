@@ -199,12 +199,12 @@ DOSYA LINKLERI (WeTransfer, Google Drive, Dropbox, iCloud, 3Shape...)
 - Basilan siparis formunda "Dosya linkleri" satiri yer alir.
 - Linklerin suresi dolabilir; dosyalari zamaninda indirin.
 
-TASARIM VE YAZICI (CTB) DOSYASINI HEKIME VERME
+TASARIM VE 3D PRINTER (CTB) DOSYASINI HEKIME VERME
 ----------------------------------------------
 - Teknisyen (Teknisyen Paneli > is > Dosyalar > Dosya yukle) ya da laboratuvar
-  (Is Detayi > Dosyalar) dosya turu olarak "Tasarim" veya "Yazici (Elegoo CTB
+  (Is Detayi > Dosyalar) dosya turu olarak "Tasarim" veya "3D Printer (Elegoo CTB
   vb.)" secip yukler. .ctb, .goo, .pwmx, .prz, .sl1 gibi yazici dosyalari tur
-  secilmese de kendiliginden "Yazici" olarak kaydedilir.
+  secilmese de kendiliginden "3D Printer" olarak kaydedilir.
 - Yuklendigi anda hekim, Hekim Portali > Islerim'de o isin kartinda "Hazir
   dosyalar" seridinde gorur ve tek tikla indirir (isi acmasi gerekmez).
   Indirilmemis dosyada YENI etiketi olur; hekime ayrica is mesaji gider.

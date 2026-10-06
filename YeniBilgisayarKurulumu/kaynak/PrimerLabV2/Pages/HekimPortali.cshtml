@@ -563,7 +563,7 @@
         <!-- İŞLERİM -->
         <section id="islerBolum">
             <div class="ana-ust">
-                <div><div class="ana-selam" id="anaSelam">Hoş geldiniz</div><div class="ana-alt">İşlerinizin durumu, taramalarınız, hazır tasarım ve 3D yazıcı dosyaları burada.</div></div>
+                <div><div class="ana-selam" id="anaSelam">Hoş geldiniz</div><div class="ana-alt">İşlerinizin durumu, taramalarınız, hazır tasarım ve 3D printer dosyaları burada.</div></div>
                 <button class="btn ana-yeni" type="button" onclick="sekme('yeni')">＋ Yeni İş Gönder</button>
             </div>
             <div class="ozet-kutular" id="ozetKutular"></div>
@@ -1322,7 +1322,8 @@
             const [d, c] = durum(j);
             const kal = (j.kalemler || []).map(k => esc(k.isTuru) + " × " + k.adet).join(", ");
             const hazir = j.hazirDosyalar || [];
-            const tasarim = hazir.filter(f => f.dosyaTuru !== "Yazıcı"), yazici = hazir.filter(f => f.dosyaTuru === "Yazıcı");
+            const printerMi = t => t === "3D Printer" || t === "Yazıcı";
+            const tasarim = hazir.filter(f => !printerMi(f.dosyaTuru)), yazici = hazir.filter(f => printerMi(f.dosyaTuru));
             const tarama = Math.max(0, (j.dosyaSayisi || 0) - hazir.length);
             const acik = acikIs === j.id;
             return `<div class="is-kart ${hazirYeni(j) || j.okunmamisMesaj ? "dikkat" : ""}">
@@ -1337,7 +1338,7 @@
                         <div class="dg-bos" style="color:#334155">${tarama ? tarama + " dosya gönderildi" : "Dosya yok"}${j.linkSayisi ? " · 🔗 " + j.linkSayisi + " link" : ""}</div>
                         <button class="pk-link" type="button" onclick="isAc(${j.id})">${acik ? "Gizle" : "Dosyaları gör / link ekle"}</button></div>
                     ${dosyaGrup(j, "📐 Tasarım", tasarim, "Tasarım hazır olunca burada indirilir")}
-                    ${dosyaGrup(j, "🖨️ 3D Yazıcı", yazici, "Baskı dosyası (CTB vb.) hazır olunca burada")}
+                    ${dosyaGrup(j, "🖨️ 3D Printer", yazici, "Baskı dosyası (CTB vb.) hazır olunca burada")}
                 </div>
                 <div class="is-alt">
                     <button class="btn ${j.okunmamisMesaj ? "" : "btn-light"}" type="button" onclick="isAc(${j.id})">💬 Mesajlar${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni</span>` : (j.mesajSayisi ? " (" + j.mesajSayisi + ")" : "")}</button>

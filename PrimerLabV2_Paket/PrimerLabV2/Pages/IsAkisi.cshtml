@@ -361,7 +361,7 @@
     async function dosyalariGetir(id) {
         try {
             const d = await api(`/api/is-akisi/isler/${id}/dosyalar`);
-            const ik = t => t === "Tarama" ? "🦷" : t === "Tasarım" ? "📐" : t === "Yazıcı" ? "🖨️" : "📎";
+            const ik = t => t === "Tarama" ? "🦷" : t === "Tasarım" ? "📐" : (t === "3D Printer" || t === "Yazıcı") ? "🖨️" : "📎";
             $("dDosyalar").innerHTML = (d.dosyalar.map(f => `<a class="dosya" href="/api/is-akisi/dosya/${f.id}"${/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi) ? ` onmouseenter="onizle(this,${f.id},${JSON.stringify(f.orijinalDosyaAdi).replace(/"/g, "&quot;")})" onmouseleave="onizlemeGizle()"` : ""}><span>${ik(f.dosyaTuru)} ${esc(f.orijinalDosyaAdi)}</span><small style="color:var(--muted)">${esc(f.dosyaTuru)} · ${boyut(f.boyut)} ⬇</small></a>`).join("") +
                 d.linkler.map(l => `<a class="dosya" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"><span>🔗 ${esc(l.servis)} — ${esc(l.url)}</span><small style="color:var(--muted)">Aç ↗</small></a>`).join("")) || "Dosya yok.";
         } catch (err) { $("dDosyalar").textContent = err.message; }
