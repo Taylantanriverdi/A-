@@ -1,0 +1,1063 @@
+@page "/teknisyen"
+@inject PrimerLabV2.Infrastructure.FirmaServisi Firma
+@{
+    Layout = null;
+    // Firma Bilgileri (ana program > Firma Bilgileri): ad, logo ve iletişim bilgisi.
+    var firmaAd = Firma.Ad;
+    var firmaBuyuk = firmaAd; // girildiği gibi (Türkçe büyük harf "Studio"yu "STUDİO" yapardı)
+    var firmaLogo = Firma.LogoDataUrl();
+    var firmaKisa = PrimerLabV2.Infrastructure.FirmaServisi.Kisaltma(firmaAd);
+    var firmaIletisim = Firma.IletisimSatiri();
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="theme-color" content="#10233e" />
+    <title>@firmaAd — Teknisyen Paneli</title>
+    <style>
+        :root{--ink:#10233e;--muted:#64748b;--line:#dbe3ef;--bg:#f3f6fb;--card:#fff;--blue:#1565c0;--blue-soft:#eff6ff;--green:#15803d;--green-soft:#ecfdf5;--red:#dc2626;--red-soft:#fef2f2;--amber:#b45309;--amber-soft:#fffbeb;--violet:#6d28d9;--violet-soft:#f5f3ff}
+        *{box-sizing:border-box}
+        html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px;-webkit-text-size-adjust:100%}
+        button,input,select,textarea{font:inherit;color:inherit}
+        .hidden{display:none!important}
+        .wrap{max-width:980px;margin:0 auto;padding:16px}
+        .brand{display:flex;align-items:center;gap:10px}
+        .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900;font-size:15px}
+        .yeni-mesaj{display:inline-block;background:#dc2626;color:#fff;border-radius:99px;padding:0 7px;font-size:11px;font-weight:900;margin-left:4px}
+        .msg-b.hk{background:#fffbeb;border-color:#fde68a}
+        .brand-img{height:40px;max-width:150px;object-fit:contain;border-radius:8px;background:#fff;padding:2px}
+        .firma-iletisim{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center;line-height:1.5}
+        .brand-name{font-weight:900;font-size:16px;line-height:1.1}
+        .brand-sub{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px}
+        .login{min-height:100vh;display:grid;place-items:center;padding:16px}
+        .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
+        .login-card h1{font-size:20px;margin:18px 0 4px}
+        .msg.info{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+        .pk-alt{display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap}
+        .pk-link{background:none;border:0;color:var(--blue);font-weight:800;cursor:pointer;padding:4px 0;font-size:13px}
+        .pk-geri{display:block;width:100%;text-align:center;margin-top:12px;color:var(--muted)}
+        .pk-bilgi{font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.45}
+        .pk-kod{font-size:24px!important;letter-spacing:6px;text-align:center;font-weight:900}
+        .pk-onay{display:flex;gap:9px;align-items:flex-start;font-size:12px;color:#334155;margin:4px 0 14px;line-height:1.4;cursor:pointer}
+        .pk-onay input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:var(--blue)}
+        .pk-gizli{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+        .pk-iki{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+        .pk-iki .field{margin-bottom:12px}
+        .login-card p{margin:0 0 18px;color:var(--muted);font-size:13px}
+        .topbar{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff}
+        .topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:10px;padding-bottom:10px}
+        .topbar .brand-logo{background:#fff;color:var(--ink)}
+        .topbar .brand-sub{color:#b8c4d6}
+        .who{font-size:12px;text-align:right;line-height:1.35}
+        .who b{display:block;font-size:13px}
+        .link-btn{background:none;border:0;color:#b8c4d6;text-decoration:underline;cursor:pointer;padding:0;font-size:12px}
+        .tabs{background:#0b1a2f}
+        .tabs .wrap{display:flex;gap:6px;padding-top:6px;padding-bottom:0}
+        .tab{flex:1;border:0;background:transparent;color:#b8c4d6;padding:11px 8px;font-weight:800;cursor:pointer;border-radius:10px 10px 0 0}
+        .tab.active{background:var(--bg);color:var(--ink)}
+        .field{margin-bottom:12px}
+        label.lbl{display:block;font-size:12px;font-weight:800;color:#334155;margin-bottom:5px}
+        .inp{width:100%;height:44px;border:1px solid #cbd5e1;border-radius:10px;padding:0 12px;background:#fff;outline:none}
+        textarea.inp{height:auto;min-height:70px;padding:10px 12px;resize:vertical}
+        .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(21,101,192,.15)}
+        .btn{height:44px;border:0;border-radius:12px;padding:0 16px;font-weight:900;cursor:pointer;background:var(--blue);color:#fff}
+        .btn:disabled{opacity:.5;cursor:not-allowed}
+        .btn-block{width:100%}
+        .btn-sm{height:36px;padding:0 12px;border-radius:9px;font-size:13px}
+        .btn-light{background:#fff;color:var(--ink);border:1px solid var(--line)}
+        .btn-green{background:var(--green)}
+        .msg{border-radius:12px;padding:11px 13px;font-size:13px;font-weight:700;margin-bottom:12px}
+        .msg.err{background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+        .msg.ok{background:var(--green-soft);color:var(--green);border:1px solid #bbf7d0}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+        .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+        .stat b{display:block;font-size:22px}
+        .stat span{font-size:11px;color:var(--muted);font-weight:800}
+        .toolbar{display:flex;gap:8px;margin-bottom:12px}
+        .job{background:#fff;border:1px solid var(--line);border-radius:16px;margin-bottom:12px;padding:14px}
+        .job.yeni{border-color:#93c5fd;box-shadow:0 0 0 3px rgba(21,101,192,.08)}
+        .job-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+        .job-name{font-weight:900;font-size:16px}
+        .job-sub{font-size:12px;color:var(--muted);margin-top:3px}
+        .late{color:var(--red);font-weight:900}
+        .badge{border-radius:999px;padding:5px 10px;font-size:11px;font-weight:900;white-space:nowrap;background:#e2e8f0;color:#334155}
+        .b-Bekliyor{background:var(--amber-soft);color:var(--amber)}
+        .b-Tasarımda{background:var(--violet-soft);color:var(--violet)}
+        .b-Üretimde,.b-Makyajda{background:var(--blue-soft);color:var(--blue)}
+        .b-Tamamlama{background:#fef9c3;color:#854d0e}
+        .b-Tamamlandı{background:var(--green-soft);color:var(--green)}
+        .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+        .chip{background:#f1f5f9;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:800}
+        .info{font-size:13px;line-height:1.6}
+        .info pre{white-space:pre-wrap;font:inherit;margin:4px 0 0;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px}
+        .steps{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+        .step{border:1px solid #cbd5e1;background:#fff;border-radius:9px;padding:8px 11px;font-size:12px;font-weight:900;cursor:pointer}
+        .step.on{background:var(--ink);border-color:var(--ink);color:#fff}
+        .step:disabled{opacity:.45;cursor:not-allowed}
+        .step.on:disabled{opacity:1;cursor:default}
+        .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+        /* İş masası: indir → yükle → teslim et (tek ekranda) */
+        .masa{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+        @@media(max-width:1000px){.masa{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        @@media(max-width:620px){.masa{grid-template-columns:1fr}}
+        .adim.yazici{background:#faf5ff;border-color:#e9d5ff}
+        .adim.yazici.ok{background:#f3e8ff;border-color:#c084fc}
+        .birak.yz{border-color:#c4b5fd;background:#f5f3ff;color:var(--violet)}
+        .adim{border:1px solid var(--line);border-radius:14px;padding:11px;background:#fbfdff;min-width:0}
+        .adim.ok{border-color:#86efac;background:#f0fdf4}
+        .adim-b{font-weight:900;font-size:13px;margin-bottom:8px;display:flex;gap:6px;align-items:center}
+        .adim-no{width:22px;height:22px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+        .adim.ok .adim-no{background:var(--green)}
+        .md{display:flex;justify-content:space-between;gap:6px;align-items:center;padding:7px 9px;border:1px solid #e2e8f0;border-radius:9px;background:#fff;margin-top:5px;font-size:13px;color:inherit;text-decoration:none;min-width:0}
+        .md:hover{border-color:var(--blue)}
+        .md span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .md small{color:var(--muted);white-space:nowrap}
+        .birak{display:block;border:2px dashed #93c5fd;background:var(--blue-soft);border-radius:12px;padding:14px 10px;text-align:center;color:var(--blue);font-weight:800;cursor:pointer;font-size:13px}
+        .birak.ustunde{background:#dbeafe;border-color:var(--blue)}
+        .teslim-btn{width:100%;height:56px;font-size:14px}
+        .note{font-size:12px;color:var(--muted)}
+        .empty{text-align:center;color:var(--muted);padding:34px 10px;background:#fff;border:1px dashed var(--line);border-radius:16px}
+        .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+        .modal-box{background:#fff;width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px}
+        .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+        .modal-head h3{margin:0;font-size:16px}
+        .x{border:0;background:#f1f5f9;border-radius:9px;width:34px;height:34px;font-size:18px;cursor:pointer}
+        .file{display:flex;justify-content:space-between;gap:8px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13px}
+        .file a{color:var(--blue);font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .file small{color:var(--muted);flex:none}
+        .msgs{display:grid;gap:6px;margin:8px 0;max-height:46vh;overflow:auto}
+        .msg-b{max-width:85%;padding:7px 10px;border-radius:12px;background:#f8fafc;border:1px solid var(--line);white-space:pre-wrap;font-size:13px}
+        .msg-b.me{margin-left:auto;background:var(--blue-soft);border-color:#bfdbfe}
+        .msg-b small{display:block;color:var(--muted);font-size:10px;font-weight:700}
+        .progress{height:8px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin:8px 0}
+        .progress div{height:100%;width:0;background:var(--blue);transition:width .2s}
+        .form-satir{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+        .form-satir .job-top{align-items:center}
+        .sf{font-size:13px;line-height:1.5}
+        .sf table{width:100%;border-collapse:collapse;margin:8px 0}
+        .sf td,.sf th{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+        .sf th{background:#f8fafc;width:34%;font-size:12px}
+        .sf pre{white-space:pre-wrap;font:inherit;margin:0}
+        .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:700;z-index:60;max-width:92vw}
+        @@media (min-width:700px){.modal{align-items:center}.modal-box{border-radius:18px}}
+        @@media (max-width:620px){.wrap{padding:12px}.stats{grid-template-columns:repeat(2,1fr)}}
+    </style>
+</head>
+<body>
+
+<section id="loginScreen" class="login hidden">
+    <form class="login-card" onsubmit="girisYap(event)">
+        <div class="brand">
+            @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+            <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+        </div>
+        <h1>Teknisyen girişi</h1>
+        <p>Kullanıcı adınız ve şifrenizle giriş yapın. Hesabınız yoksa aşağıdan kendiniz kayıt olabilirsiniz.</p>
+        <div id="loginMsg" class="msg err hidden"></div>
+        <div id="sifreAdimi">
+        <div class="field">
+            <label class="lbl" for="loginUser">Kullanıcı adı</label>
+            <input id="loginUser" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+        </div>
+        <div class="field">
+            <label class="lbl" for="loginPass">Şifre</label>
+            <input id="loginPass" class="inp" type="password" autocomplete="current-password" required />
+        </div>
+        </div>
+        <div id="kodAdimi" class="hidden">
+            <div id="pkEpostaAlani" class="hidden">
+                <p class="pk-bilgi">Güvenliğiniz için girişte e-posta adresinize tek kullanımlık kod gönderiyoruz. Bir kez e-posta adresinizi yazın ve gelen kodla onaylayın.</p>
+                <div class="field">
+                    <label class="lbl" for="pkGirisEposta">E-posta adresiniz</label>
+                    <input id="pkGirisEposta" class="inp" type="email" autocomplete="email" placeholder="ornek@@klinik.com" />
+                </div>
+            </div>
+            <div id="pkKodAlani" class="hidden">
+                <p id="pkKodBilgi" class="pk-bilgi"></p>
+                <div class="field">
+                    <label class="lbl" for="pkGirisKod">E-postadaki 6 haneli kod</label>
+                    <input id="pkGirisKod" class="inp pk-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+                </div>
+                <label id="pkHatirlaSatir" class="pk-onay"><input id="pkHatirla" type="checkbox" /> <span id="pkHatirlaMetin">Bu cihazı hatırla</span></label>
+                <button type="button" class="pk-link" onclick="pkKodTekrar()">Kod gelmedi mi? Tekrar gönder</button>
+            </div>
+        </div>
+        <button id="loginBtn" class="btn btn-block" type="submit">Giriş Yap</button>
+        <div id="pkAltLinkler" class="pk-alt">
+            <button type="button" class="pk-link" id="pkSifreLink" onclick="pkAc('sifre')">Şifremi unuttum</button>
+            <button type="button" class="pk-link" id="pkKayitLink" onclick="pkAc('kayit')">Hesabınız yok mu? <b>Kayıt olun</b></button>
+        </div>
+        <button id="pkGirisGeri" class="pk-link pk-geri hidden" type="button" onclick="pkGirisSifirla();pkMsg('loginMsg','')">&larr; Kullanıcı adı ve şifreye dön</button>
+        @if (!string.IsNullOrEmpty(firmaIletisim)) { <div class="firma-iletisim">@firmaIletisim</div> }
+    </form>
+</section>
+
+<!-- KAYIT OL -->
+<section id="kayitScreen" class="login hidden">
+    <form class="login-card" onsubmit="pkKayit(event)">
+        <div class="brand">
+            @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+            <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+        </div>
+        <h1>Yeni hesap</h1>
+        <p>Bilgilerinizi doldurun; e-postanıza gelen kodla hesabınızı onaylayın. Kullanıcı adınızı ve şifrenizi kendiniz belirlersiniz.</p>
+        <div id="kayitMsg" class="msg err hidden"></div>
+        <div id="kayitForm">
+            <div class="field">
+                <label class="lbl" for="kAdSoyad">Ad soyad</label>
+                <input id="kAdSoyad" class="inp" autocomplete="name" maxlength="150" required />
+            </div>
+            <div class="pk-iki">
+                <div class="field">
+                    <label class="lbl" for="kTelefon">Telefon</label>
+                    <input id="kTelefon" class="inp" type="tel" autocomplete="tel" maxlength="30" />
+                </div>
+                <div class="field">
+                    <label class="lbl" for="kEposta">E-posta</label>
+                    <input id="kEposta" class="inp" type="email" autocomplete="email" maxlength="160" required />
+                </div>
+            </div>
+            <div class="field">
+                <label class="lbl" for="kKullanici">Kullanıcı adı</label>
+                <input id="kKullanici" class="inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" pattern="[a-zA-Z0-9._\-]{3,64}" title="3-64 karakter: harf, rakam, nokta, alt çizgi, tire" required />
+            </div>
+            <div class="pk-iki">
+                <div class="field">
+                    <label class="lbl" for="kParola">Şifre</label>
+                    <input id="kParola" class="inp" type="password" autocomplete="new-password" minlength="8" required />
+                </div>
+                <div class="field">
+                    <label class="lbl" for="kParola2">Şifre (tekrar)</label>
+                    <input id="kParola2" class="inp" type="password" autocomplete="new-password" minlength="8" required />
+                </div>
+            </div>
+            <p class="pk-bilgi" style="margin-top:-4px">Şifre en az 8 karakter; en az bir harf ve bir rakam.</p>
+            <div class="pk-gizli" aria-hidden="true"><label>Web sitesi <input id="kWebsite" tabindex="-1" autocomplete="off" /></label></div>
+            <label class="pk-onay"><input id="kKvkk" type="checkbox" /> <span>Ad, telefon ve e-posta bilgilerimin iş takibi ve iletişim amacıyla @firmaAd tarafından işlenmesini kabul ediyorum.</span></label>
+        </div>
+        <div id="kayitKodAlani" class="hidden">
+            <p id="kayitKodBilgi" class="pk-bilgi"></p>
+            <div class="field">
+                <label class="lbl" for="kKod">E-postadaki 6 haneli kod</label>
+                <input id="kKod" class="inp pk-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+            </div>
+        </div>
+        <button id="kayitBtn" class="btn btn-block" type="submit">Kayıt Ol</button>
+        <button type="button" class="pk-link pk-geri" onclick="pkEkran('login')">&larr; Girişe dön</button>
+    </form>
+</section>
+
+<!-- ŞİFREMİ UNUTTUM -->
+<section id="sifreScreen" class="login hidden">
+    <form class="login-card" onsubmit="pkSifre(event)">
+        <div class="brand">
+            @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+            <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+        </div>
+        <h1>Şifremi unuttum</h1>
+        <p>Kullanıcı adınızı veya kayıtlı e-posta adresinizi yazın; e-postanıza şifre yenileme kodu gönderelim.</p>
+        <div id="sifreMsg" class="msg err hidden"></div>
+        <div id="sifreAdim1">
+            <div class="field">
+                <label class="lbl" for="sKimlik">Kullanıcı adı veya e-posta</label>
+                <input id="sKimlik" class="inp" autocapitalize="none" spellcheck="false" maxlength="160" />
+            </div>
+        </div>
+        <div id="sifreAdim2" class="hidden">
+            <div class="field">
+                <label class="lbl" for="sKod">E-postadaki 6 haneli kod</label>
+                <input id="sKod" class="inp pk-kod" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000" />
+            </div>
+            <div class="pk-iki">
+                <div class="field">
+                    <label class="lbl" for="sYeni">Yeni şifre</label>
+                    <input id="sYeni" class="inp" type="password" autocomplete="new-password" />
+                </div>
+                <div class="field">
+                    <label class="lbl" for="sYeni2">Yeni şifre (tekrar)</label>
+                    <input id="sYeni2" class="inp" type="password" autocomplete="new-password" />
+                </div>
+            </div>
+        </div>
+        <button id="sifreBtn" class="btn btn-block" type="submit">Kod Gönder</button>
+        <button type="button" class="pk-link pk-geri" onclick="pkEkran('login')">&larr; Girişe dön</button>
+    </form>
+</section>
+
+
+<div id="appScreen" class="hidden">
+    <header class="topbar">
+        <div class="wrap">
+            <div class="brand">
+                @if (firmaLogo != null) { <img class="brand-img" src="@firmaLogo" alt="@firmaAd" /> } else { <div class="brand-logo">@firmaKisa</div> }
+                <div><div class="brand-name">@firmaBuyuk</div><div class="brand-sub">TEKNİSYEN PANELİ</div></div>
+            </div>
+            <div class="who"><b id="whoName">-</b><span id="whoTip"></span> <button class="link-btn" type="button" onclick="cikisYap()">Çıkış</button></div>
+        </div>
+        <nav class="tabs"><div class="wrap">
+            <button class="tab active" id="tabAktif" type="button" onclick="sekme('aktif')">🛠️ Devam Eden</button>
+            <button class="tab" id="tabBiten" type="button" onclick="sekme('biten')">✅ Tamamlanan</button>
+            <button class="tab hidden" id="tabFormlar" type="button" onclick="sekme('formlar')">📄 Sipariş Formları</button>
+        </div></nav>
+    </header>
+
+    <main class="wrap hidden" id="formlarBolum">
+        <div class="toolbar">
+            <input id="formAra" class="inp" placeholder="İş no, hasta, hekim veya iş türü ara" oninput="formAraGecikmeli()" />
+            <a class="btn" style="display:inline-grid;place-items:center;text-decoration:none;white-space:nowrap" href="/hekim-portal?mod=teknisyen">＋ Yeni Sipariş</a>
+        </div>
+        <div id="formListe"><div class="empty">Yükleniyor...</div></div>
+        <div id="formDevam" class="hidden" style="text-align:center;margin:10px 0 20px"><button class="btn btn-light" type="button" onclick="formlariYukle(true)">Daha fazla göster</button></div>
+    </main>
+
+    <main class="wrap" id="islerBolum">
+        <div class="stats">
+            <div class="stat"><b id="stYeni">0</b><span>YENİ / BEKLEYEN</span></div>
+            <div class="stat"><b id="stDevam">0</b><span>DEVAM EDEN</span></div>
+            <div class="stat"><b id="stOnay">0</b><span>ONAY BEKLEYEN</span></div>
+            <div class="stat"><b id="stGec">0</b><span>TESLİMİ GECİKEN</span></div>
+        </div>
+        <div class="toolbar">
+            <input id="ara" class="inp" placeholder="Hasta, hekim veya iş türü ara" oninput="ciz()" />
+            <button class="btn btn-light" type="button" onclick="yukle()">Yenile</button>
+        </div>
+        <div id="liste"><div class="empty">Yükleniyor...</div></div>
+    </main>
+</div>
+
+<div id="modal" class="modal hidden" onclick="if(event.target===this)modalKapat()">
+    <div class="modal-box">
+        <div class="modal-head"><h3 id="modalBaslik">-</h3><button class="x" type="button" onclick="modalKapat()">×</button></div>
+        <div id="modalIcerik"></div>
+    </div>
+</div>
+
+<script>
+    // İç teknisyen üretim aşamalarını da yürütür; dış teknisyen tasarımı teslim eder, üretimi laboratuvar yapar.
+    const ADIMLAR_IC = ["Bekliyor", "Tasarımda", "Üretimde", "Makyajda", "Tamamlama Onayı"];
+    const ADIMLAR_DIS = ["Bekliyor", "Tasarımda"];
+    let ben = null;
+    let isler = [];
+    let gorunum = "aktif";
+    let acikModal = null;
+    let yenilemeZamani = null;
+    let sonOkunmamis = null;
+    let bilinenIsler = null;
+
+    const $ = id => document.getElementById(id);
+    const esc = v => String(v == null ? "" : v).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    const tarih = v => { if (!v) return "-"; const d = new Date(v); return isNaN(d) ? "-" : d.toLocaleDateString("tr-TR"); };
+    const boyut = b => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+
+    function bildir(t) {
+        document.querySelectorAll(".toast").forEach(x => x.remove());
+        const el = document.createElement("div"); el.className = "toast"; el.textContent = t;
+        document.body.appendChild(el); setTimeout(() => el.remove(), 3200);
+    }
+
+    async function api(url, opt) {
+        const r = await fetch(url, Object.assign({ cache: "no-store", credentials: "same-origin" }, opt || {}));
+        if (r.status === 401) { girisEkrani(); throw new Error("Oturum sona erdi, tekrar giriş yapın."); }
+        if (!r.ok) throw new Error((await r.text()) || ("İşlem başarısız (" + r.status + ")"));
+        const t = r.headers.get("content-type") || "";
+        return t.includes("json") ? r.json() : r.text();
+    }
+
+    function girisEkrani() {
+        clearInterval(yenilemeZamani);
+        $("appScreen").classList.add("hidden");
+        pkEkran("login");
+        setTimeout(() => $("loginUser").focus(), 50);
+    }
+
+    async function girisYap(e) {
+        e.preventDefault();
+        const m = $("loginMsg"); m.classList.add("hidden");
+        const btn = $("loginBtn"); btn.disabled = true; btn.textContent = "Giriş yapılıyor...";
+        try {
+            if (pkGiris) { await pkKodAdimi(); return; }
+            const r = await fetch("/api/teknisyen-portal/login", {
+                method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+                body: JSON.stringify({ kullaniciAdi: $("loginUser").value.trim(), parola: $("loginPass").value })
+            });
+            if (!r.ok) throw new Error((await r.text()) || "Giriş yapılamadı.");
+            $("loginPass").value = "";
+            await pkGirisCevabi(await r.json().catch(() => ({})));
+        } catch (err) { m.textContent = err.message; m.classList.remove("hidden"); }
+        finally { btn.disabled = false; btn.textContent = pkButon(); }
+    }
+
+    // ---------- Giriş: e-posta kodu, kendi kendine kayıt, şifremi unuttum ----------
+    const PK_API = "/api/teknisyen-portal";
+    let pkGiris = null;      // parola sonrası adım: { tur: "eposta-gir" | "eposta-kod", jeton, ... }
+    let pkKayitJeton = null; // kayıtta e-posta kodu bekleniyor
+    let pkSifreJeton = null; // şifre yenilemede kod bekleniyor
+    function pkMsg(id, text, tur) {
+        const m = $(id);
+        if (!text) { m.classList.add("hidden"); return; }
+        m.className = "msg " + (tur || "err");
+        m.textContent = text;
+    }
+    async function pkPost(yol, govde) {
+        const r = await fetch(PK_API + yol, {
+            method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin",
+            body: JSON.stringify(govde || {})
+        });
+        const metin = await r.text();
+        if (!r.ok) {
+            const err = new Error(metin || "İşlem başarısız.");
+            err.sureDoldu = r.status === 401 && /^(Süre doldu|Çok fazla hatalı kod)/.test(metin);
+            throw err;
+        }
+        try { return JSON.parse(metin); } catch { return {}; }
+    }
+    function pkEkran(ad) {
+        $("loginScreen").classList.toggle("hidden", ad !== "login");
+        $("kayitScreen").classList.toggle("hidden", ad !== "kayit");
+        $("sifreScreen").classList.toggle("hidden", ad !== "sifre");
+        pkMsg("kayitMsg", ""); pkMsg("sifreMsg", "");
+        if (ad === "kayit") { pkKayitJeton = null; $("kayitForm").classList.remove("hidden"); $("kayitKodAlani").classList.add("hidden"); $("kayitBtn").textContent = "Kayıt Ol"; setTimeout(() => $("kAdSoyad").focus(), 50); }
+        if (ad === "sifre") { pkSifreJeton = null; $("sifreAdim1").classList.remove("hidden"); $("sifreAdim2").classList.add("hidden"); $("sifreBtn").textContent = "Kod Gönder"; setTimeout(() => $("sKimlik").focus(), 50); }
+        if (ad === "login") { pkGirisSifirla(); pkDurumYukle(); }
+    }
+    let pkDurum = null;
+    async function pkDurumYukle() {
+        try { pkDurum = await (await fetch(PK_API + "/kayit/durum", { cache: "no-store" })).json(); } catch {}
+        return pkDurum;
+    }
+    // Bağlantılar her zaman görünür; kayıt / şifre yenileme kapalıysa nedeni açıklanır.
+    async function pkAc(ad) {
+        const d = await pkDurumYukle();
+        if (ad === "kayit" && d && !d.kayitAcik) {
+            pkMsg("loginMsg", d.sifreSifirlama
+                ? "Yeni kayıt şu anda kapalı. Hesap açmak için lütfen laboratuvarla görüşün."
+                : "Kayıt henüz açılmadı: laboratuvarın e-posta ayarı yapılınca buradan kendiniz kayıt olabileceksiniz. Şimdilik hesap için laboratuvarla görüşün.", "info");
+            return;
+        }
+        if (ad === "sifre" && d && !d.sifreSifirlama) {
+            pkMsg("loginMsg", "Şifre yenileme henüz açılmadı (laboratuvarın e-posta ayarı yapılmamış). Yeni şifre için laboratuvarla görüşün.", "info");
+            return;
+        }
+        pkEkran(ad);
+    }
+    function pkButon() {
+        return !pkGiris ? "Giriş Yap" : pkGiris.tur === "eposta-gir" ? "Kodu Gönder" : "Doğrula ve Giriş Yap";
+    }
+    function pkGirisSifirla() {
+        pkGiris = null;
+        $("sifreAdimi").classList.remove("hidden");
+        $("kodAdimi").classList.add("hidden");
+        $("pkGirisGeri").classList.add("hidden");
+        $("pkAltLinkler").classList.remove("hidden");
+        $("loginUser").required = true; $("loginPass").required = true;
+        $("pkGirisKod").value = "";
+        $("loginBtn").textContent = pkButon();
+    }
+    function pkGirisAdim(d) {
+        pkGiris = { tur: d.ikiAdim, jeton: d.jeton };
+        const kodMu = d.ikiAdim === "eposta-kod";
+        $("sifreAdimi").classList.add("hidden");
+        $("kodAdimi").classList.remove("hidden");
+        $("pkGirisGeri").classList.remove("hidden");
+        $("pkAltLinkler").classList.add("hidden");
+        $("loginUser").required = false; $("loginPass").required = false;
+        $("pkEpostaAlani").classList.toggle("hidden", kodMu);
+        $("pkKodAlani").classList.toggle("hidden", !kodMu);
+        if (kodMu) {
+            $("pkKodBilgi").textContent = (d.eposta || "E-posta") + " adresine 6 haneli giriş kodu gönderdik. Birkaç dakika içinde gelmezse gereksiz (spam) klasörüne bakın.";
+            const gun = Number(d.hatirlaGun || 0);
+            $("pkHatirlaSatir").classList.toggle("hidden", gun <= 0);
+            $("pkHatirlaMetin").textContent = "Bu cihazı " + gun + " gün hatırla (bu süre içinde kod sorulmaz)";
+            $("pkGirisKod").value = "";
+            setTimeout(() => $("pkGirisKod").focus(), 50);
+        } else {
+            if (d.oneri) $("pkGirisEposta").value = d.oneri;
+            setTimeout(() => $("pkGirisEposta").focus(), 50);
+        }
+        $("loginBtn").textContent = pkButon();
+    }
+    async function pkGirisCevabi(d) {
+        if (d && (d.ikiAdim === "eposta-kod" || d.ikiAdim === "eposta-gir")) { pkGirisAdim(d); return; }
+        pkGirisSifirla();
+        await basla();
+    }
+    async function pkKodAdimi() {
+        if (pkGiris.tur === "eposta-gir") {
+            const e = $("pkGirisEposta").value.trim();
+            if (!e) throw new Error("E-posta adresinizi yazın.");
+            try { pkGirisAdim(await pkPost("/login/eposta", { jeton: pkGiris.jeton, eposta: e })); }
+            catch (err) { if (/^Süre doldu/.test(err.message)) pkGirisSifirla(); throw err; }
+            return;
+        }
+        const kod = $("pkGirisKod").value.replace(/\D/g, "");
+        if (kod.length !== 6) throw new Error("E-postanıza gelen 6 haneli kodu girin.");
+        try {
+            await pkPost("/login/kod", { jeton: pkGiris.jeton, kod, hatirla: $("pkHatirla").checked });
+        } catch (err) {
+            if (err.sureDoldu) pkGirisSifirla();
+            $("pkGirisKod").value = "";
+            throw err;
+        }
+        pkGirisSifirla();
+        await basla();
+    }
+    async function pkKodTekrar() {
+        try { await pkPost("/login/kod-tekrar", { jeton: pkGiris && pkGiris.jeton }); pkMsg("loginMsg", "Yeni kod gönderildi. Son gelen kodu girin.", "ok"); }
+        catch (e) { pkMsg("loginMsg", e.message); }
+    }
+
+    // Bot engeli (iş kanıtı): sunucunun verdiği metin için SHA-256 özeti belirli sayıda sıfır bitle
+    // başlayan bir sayı aranır. Normal bir kişi için yaklaşık 1 saniye sürer.
+    const PK_K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+    const PK_W = new Uint32Array(64);
+    function pkSha256Ilk(s) {
+        const W = PK_W; W.fill(0);
+        const L = s.length;
+        for (let i = 0; i < L; i++) W[i >> 2] |= s.charCodeAt(i) << (24 - 8 * (i & 3));
+        W[L >> 2] |= 0x80 << (24 - 8 * (L & 3));
+        W[15] = L * 8;
+        for (let i = 16; i < 64; i++) {
+            const x = W[i - 15], y = W[i - 2];
+            const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+            const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+            W[i] = (W[i - 16] + s0 + W[i - 7] + s1) | 0;
+        }
+        let a = 0x6a09e667, b = 0xbb67ae85, c = 0x3c6ef372, d = 0xa54ff53a, e = 0x510e527f, f = 0x9b05688c, g = 0x1f83d9ab, h = 0x5be0cd19;
+        for (let i = 0; i < 64; i++) {
+            const S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+            const t1 = (h + S1 + ((e & f) ^ (~e & g)) + PK_K[i] + W[i]) | 0;
+            const S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+            const t2 = (S0 + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+            h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+        }
+        return (0x6a09e667 + a) >>> 0;
+    }
+    async function pkZorluk() {
+        const r = await fetch(PK_API + "/kayit/zorluk", { cache: "no-store" });
+        if (!r.ok) throw new Error((await r.text()) || "Güvenlik kontrolü başlatılamadı.");
+        const z = await r.json();
+        let n = 0;
+        for (;;) {
+            for (let i = 0; i < 25000; i++, n++)
+                if ((pkSha256Ilk(z.tuz + ":" + n) >>> (32 - z.bit)) === 0) return { zorlukJeton: z.jeton, zorlukCevap: String(n) };
+            await new Promise(res => setTimeout(res, 0));
+        }
+    }
+
+    async function pkKayit(e) {
+        e.preventDefault();
+        pkMsg("kayitMsg", "");
+        const btn = $("kayitBtn"); btn.disabled = true;
+        try {
+            if (!pkKayitJeton) {
+                if ($("kParola").value !== $("kParola2").value) throw new Error("Şifreler aynı değil.");
+                if (!$("kKvkk").checked) throw new Error("Devam etmek için bilgilendirme metnini onaylayın.");
+                btn.textContent = "Güvenlik kontrolü...";
+                const z = await pkZorluk();
+                btn.textContent = "Gönderiliyor...";
+                const d = await pkPost("/kayit/basla", Object.assign({
+                    adSoyad: $("kAdSoyad").value.trim(), 
+                    telefon: $("kTelefon").value.trim(), eposta: $("kEposta").value.trim(),
+                    kullaniciAdi: $("kKullanici").value.trim(), parola: $("kParola").value,
+                    kvkk: $("kKvkk").checked, website: $("kWebsite").value
+                }, z));
+                pkKayitJeton = d.jeton;
+                $("kayitForm").classList.add("hidden");
+                $("kayitKodAlani").classList.remove("hidden");
+                $("kayitKodBilgi").textContent = (d.eposta || "E-posta") + " adresine 6 haneli doğrulama kodu gönderdik (10 dakika geçerli). Gelmezse gereksiz (spam) klasörüne bakın.";
+                $("kKod").value = ""; setTimeout(() => $("kKod").focus(), 50);
+            } else {
+                const kod = $("kKod").value.replace(/\D/g, "");
+                if (kod.length !== 6) throw new Error("E-postanıza gelen 6 haneli kodu girin.");
+                const d = await pkPost("/kayit/tamamla", { jeton: pkKayitJeton, kod });
+                pkKayitJeton = null;
+                $("kParola").value = ""; $("kParola2").value = "";
+                if (d.onayBekliyor) { pkEkran("login"); pkMsg("loginMsg", d.message || "Kaydınız alındı; laboratuvar onayından sonra giriş yapabilirsiniz.", "ok"); return; }
+                $("kayitScreen").classList.add("hidden");
+                await basla();
+            }
+        } catch (err) {
+            if (err.sureDoldu || /^Bu kullanıcı adı az önce/.test(err.message)) { pkKayitJeton = null; $("kayitForm").classList.remove("hidden"); $("kayitKodAlani").classList.add("hidden"); }
+            pkMsg("kayitMsg", err.message);
+        } finally {
+            btn.disabled = false; btn.textContent = pkKayitJeton ? "Hesabı Onayla" : "Kayıt Ol";
+        }
+    }
+
+    async function pkSifre(e) {
+        e.preventDefault();
+        pkMsg("sifreMsg", "");
+        const btn = $("sifreBtn"); btn.disabled = true;
+        try {
+            if (!pkSifreJeton) {
+                const kimlik = $("sKimlik").value.trim();
+                if (!kimlik) throw new Error("Kullanıcı adınızı veya e-posta adresinizi yazın.");
+                btn.textContent = "Güvenlik kontrolü...";
+                const z = await pkZorluk();
+                const d = await pkPost("/sifre/basla", Object.assign({ kimlik }, z));
+                pkSifreJeton = d.jeton;
+                $("sifreAdim1").classList.add("hidden"); $("sifreAdim2").classList.remove("hidden");
+                pkMsg("sifreMsg", "Bu bilgilerle kayıtlı bir hesap varsa, hesabın e-posta adresine kod gönderildi. Gelmezse gereksiz (spam) klasörüne bakın.", "ok");
+                setTimeout(() => $("sKod").focus(), 50);
+            } else {
+                const kod = $("sKod").value.replace(/\D/g, "");
+                if (kod.length !== 6) throw new Error("E-postanıza gelen 6 haneli kodu girin.");
+                if ($("sYeni").value !== $("sYeni2").value) throw new Error("Yeni şifreler aynı değil.");
+                await pkPost("/sifre/tamamla", { jeton: pkSifreJeton, kod, yeniParola: $("sYeni").value });
+                pkSifreJeton = null; $("sYeni").value = ""; $("sYeni2").value = ""; $("sKod").value = "";
+                pkEkran("login");
+                pkMsg("loginMsg", "Şifreniz yenilendi. Yeni şifrenizle giriş yapabilirsiniz.", "ok");
+            }
+        } catch (err) {
+            if (err.sureDoldu) { pkSifreJeton = null; $("sifreAdim1").classList.remove("hidden"); $("sifreAdim2").classList.add("hidden"); }
+            pkMsg("sifreMsg", err.message);
+        } finally {
+            btn.disabled = false; btn.textContent = pkSifreJeton ? "Şifreyi Yenile" : "Kod Gönder";
+        }
+    }
+
+    async function cikisYap() {
+        const yonetici = !!(ben && ben.yoneticiGorunumu);
+        try { await fetch("/api/teknisyen-portal/logout", { method: "POST", credentials: "same-origin" }); } catch {}
+        document.getElementById("yoneticiSerit")?.remove();
+        ben = null; bilinenIsler = null; girisEkrani();
+        if (yonetici) window.close();
+    }
+
+    async function basla() {
+        try {
+            const r = await fetch("/api/teknisyen-portal/me", { cache: "no-store", credentials: "same-origin" });
+            if (!r.ok) { girisEkrani(); return; }
+            ben = await r.json();
+        } catch { girisEkrani(); return; }
+        $("loginScreen").classList.add("hidden");
+        $("appScreen").classList.remove("hidden");
+        $("whoName").textContent = ben.adSoyad;
+        $("whoTip").textContent = ben.tip === "dis" ? "Dış teknisyen" : "İç teknisyen";
+        $("tabFormlar").classList.toggle("hidden", ben.tip === "dis");
+        // Yönetici ana programdan bu teknisyenin paneline girdiyse üstte uyarı şeridi.
+        let serit = document.getElementById("yoneticiSerit");
+        if (ben.yoneticiGorunumu) {
+            if (!serit) { serit = document.createElement("div"); serit.id = "yoneticiSerit"; document.body.prepend(serit); }
+            serit.style.cssText = "background:#4338ca;color:#fff;padding:9px 14px;font-size:13px;font-weight:700;text-align:center;position:sticky;top:0;z-index:50";
+            serit.innerHTML = `👁 Yönetici görünümü — <b>${esc(ben.adSoyad)}</b> adlı teknisyenin paneli. İşlemler bu teknisyen adına yapılır; yazdığınız mesajlar laboratuvardan gider. <button type="button" onclick="cikisYap()" style="margin-left:10px;background:#fff;color:#4338ca;border:0;border-radius:6px;padding:3px 10px;font-weight:800;cursor:pointer">Görünümden çık</button>`;
+            $("whoTip").textContent = (ben.tip === "dis" ? "Dış teknisyen" : "İç teknisyen") + " · yönetici görünümü";
+        } else if (serit) serit.remove();
+        await yukle();
+        clearInterval(yenilemeZamani);
+        yenilemeZamani = setInterval(() => { if (!acikModal && !masaMesgul && document.visibilityState === "visible") { masaDosya.clear(); yukle(true); } }, 60000);
+    }
+
+    function sekme(ad) {
+        gorunum = ad;
+        $("tabAktif").classList.toggle("active", ad === "aktif");
+        $("tabBiten").classList.toggle("active", ad === "biten");
+        $("tabFormlar").classList.toggle("active", ad === "formlar");
+        $("formlarBolum").classList.toggle("hidden", ad !== "formlar");
+        $("islerBolum").classList.toggle("hidden", ad === "formlar");
+        if (ad === "formlar") { formlariYukle(); return; }
+        ciz();
+    }
+
+    // ---------- Sipariş formları (iç teknisyen: tüm işler, fiyatsız) ----------
+    let formlar = [], formSayfa = 0, formZaman = null;
+    function formAraGecikmeli() { clearTimeout(formZaman); formZaman = setTimeout(() => formlariYukle(), 300); }
+    async function formlariYukle(devam) {
+        formSayfa = devam ? formSayfa + 1 : 0;
+        if (!devam) $("formListe").innerHTML = '<div class="empty">Yükleniyor...</div>';
+        try {
+            const d = await api("/api/teknisyen-portal/siparis-formlari?sayfa=" + formSayfa + "&ara=" + encodeURIComponent($("formAra").value.trim()));
+            formlar = devam ? formlar.concat(d.formlar) : d.formlar;
+            $("formDevam").classList.toggle("hidden", !d.devami);
+            $("formListe").innerHTML = formlar.length ? formlar.map(f => `<div class="form-satir">
+                <div class="job-top">
+                    <div><div class="job-name">#${f.id} · ${esc(f.hastaAdi)}</div>
+                    <div class="job-sub">${esc(f.hekimAdi)}${f.klinikAdi ? " · " + esc(f.klinikAdi) : ""} · ${tarih(f.olusturmaTarihi)} · Teslim: ${tarih(f.terminTarihi)}</div>
+                    <div class="job-sub">${esc(f.kalemler || "-")}</div></div>
+                    <span class="badge ${esc(f.onayDurumu === "Gelen Onay" ? "b-Bekliyor" : "b-" + f.durum)}">${esc(f.onayDurumu === "Gelen Onay" ? "Onay bekliyor" : f.onayDurumu === "Reddedildi" ? "Reddedildi" : f.durum)}</span>
+                </div>
+                <div class="actions">
+                    <button class="btn btn-light btn-sm" type="button" onclick="formGoster(${f.id})">📄 Formu Gör / Yazdır</button>
+                    <button class="btn btn-light btn-sm" type="button" onclick="formDosyalari(${f.id})">📎 Dosyalar (${f.dosyaSayisi})</button>
+                </div></div>`).join("") : '<div class="empty">Sipariş formu bulunamadı.</div>';
+        } catch (err) { $("formListe").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+    function formHtml(f) {
+        const satir = (b, v) => `<tr><th>${b}</th><td>${v}</td></tr>`;
+        return `<div class="sf"><table>
+            ${satir("İş no", "#" + f.id)}
+            ${satir("Hekim", esc(f.hekimAdi) + (f.klinikAdi ? " — " + esc(f.klinikAdi) : ""))}
+            ${satir("Hasta", esc(f.hastaAdi))}
+            ${satir("Sipariş tarihi", tarih(f.olusturmaTarihi))}
+            ${satir("Teslim tarihi", tarih(f.terminTarihi))}
+            ${satir("İş / kalemler", esc(f.kalemler || "-"))}
+            ${satir("Dişler", esc(f.disSemasi || "-"))}
+            ${satir("Renk", esc(f.disRengi || "-"))}
+            ${satir("Materyal", esc(f.materyal || "-"))}
+            ${satir("Teknisyen", esc(f.teknisyenAdi || "-"))}
+            ${satir("Durum", esc(f.onayDurumu === "Gelen Onay" ? "Laboratuvar onayı bekliyor" : f.durum))}
+            ${satir("Kaynak", esc(f.kaynak || "-"))}
+            ${satir("Notlar", f.notlar ? "<pre>" + esc(f.notlar) + "</pre>" : "-")}
+        </table></div>`;
+    }
+    function formGoster(id) {
+        const f = formlar.find(x => x.id === id); if (!f) return;
+        acikModal = { tur: "form", id };
+        modalAc(`#${id} · ${f.hastaAdi} — Sipariş Formu`, formHtml(f) +
+            `<div class="actions"><button class="btn btn-sm" type="button" onclick="formYazdir(${id})">🖨️ Yazdır</button></div>`);
+    }
+    // Firma Bilgileri (ana program > Firma Bilgileri)
+    const FIRMA = @Html.Raw(Firma.IstemciJson());
+    function firmaBasligi() {
+        const il = [FIRMA.adres, FIRMA.telefon, FIRMA.eposta, FIRMA.web].filter(Boolean).map(esc).join(" · ");
+        return `<div class="fb">${FIRMA.logo ? `<img src="${FIRMA.logo}" alt="">` : ""}<div><div class="ad">${esc(FIRMA.ad)}</div>${FIRMA.altBaslik ? `<div class="il">${esc(FIRMA.altBaslik)}</div>` : ""}${il ? `<div class="il">${il}</div>` : ""}</div></div>`;
+    }
+    function formYazdir(id) {
+        const f = formlar.find(x => x.id === id); if (!f) return;
+        const w = window.open("", "_blank"); if (!w) { bildir("Açılır pencere engellendi."); return; }
+        w.document.write(`<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><title>Sipariş Formu #${f.id}</title><style>
+            body{font-family:Arial,sans-serif;color:#10233e;margin:24px}h1{font-size:18px;margin:0 0 4px}.alt{font-size:11px;color:#64748b;margin-bottom:12px}
+            table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #cbd5e1;padding:7px 9px;text-align:left;vertical-align:top}th{background:#f1f5f9;width:30%}pre{white-space:pre-wrap;font:inherit;margin:0}
+            .fb{display:flex;align-items:center;gap:14px;border-bottom:2px solid #10233e;padding-bottom:10px;margin-bottom:12px}.fb img{max-height:60px;max-width:180px;object-fit:contain}.fb .ad{font-size:18px;font-weight:900}.fb .il{font-size:11px;color:#475569;margin-top:2px}
+            </style></head><body>${firmaBasligi()}<h1>SİPARİŞ FORMU</h1><div class="alt">Yazdırma: ${new Date().toLocaleString("tr-TR")}</div>${formHtml(f).replace('<div class="sf">', "<div>")}</body></html>`);
+        w.document.close(); w.focus(); setTimeout(() => w.print(), 200);
+    }
+    async function formDosyalari(id) {
+        const f = formlar.find(x => x.id === id); if (!f) return;
+        acikModal = { tur: "formdosya", id };
+        modalAc(`#${id} · ${f.hastaAdi} — Dosyalar`, '<div class="note">Yükleniyor...</div>');
+        try {
+            const list = await api(`/api/teknisyen-portal/jobs/${id}/files`);
+            const linkler = await linkHtml(id, true);
+            $("modalIcerik").innerHTML = (list.length ? list.map(x => `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${x.id}">${esc(x.orijinalDosyaAdi)}</a><small>${esc(x.dosyaTuru)} · ${boyut(x.boyut)}</small></div>`).join("") : (linkler ? "" : '<div class="note">Bu işte dosya yok.</div>')) + linkler;
+        } catch (err) { $("modalIcerik").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+
+    async function yukle(sessiz) {
+        try {
+            isler = await api("/api/teknisyen-portal/jobs");
+            const idler = new Set(isler.map(x => x.id));
+            if (bilinenIsler) {
+                const yeni = isler.filter(x => !bilinenIsler.has(x.id) && x.durum !== "Tamamlandı").length;
+                if (yeni) bildir("🔔 Size " + yeni + " yeni iş atandı.");
+            }
+            bilinenIsler = idler;
+            const okunmamis = isler.reduce((t, x) => t + (x.okunmamisMesaj || 0), 0);
+            if (sonOkunmamis !== null && okunmamis > sonOkunmamis) bildir("💬 " + (okunmamis - sonOkunmamis) + " yeni mesajınız var.");
+            sonOkunmamis = okunmamis;
+            ciz();
+        } catch (err) { if (!sessiz) $("liste").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+
+    function gecikti(j) {
+        if (!j.terminTarihi || j.durum === "Tamamlandı" || j.durum === "Tamamlama Onayı") return false;
+        const t = new Date(j.terminTarihi); t.setHours(23, 59, 59);
+        return t < new Date();
+    }
+
+    function ciz() {
+        const aktif = isler.filter(j => j.durum !== "Tamamlandı");
+        $("stYeni").textContent = aktif.filter(j => !j.kabul || j.durum === "Bekliyor").length;
+        $("stDevam").textContent = aktif.filter(j => j.kabul && ["Tasarımda", "Üretimde", "Makyajda"].includes(j.durum)).length;
+        $("stOnay").textContent = aktif.filter(j => j.durum === "Tamamlama Onayı").length;
+        $("stGec").textContent = aktif.filter(gecikti).length;
+
+        const q = $("ara").value.trim().toLocaleLowerCase("tr-TR");
+        let liste = (gorunum === "aktif" ? aktif : isler.filter(j => j.durum === "Tamamlandı"))
+            .filter(j => !q || [j.hastaAdi, j.hekimAdi, ...(j.kalemler || []).map(k => k.isTuru)].some(v => (v || "").toLocaleLowerCase("tr-TR").includes(q)));
+        if (gorunum === "aktif") {
+            const oncelik = { "Bekliyor": 0, "Tasarımda": 1, "Üretimde": 2, "Makyajda": 3, "Tamamlama Onayı": 4 };
+            liste.sort((a, b) => (a.kabul ? 1 : 0) - (b.kabul ? 1 : 0) || (oncelik[a.durum] ?? 9) - (oncelik[b.durum] ?? 9) ||
+                String(a.terminTarihi || "9999").localeCompare(String(b.terminTarihi || "9999")));
+        } else {
+            liste.sort((a, b) => String(b.tamamlanmaTarihi || "").localeCompare(String(a.tamamlanmaTarihi || "")));
+        }
+        if (!liste.length) {
+            $("liste").innerHTML = `<div class="empty">${q ? "Aramaya uyan iş yok." : gorunum === "aktif" ? "Size atanmış devam eden iş yok." : "Tamamlanan iş yok."}</div>`;
+            return;
+        }
+        $("liste").innerHTML = liste.map(isKarti).join("");
+    }
+
+    function isKarti(j) {
+        const kalem = (j.kalemler || []).map(k => `<span class="chip">${esc(k.isTuru)} × ${k.adet}</span>`).join("");
+        const rozet = j.durum === "Tamamlama Onayı" ? "b-Tamamlama" : "b-" + (j.durum || "");
+        const kilitli = !j.kabul;
+        const bitti = j.durum === "Tamamlandı";
+        const onayda = j.durum === "Tamamlama Onayı";
+        const dis = ben && ben.tip === "dis";
+        const labda = dis && (j.durum === "Üretimde" || j.durum === "Makyajda");
+        const teslimEdilebilir = !kilitli && !bitti && !onayda && !labda;
+        const teslimBilgi = j.tasarimTeslimTarihi
+            ? `<div class="note" style="margin-top:10px">✔ Tasarım ${tarih(j.tasarimTeslimTarihi)} tarihinde teslim edildi · ${j.uretimeAlindi ? "<b>laboratuvar üretime aldı</b>" : "laboratuvarın üretime alması bekleniyor"}</div>`
+            : "";
+        const teslimBtn = teslimEdilebilir
+            ? `<button class="btn btn-green btn-sm" type="button" ${j.tasarimSayisi ? "" : "disabled title=\"Önce Dosyalar'dan tasarım dosyasını yükleyin\""} onclick="tasarimTeslim(${j.id})">📤 Tasarımı Laboratuvara Teslim Et</button>`
+            : "";
+        const adimListesi = dis ? ADIMLAR_DIS : ADIMLAR_IC;
+        const adimlar = (bitti || labda) ? "" : `<div class="steps">${adimListesi.map(a =>
+            `<button type="button" class="step ${j.durum === a ? "on" : ""}" ${kilitli || onayda || j.durum === a ? "disabled" : ""}
+              onclick="durumYap(${j.id},'${a}')">${a === "Tamamlama Onayı" ? "✔ Bitti — onaya gönder" : a}</button>`).join("")}</div>`;
+        return `<div class="job ${kilitli || j.durum === "Bekliyor" ? "yeni" : ""}">
+            <div class="job-top">
+                <div>
+                    <div class="job-name">${esc(j.hastaAdi)}</div>
+                    <div class="job-sub">#${j.id} · Hekim: ${esc(j.hekimAdi)} · Teslim: <span class="${gecikti(j) ? "late" : ""}">${tarih(j.terminTarihi)}${gecikti(j) ? " (gecikti)" : ""}</span></div>
+                </div>
+                <span class="badge ${esc(rozet)}">${esc(j.durum || "-")}</span>
+            </div>
+            <div class="chips">${kalem}</div>
+            <div class="info">
+                <div><b>Renk:</b> ${esc(j.disRengi || "-")} · <b>Materyal:</b> ${esc(j.materyal || "-")} · <b>Dişler:</b> ${esc(j.disSemasi || "-")}</div>
+                ${j.notlar ? `<pre>${esc(j.notlar)}</pre>` : ""}
+            </div>
+            ${kilitli ? `<div class="actions"><button class="btn btn-green btn-sm" type="button" onclick="kabulEt(${j.id})">✅ İşi Kabul Et</button>
+                <span class="note">Kabul ettikten sonra tarama dosyalarını indirip çalışmaya başlayabilirsiniz.</span></div>` : ""}
+            ${onayda ? `<div class="note" style="margin-top:10px">⏳ Laboratuvarın tamamlama onayı bekleniyor.</div>` : ""}
+            ${labda ? `<div class="note" style="margin-top:10px">🏭 İş laboratuvarda ${esc(j.durum.toLocaleLowerCase("tr-TR"))}; durumu laboratuvar yönetir.</div>` : ""}
+            ${teslimBilgi}
+            ${kilitli ? "" : masaHtml(j, teslimEdilebilir)}
+            ${adimlar}
+            <div class="actions">
+                ${kilitli ? `<button class="btn btn-light btn-sm" type="button" onclick="dosyalarAc(${j.id})">📎 Dosyalar (${j.taramaSayisi} tarama · ${j.tasarimSayisi} tasarım${j.linkSayisi ? " · 🔗 " + j.linkSayisi + " link" : ""})</button>` : ""}
+                <button class="btn btn-light btn-sm" type="button" onclick="mesajlarAc(${j.id})">💬 Mesajlar${j.mesajSayisi ? " (" + j.mesajSayisi + ")" : ""}${j.okunmamisMesaj ? ` <span class="yeni-mesaj">${j.okunmamisMesaj} yeni</span>` : ""}</button>
+            </div>
+        </div>`;
+    }
+
+    // ---------- İş masası ----------
+    const masaDosya = new Map();   // iş no -> { dosyalar, linkler }
+    let masaMesgul = false;
+    const TASARIM_TURLERI = ["Tasarım", "3D Printer", "Yazıcı", "Üretim"];
+    const printerMi = t => t === "3D Printer" || t === "Yazıcı";
+    function masaHtml(j, teslimEdilebilir) {
+        const d = masaDosya.get(j.id);
+        if (!d) setTimeout(() => masaYukle(j.id), 0);
+        const gelen = d ? d.dosyalar.filter(f => !TASARIM_TURLERI.includes(f.dosyaTuru)) : null;
+        const benim = d ? d.dosyalar.filter(f => TASARIM_TURLERI.includes(f.dosyaTuru)) : [];
+        // Tasarım (CAD çıktısı) ile yazıcı dosyası (dilimlenmiş CTB vb.) ayrı tutulur; teslim için tasarım gerekir.
+        const tasarimlar = (benim || []).filter(f => !printerMi(f.dosyaTuru)), yazicilar = (benim || []).filter(f => printerMi(f.dosyaTuru));
+        const ikon = t => t === "Tasarım" ? "📐" : printerMi(t) ? "🖨️" : t === "Üretim" ? "🏭" : t === "Tarama" ? "🦷" : "📎";
+        const satir = f => `<a class="md" href="/api/teknisyen-portal/jobs/${j.id}/files/${f.id}" title="${esc(f.orijinalDosyaAdi)} — indir"><span>${ikon(f.dosyaTuru)} ${esc(f.orijinalDosyaAdi)}</span><small>${boyut(f.boyut)} ⬇</small></a>`;
+        const bitti = j.durum === "Tamamlandı";
+        const tasarimVar = (j.tasarimSayisi || 0) > 0 || tasarimlar.some(f => f.dosyaTuru === "Tasarım");
+        const teslimEdildi = !!j.tasarimTeslimTarihi;
+        return `<div class="masa">
+            <div class="adim ${gelen && gelen.length ? "ok" : ""}"><div class="adim-b"><span class="adim-no">1</span> Taramaları indir</div>
+                ${!d ? '<div class="note">Yükleniyor...</div>' : (gelen.length ? gelen.map(satir).join("") + (gelen.length > 1 ? `<button class="btn btn-light btn-sm" type="button" style="width:100%;margin-top:6px" onclick="hepsiniIndir(${j.id})">⬇ Tümünü indir (${gelen.length})</button>` : "") : (d.linkler.length ? "" : '<div class="note">Hekimden dosya gelmedi.</div>'))
+                  + (d && d.linkler.length ? d.linkler.map(l => `<a class="md" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"><span>🔗 ${esc(l.servis)} linki</span><small>aç ↗</small></a>`).join("") : "")}
+            </div>
+            <div class="adim ${tasarimVar ? "ok" : ""}"><div class="adim-b"><span class="adim-no">2</span> 📐 Tasarımı yükle</div>
+                ${bitti ? "" : birakAlani(j.id, "Tasarım", "📐 Tasarım dosyalarını buraya sürükleyin", ".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo")}
+                ${tasarimlar.length ? tasarimlar.map(satir).join("") : ""}
+            </div>
+            <div class="adim yazici ${yazicilar.length ? "ok" : ""}"><div class="adim-b"><span class="adim-no">3</span> 🖨️ 3D Printer dosyası (CTB) <span class="note" style="font-weight:600">· isteğe bağlı</span></div>
+                ${bitti ? "" : birakAlani(j.id, "3D Printer", "🖨️ Elegoo CTB / 3D printer dosyasını buraya sürükleyin", ".ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode")}
+                ${yazicilar.length ? yazicilar.map(satir).join("") : '<div class="note" style="margin-top:6px">3D printer için baskıya hazır dosya (CTB, GOO, PWMX...). Tasarım değildir.</div>'}
+            </div>
+            <div class="adim ${teslimEdildi ? "ok" : ""}"><div class="adim-b"><span class="adim-no">4</span> Laboratuvara gönder</div>
+                ${teslimEdilebilir ? `<button class="btn btn-green teslim-btn" type="button" ${tasarimVar ? "" : "disabled"} onclick="tasarimTeslim(${j.id})">📤 Tasarımı Teslim Et</button>
+                    <div class="note" style="margin-top:6px">${tasarimVar ? (teslimEdildi ? "Yeni dosya yüklediyseniz tekrar teslim edebilirsiniz." : "Laboratuvar kontrol edip üretime alır; hekim tasarım/CTB dosyasını portalda görür.") : "Önce 2. adımda tasarım dosyasını yükleyin (CTB tasarım yerine geçmez)."}</div>`
+                  : `<div class="note">${teslimEdildi ? "✔ Teslim edildi." : bitti ? "İş tamamlandı." : "Bu aşamada teslim gerekmez."}</div>`}
+            </div>
+        </div>`;
+    }
+    function birakAlani(id, tur, metin, kabul) {
+        return `<label class="birak ${tur === "3D Printer" ? "yz" : ""}" ondragover="event.preventDefault();this.classList.add('ustunde')" ondragleave="this.classList.remove('ustunde')" ondrop="event.preventDefault();this.classList.remove('ustunde');masaDosyaYukle(${id},event.dataTransfer.files,'${tur}')">
+            ${metin}<br><span style="font-weight:600">veya tıklayıp seçin</span>
+            <input type="file" multiple class="hidden" accept="${kabul}" onchange="masaDosyaYukle(${id},this.files,'${tur}');this.value=''" /></label>
+            <div class="progress hidden" id="masaCubuk${tur === "3D Printer" ? "Y" : "T"}${id}"><div></div></div><div class="note" id="masaDurum${tur === "3D Printer" ? "Y" : "T"}${id}"></div>`;
+    }
+    const YAZICI_UZ = /\.(ctb|cbddlp|photon|photons|pwmx|pwma|pwms|pws|pw0|pwmo|pwmb|pwx|dlp|goo|prz|sl1|sl1s|jxs|fdg|zcode|cws|gcode)$/i;
+    async function masaYukle(id, yeniden) {
+        if (masaDosya.has(id) && !yeniden) return;
+        try {
+            const [dosyalar, linkler] = await Promise.all([api(`/api/teknisyen-portal/jobs/${id}/files`), api(`/api/teknisyen-portal/jobs/${id}/links`).catch(() => [])]);
+            masaDosya.set(id, { dosyalar, linkler });
+        } catch { masaDosya.set(id, { dosyalar: [], linkler: [] }); }
+        if (!masaMesgul) ciz();
+    }
+    function hepsiniIndir(id) {
+        const d = masaDosya.get(id); if (!d) return;
+        d.dosyalar.filter(f => !TASARIM_TURLERI.includes(f.dosyaTuru)).forEach((f, i) => setTimeout(() => {
+            const a = document.createElement("a"); a.href = `/api/teknisyen-portal/jobs/${id}/files/${f.id}`; a.download = ""; document.body.appendChild(a); a.click(); a.remove();
+        }, i * 700));
+    }
+    async function masaDosyaYukle(id, liste, tur) {
+        let secim = Array.from(liste || []); if (!secim.length) return;
+        // Yanlış alana bırakılan dosyalar ayıklanır: CTB tasarım değildir, tasarım da yazıcı dosyası değildir.
+        const yanlis = secim.filter(f => tur === "3D Printer" ? !YAZICI_UZ.test(f.name) : YAZICI_UZ.test(f.name));
+        if (yanlis.length) {
+            bildir(tur === "3D Printer"
+                ? "3D Printer bölümüne yalnız CTB / GOO / PWMX gibi baskı dosyaları yüklenir: " + yanlis.map(f => f.name).join(", ")
+                : "CTB / baskı dosyaları tasarım değildir; 3. adımdaki 🖨️ 3D Printer bölümüne yükleyin: " + yanlis.map(f => f.name).join(", "));
+            secim = secim.filter(f => !yanlis.includes(f));
+            if (!secim.length) return;
+        }
+        const ek = tur === "3D Printer" ? "Y" : "T";
+        const cubuk = $("masaCubuk" + ek + id), ic = cubuk.firstElementChild, durum = $("masaDurum" + ek + id);
+        masaMesgul = true; cubuk.classList.remove("hidden");
+        let tamam = 0, hata = "";
+        for (const f of secim) {
+            durum.textContent = `${tamam + 1} / ${secim.length} · ${f.name}`;
+            await new Promise(res => {
+                const fd = new FormData(); fd.append("dosya", f, f.name); fd.append("dosyaTuru", tur);
+                const x = new XMLHttpRequest();
+                x.open("POST", `/api/teknisyen-portal/jobs/${id}/files`); x.withCredentials = true;
+                x.upload.onprogress = ev => { if (ev.lengthComputable) ic.style.width = Math.round((tamam + ev.loaded / ev.total) * 100 / secim.length) + "%"; };
+                x.onload = () => { if (x.status >= 200 && x.status < 300) tamam++; else hata = x.responseText || ("HTTP " + x.status); res(); };
+                x.onerror = () => { hata = "Bağlantı koptu."; res(); };
+                x.send(fd);
+            });
+        }
+        masaMesgul = false;
+        bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : tur === "3D Printer" ? `✔ ${tamam} 3D printer dosyası yüklendi; hekim portalda "3D Printer" bölümünden indirebilir.` : `✔ ${tamam} tasarım dosyası yüklendi. Bittiyse "Tasarımı Teslim Et"e basın.`);
+        await yukle(true);
+        await masaYukle(id, true);
+    }
+
+    async function tasarimTeslim(id) {
+        const j = isler.find(x => x.id === id);
+        const md = masaDosya.get(id);
+        const tasarimVar = j && ((j.tasarimSayisi || 0) > 0 || (md && md.dosyalar.some(f => f.dosyaTuru === "Tasarım")));
+        if (!j || !tasarimVar) { bildir("Önce 2. adımda tasarım dosyasını yükleyin (CTB tasarım yerine geçmez)."); return; }
+        if (!confirm("Tasarım laboratuvara teslim edilsin mi? Laboratuvar kontrol edip işi üretime alacak.")) return;
+        try { const r = await api(`/api/teknisyen-portal/jobs/${id}/tasarim-teslim`, { method: "POST" }); bildir(r.message || "Tasarım teslim edildi."); if (acikModal) modalKapat(); else await yukle(true); }
+        catch (err) { bildir(err.message); }
+    }
+
+    async function kabulEt(id) {
+        try { const r = await api(`/api/teknisyen-portal/jobs/${id}/kabul`, { method: "POST" }); bildir(r.message || "İş kabul edildi."); await yukle(true); }
+        catch (err) { bildir(err.message); }
+    }
+
+    async function durumYap(id, durum) {
+        if (durum === "Tamamlama Onayı" && !confirm("İş bitti olarak laboratuvar onayına gönderilsin mi?")) return;
+        try {
+            const r = await api(`/api/teknisyen-portal/jobs/${id}/durum`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ durum }) });
+            bildir(r.message || "Durum güncellendi.");
+            await yukle(true);
+        } catch (err) { bildir(err.message); }
+    }
+
+    function modalAc(baslik, html) {
+        $("modalBaslik").textContent = baslik;
+        $("modalIcerik").innerHTML = html;
+        $("modal").classList.remove("hidden");
+    }
+
+    function modalKapat() {
+        $("modal").classList.add("hidden");
+        acikModal = null;
+        yukle(true);
+    }
+
+    async function dosyalarAc(id) {
+        const j = isler.find(x => x.id === id); if (!j) return;
+        acikModal = { tur: "dosya", id };
+        modalAc(`#${id} · ${j.hastaAdi} — Dosyalar`, '<div class="note">Yükleniyor...</div>');
+        await dosyalariCiz(id);
+    }
+
+    // Hekimin dosya yerine paylaştığı linkler (WeTransfer, Drive...). Kabul edilmemiş işte tıklanamaz.
+    async function linkHtml(id, tiklanir) {
+        let l = [];
+        try { l = await api(`/api/teknisyen-portal/jobs/${id}/links`); } catch { return ""; }
+        if (!l.length) return "";
+        return `<div style="margin:10px 0 4px;font-weight:900">🔗 Dosya linkleri</div>` + l.map(x => tiklanir
+            ? `<div class="file"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.servis)} — ${esc(x.url.length > 70 ? x.url.slice(0, 70) + "…" : x.url)}</a><small>${esc(x.ekleyenTipi)}</small></div>`
+            : `<div class="file"><span>${esc(x.servis)} linki</span><small>${esc(x.ekleyenTipi)}</small></div>`).join("");
+    }
+
+    async function dosyalariCiz(id) {
+        const j = isler.find(x => x.id === id); if (!j || !acikModal || acikModal.id !== id) return;
+        let list = [];
+        try { list = await api(`/api/teknisyen-portal/jobs/${id}/files`); }
+        catch (err) { $("modalIcerik").innerHTML = `<div class="msg err">${esc(err.message)}</div>`; return; }
+        const satir = f => j.kabul
+            ? `<div class="file"><a href="/api/teknisyen-portal/jobs/${id}/files/${f.id}">${esc(f.orijinalDosyaAdi)}</a><small>${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</small></div>`
+            : `<div class="file"><span>${esc(f.orijinalDosyaAdi)}</span><small>${esc(f.dosyaTuru)} · ${boyut(f.boyut)}</small></div>`;
+        const linkler = await linkHtml(id, j.kabul);
+        $("modalIcerik").innerHTML =
+            (j.kabul ? "" : '<div class="msg err">Dosyaları indirmek için önce işi kabul edin.</div>') +
+            (list.length ? list.map(satir).join("") : (linkler ? "" : '<div class="note">Bu işte henüz dosya yok.</div>')) + linkler +
+            (j.kabul && j.durum !== "Tamamlandı" ? `
+            <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+                <label class="lbl">Dosya yükle (tasarım / üretim)</label>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <select id="yukTur" class="inp" style="width:auto"><option value="Tasarım">Tasarım</option><option value="3D Printer">3D Printer (Elegoo CTB vb.)</option><option value="Üretim">Üretim</option><option value="Diger">Diğer</option></select>
+                    <input id="yukDosya" type="file" multiple class="inp" style="flex:1;padding-top:9px" accept=".stl,.obj,.ply,.dcm,.zip,.rar,.7z,.pdf,.jpg,.jpeg,.png,.webp,.txt,.xml,.3ox,.3oxz,.dentalproject,.constructioninfo,.ctb,.cbddlp,.photon,.photons,.pwmx,.pwma,.pwms,.pws,.pw0,.pwmo,.pwmb,.pwx,.dlp,.goo,.prz,.sl1,.sl1s,.jxs,.fdg,.zcode,.cws,.gcode" />
+                    <button class="btn btn-sm" type="button" style="height:44px" onclick="dosyaYukle(${id})">Yükle</button>
+                </div>
+                <div class="note" style="margin-top:6px">📐 <b>Tasarım</b> ve 🖨️ <b>3D Printer (CTB)</b> dosyaları yüklenince hekim bunları Hekim Portalı'nda iş kartından doğrudan indirebilir ve bilgilendirilir.</div>
+                <div class="progress hidden" id="yukCubuk"><div></div></div>
+                <div class="note" id="yukDurum"></div>
+            </div>` : "");
+    }
+
+    async function dosyaYukle(id) {
+        const secim = Array.from($("yukDosya").files || []);
+        if (!secim.length) { bildir("Dosya seçin."); return; }
+        const tur = $("yukTur").value, cubuk = $("yukCubuk"), ic = cubuk.firstElementChild, durum = $("yukDurum");
+        cubuk.classList.remove("hidden");
+        let tamam = 0, hata = "";
+        for (const f of secim) {
+            durum.textContent = `${tamam + 1} / ${secim.length} · ${f.name}`;
+            await new Promise(res => {
+                const fd = new FormData(); fd.append("dosya", f, f.name); fd.append("dosyaTuru", tur);
+                const x = new XMLHttpRequest();
+                x.open("POST", `/api/teknisyen-portal/jobs/${id}/files`);
+                x.withCredentials = true;
+                x.upload.onprogress = ev => { if (ev.lengthComputable) ic.style.width = Math.round((tamam + ev.loaded / ev.total) * 100 / secim.length) + "%"; };
+                x.onload = () => { if (x.status >= 200 && x.status < 300) tamam++; else hata = x.responseText || ("HTTP " + x.status); res(); };
+                x.onerror = () => { hata = "Bağlantı koptu."; res(); };
+                x.send(fd);
+            });
+        }
+        bildir(hata ? `${tamam} dosya yüklendi; hata: ${hata}` : `${tamam} dosya yüklendi.`);
+        await yukle(true);
+        await dosyalariCiz(id);
+        const j = isler.find(x => x.id === id);
+        if (tamam && tur === "Tasarım" && j && $("modalIcerik")) {
+            $("modalIcerik").insertAdjacentHTML("beforeend",
+                `<div class="msg ok" style="margin-top:12px">Tasarım yüklendi. Bittiyse laboratuvara teslim edin:
+                 <div style="margin-top:8px"><button class="btn btn-green btn-sm" type="button" onclick="tasarimTeslim(${id})">📤 Tasarımı Laboratuvara Teslim Et</button></div></div>`);
+        }
+    }
+
+    async function mesajlarAc(id) {
+        const j = isler.find(x => x.id === id); if (!j) return;
+        acikModal = { tur: "mesaj", id };
+        modalAc(`#${id} · ${j.hastaAdi} — Mesajlar`, `
+            <div class="msgs" id="mesajListe"><div class="note">Yükleniyor...</div></div>
+            <div style="display:flex;gap:8px"><textarea id="mesajYaz" class="inp" maxlength="4000" placeholder="Laboratuvara mesaj yazın (hekim görmez)..."></textarea>
+            <button class="btn btn-sm" type="button" style="height:auto" onclick="mesajGonder(${id})">Gönder</button></div>`);
+        await mesajlariCiz(id);
+    }
+
+    async function mesajlariCiz(id) {
+        const el = $("mesajListe"); if (!el) return;
+        try {
+            const list = await api(`/api/teknisyen-portal/jobs/${id}/messages`);
+            el.innerHTML = list.length ? list.map(m => `<div class="msg-b ${m.benim ? "me" : ""} ${m.kanal === "hekim" ? "hk" : ""}"><small>${m.kanal === "hekim" ? "🦷 Hekim yazışması · " : ""}${esc(m.gonderenAdi || m.gonderenTipi)} · ${new Date(m.tarih).toLocaleString("tr-TR")}</small>${esc(m.mesaj)}</div>`).join("")
+                : '<div class="note">Henüz mesaj yok.</div>';
+            el.scrollTop = el.scrollHeight;
+            const j = isler.find(x => x.id === id); if (j) j.okunmamisMesaj = 0;
+        } catch (err) { el.innerHTML = `<div class="msg err">${esc(err.message)}</div>`; }
+    }
+
+    async function mesajGonder(id) {
+        const t = $("mesajYaz"); const mesaj = (t.value || "").trim(); if (!mesaj) return;
+        try {
+            await api(`/api/teknisyen-portal/jobs/${id}/messages`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mesaj }) });
+            t.value = ""; await mesajlariCiz(id);
+        } catch (err) { bildir(err.message); }
+    }
+
+    basla();
+</script>
+</body>
+</html>

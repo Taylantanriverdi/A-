@@ -1,0 +1,8 @@
+﻿Eski bilgisayardan getirdiklerinizi bu klasore koyun:
+
+  PrimerLab_Backup_....json   (Ayarlar > Tam Yedek ile indirilen dosya)
+  Pages                       (eski proje klasorundeki Pages klasoru - Hekim Portali icin)
+  App_Data                    (eski proje klasorundeki App_Data klasoru - is dosyalari)
+  wwwroot                     (varsa)
+
+Hicbiri zorunlu degildir; bos birakirsaniz program bos bir veritabaniyla kurulur.

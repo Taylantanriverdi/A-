@@ -1,0 +1,273 @@
+@page "/giris"
+@inject PrimerLabV2.Infrastructure.FirmaServisi Firma
+@inject PrimerLabV2.Infrastructure.YoneticiGirisi Giris
+@{
+    Layout = null;
+    var firmaAd = Firma.Ad;
+    var firmaLogo = Firma.LogoDataUrl();
+    var firmaKisa = PrimerLabV2.Infrastructure.FirmaServisi.Kisaltma(firmaAd);
+    var kurulu = Giris.Kurulu;
+}
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>@firmaAd — Yönetici Girişi</title>
+    <style>
+        :root{--ink:#10233e;--muted:#64748b;--line:#dbe3ef;--bg:#f3f6fb;--blue:#1565c0;--green:#15803d;--red:#dc2626;--amber:#b45309}
+        *{box-sizing:border-box}
+        html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:15px}
+        button,input{font:inherit;color:inherit}
+        .hidden{display:none!important}
+        .sayfa{min-height:100vh;display:grid;place-items:center;padding:16px}
+        .kart{width:100%;max-width:440px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:26px;box-shadow:0 10px 30px rgba(16,35,62,.08)}
+        .marka{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+        .marka img{height:44px;max-width:160px;object-fit:contain}
+        .marka .bas{width:44px;height:44px;border-radius:11px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:900}
+        .marka .ad{font-weight:900;font-size:16px;line-height:1.15}
+        .marka .alt{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.3px}
+        h1{font-size:20px;margin:0 0 6px}
+        .aciklama{color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 16px}
+        .adimlar{display:flex;gap:6px;margin:0 0 18px}
+        .adim{flex:1;font-size:11px;font-weight:800;color:var(--muted);border-top:4px solid #e2e8f0;padding-top:6px}
+        .adim.on{color:var(--ink);border-color:var(--blue)}
+        .adim.bitti{color:var(--green);border-color:var(--green)}
+        label.lbl{display:block;font-size:12px;font-weight:800;color:#334155;margin:0 0 5px}
+        .alan{margin-bottom:14px}
+        .sarmal{position:relative}
+        .inp{width:100%;height:46px;border:1px solid #cbd5e1;border-radius:11px;padding:0 44px 0 12px;background:#fff;outline:none}
+        .inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(21,101,192,.15)}
+        .goster{position:absolute;right:6px;top:6px;height:34px;width:34px;border:0;background:#f1f5f9;border-radius:8px;cursor:pointer;font-size:15px}
+        .capslock{font-size:12px;color:var(--amber);font-weight:700;margin-top:4px}
+        .kurallar{list-style:none;padding:0;margin:-4px 0 14px;display:grid;gap:3px;font-size:12px;color:var(--muted)}
+        .kurallar li::before{content:"○ ";font-weight:900}
+        .kurallar li.tamam{color:var(--green)}
+        .kurallar li.tamam::before{content:"✓ "}
+        .guc{height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;margin:6px 0 2px}
+        .guc div{height:100%;width:0;transition:width .2s,background .2s}
+        .guc-yazi{font-size:11px;color:var(--muted);font-weight:700}
+        .onay{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:#334155;margin:4px 0 16px;cursor:pointer;line-height:1.4}
+        .onay input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:var(--blue)}
+        .btn{width:100%;height:46px;border:0;border-radius:12px;font-weight:900;cursor:pointer;background:var(--blue);color:#fff}
+        .btn:disabled{opacity:.45;cursor:not-allowed}
+        .btn-acik{background:#fff;color:var(--ink);border:1px solid var(--line)}
+        .ikili{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+        .ikili .btn{height:40px;font-size:13px}
+        .mesaj{border-radius:11px;padding:10px 12px;font-size:13px;font-weight:700;margin-bottom:14px;background:#fef2f2;color:var(--red);border:1px solid #fecaca}
+        .mesaj.bilgi{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+        .kod{font-family:Consolas,"Courier New",monospace;font-size:24px;font-weight:900;letter-spacing:2px;text-align:center;background:#f8fafc;border:2px dashed #94a3b8;border-radius:12px;padding:16px 8px;margin:4px 0 12px;user-select:all}
+        .uyari{background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:11px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:14px}
+        .baglanti{display:block;width:100%;background:none;border:0;color:var(--blue);font-weight:800;cursor:pointer;margin-top:14px;font-size:13px}
+        .dipnot{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);line-height:1.5}
+        .kod-inp{text-transform:uppercase;letter-spacing:2px;font-family:Consolas,"Courier New",monospace;font-weight:800;padding-right:12px}
+        @@media print{body *{visibility:hidden}#yazdirAlan,#yazdirAlan *{visibility:visible}#yazdirAlan{position:fixed;top:30px;left:30px}}
+    </style>
+</head>
+<body>
+<div class="sayfa">
+<div class="kart">
+    <div class="marka">
+        @if (firmaLogo != null) { <img src="@firmaLogo" alt="@firmaAd" /> } else { <div class="bas">@firmaKisa</div> }
+        <div><div class="ad">@firmaAd</div><div class="alt">PRIMER LAB · YÖNETİM</div></div>
+    </div>
+
+    <div id="mesaj" class="mesaj hidden"></div>
+
+    <!-- ============ İLK KURULUM: 1) şifre ============ -->
+    <section id="ekranKur" class="hidden">
+        <div class="adimlar"><div class="adim on" id="a1">1 · Şifre belirle</div><div class="adim" id="a2">2 · Kurtarma kodu</div><div class="adim" id="a3">3 · Başla</div></div>
+        <h1>Yönetici şifresi belirleyin</h1>
+        <p class="aciklama">Bu şifre ana programı (işler, cari, kasa, ayarlar) korur ve programı her açışınızda sorulur. Hekim ve teknisyen şifrelerinden ayrıdır.</p>
+        <form onsubmit="kur(event)" novalidate>
+            <div class="alan">
+                <label class="lbl" for="kYeni">Yeni şifre</label>
+                <div class="sarmal"><input id="kYeni" class="inp" type="password" autocomplete="new-password" oninput="kuralCiz('k')" onkeyup="caps(event,'kCaps')" /><button type="button" class="goster" onclick="goster('kYeni',this)" title="Göster">👁</button></div>
+                <div class="guc"><div id="kGuc"></div></div><div class="guc-yazi" id="kGucYazi">&nbsp;</div>
+                <div id="kCaps" class="capslock hidden">Caps Lock açık</div>
+            </div>
+            <div class="alan">
+                <label class="lbl" for="kTekrar">Yeni şifre (tekrar)</label>
+                <div class="sarmal"><input id="kTekrar" class="inp" type="password" autocomplete="new-password" oninput="kuralCiz('k')" /><button type="button" class="goster" onclick="goster('kTekrar',this)" title="Göster">👁</button></div>
+            </div>
+            <ul class="kurallar" id="kKurallar"></ul>
+            <label class="onay"><input id="kHatirla" type="checkbox" checked /> <span>Bu bilgisayarda 30 gün hatırla</span></label>
+            <button id="kBtn" class="btn" type="submit" disabled>Şifreyi Belirle ve Devam Et</button>
+        </form>
+    </section>
+
+    <!-- ============ KURTARMA KODU (ilk kurulum 2. adım ve şifre kurtarma sonrası) ============ -->
+    <section id="ekranKod" class="hidden">
+        <div class="adimlar" id="kodAdimlar"><div class="adim bitti">1 · Şifre belirle</div><div class="adim on">2 · Kurtarma kodu</div><div class="adim">3 · Başla</div></div>
+        <h1>Kurtarma kodunuzu saklayın</h1>
+        <p class="aciklama">Şifrenizi unutursanız yeni şifreyi <b>yalnız bu kodla</b> belirleyebilirsiniz. Kod bir kez gösterilir; sonra bir daha görüntülenemez.</p>
+        <div id="yazdirAlan"><div style="font-size:12px;font-weight:800;color:#64748b">@firmaAd — Primer Lab yönetici kurtarma kodu</div><div class="kod" id="kodMetin">----</div></div>
+        <div class="ikili">
+            <button class="btn btn-acik" type="button" onclick="kodKopyala()">📋 Kopyala</button>
+            <button class="btn btn-acik" type="button" onclick="window.print()">🖨️ Yazdır</button>
+        </div>
+        <div class="uyari">Kodu kâğıda yazıp güvenli bir yerde saklayın ya da yazdırın. Bilgisayarın masaüstüne düz metin olarak kaydetmeyin.</div>
+        <label class="onay"><input id="kodOnay" type="checkbox" onchange="$('kodBtn').disabled=!this.checked" /> <span>Kurtarma kodunu güvenli bir yere kaydettim.</span></label>
+        <button id="kodBtn" class="btn" type="button" disabled onclick="programaGir()">Programa Gir</button>
+    </section>
+
+    <!-- ============ GİRİŞ ============ -->
+    <section id="ekranGiris" class="hidden">
+        <h1>Yönetici girişi</h1>
+        <p class="aciklama">Devam etmek için yönetici şifrenizi girin.</p>
+        <form onsubmit="giris(event)" novalidate>
+            <div class="alan">
+                <label class="lbl" for="gSifre">Şifre</label>
+                <div class="sarmal"><input id="gSifre" class="inp" type="password" autocomplete="current-password" onkeyup="caps(event,'gCaps')" /><button type="button" class="goster" onclick="goster('gSifre',this)" title="Göster">👁</button></div>
+                <div id="gCaps" class="capslock hidden">Caps Lock açık</div>
+            </div>
+            <label class="onay"><input id="gHatirla" type="checkbox" /> <span>Bu bilgisayarda 30 gün hatırla</span></label>
+            <button id="gBtn" class="btn" type="submit">Giriş Yap</button>
+        </form>
+        <button class="baglanti" type="button" onclick="ekran('kurtar')">Şifremi unuttum</button>
+    </section>
+
+    <!-- ============ ŞİFREMİ UNUTTUM ============ -->
+    <section id="ekranKurtar" class="hidden">
+        <h1>Yeni şifre belirleyin</h1>
+        <p class="aciklama">İlk şifreyi belirlerken size verilen kurtarma kodunu yazın, ardından yeni şifrenizi belirleyin. Verileriniz etkilenmez.</p>
+        <form onsubmit="kurtar(event)" novalidate>
+            <div class="alan">
+                <label class="lbl" for="rKod">Kurtarma kodu</label>
+                <input id="rKod" class="inp kod-inp" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" oninput="kodBicim(this);kuralCiz('r')" />
+            </div>
+            <div class="alan">
+                <label class="lbl" for="rYeni">Yeni şifre</label>
+                <div class="sarmal"><input id="rYeni" class="inp" type="password" autocomplete="new-password" oninput="kuralCiz('r')" onkeyup="caps(event,'rCaps')" /><button type="button" class="goster" onclick="goster('rYeni',this)" title="Göster">👁</button></div>
+                <div class="guc"><div id="rGuc"></div></div><div class="guc-yazi" id="rGucYazi">&nbsp;</div>
+                <div id="rCaps" class="capslock hidden">Caps Lock açık</div>
+            </div>
+            <div class="alan">
+                <label class="lbl" for="rTekrar">Yeni şifre (tekrar)</label>
+                <div class="sarmal"><input id="rTekrar" class="inp" type="password" autocomplete="new-password" oninput="kuralCiz('r')" /><button type="button" class="goster" onclick="goster('rTekrar',this)" title="Göster">👁</button></div>
+            </div>
+            <ul class="kurallar" id="rKurallar"></ul>
+            <button id="rBtn" class="btn" type="submit" disabled>Yeni Şifreyi Kaydet</button>
+        </form>
+        <button class="baglanti" type="button" onclick="ekran('giris')">← Girişe dön</button>
+        <div class="dipnot">Kurtarma kodunuz da yoksa: programın kurulu olduğu bilgisayarda <b>C:\PrimerLab\PrimerLab_SifreSifirla.bat</b> dosyasını çalıştırın. Yalnız yönetici şifresi silinir (işler, cari ve diğer veriler korunur) ve bu ekran ilk şifre belirleme olarak yeniden açılır.</div>
+    </section>
+
+    <!-- ============ BAŞKA CİHAZDAN İLK AÇILIŞ ============ -->
+    <section id="ekranUzak" class="hidden">
+        <h1>Kurulum tamamlanmadı</h1>
+        <p class="aciklama">Yönetici şifresi henüz belirlenmemiş. İlk şifre yalnız Primer Lab'in kurulu olduğu bilgisayarda, tarayıcıdan <b>localhost:5169</b> açılarak belirlenebilir.</p>
+    </section>
+</div>
+</div>
+
+<script>
+    const KURULU = @(kurulu ? "true" : "false");
+    const $ = id => document.getElementById(id);
+    let kurtarmaKodu = "";
+
+    function hedef() {
+        const r = new URLSearchParams(location.search).get("r") || "/";
+        return r.startsWith("/") && !r.startsWith("//") && !r.startsWith("/\\") && !r.startsWith("/giris") ? r : "/";
+    }
+    function mesaj(t, bilgi) { const m = $("mesaj"); m.textContent = t || ""; m.className = "mesaj" + (bilgi ? " bilgi" : "") + (t ? "" : " hidden"); }
+    function ekran(ad) {
+        ["Kur", "Kod", "Giris", "Kurtar", "Uzak"].forEach(x => $("ekran" + x).classList.toggle("hidden", x.toLowerCase() !== ad));
+        mesaj("");
+        const odak = { kur: "kYeni", giris: "gSifre", kurtar: "rKod" }[ad];
+        if (odak) setTimeout(() => $(odak).focus(), 50);
+    }
+    function goster(id, b) { const i = $(id); i.type = i.type === "password" ? "text" : "password"; b.textContent = i.type === "password" ? "👁" : "🙈"; }
+    function caps(e, id) { if (e.getModifierState) $(id).classList.toggle("hidden", !e.getModifierState("CapsLock")); }
+    function kodBicim(i) {
+        const t = i.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16);
+        i.value = t.match(/.{1,4}/g)?.join("-") || "";
+    }
+
+    // Şifre kuralları sunucuyla aynı: en az 8 karakter, harf ve rakam; iki alan aynı.
+    function kurallar(p, t) {
+        return [
+            ["En az 8 karakter", p.length >= 8],
+            ["En az bir harf", /\p{L}/u.test(p)],
+            ["En az bir rakam", /\d/.test(p)],
+            ["İki şifre aynı", p.length > 0 && p === t]
+        ];
+    }
+    function guc(p) {
+        let s = 0;
+        if (p.length >= 8) s++; if (p.length >= 12) s++;
+        if (/[a-zçğıöşü]/.test(p) && /[A-ZÇĞİÖŞÜ]/.test(p)) s++;
+        if (/\d/.test(p)) s++; if (/[^\p{L}\d]/u.test(p)) s++;
+        return Math.min(4, s);
+    }
+    function kuralCiz(on) {
+        const p = $(on + "Yeni").value, t = $(on + "Tekrar").value, k = kurallar(p, t);
+        $(on + "Kurallar").innerHTML = k.map(([a, ok]) => `<li class="${ok ? "tamam" : ""}">${a}</li>`).join("");
+        const g = p ? guc(p) : 0, renk = ["#dc2626", "#dc2626", "#d97706", "#16a34a", "#15803d"][g];
+        $(on + "Guc").style.width = (p ? (g + 1) * 20 : 0) + "%"; $(on + "Guc").style.background = renk;
+        $(on + "GucYazi").textContent = p ? ["Çok zayıf", "Zayıf", "Orta", "İyi", "Güçlü"][g] : "\u00a0";
+        let hazir = k.every(x => x[1]);
+        if (on === "r") hazir = hazir && $("rKod").value.replace(/-/g, "").length === 16;
+        $(on + "Btn").disabled = !hazir;
+    }
+
+    async function post(yol, govde) {
+        const r = await fetch("/api/yonetici-giris/" + yol, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(govde || {}), credentials: "same-origin" });
+        const metin = await r.text();
+        if (!r.ok) throw new Error(metin || ("İşlem başarısız (" + r.status + ")"));
+        try { return JSON.parse(metin); } catch { return {}; }
+    }
+    function kodGoster(kod, kurulumda) {
+        kurtarmaKodu = kod;
+        $("kodMetin").textContent = kod;
+        $("kodAdimlar").classList.toggle("hidden", !kurulumda);
+        $("kodOnay").checked = false; $("kodBtn").disabled = true;
+        ekran("kod");
+        if (!kurulumda) mesaj("Yeni şifreniz kaydedildi. Eski kurtarma kodu artık geçersiz; aşağıdaki yeni kodu saklayın.", true);
+    }
+    async function kodKopyala() {
+        try { await navigator.clipboard.writeText(kurtarmaKodu); mesaj("Kod panoya kopyalandı. Güvenli bir yere yapıştırıp kaydedin.", true); }
+        catch { mesaj("Kopyalanamadı; kodu elle yazın."); }
+    }
+    function programaGir() { location.replace(hedef()); }
+
+    async function kur(e) {
+        e.preventDefault(); const b = $("kBtn"); b.disabled = true; mesaj("");
+        try {
+            const d = await post("kur", { yeniParola: $("kYeni").value, yeniParolaTekrar: $("kTekrar").value, hatirla: $("kHatirla").checked });
+            $("kYeni").value = $("kTekrar").value = "";
+            kodGoster(d.kurtarmaKodu, true);
+        } catch (err) { mesaj(err.message); b.disabled = false; }
+    }
+    async function giris(e) {
+        e.preventDefault(); const b = $("gBtn");
+        if (!$("gSifre").value) { mesaj("Şifrenizi yazın."); return; }
+        b.disabled = true; b.textContent = "Giriş yapılıyor..."; mesaj("");
+        try { await post("giris", { parola: $("gSifre").value, hatirla: $("gHatirla").checked, istasyon: hedef().includes("istasyon=1") }); location.replace(hedef()); }
+        catch (err) { mesaj(err.message); $("gSifre").select(); b.disabled = false; b.textContent = "Giriş Yap"; }
+    }
+    async function kurtar(e) {
+        e.preventDefault(); const b = $("rBtn"); b.disabled = true; mesaj("");
+        try {
+            const d = await post("kurtar", { kurtarmaKodu: $("rKod").value, yeniParola: $("rYeni").value, yeniParolaTekrar: $("rTekrar").value });
+            $("rYeni").value = $("rTekrar").value = $("rKod").value = "";
+            kodGoster(d.kurtarmaKodu, false);
+        } catch (err) { mesaj(err.message); b.disabled = false; }
+    }
+
+    if (hedef().includes("istasyon=1")) {
+        document.querySelector("#ekranGiris h1").textContent = "Yazıcı istasyonu girişi";
+        document.querySelector("#ekranGiris .aciklama").textContent = "Otomatik yazdırma penceresi için yönetici şifresini bir kez girin; bu pencere bir yıl hatırlanır.";
+    }
+    (async function basla() {
+        kuralCiz("k"); kuralCiz("r");
+        try {
+            const d = await (await fetch("/api/yonetici-giris/durum", { cache: "no-store", credentials: "same-origin" })).json();
+            if (d.kurulu && d.oturum) { location.replace(hedef()); return; }
+            ekran(d.kurulu ? "giris" : (d.anaBilgisayar ? "kur" : "uzak"));
+        } catch { ekran(KURULU ? "giris" : "kur"); }
+    })();
+</script>
+</body>
+</html>

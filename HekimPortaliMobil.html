@@ -815,13 +815,20 @@ function enterSession(dr) {
 // yetkisi bilinçli olarak sadece admin/laboratuvar tarafındaki Sipariş
 // Formu'nda bırakıldı — hekim burada sadece talebini iletir.
 function renderJobTypeSelect() {
-  const sel = document.getElementById('hp-jobtype');
+  let sel = document.getElementById('hp-jobtype');
   const note = document.getElementById('jobtype-note');
   const prices = currentDoctor && currentDoctor.prices
     ? (Array.isArray(currentDoctor.prices) ? currentDoctor.prices : Object.values(currentDoctor.prices))
     : [];
 
   if (prices.length) {
+    // Daha önce (iş listesi olmayan bir hekim için) alan serbest metin
+    // kutusuna çevrildiyse, liste geldiğinde seçim kutusu geri kurulur.
+    if (!sel || sel.tagName !== 'SELECT') {
+      const wrap = document.getElementById('jobtype-field-wrap');
+      wrap.innerHTML = '<select id="hp-jobtype" class="inp" onchange="updateSummary()"></select>';
+      sel = document.getElementById('hp-jobtype');
+    }
     note.textContent = 'Size atanmış iş listesinden seçiniz.';
     sel.innerHTML = '<option value="">— Seçiniz —</option>' +
       prices.map(p => `<option value="${escHtml(p.name)}">${escHtml((p.name||'').toLocaleUpperCase('tr-TR'))}</option>`).join('');

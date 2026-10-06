@@ -1,0 +1,43 @@
+﻿PRIMER LAB V33.08 - HATA DUZELTMELERI
+
+Bu paket V33.07.22.7 (teknisyen yonetimi) paketini de icerir; once onu kurmaniza gerek yoktur.
+
+KURULUM
+1) PrimerLabV2_GUNCELLE_V33_08.bat dosyasina cift tiklayin.
+   - Controllers, Infrastructure, Pages\Index.cshtml ve Tools\legacy_import.py once otomatik yedeklenir.
+   - Derleme veya acilis basarisiz olursa her sey otomatik eski haline doner.
+2) Veritabani sayac esitleme (BIR KEZ yapilir, guvenlidir):
+   pgAdmin'de primerlab veritabanina baglanin ve DB\V33_SAYAC_ESITLEME.sql dosyasini calistirin.
+   Bu betik hicbir veriyi degistirmez; yalniz Id sayaclarini ileri alir.
+
+GUVENLIK NOTU
+- Yonetim ekrani artik yalniz localhost, IP adresi veya bu bilgisayarin adi ile acilir.
+  (Ornek: http://localhost:5169 ve hekimler icin http://192.168.x.x:5169/hekim-portal)
+- Uygulamayi bir alan adi / tunel uzerinden kullaniyorsaniz o adresi appsettings.json
+  icine ekleyin:  "PrimerLab": { "AllowedHosts": "ornek.alanadi.com" }
+
+DUZELTILEN HATALAR
+- GUVENLIK (DNS rebinding): Kotu niyetli bir web sitesi, bu bilgisayardaki tarayici
+  uzerinden yonetim API'lerine erisip tum veritabani yedegini indirebiliyordu. Engellendi.
+- Mail ekleri indirilemezse mail artik "Inceleme Gerekli" olarak isaretlenir
+  (onceden ekler sessizce kayboluyordu ve bir daha denenmiyordu).
+- Cari ekraninda "Donem Kapat", Cari tahsilat girisi, Tahsilatlar ekranindan tahsilat
+  girisi ve is detayina dosya yukleme her seferinde hata veriyordu (EF Core uyumsuzlugu).
+- Is kalemi duzenlendikten sonra yeni is acmak "Is kaydedilemedi" hatasi verebiliyordu.
+  Ayni sorun Kasa'dan tahsilat sonrasi Cari tahsilati ve donem kapatmada da vardi.
+- Coklu is acma ve kalici silme, veritabani yeniden deneme ayari acikken hata veriyordu.
+- Donem kapanmadan once gelip kapanistan sonra tamamlanan isler hicbir doneme girmiyor,
+  hekime hic faturalanmiyordu. Artik tamamlanma tarihine gore faturalanir;
+  kapatilmis doneme girmis bir is ikinci kez faturalanmaz.
+- Cari, Kasa / Arsiv ve Primer AI ayni hekim icin farkli bakiye gosterebiliyordu; artik ayni kural.
+- Kapatilmis doneme geriye tarihli tahsilat girilince tahsilat bakiyeden hic dusmuyordu;
+  artik engellenir. Kapatilmis doneme ait tahsilat da duzenlenemez.
+- Pasife alinan hekimin odenmemis borcu Cari ve Kasa ozetinden kayboluyordu.
+- Onaylanmis (Tamamlandi) bir is, eski bir ekrandan gelen "reddet" ile Makyajda'ya donebiliyordu.
+- Aylik raporda TL, EUR ve USD tahsilatlar tek sayi olarak toplanip TL gibi gosteriliyordu.
+- Aylik raporlarda tamamlandiktan sonra geri alinan veya silinen isler ciroya sayiliyordu.
+- Laboratuvar ekranindan .dcm dosyasi yuklenebilir (Hekim Portali'nda zaten kabul ediliyordu).
+- Eski JSON yedegi aktarimi (legacy_import.py): ayni gun ayni tutarli iki tahsilatin teke
+  inmesi, Firebase kimlikli kayitlarin atlanmasi, GG.AA.YYYY tarihlerin yanlis okunmasi,
+  parolalarin arsive yazilmasi ve guncel fiyatlarin eskileriyle ezilmesi duzeltildi.
+- Teknisyen yonetimi (V33.07.22.7) ve kurulum betigi duzeltmeleri dahildir.

@@ -1,0 +1,19 @@
+PRIMER LAB V33.07.22.7
+
+Teknisyen Yönetim Merkezi yönetim işlemleri:
+- Teknisyen düzenle
+- Aktif / pasif yap
+- Güvenli silme
+- Geçmiş/atanmış işi olan teknisyen kalıcı silinmez; pasife alınır.
+- Mevcut sipariş ve iş geçmişi korunur.
+
+Kurulum: PrimerLabV2_GUNCELLE_V33_07_22_7.bat dosyasına çift tıklayın.
+
+Gözden geçirme düzeltmeleri:
+- Teknisyen Yönetim Merkezi; ekleme, düzenleme ve Aktif/Pasif işlemlerinden sonra artık anında yenilenir.
+- Sadece isim güncellemesi pasif teknisyeni artık yanlışlıkla aktif yapmaz.
+- Pasif teknisyenin zaten atanmış olduğu iş tekrar kaydedilebilir (önceden hata veriyordu).
+- Silme kontrolü ve silme tek komutta yapılır; başka tablolara bağlı teknisyen 500 hatası yerine anlaşılır uyarı verir.
+- Pasif bir teknisyenle aynı isimde kayıt açılmak istendiğinde "Aktif Yap" önerilir.
+- Kasa Arşivi tahsilat "Sil" butonu için eksik olan fonksiyon eklendi (sunucuda DELETE /api/kasa-arsiv/tahsilat/{id} gerekir).
+- Kurulum .bat: UTF-8 BOM kaldırıldı; hata durumunda eski sürüm yeniden derlenip başlatılır.
