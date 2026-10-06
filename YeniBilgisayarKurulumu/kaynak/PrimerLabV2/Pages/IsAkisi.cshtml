@@ -108,6 +108,149 @@
         .toast.err{background:var(--red)}
         @@media(max-width:700px){.arac{top:54px}.arac .inp{max-width:none}.pano{grid-template-columns:repeat(5,82vw)}}
     </style>
+    <style>
+        /* ===== Ana programdaki Sipariş Takip Formu stilleri (Index.cshtml'den aynen) ===== */
+        .form-error{background: #fee2e2; color: #991b1b; border-radius: 8px; padding: 11px; margin-bottom: 14px;}
+        .order-line-total{min-height:39px;border:1px solid #dbe3ef;background:#fff;border-radius:9px;padding:10px;font-weight:900;text-align:right}
+        .tooth-board{display:grid;grid-template-columns:1fr 1fr;gap:0;max-width:650px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px}
+        .tooth-quadrant{padding:8px}
+        .tooth-quadrant:nth-child(1),.tooth-quadrant:nth-child(3){border-right:1px solid #94a3b8}
+        .tooth-quadrant:nth-child(1),.tooth-quadrant:nth-child(2){border-bottom:1px solid #94a3b8}
+        .tooth-row-v30{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+        .tooth-q-label{font-size:10px;font-weight:900;color:#64748b;text-align:center;margin-bottom:7px}
+        @@media(max-width:1000px){
+            .order-line-total{grid-column:1 / 3}
+        }
+        .ref-order-brand{grid-template-columns:180px minmax(0,1fr); gap:22px; padding-bottom:12px; margin-bottom:14px;}
+        .ref-order-logo{font-size:31px; line-height:.95; letter-spacing:-1.5px;}
+        .ref-order-logo small{font-size:7.5px; line-height:1.25; letter-spacing:.2px; margin-top:3px;}
+        .ref-tooth-mini{position:relative; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:auto auto; border:0; padding:0; background:#fff; gap:0;}
+        .ref-tooth-mini::before{content:""; position:absolute; left:50%; top:0; bottom:0; width:1px; background:#26364d; transform:translateX(-.5px); pointer-events:none;}
+        .ref-tooth-mini::after{content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:#26364d; transform:translateY(-.5px); pointer-events:none;}
+        .ref-tooth-quadrant{display:flex; align-items:center; justify-content:center; gap:2px; padding:4px 10px 5px; min-width:0;}
+        .ref-tooth-quadrant.left{padding-right:18px}
+        .ref-tooth-quadrant.right{padding-left:18px}
+        .ref-tooth-cell{display:flex; flex-direction:column; align-items:center; gap:1px;}
+        .ref-tooth-cell .tooth-number-top{font-size:5.8px; line-height:1; font-weight:800; color:#475569;}
+        .ref-tooth-cell .tooth-btn{width:18px; min-width:18px; height:18px; padding:0; border:1px solid #b8c4d2; background:#fff; color:#334155; border-radius:1px; font-size:6.2px; line-height:16px; font-weight:800; cursor:pointer;}
+        .ref-tooth-cell .tooth-btn.selected{background:#1565c0; color:#fff; border-color:#1565c0;}
+        .ref-form-title{font-size:11px; letter-spacing:4px; margin-top:7px;}
+        .ref-tooth-mini{display:block; border:1px solid #26364d; padding:5px 6px; background:#fff;}
+        .ref-tooth-mini .tooth-unified-row{display:flex; align-items:center; justify-content:center; gap:2px; flex-wrap:nowrap; min-width:0;}
+        .ref-tooth-mini .tooth-unified-row + .tooth-unified-row{margin-top:3px;}
+        .ref-tooth-mini .tooth-row-label{width:22px; flex:0 0 22px; font-size:6.5px; line-height:1; font-weight:900; color:#64748b; text-align:center; letter-spacing:.1px;}
+        .ref-tooth-mini .tooth-btn{width:19px; min-width:19px; height:19px; border-radius:2px; padding:0; border:1px solid #cbd5e1; background:#fff; color:#334155; cursor:pointer; font-weight:800; font-size:6.7px; line-height:17px;}
+        .ref-tooth-mini .tooth-btn.selected{background:#1565c0; color:#fff; border-color:#1565c0;}
+        .ref-tooth-mini .tooth-mid-gap{width:3px; flex:0 0 3px;}
+        .ref-tooth-quadrant{gap:3px; padding:5px 8px;}
+        .ref-tooth-quadrant.left{padding-right:14px}
+        .ref-tooth-quadrant.right{padding-left:14px}
+        .ref-tooth-cell{gap:0;}
+        .ref-tooth-cell .tooth-number-top{display:none!important;}
+        .ref-tooth-cell .tooth-btn{width:24px; min-width:24px; height:24px; font-size:8.5px; line-height:22px; font-weight:900;}
+        .ref-tooth-mini{display:grid!important;grid-template-columns:1fr 1fr!important;border:0!important;padding:0!important}
+        .ref-tooth-mini .tooth-unified-row{display:none!important}
+        .ref-order-page{max-width:1180px;margin:0 auto}
+        .ref-order-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+        .ref-order-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+        .ref-stl{padding:10px 12px}
+        .ref-stl-baslik{font-size:11px;font-weight:900;letter-spacing:.6px;color:#23354d;margin-bottom:8px}
+        .ref-stl-izgara{display:grid;grid-template-columns:repeat(var(--stl-adet,3),1fr);gap:10px}
+        .ref-stl figure{margin:0;border:1px solid #cbd5e1;border-radius:8px;padding:6px;text-align:center;background:#fff;break-inside:avoid}
+        .ref-stl img{width:100%;max-width:var(--stl-max,100%);aspect-ratio:1/1;object-fit:contain;height:auto;display:block;margin:0 auto}
+        .ref-stl figcaption{font-size:11px;font-weight:900;color:#23354d;margin-top:4px;letter-spacing:.4px}
+        .ref-stl-ara{height:10px}
+        .ref-stl-dosyalar{font-size:9.5px;color:#334155;margin-top:8px;line-height:1.45;word-break:break-word}
+        .ref-stl figcaption small{display:block;font-weight:600;color:#64748b;font-size:9px;letter-spacing:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ref-order-paper{max-width:760px;margin:0 auto;background:#fff;border:1px solid #dbe3ef;box-shadow:0 8px 28px rgba(15,23,42,.08);padding:24px}
+        .ref-order-brand{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:20px;border-bottom:2px solid #172033;padding-bottom:14px;margin-bottom:14px}
+        .ref-order-logo{font-size:34px;font-weight:1000;letter-spacing:-2px;text-align:center;color:#0b1d36}
+        .ref-order-logo small{display:block;font-size:9px;letter-spacing:.4px;font-weight:800;margin-top:2px}
+        .ref-order-logo .ref-firma-img{display:block;max-width:100%;max-height:72px;object-fit:contain;margin:0 auto 4px}
+        .ref-order-logo small.ref-firma-ad{font-size:11.5px;letter-spacing:.1px;font-weight:1000}
+        .ref-firma-il{text-align:center;font-size:9.5px;color:#334155;margin-top:6px;line-height:1.45;font-weight:600}
+        .ref-firma-alt{margin-top:10px;padding-top:6px;border-top:1px solid #cbd5e1;font-size:9.5px;color:#475569;text-align:center;white-space:pre-wrap}
+        .an-mail-bant{max-width:760px;margin:0 auto 10px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:12px;padding:10px 14px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;gap:10px;align-items:center}
+        .an-mail-bant button{border:0;background:none;color:#1e40af;font-weight:900;cursor:pointer}
+        .ref-tooth-mini{display:grid;grid-template-columns:1fr 1fr;border-left:1px solid #26364d;border-right:1px solid #26364d}
+        .ref-tooth-mini .quad{padding:5px;display:flex;gap:3px;justify-content:center;flex-wrap:wrap}
+        .ref-tooth-mini .quad:nth-child(1),.ref-tooth-mini .quad:nth-child(2){border-bottom:1px solid #26364d}
+        .ref-tooth-mini .quad:nth-child(1),.ref-tooth-mini .quad:nth-child(3){border-right:1px solid #26364d}
+        .ref-tooth-mini button{width:25px;height:25px;padding:0;border:1px solid #cbd5e1;background:#fff;font-size:9px;font-weight:800;cursor:pointer}
+        .ref-tooth-mini button.selected{background:#1565c0;color:#fff;border-color:#1565c0}
+        .ref-form-title{text-align:center;font-size:13px;letter-spacing:4px;font-weight:1000;color:#0b1d36;margin:8px 0 0}
+        .ref-box{border:1.5px solid #23354d;margin-top:10px}
+        .ref-grid-2{display:grid;grid-template-columns:1fr 1fr}
+        .ref-grid-2>*:first-child{border-right:1px solid #23354d}
+        .ref-field{padding:9px 12px;min-height:58px}
+        .ref-field label,.ref-section-label{display:block;font-size:10px;font-weight:1000;letter-spacing:.35px;color:#10233e;margin-bottom:5px}
+        .ref-field input,.ref-field select,.ref-field textarea{width:100%;border:0;border-bottom:1px dotted #8b9bb0;border-radius:0;background:transparent;padding:5px 2px;font-weight:800;color:#10233e;outline:none}
+        .ref-field textarea{border:0;min-height:80px;resize:vertical;font-weight:600}
+        .ref-job-box{padding:9px 12px}
+        .ref-job-row{display:grid;grid-template-columns:minmax(0,1fr) 70px 34px;gap:7px;margin-bottom:7px;align-items:center}
+        .ref-job-row select,.ref-job-row input{height:34px;border:1px solid #cbd5e1;border-radius:7px;padding:5px 9px;background:#fff;font-weight:800}
+        .ref-job-row button{height:34px;border:1px solid #fecaca;background:#fff;color:#ef4444;border-radius:7px;font-size:18px;cursor:pointer}
+        .ref-add-line{border:1px dashed #93c5fd;background:#eff6ff;color:#1565c0;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:900;cursor:pointer}
+        .ref-help{font-size:9px;color:#718096;margin-top:6px}
+        .ref-materials{display:grid;gap:6px;padding-top:2px}
+        .ref-materials label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:900;color:#172033;margin:0}
+        .ref-materials input{width:auto;margin:0}
+        .ref-selected-teeth{margin-top:10px;background:#f1f5f9;padding:8px 10px;font-size:10px;font-weight:800;color:#475569}
+        .ref-history{max-width:760px;margin:18px auto 0;background:#fff;border:1px solid #dbe3ef;border-radius:14px;padding:14px}
+        .ref-history-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+        .ref-history-head strong{font-size:13px}
+        .ref-history-search{max-width:220px;height:34px;border:1px solid #dbe3ef;border-radius:8px;padding:0 10px}
+        .ref-member-count{font-size:15px;font-weight:1000;text-align:center;padding:5px;border-bottom:1px dotted #8b9bb0;color:#10233e}
+        @@media(max-width:800px){
+            .ref-order-top{flex-direction:column}
+            .ref-order-actions{justify-content:flex-start}
+            .ref-order-paper{padding:12px}
+            .ref-order-brand{grid-template-columns:1fr}
+            .ref-grid-2{grid-template-columns:1fr}
+            .ref-grid-2>*:first-child{border-right:0;border-bottom:1px solid #23354d}
+        }
+        body.a5-olcum #siparisFormu .ref-order-paper{width:760px!important;max-width:none!important;padding:24px!important}
+        body.a5-olcum .ref-order-paper .ref-order-brand{grid-template-columns:150px 1fr!important}
+        body.a5-olcum .ref-order-paper .ref-grid-2{grid-template-columns:1fr 1fr!important}
+        body.a5-olcum .ref-order-paper .ref-grid-2>*:first-child{border-right:1px solid #23354d!important;border-bottom:0!important}
+        @@media print{
+            #siparisFormu,#siparisFormu *{visibility:visible!important}
+            #siparisFormu{position:absolute;left:0;top:0;width:100%;background:#fff}
+            .sidebar,.ref-order-top,.ref-history,.global-new-job,.ai-fab,.ai-panel{display:none!important}
+            .ref-order-paper{box-shadow:none;border:0;max-width:100%;padding:0}
+            body.print-a5,body.print-a5 .app,body.print-a5 .main{background:#fff!important}
+            body.print-a5 #siparisFormu{padding:0!important;margin:0!important}
+            body.print-a5 #siparisFormu .ref-order-paper{zoom:var(--a5-zoom,1);width:var(--a5-width,760px)!important;max-width:none!important;margin:0 auto!important;padding:24px!important;border:1px solid #dbe3ef!important;box-shadow:none!important}
+            body.print-a5 .ref-order-paper .ref-order-brand{grid-template-columns:150px 1fr!important}
+            body.print-a5 .ref-order-paper .ref-grid-2{grid-template-columns:1fr 1fr!important}
+            body.print-a5 .ref-order-paper .ref-grid-2>*:first-child{border-right:1px solid #23354d!important;border-bottom:0!important}
+            body.print-a5 .ref-order-paper, body.print-a5 .ref-order-paper *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+            body.print-a5 .ref-order-paper .ref-box{break-inside:avoid}
+            body.print-a5 .ref-order-paper textarea{resize:none;overflow:hidden!important}
+            body.print-a5 .ref-order-paper .ref-add-line, body.print-a5 .ref-order-paper .ref-help, body.print-a5 .ref-order-paper .an-kalem-sil{display:none!important}
+            body.print-a5 .ref-order-paper select{-webkit-appearance:none!important;appearance:none!important;background-image:none!important}
+            body.print-a5 .ref-order-paper input[type=date]::-webkit-calendar-picker-indicator{display:none!important}
+            body.print-a5 .job-slip, body.print-a5 .delivery-slip{display:none!important}
+        }
+        .tooth-grid{display:grid; grid-template-columns:repeat(8,36px); gap:5px; justify-content:start; margin-top:8px;}
+        .tooth-btn{width:36px; height:36px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:#334155; cursor:pointer; font-weight:800; font-size:11px;}
+        .tooth-btn.selected{background:#0f172a; color:#fff; border-color:#0f172a;}
+        @@media(max-width:900px){
+            .tooth-grid{grid-template-columns:repeat(4,36px)}
+        }
+        /* İş Akışı: sipariş formu düzeni, kayıtlı (salt okunur) form ve yazdırma */
+        #siparisFormu .ref-order-paper{background:#fff}
+        .sf-bant{max-width:760px;margin:0 auto 10px;background:var(--blue-soft);border:1px solid #bfdbfe;color:#1e3a8a;border-radius:12px;padding:9px 12px;font-size:13px;font-weight:700;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+        .ref-order-paper.sf-salt select,.ref-order-paper.sf-salt input,.ref-order-paper.sf-salt textarea,.ref-order-paper.sf-salt .tooth-btn{pointer-events:none}
+        .ref-order-paper.sf-salt .ref-add-line,.ref-order-paper.sf-salt .ref-help,.ref-order-paper.sf-salt .an-kalem-sil{display:none!important}
+        #anFormHistoryBody tr{cursor:pointer}
+        @@media print{
+            html,body{background:#fff!important}
+            body *{visibility:hidden!important}
+            .ust,.arac,.sf-bant,.toast,.perde,.cekmece,.oniz{display:none!important}
+        }
+    </style>
+    <script>window.FIRMA_FORM = @Html.Raw(Firma.IstemciJson());</script>
 </head>
 <body>
 
@@ -151,7 +294,8 @@
         <span style="flex:1"></span>
         <button class="cip" type="button" onclick="formlarAc('tamam')" title="Tamamlanan işler (panoda gösterilmez)">🏁 Tamamlananlar <span class="say" id="tamamSay"></span></button>
         <button class="cip" type="button" onclick="formlarAc('hepsi')" title="Geçmişte açılmış tüm sipariş formları">📄 Sipariş Formları</button>
-        <button class="btn" type="button" style="height:32px" onclick="window.open('/hekim-portal?mod=akis','_blank')">＋ Yeni Sipariş</button>
+        <button class="cip" type="button" onclick="window.open('/hekim-portal?mod=akis','_blank')" title="Tarama dosyası / link ekleyerek sipariş (hekim portalı formu)">📎 Dosyalı Sipariş</button>
+        <button class="btn" type="button" style="height:32px" onclick="sfYeni()" title="Ana programdaki Sipariş Formu ile aynı form">＋ Yeni Sipariş</button>
     </div>
 
     <div id="pano" class="pano"></div>
@@ -171,6 +315,125 @@
         </div>
         <div id="formlarListe" class="liste" style="padding:0"></div>
     </div>
+
+    <!-- Sipariş Takip Formu: ana programdaki (admin) Sipariş Formu ile aynı şablon, aynı A5 çıktı -->
+    <div id="siparisFormu" class="hidden" style="padding:12px 16px">
+        <div class="ref-order-page">
+            <div class="ref-order-top">
+                <div>
+                    <h1 class="page-title" style="margin:0;font-size:22px">📝 Sipariş Takip Formu</h1>
+                    <div class="page-subtitle" id="sfAltBaslik" style="color:var(--muted);font-size:13px;margin-top:4px">Yeni gelen iş için sipariş formu doldurun — onay bekleyen işlere otomatik atanacaktır.</div>
+                </div>
+                <div class="ref-order-actions">
+                    <button type="button" class="btn btn-light" onclick="sfKapat()">← Panoya Dön</button>
+                    <button type="button" class="btn btn-light" onclick="sfYeni()">▣ Yeni Form</button>
+                    <button id="sfTemizleBtn" type="button" class="btn btn-light" onclick="sfTemizle(false)">🗑 Temizle</button>
+                    <button id="sfYazdirBtn" type="button" class="btn btn-light" onclick="sfYazdir()" disabled>▣ Yazdır</button>
+                    <button id="sfKaydetBtn" type="button" class="btn" onclick="sfKaydet()">☁ Onaya Gönder</button>
+                </div>
+            </div>
+            <div id="sfBant" class="sf-bant hidden"></div>
+                <div class="ref-order-paper">
+                    <div class="ref-order-brand">
+                        <div class="ref-order-logo" id="anFirmaLogo"></div>
+                        <div>
+                            <div id="anDisSemasi" class="ref-tooth-mini"></div>
+                            <div class="ref-form-title">SİPARİŞ TAKİP FORMU</div>
+                            <div id="anFirmaIletisim" class="ref-firma-il"></div>
+                        </div>
+                    </div>
+
+                    <div class="ref-box ref-grid-2">
+                        <div class="ref-field">
+                            <label>KLİNİK / HEKİM</label>
+                            <select id="anHekim" onchange="sfHekimDegisti()">
+                                <option value="">— HEKİM SEÇİN —</option>
+                            </select>
+                        </div>
+                        <div class="ref-field">
+                            <label>HASTA ADI - SOYADI</label>
+                            <input id="anHasta" type="text" maxlength="150" autocomplete="off" />
+                        </div>
+                    </div>
+
+                    <div class="ref-box ref-job-box">
+                        <span class="ref-section-label">İŞ TÜRÜ / KALEMLERİ</span>
+                        <div id="anKalemler"></div>
+                        <button type="button" class="ref-add-line" onclick="sfKalemEkle()">+ Kalem Ekle</button>
+                        <div class="ref-help">TL, EUR ve USD aynı formda birlikte kullanılabilir. Sistem para birimlerine göre ayrı iş kayıtları oluşturur; hekim, hasta, termin, renk, diş ve not bilgilerini aynen korur.</div>
+                    </div>
+
+                    <div class="ref-box ref-grid-2">
+                        <div>
+                            <div class="ref-field">
+                                <label>RENK</label>
+                                <input id="anDisRengi" type="text" maxlength="50" list="disRengiSecenekleri" placeholder="A2 / A3.5 / BL1" />
+                            </div>
+                            <div class="ref-field">
+                                <label>ÜYE SAYISI</label>
+                                <div id="anUyeSayisi" class="ref-member-count">—</div>
+                            </div>
+                            <div class="ref-field">
+                                <label>TESLİM TARİHİ</label>
+                                <input id="anTermin" type="date" />
+                            </div>
+                        </div>
+                        <div class="ref-field">
+                            <label>MATERYAL</label>
+                            <input id="anMateryal" type="hidden" />
+                            <div class="ref-materials">
+                                <label><input type="radio" name="anMateryalRadio" value="Zirkonyum" onchange="sfMateryalSec(this)"> ZİRKONYA</label>
+                                <label><input type="radio" name="anMateryalRadio" value="Metal Destekli Porselen" onchange="sfMateryalSec(this)"> METAL DESTEKLİ PORSELEN</label>
+                                <label><input type="radio" name="anMateryalRadio" value="E.max" onchange="sfMateryalSec(this)"> EMAX</label>
+                                <label><input type="radio" name="anMateryalRadio" value="Lamine" onchange="sfMateryalSec(this)"> LAMİNE</label>
+                                <label><input type="radio" name="anMateryalRadio" value="PMMA" onchange="sfMateryalSec(this)"> PMMA</label>
+                                <label><input type="radio" name="anMateryalRadio" value="Titanyum" onchange="sfMateryalSec(this)"> TİTANYUM</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ref-box">
+                        <div class="ref-field">
+                            <label>NOTLAR</label>
+                            <textarea id="anNot" maxlength="2000"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="anStlGorseller" class="ref-box ref-stl" style="display:none"></div>
+
+                    <div id="anSelectedTeeth" class="ref-selected-teeth">Seçilen Dişler: —</div>
+                    <div id="anFirmaAltNot" class="ref-firma-alt" style="display:none"></div>
+                </div>
+
+            <div class="ref-history">
+                <div class="ref-history-head">
+                    <strong>📋 Geçmiş Sipariş Formları</strong>
+                    <input id="anFormHistorySearch" class="ref-history-search" type="text" placeholder="🔍 Hekim / hasta / iş no ara..." oninput="sfGecmisCiz()" />
+                </div>
+                <div class="liste" style="padding:0">
+                    <table>
+                        <thead><tr><th>İş</th><th>Tarih</th><th>Hekim</th><th>Hasta</th><th>İş</th><th>Üye</th><th>İşlem</th></tr></thead>
+                        <tbody id="anFormHistoryBody"></tbody>
+                    </table>
+                </div>
+                <div style="text-align:right;margin-top:8px"><button type="button" class="btn btn-light" style="height:32px" onclick="formlarAc('hepsi')">📄 Tüm sipariş formları →</button></div>
+            </div>
+        </div>
+    </div>
+    <datalist id="disRengiSecenekleri">
+        <option value="A1"></option><option value="A2"></option>
+        <option value="A3"></option><option value="A3.5"></option>
+        <option value="A4"></option><option value="B1"></option>
+        <option value="B2"></option><option value="B3"></option>
+        <option value="B4"></option><option value="C1"></option>
+        <option value="C2"></option><option value="C3"></option>
+        <option value="C4"></option><option value="D2"></option>
+        <option value="D3"></option><option value="D4"></option>
+        <option value="BL1"></option><option value="BL2"></option>
+        <option value="BL3"></option><option value="BL4"></option>
+        <option value="OM1"></option><option value="OM2"></option>
+        <option value="OM3"></option>
+    </datalist>
 </section>
 
 <div id="perde" class="perde hidden" onclick="cekmeceKapat()"></div>
@@ -311,6 +574,7 @@
         }
     }
     function gorunumDegis() {
+        sfGizle(); $("formlar").classList.add("hidden");
         gorunum = gorunum === "pano" ? "liste" : "pano";
         $("pano").classList.toggle("hidden", gorunum !== "pano"); $("liste").classList.toggle("hidden", gorunum !== "liste");
         $("gorunumBtn").textContent = gorunum === "pano" ? "☰ Liste" : "▦ Pano"; ciz();
@@ -395,30 +659,8 @@
         catch (err) { toast(err.message, true); }
     }
 
-    // ---------- Fiyatsız sipariş formu (A5) ----------
-    async function formYazdir(id) {
-        const x = isler.find(i => i.id === id) || tumIsler.find(i => i.id === id); if (!x) return;
-        let d = { dosyalar: [], linkler: [] };
-        try { d = await api(`/api/is-akisi/isler/${id}/dosyalar`); } catch {}
-        const w = window.open("", "_blank"); if (!w) { toast("Açılır pencereye izin verin.", true); return; }
-        const sat = (a, b) => `<tr><th>${a}</th><td>${b}</td></tr>`;
-        w.document.write(`<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Sipariş Formu #${x.id}</title><style>
-            @@page{size:A5 portrait;margin:8mm} body{font-family:Arial,sans-serif;color:#111;font-size:12px;margin:0}
-            .bas{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
-            .bas img{max-height:46px;max-width:150px} h1{font-size:15px;letter-spacing:2px;margin:0;text-align:right}
-            table{width:100%;border-collapse:collapse} th,td{border:1px solid #333;padding:6px 7px;text-align:left;vertical-align:top} th{width:30%;background:#f1f1f1;font-size:11px}
-            .kucuk{font-size:10px;color:#444} .not{white-space:pre-wrap}
-        </style></head><body>
-            <div class="bas"><div>${FIRMA.logo ? `<img src="${FIRMA.logo}">` : `<b style="font-size:16px">${esc(FIRMA.ad)}</b>`}<div class="kucuk">${esc(FIRMA.iletisim || "")}</div></div><div><h1>SİPARİŞ TAKİP FORMU</h1><div class="kucuk" style="text-align:right">İş No #${x.id} · ${tarih(x.olusturmaTarihi)}</div></div></div>
-            <table>${sat("Klinik / Hekim", esc(x.hekimAdi) + (x.klinikAdi ? " · " + esc(x.klinikAdi) : ""))}${sat("Hasta", "<b>" + esc(x.hastaAdi) + "</b>")}
-            ${sat("İş türü / adet", (x.kalemler || []).map(k => esc(k.isTuru) + " × " + k.adet).join("<br>") || "-")}${sat("Dişler", esc(x.disSemasi || "-"))}
-            ${sat("Renk", esc(x.disRengi || "-"))}${sat("Materyal", esc(x.materyal || "-"))}${sat("Teslim tarihi", tarih(x.terminTarihi))}
-            ${sat("Teknisyen", esc(x.teknisyenAdi || "-"))}${sat("Notlar", '<div class="not">' + esc(x.notlar || "-") + "</div>")}
-            ${d.dosyalar.length ? sat("Ekli dosyalar", d.dosyalar.map(f => esc(f.orijinalDosyaAdi) + " (" + esc(f.dosyaTuru) + ")").join(" · ")) : ""}
-            ${d.linkler.length ? sat("Dosya linkleri", '<span style="word-break:break-all">' + d.linkler.map(l => esc(l.url)).join("<br>") + "</span>") : ""}</table>
-            <script>setTimeout(()=>print(),300)<\/script></body></html>`);
-        w.document.close();
-    }
+    // ---------- Sipariş formu çıktısı: ana programdaki şablonla (bkz. Sipariş Takip Formu) ----------
+    function formYazdir(id) { return sfGoruntule(id, true); }
 
     // ---------- STL / PLY / OBJ 3B önizleme (fareyle üstüne gelince) ----------
     const onizOnbellek = new Map();
@@ -503,7 +745,7 @@
     async function formlarAc(durum) {
         $("fDurum").value = durum === "tamam" ? "tamam" : "hepsi";
         $("formlarBaslik").textContent = durum === "tamam" ? "🏁 Tamamlanan İşler" : "📄 Sipariş Formları (tümü)";
-        ["pano", "liste"].forEach(i => $(i).classList.add("hidden")); $("formlar").classList.remove("hidden");
+        sfGizle(); ["pano", "liste"].forEach(i => $(i).classList.add("hidden")); $("formlar").classList.remove("hidden");
         $("formlarListe").innerHTML = '<div class="bos">Yükleniyor...</div>';
         try { tumIsler = await api("/api/is-akisi/isler?tumu=true"); formlarCiz(); }
         catch (err) { $("formlarListe").innerHTML = `<div class="bos">${esc(err.message)}</div>`; }
@@ -518,7 +760,685 @@
             (!q || [x.hastaAdi, x.hekimAdi, x.klinikAdi, x.teknisyenAdi, "#" + x.id, String(x.id), ...(x.kalemler || []).map(i => i.isTuru)].some(v => String(v || "").toLocaleLowerCase("tr-TR").includes(q))));
         $("formlarListe").innerHTML = `<div style="color:var(--muted);font-size:12px;margin-bottom:6px">${l.length} kayıt</div><table><thead><tr><th>İş</th><th>Tarih</th><th>Hasta / Hekim</th><th>İş türü</th><th>Kaynak</th><th>Durum</th><th>Teknisyen</th><th>Teslim</th><th></th></tr></thead><tbody>${l.slice(0, 1000).map(x =>
             `<tr onclick="cekmeceAc(${x.id})"><td><b>#${x.id}</b></td><td>${tarih(x.olusturmaTarihi)}</td><td><b>${esc(x.hastaAdi)}</b><div style="color:var(--muted)">${esc(x.hekimAdi)}</div></td><td>${kalemMetni(x)}</td><td>${KAYNAK[x.kaynak] || esc(x.kaynak)}</td><td>${esc(x.onayDurumu === "Gelen Onay" ? "Onay bekliyor" : x.durum)}</td><td>${esc(x.teknisyenAdi || "-")}</td><td>${tarih(x.terminTarihi)}</td>
-            <td><button class="btn btn-light" type="button" style="height:30px" onclick="event.stopPropagation();formYazdir(${x.id})">🖨 Form</button></td></tr>`).join("") || '<tr><td colspan="9" class="bos">Kayıt yok</td></tr>'}</tbody></table>${l.length > 1000 ? '<div class="bos">İlk 1000 kayıt gösteriliyor; aramayı daraltın.</div>' : ""}`;
+            <td style="white-space:nowrap"><button class="btn btn-light" type="button" style="height:30px" onclick="event.stopPropagation();sfGoruntule(${x.id})">📄 Form</button> <button class="btn btn-light" type="button" style="height:30px" onclick="event.stopPropagation();formYazdir(${x.id})">🖨 Yazdır</button></td></tr>`).join("") || '<tr><td colspan="9" class="bos">Kayıt yok</td></tr>'}</tbody></table>${l.length > 1000 ? '<div class="bos">İlk 1000 kayıt gösteriliyor; aramayı daraltın.</div>' : ""}`;
+    }
+
+    // ================= Sipariş Takip Formu (ana programdaki Sipariş Formu ile aynı) =================
+    // Kâğıt şablonu, alanlar, diş şeması, kalem satırları, akıllı üye sayısı, "Onaya Gönder" kuralları
+    // ve A5 çıktı ana programdakiyle birebir aynıdır. Tek fark: fiyat / para birimi panelde hiç yoktur;
+    // sunucu hekimin iş listesinden ekler. Eski formlar aynı şablonla açılıp yeniden yazdırılır.
+    const FORM_FIRMA = window.FIRMA_FORM || {};
+    const escapeHtml = esc, showSuccess = t => toast(t), showError = t => toast(t, true);
+    const sfDisler = new Set();
+    let sfHekimler = null, sfIsTurleri = [], sfHekimSecimNo = 0, sfKayitli = false, sfYazdirIsId = null,
+        sfSalt = false, sfAcik = false, sfDonus = "pano";
+
+    function sfFirmaUygula() {
+        const F = FORM_FIRMA;
+        const lg = $("anFirmaLogo");
+        if (lg) lg.innerHTML = (F.logo ? `<img class="ref-firma-img" src="${F.logo}" alt="">` : esc(F.kisaltma || "")) +
+            `<small class="ref-firma-ad">${esc(F.ad || "")}</small>` + (F.altBaslik ? `<small>${esc(F.altBaslik)}</small>` : "");
+        const il = $("anFirmaIletisim");
+        if (il) {
+            const v = [F.vergiDairesi, F.vergiNo].filter(Boolean).join(" / ");
+            il.innerText = [[F.adres, F.telefon, F.eposta, F.web].filter(Boolean).join(" · "), v ? "V.D. / No: " + v : ""].filter(Boolean).join("\n");
+        }
+        const an = $("anFirmaAltNot");
+        if (an) { an.innerText = F.formAltNotu || ""; an.style.display = F.formAltNotu ? "block" : "none"; }
+    }
+
+    // ---------- ekran ----------
+    function sfGoster(donus) {
+        sfDonus = donus || "pano";
+        ["pano", "liste", "formlar"].forEach(i => $(i).classList.add("hidden"));
+        $("siparisFormu").classList.remove("hidden");
+        sfAcik = true;
+        window.scrollTo(0, 0);
+    }
+    function sfGizle() { if (!sfAcik) return; $("siparisFormu").classList.add("hidden"); sfAcik = false; }
+    function sfKapat() {
+        sfGizle();
+        if (sfDonus === "formlar") { $("formlar").classList.remove("hidden"); formlarCiz(); return; }
+        $(gorunum === "pano" ? "pano" : "liste").classList.remove("hidden");
+        ciz();
+    }
+    function sfMevcutEkran() {
+        if (sfAcik) return sfDonus;
+        return $("formlar").classList.contains("hidden") ? "pano" : "formlar";
+    }
+    function sfButonlar() {
+        $("sfYazdirBtn").disabled = !sfKayitli;
+        $("sfKaydetBtn").disabled = sfKayitli || sfSalt;
+        $("sfKaydetBtn").classList.toggle("hidden", sfSalt);
+        $("sfTemizleBtn").classList.toggle("hidden", sfSalt);
+    }
+    function sfBant(x) {
+        const b = $("sfBant");
+        if (!x) {
+            b.classList.add("hidden"); b.innerHTML = "";
+            $("sfAltBaslik").textContent = "Yeni gelen iş için sipariş formu doldurun — onay bekleyen işlere otomatik atanacaktır.";
+            return;
+        }
+        b.innerHTML = `<span>📄 <b>#${x.id}</b> · ${esc(x.hastaAdi)} · ${esc(x.hekimAdi)} · ${tarih(x.olusturmaTarihi)} — kayıtlı sipariş formu (değiştirilemez)</span>
+            <span style="display:flex;gap:6px"><button class="btn btn-light" type="button" style="height:32px" onclick="cekmeceAc(${x.id})">İş detayı</button><button class="btn" type="button" style="height:32px" onclick="sfYazdir()">🖨 Yazdır</button></span>`;
+        b.classList.remove("hidden");
+        $("sfAltBaslik").textContent = "Geçmişte açılmış sipariş formu — aynı şablonla yeniden yazdırabilirsiniz.";
+    }
+    // Kayıtlı form salt okunur gösterilir (alanlar devre dışı bırakılmaz ki kâğıtta soluk çıkmasın).
+    function sfSaltAyarla(acik) {
+        sfSalt = !!acik;
+        const kagit = document.querySelector("#siparisFormu .ref-order-paper");
+        kagit.classList.toggle("sf-salt", sfSalt);
+        kagit.querySelectorAll("input,textarea").forEach(e => { e.readOnly = sfSalt; });
+        kagit.querySelectorAll("select,input,textarea,button").forEach(e => { if (sfSalt) e.tabIndex = -1; else e.removeAttribute("tabindex"); });
+    }
+
+    // ---------- hekim ve iş listesi ----------
+    async function sfHekimleriYukle() {
+        if (!sfHekimler) sfHekimler = await api("/api/is-akisi/hekimler");
+        const sel = $("anHekim"), cur = sel.value;
+        sel.innerHTML = '<option value="">Hekim seç...</option>' + sfHekimler.map(h => {
+            const hekim = String(h.adSoyad || "").trim(), klinik = String(h.klinikAdi || "").trim();
+            let g = hekim || klinik || ("Hekim #" + Number(h.id));
+            // Hekim ve klinik aynıysa aynı bilgi iki kez yazılmaz.
+            if (hekim && klinik && hekim.toLocaleLowerCase("tr-TR") !== klinik.toLocaleLowerCase("tr-TR")) g = hekim + " — " + klinik;
+            return `<option value="${Number(h.id)}">${esc(g)}</option>`;
+        }).join("");
+        if (cur && sfHekimler.some(h => String(h.id) === cur)) sel.value = cur;
+    }
+    async function sfHekimDegisti() {
+        // Hekim hızlıca değiştirilirse yalnız son seçimin listesi uygulanır.
+        const no = ++sfHekimSecimNo, id = Number($("anHekim").value || 0), host = $("anKalemler");
+        host.innerHTML = ""; sfIsTurleri = []; $("anKalemNotu")?.remove();
+        if (!id) { sfToplamGuncelle(); return; }
+        let l = [];
+        try { l = await api(`/api/is-akisi/hekimler/${id}/is-turleri`); } catch (e) { toast(e.message, true); }
+        if (no !== sfHekimSecimNo) return;
+        sfIsTurleri = (l || []).map(x => x.isTuru).filter(Boolean);
+        if (!sfIsTurleri.length) {
+            const n = document.createElement("div");
+            n.id = "anKalemNotu"; n.className = "form-error"; n.style.display = "block";
+            n.textContent = "Bu hekime henüz iş listesi tanımlanmamış. Ana programda Hekimler ekranından hekimin iş listesini tanımlayın.";
+            host.parentNode.insertBefore(n, host);
+        }
+        sfKalemEkle(sfIsTurleri[0] ? { isTuru: sfIsTurleri[0] } : null);
+    }
+
+    // ---------- kalemler (ana programla aynı satır yapısı; fiyat alanları yok) ----------
+    function sfSecenekler(secili) {
+        const cur = String(secili || "");
+        const l = !cur || sfIsTurleri.includes(cur) ? sfIsTurleri : [cur, ...sfIsTurleri];
+        return '<option value="">İş türü seç...</option>' + l.map(v => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(v)}</option>`).join("");
+    }
+    function sfAdetTipi(isTuru) {
+        const n = String(isTuru || "").toLocaleLowerCase("tr-TR");
+        if (n.includes("bar") || n.includes("titanyum bar") || n.includes("ti-bar")) return "cene";
+        return "dis";
+    }
+    function sfCeneAdedi() {
+        let ust = false, alt = false;
+        sfDisler.forEach(x => { const n = Number(x); if (n >= 11 && n <= 28) ust = true; if (n >= 31 && n <= 48) alt = true; });
+        return (ust ? 1 : 0) + (alt ? 1 : 0);
+    }
+    function sfAkilliAdetler() {
+        const dis = sfDisler.size, cene = sfCeneAdedi();
+        document.querySelectorAll("#siparisFormu .an-job-line").forEach(row => {
+            const mode = row.querySelector(".an-count-mode")?.value || sfAdetTipi(row.querySelector(".an-type")?.value || "");
+            const q = row.querySelector(".an-qty"); if (!q) return;
+            if (mode === "manuel" || row.dataset.manualOverride === "1") return;
+            const v = mode === "cene" ? cene : dis;
+            q.value = v > 0 ? String(v) : "";
+            q.placeholder = "Belirtilmedi";
+        });
+        sfToplamGuncelle();
+    }
+    function sfKalemEkle(prefill) {
+        const host = $("anKalemler"); if (!host) return;
+        const row = document.createElement("div");
+        row.className = "ref-job-row an-job-line";
+        row.style.gridTemplateColumns = "minmax(260px,1fr) 110px 38px";
+        const mode = sfAdetTipi(prefill?.isTuru || ""), dolu = Number(prefill?.adet || 0) > 0;
+        row.innerHTML = `
+            <select class="an-type" onchange="sfKalemTurDegisti(this)">${sfSecenekler(prefill?.isTuru || "")}</select>
+            <input class="an-count-mode" type="hidden" value="${mode}" />
+            <input class="an-qty" type="number" min="1" value="${dolu ? Number(prefill.adet) : ""}" placeholder="Belirtilmedi"
+                   title="Adet / üye sayısı — sistem otomatik hesaplar, gerekirse elle düzeltebilirsin"
+                   oninput="this.closest('.an-job-line').dataset.manualOverride='1';sfToplamGuncelle()" />
+            <button type="button" class="an-kalem-sil" title="Kalemi kaldır"
+                    onclick="this.closest('.an-job-line').remove();sfToplamGuncelle();sfDegisti();">×</button>`;
+        host.appendChild(row);
+        if (!dolu) sfAkilliAdetler(); else sfToplamGuncelle();
+    }
+    function sfKalemTurDegisti(sel) {
+        const row = sel.closest(".an-job-line"), m = row?.querySelector(".an-count-mode");
+        if (m) { m.value = sfAdetTipi(sel.value); row.dataset.manualOverride = ""; }
+        sfAkilliAdetler();
+    }
+    function sfToplamGuncelle() {
+        let adet = 0;
+        document.querySelectorAll("#siparisFormu .an-job-line").forEach(row => {
+            const t = row.querySelector(".an-type")?.value || "", q = Number(row.querySelector(".an-qty")?.value || 0);
+            if (t && q > 0) adet += q;
+        });
+        $("anUyeSayisi").innerText = adet > 0 ? String(adet) : "Belirtilmedi";
+    }
+    function sfKalemleriOku() {
+        return [...document.querySelectorAll("#siparisFormu .an-job-line")]
+            .map(r => ({ isTuru: r.querySelector(".an-type")?.value.trim() || "", adet: Number(r.querySelector(".an-qty")?.value || 0) }))
+            .filter(k => k.isTuru && k.adet > 0);
+    }
+
+    // ---------- diş şeması ve materyal ----------
+    function sfDisSemasi() {
+        const el = $("anDisSemasi"); if (!el) return;
+        const q1 = [18, 17, 16, 15, 14, 13, 12, 11], q2 = [21, 22, 23, 24, 25, 26, 27, 28];
+        const q4 = [48, 47, 46, 45, 44, 43, 42, 41], q3 = [31, 32, 33, 34, 35, 36, 37, 38];
+        const kadran = (dl, yan) => `<div class="ref-tooth-quadrant ${yan}">${dl.map(n =>
+            `<div class="ref-tooth-cell"><button type="button" class="tooth-btn${sfDisler.has(String(n)) ? " selected" : ""}" title="Diş ${n}" onclick="sfDisToggle('${n}')">${n}</button></div>`).join("")}</div>`;
+        el.innerHTML = kadran(q1, "left") + kadran(q2, "right") + kadran(q4, "left") + kadran(q3, "right");
+        $("anSelectedTeeth").innerText = sfDisler.size ? "Seçilen Dişler: " + [...sfDisler].join(", ") : "Seçilen Dişler: —";
+        if (sfSalt) sfSaltAyarla(true);
+    }
+    function sfDisToggle(n) {
+        if (sfSalt) return;
+        const k = String(n);
+        if (sfDisler.has(k)) sfDisler.delete(k); else sfDisler.add(k);
+        sfDisSemasi(); sfAkilliAdetler(); sfDegisti();
+    }
+    function sfMateryalSec(r) { $("anMateryal").value = r?.checked ? String(r.value || "") : ""; }
+    function sfMateryalSync() {
+        const v = String($("anMateryal").value || "").trim().toLowerCase();
+        document.querySelectorAll('input[name="anMateryalRadio"]').forEach(r => { r.checked = String(r.value || "").trim().toLowerCase() === v; });
+    }
+
+    // ---------- form durumu: gönderildikten sonra değişirse yeniden onaya gönderilmesi gerekir ----------
+    function sfDegisti() { if (sfSalt || !sfKayitli) return; sfKayitli = false; sfButonlar(); }
+    document.addEventListener("input", e => { if (e.target?.closest?.("#siparisFormu .ref-order-paper")) sfDegisti(); });
+    document.addEventListener("change", e => { if (e.target?.closest?.("#siparisFormu .ref-order-paper")) sfDegisti(); });
+
+    function sfTemizle(yeni) {
+        sfKayitli = false; sfYazdirIsId = null; sfSaltAyarla(false); stlGorselAlaniTemizle(); sfBant(null);
+        ["anHasta", "anTermin", "anDisRengi", "anMateryal", "anNot"].forEach(i => { $(i).value = ""; });
+        document.querySelectorAll('input[name="anMateryalRadio"]').forEach(r => { r.checked = false; });
+        sfDisler.clear(); sfDisSemasi();
+        $("anKalemler").innerHTML = ""; $("anKalemNotu")?.remove(); sfIsTurleri = [];
+        if (yeni) $("anHekim").value = "";
+        sfToplamGuncelle(); sfButonlar();
+        // Hekim seçili kaldıysa iş listesi yeniden getirilir (boş kalem satırı açılır).
+        if (!yeni && $("anHekim").value) sfHekimDegisti();
+    }
+
+    async function sfYeni() {
+        sfGoster(sfMevcutEkran());
+        sfTemizle(true); sfFirmaUygula();
+        try { await sfHekimleriYukle(); } catch (e) { toast(e.message, true); }
+        sfGecmisYukle();
+        $("anHekim").focus();
+    }
+
+    async function sfKaydet() {
+        if (sfSalt) return;
+        const hekimId = Number($("anHekim").value || 0), hastaAdi = $("anHasta").value.trim(), kalemler = sfKalemleriOku();
+        if (!hekimId) return toast("Hekim seç.", true);
+        if (!hastaAdi) return toast("Hasta adı gerekli.", true);
+        if (!kalemler.length) return toast("En az bir iş kalemi ekle.", true);
+        const b = $("sfKaydetBtn"); b.disabled = true; b.innerText = "Gönderiliyor...";
+        try {
+            const d = await post("/api/is-akisi/siparis", {
+                hekimId, hastaAdi,
+                terminTarihi: $("anTermin").value || null,
+                disRengi: $("anDisRengi").value.trim() || null,
+                materyal: $("anMateryal").value.trim() || null,
+                disSemasi: [...sfDisler].join(","),
+                notlar: $("anNot").value.trim() || null,
+                kalemler
+            });
+            const idler = (d.siparisIdler || []).map(Number).filter(Boolean);
+            // Yazdırırken bu işin tarama (STL) dosyaları forma resim olarak eklenir.
+            sfYazdirIsId = idler[0] || null;
+            sfKayitli = true;
+            if (sfYazdirIsId) stlGorselleriArkada(sfYazdirIsId);
+            toast(idler.length > 1
+                ? `Sipariş onaya gönderildi. ${idler.length} farklı para birimi için ${idler.length} ayrı iş kaydı oluşturuldu (#${idler.join(", #")}). Yazdırabilirsin.`
+                : `Sipariş onaya gönderildi${sfYazdirIsId ? " (#" + sfYazdirIsId + ")" : ""}. Artık Yazdır butonunu kullanabilirsin.`);
+            yukle(true);
+            sfGecmisYukle(true);
+        } catch (e) {
+            toast(e.message || "Sipariş oluşturulamadı.", true);
+        } finally {
+            b.innerText = "☁ Onaya Gönder";
+            sfButonlar();
+        }
+    }
+
+    // ---------- geçmiş formlar: aynı şablonla açılır, yeniden yazdırılır ----------
+    async function sfIsBul(id) {
+        let x = isler.find(i => i.id === id) || tumIsler.find(i => i.id === id);
+        if (!x) {
+            try { tumIsler = await api("/api/is-akisi/isler?tumu=true"); } catch (e) { toast(e.message, true); return null; }
+            x = tumIsler.find(i => i.id === id);
+        }
+        return x || null;
+    }
+    async function sfGoruntule(id, yazdir) {
+        const x = await sfIsBul(Number(id));
+        if (!x) { toast("#" + id + " bulunamadı.", true); return; }
+        if (acikIs) cekmeceKapat();
+        sfGoster(sfMevcutEkran());
+        sfTemizle(true); sfFirmaUygula();
+        try { await sfHekimleriYukle(); } catch { }
+        const sel = $("anHekim");
+        // Hekim sonradan pasif yapıldıysa eski formda yine adı görünsün.
+        if (x.hekimId && ![...sel.options].some(o => o.value === String(x.hekimId)))
+            sel.insertAdjacentHTML("beforeend", `<option value="${Number(x.hekimId)}">${esc(x.hekimAdi + (x.klinikAdi && x.klinikAdi !== x.hekimAdi ? " — " + x.klinikAdi : ""))}</option>`);
+        sel.value = String(x.hekimId || "");
+        $("anHasta").value = x.hastaAdi && x.hastaAdi !== "-" ? x.hastaAdi : "";
+        $("anTermin").value = x.terminTarihi ? String(x.terminTarihi).slice(0, 10) : "";
+        $("anDisRengi").value = x.disRengi || "";
+        $("anMateryal").value = x.materyal || ""; sfMateryalSync();
+        $("anNot").value = x.notlar || "";
+        String(x.disSemasi || "").split(",").map(v => v.trim()).filter(Boolean).forEach(v => sfDisler.add(v));
+        sfDisSemasi();
+        (x.kalemler || []).forEach(k => sfKalemEkle({ isTuru: k.isTuru || "", adet: Number(k.adet || 1) }));
+        if (!(x.kalemler || []).length) sfKalemEkle();
+        sfSaltAyarla(true);
+        sfKayitli = true; sfYazdirIsId = x.id;
+        sfButonlar(); sfBant(x); sfGecmisYukle();
+        const hazir = stlGorselleriArkada(x.id);
+        if (yazdir) { await hazir; await sfYazdir(); }
+    }
+    async function sfGecmisYukle(yenile) {
+        if (yenile || !tumIsler.length) { try { tumIsler = await api("/api/is-akisi/isler?tumu=true"); } catch { } }
+        sfGecmisCiz();
+    }
+    function sfGecmisCiz() {
+        const body = $("anFormHistoryBody"); if (!body) return;
+        const q = String($("anFormHistorySearch").value || "").trim().toLocaleLowerCase("tr-TR");
+        const l = (tumIsler.length ? tumIsler : isler)
+            .filter(x => !q || [x.hekimAdi, x.hastaAdi, x.klinikAdi, "#" + x.id, String(x.id)].some(v => String(v || "").toLocaleLowerCase("tr-TR").includes(q)))
+            .slice().sort((a, b) => b.id - a.id).slice(0, 20);
+        if (!l.length) { body.innerHTML = '<tr><td colspan="7" class="bos">Henüz sipariş formu bulunmuyor.</td></tr>'; return; }
+        body.innerHTML = l.map(x => {
+            const kl = x.kalemler || [];
+            const isText = kl.map(k => k.isTuru).filter(Boolean).join(", ") || "-";
+            const uye = kl.reduce((s, k) => s + Number(k.adet || 0), 0) || "-";
+            return `<tr onclick="sfGoruntule(${x.id})"><td><b>#${x.id}</b></td><td>${tarih(x.olusturmaTarihi)}</td><td>${esc(x.hekimAdi || "-")}</td><td>${esc(x.hastaAdi || "-")}</td><td>${esc(isText)}</td><td>${esc(String(uye))}</td>
+                <td style="white-space:nowrap"><button class="btn btn-light" type="button" style="height:30px" onclick="event.stopPropagation();sfGoruntule(${x.id})">📄 Aç</button>
+                <button class="btn btn-light" type="button" style="height:30px" onclick="event.stopPropagation();sfGoruntule(${x.id},true)">🖨 Yazdır</button></td></tr>`;
+        }).join("");
+    }
+
+    // ---------- A5 çıktı (ana programdaki Yazdır ile aynı) ----------
+    async function sfYazdir() {
+        if (!sfKayitli) { toast("Yazdırmadan önce siparişi Onaya Gönder.", true); return; }
+        const paper = document.querySelector("#siparisFormu .ref-order-paper");
+        if (!paper) { window.print(); return; }
+        // Hekimin yüklediği taramalar (üst çene / alt çene / kapanış) forma resim olarak eklenir.
+        if (sfYazdirIsId) {
+            if (stlHazirlaniyor) await stlHazirlaniyor;
+            if (stlHazirIsId !== Number(sfYazdirIsId)) await stlGorselleriArkada(sfYazdirIsId);
+        }
+        document.body.classList.add("a5-olcum");
+        // Notlar kâğıtta kaydırma çubuğuyla kesilmesin: alan içeriğe göre uzatılır.
+        paper.querySelectorAll("textarea").forEach(t => { t.dataset.eskiYukseklik = t.style.height || ""; t.style.height = Math.max(t.offsetHeight, t.scrollHeight + 4) + "px"; });
+        // Çıktı, ekrandaki formun birebir aynısı olarak tek bir A5 (148 x 210 mm) dikey sayfaya basılır.
+        const sayfa = document.createElement("style");
+        sayfa.id = "a5YazdirmaSayfasi";
+        sayfa.textContent = "@@page{size:A5 portrait;margin:5mm}";
+        document.head.appendChild(sayfa);
+        // Ölçek: formun ekrandaki ölçüleri A5'in yazılabilir alanına (138 x 200 mm) sığacak kadar.
+        const mm = 96 / 25.4;
+        const genislik = Math.max(1, paper.offsetWidth), yukseklik = Math.max(1, paper.offsetHeight);
+        const olcek = Math.min(1, 138 * mm / genislik, 200 * mm / yukseklik) * 0.98;
+        paper.style.setProperty("--a5-width", genislik + "px");
+        paper.style.setProperty("--a5-zoom", String(olcek));
+        // Tarama/tasarım görüntüleri kâğıtta en fazla 7 x 7 cm kare.
+        const stlKutu = $("anStlGorseller");
+        if (stlKutu) stlKutu.style.setProperty("--stl-max", (70 * mm / olcek).toFixed(1) + "px");
+        const kaydirmalar = [];
+        for (let el = paper.parentElement; el; el = el.parentElement) {
+            if (el.scrollTop || el.scrollLeft) { kaydirmalar.push([el, el.scrollTop, el.scrollLeft]); el.scrollTop = 0; el.scrollLeft = 0; }
+        }
+        const pencereKaydirma = [window.scrollX, window.scrollY];
+        window.scrollTo(0, 0);
+        document.body.classList.add("print-a5");
+        const temizle = function () {
+            kaydirmalar.forEach(k => { k[0].scrollTop = k[1]; k[0].scrollLeft = k[2]; });
+            window.scrollTo(pencereKaydirma[0], pencereKaydirma[1]);
+            document.body.classList.remove("print-a5", "a5-olcum");
+            paper.style.removeProperty("--a5-zoom");
+            paper.style.removeProperty("--a5-width");
+            $("anStlGorseller")?.style.removeProperty("--stl-max");
+            paper.querySelectorAll("textarea").forEach(t => { t.style.height = t.dataset.eskiYukseklik || ""; });
+            $("a5YazdirmaSayfasi")?.remove();
+            window.removeEventListener("afterprint", temizle);
+        };
+        window.addEventListener("afterprint", temizle);
+        await Promise.all([...paper.querySelectorAll("img")].map(i => i.decode ? i.decode().catch(() => { }) : null));
+        window.print();
+    }
+
+    // ---------- Ana programdaki tarama/tasarım görüntüleri modülü (Index.cshtml'den aynen; uçlar İş Akışı) ----------
+    // ---------------- Sipariş formu çıktısı: tarama (STL) görüntüleri ----------------
+    // Üst çene ve alt çene çiğneme yüzeyinden (okluzal) tepeden çizilir; ikisinde de kesici dişler
+    // (insizal bölge) resmin üstündedir. Kapanış iki çene dişleri birbirine oturmuş hâlde önden çizilir.
+    // Dosya adından tanınır (upper/üst/maxilla, lower/alt/mandible, bite/kapanış). Taramalar kapanış
+    // konumunda gelmediyse (ayrı ayrı dışa aktarılmış) iki çene kesici uçları ve orta hatları
+    // hizalanıp dişler temas edecek şekilde üst üste oturtulur.
+    // Görüntüler iş forma yüklenince hazırlanır (ekranda da görünür); yazdırırken aynı iş için yeniden çizilmez.
+    var stlHazirIsId=null, stlHazirlaniyor=null;
+    function stlGorselAlaniTemizle(){ stlHazirIsId=null; const k=document.getElementById('anStlGorseller'); if(k){ k.innerHTML=''; k.style.display='none'; } }
+    function stlGorselleriArkada(isId){
+        if(!isId) return Promise.resolve();
+        stlHazirlaniyor=stlGorselleriHazirla(isId).then(()=>{ stlHazirIsId=Number(isId); })
+            .catch(e=>{ console.warn('Tarama görüntüleri hazırlanamadı',e); showError('Tarama/tasarım görüntüleri hazırlanamadı: '+(e.message||e)); })
+            .finally(()=>{ stlHazirlaniyor=null; });
+        return stlHazirlaniyor;
+    }
+    function stlTurBul(ad){
+        const a=String(ad||'').toLocaleLowerCase('tr').replace(/ü/g,'u').replace(/ı/g,'i').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ğ/g,'g').replace(/ö/g,'o');
+        if(/(bite|kapanis|occlus|okluz|buccal|bukkal|registr)/.test(a)) return 'kapanis';
+        if(/(upper|maxill|(^|[^a-z])ust|(^|[^a-z])max([^a-z]|$)|(^|[^a-z])u([^a-z]|$))/.test(a)) return 'ust';
+        if(/(lower|mandib|(^|[^a-z])alt|(^|[^a-z])mand([^a-z]|$)|(^|[^a-z])l([^a-z]|$))/.test(a)) return 'alt';
+        return null;
+    }
+    async function stlHamMesh(fileId){
+        const r=await fetch('/api/is-akisi/dosya/'+fileId+'/onizleme',{credentials:'same-origin'});
+        if(!r.ok) throw new Error((await r.text())||'Önizleme oluşturulamadı.');
+        const buf=await r.arrayBuffer(), dv=new DataView(buf);
+        if(String.fromCharCode(dv.getUint8(0),dv.getUint8(1),dv.getUint8(2),dv.getUint8(3))!=='PLM1') throw new Error('Önizleme verisi okunamadı.');
+        const vc=dv.getUint32(4,true), tc=dv.getUint32(8,true);
+        return {p:new Float32Array(buf.slice(12,12+vc*12)), idx:new Uint32Array(buf.slice(12+vc*12,12+vc*12+tc*12))};
+    }
+    // Simetrik 3x3 matrisin özvektörleri (Jacobi); büyükten küçüğe sıralı.
+    function stlOzvektor(A){
+        let a=A.map(x=>x.slice()), v=[[1,0,0],[0,1,0],[0,0,1]];
+        for(let it=0;it<50;it++){
+            let p=0,q=1; if(Math.abs(a[0][2])>Math.abs(a[p][q])){p=0;q=2;} if(Math.abs(a[1][2])>Math.abs(a[p][q])){p=1;q=2;}
+            if(Math.abs(a[p][q])<1e-12) break;
+            const th=0.5*Math.atan2(2*a[p][q],a[q][q]-a[p][p]), c=Math.cos(th), s=Math.sin(th);
+            for(let k=0;k<3;k++){ const akp=a[k][p], akq=a[k][q]; a[k][p]=c*akp-s*akq; a[k][q]=s*akp+c*akq; }
+            for(let k=0;k<3;k++){ const apk=a[p][k], aqk=a[q][k]; a[p][k]=c*apk-s*aqk; a[q][k]=s*apk+c*aqk; }
+            for(let k=0;k<3;k++){ const vkp=v[k][p], vkq=v[k][q]; v[k][p]=c*vkp-s*vkq; v[k][q]=s*vkp+c*vkq; }
+        }
+        return [0,1,2].map(i=>({d:a[i][i],v:[v[0][i],v[1][i],v[2][i]]})).sort((x,y)=>y.d-x.d);
+    }
+    const stlV={ dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2], cr:(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]], sc:(a,k)=>[a[0]*k,a[1]*k,a[2]*k], ad:(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]], ny:a=>{const l=Math.hypot(a[0],a[1],a[2])||1;return [a[0]/l,a[1]/l,a[2]/l];} };
+    // Bir çenenin eksenleri: genişlik (sağ-sol), derinlik (ön-arka; ön yönü işaretli), dikey (dişlerin baktığı yön işaretli).
+    function stlCeneEksen(m, karsiMerkez){
+        const p=m.p, n=p.length/3, adim=Math.max(1,Math.floor(n/40000));
+        let c=[0,0,0], say=0; for(let i=0;i<n;i+=adim){ c[0]+=p[i*3]; c[1]+=p[i*3+1]; c[2]+=p[i*3+2]; say++; } c=stlV.sc(c,1/say);
+        const C=[[0,0,0],[0,0,0],[0,0,0]];
+        for(let i=0;i<n;i+=adim){ const d=[p[i*3]-c[0],p[i*3+1]-c[1],p[i*3+2]-c[2]]; for(let a=0;a<3;a++)for(let b=0;b<3;b++)C[a][b]+=d[a]*d[b]; }
+        const e=stlOzvektor(C); let gen=e[0].v, der=e[1].v, dik=e[2].v;
+        // Dişlerin baktığı yön: yüzey normallerinin alan ağırlıklı toplamı (tarama tabanı açıktır, diş yüzeyi daha geniştir).
+        let top=0; const idx=m.idx;
+        for(let i=0;i<idx.length;i+=3){
+            const a=idx[i]*3,b=idx[i+1]*3,d=idx[i+2]*3;
+            const u=[p[b]-p[a],p[b+1]-p[a+1],p[b+2]-p[a+2]], w=[p[d]-p[a],p[d+1]-p[a+1],p[d+2]-p[a+2]];
+            top+=Math.abs(stlV.dot(stlV.cr(u,w),dik))>0?stlV.dot(stlV.cr(u,w),dik):0;
+        }
+        // Karşı çene varsa en güvenilir ipucu: dişler karşı çeneye bakar. Yoksa yüzey normallerinin
+        // toplamı kullanılır (tarayıcılar dışa dönük üçgen yazar; toplam diş tarafını gösterir).
+        if(karsiMerkez){ if(stlV.dot([karsiMerkez[0]-c[0],karsiMerkez[1]-c[1],karsiMerkez[2]-c[2]],dik)<0) dik=stlV.sc(dik,-1); }
+        else if(top<0) dik=stlV.sc(dik,-1);
+        // Damak/dil tabanı kütlesi eksenleri eğer. Eksenler yalnız diş uçlarından (dişlerin baktığı yönde
+        // en önde kalan %30'luk bant: çiğneme yüzeyleri ve kesici kenarlar) yeniden hesaplanır.
+        let uc=[];
+        for(let tur=0;tur<2;tur++){
+            const h=[]; for(let i=0;i<n;i+=adim) h.push((p[i*3]-c[0])*dik[0]+(p[i*3+1]-c[1])*dik[1]+(p[i*3+2]-c[2])*dik[2]);
+            const sirali=h.slice().sort((x,y)=>x-y), esik=sirali[Math.floor(sirali.length*0.7)];
+            uc=[]; let k=0; for(let i=0;i<n;i+=adim,k++) if(h[k]>=esik) uc.push(i);
+            if(uc.length<30) break;
+            let cu=[0,0,0]; for(const i of uc){ cu[0]+=p[i*3]; cu[1]+=p[i*3+1]; cu[2]+=p[i*3+2]; } cu=stlV.sc(cu,1/uc.length);
+            const Cu=[[0,0,0],[0,0,0],[0,0,0]];
+            for(const i of uc){ const d=[p[i*3]-cu[0],p[i*3+1]-cu[1],p[i*3+2]-cu[2]]; for(let a=0;a<3;a++)for(let b=0;b<3;b++)Cu[a][b]+=d[a]*d[b]; }
+            const eu=stlOzvektor(Cu); let yeni=eu[2].v; if(stlV.dot(yeni,dik)<0) yeni=stlV.sc(yeni,-1);
+            dik=yeni; gen=eu[0].v; der=eu[1].v;
+        }
+        if(uc.length<30) uc=null;
+        // Ön taraf: kemerin uç dilimlerinden, noktaları orta hatta toplu olan uç (kesiciler) öndür.
+        const secim=uc||Array.from({length:Math.ceil(n/adim)},(_,k)=>k*adim);
+        let mn=Infinity,mx=-Infinity; for(const i of secim){ const t=(p[i*3]-c[0])*der[0]+(p[i*3+1]-c[1])*der[1]+(p[i*3+2]-c[2])*der[2]; if(t<mn)mn=t; if(t>mx)mx=t; }
+        // Arka uçta azı dişleri iki yanda en geniştedir; damak/dil tabanı orta hatta nokta eklese de
+        // dilimin yanlara yayılımı (yüzde 97'lik genişlik) arka uçta büyük kalır.
+        const dilim=(mx-mn)*0.15, u1=[], u2=[];
+        let cy=0; for(const i of secim) cy+=(p[i*3]-c[0])*gen[0]+(p[i*3+1]-c[1])*gen[1]+(p[i*3+2]-c[2])*gen[2]; cy/=secim.length;
+        for(const i of secim){
+            const d=[p[i*3]-c[0],p[i*3+1]-c[1],p[i*3+2]-c[2]], t=stlV.dot(d,der), y=Math.abs(stlV.dot(d,gen)-cy);
+            if(t>mx-dilim) u1.push(y); else if(t<mn+dilim) u2.push(y);
+        }
+        const yuzde=(a,q)=>{ if(!a.length) return 0; a.sort((x,y)=>x-y); return a[Math.min(a.length-1,Math.floor(a.length*q))]; };
+        if(u1.length&&u2.length && yuzde(u1,0.97) > yuzde(u2,0.97)) der=stlV.sc(der,-1);
+        return {c, gen, der, dik};
+    }
+    // Görüntüleyici: ortografik, beyaz zemin, iki yönlü aydınlatma; tuval yeniden kullanılır.
+    const stlCizer=(function(){
+        let tuval=null, gl=null, prog=null, ext=null;
+        const vs='attribute vec3 p;attribute vec3 n;uniform mat4 m;uniform mat3 r;varying vec3 vn;void main(){vn=r*n;gl_Position=m*vec4(p,1.0);}';
+        // Kâğıtta silik çıkmasın: sol üstten eğik ana ışık (tümsek/çukur gölgeli), zayıf dolgu ışığı,
+        // bakış yönüne dik kalan yüzeylerde koyulaşma (diş sınırları çizgi gibi belirginleşir).
+        const fs='precision mediump float;varying vec3 vn;uniform vec3 c;void main(){vec3 N=normalize(vn);if(N.z<0.0)N=-N;'+
+            'float k=max(dot(N,normalize(vec3(-0.55,0.65,0.55))),0.0);float f=max(dot(N,normalize(vec3(0.6,-0.3,0.75))),0.0);'+
+            'float kenar=pow(1.0-N.z,2.2);float s=pow(max(dot(N,normalize(vec3(-0.25,0.35,1.0))),0.0),40.0)*0.18;'+
+            'vec3 r=c*(0.12+0.78*k+0.22*f)*(1.0-0.62*kenar)+vec3(s);gl_FragColor=vec4(clamp(r,0.0,1.0),1.0);}';
+        function hazirla(){
+            if(gl) return true;
+            tuval=document.createElement('canvas'); tuval.width=800; tuval.height=800; // kare: kâğıtta 7x7 cm kare çerçeve
+            gl=tuval.getContext('webgl',{antialias:true,preserveDrawingBuffer:true});
+            if(!gl) return false;
+            ext=gl.getExtension('OES_element_index_uint');
+            const sh=(t,src)=>{const x=gl.createShader(t);gl.shaderSource(x,src);gl.compileShader(x);return x;};
+            prog=gl.createProgram(); gl.attachShader(prog,sh(gl.VERTEX_SHADER,vs)); gl.attachShader(prog,sh(gl.FRAGMENT_SHADER,fs)); gl.linkProgram(prog);
+            return true;
+        }
+        // parcalar: [{m, renk}], kamera: {ileri, yukari} (birim vektörler; ileri = bakış yönü)
+        function ciz(parcalar, ileri, yukari){
+            if(!hazirla()) return null;
+            const geri=stlV.sc(ileri,-1), sag=stlV.ny(stlV.cr(yukari,geri)), ust=stlV.cr(geri,sag);
+            // Görüntü alanı: tüm noktaların kamera eksenlerindeki izdüşümü.
+            let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity,z0=Infinity,z1=-Infinity;
+            for(const pr of parcalar){ const p=pr.m.p; for(let i=0;i<p.length;i+=3){ const v=[p[i],p[i+1],p[i+2]]; const x=stlV.dot(v,sag),y=stlV.dot(v,ust),z=stlV.dot(v,geri);
+                if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; if(z<z0)z0=z; if(z>z1)z1=z; } }
+            const asp=tuval.width/tuval.height, gx=(x1-x0)*1.08||1, gy=(y1-y0)*1.08||1;
+            let w=gx, h=gy; if(w/h<asp) w=h*asp; else h=w/asp;
+            const cx=(x0+x1)/2, cy=(y0+y1)/2;
+            // Ortografik projeksiyon * görünüm (sütun düzeni)
+            const sx=2/w, sy=2/h, sz=-2/((z1-z0)*1.2+1e-6), zc=(z0+z1)/2;
+            const M=new Float32Array([ sag[0]*sx, ust[0]*sy, geri[0]*sz, 0,  sag[1]*sx, ust[1]*sy, geri[1]*sz, 0,  sag[2]*sx, ust[2]*sy, geri[2]*sz, 0,  -cx*sx, -cy*sy, -zc*sz, 1 ]);
+            const R=new Float32Array([sag[0],ust[0],geri[0], sag[1],ust[1],geri[1], sag[2],ust[2],geri[2]]);
+            gl.viewport(0,0,tuval.width,tuval.height); gl.clearColor(1,1,1,1); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST);
+            gl.useProgram(prog);
+            const lp=gl.getAttribLocation(prog,'p'), ln=gl.getAttribLocation(prog,'n');
+            gl.uniformMatrix4fv(gl.getUniformLocation(prog,'m'),false,M);
+            gl.uniformMatrix3fv(gl.getUniformLocation(prog,'r'),false,R);
+            for(const pr of parcalar){
+                const m=pr.m; if(!m.nor) m.nor=stlNormaller(m);
+                if(!ext && m.p.length/3>65535) continue;
+                const bp=gl.createBuffer(), bn=gl.createBuffer(), bi=gl.createBuffer();
+                gl.bindBuffer(gl.ARRAY_BUFFER,bp); gl.bufferData(gl.ARRAY_BUFFER,m.p,gl.STATIC_DRAW); gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp,3,gl.FLOAT,false,0,0);
+                gl.bindBuffer(gl.ARRAY_BUFFER,bn); gl.bufferData(gl.ARRAY_BUFFER,m.nor,gl.STATIC_DRAW); gl.enableVertexAttribArray(ln); gl.vertexAttribPointer(ln,3,gl.FLOAT,false,0,0);
+                gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,bi); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,ext?m.idx:new Uint16Array(m.idx),gl.STATIC_DRAW);
+                gl.uniform3fv(gl.getUniformLocation(prog,'c'),new Float32Array(pr.renk));
+                gl.drawElements(gl.TRIANGLES,m.idx.length,ext?gl.UNSIGNED_INT:gl.UNSIGNED_SHORT,0);
+                gl.deleteBuffer(bp); gl.deleteBuffer(bn); gl.deleteBuffer(bi);
+            }
+            return tuval.toDataURL('image/png');
+        }
+        return {ciz};
+    })();
+    // Taramalar kapanış konumunda mı: çenelerin dişleri birbirine bakar, orta hatları ve ön uçları
+    // hizalıdır, diş uçları arasında boşluk yoktur (mm; ağız içi tarayıcılar mm yazar).
+    function stlKapanisKonumunda(mu,eu,ma,ea){
+        if(stlV.dot(eu.dik,ea.dik)>-0.8) return false;
+        const d=[ea.c[0]-eu.c[0],ea.c[1]-eu.c[1],ea.c[2]-eu.c[2]];
+        if(Math.abs(stlV.dot(d,eu.gen))>8 || Math.abs(stlV.dot(d,eu.der))>12) return false;
+        const dd=stlV.dot(d,eu.dik); if(dd<3||dd>45) return false;
+        const h=(m,yon)=>{ const p=m.p; let e=-Infinity; for(let i=0;i<p.length;i+=3){ const v=p[i]*yon[0]+p[i+1]*yon[1]+p[i+2]*yon[2]; if(v>e)e=v; } return e; };
+        // eu.dik alt çeneye doğru: üst diş uçlarının o yöndeki en ileri noktası ile alt diş uçları arasındaki boşluk.
+        const ustUc=h(mu,eu.dik), altUc=-h(ma,stlV.sc(eu.dik,-1));
+        const bosluk=altUc-ustUc;
+        return bosluk>-10 && bosluk<4;
+    }
+    // Ayrı dışa aktarılmış iki çeneyi kapanışa oturtur: ortak eksen (x sağ-sol, y ön, z yukarı);
+    // orta hatlar ve kesici uçlar hizalanır; üst kesiciler 1,5 mm önde ve 1,5 mm alt dişlerin önüne biner.
+    function stlKapanisaOturt(mu,eu,ma,ea){
+        const donustur=(m,e,ust)=>{
+            const z=ust?stlV.sc(e.dik,-1):e.dik, y=e.der, x=stlV.cr(y,z), p=m.p, q=new Float32Array(p.length);
+            for(let i=0;i<p.length;i+=3){ const d=[p[i]-e.c[0],p[i+1]-e.c[1],p[i+2]-e.c[2]]; q[i]=stlV.dot(d,x); q[i+1]=stlV.dot(d,y); q[i+2]=stlV.dot(d,z); }
+            return {p:q, idx:m.idx};
+        };
+        const sinir=m=>{ const p=m.p, a=[Infinity,Infinity,Infinity], b=[-Infinity,-Infinity,-Infinity]; for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<a[k])a[k]=p[i+k]; if(p[i+k]>b[k])b[k]=p[i+k]; } return {a,b}; };
+        const u=donustur(mu,eu,true), l=donustur(ma,ea,false), su=sinir(u), sl=sinir(l);
+        const kaydir=(m,dx,dy,dz)=>{ const p=m.p; for(let i=0;i<p.length;i+=3){ p[i]+=dx; p[i+1]+=dy; p[i+2]+=dz; } };
+        kaydir(u, -(su.a[0]+su.b[0])/2, -su.b[1]+1.5, -su.a[2]-1.5);
+        kaydir(l, -(sl.a[0]+sl.b[0])/2, -sl.b[1], -sl.b[2]);
+        return {ust:u, alt:l};
+    }
+    function stlNormaller(m){
+        const p=m.p, idx=m.idx, nor=new Float32Array(p.length);
+        for(let i=0;i<idx.length;i+=3){
+            const a=idx[i]*3,b=idx[i+1]*3,d=idx[i+2]*3;
+            const ux=p[b]-p[a],uy=p[b+1]-p[a+1],uz=p[b+2]-p[a+2], vx=p[d]-p[a],vy=p[d+1]-p[a+1],vz=p[d+2]-p[a+2];
+            const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+            for(const q of [a,b,d]){ nor[q]+=nx; nor[q+1]+=ny; nor[q+2]+=nz; }
+        }
+        return nor;
+    }
+    const STL_RENK_UST=[0.86,0.72,0.55], STL_RENK_ALT=[0.62,0.72,0.86], STL_RENK_KAPANIS=[0.70,0.74,0.84];
+    // Tasarım parçası (altın sarısı) ve tasarımın altındaki model (açık gri) ayırt edilsin.
+    const STL_RENK_TASARIM=[0.98,0.62,0.12], STL_RENK_MODEL=[0.70,0.72,0.74];
+    async function stlGorselleriHazirla(isId){
+        const kutu=document.getElementById('anStlGorseller'); if(!kutu) return;
+        stlGorselAlaniTemizle();
+        // İş Akışı: dosyalar ve linkler panelin kendi ucundan (ana programdaki listeyle aynı kayıtlar).
+        const r=await fetch('/api/is-akisi/isler/'+Number(isId)+'/dosyalar',{cache:'no-store',credentials:'same-origin'}); if(!r.ok) return;
+        const dj=await r.json();
+        const tumDosyalar=dj.dosyalar||[];
+        const linkler=dj.linkler||[];
+        const tumu=tumDosyalar.filter(f=>/\.(stl|ply|obj)$/i.test(f.orijinalDosyaAdi||''));
+        // Görüntü çizilemeyen dosyalar ve hekimin paylaştığı linkler de kâğıtta görünsün.
+        const dosyaListesi=()=>(tumDosyalar.length?`<div class="ref-stl-dosyalar"><b>Ekli dosyalar:</b> ${tumDosyalar.map(f=>escapeHtml(f.orijinalDosyaAdi)+(f.dosyaTuru&&f.dosyaTuru!=='Diger'?' ('+escapeHtml(f.dosyaTuru)+')':'')).join(' · ')}</div>`:'')
+            +(linkler.length?`<div class="ref-stl-dosyalar" style="word-break:break-all"><b>Dosya linkleri:</b> ${linkler.map(l=>escapeHtml(l.servis)+': '+escapeHtml(l.url)).join(' · ')}</div>`:'');
+        if(!tumu.length){ if(tumDosyalar.length||linkler.length){ kutu.innerHTML=dosyaListesi(); kutu.style.display='block'; } return; }
+        // Tüm modeller önce okunur; tür etiketine değil gerçek boyuta bakılır: hekim "tasarımı ben
+        // gönderiyorum" seçtiğinde ağız içi taramalar da "Tasarım" türüyle kaydedilir. Tam çene büyüklüğündeki
+        // model (en uzun kenar ≥ 35 mm) tarama, kron/köprü gibi küçük parçalar tasarım sayılır.
+        const hatalar=[];
+        const yuklu=[];
+        for(const f of tumu.slice(0,12)){
+            try{
+                const m=await stlHamMesh(Number(f.id)), p=m.p, a=[Infinity,Infinity,Infinity], b=[-Infinity,-Infinity,-Infinity];
+                for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<a[k])a[k]=p[i+k]; if(p[i+k]>b[k])b[k]=p[i+k]; }
+                yuklu.push({f,m,boy:Math.max(b[0]-a[0],b[1]-a[1],b[2]-a[2])});
+            }catch(e){ console.warn(e); hatalar.push(f.orijinalDosyaAdi+': '+(e.message||e)); }
+        }
+        // Gerçek taramalar (tarama türlü) zaten iki çeneyi karşılıyorsa büyük "Tasarım" dosyası tam çene tasarımıdır.
+        const gercekTarama=yuklu.filter(x=>(x.f.dosyaTuru||'')!=='Tasarım').length;
+        const tasarimMi=x=>(x.f.dosyaTuru||'')==='Tasarım' && (x.boy<35 || gercekTarama>=2);
+        const taramaYuklu=yuklu.filter(x=>!tasarimMi(x)), tasarimYuklu=yuklu.filter(tasarimMi);
+        const dosyalar=taramaYuklu.map(x=>x.f);
+        const meshBul=f=>yuklu.find(x=>x.f===f)?.m;
+        showSuccess('Tarama ve tasarım görüntüleri hazırlanıyor...');
+        const tur={ust:null,alt:null,kapanis:null}, diger=[];
+        for(const f of dosyalar){ const t=stlTurBul(f.orijinalDosyaAdi); if(t && !tur[t]) tur[t]=f; else diger.push(f); }
+        // Adı tanınmayan dosyalar sırayla boş yerlere (üst, alt) yerleşir; ad yine altta yazar.
+        for(const f of diger){ if(!tur.ust) tur.ust=f; else if(!tur.alt) tur.alt=f; }
+        const mesh={};
+        for(const k of ['ust','alt','kapanis']) if(tur[k]) mesh[k]=meshBul(tur[k]);
+        const merkez=m=>{ const p=m.p; let c=[0,0,0]; for(let i=0;i<p.length;i+=3){ c[0]+=p[i]; c[1]+=p[i+1]; c[2]+=p[i+2]; } return stlV.sc(c,3/p.length); };
+        const sinir=m=>{ const p=m.p, a=[Infinity,Infinity,Infinity], b=[-Infinity,-Infinity,-Infinity]; for(let i=0;i<p.length;i+=3) for(let k=0;k<3;k++){ if(p[i+k]<a[k])a[k]=p[i+k]; if(p[i+k]>b[k])b[k]=p[i+k]; } return {a,b}; };
+        const mU=mesh.ust?merkez(mesh.ust):null, mA=mesh.alt?merkez(mesh.alt):null;
+        // Çene eksenleri: önce taramaların kapanış konumunda olup olmadığı karşı çeneye göre denetlenir.
+        let eu=mesh.ust?stlCeneEksen(mesh.ust,mA):null, ea=mesh.alt?stlCeneEksen(mesh.alt,mU):null;
+        const kapanisKonumu=!!(eu&&ea) && stlKapanisKonumunda(mesh.ust,eu,mesh.alt,ea);
+        if(eu&&ea&&!kapanisKonumu){ eu=stlCeneEksen(mesh.ust); ea=stlCeneEksen(mesh.alt); }
+        const resimler=[];
+        const guvenli=(ad,f)=>{ try{ return f(); }catch(e){ console.warn(e); hatalar.push(ad+': '+(e.message||e)); return null; } };
+        // Tepeden (okluzal) görünüm, kesici dişler yukarıda.
+        if(mesh.ust){ resimler.push({ad:'ÜST ÇENE',dosya:tur.ust.orijinalDosyaAdi,src:guvenli('Üst çene',()=>stlCizer.ciz([{m:mesh.ust,renk:STL_RENK_UST}],stlV.sc(eu.dik,-1),eu.der))}); }
+        if(mesh.alt){ resimler.push({ad:'ALT ÇENE',dosya:tur.alt.orijinalDosyaAdi,src:guvenli('Alt çene',()=>stlCizer.ciz([{m:mesh.alt,renk:STL_RENK_ALT}],stlV.sc(ea.dik,-1),ea.der))}); }
+        let onYukari=null, onIleri=null;
+        if(mesh.ust && mesh.alt){
+            // Kapanış: iki çene dişleri birbirine oturmuş, önden; üst çene yukarıda.
+            let pu=mesh.ust, pa=mesh.alt, yukari, ileri;
+            if(kapanisKonumu){
+                yukari=stlV.ny([eu.c[0]-ea.c[0],eu.c[1]-ea.c[1],eu.c[2]-ea.c[2]]);
+                ileri=stlV.sc(eu.der,-1); ileri=stlV.ny(stlV.ad(ileri,stlV.sc(yukari,-stlV.dot(ileri,yukari))));
+                onYukari=yukari; onIleri=ileri;
+            } else {
+                const o=stlKapanisaOturt(mesh.ust,eu,mesh.alt,ea); pu=o.ust; pa=o.alt;
+                yukari=[0,0,1]; ileri=[0,-1,0];
+            }
+            resimler.push({ad:'KAPANIŞ',dosya:'Üst + alt çene kapanışta (önden)',src:stlCizer.ciz([{m:pu,renk:STL_RENK_UST},{m:pa,renk:STL_RENK_ALT}],ileri,yukari)});
+        } else if(mesh.kapanis){
+            const e=stlCeneEksen(mesh.kapanis);
+            resimler.push({ad:'KAPANIŞ',dosya:tur.kapanis.orijinalDosyaAdi,src:stlCizer.ciz([{m:mesh.kapanis,renk:STL_RENK_KAPANIS}],stlV.sc(e.der,-1),e.dik)});
+        }
+
+        // ---- Tasarım dosyaları: tarama ile aynı koordinatlardaysa kendi çenesinin üzerinde, değilse tek başına.
+        const tasarimResimleri=[];
+        const tMesh=[];
+        try{
+        tasarimYuklu.slice(0,8).forEach(x=>tMesh.push({f:x.f,m:x.m}));
+        if(tMesh.length){
+            const cene={ust:[],alt:[]}, serbest=[];
+            const kutuU=mesh.ust?sinir(mesh.ust):null, kutuA=mesh.alt?sinir(mesh.alt):null;
+            const icinde=(c,k)=>k&&[0,1,2].every(i=>c[i]>=k.a[i]-6&&c[i]<=k.b[i]+6);
+            for(const t of tMesh){
+                const c=merkez(t.m), ad=stlTurBul(t.f.orijinalDosyaAdi);
+                let hedef=null;
+                if(ad==='ust'&&icinde(c,kutuU)) hedef='ust';
+                else if(ad==='alt'&&icinde(c,kutuA)) hedef='alt';
+                else {
+                    const u=icinde(c,kutuU), a=icinde(c,kutuA);
+                    if(u&&a) hedef=Math.hypot(...stlV.ad(c,stlV.sc(mU,-1)))<=Math.hypot(...stlV.ad(c,stlV.sc(mA,-1)))?'ust':'alt';
+                    else hedef=u?'ust':a?'alt':null;
+                }
+                if(hedef) cene[hedef].push(t); else serbest.push(t);
+            }
+            const adlar=l=>l.map(t=>t.f.orijinalDosyaAdi).join(', ');
+            const parca=l=>l.map(t=>({m:t.m,renk:STL_RENK_TASARIM}));
+            if(cene.ust.length) tasarimResimleri.push({ad:'TASARIM · ÜST ÇENE',dosya:adlar(cene.ust),src:stlCizer.ciz([{m:mesh.ust,renk:STL_RENK_MODEL},...parca(cene.ust)],stlV.sc(eu.dik,-1),eu.der)});
+            if(cene.alt.length) tasarimResimleri.push({ad:'TASARIM · ALT ÇENE',dosya:adlar(cene.alt),src:stlCizer.ciz([{m:mesh.alt,renk:STL_RENK_MODEL},...parca(cene.alt)],stlV.sc(ea.dik,-1),ea.der)});
+            // Önden: kapanış konumundaki çeneler ya da tasarımın oturduğu çene
+            if(cene.ust.length||cene.alt.length){
+                let parcalar=[], yukari, ileri;
+                if(onYukari){ parcalar=[{m:mesh.ust,renk:STL_RENK_MODEL},{m:mesh.alt,renk:STL_RENK_MODEL}]; yukari=onYukari; ileri=onIleri; }
+                else { const k=cene.ust.length?'ust':'alt', e=k==='ust'?eu:ea; parcalar=[{m:mesh[k],renk:STL_RENK_MODEL}];
+                    yukari=k==='ust'?e.dik:stlV.sc(e.dik,-1); ileri=stlV.sc(e.der,-1); }
+                tasarimResimleri.push({ad:'TASARIM · ÖNDEN',dosya:'Tasarım modelin üzerinde',src:stlCizer.ciz([...parcalar,...parca(cene.ust),...parca(cene.alt)],ileri,yukari)});
+            }
+            if(serbest.length){
+                // Tek başına: tüm tasarım parçalarının ana eksenlerine göre üstten ve yandan.
+                const nokta=[]; serbest.forEach(t=>{ const p=t.m.p, ad=Math.max(1,Math.floor(p.length/3/20000)); for(let i=0;i<p.length;i+=3*ad) nokta.push([p[i],p[i+1],p[i+2]]); });
+                const c=stlV.sc(nokta.reduce((t,v)=>stlV.ad(t,v),[0,0,0]),1/nokta.length);
+                const C=[[0,0,0],[0,0,0],[0,0,0]]; nokta.forEach(v=>{ const d=stlV.ad(v,stlV.sc(c,-1)); for(let a=0;a<3;a++)for(let b=0;b<3;b++)C[a][b]+=d[a]*d[b]; });
+                const e=stlOzvektor(C);
+                // Çiğneme yüzü: dışa dönük yüzey normallerinin alan ağırlıklı toplamı (kron kabuğu alttan açıktır).
+                let n=[0,0,0];
+                serbest.forEach(t=>{ const p=t.m.p, ix=t.m.idx; for(let i=0;i<ix.length;i+=3){ const a=ix[i]*3,b=ix[i+1]*3,d=ix[i+2]*3;
+                    n=stlV.ad(n,stlV.cr([p[b]-p[a],p[b+1]-p[a+1],p[b+2]-p[a+2]],[p[d]-p[a],p[d+1]-p[a+1],p[d+2]-p[a+2]])); } });
+                let ust=Math.hypot(...n)>1e-6?stlV.ny(n):e[2].v;
+                // Uzun eksen (köprü boyu) yatay kalsın; yan görünüm uzun eksene ve yukarıya dik yönden.
+                let boy=stlV.ny(stlV.ad(e[0].v,stlV.sc(ust,-stlV.dot(e[0].v,ust))));
+                if(!isFinite(boy[0])) boy=e[1].v;
+                const yan=stlV.ny(stlV.cr(ust,boy));
+                const yer=Math.max(0,3-tasarimResimleri.length);
+                if(yer>=1) tasarimResimleri.push({ad:'TASARIM · ÜSTTEN',dosya:adlar(serbest),src:stlCizer.ciz(parca(serbest),stlV.sc(ust,-1),yan)});
+                if(yer>=2) tasarimResimleri.push({ad:'TASARIM · YANDAN',dosya:adlar(serbest),src:stlCizer.ciz(parca(serbest),yan,ust)});
+            }
+        }
+        }catch(e){ console.warn(e); hatalar.push('Tasarım: '+(e.message||e)); }
+
+        const gecerli=resimler.filter(x=>x.src), tGecerli=tasarimResimleri.filter(x=>x.src);
+        if(hatalar.length) showError('Bazı dosyaların görüntüsü çizilemedi: '+hatalar.join(' | '));
+        if(!gecerli.length && !tGecerli.length){ kutu.innerHTML=dosyaListesi(); kutu.style.display=tumDosyalar.length?'block':'none'; return; }
+        const satir=(baslik,l)=>l.length?`<div class="ref-stl-baslik">${baslik}</div><div class="ref-stl-izgara" style="--stl-adet:3">`+l.map(x=>`<figure><img src="${x.src}" alt="${escapeHtml(x.ad)}" /><figcaption>${escapeHtml(x.ad)}<small>${escapeHtml(x.dosya||'')}</small></figcaption></figure>`).join('')+'</div>':'';
+        kutu.innerHTML=satir('TARAMA GÖRÜNTÜLERİ',gecerli)+(gecerli.length&&tGecerli.length?'<div class="ref-stl-ara"></div>':'')+satir('TASARIM GÖRÜNTÜLERİ',tGecerli)+dosyaListesi();
+        kutu.style.display='block';
+        // Resimler yüklenmeden ölçü alınmasın.
+        await Promise.all([...kutu.querySelectorAll('img')].map(i=>i.complete?null:new Promise(ok=>{i.onload=ok;i.onerror=ok;})));
     }
 
     document.addEventListener("keydown", e => { if (e.key === "Escape" && acikIs) cekmeceKapat(); });

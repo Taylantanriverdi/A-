@@ -224,16 +224,28 @@ IS AKISI PANELI (fiyatsiz is takibi - sekreter / is takipcisi icin)
   gorunur: Onay Bekleyen > Bekliyor > Tasarimda > Uretimde > Tamamlama Onayi >
   Tamamlandi. Suzgecler: kaynak, atanmamis, geciken, bugun teslim, yeni mesaj.
 - Is kartina tiklayinca: onayla/reddet, durum degistir, teknisyen ata,
-  tamamlamayi onayla, dosya indir, linkler, hekime/teknisyene mesaj, fiyatsiz
-  siparis formu yazdir.
+  tamamlamayi onayla, dosya indir, linkler, hekime/teknisyene mesaj, siparis
+  formunu yazdir.
 - Tamamlanan isler panoda gosterilmez; ustteki "Tamamlananlar" dugmesiyle
   ayri listede acilir.
 - "Siparis Formlari": gecmiste acilmis tum siparis formlari (tamamlananlar
   dahil); hasta/hekim/is no ile arama, durum, kaynak ve tarih araligi suzgeci;
-  her satirdan fiyatsiz form yazdirilir.
-- "+ Yeni Siparis": panelden manuel siparis formu acar (hekim secilir; fiyat
-  hekimin fiyat listesinden ana programda hesaplanir, panelde gorunmez).
-  Kaydedilen is onayli olarak "Bekliyor" sutununa duser.
+  her satirda "Form" (formu ekranda acar) ve "Yazdir" (A5 basar) dugmeleri.
+- "+ Yeni Siparis": ana programdaki "Siparis Takip Formu"nun AYNISI acilir
+  (ayni kagit sablonu, dis semasi, kalem satirlari, otomatik uye sayisi,
+  renk / teslim tarihi / materyal / notlar). Hekim secilince o hekimin is
+  listesi gelir; fiyat ve para birimi panelde gorunmez, sunucu hekimin fiyat
+  listesinden ekler. "Onaya Gonder" ile is ana programdaki gibi Onay Bekleyen'e
+  duser (farkli para birimli kalemler ayri is kayitlarina bolunur); sonra
+  "Yazdir" ana programla ayni tek sayfa A5 ciktiyi basar. Gonderdikten sonra
+  form degistirilirse yeniden "Onaya Gonder" istenir.
+- Formun altindaki "Gecmis Siparis Formlari": son 20 form; "Ac" ile eski form
+  ayni sablonla (degistirilemez) acilir, "Yazdir" ile yeniden basilir. Isin
+  tarama dosyalari (ust/alt cene, kapanis) varsa ana programdaki gibi forma
+  resim olarak eklenir.
+- "Dosyali Siparis": tarama dosyasi / link ekleyerek siparis acmak icin eski
+  form (hekim portali formu) ayrica durur; bu yoldan acilan is onayli olarak
+  "Bekliyor" sutununa duser.
 - Is detayinda STL/PLY/OBJ dosyasinin uzerine fareyle gelince 3B onizleme
   acilir (kendiliginden doner, surukleyerek cevrilir).
 - Panelde "Tamamlandi" secilince is "Tamamlama Onayi"na (Admin Onayinda) duser;

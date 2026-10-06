@@ -1,3 +1,2 @@
-* text=auto
-*.bat text eol=crlf
+autobar/**/*.bat text eol=crlf
 autobar/windows/*.txt text eol=crlf

@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PrimerLabV2.Data;
@@ -8,8 +9,9 @@ namespace PrimerLabV2.Controllers;
 
 /// <summary>
 /// İş Akışı Paneli: hekimden, mailden ve elle girilen tüm işlerin akışı (onay, durum, teknisyen ataması,
-/// dosyalar, mesajlar, fiyatsız sipariş formu). Aynı veritabanını kullandığı için ana programla anlık senkrondur.
-/// FİYAT: bu denetleyici fiyat/tutar/para birimi alanlarını hiç sorgulamaz ve döndürmez.
+/// dosyalar, mesajlar, sipariş formu). Aynı veritabanını kullandığı için ana programla anlık senkrondur.
+/// FİYAT: bu denetleyici fiyat/tutar/para birimi alanlarını hiç döndürmez. Yalnız sipariş açılırken
+/// fiyat, ana programın sipariş formunda olduğu gibi hekimin iş listesinden sunucu tarafında eklenir.
 /// Değişiklikler (onay, durum, atama, mesaj) ana programın kendi uçlarına içeriden yaptırılır;
 /// böylece kurallar ve kayıtlar (durum geçmişi, bildirimler) birebir aynı kalır.
 /// </summary>
@@ -255,6 +257,110 @@ public sealed class IsAkisiController : ControllerBase
         return StatusCode((int)r.StatusCode, string.IsNullOrWhiteSpace(metin) || metin.TrimStart().StartsWith('{') ? "İşlem yapılamadı." : metin);
     }
 
+    // ------------------------------------------------------------------ sipariş formu (ana programdaki formun aynısı)
+
+    /// <summary>Sipariş formundaki hekim listesi (aktif hekimler).</summary>
+    [HttpGet("hekimler")]
+    public async Task<IActionResult> Hekimler(CancellationToken ct)
+    {
+        if (Kullanici() == null) return Unauthorized("Giriş gerekli.");
+        var l = await _db.Database.SqlQuery<IsAkisiHekimSatiri>($"""
+            SELECT "Id", COALESCE("AdSoyad",'') AS "AdSoyad", "KlinikAdi" FROM "Hekimler" WHERE "Aktif"=true ORDER BY "AdSoyad"
+            """).ToListAsync(ct);
+        return Ok(l);
+    }
+
+    /// <summary>Hekime tanımlı iş türleri: ana programdaki sipariş formunun listesi, fiyatsız.</summary>
+    [HttpGet("hekimler/{hekimId:int}/is-turleri")]
+    public async Task<IActionResult> HekimIsTurleri(int hekimId, CancellationToken ct)
+    {
+        if (Kullanici() == null) return Unauthorized("Giriş gerekli.");
+        return Ok((await HekimIsListesi(hekimId, ct)).Select(x => new { x.IsTuru }));
+    }
+
+    /// <summary>
+    /// Sipariş formunu kaydeder ("Onaya Gönder"). Kayıt ana programın sipariş formu ucuna yaptırılır;
+    /// böylece iş, ana programda açılmış gibi aynı kurallarla (onay bekleyen, para birimine göre bölme) oluşur.
+    /// Birim fiyat ve para birimi istemciden alınmaz, hekimin iş listesinden eklenir.
+    /// </summary>
+    [HttpPost("siparis")]
+    public async Task<IActionResult> SiparisAc([FromBody] IsAkisiSiparisDto dto, CancellationToken ct)
+    {
+        if (Kullanici() == null) return Unauthorized("Giriş gerekli.");
+        if (dto.HekimId <= 0) return BadRequest("Hekim seç.");
+        if (string.IsNullOrWhiteSpace(dto.HastaAdi)) return BadRequest("Hasta adı gerekli.");
+        var kalemler = (dto.Kalemler ?? new()).Where(k => !string.IsNullOrWhiteSpace(k.IsTuru) && k.Adet > 0).ToList();
+        if (kalemler.Count == 0) return BadRequest("En az bir iş kalemi ekle.");
+
+        var liste = (await HekimIsListesi(dto.HekimId, ct))
+            .GroupBy(x => x.IsTuru.Trim(), StringComparer.CurrentCultureIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.CurrentCultureIgnoreCase);
+        var govdeKalemler = new List<object>();
+        var paraBirimleri = new HashSet<string>();
+        foreach (var k in kalemler)
+        {
+            if (!liste.TryGetValue(k.IsTuru!.Trim(), out var f))
+                return BadRequest($"'{k.IsTuru!.Trim()}' bu hekime tanımlı iş listesinde bulunmuyor.");
+            var pb = string.IsNullOrWhiteSpace(f.ParaBirimi) ? "TRY" : f.ParaBirimi.Trim().ToUpperInvariant();
+            paraBirimleri.Add(pb);
+            govdeKalemler.Add(new { isTuru = f.IsTuru.Trim(), adet = k.Adet, birimFiyat = f.BirimFiyat, paraBirimi = pb });
+        }
+
+        var govde = new
+        {
+            hekimId = dto.HekimId,
+            hastaAdi = dto.HastaAdi!.Trim(),
+            terminTarihi = string.IsNullOrWhiteSpace(dto.TerminTarihi) ? null : dto.TerminTarihi,
+            disRengi = dto.DisRengi,
+            materyal = dto.Materyal,
+            disSemasi = dto.DisSemasi,
+            notlar = dto.Notlar,
+            kaynak = "Sipariş Formu (İş Akışı)",
+            paraBirimi = paraBirimleri.Count == 1 ? paraBirimleri.First() : null,
+            kalemler = govdeKalemler
+        };
+        using var istek = new HttpRequestMessage(HttpMethod.Post, "/api/anayasa/siparis") { Content = JsonContent.Create(govde) };
+        using var r = await IcIstemci().SendAsync(istek, ct);
+        var metin = await r.Content.ReadAsStringAsync(ct);
+        if (!r.IsSuccessStatusCode) return StatusCode((int)r.StatusCode, HataMetni(metin));
+
+        // Yanıttan yalnız iş numaraları alınır (para birimi bilgisi panele taşınmaz).
+        var idler = new List<int>();
+        try
+        {
+            using var belge = JsonDocument.Parse(metin);
+            if (belge.RootElement.TryGetProperty("siparisler", out var sl) && sl.ValueKind == JsonValueKind.Array)
+                foreach (var e in sl.EnumerateArray())
+                    if (e.TryGetProperty("id", out var id) && id.TryGetInt32(out var v)) idler.Add(v);
+        }
+        catch (JsonException) { }
+        return Ok(new { siparisIdler = idler });
+    }
+
+    private async Task<List<IsAkisiIsListesiSatiri>> HekimIsListesi(int hekimId, CancellationToken ct) =>
+        await _db.Database.SqlQuery<IsAkisiIsListesiSatiri>($"""
+            SELECT "IsTuru", "BirimFiyat", COALESCE("ParaBirimi",'TRY') AS "ParaBirimi", "Sira"
+            FROM "HekimFiyatlari"
+            WHERE "HekimId"={hekimId} AND "Aktif"=true
+            ORDER BY "Sira","IsTuru"
+            """).ToListAsync(ct);
+
+    /// <summary>Ana programın hata yanıtından kullanıcıya gösterilecek metin (ProblemDetails ise detail/title).</summary>
+    private static string HataMetni(string metin)
+    {
+        if (string.IsNullOrWhiteSpace(metin)) return "İşlem yapılamadı.";
+        if (!metin.TrimStart().StartsWith('{')) return metin;
+        try
+        {
+            using var belge = JsonDocument.Parse(metin);
+            foreach (var ad in new[] { "detail", "title" })
+                if (belge.RootElement.TryGetProperty(ad, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString()))
+                    return v.GetString()!;
+        }
+        catch (JsonException) { }
+        return "İşlem yapılamadı.";
+    }
+
     // ------------------------------------------------------------------ hesap yönetimi (yalnız yönetici)
 
     [HttpGet("admin/hesaplar")]
@@ -278,6 +384,20 @@ public sealed class IsAkisiController : ControllerBase
     public IActionResult HesapSil(int id) => _hesaplar.Sil(id) ? Ok() : NotFound("Hesap bulunamadı.");
 }
 
+public sealed class IsAkisiSiparisDto
+{
+    public int HekimId { get; set; }
+    public string? HastaAdi { get; set; }
+    public string? TerminTarihi { get; set; }
+    public string? DisRengi { get; set; }
+    public string? Materyal { get; set; }
+    public string? DisSemasi { get; set; }
+    public string? Notlar { get; set; }
+    public List<IsAkisiSiparisKalemDto>? Kalemler { get; set; }
+}
+public sealed class IsAkisiSiparisKalemDto { public string? IsTuru { get; set; } public int Adet { get; set; } }
+public sealed class IsAkisiHekimSatiri { public int Id { get; set; } public string AdSoyad { get; set; } = ""; public string? KlinikAdi { get; set; } }
+public sealed class IsAkisiIsListesiSatiri { public string IsTuru { get; set; } = ""; public decimal BirimFiyat { get; set; } public string ParaBirimi { get; set; } = "TRY"; public int Sira { get; set; } }
 public sealed class IsAkisiGirisDto { public string? KullaniciAdi { get; set; } public string? Parola { get; set; } public bool Hatirla { get; set; } }
 public sealed class IsAkisiDurumDto { public string? Durum { get; set; } }
 public sealed class IsAkisiAtamaDto { public int? TeknisyenId { get; set; } }
