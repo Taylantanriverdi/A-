@@ -2505,6 +2505,65 @@
         .ka-duz-satir td{background:#f5f3ff}
         .ka-bilgi{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:9px 12px;font-size:12px;margin-bottom:12px}
         @@media(max-width:900px){.ka-ay-toplam{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        /* V54 - Kasa / Arşiv sade ekstre ekranı */
+        .kx-donem{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#fff;border:1px solid #e3e8f0;border-radius:14px;padding:12px 14px;margin-bottom:14px}
+        .kx-donem-ay{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+        .kx-donem-ay.kx-pasif{opacity:.45}
+        .kx-etiket{font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase;margin-right:4px}
+        .kx-donem input{height:40px;border:1px solid #cfd8e6;border-radius:9px;padding:0 10px;background:#fff;font-weight:800;font-size:14px}
+        .kx-donem .button{min-width:40px;height:40px}
+        .kx-aralik{display:flex;align-items:center;gap:6px}
+        .kx-onay{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:700;color:#334155}
+        .kx-onay input{width:17px;height:17px}
+        .kx-kucuk{font-size:11px;font-weight:600;margin:8px 2px}
+        .kx-genel{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
+        .kx-genel>div{display:flex;flex-direction:column;align-items:flex-end}
+        .kx-genel span{font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase}
+        .kx-genel strong{font-size:14px;text-align:right}
+        .kx-govde{display:grid;grid-template-columns:330px minmax(0,1fr);gap:14px;align-items:start}
+        .kx-sol{background:#fff;border:1px solid #e3e8f0;border-radius:14px;padding:12px;position:sticky;top:12px}
+        .kx-sol input[type=search]{width:100%;height:40px;border:1px solid #cfd8e6;border-radius:9px;padding:0 10px;box-sizing:border-box}
+        .kx-hekimler{max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:4px}
+        .kx-hekim{display:flex;justify-content:space-between;gap:10px;padding:10px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+        .kx-hekim:hover{background:#f5f8ff}
+        .kx-hekim.secili{background:#eff6ff;border-color:#93c5fd}
+        .kx-hekim-ad{font-weight:800;color:#0f172a}
+        .kx-hekim-alt{font-size:11px;color:#64748b;margin-top:2px}
+        .kx-hekim-tutar{text-align:right;font-size:13px;font-weight:800;white-space:nowrap}
+        .kx-tum{width:100%;margin-top:10px}
+        .kx-sag{background:#fff;border:1px solid #e3e8f0;border-radius:14px;padding:18px;min-height:300px}
+        .kx-bos{color:#94a3b8;text-align:center;padding:18px;font-size:13px}
+        .kx-bos-buyuk{padding:60px 20px;font-size:16px;line-height:1.6}
+        .kx-ust{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;border-bottom:1px solid #eef2f7;padding-bottom:12px;margin-bottom:12px}
+        .kx-ust h2{margin:0;font-size:22px}
+        .kx-alt{font-size:12px;color:#64748b;margin-top:2px}
+        .kx-donem-ad{margin-top:6px;font-weight:800;color:#1d4ed8}
+        .kx-aksiyon{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-start}
+        .kx-uyari{background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;border-radius:10px;padding:8px 12px;font-size:12px;margin-bottom:12px}
+        .kx-blok{border:1px solid #eef2f7;border-radius:12px;padding:6px 12px;margin-bottom:6px}
+        .kx-devir{background:#fffbeb;border-color:#fde68a;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px}
+        .kx-devir-deger{font-size:14px}
+        .kx-link{border:0;background:none;color:#2563eb;font-weight:800;cursor:pointer;text-decoration:underline;padding:0}
+        .kx-devir-form{flex-basis:100%;border-top:1px dashed #fcd34d;padding-top:8px}
+        .kx-devir-form-satir{display:flex;gap:8px;align-items:center;margin-top:6px}
+        .kx-devir-form-satir select,.kx-devir-form-satir input{height:36px;border:1px solid #e5d9a8;border-radius:8px;padding:0 8px;background:#fff;font-weight:700}
+        .kx-devir-form-satir input{width:140px;text-align:right}
+        .kx-devir-form-btn{display:flex;gap:6px;margin-top:8px}
+        .kx-bolum-bas{display:flex;justify-content:space-between;align-items:center;margin:16px 2px 6px;font-size:14px;font-weight:900}
+        .kx-hasta{padding:8px 0;border-bottom:1px solid #f1f5f9}
+        .kx-hasta:last-child{border-bottom:0}
+        .kx-hasta-bas{display:flex;justify-content:space-between;font-weight:900;color:#0f172a}
+        .kx-is{display:grid;grid-template-columns:92px minmax(0,1fr) auto;gap:10px;padding:4px 0 4px 22px;font-size:13px;color:#334155}
+        .kx-blok>.kx-is{padding-left:0;border-bottom:1px solid #f1f5f9}
+        .kx-blok>.kx-is:last-child{border-bottom:0}
+        .kx-tarih{color:#64748b}
+        .kx-tutar{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:700}
+        .kx-toplam{margin-top:14px;border:2px solid #10233e;border-radius:12px;overflow:hidden}
+        .kx-toplam-satir{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;flex-wrap:wrap}
+        .kx-toplam-satir+.kx-toplam-satir{border-top:1px solid #e2e8f0}
+        .kx-toplam-hesap{font-size:13px;color:#475569;white-space:pre-wrap;word-spacing:2px}
+        .kx-toplam-son{font-size:21px;font-weight:900}
+        @@media(max-width:1000px){.kx-govde{grid-template-columns:1fr}.kx-sol{position:static}.kx-genel{margin-left:0}}
         /* V53 - Hekim ekstresi (tarih aralığı) */
         .ks-panel{margin-bottom:16px}
         .ks-filtre{display:flex;gap:10px;align-items:end;flex-wrap:wrap;background:#f8fafc;border:1px solid #e5eaf2;border-radius:12px;padding:12px;margin-bottom:14px}
@@ -4489,7 +4548,7 @@
                     <div>
                         <h1 class="page-title">Kasa / Arşiv</h1>
                         <div class="page-subtitle">
-                            Hekim bazlı cari hesap, tahsilat ve dönem arşivi
+                            Hekim ekstresi: seçilen dönemde yapılan işler hasta hasta, önceki dönemden devir ve ödemeler
                         </div>
                     </div>
                     <div class="button-group">
@@ -4498,88 +4557,37 @@
                     </div>
                 </div>
 
-                <div class="ka-ay-bar">
-                    <div class="ka-mod">
-                        <button id="kaModAylik" class="ka-mod-btn active" type="button" onclick="kaModSec('aylik')">🧾 Hekim Ekstresi</button>
-                        <button id="kaModDonem" class="ka-mod-btn" type="button" onclick="kaModSec('donem')">📂 Açık Dönem (Tüm Hareketler)</button>
+                <div class="kx-donem">
+                    <div class="kx-donem-ay">
+                        <span class="kx-etiket">Dönem</span>
+                        <button class="button button-light" type="button" title="Önceki ay" onclick="kxAyKaydir(-1)">‹</button>
+                        <input id="kxAy" type="month" onchange="kxDonemDegisti()" />
+                        <button class="button button-light" type="button" title="Sonraki ay" onclick="kxAyKaydir(1)">›</button>
+                        <button class="button button-light" type="button" onclick="kxAyKaydir(0)">Bu Ay</button>
+                    </div>
+                    <label class="kx-onay"><input id="kxAralikAcik" type="checkbox" onchange="kxAralikDegis()" /> Özel tarih aralığı</label>
+                    <div id="kxAralik" class="kx-aralik" style="display:none;">
+                        <input id="kxBas" type="date" onchange="kxDonemDegisti()" />
+                        <span>–</span>
+                        <input id="kxBit" type="date" onchange="kxDonemDegisti()" />
+                    </div>
+                    <div id="kxGenel" class="kx-genel"></div>
+                </div>
+
+                <div class="kx-govde">
+                    <aside class="kx-sol">
+                        <input id="kxAra" type="search" placeholder="🔍 Hekim / klinik ara..." oninput="kxListeCiz()" />
+                        <label class="kx-onay kx-kucuk"><input id="kxHareketli" type="checkbox" checked onchange="kxListeCiz()" /> Yalnız bu dönemde işi veya bakiyesi olanlar</label>
+                        <div id="kxHekimler" class="kx-hekimler"><div class="kx-bos">Yükleniyor...</div></div>
+                        <button class="button button-light kx-tum" type="button" onclick="kxHepsiniYazdir()">🖨️ Listedekilerin hepsini yazdır</button>
+                    </aside>
+                    <div id="kxEkstre" class="kx-sag">
+                        <div class="kx-bos kx-bos-buyuk">👈 Soldan bir hekim seçin.<br><small>Seçtiğiniz dönemde o hekime yapılan işler hasta hasta listelenir; önceki aylardan kalan borç veya fazla ödeme toplama eklenir ya da düşülür.</small></div>
                     </div>
                 </div>
 
-                <div class="ka-summary-grid">
-                    <div class="ka-summary-card">
-                        <div class="ka-summary-label">Açık Cari</div>
-                        <div id="kaAcikCariSayisi" class="ka-summary-value">0</div>
-                        <div class="ka-summary-small">Bakiyesi bulunan hekim</div>
-                    </div>
-                    <div class="ka-summary-card">
-                        <div class="ka-summary-label">TRY Alacak</div>
-                        <div id="kaTryBakiye" class="ka-summary-value">₺0</div>
-                        <div class="ka-summary-small">Toplam açık TL bakiyesi</div>
-                    </div>
-                    <div class="ka-summary-card">
-                        <div class="ka-summary-label">EUR Alacak</div>
-                        <div id="kaEurBakiye" class="ka-summary-value">€0</div>
-                        <div class="ka-summary-small">Toplam açık EUR bakiyesi</div>
-                    </div>
-                    <div class="ka-summary-card">
-                        <div class="ka-summary-label">USD Alacak</div>
-                        <div id="kaUsdBakiye" class="ka-summary-value">$0</div>
-                        <div class="ka-summary-small">Toplam açık USD bakiyesi</div>
-                    </div>
-                </div>
-
-                <div id="kaAylikPanel">
-                    <div class="panel ks-panel">
-                        <div class="panel-header">
-                            <div>
-                                <div class="panel-title">🧾 Hekim Ekstresi</div>
-                                <div class="page-subtitle">Hekimi ve tarih aralığını seçin. Listeden göndermek istediğiniz işleri işaretleyin, geçmiş borç veya alacağı ekleyin; yazdırın ya da WhatsApp ile gönderin.</div>
-                            </div>
-                        </div>
-                        <div class="ks-filtre">
-                            <div class="ks-alan ks-hekim"><label>Hekim</label><select id="ksHekim" onchange="ksGetir()"></select></div>
-                            <div class="ks-alan"><label>Başlangıç</label><input id="ksBas" type="date" onchange="ksTarihDegisti()" /></div>
-                            <div class="ks-alan"><label>Bitiş</label><input id="ksBit" type="date" onchange="ksTarihDegisti()" /></div>
-                            <div class="ks-hizli">
-                                <button class="button button-light" type="button" onclick="ksHizli('buay')">Bu Ay</button>
-                                <button class="button button-light" type="button" onclick="ksHizli('gecenay')">Geçen Ay</button>
-                                <button class="button button-light" type="button" onclick="ksHizli('son3')">Son 3 Ay</button>
-                                <button class="button button-light" type="button" onclick="ksHizli('buyil')">Bu Yıl</button>
-                            </div>
-                        </div>
-                        <div id="ksIcerik"><div class="ka-empty">Ekstre için yukarıdan hekim seçin.</div></div>
-                    </div>
-
-                    <div class="panel">
-                        <div class="panel-header">
-                            <div>
-                                <div id="kaAylikBaslik" class="panel-title">Tüm Hekimler</div>
-                                <div class="page-subtitle">Seçilen tarih aralığında her hekimin durumu. Satıra tıklayınca ekstresi yukarıda açılır.</div>
-                            </div>
-                            <div class="ka-aylik-arac">
-                                <input id="kaAylikArama" type="search" placeholder="Hekim / klinik ara..." oninput="kaAylikRender()" />
-                                <label><input id="kaAylikHareketli" type="checkbox" checked onchange="kaAylikRender()" /> Yalnız hareketi/bakiyesi olanlar</label>
-                                <button class="button button-light" type="button" onclick="kaTumEkstreYazdir()">🖨️ Hepsini Yazdır</button>
-                            </div>
-                        </div>
-                        <div class="table-wrapper">
-                            <table class="ka-table">
-                                <thead>
-                                    <tr>
-                                        <th>Hekim / Klinik</th>
-                                        <th>İş</th>
-                                        <th>Geçmiş Bakiye</th>
-                                        <th>Aralıktaki İşler</th>
-                                        <th>Aralıktaki Tahsilat</th>
-                                        <th>Toplam Bakiye</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="kaAylikBody">
-                                    <tr><td colspan="6" class="empty">Yükleniyor...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                <div style="display:none;">
+                    <span id="kaAcikCariSayisi"></span><span id="kaTryBakiye"></span><span id="kaEurBakiye"></span><span id="kaUsdBakiye"></span>
                 </div>
 
                 <div id="kaDonemFiltrePanel" class="panel ka-filter-panel" style="display:none;">
@@ -6690,6 +6698,7 @@
 
             if (id === "muhasebe") {
                 renderMuhasebe();
+                kaAylikYukle();
             }
 
             if (id === "uretimPanosu") {
@@ -12647,316 +12656,297 @@
             w.document.close();
         }
 
-        // ---------------- V53 · Hekim ekstresi (tarih aralığı) ----------------
-        // Hekim ve tarih aralığı seçilir; aralıktaki işler işaretlenerek gönderilir. Aralık başından önceki
-        // borç/alacak "geçmiş bakiye" satırıyla eklenir (tutarı ve yönü elle değiştirilebilir).
-        let kaMod="aylik";
-        let kaAylik=null;
-        let ks={veri:null,secili:new Set(),devirAcik:true,tahsilatDus:true};
+        // ---------------- V54 · Kasa / Arşiv: hekim ekstresi (sade ekran) ----------------
+        // Solda hekimler, sağda seçili hekimin seçilen dönem ekstresi: önceki aylardan devir (borç eklenir,
+        // fazla ödeme düşülür) + o dönemin hastaları ve işleri + o dönemin ödemeleri = toplam.
         const KA_PB=["TRY","EUR","USD"];
+        const KX_AYLAR=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+        let kaAylik=null;
+        let kx={hekimId:0,veri:null,anahtar:"",devirAcik:true,devirElle:null,devirFormAcik:false};
 
-        function ksGun(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-        function kaGunDegeri(d){return ksGun(d);}
-        function ksTarihVarsayilan(){
-            const b=document.getElementById("ksBas"), e=document.getElementById("ksBit");
+        function kxGun(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+        function kaGunDegeri(d){return kxGun(d);}
+        function kxAyStr(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+
+        // Seçili dönem: ay (varsayılan) ya da özel tarih aralığı.
+        function kxDonem(){
+            const ay=document.getElementById("kxAy");
+            if(!ay)return null;
+            if(!/^\d{4}-\d{2}$/.test(ay.value))ay.value=kxAyStr(new Date());
+            if(document.getElementById("kxAralikAcik").checked){
+                const b=document.getElementById("kxBas").value, e=document.getElementById("kxBit").value;
+                if(!b||!e)return null;
+                if(e<b){showError("Bitiş tarihi başlangıçtan önce olamaz.");return null;}
+                return {b,e,ad:tarihGoster(b)+" – "+tarihGoster(e)};
+            }
+            const [y,m]=ay.value.split("-").map(Number);
+            return {b:kxGun(new Date(y,m-1,1)),e:kxGun(new Date(y,m,0)),ad:KX_AYLAR[m-1]+" "+y};
+        }
+        function kxAyKaydir(fark){
+            const ay=document.getElementById("kxAy");
             const n=new Date();
-            if(!b.value)b.value=ksGun(new Date(n.getFullYear(),n.getMonth(),1));
-            if(!e.value)e.value=ksGun(n);
+            let d=n;
+            if(fark!==0&&/^\d{4}-\d{2}$/.test(ay.value)){const [y,m]=ay.value.split("-").map(Number);d=new Date(y,m-1+fark,1);}
+            ay.value=kxAyStr(d);
+            document.getElementById("kxAralikAcik").checked=false;
+            kxAralikDegis();
         }
-        function ksHizli(t){
-            const n=new Date();
-            let b,e;
-            if(t==="gecenay"){b=new Date(n.getFullYear(),n.getMonth()-1,1);e=new Date(n.getFullYear(),n.getMonth(),0);}
-            else if(t==="son3"){b=new Date(n.getFullYear(),n.getMonth()-2,1);e=n;}
-            else if(t==="buyil"){b=new Date(n.getFullYear(),0,1);e=n;}
-            else{b=new Date(n.getFullYear(),n.getMonth(),1);e=n;}
-            document.getElementById("ksBas").value=ksGun(b);
-            document.getElementById("ksBit").value=ksGun(e);
-            ksTarihDegisti();
+        function kxAralikDegis(){
+            const acik=document.getElementById("kxAralikAcik").checked;
+            document.getElementById("kxAralik").style.display=acik?"flex":"none";
+            document.querySelector(".kx-donem-ay").classList.toggle("kx-pasif",acik);
+            if(acik){
+                const b=document.getElementById("kxBas"), e=document.getElementById("kxBit");
+                const [y,m]=document.getElementById("kxAy").value.split("-").map(Number);
+                if(!b.value)b.value=kxGun(new Date(y,m-1,1));
+                if(!e.value)e.value=kxGun(new Date(y,m,0));
+            }
+            kxDonemDegisti();
         }
-        function ksAralik(){
-            const b=document.getElementById("ksBas").value, e=document.getElementById("ksBit").value;
-            if(!b||!e)return null;
-            if(e<b){showError("Bitiş tarihi başlangıçtan önce olamaz.");return null;}
-            return {b,e};
-        }
-        function ksAralikYazi(e){return tarihGoster(e.baslangic)+" – "+tarihGoster(e.bitis);}
-        function ksTarihDegisti(){kaAylikYukle();}
-        function kaSifirMi(map){return KA_PB.every(c=>Math.abs(Number(map?.[c]||0))<0.005);}
-        function kaBakiyeHucre(map){
-            const rows=[];
+        function kxDonemDegisti(){kaAylikYukle();}
+
+        function kxTutarlar(map,yonlu){
+            const l=[];
             KA_PB.forEach(c=>{
                 const v=Number(map?.[c]||0);
                 if(Math.abs(v)<0.005)return;
-                rows.push(v>0?`<span class="ka-negative">${kaPara(v,c)} <small>borç</small></span>`
-                    :`<span class="ka-positive">${kaPara(-v,c)} <small>alacak</small></span>`);
+                l.push(yonlu?(v>0?`<span class="ka-negative">${kaPara(v,c)}</span>`:`<span class="ka-positive">${kaPara(-v,c)} alacak</span>`):kaPara(v,c));
             });
-            return rows.length?`<div class="ka-money">${rows.join("")}</div>`:'<span class="muted">0</span>';
+            return l.join("<br>");
         }
 
-        function kaModSec(mod){
-            kaMod=mod==="donem"?"donem":"aylik";
-            const aylik=kaMod==="aylik";
-            document.getElementById("kaModAylik").classList.toggle("active",aylik);
-            document.getElementById("kaModDonem").classList.toggle("active",!aylik);
-            document.getElementById("kaAylikPanel").style.display=aylik?"block":"none";
-            document.getElementById("kaDonemFiltrePanel").style.display=aylik?"none":"block";
-            document.getElementById("kaDonemListePanel").style.display=aylik?"none":"block";
-            if(aylik)kaAylikYukle();
-        }
-
-        // Hekim listesi (seçilen aralık) + seçili hekimin ekstresi.
+        // Hekim listesi + seçili hekimin ekstresi (Kasa açılınca ve her değişiklikte çağrılır).
         async function kaAylikYukle(){
-            if(!document.getElementById("ksBas"))return;
-            ksTarihVarsayilan();
-            const a=ksAralik();
-            if(!a)return;
+            const d=kxDonem();
+            if(!d)return;
             try{
-                const r=await fetch(`/api/kasa-arsiv/aylik?baslangic=${a.b}&bitis=${a.e}`,{cache:"no-store"});
+                const r=await fetch(`/api/kasa-arsiv/aylik?baslangic=${d.b}&bitis=${d.e}`,{cache:"no-store"});
                 if(!r.ok)throw new Error((await r.text())||"Hekim listesi alınamadı.");
-                const d=await r.json();
-                const s=ksAralik();
-                if(!s||s.b!==a.b||s.e!==a.e)return;
-                kaAylik=d;
-                ksHekimDoldur();
-                kaAylikRender();
-                if(Number(document.getElementById("ksHekim").value||0))await ksGetir();
+                const veri=await r.json();
+                const s=kxDonem();
+                if(!s||s.b!==d.b||s.e!==d.e)return;
+                kaAylik=veri;
+                kxGenelCiz();
+                kxListeCiz();
+                if(kx.hekimId)await kxEkstreGetir();
             }catch(e){
-                const body=document.getElementById("kaAylikBody");
-                if(body)body.innerHTML=`<tr><td colspan="6" class="empty">${escapeHtml(e?.message||"Hekim listesi alınamadı.")}</td></tr>`;
+                document.getElementById("kxHekimler").innerHTML=`<div class="kx-bos">${escapeHtml(e?.message||"Hekim listesi alınamadı.")}</div>`;
             }
         }
 
-        function ksHekimDoldur(){
-            const sel=document.getElementById("ksHekim");
-            const once=sel.value;
-            sel.innerHTML='<option value="">— Hekim seçin —</option>'+(kaAylik?.hekimler||[]).map(x=>{
-                const k=x.klinikAdi&&x.klinikAdi!==x.hekimAdi?" — "+x.klinikAdi:"";
-                return `<option value="${Number(x.hekimId)}">${escapeHtml((x.hekimAdi||"-")+k)}</option>`;
-            }).join("");
-            if(once&&[...sel.options].some(o=>o.value===once))sel.value=once;
+        function kxGenelCiz(){
+            const g=kaAylik?.genel||{};
+            const alacak={TRY:0,EUR:0,USD:0};
+            (kaAylik?.hekimler||[]).forEach(x=>KA_PB.forEach(c=>{const v=Number(x.guncelBakiye?.[c]||0);if(v>0)alacak[c]+=v;}));
+            document.getElementById("kxGenel").innerHTML=
+                `<div><span>Bu dönemin işleri</span><strong>${kxTutarlar(g.isToplam)||"0"}</strong></div>`+
+                `<div><span>Bu dönem tahsilat</span><strong>${kxTutarlar(g.tahsilat)||"0"}</strong></div>`+
+                `<div><span>Bugün toplam alacak</span><strong class="ka-negative">${kxTutarlar(alacak)||"0"}</strong></div>`;
         }
 
-        function kaAylikSatirlar(){
-            if(!kaAylik)return [];
-            const q=String(document.getElementById("kaAylikArama")?.value||"").trim().toLocaleLowerCase("tr-TR");
-            const hareketli=document.getElementById("kaAylikHareketli")?.checked!==false;
-            return (kaAylik.hekimler||[]).filter(x=>
-                (!hareketli||x.hareketli)&&
+        function kxListeSatirlari(){
+            const q=String(document.getElementById("kxAra")?.value||"").trim().toLocaleLowerCase("tr-TR");
+            const hareketli=document.getElementById("kxHareketli")?.checked!==false;
+            return (kaAylik?.hekimler||[]).filter(x=>
+                (!hareketli||x.hareketli||x.hekimId===kx.hekimId)&&
                 [x.hekimAdi,x.klinikAdi].some(v=>String(v||"").toLocaleLowerCase("tr-TR").includes(q)));
         }
 
-        function kaAylikRender(){
-            const body=document.getElementById("kaAylikBody");
-            if(!body||!kaAylik)return;
-            document.getElementById("kaAylikBaslik").innerText="Tüm Hekimler · "+tarihGoster(kaAylik.baslangic)+" – "+tarihGoster(kaAylik.bitis);
-            const list=kaAylikSatirlar();
-            if(!list.length){
-                body.innerHTML='<tr><td colspan="6" class="empty">Bu tarih aralığında hareketi veya bakiyesi olan hekim yok.</td></tr>';
-                return;
-            }
-            body.innerHTML=list.map(x=>{
-                const klinik=x.klinikAdi&&x.klinikAdi!==x.hekimAdi?`<div class="ops-mini">${escapeHtml(x.klinikAdi)}</div>`:"";
-                const pasif=x.aktif?"":' <span class="status" style="background:#f1f5f9;color:#64748b">Pasif</span>';
-                return `<tr onclick="ksSec(${Number(x.hekimId)})">
-                    <td><strong>${escapeHtml(x.hekimAdi||"-")}</strong>${pasif}${klinik}</td>
-                    <td><strong>${Number(x.isSayisi||0)}</strong><div class="ka-not">${Number(x.hastaSayisi||0)} hasta</div></td>
-                    <td>${kaBakiyeHucre(x.devir)}</td>
-                    <td>${kaMoneyStack(x.isToplam)}</td>
-                    <td>${kaMoneyStack(x.tahsilat)}</td>
-                    <td>${kaBakiyeHucre(x.kapanis)}</td>
-                </tr>`;
+        function kxListeCiz(){
+            const host=document.getElementById("kxHekimler");
+            if(!host||!kaAylik)return;
+            const l=kxListeSatirlari();
+            if(!l.length){host.innerHTML='<div class="kx-bos">Bu dönemde işi veya bakiyesi olan hekim yok.</div>';return;}
+            host.innerHTML=l.map(x=>{
+                const klinik=x.klinikAdi&&x.klinikAdi!==x.hekimAdi?escapeHtml(x.klinikAdi)+" · ":"";
+                return `<div class="kx-hekim${x.hekimId===kx.hekimId?" secili":""}" onclick="kxSec(${Number(x.hekimId)})">
+                    <div class="kx-hekim-sol">
+                        <div class="kx-hekim-ad">${escapeHtml(x.hekimAdi||"-")}${x.aktif?"":' <small class="ka-not">(pasif)</small>'}</div>
+                        <div class="kx-hekim-alt">${klinik}${Number(x.isSayisi||0)} iş · ${Number(x.hastaSayisi||0)} hasta</div>
+                    </div>
+                    <div class="kx-hekim-tutar">${kxTutarlar(x.kapanis,true)||'<span class="ka-not">0</span>'}</div>
+                </div>`;
             }).join("");
         }
 
-        function ksSec(hekimId){
-            document.getElementById("ksHekim").value=String(hekimId);
-            ksGetir();
-            document.querySelector(".ks-panel")?.scrollIntoView({behavior:"smooth",block:"start"});
+        function kxSec(id){
+            if(kx.hekimId!==Number(id)){kx.hekimId=Number(id);kx.anahtar="";}
+            kxListeCiz();
+            kxEkstreGetir();
+            if(window.innerWidth<1000)document.getElementById("kxEkstre").scrollIntoView({behavior:"smooth"});
         }
 
-        async function ksGetir(){
-            const host=document.getElementById("ksIcerik");
-            const hekimId=Number(document.getElementById("ksHekim").value||0);
-            if(!hekimId){ks.veri=null;host.innerHTML='<div class="ka-empty">Ekstre için yukarıdan hekim seçin.</div>';return;}
-            ksTarihVarsayilan();
-            const a=ksAralik();
-            if(!a)return;
-            const anahtar=hekimId+"|"+a.b+"|"+a.e;
-            const ayni=ks.veri&&ks.anahtar===anahtar;
-            if(!ayni)host.innerHTML='<div class="ka-empty">Yükleniyor...</div>';
+        async function kxEkstreGetir(){
+            const host=document.getElementById("kxEkstre");
+            const d=kxDonem();
+            if(!kx.hekimId||!d)return;
+            const hekimId=kx.hekimId, anahtar=hekimId+"|"+d.b+"|"+d.e;
+            const ayni=kx.veri&&kx.anahtar===anahtar;
+            if(!ayni)host.innerHTML='<div class="kx-bos kx-bos-buyuk">Yükleniyor...</div>';
             try{
-                const r=await fetch(`/api/kasa-arsiv/ekstre/${hekimId}?baslangic=${a.b}&bitis=${a.e}`,{cache:"no-store"});
+                const r=await fetch(`/api/kasa-arsiv/ekstre/${hekimId}?baslangic=${d.b}&bitis=${d.e}`,{cache:"no-store"});
                 if(!r.ok)throw new Error((await r.text())||"Ekstre alınamadı.");
-                const d=await r.json();
-                if(Number(document.getElementById("ksHekim").value||0)!==hekimId)return;
-                const eskiSecim=ayni?ks.secili:null, eskiIsler=ayni?new Set((ks.veri.isler||[]).map(x=>x.id)):null;
-                ks.veri=d; ks.anahtar=anahtar;
-                // Aynı ekstre yenilenirse (ör. tahsilat girildi) işaretler korunur; yeni gelen işler işaretli gelir.
-                ks.secili=new Set((d.isler||[]).filter(x=>!eskiSecim||eskiSecim.has(x.id)||!eskiIsler.has(x.id)).map(x=>x.id));
-                if(!ayni){ks.devirAcik=!kaSifirMi(d.devir);ks.tahsilatDus=true;ks.devir=null;}
-                ksRender();
+                const v=await r.json();
+                if(kx.hekimId!==hekimId)return;
+                v.donemAdi=d.ad;
+                kx.veri=v;
+                // Aynı ekstre yenilenince (ör. tahsilat girildi) devir ayarı korunur.
+                if(!ayni){kx.devirAcik=true;kx.devirElle=null;kx.devirFormAcik=false;}
+                kx.anahtar=anahtar;
+                kxEkstreCiz();
             }catch(e){
-                ks.veri=null;
-                host.innerHTML=`<div class="ka-empty">${escapeHtml(e?.message||"Ekstre alınamadı.")}</div>`;
+                kx.veri=null;
+                host.innerHTML=`<div class="kx-bos kx-bos-buyuk">${escapeHtml(e?.message||"Ekstre alınamadı.")}</div>`;
             }
         }
 
-        // Ekstrede gösterilen para birimleri: TRY her zaman, diğerleri hareket/bakiye varsa.
-        function ksPb(e){
-            return KA_PB.filter(c=>c==="TRY"||
-                Math.abs(Number(e.devir?.[c]||0))>=0.005||
-                (e.isler||[]).some(x=>x.paraBirimi===c)||(e.odemeler||[]).some(x=>x.paraBirimi===c));
-        }
-
-        function ksRender(){
-            const e=ks.veri, host=document.getElementById("ksIcerik");
-            if(!e)return;
-            const pb=ksPb(e);
-            const hesap=pb.map(c=>{const v=Number(e.devir?.[c]||0);return Math.abs(v)<0.005?"":(v>0?kaPara(v,c)+" borç":kaPara(-v,c)+" alacak");}).filter(Boolean).join(" · ")||"0 (borç/alacak yok)";
-            const devirSatir=pb.map(c=>{
-                const v=ks.devir?.[c]??Number(e.devir?.[c]||0);
-                return `<div class="ks-devir-satir">
-                    <select id="ksDevirTur_${c}" onchange="ksHesapla()">
-                        <option value="1" ${v>=0?"selected":""}>Geçmiş borç (eklenir)</option>
-                        <option value="-1" ${v<0?"selected":""}>Geçmiş alacak / fazla ödeme (düşülür)</option>
-                    </select>
-                    <input id="ksDevirTutar_${c}" type="number" min="0" step="0.01" value="${Math.abs(v).toFixed(2)}" oninput="ksHesapla()" />
-                    <span class="ks-pb">${c}</span>
-                </div>`;
-            }).join("");
-            const isler=(e.isler||[]).map(x=>`<tr>
-                <td style="width:34px"><input type="checkbox" class="ks-is" data-id="${Number(x.id)}" ${ks.secili.has(x.id)?"checked":""} onchange="ksIsSec(this)" /></td>
-                <td>${tarihGoster(x.tarih)}</td>
-                <td><strong>${escapeHtml(x.hastaAdi||"-")}</strong></td>
-                <td>${escapeHtml(x.isTuru||"-")}</td>
-                <td class="ks-sag">${kaPara(x.tutar,x.paraBirimi)}</td>
-            </tr>`).join("");
-            const odemeler=(e.odemeler||[]).map(x=>`<tr>
-                <td>${tarihGoster(x.tarih)}</td>
-                <td>${escapeHtml(x.odemeTuru||"Ödeme")}${x.islemNo?" · "+escapeHtml(x.islemNo):""}${x.aciklama?`<div class="ka-not">${escapeHtml(x.aciklama)}</div>`:""}</td>
-                <td class="ks-sag">${kaPara(x.tutar,x.paraBirimi)}</td>
-            </tr>`).join("");
-            host.innerHTML=`
-                <div class="ks-kart">
-                    <label class="ks-onay"><input id="ksDevirAcik" type="checkbox" ${ks.devirAcik?"checked":""} onchange="ksHesapla()" /> <strong>Geçmiş borç / alacağı listeye ekle</strong></label>
-                    <div class="ka-not" style="margin:4px 0 8px">${escapeHtml(tarihGoster(e.baslangic))} öncesinden hesaplanan: <strong>${escapeHtml(hesap)}</strong> · <a href="#" onclick="event.preventDefault();ks.devir=null;ksRender();ksHesapla();">hesaplananı geri yükle</a></div>
-                    <div id="ksDevirAlan">${devirSatir}</div>
-                </div>
-                <div class="ks-baslik">
-                    <span>🦷 İşler <span id="ksIsSayac" class="ka-not"></span></span>
-                    ${(e.isler||[]).length?`<label class="ks-onay"><input id="ksTumIs" type="checkbox" onchange="ksTumuSec(this.checked)" /> Tümünü seç</label>`:""}
-                </div>
-                <div class="table-wrapper"><table class="ks-tablo">
-                    <thead><tr><th></th><th>Tarih</th><th>Hasta</th><th>İş</th><th class="ks-sag">Tutar</th></tr></thead>
-                    <tbody>${isler||'<tr><td colspan="5" class="ka-empty">Bu tarihlerde tamamlanan iş yok.</td></tr>'}</tbody>
-                </table></div>
-                <div class="ks-baslik">
-                    <label class="ks-onay"><input id="ksTahsilatDus" type="checkbox" ${ks.tahsilatDus?"checked":""} onchange="ksHesapla()" /> 💳 Bu tarihlerdeki ödemeleri düş</label>
-                    <button class="button button-light" type="button" onclick="kaTahsilatAc(${Number(e.hekim?.id||0)})">+ Tahsilat Gir</button>
-                </div>
-                ${odemeler?`<div class="table-wrapper"><table class="ks-tablo"><thead><tr><th>Tarih</th><th>Ödeme</th><th class="ks-sag">Tutar</th></tr></thead><tbody>${odemeler}</tbody></table></div>`:'<div class="ka-not" style="padding:6px 2px 4px">Bu tarihlerde ödeme yok.</div>'}
-                <div id="ksToplam" class="ks-toplam"></div>
-                <div class="ks-butonlar">
-                    <button class="button button-blue" type="button" onclick="ksYazdir()">🖨️ Yazdır / PDF</button>
-                    <button class="button" style="background:#16a34a;color:#fff" type="button" onclick="ksWhatsApp()">💬 WhatsApp ile Gönder</button>
-                    <button class="button button-light" type="button" onclick="ksKopyala()">📋 Metni Kopyala</button>
-                </div>`;
-            ksHesapla();
-        }
-
-        function ksIsSec(el){
-            const id=Number(el.dataset.id);
-            if(el.checked)ks.secili.add(id);else ks.secili.delete(id);
-            ksHesapla();
-        }
-        function ksTumuSec(v){
-            ks.secili=new Set(v?(ks.veri?.isler||[]).map(x=>x.id):[]);
-            document.querySelectorAll("#ksIcerik .ks-is").forEach(x=>x.checked=v);
-            ksHesapla();
-        }
-
-        // Ekrandaki seçimlerden ekstre durumunu çıkarır (yazdırma/mesaj/toplam aynı veriyi kullanır).
-        function ksDurum(e,ekrandan){
-            const pb=ksPb(e);
-            let devir={}, devirAcik, tahsilatDus, isler;
-            if(ekrandan){
-                devirAcik=!!document.getElementById("ksDevirAcik")?.checked;
-                tahsilatDus=!!document.getElementById("ksTahsilatDus")?.checked;
-                pb.forEach(c=>{
-                    const t=Math.abs(Number(document.getElementById("ksDevirTutar_"+c)?.value||0))||0;
-                    const y=Number(document.getElementById("ksDevirTur_"+c)?.value||1);
-                    devir[c]=Math.round(t*y*100)/100;
-                });
-                isler=(e.isler||[]).filter(x=>ks.secili.has(x.id));
-            }else{
-                devirAcik=true; tahsilatDus=true;
-                pb.forEach(c=>devir[c]=Number(e.devir?.[c]||0));
-                isler=e.isler||[];
-            }
-            const odemeler=tahsilatDus?(e.odemeler||[]):[];
+        // Ekrandaki ayarlardan ekstre hesabı (ekran, yazdırma ve mesaj aynı sonucu kullanır).
+        function kxDurum(e,ayarli){
+            const devirAcik=ayarli?kx.devirAcik:true;
+            const devir={};
+            KA_PB.forEach(c=>devir[c]=devirAcik?Number((ayarli&&kx.devirElle?kx.devirElle[c]:e.devir?.[c])||0):0);
+            const isler=e.isler||[], odemeler=e.odemeler||[];
+            // Dönem içinde kapatılmış cari dönemin elle belirlenen bakiyesi (indirim vb.) farkı.
+            const duzeltmeler=[];
+            (e.duzeltmeler||[]).forEach(x=>KA_PB.forEach(c=>{
+                const v=Number(x.tutarlar?.[c]||0);
+                if(Math.abs(v)>=0.005)duzeltmeler.push({tarih:x.tarih,aciklama:x.aciklama||"Dönem kapanışı düzeltmesi",tutar:v,paraBirimi:c});
+            }));
             const top={};
-            pb.forEach(c=>{
-                const d=devirAcik?devir[c]:0;
+            KA_PB.forEach(c=>{
                 const i=isler.filter(x=>x.paraBirimi===c).reduce((s,x)=>s+Number(x.tutar||0),0);
                 const o=odemeler.filter(x=>x.paraBirimi===c).reduce((s,x)=>s+Number(x.tutar||0),0);
-                top[c]={devir:d,is:i,odeme:o,toplam:Math.round((d+i-o)*100)/100};
+                const z=duzeltmeler.filter(x=>x.paraBirimi===c).reduce((s,x)=>s+x.tutar,0);
+                top[c]={devir:devir[c],is:i,odeme:o,duzeltme:z,toplam:Math.round((devir[c]+i-o+z)*100)/100};
             });
-            return {pb,devir,devirAcik,tahsilatDus,isler,odemeler,top};
+            const pb=KA_PB.filter(c=>c==="TRY"||Math.abs(Number(e.devir?.[c]||0))>=0.005||Object.values(top[c]).some(v=>Math.abs(v)>=0.005));
+            // Hastalar: her hasta altında o dönemdeki işleri (ilk iş tarihine göre sıralı).
+            const gr=new Map();
+            isler.forEach(x=>{
+                const k=String(x.hastaAdi||"-").trim().toLocaleLowerCase("tr-TR");
+                if(!gr.has(k))gr.set(k,{ad:x.hastaAdi||"-",isler:[],toplam:{}});
+                const g=gr.get(k); g.isler.push(x); g.toplam[x.paraBirimi]=(g.toplam[x.paraBirimi]||0)+Number(x.tutar||0);
+            });
+            return {devirAcik,devir,isler,odemeler,duzeltmeler,top,pb,hastalar:[...gr.values()]};
         }
 
-        function ksHesapla(){
-            const e=ks.veri;
+        function kxSonucYazi(t,c){
+            return Math.abs(t)<0.005?"Bakiye yok":t>0?"Ödenecek: "+kaPara(t,c):"Fazla ödeme (alacak): "+kaPara(-t,c);
+        }
+
+        function kxEkstreCiz(){
+            const e=kx.veri, host=document.getElementById("kxEkstre");
             if(!e)return;
-            const s=ksDurum(e,true);
-            ks.devirAcik=s.devirAcik; ks.tahsilatDus=s.tahsilatDus; ks.devir=s.devir;
-            const alan=document.getElementById("ksDevirAlan");
-            if(alan)alan.style.display=s.devirAcik?"block":"none";
-            const n=(e.isler||[]).length;
-            document.getElementById("ksIsSayac").innerText=n?`(${s.isler.length} / ${n} seçili)`:"";
-            const tum=document.getElementById("ksTumIs");
-            if(tum){tum.checked=n>0&&s.isler.length===n;tum.indeterminate=s.isler.length>0&&s.isler.length<n;}
-            document.getElementById("ksToplam").innerHTML=s.pb.filter(c=>c==="TRY"||Object.values(s.top[c]).some(v=>Math.abs(v)>=0.005)).map(c=>{
-                const t=s.top[c];
-                const parca=[];
-                if(s.devirAcik&&Math.abs(t.devir)>=0.005)parca.push(`Geçmiş ${t.devir>0?"borç":"alacak"} <b>${t.devir>0?"+":"−"} ${kaPara(Math.abs(t.devir),c)}</b>`);
-                parca.push(`İşler <b>+ ${kaPara(t.is,c)}</b>`);
-                if(s.tahsilatDus&&t.odeme>=0.005)parca.push(`Ödemeler <b>− ${kaPara(t.odeme,c)}</b>`);
-                const son=Math.abs(t.toplam)<0.005?`<span>Bakiye yok</span>`
-                    :t.toplam>0?`<span class="ka-negative">Ödenecek: ${kaPara(t.toplam,c)}</span>`
-                    :`<span class="ka-positive">Fazla ödeme (alacak): ${kaPara(-t.toplam,c)}</span>`;
-                return `<div class="ks-toplam-satir"><div class="ks-toplam-parca">${parca.join(' <span class="ka-not">·</span> ')}</div><div class="ks-toplam-son">${son}</div></div>`;
+            const s=kxDurum(e,true);
+            const h=e.hekim||{};
+            const hesapDevir=KA_PB.filter(c=>Math.abs(Number(e.devir?.[c]||0))>=0.005);
+            const devirYazi=KA_PB.filter(c=>Math.abs(Number(s.devir[c]||0))>=0.005).map(c=>{
+                const v=s.devir[c];
+                return v>0?`<b class="ka-negative">+ ${kaPara(v,c)}</b> <small>borç (eklenir)</small>`:`<b class="ka-positive">− ${kaPara(-v,c)}</b> <small>fazla ödeme (düşülür)</small>`;
+            }).join(" · ");
+            const devirForm=s.pb.map(c=>{
+                const v=Number((kx.devirElle?kx.devirElle[c]:e.devir?.[c])||0);
+                return `<div class="kx-devir-form-satir">
+                    <select id="kxDevirYon_${c}"><option value="1" ${v>=0?"selected":""}>Borç (eklenir)</option><option value="-1" ${v<0?"selected":""}>Fazla ödeme / alacak (düşülür)</option></select>
+                    <input id="kxDevirTutar_${c}" type="number" min="0" step="0.01" value="${Math.abs(v).toFixed(2)}" />
+                    <b>${c}</b>
+                </div>`;
             }).join("");
+            const hastalar=s.hastalar.map(g=>`<div class="kx-hasta">
+                <div class="kx-hasta-bas"><span>👤 ${escapeHtml(g.ad)}</span><span>${Object.entries(g.toplam).map(([c,v])=>kaPara(v,c)).join(" + ")}</span></div>
+                ${g.isler.map(x=>`<div class="kx-is"><span class="kx-tarih">${tarihGoster(x.tarih)}</span><span class="kx-is-ad">${escapeHtml(x.isTuru||"-")}</span><span class="kx-tutar">${kaPara(x.tutar,x.paraBirimi)}</span></div>`).join("")}
+            </div>`).join("");
+            const odemeler=s.odemeler.map(x=>`<div class="kx-is"><span class="kx-tarih">${tarihGoster(x.tarih)}</span><span class="kx-is-ad">${escapeHtml(x.odemeTuru||"Ödeme")}${x.islemNo?" · "+escapeHtml(x.islemNo):""}${x.aciklama?' <small class="ka-not">'+escapeHtml(x.aciklama)+"</small>":""}</span><span class="kx-tutar ka-positive">− ${kaPara(x.tutar,x.paraBirimi)}</span></div>`).join("")+
+                s.duzeltmeler.map(x=>`<div class="kx-is"><span class="kx-tarih">${tarihGoster(x.tarih)}</span><span class="kx-is-ad">⚖️ ${escapeHtml(x.aciklama)}</span><span class="kx-tutar">${x.tutar>0?"+":"−"} ${kaPara(Math.abs(x.tutar),x.paraBirimi)}</span></div>`).join("");
+            const toplam=s.pb.map(c=>{
+                const t=s.top[c];
+                const p=[];
+                if(s.devirAcik&&Math.abs(t.devir)>=0.005)p.push(`Devir ${t.devir>0?"+":"−"} ${kaPara(Math.abs(t.devir),c)}`);
+                p.push(`İşler + ${kaPara(t.is,c)}`);
+                if(t.odeme>=0.005)p.push(`Ödemeler − ${kaPara(t.odeme,c)}`);
+                if(Math.abs(t.duzeltme)>=0.005)p.push(`Düzeltme ${t.duzeltme>0?"+":"−"} ${kaPara(Math.abs(t.duzeltme),c)}`);
+                return `<div class="kx-toplam-satir"><div class="kx-toplam-hesap">${p.join("  ")}</div><div class="kx-toplam-son ${t.toplam>0.004?"ka-negative":t.toplam<-0.004?"ka-positive":""}">${kxSonucYazi(t.toplam,c)}</div></div>`;
+            }).join("");
+
+            host.innerHTML=`
+                <div class="kx-ust">
+                    <div>
+                        <h2>${escapeHtml(h.adSoyad||"")}</h2>
+                        <div class="kx-alt">${[h.klinikAdi&&h.klinikAdi!==h.adSoyad?escapeHtml(h.klinikAdi):"",h.telefon?escapeHtml(h.telefon):""].filter(Boolean).join(" · ")}</div>
+                        <div class="kx-donem-ad">📅 ${escapeHtml(e.donemAdi||"")}${/\d/.test(String(e.donemAdi||"").slice(0,2))?"":` <small>(${tarihGoster(e.baslangic)} – ${tarihGoster(e.bitis)})</small>`}</div>
+                    </div>
+                    <div class="kx-aksiyon">
+                        <button class="button button-blue" type="button" onclick="kxYazdir()">🖨️ Yazdır / PDF</button>
+                        <button class="button" style="background:#16a34a;color:#fff" type="button" onclick="kxWhatsApp()">💬 WhatsApp</button>
+                        <button class="button button-light" type="button" onclick="kxKopyala()">📋 Kopyala</button>
+                        <button class="button button-light" type="button" onclick="kaTahsilatAc(${Number(h.id||0)})">+ Tahsilat</button>
+                        <button class="button button-light" type="button" title="Açık dönem işleri, ödeme geçmişi, dönem kapatma" onclick="kaDetayAc(${Number(h.id||0)})">Cari detayı</button>
+                    </div>
+                </div>
+                ${e.ayBitmedi?'<div class="kx-uyari">Dönem henüz bitmedi; bugüne kadarki işler ve ödemeler gösteriliyor.</div>':""}
+
+                <div class="kx-blok kx-devir">
+                    <label class="kx-onay"><input type="checkbox" ${kx.devirAcik?"checked":""} onchange="kx.devirAcik=this.checked;kxEkstreCiz();" /> <b>Önceki dönemden devir</b></label>
+                    <div class="kx-devir-deger">${kx.devirAcik?(devirYazi||'<span class="ka-not">Devreden borç veya fazla ödeme yok</span>'):'<span class="ka-not">Toplama katılmıyor</span>'}</div>
+                    <button class="kx-link" type="button" onclick="kx.devirFormAcik=!kx.devirFormAcik;kxEkstreCiz();">${kx.devirFormAcik?"kapat":"değiştir"}</button>
+                    ${kx.devirElle?'<span class="ka-not">(elle değiştirildi)</span>':""}
+                    ${kx.devirFormAcik?`<div class="kx-devir-form">
+                        <div class="ka-not">Hesaplanan: ${hesapDevir.length?hesapDevir.map(c=>{const v=Number(e.devir[c]);return (v>0?"borç ":"fazla ödeme ")+kaPara(Math.abs(v),c);}).join(" · "):"yok"}</div>
+                        ${devirForm}
+                        <div class="kx-devir-form-btn"><button class="button button-blue" type="button" onclick="kxDevirUygula()">Uygula</button><button class="button button-light" type="button" onclick="kx.devirElle=null;kx.devirFormAcik=false;kxEkstreCiz();">Hesaplanana dön</button></div>
+                    </div>`:""}
+                </div>
+
+                <div class="kx-bolum-bas"><span>🦷 Hastalar ve işler</span><span class="ka-not">${s.hastalar.length} hasta · ${s.isler.length} iş</span></div>
+                <div class="kx-blok">${hastalar||'<div class="kx-bos">Bu dönemde tamamlanan iş yok.</div>'}</div>
+
+                <div class="kx-bolum-bas"><span>💳 Ödemeler</span><span class="ka-not">${s.odemeler.length} ödeme</span></div>
+                <div class="kx-blok">${odemeler||'<div class="kx-bos">Bu dönemde ödeme yok.</div>'}</div>
+
+                <div class="kx-toplam">${toplam}</div>
+                <div class="ka-not" style="margin-top:8px">İşler tamamlandığı (teslim) güne yazılır; devam eden işler ekstreye girmez.</div>`;
         }
 
-        function ksBaskiHtml(e,s){
-            const h=e.hekim||{};
-            const satir=[];
-            if(s.devirAcik)s.pb.forEach(c=>{
-                const v=Number(s.devir[c]||0);
-                if(Math.abs(v)<0.005)return;
-                satir.push(`<tr class="devir"><td>${tarihGoster(e.baslangic)}</td><td>${v>0?"Geçmiş dönemden kalan borç":"Geçmiş dönemden alacak / fazla ödeme"}</td><td class="t">${v>0?kaPara(v,c):""}</td><td class="t">${v<0?kaPara(-v,c):""}</td></tr>`);
+        function kxDevirUygula(){
+            const m={TRY:0,EUR:0,USD:0};
+            KA_PB.forEach(c=>{
+                const t=document.getElementById("kxDevirTutar_"+c);
+                if(!t)return;
+                m[c]=Math.round(Math.abs(Number(t.value||0))*Number(document.getElementById("kxDevirYon_"+c).value||1)*100)/100;
             });
-            [...s.isler.map(x=>({t:x.tarih,k:0,h:`<tr><td>${tarihGoster(x.tarih)}</td><td><strong>${escapeHtml(x.hastaAdi||"-")}</strong> — ${escapeHtml(x.isTuru||"-")}</td><td class="t">${kaPara(x.tutar,x.paraBirimi)}</td><td class="t"></td></tr>`})),
-             ...s.odemeler.map(x=>({t:x.tarih,k:1,h:`<tr><td>${tarihGoster(x.tarih)}</td><td>Ödeme — ${escapeHtml(x.odemeTuru||"Ödeme")}${x.islemNo?" ("+escapeHtml(x.islemNo)+")":""}</td><td class="t"></td><td class="t">${kaPara(x.tutar,x.paraBirimi)}</td></tr>`}))]
-                .sort((a,b)=>a.t<b.t?-1:a.t>b.t?1:a.k-b.k).forEach(x=>satir.push(x.h));
-            const sonuc=s.pb.filter(c=>c==="TRY"||Object.values(s.top[c]).some(v=>Math.abs(v)>=0.005)).map(c=>{
+            kx.devirElle=m; kx.devirAcik=true; kx.devirFormAcik=false;
+            kxEkstreCiz();
+        }
+
+        function kxBaskiHtml(e,s){
+            const h=e.hekim||{};
+            const devir=s.devirAcik?s.pb.filter(c=>Math.abs(s.devir[c])>=0.005).map(c=>{
+                const v=s.devir[c];
+                return `<tr class="devir"><td colspan="2">${v>0?"Önceki dönemden devreden borç":"Önceki dönemden devreden fazla ödeme"}</td><td class="t">${v>0?"+ ":"− "}${kaPara(Math.abs(v),c)}</td></tr>`;
+            }).join(""):"";
+            const hastalar=s.hastalar.map(g=>
+                `<tr class="hasta"><td colspan="2">${escapeHtml(g.ad)}</td><td class="t">${Object.entries(g.toplam).map(([c,v])=>kaPara(v,c)).join(" + ")}</td></tr>`+
+                g.isler.map(x=>`<tr><td class="tarih">${tarihGoster(x.tarih)}</td><td>${escapeHtml(x.isTuru||"-")}</td><td class="t">${kaPara(x.tutar,x.paraBirimi)}</td></tr>`).join("")).join("");
+            const odemeler=s.odemeler.map(x=>`<tr><td class="tarih">${tarihGoster(x.tarih)}</td><td>Ödeme — ${escapeHtml(x.odemeTuru||"Ödeme")}${x.islemNo?" ("+escapeHtml(x.islemNo)+")":""}</td><td class="t">− ${kaPara(x.tutar,x.paraBirimi)}</td></tr>`).join("")+
+                s.duzeltmeler.map(x=>`<tr><td class="tarih">${tarihGoster(x.tarih)}</td><td>${escapeHtml(x.aciklama)}</td><td class="t">${x.tutar>0?"+ ":"− "}${kaPara(Math.abs(x.tutar),x.paraBirimi)}</td></tr>`).join("");
+            const sonuc=s.pb.map(c=>{
                 const t=s.top[c].toplam;
-                return Math.abs(t)<0.005?`<div>${c}: Bakiye yoktur.</div>`
-                    :t>0?`<div>TOPLAM ÖDENECEK: <strong>${kaPara(t,c)}</strong></div>`
-                    :`<div>Fazla ödemeniz (alacağınız): <strong>${kaPara(-t,c)}</strong></div>`;
+                return `<div>${Math.abs(t)<0.005?c+": Bakiye yoktur.":t>0?"TOPLAM ÖDENECEK: <strong>"+kaPara(t,c)+"</strong>":"Fazla ödemeniz (alacağınız): <strong>"+kaPara(-t,c)+"</strong>"}</div>`;
             }).join("");
-            const hastaSay=new Set(s.isler.map(x=>String(x.hastaAdi||"").trim().toLocaleLowerCase("tr-TR"))).size;
             return `<div class="sayfa">
                 ${firmaBaskiBasligi()}
                 <div class="bas">
-                    <div><h1>HESAP EKSTRESİ</h1><div class="kucuk">${ksAralikYazi(e)}</div></div>
-                    <div class="hekim"><strong>${escapeHtml(h.adSoyad||"")}</strong>${h.klinikAdi&&h.klinikAdi!==h.adSoyad?"<br>"+escapeHtml(h.klinikAdi):""}${h.telefon?"<br>"+escapeHtml(h.telefon):""}</div>
+                    <div><h1>HESAP EKSTRESİ</h1><div class="kucuk">${tarihGoster(e.baslangic)} – ${tarihGoster(e.bitis)}</div></div>
+                    <div class="hekim"><strong>${escapeHtml(h.adSoyad||"")}</strong>${h.klinikAdi&&h.klinikAdi!==h.adSoyad?"<br>"+escapeHtml(h.klinikAdi):""}</div>
                 </div>
-                <table><thead><tr><th style="width:84px">Tarih</th><th>Açıklama (Hasta — İş)</th><th class="t" style="width:110px">Borç</th><th class="t" style="width:110px">Ödeme / Alacak</th></tr></thead>
-                <tbody>${satir.join("")||'<tr><td colspan="4" class="kucuk">Hareket yok.</td></tr>'}</tbody></table>
+                <table>
+                    ${devir}
+                    <tr class="bolum"><td colspan="3">Hastalar ve işler (${s.hastalar.length} hasta, ${s.isler.length} iş)</td></tr>
+                    ${hastalar||'<tr><td colspan="3" class="kucuk">Bu dönemde iş yok.</td></tr>'}
+                    ${odemeler?`<tr class="bolum"><td colspan="3">Ödemeler</td></tr>${odemeler}`:""}
+                </table>
                 <div class="sonuc">${sonuc}</div>
-                <div class="kucuk alt">${s.isler.length} iş · ${hastaSay} hasta · Düzenleme: ${tarihGoster(ksGun(new Date()))}</div>
+                <div class="kucuk alt">Düzenleme: ${tarihGoster(kxGun(new Date()))}${e.ayBitmedi?" · Dönem henüz bitmedi, bugüne kadarki hareketler":""}</div>
             </div>`;
         }
 
@@ -12968,89 +12958,91 @@
                 .sayfa:last-child{page-break-after:auto}
                 .bas{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:12px}
                 h1{margin:0;font-size:20px;letter-spacing:.5px}
-                .hekim{text-align:right;font-size:13px;line-height:1.4}
+                .hekim{text-align:right;font-size:14px;line-height:1.4}
                 .kucuk{color:#64748b;font-size:11px}
-                table{width:100%;border-collapse:collapse;margin-top:8px}
-                th,td{padding:6px 7px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top}
-                th{background:#f1f5f9;font-size:10px;text-transform:uppercase;color:#475569}
-                .t{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+                table{width:100%;border-collapse:collapse;margin-top:6px}
+                td{padding:5px 7px;border-bottom:1px solid #eef2f7;vertical-align:top}
+                td.tarih{width:84px;color:#475569;padding-left:18px}
+                .t{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;width:140px}
                 tr.devir td{background:#fff7e0;font-weight:700}
-                .sonuc{margin-top:14px;padding:10px 12px;border:2px solid #10233e;border-radius:8px;font-size:14px;line-height:1.7}
+                tr.bolum td{background:#10233e;color:#fff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+                tr.hasta td{background:#f1f5f9;font-weight:700}
+                .sonuc{margin-top:14px;padding:10px 12px;border:2px solid #10233e;border-radius:8px;font-size:15px;line-height:1.7}
                 .alt{margin-top:10px}
             </style></head><body>${govde}<script>window.onload=()=>setTimeout(()=>window.print(),200);<\/script></body></html>`;
         }
 
-        function ksYazdir(){
-            const e=ks.veri;
+        function kxYazdir(){
+            const e=kx.veri;
             if(!e)return;
-            const s=ksDurum(e,true);
-            if(!s.isler.length&&!s.odemeler.length&&!(s.devirAcik&&s.pb.some(c=>Math.abs(s.devir[c])>=0.005)))
-                return showError("Ekstrede gösterilecek satır yok.");
             const w=window.open("","_blank","width=900,height=900");
             if(!w)return showError("Yazdırma penceresi açılamadı.");
-            w.document.write(kaEkstreBaskiBelgesi(ksBaskiHtml(e,s),"Ekstre - "+(e.hekim?.adSoyad||"")));
+            w.document.write(kaEkstreBaskiBelgesi(kxBaskiHtml(e,kxDurum(e,true)),"Ekstre - "+(e.hekim?.adSoyad||"")+" - "+(e.donemAdi||"")));
             w.document.close();
         }
 
-        function ksMetin(){
-            const e=ks.veri;
-            const s=ksDurum(e,true);
-            const l=["Sayın "+(e.hekim?.adSoyad||"Hekim")+",","",ksAralikYazi(e)+" tarihleri arası hesap ekstreniz:"];
+        function kxMetin(){
+            const e=kx.veri, s=kxDurum(e,true);
+            const l=["Sayın "+(e.hekim?.adSoyad||"Hekim")+",","",(e.donemAdi||"")+" hesap ekstreniz:"];
             if(s.devirAcik)s.pb.forEach(c=>{
-                const v=Number(s.devir[c]||0);
-                if(Math.abs(v)>=0.005)l.push(v>0?"Geçmiş dönemden kalan borç: "+kaPara(v,c):"Geçmiş dönemden alacağınız: "+kaPara(-v,c));
+                const v=s.devir[c];
+                if(Math.abs(v)>=0.005)l.push(v>0?"Önceki dönemden devreden borç: "+kaPara(v,c):"Önceki dönemden devreden fazla ödeme: "+kaPara(-v,c));
             });
-            l.push("","İşler ("+s.isler.length+" iş):");
-            if(!s.isler.length)l.push("- Yok");
-            s.isler.forEach(x=>l.push("- "+tarihGoster(x.tarih).slice(0,5)+" "+(x.hastaAdi||"-")+" — "+(x.isTuru||"-")+": "+kaPara(x.tutar,x.paraBirimi)));
+            l.push("","Hastalar ve işler ("+s.hastalar.length+" hasta, "+s.isler.length+" iş):");
+            if(!s.hastalar.length)l.push("- Bu dönemde iş yok.");
+            s.hastalar.forEach(g=>{
+                l.push("• "+g.ad+": "+Object.entries(g.toplam).map(([c,v])=>kaPara(v,c)).join(" + "));
+                g.isler.forEach(x=>l.push("   "+tarihGoster(x.tarih).slice(0,5)+" "+(x.isTuru||"-")+" — "+kaPara(x.tutar,x.paraBirimi)));
+            });
             if(s.odemeler.length){
                 l.push("","Ödemeleriniz:");
                 s.odemeler.forEach(x=>l.push("- "+tarihGoster(x.tarih).slice(0,5)+" "+(x.odemeTuru||"Ödeme")+": "+kaPara(x.tutar,x.paraBirimi)));
             }
+            s.duzeltmeler.forEach(x=>l.push(x.aciklama+": "+(x.tutar>0?"+":"−")+kaPara(Math.abs(x.tutar),x.paraBirimi)));
             l.push("");
-            s.pb.filter(c=>c==="TRY"||Object.values(s.top[c]).some(v=>Math.abs(v)>=0.005)).forEach(c=>{
+            s.pb.forEach(c=>{
                 const t=s.top[c].toplam;
                 l.push(Math.abs(t)<0.005?"Bakiye ("+c+"): 0":t>0?"TOPLAM ÖDENECEK: "+kaPara(t,c):"Fazla ödemeniz (alacağınız): "+kaPara(-t,c));
             });
+            if(e.ayBitmedi)l.push("(Dönem henüz bitmedi; bugüne kadarki hareketlerdir.)");
             l.push("",firmaImza());
             return l.join("\n");
         }
 
-        function ksWhatsApp(){
-            if(!ks.veri)return;
-            let phone=String(ks.veri.hekim?.telefon||"").replace(/\D/g,"");
+        function kxWhatsApp(){
+            if(!kx.veri)return;
+            let phone=String(kx.veri.hekim?.telefon||"").replace(/\D/g,"");
             if(phone.startsWith("0"))phone="90"+phone.slice(1);
             if(phone&&!phone.startsWith("90")&&phone.length===10)phone="90"+phone;
             if(!phone)showSuccess("Hekimin telefonu kayıtlı değil; WhatsApp'ta kişiyi siz seçin.");
-            window.open("https://wa.me/"+phone+"?text="+encodeURIComponent(ksMetin()),"_blank","noopener");
+            window.open("https://wa.me/"+phone+"?text="+encodeURIComponent(kxMetin()),"_blank","noopener");
         }
 
-        async function ksKopyala(){
-            if(!ks.veri)return;
-            try{await navigator.clipboard.writeText(ksMetin());showSuccess("Ekstre metni kopyalandı.");}
+        async function kxKopyala(){
+            if(!kx.veri)return;
+            try{await navigator.clipboard.writeText(kxMetin());showSuccess("Ekstre metni kopyalandı.");}
             catch{showError("Metin kopyalanamadı.");}
         }
 
-        // Listede görünen tüm hekimlerin ekstresi (tüm işler, hesaplanan geçmiş bakiye), her biri ayrı sayfa.
-        async function kaTumEkstreYazdir(){
-            if(!kaAylik)return;
-            const list=kaAylikSatirlar();
-            if(!list.length)return showError("Yazdırılacak ekstre yok.");
+        // Listede görünen tüm hekimlerin ekstresi (hesaplanan devirle), her biri ayrı sayfa.
+        async function kxHepsiniYazdir(){
+            const d=kxDonem();
+            const list=kxListeSatirlari();
+            if(!d||!list.length)return showError("Yazdırılacak ekstre yok.");
             const w=window.open("","_blank","width=900,height=900");
             if(!w)return showError("Yazdırma penceresi açılamadı.");
             w.document.write('<p style="font-family:Arial;padding:30px">Ekstreler hazırlanıyor...</p>');
-            const b=kaAylik.baslangic, e=kaAylik.bitis;
             try{
                 const sonuc=[];
                 for(let i=0;i<list.length;i+=5){
                     sonuc.push(...await Promise.all(list.slice(i,i+5).map(async x=>{
-                        const r=await fetch(`/api/kasa-arsiv/ekstre/${Number(x.hekimId)}?baslangic=${b}&bitis=${e}`,{cache:"no-store"});
+                        const r=await fetch(`/api/kasa-arsiv/ekstre/${Number(x.hekimId)}?baslangic=${d.b}&bitis=${d.e}`,{cache:"no-store"});
                         if(!r.ok)throw new Error((await r.text())||"Ekstre alınamadı.");
-                        return r.json();
+                        const v=await r.json(); v.donemAdi=d.ad; return v;
                     })));
                 }
                 w.document.open();
-                w.document.write(kaEkstreBaskiBelgesi(sonuc.map(d=>ksBaskiHtml(d,ksDurum(d,false))).join(""),"Ekstreler "+tarihGoster(b)+" - "+tarihGoster(e)));
+                w.document.write(kaEkstreBaskiBelgesi(sonuc.map(v=>kxBaskiHtml(v,kxDurum(v,false))).join(""),"Ekstreler - "+d.ad));
                 w.document.close();
             }catch(err){
                 w.close();
