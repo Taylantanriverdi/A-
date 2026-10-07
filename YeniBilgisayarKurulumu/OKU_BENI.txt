@@ -187,24 +187,25 @@ OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
 - Program guncellenince acik istasyon kendini yeniler (eski sablonla basmaz).
 - Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
 
-KASA / ARSIV: AYLIK HEKIM EKSTRESI
-----------------------------------
-Kasa / Arsiv acilinca "Aylik Ekstre" gorunur (ustteki ay seciciyle ay degisir).
-- Her hekim icin YALNIZ secilen ayin hastalari/isleri ve tahsilatlari listelenir.
-  Gecmis aylarin isleri listede gorunmez; hepsi tek bir "Onceki aylardan devir"
-  satirinda toplanir: borc ise toplama EKLENIR, fazla odeme ise DUSULUR.
-- Ay sonu bakiye = Devir + Bu ayin isleri - Bu ayin tahsilatlari.
-- Is, TAMAMLANDIGI (teslim) aya yazilir; devam eden isler ekstreye girmez.
-  Tarihler Turkiye saatine gore aya ayrilir.
-- Hekime tiklayin > "Aylik Ekstre" sekmesi: "Ekstreyi Yazdir / PDF" ile
-  firma basligli hesap ekstresi, "Ekstreyi Gonder" ile WhatsApp/kopyala metni.
-- "Tum Ekstreleri Yazdir": secili ayin tum hekim ekstreleri, her biri ayri sayfa.
-- Donem kapatmak artik zorunlu degil; aylik ekstre donem kapatmadan da calisir.
-  Kapatilirsa ekstreler degismez. Kapanista bakiye elle degistirilmisse
-  (indirim vb.) fark ekstrede "Donem kapanisi duzeltmesi" olarak gorunur.
-- "Yeni Donem" penceresi, secilen kapanis tarihindeki bakiyeyi kendisi doldurur
-  (onceden hep bugunku bakiye geliyordu; gecmis tarihli kapanista sonraki
-  odemeler iki kez dusuluyordu - duzeltildi).
+KASA / ARSIV: HEKIM EKSTRESI (TARIH ARALIGI)
+--------------------------------------------
+Kasa / Arsiv acilinca "Hekim Ekstresi" ekrani gelir:
+1. Hekimi secin; Baslangic ve Bitis tarihlerini istediginiz gibi girin
+   (hizli dugmeler: Bu Ay, Gecen Ay, Son 3 Ay, Bu Yil).
+2. Listede YALNIZ bu tarihler arasinda tamamlanan isler cikar. Gondermek
+   istemediginiz isin isaretini kaldirin; toplam aninda degisir.
+3. "Gecmis borc / alacagi listeye ekle": baslangic tarihinden onceki bakiye
+   otomatik hesaplanip yazilir. Borc ise toplama EKLENIR, alacak / fazla odeme
+   ise DUSULUR. Tutar ve yonu elle degistirilebilir; kutu kaldirilirsa
+   gecmis bakiye listeye girmez. "hesaplanani geri yukle" ile eski haline doner.
+4. "Bu tarihlerdeki odemeleri dus": araliktaki tahsilatlar toplamdan dusulur.
+5. "Yazdir / PDF", "WhatsApp ile Gonder" (hekimin telefonu kayitliysa dogrudan
+   ona acilir) ya da "Metni Kopyala".
+Alttaki "Tum Hekimler" tablosu ayni tarih araligini gosterir; satira tiklayinca
+o hekimin ekstresi ustte acilir. "Hepsini Yazdir" her hekimi ayri sayfa basar.
+- Is, tamamlandigi (teslim) gune yazilir; devam eden isler listeye girmez.
+- Donem kapatmak zorunlu degildir. "Yeni Donem" penceresi secilen kapanis
+  tarihindeki bakiyeyi kendisi doldurur.
 - Eski gorunum (acik donemin tum hareketleri) "Acik Donem" dugmesindedir.
 
 

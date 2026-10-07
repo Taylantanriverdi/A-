@@ -133,13 +133,15 @@ public sealed class KasaArsivV2Controller : ControllerBase
         });
     }
 
-    // Aylık hekim listesi: her hekim için seçilen ayın devri, o ayın işleri, tahsilatları ve ay sonu bakiyesi.
+    // Hekim listesi (tarih aralığı): her hekim için aralık başındaki geçmiş bakiye, aralıktaki işler,
+    // tahsilatlar ve aralık sonu bakiyesi. Aralık verilmezse yil/ay ya da bu ay kullanılır.
     [HttpGet("aylik")]
-    public async Task<IActionResult> Aylik([FromQuery] int? yil, [FromQuery] int? ay, CancellationToken ct)
+    public async Task<IActionResult> Aylik([FromQuery] int? yil, [FromQuery] int? ay,
+        [FromQuery] string? baslangic, [FromQuery] string? bitis, CancellationToken ct)
     {
-        var (y, a, hata) = AySec(yil, ay);
+        var (bas, bit, hata) = AralikSec(yil, ay, baslangic, bitis);
         if (hata != null) return BadRequest(hata);
-        var (bas, bit) = HekimEkstreHesabi.AyAraligi(y, a);
+        var y = bas.Year; var a = bas.Month;
 
         var hekimler = await _db.Hekimler.AsNoTracking()
             .OrderBy(x => x.AdSoyad)
@@ -190,26 +192,26 @@ public sealed class KasaArsivV2Controller : ControllerBase
 
     // Hekimin aylık ekstresi: devir + o ayın hastaları/işleri − o ayın tahsilatları (± dönem düzeltmesi) = ay sonu bakiyesi.
     [HttpGet("ekstre/{hekimId:int}")]
-    public async Task<IActionResult> Ekstre(int hekimId, [FromQuery] int? yil, [FromQuery] int? ay, CancellationToken ct)
+    public async Task<IActionResult> Ekstre(int hekimId, [FromQuery] int? yil, [FromQuery] int? ay,
+        [FromQuery] string? baslangic, [FromQuery] string? bitis, CancellationToken ct)
     {
-        var (y, a, hata) = AySec(yil, ay);
+        var (bas, bit, hata) = AralikSec(yil, ay, baslangic, bitis);
         if (hata != null) return BadRequest(hata);
+        var y = bas.Year; var a = bas.Month;
         var hekim = await _db.Hekimler.AsNoTracking()
             .Where(x => x.Id == hekimId)
             .Select(x => new { x.Id, x.AdSoyad, x.KlinikAdi, x.Telefon, x.Email, x.Aktif })
             .FirstOrDefaultAsync(ct);
         if (hekim == null) return NotFound("Hekim bulunamadı.");
 
-        var (bas, bit) = HekimEkstreHesabi.AyAraligi(y, a);
         var d = (await HekimEkstreHesabi.DefterleriKur(_db, hekimId, ct))[hekimId];
         var e = HekimEkstreHesabi.Hesapla(d, bas, bit);
-        var (buYil, buAy) = HekimEkstreHesabi.BuAy();
 
         return Ok(new
         {
             hekim,
             yil = y, ay = a, baslangic = HekimEkstreHesabi.Gun(bas), bitis = HekimEkstreHesabi.Gun(bit),
-            ayBitmedi = y > buYil || (y == buYil && a >= buAy),
+            ayBitmedi = bit >= HekimEkstreHesabi.YerelGun(DateTime.UtcNow),
             devir = e.Devir, isToplam = e.IsToplam, tahsilatToplam = e.TahsilatToplam,
             duzeltmeToplam = e.DuzeltmeToplam, kapanis = e.Kapanis,
             guncelBakiye = HekimEkstreHesabi.GuncelBakiye(d),
@@ -232,6 +234,24 @@ public sealed class KasaArsivV2Controller : ControllerBase
             }),
             kapananDonemler = e.KapananDonemler.Select(x => new { x.DonemId, tarih = HekimEkstreHesabi.Gun(x.Tarih) })
         });
+    }
+
+    private static (DateOnly, DateOnly, string?) AralikSec(int? yil, int? ay, string? baslangic, string? bitis)
+    {
+        if (!string.IsNullOrWhiteSpace(baslangic) || !string.IsNullOrWhiteSpace(bitis))
+        {
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            if (!DateOnly.TryParseExact(baslangic ?? "", "yyyy-MM-dd", ci, System.Globalization.DateTimeStyles.None, out var b) ||
+                !DateOnly.TryParseExact(bitis ?? "", "yyyy-MM-dd", ci, System.Globalization.DateTimeStyles.None, out var e))
+                return (default, default, "Başlangıç ve bitiş tarihi seçilmelidir.");
+            if (e < b) return (default, default, "Bitiş tarihi başlangıçtan önce olamaz.");
+            if (b.Year < 2000 || e.Year > 2100) return (default, default, "Geçersiz tarih aralığı.");
+            return (b, e, null);
+        }
+        var (yy, aa, h) = AySec(yil, ay);
+        if (h != null) return (default, default, h);
+        var (bb, ee) = HekimEkstreHesabi.AyAraligi(yy, aa);
+        return (bb, ee, null);
     }
 
     private static (int, int, string?) AySec(int? yil, int? ay)
