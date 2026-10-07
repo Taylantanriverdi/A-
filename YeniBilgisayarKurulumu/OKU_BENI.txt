@@ -187,6 +187,27 @@ OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
 - Program guncellenince acik istasyon kendini yeniler (eski sablonla basmaz).
 - Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
 
+KASA / ARSIV: AYLIK HEKIM EKSTRESI
+----------------------------------
+Kasa / Arsiv acilinca "Aylik Ekstre" gorunur (ustteki ay seciciyle ay degisir).
+- Her hekim icin YALNIZ secilen ayin hastalari/isleri ve tahsilatlari listelenir.
+  Gecmis aylarin isleri listede gorunmez; hepsi tek bir "Onceki aylardan devir"
+  satirinda toplanir: borc ise toplama EKLENIR, fazla odeme ise DUSULUR.
+- Ay sonu bakiye = Devir + Bu ayin isleri - Bu ayin tahsilatlari.
+- Is, TAMAMLANDIGI (teslim) aya yazilir; devam eden isler ekstreye girmez.
+  Tarihler Turkiye saatine gore aya ayrilir.
+- Hekime tiklayin > "Aylik Ekstre" sekmesi: "Ekstreyi Yazdir / PDF" ile
+  firma basligli hesap ekstresi, "Ekstreyi Gonder" ile WhatsApp/kopyala metni.
+- "Tum Ekstreleri Yazdir": secili ayin tum hekim ekstreleri, her biri ayri sayfa.
+- Donem kapatmak artik zorunlu degil; aylik ekstre donem kapatmadan da calisir.
+  Kapatilirsa ekstreler degismez. Kapanista bakiye elle degistirilmisse
+  (indirim vb.) fark ekstrede "Donem kapanisi duzeltmesi" olarak gorunur.
+- "Yeni Donem" penceresi, secilen kapanis tarihindeki bakiyeyi kendisi doldurur
+  (onceden hep bugunku bakiye geliyordu; gecmis tarihli kapanista sonraki
+  odemeler iki kez dusuluyordu - duzeltildi).
+- Eski gorunum (acik donemin tum hareketleri) "Acik Donem" dugmesindedir.
+
+
 DOSYA LINKLERI (WeTransfer, Google Drive, Dropbox, iCloud, 3Shape...)
 --------------------------------------------------------------------
 - Hekim, Hekim Portali'nda is gonderirken dosya yuklemek yerine (ya da

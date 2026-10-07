@@ -133,6 +133,128 @@ public sealed class KasaArsivV2Controller : ControllerBase
         });
     }
 
+    // Aylık hekim listesi: her hekim için seçilen ayın devri, o ayın işleri, tahsilatları ve ay sonu bakiyesi.
+    [HttpGet("aylik")]
+    public async Task<IActionResult> Aylik([FromQuery] int? yil, [FromQuery] int? ay, CancellationToken ct)
+    {
+        var (y, a, hata) = AySec(yil, ay);
+        if (hata != null) return BadRequest(hata);
+        var (bas, bit) = HekimEkstreHesabi.AyAraligi(y, a);
+
+        var hekimler = await _db.Hekimler.AsNoTracking()
+            .OrderBy(x => x.AdSoyad)
+            .Select(x => new { x.Id, x.AdSoyad, x.KlinikAdi, x.Telefon, x.Aktif })
+            .ToListAsync(ct);
+        var defterler = await HekimEkstreHesabi.DefterleriKur(_db, 0, ct);
+
+        var satirlar = new List<object>();
+        var genel = new
+        {
+            devir = HekimEkstreHesabi.BosPara(), isToplam = HekimEkstreHesabi.BosPara(),
+            tahsilat = HekimEkstreHesabi.BosPara(), kapanis = HekimEkstreHesabi.BosPara()
+        };
+        var genelIs = 0;
+        foreach (var h in hekimler)
+        {
+            defterler.TryGetValue(h.Id, out var d);
+            var e = d == null ? new HekimEkstreHesabi.Ekstre { Baslangic = bas, Bitis = bit } : HekimEkstreHesabi.Hesapla(d, bas, bit);
+            var guncel = d == null ? HekimEkstreHesabi.BosPara() : HekimEkstreHesabi.GuncelBakiye(d);
+            var hareketli = e.Isler.Count > 0 || e.Odemeler.Count > 0 || e.Duzeltmeler.Count > 0 ||
+                            Sifirdan(e.Devir) || Sifirdan(e.Kapanis);
+            if (!h.Aktif && !hareketli && !Sifirdan(guncel)) continue;
+
+            foreach (var c in Currencies)
+            {
+                genel.devir[c] += e.Devir[c]; genel.isToplam[c] += e.IsToplam[c];
+                genel.tahsilat[c] += e.TahsilatToplam[c]; genel.kapanis[c] += e.Kapanis[c];
+            }
+            genelIs += e.Isler.Count;
+            satirlar.Add(new
+            {
+                hekimId = h.Id, aktif = h.Aktif, hekimAdi = h.AdSoyad, klinikAdi = h.KlinikAdi, telefon = h.Telefon,
+                hareketli,
+                isSayisi = e.Isler.Count,
+                hastaSayisi = HastaGruplari(e.Isler).Count,
+                devir = e.Devir, isToplam = e.IsToplam, tahsilat = e.TahsilatToplam,
+                duzeltme = e.DuzeltmeToplam, kapanis = e.Kapanis, guncelBakiye = guncel
+            });
+        }
+
+        return Ok(new
+        {
+            yil = y, ay = a, baslangic = HekimEkstreHesabi.Gun(bas), bitis = HekimEkstreHesabi.Gun(bit),
+            genel = new { genel.devir, genel.isToplam, genel.tahsilat, genel.kapanis, isSayisi = genelIs },
+            hekimler = satirlar
+        });
+    }
+
+    // Hekimin aylık ekstresi: devir + o ayın hastaları/işleri − o ayın tahsilatları (± dönem düzeltmesi) = ay sonu bakiyesi.
+    [HttpGet("ekstre/{hekimId:int}")]
+    public async Task<IActionResult> Ekstre(int hekimId, [FromQuery] int? yil, [FromQuery] int? ay, CancellationToken ct)
+    {
+        var (y, a, hata) = AySec(yil, ay);
+        if (hata != null) return BadRequest(hata);
+        var hekim = await _db.Hekimler.AsNoTracking()
+            .Where(x => x.Id == hekimId)
+            .Select(x => new { x.Id, x.AdSoyad, x.KlinikAdi, x.Telefon, x.Email, x.Aktif })
+            .FirstOrDefaultAsync(ct);
+        if (hekim == null) return NotFound("Hekim bulunamadı.");
+
+        var (bas, bit) = HekimEkstreHesabi.AyAraligi(y, a);
+        var d = (await HekimEkstreHesabi.DefterleriKur(_db, hekimId, ct))[hekimId];
+        var e = HekimEkstreHesabi.Hesapla(d, bas, bit);
+        var (buYil, buAy) = HekimEkstreHesabi.BuAy();
+
+        return Ok(new
+        {
+            hekim,
+            yil = y, ay = a, baslangic = HekimEkstreHesabi.Gun(bas), bitis = HekimEkstreHesabi.Gun(bit),
+            ayBitmedi = y > buYil || (y == buYil && a >= buAy),
+            devir = e.Devir, isToplam = e.IsToplam, tahsilatToplam = e.TahsilatToplam,
+            duzeltmeToplam = e.DuzeltmeToplam, kapanis = e.Kapanis,
+            guncelBakiye = HekimEkstreHesabi.GuncelBakiye(d),
+            isSayisi = e.Isler.Count,
+            isler = e.Isler.Select(x => new
+            {
+                x.Id, tarih = HekimEkstreHesabi.Gun(x.Tarih),
+                gelisTarihi = x.GelisTarihi is { } g ? HekimEkstreHesabi.Gun(g) : null,
+                x.HastaAdi, x.IsTuru, x.Adet, x.Tutar, x.ParaBirimi, arsivde = x.KapaliDonemde
+            }),
+            hastalar = HastaGruplari(e.Isler),
+            odemeler = e.Odemeler.Select(x => new
+            {
+                x.Id, tarih = HekimEkstreHesabi.Gun(x.Tarih), x.Tutar, x.ParaBirimi,
+                x.OdemeTuru, x.IslemNo, x.Aciklama, kapali = x.KapaliDonemde
+            }),
+            duzeltmeler = e.Duzeltmeler.Select(x => new
+            {
+                x.DonemId, tarih = HekimEkstreHesabi.Gun(x.Tarih), tutarlar = x.Tutarlar, x.Aciklama
+            }),
+            kapananDonemler = e.KapananDonemler.Select(x => new { x.DonemId, tarih = HekimEkstreHesabi.Gun(x.Tarih) })
+        });
+    }
+
+    private static (int, int, string?) AySec(int? yil, int? ay)
+    {
+        var (y, a) = HekimEkstreHesabi.BuAy();
+        if (yil.HasValue) y = yil.Value;
+        if (ay.HasValue) a = ay.Value;
+        if (y < 2000 || y > 2100 || a < 1 || a > 12) return (0, 0, "Geçersiz ay seçimi.");
+        return (y, a, null);
+    }
+
+    private static bool Sifirdan(Dictionary<string, decimal> m) => m.Values.Any(v => v != 0);
+
+    private static List<object> HastaGruplari(List<HekimEkstreHesabi.Hareket> isler) =>
+        isler.GroupBy(x => (x.HastaAdi ?? "").Trim().ToLower(new System.Globalization.CultureInfo("tr-TR")))
+            .Select(g =>
+            {
+                var t = HekimEkstreHesabi.BosPara();
+                foreach (var x in g) t[x.ParaBirimi] += x.Tutar;
+                return (object)new { hastaAdi = g.First().HastaAdi, isSayisi = g.Count(), tutarlar = t };
+            })
+            .ToList();
+
     [HttpPost("tahsilat")]
     public async Task<IActionResult> TahsilatEkle([FromBody] KasaArsivTahsilatInput dto)
     {
@@ -200,12 +322,12 @@ public sealed class KasaArsivV2Controller : ControllerBase
             return BadRequest("Kapanış tarihi gelecekte olamaz.");
 
         var last = await LastActivePeriod(hekimId);
-        var closeAt = closeDate.Date.AddDays(1).AddTicks(-1);
+        var closeAt = KapanisAni(closeDate);
 
         if (last != null && closeAt <= last.KapanisTarihi)
             return BadRequest("Yeni kapanış tarihi önceki dönem kapanışından sonra olmalıdır.");
 
-        var cari = await BuildCari(hekimId, null, closeAt, includeCarry: true);
+        var cari = await BuildCari(hekimId, null, closeAt, includeCarry: true, kapanisIcin: true);
 
         if (cari.Isler.Count == 0 &&
             cari.Odemeler.Count == 0 &&
@@ -240,6 +362,32 @@ public sealed class KasaArsivV2Controller : ControllerBase
             kapanisTarihi = closeAt,
             bakiyeler = balances,
             devirEklendi = dto.DevirEkle
+        });
+    }
+
+    // Dönem kapatma penceresi: seçilen kapanış tarihindeki bakiye (kapatınca kaydedilecek değerin aynısı).
+    // Önceden pencere her zaman bugünkü bakiyeyle doluyordu; geçmiş tarihli kapanışta kapanıştan sonraki
+    // tahsilatlar hem kapanış bakiyesinden hem açık dönemden düşülüyordu.
+    [HttpGet("donem-onizleme/{hekimId:int}")]
+    public async Task<IActionResult> DonemOnizleme(int hekimId, [FromQuery] DateTime? tarih)
+    {
+        if (!await _db.Hekimler.AsNoTracking().AnyAsync(x => x.Id == hekimId))
+            return NotFound("Hekim bulunamadı.");
+        var closeDate = ToUtcDate(tarih) ?? DateTime.UtcNow.Date;
+        var closeAt = KapanisAni(closeDate);
+        var last = await LastActivePeriod(hekimId);
+        var cari = await BuildCari(hekimId, null, closeAt, includeCarry: true, kapanisIcin: true);
+        return Ok(new
+        {
+            bakiyeler = cari.Bakiyeler,
+            devir = cari.Devir,
+            toplamlar = cari.Toplamlar,
+            tahsilatlar = cari.TahsilatlarToplam,
+            isSayisi = cari.Isler.Count,
+            odemeSayisi = cari.Odemeler.Count,
+            oncekiKapanis = last?.KapanisTarihi,
+            gecersiz = closeDate.Date > DateTime.UtcNow.Date ? "Kapanış tarihi gelecekte olamaz."
+                : last != null && closeAt <= last.KapanisTarihi ? "Kapanış tarihi önceki dönem kapanışından sonra olmalıdır." : null
         });
     }
 
@@ -309,7 +457,8 @@ public sealed class KasaArsivV2Controller : ControllerBase
         int hekimId,
         DateTime? baslangic,
         DateTime? bitis,
-        bool includeCarry = true)
+        bool includeCarry = true,
+        bool kapanisIcin = false)
     {
         var last = await LastActivePeriod(hekimId);
         DateTime? periodStart = last?.KapanisTarihi.AddTicks(1);
@@ -352,19 +501,22 @@ public sealed class KasaArsivV2Controller : ControllerBase
             """).ToListAsync();
 
         var start = MaxDate(periodStart, ToUtcDate(baslangic));
+        // Kapanışta bitiş, çağıranın hesapladığı kesin kapanış anıdır (Türkiye saatiyle gün sonu).
         var end = bitis.HasValue
-            ? ToUtcDate(bitis)!.Value.Date.AddDays(1).AddTicks(-1)
+            ? (kapanisIcin ? bitis.Value : ToUtcDate(bitis)!.Value.Date.AddDays(1).AddTicks(-1))
             : (DateTime?)null;
 
         // Dönem sınırı tamamlanma tarihine göre; kullanıcı filtresi geliş tarihine göre.
         // Kapatılmış dönemlere girmiş işler açık dönemde tekrar sayılmaz.
+        // Dönem kapanışında ise kapanış tarihine kadar TAMAMLANAN işler alınır: geçmiş tarihli
+        // kapanışta, kapanıştan önce gelip sonra tamamlanan iş yanlış döneme yazılmasın.
         var userStart = ToUtcDate(baslangic);
         var arsivlenmis = await CariKurallari.ArsivlenmisIsler(_db, hekimId);
         var filteredJobs = jobs.Where(x =>
             !arsivlenmis.Contains(x.Id) &&
             (!periodStart.HasValue || x.TamamlanmaTarihi >= periodStart.Value) &&
             (!userStart.HasValue || x.TeslimTarihi >= userStart.Value) &&
-            (!end.HasValue || x.TeslimTarihi <= end.Value)
+            (!end.HasValue || (kapanisIcin ? x.TamamlanmaTarihi : x.TeslimTarihi) <= end.Value)
         ).ToList();
 
         var filteredPayments = payments.Where(x =>
@@ -471,6 +623,11 @@ public sealed class KasaArsivV2Controller : ControllerBase
         }
         finally { if (opened) await conn.CloseAsync(); }
     }
+
+    // Kapanış, seçilen günün Türkiye saatiyle (UTC+3) gün sonudur; gece yarısından sonra tamamlanan
+    // iş ya da tahsilat ertesi güne (yeni döneme) kalır. Aylık ekstre de günleri Türkiye saatine göre ayırır.
+    private static DateTime KapanisAni(DateTime gun) =>
+        DateTime.SpecifyKind(gun.Date, DateTimeKind.Utc).AddDays(1).AddHours(-3).AddTicks(-1);
 
     private static void AddParam(DbCommand cmd, string name, object? value)
     {
