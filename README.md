@@ -3,4 +3,4 @@ Aİ
 
 ## Satranç 3B
 
-`Satranc3D.html` dosyasını tarayıcıda açarak 3 boyutlu satranç oynayabilirsiniz (bilgisayara karşı veya iki kişi). Beyazlar Olimpos (Zeus, Hera, Athena, Pegasus, Olimpos Kulesi, Spartalı hoplitler), siyahlar Yeraltı (Hades, Medusa, Kharon, Arion, Tartaros Kulesi, iskelet savaşçılar). Her taş kendine özgü biçimde saldırır ve parçalanır. Tüm kurallar desteklenir: rok, geçerken alma, terfi, şah mat, pat ve beraberlik kuralları.
+`Satranc3D.html` dosyasını tarayıcıda açarak 3 boyutlu satranç oynayabilirsiniz. Taylan Lego taşlarla, Toprak Minecraft taşlarla oynar; iki oyuncu da masada avatar olarak durur (yüzlerini panelden "Foto" ile yükleyebilirsiniz, fotoğraflar sadece sizin tarayıcınızda kalır). Bilgisayara karşı da oynanabilir. Tüm kurallar desteklenir: rok, geçerken alma, terfi, şah mat, pat ve beraberlik kuralları.
