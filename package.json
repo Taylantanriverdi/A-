@@ -4,6 +4,7 @@
   "description": "hyperDENT NC dosyaları için çevrimdışı kazıma simülatörü",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "report": "node tools/report.mjs"
   }
 }
