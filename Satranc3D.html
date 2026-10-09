@@ -84,6 +84,9 @@
   .caps .glyphs { font-size: 20px; line-height: 1; letter-spacing: 1px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .caps .adv { color: var(--ok); font-weight: 700; font-variant-numeric: tabular-nums; }
 
+  .cast { display: grid; gap: 10px; font-size: 13px; line-height: 1.45; }
+  .cast b { display: block; font-family: var(--display); font-weight: 500; font-size: 13px; letter-spacing: 0.05em; color: var(--accent); }
+  .cast span { color: var(--muted); }
   .moves-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .moves-h h2 { font-family: var(--display); font-weight: 500; font-size: 17px; letter-spacing: 0.05em; margin: 0; }
   .moves-h span { font-size: 12px; color: var(--muted); }
@@ -110,7 +113,7 @@
     h1 { font-size: 21px; }
     h1 small { display: none; }
     #moves { max-height: 120px; }
-    .hint { display: none; }
+    .hint, .cast { display: none; }
   }
 </style>
 
@@ -130,7 +133,7 @@
     </div>
   </div>
   <aside id="panel">
-    <h1>Satranç 3B<small>Taş heykeller · kadim tapınak salonu</small></h1>
+    <h1>Satranç 3B<small>Olimpos tanrıları · Yeraltı ordusu</small></h1>
     <div class="status" id="status"><div class="turnchip w" id="chip"></div><div><b id="statusMain">Beyazın sırası</b><span id="statusSub">Bir taşa dokunun</span></div></div>
     <div class="row">
       <div class="field"><label for="mode">Oyun</label>
@@ -159,9 +162,13 @@
       <div><span class="who">Beyaz aldı</span><span class="glyphs" id="capW"></span><span class="adv" id="advW"></span></div>
       <div><span class="who">Siyah aldı</span><span class="glyphs" id="capB"></span><span class="adv" id="advB"></span></div>
     </div>
+    <div class="cast">
+      <div><b>Olimpos · Beyaz</b><span>Şah Zeus · Vezir Hera · Fil Athena · At Pegasus · Kale Olimpos Kulesi · Piyon Spartalı Hoplit</span></div>
+      <div><b>Yeraltı · Siyah</b><span>Şah Hades · Vezir Medusa · Fil Kharon · At Arion · Kale Tartaros Kulesi · Piyon İskelet Savaşçı</span></div>
+    </div>
     <div class="moves-h"><h2>Hamleler</h2><span>Ş şah · V vezir · K kale · F fil · A at</span></div>
     <div id="moves"></div>
-    <p class="hint">Taşa tıklayın, sonra altın noktalı kareye. Taş aldığınızda saldıran heykel rakibini parçalar. Salonu döndürmek için sürükleyin, yakınlaştırmak için kaydırın.</p>
+    <p class="hint">Taşa tıklayın, sonra altın noktalı kareye. Taş aldığınızda saldıran karakter rakibini parçalar. Salonu döndürmek için sürükleyin, yakınlaştırmak için kaydırın.</p>
   </aside>
 </div>
 
@@ -774,12 +781,45 @@ function chooseMove(st, level) {
       return g;
     });
   }
-  const HEIGHTS = { p: 0.86, r: 1.14, n: 1.2, b: 1.32, q: 1.38, k: 1.52 };
+  const HEIGHTS = { p: 0.86, r: 1.16, n: 1.2, b: 1.32, q: 1.38, k: 1.56 };
+
+  // ---------- Painted materials for the two pantheons ----------
+  const paintTex = canvasTex(128, (u, v) => { const c = 208 + 47 * nzA(u, v, 4, 4); return [c, c, c]; });
+  const PM = {};
+  function paint(color, o) {
+    o = o || {};
+    const key = color + '|' + JSON.stringify(o);
+    if (PM[key]) return PM[key];
+    const m = o.glow
+      ? new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: o.glow, roughness: 0.5 })
+      : weather(new THREE.MeshStandardMaterial({ map: paintTex, bumpMap: graniteW, bumpScale: 0.02, color, roughness: o.r === undefined ? 0.6 : o.r, metalness: o.m || 0, side: o.ds ? THREE.DoubleSide : THREE.FrontSide }));
+    return (PM[key] = m);
+  }
+  const FM = {};
+  function fragMatFor(m) {
+    if (!FM[m.uuid]) { const c = cloneMat(m); c.flatShading = true; c.side = THREE.FrontSide; FM[m.uuid] = c; }
+    return FM[m.uuid];
+  }
+  // Olympus (white): marble, gold, sky blue, crimson, royal purple
+  const OL = {
+    ped: paint(0xe4ddcf), white: paint(0xf2ede4), gold: paint(0xd9a334, { m: 0.75, r: 0.3 }), bronze: paint(0xb8732a, { m: 0.65, r: 0.34 }),
+    blue: paint(0x2a5fc4), blueD: paint(0x2353b0, { ds: true }), red: paint(0xb31f2a), redD: paint(0x9c1a24, { ds: true }),
+    purple: paint(0x6b2c98), teal: paint(0x139c9c), tealD: paint(0x118a8a, { ds: true }), skin: paint(0xdca57a, { r: 0.5 }),
+    hair: paint(0x3b2618), beard: paint(0xe8e4dc), wood: paint(0x6a4526), owl: paint(0x8a6a48),
+    bolt: paint(0xfff0a0, { glow: 1.5 }), eyeG: paint(0xffd23a, { glow: 1.2 })
+  };
+  // Underworld (black): basalt, iron, bone, deep purple, ghost green, hellfire
+  const UW = {
+    ped: paint(0x2b2630), robe: paint(0x24202b), black: paint(0x151318), blackD: paint(0x1b1820, { ds: true }), iron: paint(0x4a4852, { m: 0.6, r: 0.4 }),
+    purple: paint(0x4f2479), purpleD: paint(0x45206c, { ds: true }), bone: paint(0xdcd2b6, { r: 0.7 }), pale: paint(0x9aa59e, { r: 0.55 }),
+    green: paint(0x2f5f2a), medusa: paint(0x7f9f58, { r: 0.5 }), snake: paint(0x4e9a36, { r: 0.45 }), gold: paint(0x8c6826, { m: 0.7, r: 0.35 }),
+    wood: paint(0x3a2a1c), beard: paint(0x2c2931), red: paint(0x8e1424, { r: 0.4 }),
+    ghost: paint(0x3dffa0, { glow: 1.6 }), fire: paint(0xff6a1a, { glow: 1.8 }), ember: paint(0xff3b1a, { glow: 1.6 }), eyeY: paint(0xffd23a, { glow: 2 })
+  };
 
   function makePiece(ch) {
-    const t = ch.toLowerCase(), white = ch !== t;
-    const M = white ? stoneW : stoneB, M2 = white ? stoneW2 : stoneB2, A = white ? accentW : accentB;
-    const root = new THREE.Group(), body = new THREE.Group(), rig = {};
+    const t = ch.toLowerCase(), white = ch !== t, P = white ? OL : UW;
+    const root = new THREE.Group(), body = new THREE.Group(), rig = {}, flames = [], snakes = [];
     root.add(body);
     function pivot(name, x, y, z, parent) {
       const g = new THREE.Group(), pp = parent ? parent.userData.pv : ZERO;
@@ -797,59 +837,97 @@ function chooseMove(st, level) {
       (into || body).add(m);
       return m;
     }
+    function fire(m) { m.userData.sy = m.scale.y; flames.push(m); return m; }
     function limb(a, b, r, into, mat) {
       const from = new V3(a[0], a[1], a[2]), to = new V3(b[0], b[1], b[2]), d = new V3().subVectors(to, from), len = d.length();
-      const m = add(geo('limb' + r, () => new THREE.CylinderGeometry(r, r * 0.8, 1, 10)), mat || M, 0, 0, 0, 0, 0, 0, 0, 0, 0, into);
+      const m = add(geo('limb' + r, () => new THREE.CylinderGeometry(r, r * 0.8, 1, 10)), mat, 0, 0, 0, 0, 0, 0, 0, 0, 0, into);
       const pv = into ? into.userData.pv : ZERO;
       m.scale.set(1, len, 1);
       m.position.copy(from).addScaledVector(d, 0.5).sub(pv);
       m.quaternion.setFromUnitVectors(new V3(0, 1, 0), d.normalize());
-      add(sphere(+(r * 1.3).toFixed(3)), mat || M, b[0], b[1], b[2], 0, 0, 0, 0, 0, 0, into);
+      add(sphere(+(r * 1.3).toFixed(3)), mat, b[0], b[1], b[2], 0, 0, 0, 0, 0, 0, into);
     }
-    // Torso, belt and a head with a carved face; returns the head pivot
-    function figure(k, h, r0, waist, chest, sh, headR, folds) {
-      add(robe(k, h, r0, waist, chest, sh, folds), M);
-      add(torus(waist + 0.012, 0.016), A, 0, 0.14 + 0.6 * (h - 0.14), 0, Math.PI / 2, 0, 0);
-      [-1, 1].forEach((s) => add(geo('pauld' + sh, () => new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), M, s * (sh - 0.02), h - 0.04, 0, 0, 0, s * 0.5));
-      const head = pivot('head', 0, h, 0);
-      const hy = h + headR * 0.95;
-      add(cyl(headR * 0.45, headR * 0.55, 0.06, 10), M, 0, h + 0.01, 0, 0, 0, 0, 0, 0, 0, head);
-      add(sphere(headR), M, 0, hy, 0, 0, 0, 0, 0.95, 1.05, 1, head);
-      add(box(0.022, 0.04, 0.03), M, 0, hy - 0.004, headR * 0.93, -0.2, 0, 0, 0, 0, 0, head);
-      [-1, 1].forEach((s) => add(sphere(0.013), voidMat, s * headR * 0.36, hy + headR * 0.18, headR * 0.82, 0, 0, 0, 0, 0, 0, head));
-      add(box(headR * 1.1, 0.014, 0.02), M, 0, hy + headR * 0.32, headR * 0.86, 0, 0, 0, 0, 0, 0, head);
+    // Torso in a draped robe, belt, shoulder guards and a head; returns the head pivot
+    function figure(k, h, r0, waist, chest, sh, headR, folds, o) {
+      add(robe(k, h, r0, waist, chest, sh, folds), o.robe);
+      add(torus(waist + 0.012, 0.016), o.belt, 0, 0.14 + 0.6 * (h - 0.14), 0, Math.PI / 2, 0, 0);
+      if (o.pauld) [-1, 1].forEach((s) => add(geo('pauld', () => new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), o.pauld, s * (sh - 0.02), h - 0.04, 0, 0, 0, s * 0.5));
+      const head = pivot('head', 0, h, 0), hy = h + headR * 0.95;
+      add(cyl(headR * 0.45, headR * 0.55, 0.06, 10), o.skin, 0, h + 0.01, 0, 0, 0, 0, 0, 0, 0, head);
+      add(sphere(headR), o.head || o.skin, 0, hy, 0, 0, 0, 0, 0.95, 1.05, 1, head);
+      if (!o.noFace) {
+        add(box(0.022, 0.04, 0.03), o.skin, 0, hy - 0.004, headR * 0.93, -0.2, 0, 0, 0, 0, 0, head);
+        [-1, 1].forEach((s) => add(sphere(0.013), o.eye || voidMat, s * headR * 0.36, hy + headR * 0.18, headR * 0.82, 0, 0, 0, 0, 0, 0, head));
+        add(box(headR * 1.1, 0.014, 0.02), o.skin, 0, hy + headR * 0.32, headR * 0.86, 0, 0, 0, 0, 0, 0, head);
+      }
       return { head, hy };
     }
-    add(lathe('ped', PED, 8), M);
+    const halfSphere = (r, k) => geo('hs' + r + '_' + k, () => new THREE.SphereGeometry(r, 20, 10, 0, Math.PI * 2, 0, Math.PI * k));
+    const cape = (k, r1, r2, h) => geo('cape' + k, () => new THREE.CylinderGeometry(r1, r2, h, 22, 1, true, Math.PI / 2, Math.PI));
+    add(lathe('ped', PED, 8), P.ped);
+    let main;
 
-    if (t === 'p') { // shield-bearing foot soldier with spear
-      const { head, hy } = figure('pr', 0.56, 0.22, 0.13, 0.15, 0.16, 0.082, 11);
-      add(geo('helm', () => new THREE.SphereGeometry(0.094, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2)), M, 0, hy + 0.005, 0, -0.1, 0, 0, 0, 0, 0, head);
-      add(box(0.026, 0.07, 0.17), M, 0, hy + 0.1, -0.01, 0, 0, 0, 0, 0, 0, head);
-      add(box(0.016, 0.06, 0.016), M, 0, hy - 0.005, 0.09, 0, 0, 0, 0, 0, 0, head);
+    if (t === 'p' && white) { // Spartan hoplite: crested bronze helmet, crimson cloak, lambda shield
+      main = OL.red;
+      const { head, hy } = figure('pr', 0.56, 0.22, 0.13, 0.15, 0.16, 0.082, 11, { robe: OL.red, skin: OL.skin, belt: OL.bronze, pauld: OL.bronze });
+      add(lathe('cuir', [[0.14, 0.33], [0.158, 0.42], [0.166, 0.5], [0.15, 0.55], [0.07, 0.575], [0, 0.575]], 24), OL.bronze);
+      add(cape('p', 0.14, 0.24, 0.42), OL.redD, 0, 0.35, -0.015);
+      add(halfSphere(0.096, 0.55), OL.bronze, 0, hy + 0.005, 0, -0.1, 0, 0, 0, 0, 0, head);
+      [-1, 1].forEach((s) => add(box(0.02, 0.07, 0.05), OL.bronze, s * 0.07, hy - 0.03, 0.05, 0, 0, 0, 0, 0, 0, head));
+      add(box(0.026, 0.085, 0.21), OL.red, 0, hy + 0.125, -0.01, 0, 0, 0, 0, 0, 0, head);
       const armL = pivot('armL', -0.14, 0.5, 0);
-      limb([-0.14, 0.5, 0], [-0.1, 0.38, 0.13], 0.04, armL);
-      const sh = add(cyl(0.145, 0.145, 0.035, 22), M, -0.12, 0.36, 0.17, Math.PI / 2, 0, 0, 0, 0, 0, armL);
+      limb([-0.14, 0.5, 0], [-0.1, 0.38, 0.13], 0.04, armL, OL.skin);
+      const sh = add(cyl(0.145, 0.145, 0.035, 22), OL.bronze, -0.12, 0.36, 0.17, Math.PI / 2, 0, 0, 0, 0, 0, armL);
       sh.rotation.z = 0.35; sh.userData.part = 'shield';
-      const boss = new THREE.Mesh(sphere(0.035), A); boss.position.set(0, 0.025, 0); sh.add(boss);
-      const rim = new THREE.Mesh(torus(0.14, 0.012), A); rim.rotation.x = Math.PI / 2; sh.add(rim);
+      const rim = new THREE.Mesh(torus(0.14, 0.014), OL.red); rim.rotation.x = Math.PI / 2; sh.add(rim);
+      [-1, 1].forEach((s) => { const b = new THREE.Mesh(box(0.02, 0.012, 0.13), OL.red); b.position.set(s * 0.028, 0.022, 0); b.rotation.y = s * 0.38; sh.add(b); });
       const armR = pivot('armR', 0.14, 0.5, 0);
-      limb([0.14, 0.5, 0], [0.17, 0.42, 0.12], 0.04, armR);
-      add(cyl(0.014, 0.014, 0.92, 8), M, 0.17, 0.52, 0.12, 0, 0, 0, 0, 0, 0, armR);
-      add(cone(0.032, 0.11), A, 0.17, 1.03, 0.12, 0, 0, 0, 0, 0, 0, armR);
-    } else if (t === 'r') { // fortified tower of stacked blocks
-      add(lathe('rt', [[0, 0.14], [0.31, 0.14], [0.31, 0.2], [0.27, 0.25], [0.245, 0.8], [0.3, 0.85], [0.32, 0.93], [0.32, 1.02], [0.24, 1.02], [0.24, 0.96], [0, 0.96]], 14), M);
-      for (let row = 0; row < 5; row++) add(torus(0.252 - row * 0.003, 0.008), M, 0, 0.32 + row * 0.11, 0, Math.PI / 2, 0, 0);
-      for (let k = 0; k < 8; k++) {
-        const a = k / 8 * Math.PI * 2;
-        add(box(0.11, 0.12, 0.09), M, Math.sin(a) * 0.28, 1.08, Math.cos(a) * 0.28, 0, a, 0);
-      }
-      add(box(0.13, 0.2, 0.03), voidMat, 0, 0.32, 0.262);
-      add(cyl(0.065, 0.065, 0.03, 16), voidMat, 0, 0.42, 0.262, Math.PI / 2, 0, 0);
-      add(box(0.17, 0.035, 0.05), M, 0, 0.5, 0.27);
-      [0, Math.PI / 2, -Math.PI / 2, Math.PI].forEach((a) => add(box(0.035, 0.13, 0.03), voidMat, Math.sin(a) * 0.25, 0.7, Math.cos(a) * 0.25, 0, a, 0));
-    } else if (t === 'n') { // war-horse bust; the head is a pivot so it can nod and toss
-      add(lathe('np', [[0, 0.14], [0.27, 0.14], [0.27, 0.22], [0.23, 0.26], [0, 0.26]], 24), M);
+      limb([0.14, 0.5, 0], [0.17, 0.42, 0.12], 0.04, armR, OL.skin);
+      add(cyl(0.014, 0.014, 0.92, 8), OL.wood, 0.17, 0.52, 0.12, 0, 0, 0, 0, 0, 0, armR);
+      add(cone(0.032, 0.11), OL.bronze, 0.17, 1.03, 0.12, 0, 0, 0, 0, 0, 0, armR);
+    } else if (t === 'p') { // risen skeleton warrior with ghost-fire eyes
+      main = UW.iron;
+      const { head, hy } = figure('pr', 0.56, 0.22, 0.13, 0.15, 0.16, 0.08, 11, { robe: UW.robe, skin: UW.bone, belt: UW.iron, pauld: UW.iron, noFace: true });
+      [0.4, 0.45, 0.5].forEach((y) => add(torus(0.152, 0.009), UW.bone, 0, y, 0, Math.PI / 2, 0, 0));
+      [-1, 1].forEach((s) => {
+        add(sphere(0.022), voidMat, s * 0.03, hy + 0.012, 0.06, 0, 0, 0, 0, 0, 0, head);
+        add(sphere(0.011), UW.ghost, s * 0.03, hy + 0.012, 0.074, 0, 0, 0, 0, 0, 0, head);
+      });
+      add(box(0.07, 0.03, 0.05), UW.bone, 0, hy - 0.07, 0.03, 0, 0, 0, 0, 0, 0, head);
+      add(halfSphere(0.092, 0.42), UW.iron, 0, hy + 0.015, -0.005, -0.15, 0, 0, 0, 0, 0, head);
+      [-1, 0, 1].forEach((s) => add(cone(0.016, 0.07), UW.iron, s * 0.045, hy + 0.1, -0.01, 0, 0, s * 0.4, 0, 0, 0, head));
+      const armL = pivot('armL', -0.14, 0.5, 0);
+      limb([-0.14, 0.5, 0], [-0.1, 0.38, 0.13], 0.03, armL, UW.bone);
+      const sh = add(cyl(0.14, 0.14, 0.035, 8), UW.black, -0.12, 0.36, 0.17, Math.PI / 2, 0, 0, 0, 0, 0, armL);
+      sh.rotation.z = 0.35; sh.userData.part = 'shield';
+      const rim = new THREE.Mesh(torus(0.135, 0.01), UW.ghost); rim.rotation.x = Math.PI / 2; sh.add(rim);
+      const sk = new THREE.Mesh(sphere(0.035), UW.bone); sk.position.y = 0.025; sh.add(sk);
+      const armR = pivot('armR', 0.14, 0.5, 0);
+      limb([0.14, 0.5, 0], [0.17, 0.42, 0.12], 0.03, armR, UW.bone);
+      add(cyl(0.013, 0.013, 0.92, 8), UW.iron, 0.17, 0.52, 0.12, 0, 0, 0, 0, 0, 0, armR);
+      add(cone(0.035, 0.14), UW.iron, 0.17, 1.04, 0.12, 0, 0, 0, 0, 0, 0, armR);
+    } else if (t === 'r' && white) { // tower of Olympus: marble colonnade, gold crown, blue doors
+      main = OL.white;
+      add(lathe('rt', [[0, 0.14], [0.31, 0.14], [0.31, 0.2], [0.27, 0.25], [0.245, 0.8], [0.3, 0.85], [0.32, 0.93], [0.32, 1.02], [0.24, 1.02], [0.24, 0.96], [0, 0.96]], 14), OL.white);
+      for (let k = 0; k < 10; k++) { const a = (k + 0.5) / 10 * Math.PI * 2; add(cyl(0.022, 0.026, 0.56, 8), OL.white, Math.sin(a) * 0.285, 0.52, Math.cos(a) * 0.285); }
+      add(torus(0.29, 0.016), OL.gold, 0, 0.24, 0, Math.PI / 2, 0, 0);
+      add(torus(0.29, 0.016), OL.gold, 0, 0.81, 0, Math.PI / 2, 0, 0);
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; add(box(0.11, 0.12, 0.09), OL.gold, Math.sin(a) * 0.28, 1.08, Math.cos(a) * 0.28, 0, a, 0); }
+      add(lathe('dome', [[0, 0.96], [0.17, 0.96], [0.15, 1.05], [0.09, 1.12], [0, 1.15]], 20), OL.blue);
+      add(box(0.12, 0.2, 0.03), OL.blue, 0, 0.32, 0.262);
+      add(cyl(0.06, 0.06, 0.03, 16), OL.gold, 0, 0.42, 0.262, Math.PI / 2, 0, 0);
+    } else if (t === 'r') { // tower of Tartarus: black basalt with lava seams, iron spikes, a skull over the gate
+      main = UW.robe;
+      add(lathe('rt', [[0, 0.14], [0.31, 0.14], [0.31, 0.2], [0.27, 0.25], [0.245, 0.8], [0.3, 0.85], [0.32, 0.93], [0.32, 1.02], [0.24, 1.02], [0.24, 0.96], [0, 0.96]], 14), UW.robe);
+      for (let row = 0; row < 5; row++) add(torus(0.252 - row * 0.003, 0.007), UW.fire, 0, 0.32 + row * 0.11, 0, Math.PI / 2, 0, 0);
+      for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2; add(cone(0.045, 0.18), UW.iron, Math.sin(a) * 0.28, 1.11, Math.cos(a) * 0.28); }
+      add(box(0.13, 0.2, 0.03), UW.fire, 0, 0.32, 0.262);
+      add(sphere(0.045), UW.bone, 0, 0.53, 0.27);
+      [-1, 1].forEach((s) => add(sphere(0.012), UW.ember, s * 0.016, 0.54, 0.31));
+      [0, 1, 2].forEach((k) => fire(add(cone(0.06 - k * 0.012, 0.18 + k * 0.05), UW.fire, (k - 1) * 0.07, 1.04 + k * 0.03, 0)));
+    } else if (t === 'n') { // Pegasus (white, winged) / Arion, Hades' black steed with a burning mane
+      main = white ? OL.white : UW.black;
+      add(lathe('np', [[0, 0.14], [0.27, 0.14], [0.27, 0.22], [0.23, 0.26], [0, 0.26]], 24), white ? OL.blue : UW.purple);
       const headP = pivot('head', 0, 0.26, -0.04);
       const hd = add(geo('nh', () => {
         const s = new THREE.Shape();
@@ -867,74 +945,168 @@ function chooseMove(st, level) {
         const g = new THREE.ExtrudeGeometry(s, { depth: 0.24, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.05, bevelSegments: 5, curveSegments: 12 });
         g.translate(0, 0, -0.12);
         return g;
-      }), M, 0, 0.26, 0, 0, -Math.PI / 2, 0, 0, 0, 0, headP);
+      }), main, 0, 0.26, 0, 0, -Math.PI / 2, 0, 0, 0, 0, headP);
       const mane = new THREE.Mesh(geo('nm', () => {
         const s = new THREE.Shape();
         s.moveTo(0.04, 0.95); s.quadraticCurveTo(-0.16, 0.92, -0.25, 0.7); s.quadraticCurveTo(-0.35, 0.45, -0.33, 0.16);
         s.lineTo(-0.25, 0.18); s.quadraticCurveTo(-0.27, 0.45, -0.17, 0.68); s.quadraticCurveTo(-0.1, 0.84, 0.04, 0.87); s.lineTo(0.04, 0.95);
-        const g = new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 2, curveSegments: 10 });
-        g.translate(0, 0, -0.05);
+        const g = new THREE.ExtrudeGeometry(s, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.02, bevelSegments: 2, curveSegments: 10 });
+        g.translate(0, 0, -0.06);
         return g;
-      }), M);
+      }), white ? OL.gold : UW.fire);
       mane.castShadow = true; hd.add(mane);
+      if (!white) fire(mane);
       [-1, 1].forEach((side) => {
-        const eye = new THREE.Mesh(sphere(0.026), voidMat); eye.position.set(0.25, 0.78, side * 0.19); hd.add(eye);
-        const nost = new THREE.Mesh(sphere(0.018), voidMat); nost.position.set(0.47, 0.67, side * 0.1); hd.add(nost);
+        const eye = new THREE.Mesh(sphere(0.026), white ? voidMat : UW.ember); eye.position.set(0.25, 0.78, side * 0.19); hd.add(eye);
+        const nost = new THREE.Mesh(sphere(0.018), white ? voidMat : UW.ember); nost.position.set(0.47, 0.67, side * 0.1); hd.add(nost);
       });
-      const rein = new THREE.Mesh(torus(0.16, 0.012), A);
+      const rein = new THREE.Mesh(torus(0.16, 0.012), white ? OL.gold : UW.iron);
       rein.position.set(0.36, 0.63, 0); rein.rotation.y = Math.PI / 2; rein.scale.set(1, 0.55, 1); hd.add(rein);
-    } else if (t === 'b') { // robed priest with a crook
-      const { head, hy } = figure('br', 0.84, 0.25, 0.13, 0.15, 0.17, 0.088, 13);
-      add(lathe('mitre', [[0, 0], [0.088, 0], [0.11, 0.1], [0.1, 0.2], [0.06, 0.28], [0, 0.31]], 20), M, 0, hy + 0.04, 0, 0, 0, 0, 0, 0, 0, head);
-      add(torus(0.09, 0.013), A, 0, hy + 0.06, 0, Math.PI / 2, 0, 0, 0, 0, 0, head);
-      add(box(0.05, 0.5, 0.012), A, 0, 0.55, 0.15, -0.12, 0, 0);
-      const armL = pivot('armL', -0.16, 0.76, 0);
-      limb([-0.16, 0.76, 0], [-0.03, 0.58, 0.17], 0.042, armL);
+      if (white) {
+        const wingGeo = geo('wing', () => {
+          const s = new THREE.Shape();
+          s.moveTo(0, 0); s.quadraticCurveTo(0.06, 0.22, 0, 0.42); s.lineTo(-0.1, 0.62); s.lineTo(-0.13, 0.5); s.lineTo(-0.21, 0.5);
+          s.lineTo(-0.2, 0.4); s.lineTo(-0.29, 0.36); s.lineTo(-0.25, 0.26); s.lineTo(-0.31, 0.17); s.lineTo(-0.2, 0.1); s.lineTo(-0.12, 0); s.lineTo(0, 0);
+          return new THREE.ExtrudeGeometry(s, { depth: 0.02, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 1 });
+        });
+        [-1, 1].forEach((side) => {
+          const wp = pivot(side < 0 ? 'wingL' : 'wingR', side * 0.19, 0.6, -0.14);
+          const spl = new THREE.Group(); spl.rotation.z = -side * 0.5; wp.add(spl);
+          const w = new THREE.Mesh(wingGeo, OL.white); w.rotation.y = -Math.PI / 2; w.castShadow = true; spl.add(w);
+          const edge = new THREE.Mesh(box(0.012, 0.36, 0.03), OL.gold); edge.position.set(0, 0.25, 0.01); edge.rotation.x = 0.1; spl.add(edge);
+        });
+      }
+    } else if (t === 'b' && white) { // Athena: golden crested helm, blue mantle, spear and her owl
+      main = OL.white;
+      const { head, hy } = figure('br', 0.84, 0.25, 0.13, 0.15, 0.17, 0.085, 13, { robe: OL.white, skin: OL.skin, belt: OL.gold, pauld: OL.gold });
+      add(cape('b', 0.17, 0.29, 0.66), OL.blueD, 0, 0.5, -0.02);
+      add(cyl(0.06, 0.06, 0.015, 16), OL.gold, 0, 0.7, 0.152, Math.PI / 2 - 0.25, 0, 0);
+      add(halfSphere(0.096, 0.55), OL.gold, 0, hy + 0.005, 0, -0.1, 0, 0, 0, 0, 0, head);
+      add(box(0.026, 0.1, 0.23), OL.blue, 0, hy + 0.135, -0.01, 0, 0, 0, 0, 0, 0, head);
+      add(box(0.075, 0.022, 0.03), OL.gold, 0, hy + 0.045, 0.082, 0, 0, 0, 0, 0, 0, head);
       const armR = pivot('armR', 0.16, 0.76, 0);
-      limb([0.16, 0.76, 0], [0.2, 0.64, 0.11], 0.042, armR);
-      add(cyl(0.017, 0.017, 1.12, 8), M, 0.2, 0.7, 0.11, 0, 0, 0, 0, 0, 0, armR);
-      add(torus(0.065, 0.016, Math.PI * 1.25), A, 0.2 - 0.065, 1.27, 0.11, 0, 0, -0.2, 0, 0, 0, armR);
-    } else if (t === 'q') { // crowned queen with sceptre
-      const { head, hy } = figure('qr', 0.94, 0.33, 0.13, 0.16, 0.18, 0.09, 15);
-      add(geo('hair', () => new THREE.SphereGeometry(0.1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62)), M, 0, hy, -0.012, -0.35, 0, 0, 0, 0, 0, head);
-      const crown = pivot('crown', 0, hy + 0.075, 0, head);
-      add(cyl(0.09, 0.08, 0.06, 18), A, 0, hy + 0.075, 0, 0, 0, 0, 0, 0, 0, crown);
-      for (let k = 0; k < 7; k++) {
-        const a = k / 7 * Math.PI * 2;
-        add(cone(0.02, 0.09), A, Math.sin(a) * 0.088, hy + 0.145, Math.cos(a) * 0.088, 0, 0, 0, 0, 0, 0, crown);
+      limb([0.16, 0.76, 0], [0.2, 0.64, 0.11], 0.042, armR, OL.skin);
+      add(cyl(0.016, 0.016, 1.12, 8), OL.wood, 0.2, 0.7, 0.11, 0, 0, 0, 0, 0, 0, armR);
+      add(cone(0.035, 0.13), OL.gold, 0.2, 1.31, 0.11, 0, 0, 0, 0, 0, 0, armR);
+      const armL = pivot('armL', -0.16, 0.76, 0);
+      limb([-0.16, 0.76, 0], [-0.22, 0.62, 0.14], 0.042, armL, OL.skin);
+      add(sphere(0.05), OL.owl, -0.22, 0.69, 0.14, 0, 0, 0, 1, 1.3, 1, armL);
+      add(sphere(0.038), OL.owl, -0.22, 0.775, 0.14, 0, 0, 0, 0, 0, 0, armL);
+      [-1, 1].forEach((s) => {
+        add(sphere(0.011), OL.eyeG, -0.22 + s * 0.015, 0.78, 0.172, 0, 0, 0, 0, 0, 0, armL);
+        add(cone(0.01, 0.03), OL.owl, -0.22 + s * 0.022, 0.815, 0.14, 0, 0, -s * 0.3, 0, 0, 0, armL);
+      });
+    } else if (t === 'b') { // Charon the ferryman: deep hood, glowing eyes, oar and ghost lantern
+      main = UW.robe;
+      const { head, hy } = figure('br', 0.84, 0.25, 0.13, 0.15, 0.17, 0.085, 13, { robe: UW.robe, skin: UW.pale, head: UW.black, belt: UW.purple, noFace: true });
+      add(halfSphere(0.118, 0.62), UW.purpleD, 0, hy + 0.005, -0.014, -0.35, 0, 0, 0, 0, 0, head);
+      add(cone(0.085, 0.22), UW.purple, 0, hy + 0.05, -0.09, -1.05, 0, 0, 0, 0, 0, head);
+      [-1, 1].forEach((s) => add(sphere(0.012), UW.ghost, s * 0.03, hy + 0.01, 0.075, 0, 0, 0, 0, 0, 0, head));
+      add(box(0.05, 0.5, 0.012), UW.purple, 0, 0.55, 0.15, -0.12, 0, 0);
+      const armR = pivot('armR', 0.16, 0.76, 0);
+      limb([0.16, 0.76, 0], [0.2, 0.64, 0.11], 0.036, armR, UW.pale);
+      add(cyl(0.015, 0.015, 1.2, 8), UW.wood, 0.2, 0.72, 0.11, 0, 0, 0, 0, 0, 0, armR);
+      add(box(0.085, 0.24, 0.016), UW.wood, 0.2, 0.2, 0.11, 0, Math.PI / 2, 0, 0, 0, 0, armR);
+      const armL = pivot('armL', -0.16, 0.76, 0);
+      limb([-0.16, 0.76, 0], [-0.13, 0.6, 0.18], 0.036, armL, UW.pale);
+      add(cyl(0.004, 0.004, 0.06, 4), UW.iron, -0.13, 0.565, 0.18, 0, 0, 0, 0, 0, 0, armL);
+      add(box(0.065, 0.085, 0.065), UW.iron, -0.13, 0.49, 0.18, 0, 0, 0, 0, 0, 0, armL);
+      fire(add(box(0.045, 0.065, 0.07), UW.ghost, -0.13, 0.49, 0.18, 0, 0, 0, 0, 0, 0, armL));
+      add(cone(0.05, 0.04), UW.iron, -0.13, 0.55, 0.18, 0, 0, 0, 0, 0, 0, armL);
+    } else if (t === 'q' && white) { // Hera: royal purple, golden polos crown, peacock fan, lotus sceptre
+      main = OL.purple;
+      const { head, hy } = figure('qr', 0.94, 0.33, 0.13, 0.16, 0.18, 0.088, 15, { robe: OL.purple, skin: OL.skin, belt: OL.gold, pauld: OL.gold });
+      add(halfSphere(0.1, 0.62), OL.hair, 0, hy, -0.012, -0.35, 0, 0, 0, 0, 0, head);
+      const crown = pivot('crown', 0, hy + 0.1, 0, head);
+      add(cyl(0.085, 0.072, 0.11, 18), OL.gold, 0, hy + 0.1, 0, 0, 0, 0, 0, 0, 0, crown);
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; add(sphere(0.015), OL.blue, Math.sin(a) * 0.082, hy + 0.1, Math.cos(a) * 0.082, 0, 0, 0, 0, 0, 0, crown); }
+      add(cape('q', 0.17, 0.33, 0.8), OL.tealD, 0, 0.56, -0.02);
+      const fan = pivot('fan', 0, 0.9, -0.14);
+      for (let k = 0; k < 9; k++) {
+        const a = -1.25 + k / 8 * 2.5, x = Math.sin(a) * 0.3, y = 0.9 + Math.cos(a) * 0.28;
+        add(sphere(0.06), OL.teal, x, y, -0.14, 0, 0, -a, 0.75, 1.5, 0.2, fan);
+        [-1, 1].forEach((s) => {
+          add(sphere(0.026), OL.gold, x + Math.sin(a) * 0.03, y + Math.cos(a) * 0.03, -0.14 + s * 0.011, 0, 0, -a, 1, 1.2, 0.3, fan);
+          add(sphere(0.014), OL.blue, x + Math.sin(a) * 0.03, y + Math.cos(a) * 0.03, -0.14 + s * 0.016, 0, 0, 0, 1, 1, 0.3, fan);
+        });
       }
-      add(geo('qcape', () => new THREE.CylinderGeometry(0.17, 0.33, 0.8, 22, 1, true, Math.PI / 2, Math.PI)), M2, 0, 0.56, -0.02);
       const armL = pivot('armL', -0.18, 0.86, 0);
-      limb([-0.18, 0.86, 0], [-0.07, 0.64, 0.19], 0.042, armL);
+      limb([-0.18, 0.86, 0], [-0.07, 0.64, 0.19], 0.042, armL, OL.skin);
       const armR = pivot('armR', 0.18, 0.86, 0);
-      limb([0.18, 0.86, 0], [0.2, 0.68, 0.17], 0.042, armR);
-      add(cyl(0.016, 0.016, 0.42, 8), A, 0.2, 0.82, 0.17, 0, 0, 0, 0, 0, 0, armR);
-      add(sphere(0.045), A, 0.2, 1.05, 0.17, 0, 0, 0, 0, 0, 0, armR);
-    } else { // bearded king resting both hands on a great sword
-      const { head, hy } = figure('kr', 1.03, 0.33, 0.15, 0.18, 0.2, 0.098, 15);
-      add(cone(0.075, 0.17), M, 0, hy - 0.1, 0.055, Math.PI, 0, 0, 0, 0, 0, head);
-      const crown = pivot('crown', 0, hy + 0.09, 0, head);
-      add(cyl(0.1, 0.092, 0.08, 18), A, 0, hy + 0.09, 0, 0, 0, 0, 0, 0, 0, crown);
-      for (let k = 0; k < 5; k++) {
-        const a = k / 5 * Math.PI * 2;
-        add(cone(0.024, 0.09), A, Math.sin(a) * 0.098, hy + 0.17, Math.cos(a) * 0.098, 0, 0, 0, 0, 0, 0, crown);
+      limb([0.18, 0.86, 0], [0.2, 0.68, 0.17], 0.042, armR, OL.skin);
+      add(cyl(0.016, 0.016, 0.46, 8), OL.gold, 0.2, 0.84, 0.17, 0, 0, 0, 0, 0, 0, armR);
+      add(cone(0.05, 0.08), OL.gold, 0.2, 1.1, 0.17, Math.PI, 0, 0, 0, 0, 0, armR);
+      add(sphere(0.022), OL.blue, 0.2, 1.1, 0.17, 0, 0, 0, 0, 0, 0, armR);
+    } else if (t === 'q') { // Medusa: green skin, living snakes for hair, burning yellow eyes
+      main = UW.green;
+      const { head, hy } = figure('qr', 0.94, 0.33, 0.13, 0.16, 0.18, 0.088, 15, { robe: UW.green, skin: UW.medusa, belt: UW.gold, pauld: UW.gold, eye: UW.eyeY });
+      add(cape('q', 0.17, 0.33, 0.8), UW.blackD, 0, 0.56, -0.02);
+      const sn = pivot('snakes', 0, hy + 0.03, 0, head);
+      for (let k = 0; k < 11; k++) {
+        const a = 0.55 + k / 10 * (Math.PI * 2 - 1.1);
+        const g = new THREE.Group(); g.position.set(Math.sin(a) * 0.07, 0.02, Math.cos(a) * 0.07); g.rotation.y = a;
+        for (let j = 0; j < 5; j++) {
+          const s = new THREE.Mesh(sphere(j === 4 ? 0.019 : 0.016 - j * 0.0015), UW.snake);
+          s.position.set(Math.sin(j * 1.3) * 0.02, 0.012 + j * 0.022, 0.02 + j * 0.03);
+          g.add(s);
+        }
+        const tongue = new THREE.Mesh(sphere(0.006), UW.ember); tongue.position.set(Math.sin(5.2) * 0.02, 0.1, 0.16); g.add(tongue);
+        sn.add(g); snakes.push(g);
       }
-      add(box(0.045, 0.2, 0.045), A, 0, hy + 0.25, 0, 0, 0, 0, 0, 0, 0, crown);
-      add(box(0.14, 0.045, 0.045), A, 0, hy + 0.28, 0, 0, 0, 0, 0, 0, 0, crown);
-      add(geo('kcape', () => new THREE.CylinderGeometry(0.19, 0.34, 0.88, 22, 1, true, Math.PI / 2, Math.PI)), M2, 0, 0.6, -0.02);
-      const armR = pivot('armR', 0, 0.93, 0.02);
-      limb([0.19, 0.95, 0], [0.035, 0.86, 0.3], 0.045, armR);
-      limb([-0.19, 0.95, 0], [-0.035, 0.86, 0.3], 0.045, armR);
-      add(cyl(0.017, 0.017, 0.11, 8), A, 0, 0.87, 0.31, 0, 0, 0, 0, 0, 0, armR);
-      add(sphere(0.03), A, 0, 0.94, 0.31, 0, 0, 0, 0, 0, 0, armR);
-      add(box(0.26, 0.03, 0.035), A, 0, 0.8, 0.31, 0, 0, 0, 0, 0, 0, armR);
-      add(box(0.045, 0.48, 0.012), A, 0, 0.55, 0.31, 0, 0, 0, 0, 0, 0, armR);
-      add(cone(0.024, 0.06), A, 0, 0.28, 0.31, Math.PI, 0, 0, 0, 0, 0, armR);
+      const armL = pivot('armL', -0.18, 0.86, 0);
+      limb([-0.18, 0.86, 0], [-0.07, 0.64, 0.19], 0.042, armL, UW.medusa);
+      const armR = pivot('armR', 0.18, 0.86, 0);
+      limb([0.18, 0.86, 0], [0.2, 0.68, 0.17], 0.042, armR, UW.medusa);
+      add(cyl(0.016, 0.016, 0.46, 8), UW.gold, 0.2, 0.84, 0.17, 0, 0, 0, 0, 0, 0, armR);
+      [0.72, 0.82, 0.92].forEach((y) => add(torus(0.026, 0.009), UW.snake, 0.2, y, 0.17, Math.PI / 2, 0, 0, 0, 0, 0, armR));
+      add(sphere(0.03), UW.snake, 0.2, 1.08, 0.18, 0, 0, 0, 1, 0.8, 1.4, armR);
+    } else if (white) { // Zeus: white robe, sky-blue cloak, flowing white beard, laurel, thunderbolt raised
+      main = OL.white;
+      const { head, hy } = figure('kr', 1.03, 0.33, 0.15, 0.18, 0.2, 0.096, 15, { robe: OL.white, skin: OL.skin, belt: OL.gold, pauld: OL.gold });
+      add(box(0.06, 0.55, 0.02), OL.blue, 0.03, 0.74, 0.17, -0.12, 0, 0.5);
+      add(cape('k', 0.19, 0.34, 0.88), OL.blueD, 0, 0.6, -0.02);
+      add(cone(0.085, 0.22), OL.beard, 0, hy - 0.12, 0.055, Math.PI, 0, 0, 0, 0, 0, head);
+      add(halfSphere(0.104, 0.6), OL.beard, 0, hy, -0.01, -0.3, 0, 0, 0, 0, 0, head);
+      const crown = pivot('crown', 0, hy + 0.06, 0, head);
+      add(torus(0.096, 0.013), OL.gold, 0, hy + 0.06, 0, Math.PI / 2, 0, 0, 0, 0, 0, crown);
+      for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; add(box(0.02, 0.045, 0.01), OL.gold, Math.sin(a) * 0.1, hy + 0.08, Math.cos(a) * 0.1, 0, a, 0.5, 0, 0, 0, crown); }
+      const armR = pivot('armR', 0.2, 0.95, 0);
+      limb([0.2, 0.95, 0], [0.27, 1.12, 0.08], 0.046, armR, OL.skin);
+      [[1.31, 0.45], [1.21, -0.45], [1.11, 0.45]].forEach(([y, rz]) => fire(add(box(0.035, 0.13, 0.03), OL.bolt, 0.27, y, 0.08, 0, 0, rz, 0, 0, 0, armR)));
+      add(cone(0.025, 0.08), OL.bolt, 0.25, 1.03, 0.08, Math.PI, 0, 0, 0, 0, 0, armR);
+      const armL = pivot('armL', -0.2, 0.95, 0);
+      limb([-0.2, 0.95, 0], [-0.21, 0.68, 0.17], 0.046, armL, OL.skin);
+      add(cyl(0.017, 0.017, 0.62, 8), OL.gold, -0.21, 0.78, 0.17, 0, 0, 0, 0, 0, 0, armL);
+      add(sphere(0.03), OL.gold, -0.21, 1.1, 0.17, 0, 0, 0, 0, 0, 0, armL);
+      [-1, 1].forEach((s) => add(box(0.07, 0.02, 0.02), OL.gold, -0.21 + s * 0.035, 1.12, 0.17, 0, 0, s * 0.4, 0, 0, 0, armL));
+    } else { // Hades: black and purple, dark beard, iron crown crowned with fire, bident
+      main = UW.robe;
+      const { head, hy } = figure('kr', 1.03, 0.33, 0.15, 0.18, 0.2, 0.096, 15, { robe: UW.robe, skin: UW.pale, belt: UW.gold, pauld: UW.iron, eye: UW.ember });
+      add(lathe('kcuir', [[0.16, 0.6], [0.18, 0.72], [0.185, 0.85], [0.17, 0.95], [0.08, 0.99], [0, 0.99]], 24), UW.iron);
+      add(cape('k', 0.19, 0.34, 0.88), UW.purpleD, 0, 0.6, -0.02);
+      add(cone(0.08, 0.2), UW.beard, 0, hy - 0.11, 0.055, Math.PI, 0, 0, 0, 0, 0, head);
+      add(halfSphere(0.103, 0.6), UW.beard, 0, hy, -0.01, -0.3, 0, 0, 0, 0, 0, head);
+      const crown = pivot('crown', 0, hy + 0.08, 0, head);
+      add(cyl(0.1, 0.092, 0.06, 18), UW.iron, 0, hy + 0.08, 0, 0, 0, 0, 0, 0, 0, crown);
+      for (let k = 0; k < 6; k++) {
+        const a = k / 6 * Math.PI * 2;
+        add(cone(0.022, 0.1), UW.iron, Math.sin(a) * 0.097, hy + 0.15, Math.cos(a) * 0.097, 0, 0, 0, 0, 0, 0, crown);
+        fire(add(cone(0.018, 0.07), UW.fire, Math.sin(a) * 0.097, hy + 0.22, Math.cos(a) * 0.097, 0, 0, 0, 0, 0, 0, crown));
+      }
+      fire(add(cone(0.05, 0.16), UW.fire, 0, hy + 0.2, 0, 0, 0, 0, 0, 0, 0, crown));
+      const armR = pivot('armR', 0.2, 0.95, 0);
+      limb([0.2, 0.95, 0], [0.24, 0.78, 0.15], 0.046, armR, UW.pale);
+      add(cyl(0.017, 0.017, 1.3, 8), UW.iron, 0.24, 0.82, 0.15, 0, 0, 0, 0, 0, 0, armR);
+      add(box(0.13, 0.022, 0.022), UW.iron, 0.24, 1.47, 0.15, 0, 0, 0, 0, 0, 0, armR);
+      [-1, 1].forEach((s) => add(cone(0.02, 0.13), UW.iron, 0.24 + s * 0.055, 1.54, 0.15, 0, 0, 0, 0, 0, 0, armR));
+      const armL = pivot('armL', -0.2, 0.95, 0);
+      limb([-0.2, 0.95, 0], [-0.17, 0.68, 0.19], 0.046, armL, UW.pale);
+      add(sphere(0.045), UW.red, -0.17, 0.72, 0.21, 0, 0, 0, 0, 0, 0, armL);
     }
     const contact = new THREE.Mesh(planeGeo, contactMat);
     contact.rotation.x = -Math.PI / 2; contact.position.y = 0.003; contact.scale.setScalar(0.95);
     root.add(contact);
-    root.userData = { key: ch, type: t, body, rig, lift: 0, anim: false, phase: Math.random() * 6.3, yaw: white ? Math.PI : 0, H: HEIGHTS[t], headBias: t === 'n' ? (Math.random() < 0.5 ? -0.55 : 0.55) : 0 };
+    root.userData = { key: ch, type: t, body, rig, flames, snakes, mainMat: main, lift: 0, anim: false, phase: Math.random() * 6.3, yaw: white ? Math.PI : 0, H: HEIGHTS[t], headBias: t === 'n' ? (Math.random() < 0.5 ? -0.55 : 0.55) : 0 };
     root.rotation.y = root.userData.yaw;
     return root;
   }
@@ -1082,8 +1254,8 @@ function chooseMove(st, level) {
     } },
     k: { dur: 820, hit: 0.6, pose(R, k) { // two-handed overhead sword chop
       const up = ease(seg(k, 0, 0.47)), dn = seg(k, 0.47, 0.6), back = ease(seg(k, 0.6, 1));
-      R.armR.rotation.x = (-2.7 * up + 3.3 * dn) * (1 - back);
-      return { lean: (-0.12 * up + 0.42 * dn) * (1 - back), fwd: 0.2 * dn * (1 - back), lift: 0 };
+      R.armR.rotation.x = (-0.9 * up + 2.3 * dn) * (1 - back);
+      return { lean: (-0.14 * up + 0.42 * dn) * (1 - back), fwd: 0.2 * dn * (1 - back), lift: 0 };
     } }
   };
   function strike(obj, target, delay, onImpact) {
@@ -1213,6 +1385,11 @@ function chooseMove(st, level) {
   function breakKnight(victim, dir, P, white, mat) {
     const head = victim.userData.rig.head;
     detach(head);
+    ['wingL', 'wingR'].forEach((k, i) => {
+      const w = victim.userData.rig[k]; if (!w) return;
+      detach(w);
+      rigid(w, new V3(rand(-1, 1), rand(1.5, 2.5), rand(-1, 1)).addScaledVector(dir, 0.8), new V3(rand(-4, 4), rand(-4, 4), rand(-4, 4)), 0.05, 0, null);
+    });
     scene.remove(victim);
     const side = new V3(dir.z, 0, -dir.x).multiplyScalar(rand(-0.8, 0.8));
     rigid(head, dir.clone().multiplyScalar(2.6).add(side).setY(3.2), new V3(dir.z * 9, rand(-3, 3), -dir.x * 9), 0.22, 2, (o) => {
@@ -1306,7 +1483,7 @@ function chooseMove(st, level) {
     const u = victim.userData, white = u.key !== u.type;
     victim.updateMatrixWorld(true);
     SND[u.type] && SND[u.type]();
-    (BREAKS[u.type] || breakPawn)(victim, dir, victim.position.clone(), white, white ? fragW : fragB);
+    (BREAKS[u.type] || breakPawn)(victim, dir, victim.position.clone(), white, fragMatFor(u.mainMat));
   }
   function promoGlow(s) {
     const P = sqPos(s);
@@ -1323,7 +1500,7 @@ function chooseMove(st, level) {
     addAction(500, 1300 * SPEED, {
       update(k) { const e = k * k; b.rotation.x = -1.3 * e; b.position.y = 0.3 * e; if (u.rig.armR) u.rig.armR.rotation.x = 0.6 * e; },
       end() {
-        const white = u.key !== u.type, mat = white ? fragW : fragB;
+        const white = u.key !== u.type, mat = fragMatFor(u.mainMat);
         o.updateMatrixWorld(true);
         const crown = u.rig.crown;
         if (crown) {
@@ -1686,6 +1863,15 @@ function chooseMove(st, level) {
         R.armR.rotation.x += (tr - R.armR.rotation.x) * 0.08;
       }
       if (R.armL) R.armL.rotation.x = Math.sin(t * 0.8 + ph + 1.2) * 0.05 + (threatened.has(i) ? -0.3 : 0);
+    }
+    for (let i = 0; i < 64; i++) {
+      const o = pieceObjs[i]; if (!o) continue;
+      const u = o.userData, R = u.rig;
+      u.flames.forEach((f, j) => { f.scale.y = f.userData.sy * (1 + 0.28 * Math.sin(t * 14 + j * 2.1 + u.phase)); });
+      if (reduceMotion) continue;
+      if (R.wingL) { const f = 0.12 + 0.2 * Math.sin(t * 2.4 + u.phase); R.wingL.rotation.z = f; R.wingR.rotation.z = -f; }
+      u.snakes.forEach((sn, j) => { sn.rotation.x = 0.3 * Math.sin(t * 3 + j * 1.7); sn.rotation.z = 0.18 * Math.sin(t * 2.3 + j); });
+      if (R.fan && !u.anim) R.fan.rotation.z = 0.05 * Math.sin(t * 0.9 + u.phase);
     }
     if (!reduceMotion) colossi.forEach((o, i) => { o.userData.rig.head.rotation.y = 0.35 * Math.sin(t * 0.07 + i * 2); });
 
