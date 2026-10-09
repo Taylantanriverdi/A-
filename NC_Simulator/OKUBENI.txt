@@ -63,11 +63,19 @@ kaydeder.
 ONEMLI AYARLAR
 --------------
 * TAKIM TABLOSU: hyperDENT NC dosyasinda takim capi yazmaz (yalnizca
-  G200 Pxx takim numarasi vardir). Program baslangicta tahmini degerler
-  kullanir (T4 = 1.5 mm, T5 = 2.0, T6 = 0.6, T7 = 1.0 kuresel).
-  KENDI TAKIM KUTUPHANENIZE GORE DUZELTIN, sonra "Ayarlari uygula ve
-  yeniden baslat" deyin. Hassasiyet degerleri bu caplara baglidir.
-  Girdiginiz degerler kaydedilir.
+  G200 Pxx takim numarasi vardir). Program her dosyada caplari dosyanin
+  kendisinden tanir:
+    - NC yorumunda cap yaziyorsa (orn. "(T4 KUGEL D=1.0)") o kullanilir.
+    - Yoksa takim yolundan: bilye uc keskin kenarlarin uzerinden gecerken
+      tam kendi yaricapinda yay cizer (ince isleme takimi buradan bulunur).
+    - Kaba ve artik malzeme takimlari, cap bilinen takima gore "parcaya
+      oyuk acmayan" tek standart capla bulunur.
+  Takim Tablosunda her takimin altinda kaynak yazar (takim yolundan /
+  takimlar arasi / NC yorumu). Satirin uzerine gelince gerekce gorunur.
+  "tahmin, dogrulayin" yaziyorsa cap bulunamamistir; numaraya gore
+  varsayilan kullanilir (T4 = 1.5 mm, T5 = 2.0, T6 = 0.6, T7 = 1.0).
+  Elle duzeltip "Ayarlari uygula ve yeniden baslat" deyin; elle girilen
+  cap yalnizca o dosya icin gecerlidir (yeni dosyada yeniden taninir).
 
 * KALINLIK: NC dosyasindaki ilk yaklasma yuksekliginden otomatik tahmin
   edilir ("oto"). Gercek disk kalinliginizi girin (orn. 14, 16, 18, 20).
