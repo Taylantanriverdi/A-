@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIGICAD CAM | STL → NC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b1626; --panel:#101f35; --panel2:#152741; --border:#22395a; --text:#e6edf7; --soft:#8ea3c0;
+  --primary:#2f7fe0; --primary2:#1f63b8; --accent:#00b4d8; --ok:#16a37f; --warn:#f59e0b; --bad:#e5484d;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Sora',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow:hidden}
+button,input,select,textarea{font-family:inherit;font-size:12.5px;color:inherit}
+.app{display:grid;grid-template-rows:54px 1fr;height:100vh}
+header{display:flex;align-items:center;gap:10px;padding:0 14px;background:#08111f;border-bottom:1px solid var(--border)}
+.logo{font-weight:700;letter-spacing:.5px;font-size:15px;margin-right:10px;white-space:nowrap}
+.logo span{color:var(--accent)}
+.btn{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;cursor:pointer;white-space:nowrap;transition:.15s}
+.btn:hover{border-color:var(--primary)}
+.btn.pri{background:var(--primary);border-color:var(--primary)}
+.btn.pri:hover{background:var(--primary2)}
+.btn.ok{background:var(--ok);border-color:var(--ok)}
+.btn.sm{padding:4px 8px;font-size:11.5px}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#04121f}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.sp{flex:1}
+.main{display:grid;grid-template-columns:400px 1fr;min-height:0}
+aside{background:var(--panel);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{flex:1;padding:10px 6px;text-align:center;cursor:pointer;color:var(--soft);border-bottom:2px solid transparent;white-space:nowrap;font-size:12px}
+.tab.act{color:var(--text);border-bottom-color:var(--accent)}
+.pane{display:none;overflow-y:auto;padding:12px;flex:1}
+.pane.act{display:block}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:10px}
+.card h4{font-size:12px;font-weight:600;margin-bottom:8px;color:#cfe0f5;display:flex;align-items:center;gap:6px}
+.row{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.f{display:flex;flex-direction:column;gap:3px;flex:1;min-width:70px}
+.f label{font-size:10.5px;color:var(--soft)}
+input[type=number],input[type=text],select,textarea{background:#0b1830;border:1px solid var(--border);border-radius:6px;padding:5px 7px;width:100%}
+textarea{font-family:'JetBrains Mono',monospace;font-size:11px;min-height:70px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary)}
+.muted{color:var(--soft);font-size:11.5px;line-height:1.5}
+.list .it{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;background:#0d1b31;margin-bottom:4px;font-size:11.5px}
+.list .it .grow{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op{border-left:3px solid var(--primary)}
+.op.dis{opacity:.5}
+.op .hd{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.op .hd b{flex:1;font-size:12px}
+.chip{font-size:10px;padding:2px 6px;border-radius:10px;background:#0b1830;border:1px solid var(--border);color:var(--soft)}
+.viewport{position:relative;min-width:0;min-height:0}
+#cv{width:100%;height:100%;display:block;background:radial-gradient(ellipse at center,#1a2e4c 0%,#0b1626 75%)}
+.ov{position:absolute;background:rgba(8,17,31,.85);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;backdrop-filter:blur(4px)}
+.ov.tl{top:10px;left:10px;display:flex;gap:5px;flex-wrap:wrap;max-width:calc(100% - 20px)}
+.ov.bl{bottom:10px;left:10px;right:10px;display:flex;gap:12px;align-items:center}
+.ov.tr{top:10px;right:10px;font-size:11px;max-width:280px;display:none}
+.prog{flex:1;height:6px;background:#0b1830;border-radius:3px;overflow:hidden;min-width:60px}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .2s}
+#status{font-size:11.5px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:55%}
+.log{font-family:'JetBrains Mono',monospace;font-size:10.5px;background:#08111f;border-radius:6px;padding:6px;max-height:160px;overflow:auto;white-space:pre-wrap;color:#a9bdd8}
+.warn{color:var(--warn)} .bad{color:var(--bad)} .good{color:var(--ok)}
+.drop{border:2px dashed var(--border);border-radius:var(--radius);padding:18px;text-align:center;color:var(--soft);cursor:pointer}
+.drop.hv{border-color:var(--accent);color:var(--text)}
+.stat{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:11.5px}
+.stat div:nth-child(odd){color:var(--soft)}
+.legend{display:flex;gap:8px;flex-wrap:wrap;font-size:10.5px}
+.legend span{display:flex;align-items:center;gap:4px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+@media (max-width:900px){
+  body{overflow:auto}
+  .app{height:auto;min-height:100vh}
+  .main{grid-template-columns:1fr}
+  .viewport{height:60vh;order:-1}
+  aside{border-right:none;border-top:1px solid var(--border)}
+  header{flex-wrap:wrap;height:auto;padding:8px 16px}
+  .app{grid-template-rows:auto 1fr}
+  .ov.tr{top:auto;bottom:52px;left:10px;right:10px;max-width:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header>
+  <div class="logo">DIGICAD <span>CAM</span></div>
+  <button class="btn" id="bLoad">STL Yükle</button>
+  <button class="btn pri" id="bCalc">NC Hesapla</button>
+  <button class="btn ok" id="bSave" disabled>NC İndir</button>
+  <div class="sp"></div>
+  <button class="btn" id="bNcView" title="Var olan bir NC dosyasını (örn. HyperDent çıktısı) 3B olarak görüntüle">NC Görüntüle</button>
+  <input type="file" id="fStl" accept=".stl" multiple hidden>
+  <input type="file" id="fNc" accept=".nc,.txt,.cnc,.tap,.iso" hidden>
+  <input type="file" id="fProf" accept=".json" hidden>
+</header>
+<div class="main">
+<aside>
+  <div class="tabs">
+    <div class="tab act" data-t="model">Model</div>
+    <div class="tab" data-t="conn">Bağlantı</div>
+    <div class="tab" data-t="ops">İşlemler</div>
+    <div class="tab" data-t="tools">Takımlar</div>
+    <div class="tab" data-t="mach">Makine</div>
+  </div>
+
+  <!-- MODEL -->
+  <div class="pane act" id="p-model">
+    <div class="card">
+      <div class="drop" id="drop">STL dosyalarını buraya sürükleyin<br><span class="muted">veya tıklayın (birden çok dosya olabilir)</span></div>
+      <div class="list" id="fileList" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <h4>Disk (Blank)</h4>
+      <div class="row">
+        <div class="f"><label>Çap (mm)</label><input type="number" id="dD" step="0.5"></div>
+        <div class="f"><label>Kalınlık (mm)</label><input type="number" id="dT" step="0.5"></div>
+      </div>
+      <div class="muted">Disk merkezi = X0 Y0, Z0 = disk orta düzlemi.</div>
+    </div>
+    <div class="card">
+      <h4>Konumlandırma</h4>
+      <div class="row">
+        <div class="f"><label>X (mm)</label><input type="number" id="tX" step="0.5"></div>
+        <div class="f"><label>Y (mm)</label><input type="number" id="tY" step="0.5"></div>
+        <div class="f"><label>Z (mm)</label><input type="number" id="tZ" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div class="f"><label>Dönüş Z (°)</label><input type="number" id="rZ" step="5"></div>
+        <div class="f"><label>Eğim X (°)</label><input type="number" id="rX" step="1"></div>
+        <div class="f"><label>Eğim Y (°)</label><input type="number" id="rY" step="1"></div>
+      </div>
+      <div class="row">
+        <button class="btn sm" id="bCenter">Diske ortala</button>
+        <button class="btn sm" id="bFlip">Ters çevir (180°)</button>
+        <button class="btn sm" id="bReset">Sıfırla</button>
+      </div>
+      <div class="stat" id="mInfo"></div>
+    </div>
+  </div>
+
+  <!-- CONNECTORS -->
+  <div class="pane" id="p-conn">
+    <div class="card">
+      <h4>İşleme sınırı</h4>
+      <div class="row">
+        <div class="f"><label>Sınır payı (mm) – parçadan uzaklık</label><input type="number" id="sBo" step="0.5"></div>
+      </div>
+      <div class="muted">Takım merkezi parçadan bu mesafeden uzağa gitmez. Dışarıda kalan disk malzemesi parçayı bağlantılarla taşır.</div>
+    </div>
+    <div class="card">
+      <h4>Bağlantılar (Konnektör)</h4>
+      <div class="row">
+        <div class="f"><label>Çap (mm)</label><input type="number" id="cD" step="0.1"></div>
+        <div class="f"><label>Otomatik adet</label><input type="number" id="cN" step="1"></div>
+      </div>
+      <div class="row">
+        <button class="btn sm pri" id="bAutoConn">Otomatik yerleştir</button>
+        <button class="btn sm" id="bPickConn">Tıklayarak ekle</button>
+        <button class="btn sm" id="bClrConn">Tümünü sil</button>
+      </div>
+      <div class="muted">“Tıklayarak ekle” açıkken modelin kenarına tıklayın; bağlantı yüzey normali yönünde dışarı doğru uzatılır.</div>
+      <div class="list" id="connList" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <!-- OPERATIONS -->
+  <div class="pane" id="p-ops">
+    <div class="row">
+      <button class="btn sm" data-add="rough">+ Kaba</button>
+      <button class="btn sm" data-add="finish">+ İnce</button>
+      <button class="btn sm" data-add="ind">+ 3+2 Açılı</button>
+      <button class="btn sm" id="bOpsDefault">Varsayılan</button>
+    </div>
+    <div id="opList"></div>
+    <div class="card">
+      <h4>Genel hesaplama ayarları</h4>
+      <div class="row">
+        <div class="f"><label>Çözünürlük (mm)</label><input type="number" id="sRes" step="0.005"></div>
+        <div class="f"><label>Simülasyon çöz. (mm)</label><input type="number" id="sStk" step="0.01"></div>
+      </div>
+      <div class="row">
+        <div class="f"><label>Ayırma düzlemi Z</label><input type="number" id="sSplit" step="0.1"></div>
+        <div class="f"><label>Taraf bindirmesi (mm)</label><input type="number" id="sOv" step="0.05"></div>
+      </div>
+      <div class="row">
+        <div class="f"><label>Tolerans ince (mm)</label><input type="number" id="sTolF" step="0.001"></div>
+        <div class="f"><label>Tolerans kaba (mm)</label><input type="number" id="sTolR" step="0.005"></div>
+        <div class="f"><label>Maks. bağlantı (mm)</label><input type="number" id="sLink" step="0.5"></div>
+      </div>
+      <div class="muted">Üst taraf (A0) ayırma düzleminin altına, alt taraf (A180) üstüne “bindirme” kadar iner; boşluklar tamamen açılır.</div>
+    </div>
+  </div>
+
+  <!-- TOOLS -->
+  <div class="pane" id="p-tools">
+    <div id="toolList"></div>
+    <div class="row"><button class="btn sm" id="bAddTool">+ Takım ekle</button></div>
+  </div>
+
+  <!-- MACHINE -->
+  <div class="pane" id="p-mach">
+    <div class="card">
+      <h4>Kinematik</h4>
+      <div class="row">
+        <div class="f"><label>A ekseni yönü</label><select id="mSA"><option value="1">+ (sağ el)</option><option value="-1">− (ters)</option></select></div>
+        <div class="f"><label>B ekseni yönü</label><select id="mSB"><option value="1">+ (sağ el)</option><option value="-1">− (ters)</option></select></div>
+        <div class="f"><label>Sıra</label><select id="mOrd"><option value="BA">B dış, A iç</option><option value="AB">A dış, B iç</option></select></div>
+      </div>
+      <div class="row">
+        <div class="f"><label>Pivot X</label><input type="number" id="mPX" step="0.1"></div>
+        <div class="f"><label>Pivot Y</label><input type="number" id="mPY" step="0.1"></div>
+        <div class="f"><label>Pivot Z</label><input type="number" id="mPZ" step="0.1"></div>
+      </div>
+      <div class="row">
+        <div class="f"><label>Güvenli Z</label><input type="number" id="mSafe" step="0.05"></div>
+        <div class="f"><label>Maks. eğim (°)</label><input type="number" id="mTilt" step="1"></div>
+      </div>
+      <div class="muted">Doğrulama: STL'i ve aynı işin HyperDent NC dosyasını birlikte yükleyin (NC Görüntüle). Açılı (3+2) yollar modelin üstüne oturuyorsa yön ayarları doğrudur; oturmuyorsa A/B yönünü değiştirin.</div>
+    </div>
+    <div class="card">
+      <h4>Post-processor şablonları</h4>
+      <div class="muted" style="margin-bottom:6px">Yer tutucular: {T} takım no, {S} devir, {A} {B} açı, {SAFE} güvenli Z. Varsayılanlar yüklediğiniz HyperDent NC dosyasıyla birebir aynıdır.</div>
+      <div class="f"><label>İlk takım çağırma</label><textarea id="tFirst"></textarea></div>
+      <div class="f"><label>Takım değişimi</label><textarea id="tChange"></textarea></div>
+      <div class="f"><label>Bölüm başı (her işlemde)</label><textarea id="tSec"></textarea></div>
+      <div class="row">
+        <div class="f"><label>Açı satırı (takım değişiminden sonra)</label><input type="text" id="tAB1"></div>
+        <div class="f"><label>Açı satırı (diğer)</label><input type="text" id="tAB"></div>
+      </div>
+      <div class="f"><label>Program sonu</label><textarea id="tEnd"></textarea></div>
+      <div class="row" style="margin-top:6px">
+        <label class="muted"><input type="checkbox" id="mNum"> N satır numarası</label>
+        <label class="muted"><input type="checkbox" id="mCRLF"> CRLF satır sonu</label>
+        <label class="muted"><input type="checkbox" id="mPct"> % başlangıç</label>
+      </div>
+    </div>
+    <div class="card">
+      <h4>Profil</h4>
+      <div class="row">
+        <button class="btn sm" id="bProfSave">Profili kaydet (.json)</button>
+        <button class="btn sm" id="bProfLoad">Profil yükle</button>
+        <button class="btn sm" id="bProfReset">Fabrika ayarı</button>
+      </div>
+      <div class="muted">Ayarlar tarayıcıda otomatik saklanır.</div>
+    </div>
+  </div>
+
+  <div style="padding:10px 12px;border-top:1px solid var(--border)">
+    <div class="stat" id="resInfo"><div>Durum</div><div>Hesaplanmadı</div></div>
+    <div class="log" id="log" style="margin-top:6px"></div>
+  </div>
+</aside>
+
+<div class="viewport">
+  <canvas id="cv"></canvas>
+  <div class="ov tl">
+    <button class="btn sm" data-view="iso">İzometrik</button>
+    <button class="btn sm" data-view="top">Üst</button>
+    <button class="btn sm" data-view="bottom">Alt</button>
+    <button class="btn sm" data-view="front">Ön</button>
+    <span style="width:8px"></span>
+    <button class="btn sm on" data-show="model">Model</button>
+    <button class="btn sm on" data-show="disc">Disk</button>
+    <button class="btn sm on" data-show="conn">Bağlantı</button>
+    <button class="btn sm on" data-show="path">Yollar</button>
+    <button class="btn sm" data-show="rapid">Boş hareket</button>
+    <button class="btn sm on" data-show="nc">NC</button>
+  </div>
+  <div class="ov tr" id="legend"></div>
+  <div class="ov bl">
+    <span id="status">STL yükleyerek başlayın.</span>
+    <div class="prog"><i id="progBar"></i></div>
+  </div>
+</div>
+</div>
+</div>
+
+<!-- ======================= CAM ÇEKİRDEĞİ (Worker içinde de çalışır) ======================= -->
+<script id="cam-core">
+(function(root){
+"use strict";
+var C = {};
+var NEG = -1e9, DEG = Math.PI / 180;
+C.NEG = NEG;
+
+/* ---------- STL okuma ---------- */
+C.parseSTL = function(buf){
+  var len = buf.byteLength, dv = new DataView(buf);
+  function bin(n){
+    var t = new Float32Array(n * 9), o = 84;
+    for (var i = 0; i < n; i++){ o += 12; var b = i * 9; for (var k = 0; k < 9; k++){ t[b + k] = dv.getFloat32(o, true); o += 4; } o += 2; }
+    return t;
+  }
+  if (len >= 84){ var n = dv.getUint32(80, true); if (84 + n * 50 === len) return bin(n); }
+  var head = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(len, 256)));
+  if (/^\s*solid/i.test(head)){
+    var txt = new TextDecoder().decode(new Uint8Array(buf));
+    if (txt.indexOf('vertex') >= 0){
+      var re = /vertex\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)/g, arr = [], m;
+      while ((m = re.exec(txt))) arr.push(+m[1], +m[2], +m[3]);
+      var nn = Math.floor(arr.length / 9);
+      return new Float32Array(arr.slice(0, nn * 9));
+    }
+  }
+  if (len >= 134) return bin(Math.floor((len - 84) / 50));
+  throw new Error('Geçersiz STL dosyası');
+};
+
+/* ---------- 3x4 rijit matrisler ---------- */
+var M = C.M = {
+  I: function(){ return [1,0,0,0, 0,1,0,0, 0,0,1,0]; },
+  rx: function(t){ var c = Math.cos(t), s = Math.sin(t); return [1,0,0,0, 0,c,-s,0, 0,s,c,0]; },
+  ry: function(t){ var c = Math.cos(t), s = Math.sin(t); return [c,0,s,0, 0,1,0,0, -s,0,c,0]; },
+  rz: function(t){ var c = Math.cos(t), s = Math.sin(t); return [c,-s,0,0, s,c,0,0, 0,0,1,0]; },
+  t: function(x, y, z){ return [1,0,0,x, 0,1,0,y, 0,0,1,z]; },
+  mul: function(a, b){
+    var r = new Array(12);
+    for (var i = 0; i < 3; i++){
+      for (var j = 0; j < 3; j++) r[i*4+j] = a[i*4]*b[j] + a[i*4+1]*b[4+j] + a[i*4+2]*b[8+j];
+      r[i*4+3] = a[i*4]*b[3] + a[i*4+1]*b[7] + a[i*4+2]*b[11] + a[i*4+3];
+    }
+    return r;
+  },
+  inv: function(m){
+    var r = [m[0],m[4],m[8],0, m[1],m[5],m[9],0, m[2],m[6],m[10],0];
+    for (var i = 0; i < 3; i++) r[i*4+3] = -(r[i*4]*m[3] + r[i*4+1]*m[7] + r[i*4+2]*m[11]);
+    return r;
+  },
+  ap: function(m, x, y, z){ return [m[0]*x+m[1]*y+m[2]*z+m[3], m[4]*x+m[5]*y+m[6]*z+m[7], m[8]*x+m[9]*y+m[10]*z+m[11]]; },
+  apv: function(m, x, y, z){ return [m[0]*x+m[1]*y+m[2]*z, m[4]*x+m[5]*y+m[6]*z, m[8]*x+m[9]*y+m[10]*z]; }
+};
+
+C.transform = function(t, m){
+  var o = new Float32Array(t.length);
+  for (var i = 0; i < t.length; i += 3){
+    var x = t[i], y = t[i+1], z = t[i+2];
+    o[i] = m[0]*x+m[1]*y+m[2]*z+m[3]; o[i+1] = m[4]*x+m[5]*y+m[6]*z+m[7]; o[i+2] = m[8]*x+m[9]*y+m[10]*z+m[11];
+  }
+  return o;
+};
+
+C.bbox = function(t){
+  var mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (var i = 0; i < t.length; i += 3){
+    for (var k = 0; k < 3; k++){ var v = t[i+k]; if (v < mn[k]) mn[k] = v; if (v > mx[k]) mx[k] = v; }
+  }
+  return {min: mn, max: mx};
+};
+
+C.concat = function(list){
+  var n = 0; list.forEach(function(a){ n += a.length; });
+  var o = new Float32Array(n), p = 0;
+  list.forEach(function(a){ o.set(a, p); p += a.length; });
+  return o;
+};
+
+/* Parça -> makine koordinatı. B dış eksen, A iç eksen (varsayılan): q = Ry(B)·Rx(A)·p */
+C.machineMatrix = function(A, B, mc){
+  var sA = (mc && mc.signA < 0) ? -1 : 1, sB = (mc && mc.signB < 0) ? -1 : 1;
+  var pv = (mc && mc.pivot) || [0, 0, 0];
+  var ra = M.rx(sA * A * DEG), rb = M.ry(sB * B * DEG);
+  var R = (mc && mc.order === 'AB') ? M.mul(ra, rb) : M.mul(rb, ra);
+  return M.mul(M.t(pv[0], pv[1], pv[2]), M.mul(R, M.t(-pv[0], -pv[1], -pv[2])));
+};
+
+/* Parça çerçevesindeki n yönünü takım eksenine (+Z) getiren A,B açıları */
+C.axisToAB = function(n, mc){
+  var sA = (mc && mc.signA < 0) ? -1 : 1, sB = (mc && mc.signB < 0) ? -1 : 1;
+  var L = Math.hypot(n[0], n[1], n[2]) || 1, x = n[0]/L, y = n[1]/L, z = n[2]/L, th, ph;
+  if (mc && mc.order === 'AB'){
+    ph = Math.atan2(-x, z);
+    var v1 = y, v2 = -x*Math.sin(ph) + z*Math.cos(ph);
+    th = Math.atan2(v1, v2);
+  } else {
+    th = Math.atan2(y, z);
+    var vz = y*Math.sin(th) + z*Math.cos(th);
+    ph = Math.atan2(-x, vz);
+  }
+  return {A: sA * th / DEG, B: sB * ph / DEG};
+};
+
+/* ---------- Bağlantı silindiri üçgenleri ---------- */
+C.cylinderTris = function(a, b, r, seg){
+  seg = seg || 20;
+  var d = [b[0]-a[0], b[1]-a[1], b[2]-a[2]], L = Math.hypot(d[0], d[1], d[2]) || 1;
+  d = [d[0]/L, d[1]/L, d[2]/L];
+  var t = Math.abs(d[2]) < 0.9 ? [0,0,1] : [1,0,0];
+  var u = [d[1]*t[2]-d[2]*t[1], d[2]*t[0]-d[0]*t[2], d[0]*t[1]-d[1]*t[0]], ul = Math.hypot(u[0],u[1],u[2]);
+  u = [u[0]/ul, u[1]/ul, u[2]/ul];
+  var v = [d[1]*u[2]-d[2]*u[1], d[2]*u[0]-d[0]*u[2], d[0]*u[1]-d[1]*u[0]];
+  var out = [], ring = function(c, k){ var an = 2*Math.PI*k/seg, cs = Math.cos(an)*r, sn = Math.sin(an)*r;
+    return [c[0]+u[0]*cs+v[0]*sn, c[1]+u[1]*cs+v[1]*sn, c[2]+u[2]*cs+v[2]*sn]; };
+  for (var k = 0; k < seg; k++){
+    var p0 = ring(a, k), p1 = ring(a, k+1), q0 = ring(b, k), q1 = ring(b, k+1);
+    out.push.apply(out, p0.concat(q0, q1)); out.push.apply(out, p0.concat(q1, p1));
+    out.push.apply(out, a.concat(p1, p0)); out.push.apply(out, b.concat(q0, q1));
+  }
+  return new Float32Array(out);
+};
+
+/* ---------- Yükseklik haritası ---------- */
+function Grid(x0, y0, res, nx, ny, fill){
+  if (nx * ny > 60e6) throw new Error('Izgara çok büyük (' + nx + '×' + ny + '). Çözünürlüğü büyütün.');
+  this.x0 = x0; this.y0 = y0; this.res = res; this.nx = nx; this.ny = ny;
+  this.h = new Float32Array(nx * ny); if (fill !== 0) this.h.fill(fill);
+}
+C.Grid = Grid;
+C.makeGrid = function(minx, miny, maxx, maxy, res, fill){
+  return new Grid(minx, miny, res, Math.ceil((maxx - minx) / res) + 1, Math.ceil((maxy - miny) / res) + 1, fill);
+};
+
+/* Üçgenleri ızgaraya “en yüksek Z” olarak işler (kenarlar da örneklenir -> dik duvarlar kaçmaz) */
+C.rasterize = function(g, t){
+  var x0 = g.x0, y0 = g.y0, inv = 1 / g.res, nx = g.nx, ny = g.ny, h = g.h;
+  function edge(u0, v0, z0, u1, v1, z1){
+    var n = Math.ceil(Math.max(Math.abs(u1-u0), Math.abs(v1-v0)) * 2) + 1;
+    for (var s = 0; s <= n; s++){
+      var tt = s / n, i = Math.round(u0 + (u1-u0)*tt), j = Math.round(v0 + (v1-v0)*tt);
+      if (i < 0 || j < 0 || i >= nx || j >= ny) continue;
+      var z = z0 + (z1-z0)*tt, id = j*nx + i; if (z > h[id]) h[id] = z;
+    }
+  }
+  for (var q = 0; q < t.length; q += 9){
+    var u0 = (t[q]-x0)*inv, v0 = (t[q+1]-y0)*inv, z0 = t[q+2];
+    var u1 = (t[q+3]-x0)*inv, v1 = (t[q+4]-y0)*inv, z1 = t[q+5];
+    var u2 = (t[q+6]-x0)*inv, v2 = (t[q+7]-y0)*inv, z2 = t[q+8];
+    var imin = Math.max(0, Math.ceil(Math.min(u0, u1, u2))), imax = Math.min(nx-1, Math.floor(Math.max(u0, u1, u2)));
+    var jmin = Math.max(0, Math.ceil(Math.min(v0, v1, v2))), jmax = Math.min(ny-1, Math.floor(Math.max(v0, v1, v2)));
+    var d = (v1-v2)*(u0-u2) + (u2-u1)*(v0-v2);
+    if (Math.abs(d) > 1e-12 && imin <= imax && jmin <= jmax){
+      var id_ = 1/d, a1 = (v1-v2)*id_, b1 = (u2-u1)*id_, a2 = (v2-v0)*id_, b2 = (u0-u2)*id_;
+      for (var j = jmin; j <= jmax; j++){
+        var dy = j - v2, row = j*nx;
+        for (var i = imin; i <= imax; i++){
+          var dx = i - u2, w0 = a1*dx + b1*dy, w1 = a2*dx + b2*dy, w2 = 1 - w0 - w1;
+          if (w0 >= -1e-7 && w1 >= -1e-7 && w2 >= -1e-7){
+            var z = w0*z0 + w1*z1 + w2*z2; if (z > h[row+i]) h[row+i] = z;
+          }
+        }
+      }
+    }
+    edge(u0, v0, z0, u1, v1, z1); edge(u1, v1, z1, u2, v2, z2); edge(u2, v2, z2, u0, v0, z0);
+  }
+};
+
+/* Kesin Öklid uzaklık dönüşümü (Felzenszwalb) – sonuç hücre cinsinden */
+C.edt = function(occ, nx, ny){
+  var INF = 1e10, N = nx*ny, D = new Float64Array(N);
+  for (var i = 0; i < N; i++) D[i] = occ[i] ? 0 : INF;
+  var n = Math.max(nx, ny), f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n+1);
+  function dt(len){
+    var k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for (var q = 1; q < len; q++){
+      var s = ((f[q] + q*q) - (f[v[k]] + v[k]*v[k])) / (2*q - 2*v[k]);
+      while (s <= z[k]){ k--; s = ((f[q] + q*q) - (f[v[k]] + v[k]*v[k])) / (2*q - 2*v[k]); }
+      k++; v[k] = q; z[k] = s; z[k+1] = INF;
+    }
+    k = 0;
+    for (var q2 = 0; q2 < len; q2++){ while (z[k+1] < q2) k++; var dq = q2 - v[k]; d[q2] = dq*dq + f[v[k]]; }
+  }
+  for (var x = 0; x < nx; x++){ for (var y = 0; y < ny; y++) f[y] = D[y*nx+x]; dt(ny); for (y = 0; y < ny; y++) D[y*nx+x] = d[y]; }
+  for (y = 0; y < ny; y++){ var r = y*nx; for (x = 0; x < nx; x++) f[x] = D[r+x]; dt(nx); for (x = 0; x < nx; x++) D[r+x] = d[x]; }
+  var out = new Float32Array(N); for (i = 0; i < N; i++) out[i] = Math.sqrt(D[i]);
+  return out;
+};
+
+/* Maks-havuzlama ile kaba seviye (muhafazakâr) */
+C.downsample = function(g, f){
+  if (f <= 1) return g;
+  var nx = Math.floor((g.nx-1)/f) + 1, ny = Math.floor((g.ny-1)/f) + 1, hw = Math.ceil(f/2);
+  var tmp = new Float32Array(nx * g.ny), out = new Grid(g.x0, g.y0, g.res*f, nx, ny, NEG);
+  for (var j = 0; j < g.ny; j++){
+    for (var I = 0; I < nx; I++){
+      var c = I*f, m = NEG;
+      for (var i = Math.max(0, c-hw); i <= Math.min(g.nx-1, c+hw); i++){ var v = g.h[j*g.nx+i]; if (v > m) m = v; }
+      tmp[j*nx+I] = m;
+    }
+  }
+  for (var J = 0; J < ny; J++){
+    var cj = J*f;
+    for (I = 0; I < nx; I++){
+      var mm = NEG;
+      for (var jj = Math.max(0, cj-hw); jj <= Math.min(g.ny-1, cj+hw); jj++){ var w = tmp[jj*nx+I]; if (w > mm) mm = w; }
+      out.h[J*nx+I] = mm;
+    }
+  }
+  return out;
+};
+
+/* ---------- Takım profili ve “drop-cutter” ---------- */
+C.profile = function(tool, a){
+  var R0 = tool.d/2, R = R0 + a;
+  if (tool.type === 'flat') return {R: R, f: function(){ return 0; }};
+  if (tool.type === 'bull'){
+    var r = Math.min(Math.max(+tool.r || 0, 0), R0), fr = R0 - r, rc = r + a;
+    return {R: R, f: function(d){ return d <= fr ? 0 : rc - Math.sqrt(Math.max(0, rc*rc - (d-fr)*(d-fr))); }};
+  }
+  return {R: R, f: function(d){ return R - Math.sqrt(Math.max(0, R*R - d*d)); }};
+};
+/* pad: ızgara örnekleme hatasını telafi eden yarıçap payı (dik duvarlarda oyulmayı önler) */
+C.kernel = function(tool, a, res, nx, pad){
+  pad = pad || 0;
+  var p = C.profile(tool, a), n = Math.ceil((p.R + pad)/res - 1e-9), di = [], dj = [], dz = [];
+  for (var j = -n; j <= n; j++) for (var i = -n; i <= n; i++){
+    var d = Math.hypot(i, j) * res;
+    if (d <= p.R + pad + 1e-9){ di.push(i); dj.push(j); dz.push(p.f(Math.min(Math.max(0, d - pad), p.R))); }
+  }
+  var k = {n: n, R: p.R, a: a, cnt: di.length, di: Int32Array.from(di), dj: Int32Array.from(dj), dz: Float32Array.from(dz)};
+  if (nx){ k.off = new Int32Array(k.cnt); for (var q = 0; q < k.cnt; q++) k.off[q] = k.dj[q]*nx + k.di[q]; }
+  return k;
+};
+/* Takım ucunun (i,j) hücresinde inebileceği en düşük Z */
+C.drop = function(g, k, i, j, outside){
+  var h = g.h, nx = g.nx, ny = g.ny, n = k.n, best = NEG, q, v, dz = k.dz;
+  if (i >= n && j >= n && i < nx-n && j < ny-n){
+    var c = j*nx + i, off = k.off;
+    for (q = 0; q < k.cnt; q++){ v = h[c + off[q]] - dz[q]; if (v > best) best = v; }
+  } else {
+    for (q = 0; q < k.cnt; q++){
+      var ii = i + k.di[q], jj = j + k.dj[q];
+      v = (ii < 0 || jj < 0 || ii >= nx || jj >= ny) ? outside : h[jj*nx+ii];
+      v -= dz[q]; if (v > best) best = v;
+    }
+  }
+  return best + k.a;
+};
+C.dropXY = function(g, k, x, y, outside){
+  return C.drop(g, k, Math.round((x - g.x0)/g.res), Math.round((y - g.y0)/g.res), outside);
+};
+C.cutAt = function(st, k, x, y, z){
+  var i = Math.round((x - st.x0)/st.res), j = Math.round((y - st.y0)/st.res), h = st.h, nx = st.nx, ny = st.ny;
+  for (var q = 0; q < k.cnt; q++){
+    var ii = i + k.di[q], jj = j + k.dj[q];
+    if (ii < 0 || jj < 0 || ii >= nx || jj >= ny) continue;
+    var id = jj*nx + ii, v = z + k.dz[q]; if (v < h[id]) h[id] = v;
+  }
+};
+C.cutSeg = function(st, k, x0, y0, z0, x1, y1, z1){
+  var L = Math.hypot(x1-x0, y1-y0), n = Math.max(1, Math.ceil(L / (st.res*0.7)));
+  for (var s = 1; s <= n; s++){ var t = s/n; C.cutAt(st, k, x0+(x1-x0)*t, y0+(y1-y0)*t, z0+(z1-z0)*t); }
+};
+
+/* 3B Douglas-Peucker sadeleştirme: pts = [x,y,z,x,y,z...] */
+C.simplify = function(p, tol){
+  var n = p.length/3; if (n <= 2) return p;
+  var keep = new Uint8Array(n); keep[0] = keep[n-1] = 1;
+  var stack = [0, n-1], t2 = tol*tol;
+  while (stack.length){
+    var b = stack.pop(), a = stack.pop();
+    var ax = p[a*3], ay = p[a*3+1], az = p[a*3+2], dx = p[b*3]-ax, dy = p[b*3+1]-ay, dz = p[b*3+2]-az, L2 = dx*dx+dy*dy+dz*dz;
+    var mi = -1, md = t2;
+    for (var i = a+1; i < b; i++){
+      var px = p[i*3]-ax, py = p[i*3+1]-ay, pz = p[i*3+2]-az, tt = L2 > 0 ? (px*dx+py*dy+pz*dz)/L2 : 0;
+      tt = tt < 0 ? 0 : tt > 1 ? 1 : tt;
+      var ex = px-dx*tt, ey = py-dy*tt, ez = pz-dz*tt, d2 = ex*ex+ey*ey+ez*ez;
+      if (d2 > md){ md = d2; mi = i; }
+    }
+    if (mi > 0){ keep[mi] = 1; stack.push(a, mi, mi, b); }
+  }
+  var o = []; for (i = 0; i < n; i++) if (keep[i]) o.push(p[i*3], p[i*3+1], p[i*3+2]);
+  return o;
+};
+
+/* ---------- Hareket bağlayıcı (yaklaşma, bağlantı, geri çekilme, stok güncelleme) ---------- */
+function Linker(o){
+  this.o = o; this.g = []; this.x = []; this.y = []; this.z = []; this.f = [];
+  this.cur = null; this.cutLen = 0; this.rapLen = 0; this.time = 0; this.px = NaN; this.py = NaN; this.pz = NaN;
+}
+Linker.prototype.mv = function(g, x, y, z, f){
+  var px = isNaN(x) ? this.px : x, py = isNaN(y) ? this.py : y, pz = isNaN(z) ? this.pz : z;
+  if (!isNaN(this.px) && !isNaN(this.pz)){
+    var L = Math.hypot(px-this.px, py-this.py, pz-this.pz);
+    if (g) { this.cutLen += L; this.time += L / f; } else { this.rapLen += L; this.time += L / 5000; }
+  }
+  this.g.push(g); this.x.push(x); this.y.push(y); this.z.push(z); this.f.push(f || 0);
+  this.px = px; this.py = py; this.pz = pz;
+};
+Linker.prototype.cut = function(x, y, z){
+  var o = this.o;
+  if (o.stock && this.cur) C.cutSeg(o.stock, o.kS, this.cur[0], this.cur[1], this.cur[2], x, y, z);
+  this.mv(1, x, y, z, o.feed); this.cur = [x, y, z];
+};
+Linker.prototype.approach = function(x, y, z, zfrom){
+  var o = this.o, za = o.apprZ(x, y, z);
+  if (za < zfrom - 1e-6) this.mv(o.noStock ? 1 : 0, NaN, NaN, za, o.noStock ? o.plunge : 0);
+  this.mv(1, NaN, NaN, z, o.plunge);
+  if (o.stock) C.cutAt(o.stock, o.kS, x, y, z);
+  this.cur = [x, y, z];
+};
+Linker.prototype.add = function(p){
+  if (p.length < 6) return;
+  var o = this.o, sx = p[0], sy = p[1], sz = p[2];
+  if (!this.cur){
+    this.mv(0, sx, sy, NaN); this.mv(0, NaN, NaN, o.safeZ); this.pz = o.safeZ;
+    this.approach(sx, sy, sz, o.safeZ);
+  } else {
+    var c = this.cur, d = Math.hypot(sx-c[0], sy-c[1]), done = false;
+    if (d <= o.linkMax){
+      var n = Math.max(2, Math.ceil(d / o.step)), ok = true, direct = true, zl = Math.max(c[2], sz);
+      for (var s = 0; s <= n; s++){
+        var t = s/n, x = c[0]+(sx-c[0])*t, y = c[1]+(sy-c[1])*t;
+        if (!o.inMask(x, y)){ ok = false; break; }
+        var zi = c[2] + (sz-c[2])*t, m = Math.max(o.partCL(x, y), o.stockCL(x, y));
+        if (m > zi + 0.003) direct = false;
+        if (m > zl) zl = m;
+      }
+      if (ok){
+        if (direct) this.cut(sx, sy, sz);
+        else {
+          var zc = Math.min(zl + o.lift, o.safeZ);
+          if (o.noStock){ this.mv(1, NaN, NaN, zc, o.feed); this.mv(1, sx, sy, NaN, o.feed); }
+          else { this.mv(0, NaN, NaN, zc); this.mv(0, sx, sy, NaN); }
+          this.approach(sx, sy, sz, zc);
+        }
+        done = true;
+      }
+    }
+    if (!done){
+      this.mv(0, NaN, NaN, o.safeZ); this.mv(0, sx, sy, NaN);
+      this.approach(sx, sy, sz, o.safeZ);
+    }
+  }
+  for (var i = 3; i < p.length; i += 3) this.cut(p[i], p[i+1], p[i+2]);
+};
+Linker.prototype.end = function(){ if (this.cur){ this.mv(0, NaN, NaN, this.o.safeZ); this.cur = null; } };
+C.Linker = Linker;
+
+/* Tarama çizgileri: maske içindeki hücreler, eksene göre */
+function scanLines(g, mask, so, dir){
+  var lines = [], res = g.res, nx = g.nx, ny = g.ny;
+  var along = dir === 'y' ? ny : nx, across = dir === 'y' ? nx : ny;
+  var stepC = so / res, count = Math.floor((across - 1) / stepC) + 1;
+  for (var t = 0; t < count; t++){
+    var c = Math.round(t * stepC); if (c >= across) break;
+    var cells = [];
+    for (var a = 0; a < along; a++){
+      var i = dir === 'y' ? c : a, j = dir === 'y' ? a : c, id = j*nx + i;
+      if (mask[id]) cells.push(id);
+    }
+    if (cells.length) lines.push(cells);
+  }
+  return lines;
+}
+
+/* ---------- Ana hesaplama ---------- */
+C.run = function(job, progress){
+  progress = progress || function(){};
+  var warn = [], S = job.settings, mc = job.machine, disc = job.disc, tools = job.tools;
+  if (S.pad === undefined) S.pad = 0.5;
+  var part = job.part, connT = [];
+  (job.conns || []).forEach(function(c){ connT.push(C.cylinderTris(c.a, c.b, c.d/2, 20)); });
+  var conn = C.concat(connT);
+  if (!job.conns || !job.conns.length) warn.push('Bağlantı yok: parça diskten kopabilir!');
+  var bb = C.bbox(part);
+  if (bb.max[2] > disc.T/2 || bb.min[2] < -disc.T/2) warn.push('Model disk kalınlığını aşıyor (Z ' + bb.min[2].toFixed(2) + ' .. ' + bb.max[2].toFixed(2) + ').');
+  var rr = Math.max(Math.hypot(bb.min[0], bb.min[1]), Math.hypot(bb.max[0], bb.max[1]), Math.hypot(bb.min[0], bb.max[1]), Math.hypot(bb.max[0], bb.min[1]));
+  if (rr + S.Bo > disc.D/2) warn.push('Model + sınır payı disk çapına sığmayabilir.');
+  if (S.overlap <= 0) warn.push('Taraf bindirmesi 0 veya negatif: boşluklarda ince zar kalabilir.');
+
+  var ops = job.ops.filter(function(o){ return o.on; });
+  var Rmax = 0;
+  ops.forEach(function(o){ var t = tools[o.tool]; if (t && o.type !== 'ind') Rmax = Math.max(Rmax, t.d/2 + (+o.allow || 0)); });
+  var sides = {};
+
+  function getSide(side){
+    if (sides[side]) return sides[side];
+    progress(null, (side === 'top' ? 'Üst' : 'Alt') + ' taraf yükseklik haritası...');
+    var Ms = side === 'top' ? M.I() : C.machineMatrix(180, 0, mc);
+    var pt = C.transform(part, Ms), ct = C.transform(conn, Ms), b = C.bbox(pt);
+    var ext = S.Bo + Rmax + 2.5, res = S.res;
+    var g = C.makeGrid(b.min[0]-ext, b.min[1]-ext, b.max[0]+ext, b.max[1]+ext, res, NEG);
+    C.rasterize(g, pt);
+    var N = g.nx*g.ny, occ = new Uint8Array(N);
+    for (var i = 0; i < N; i++) occ[i] = g.h[i] > NEG/2 ? 1 : 0;
+    if (ct.length) C.rasterize(g, ct);
+    var zs = M.ap(Ms, 0, 0, S.split)[2], zt1 = M.ap(Ms, 0, 0, disc.T/2)[2], zt2 = M.ap(Ms, 0, 0, -disc.T/2)[2];
+    var floor = zs - S.overlap, zTop = Math.max(zt1, zt2);
+    for (i = 0; i < N; i++) if (g.h[i] < NEG/2) g.h[i] = floor;
+    var dist = C.edt(occ, g.nx, g.ny), mask = new Uint8Array(N), lim = S.Bo / res;
+    for (i = 0; i < N; i++) mask[i] = dist[i] <= lim ? 1 : 0;
+    /* Diske bağlı olmayan kapalı “ada” malzemeyi bul ve tamamen boşalt (düşüp takımı kırmasın) */
+    var seen = new Uint8Array(N), stack = [], nx = g.nx, ny = g.ny, islands = 0;
+    var push = function(id){ if (!seen[id] && !mask[id]){ seen[id] = 1; stack.push(id); } };
+    for (i = 0; i < nx; i++){ push(i); push((ny-1)*nx + i); }
+    for (var jj = 0; jj < ny; jj++){ push(jj*nx); push(jj*nx + nx-1); }
+    while (stack.length){
+      var id = stack.pop(), ci = id % nx, cj = (id / nx) | 0;
+      if (ci > 0) push(id-1); if (ci < nx-1) push(id+1); if (cj > 0) push(id-nx); if (cj < ny-1) push(id+nx);
+    }
+    for (i = 0; i < N; i++) if (!mask[i] && !seen[i]){ mask[i] = 1; islands++; }
+    if (islands && side === 'top') warn.push('Parçayla çevrili kapalı bölge bulundu (' + (islands*res*res).toFixed(0) + ' mm²); tamamen boşaltılacak.');
+    occ = null; dist = null; seen = null;
+    var sr = Math.max(S.stockRes, res);
+    var st = C.makeGrid(g.x0, g.y0, g.x0 + (g.nx-1)*res, g.y0 + (g.ny-1)*res, sr, zTop);
+    var ctx = {side: side, Ms: Ms, g: g, mask: mask, floor: floor, zTop: zTop, stock: st, levels: {}};
+    ctx.level = function(f){
+      if (f <= 1) return {g: g, mask: mask};
+      if (ctx.levels[f]) return ctx.levels[f];
+      var cg = C.downsample(g, f), cm = new Uint8Array(cg.nx*cg.ny);
+      for (var J = 0; J < cg.ny; J++) for (var I = 0; I < cg.nx; I++) cm[J*cg.nx+I] = mask[(J*f)*g.nx + I*f];
+      return (ctx.levels[f] = {g: cg, mask: cm});
+    };
+    ctx.inMask = function(x, y){
+      var i = Math.round((x - g.x0)/res), j = Math.round((y - g.y0)/res);
+      return i >= 0 && j >= 0 && i < g.nx && j < g.ny && mask[j*g.nx+i] === 1;
+    };
+    sides[side] = ctx;
+    return ctx;
+  }
+
+  function sideLinker(ctx, tool, op, partCL){
+    var kS = C.kernel(tool, 0, ctx.stock.res, ctx.stock.nx);
+    var stockCL = function(x, y){ return C.dropXY(ctx.stock, kS, x, y, ctx.zTop); };
+    return new Linker({
+      safeZ: mc.safeZ, feed: tool.F, plunge: tool.Fp || tool.F, stock: ctx.stock, kS: kS,
+      linkMax: S.linkMax, step: Math.max(ctx.g.res, 0.05), lift: 0.3,
+      inMask: ctx.inMask, partCL: partCL, stockCL: stockCL,
+      apprZ: function(x, y, z){ return Math.min(mc.safeZ, Math.max(stockCL(x, y), z) + 1.0); }
+    });
+  }
+
+  function roughOp(op, tool){
+    var ctx = getSide(op.side), allow = +op.allow || 0, so = +op.stepover, sd = +op.stepdown;
+    var f = Math.max(1, Math.round(Math.min(0.1, tool.d/16) / ctx.g.res));
+    var lv = ctx.level(f), g = lv.g, k = C.kernel(tool, allow, g.res, g.nx, 0.5 * g.res);
+    var lines = scanLines(g, lv.mask, so, op.dir), zMin = Infinity, cls = [];
+    lines.forEach(function(cells, li){
+      var a = new Float32Array(cells.length);
+      for (var q = 0; q < cells.length; q++){
+        var id = cells[q]; a[q] = C.drop(g, k, id % g.nx, (id / g.nx) | 0, ctx.floor);
+        if (a[q] < zMin) zMin = a[q];
+      }
+      cls.push(a);
+    });
+    var partCL = function(x, y){ return C.dropXY(g, k, x, y, ctx.floor); };
+    var L = sideLinker(ctx, tool, op, partCL), kS = L.o.kS;
+    var layers = [];
+    for (var z = ctx.zTop - sd; z > zMin + 1e-4; z -= sd) layers.push(z);
+    layers.push(zMin);
+    var flip = false, tol = S.tolR;
+    for (var li = 0; li < layers.length; li++){
+      var zk = layers[li], zp = li ? layers[li-1] : ctx.zTop + 1;
+      progress(li / layers.length, op.name + ' – katman ' + (li+1) + '/' + layers.length);
+      for (var n = 0; n < lines.length; n++){
+        var cells = lines[n], cl = cls[n], runs = [], cur = null, lastIdx = -2;
+        for (var q = 0; q < cells.length; q++){
+          var id = cells[q], i = id % g.nx, j = (id / g.nx) | 0, c = cl[q], need = c < zp - 1e-4;
+          var adj = op.dir === 'y' ? j : i;
+          var x = g.x0 + i*g.res, y = g.y0 + j*g.res, tz = Math.max(zk, c);
+          if (need && C.dropXY(ctx.stock, kS, x, y, ctx.zTop) <= tz + 0.01) need = false;
+          if (need && cur && adj !== lastIdx + 1){ runs.push(cur); cur = null; }
+          if (need){ if (!cur) cur = []; cur.push(x, y, tz); lastIdx = adj; }
+          else if (cur){ runs.push(cur); cur = null; }
+        }
+        if (cur) runs.push(cur);
+        if (flip){ runs.reverse(); runs = runs.map(revPts); }
+        runs.forEach(function(r){ L.add(C.simplify(r, tol)); });
+        flip = !flip;
+      }
+    }
+    L.end();
+    return {L: L, Ms: ctx.Ms, A: op.side === 'top' ? 0 : 180, B: 0, safe: mc.safeZ};
+  }
+
+  function finishOp(op, tool){
+    var ctx = getSide(op.side), allow = +op.allow || 0, so = +op.stepover, g = ctx.g;
+    var k = C.kernel(tool, allow, g.res, g.nx, S.pad * g.res), skip = op.skipFloor !== false, fl = ctx.floor + allow + 0.002;
+    var partCL = function(x, y){ return C.dropXY(g, k, x, y, ctx.floor); };
+    var L = sideLinker(ctx, tool, op, partCL), dirs = op.dir === 'xy' ? ['x', 'y'] : [op.dir || 'x'];
+    var zlo = op.zMin !== undefined && op.zMin !== '' ? +op.zMin : -Infinity;
+    dirs.forEach(function(dir, di){
+      var lines = scanLines(g, ctx.mask, so, dir), flip = false;
+      for (var n = 0; n < lines.length; n++){
+        if (n % 20 === 0) progress((di + n/lines.length) / dirs.length, op.name + ' – ' + dir.toUpperCase() + ' yönü');
+        var cells = lines[n], runs = [], cur = null, lastIdx = -2;
+        for (var q = 0; q < cells.length; q++){
+          var id = cells[q], i = id % g.nx, j = (id / g.nx) | 0, adj = dir === 'y' ? j : i;
+          var c = C.drop(g, k, i, j, ctx.floor), need = !(skip && c <= fl) && c >= zlo;
+          if (need && cur && adj !== lastIdx + 1){ runs.push(cur); cur = null; }
+          if (need){ if (!cur) cur = []; cur.push(g.x0 + i*g.res, g.y0 + j*g.res, c); lastIdx = adj; }
+          else if (cur){ runs.push(cur); cur = null; }
+        }
+        if (cur) runs.push(cur);
+        if (flip){ runs.reverse(); runs = runs.map(revPts); }
+        runs.forEach(function(r){ if (r.length >= 6) L.add(C.simplify(r, S.tolF)); });
+        flip = !flip;
+      }
+    });
+    L.end();
+    return {L: L, Ms: ctx.Ms, A: op.side === 'top' ? 0 : 180, B: 0, safe: mc.safeZ};
+  }
+
+  function indexedOp(op, tool){
+    var A = +op.A || 0, B = +op.B || 0, Mm = C.machineMatrix(A, B, mc);
+    var allow = +op.allow || 0, so = +op.stepover, r = +op.radius || 2, res = S.res;
+    var cpt = M.ap(Mm, +op.cx || 0, +op.cy || 0, +op.cz || 0);
+    var R = tool.d/2 + allow, ext = r + R + 1;
+    var x0 = cpt[0]-ext, x1 = cpt[0]+ext, y0 = cpt[1]-ext, y1 = cpt[1]+ext;
+    var all = C.transform(C.concat([part, conn]), Mm), sel = [];
+    for (var q = 0; q < all.length; q += 9){
+      var mnx = Math.min(all[q], all[q+3], all[q+6]), mxx = Math.max(all[q], all[q+3], all[q+6]);
+      var mny = Math.min(all[q+1], all[q+4], all[q+7]), mxy = Math.max(all[q+1], all[q+4], all[q+7]);
+      if (mxx >= x0 && mnx <= x1 && mxy >= y0 && mny <= y1) for (var e = 0; e < 9; e++) sel.push(all[q+e]);
+    }
+    var g = C.makeGrid(x0, y0, x1, y1, res, NEG);
+    C.rasterize(g, new Float32Array(sel));
+    var top = NEG; for (q = 0; q < g.h.length; q++) if (g.h[q] > top) top = g.h[q];
+    if (top < NEG/2){ warn.push(op.name + ': bölgede model yok, atlandı.'); return null; }
+    var safe = Math.max(mc.safeZ, top + 2), k = C.kernel(tool, allow, res, g.nx, S.pad * res);
+    var mask = new Uint8Array(g.nx*g.ny), r2 = (r/res)*(r/res), ci = (cpt[0]-x0)/res, cj = (cpt[1]-y0)/res;
+    for (var j = 0; j < g.ny; j++) for (var i = 0; i < g.nx; i++){ var dx = i-ci, dy = j-cj; mask[j*g.nx+i] = dx*dx+dy*dy <= r2 ? 1 : 0; }
+    var inMask = function(x, y){ var dx = x-cpt[0], dy = y-cpt[1]; return dx*dx+dy*dy <= (r+0.05)*(r+0.05); };
+    var partCL = function(x, y){ return C.dropXY(g, k, x, y, NEG); };
+    var L = new Linker({
+      safeZ: safe, feed: tool.F, plunge: tool.Fp || tool.F, noStock: true,
+      linkMax: S.linkMax, step: Math.max(res, 0.05), lift: 0.3,
+      inMask: inMask, partCL: partCL, stockCL: function(){ return NEG; },
+      apprZ: function(){ return Math.min(safe, top + 1); }
+    });
+    var dirs = op.dir === 'xy' ? ['x', 'y'] : [op.dir || 'x'];
+    var zlo = op.zMin !== undefined && op.zMin !== '' ? +op.zMin : -Infinity;
+    dirs.forEach(function(dir){
+      var lines = scanLines(g, mask, so, dir), flip = false;
+      lines.forEach(function(cells){
+        var runs = [], cur = null, lastIdx = -2;
+        for (var q = 0; q < cells.length; q++){
+          var id = cells[q], i = id % g.nx, j = (id / g.nx) | 0, adj = dir === 'y' ? j : i;
+          var c = C.drop(g, k, i, j, NEG), need = c > NEG/2 && c >= zlo;
+          if (need && cur && adj !== lastIdx + 1){ runs.push(cur); cur = null; }
+          if (need){ if (!cur) cur = []; cur.push(g.x0 + i*res, g.y0 + j*res, c); lastIdx = adj; }
+          else if (cur){ runs.push(cur); cur = null; }
+        }
+        if (cur) runs.push(cur);
+        if (flip){ runs.reverse(); runs = runs.map(revPts); }
+        runs.forEach(function(rn){ if (rn.length >= 6) L.add(C.simplify(rn, S.tolF)); });
+        flip = !flip;
+      });
+    });
+    L.end();
+    return {L: L, Ms: Mm, A: A, B: B, safe: safe};
+  }
+
+  var sections = [];
+  ops.forEach(function(op, idx){
+    var tool = tools[op.tool];
+    if (!tool){ warn.push(op.name + ': takım bulunamadı (' + op.tool + ').'); return; }
+    progress(0, op.name + ' hesaplanıyor...');
+    var r = op.type === 'rough' ? roughOp(op, tool) : op.type === 'finish' ? finishOp(op, tool) : indexedOp(op, tool);
+    if (!r || !r.L.g.length){ if (r) warn.push(op.name + ': kesilecek bölge bulunamadı.'); return; }
+    sections.push({name: op.name, opIndex: idx, tool: op.tool, S: tool.S, A: r.A, B: r.B, safe: r.safe, Ms: r.Ms,
+      g: r.L.g, x: r.L.x, y: r.L.y, z: r.L.z, f: r.L.f, cutLen: r.L.cutLen, time: r.L.time});
+  });
+  progress(1, 'NC yazılıyor...');
+  var nc = C.post(sections, job.post);
+  var preview = C.preview(sections);
+  var stats = {lines: nc.lines, time: sections.reduce(function(s, x){ return s + x.time; }, 0),
+    perOp: sections.map(function(s){ return {name: s.name, tool: s.tool, time: s.time, moves: s.g.length}; })};
+  return {nc: nc.text, preview: preview, stats: stats, warnings: warn};
+};
+function revPts(r){ var o = new Array(r.length); for (var i = 0, n = r.length/3; i < n; i++){ o[i*3] = r[(n-1-i)*3]; o[i*3+1] = r[(n-1-i)*3+1]; o[i*3+2] = r[(n-1-i)*3+2]; } return o; }
+
+/* ---------- Sayı biçimi: 45 -> "45." , 6.180 -> "6.18" ---------- */
+C.fmt = function(v){
+  var r = Math.round(v * 1000) / 1000; if (r === 0) r = 0;
+  var s = r.toFixed(3); s = s.replace(/0+$/, '');
+  return s === '-0.' ? '0.' : s;
+};
+
+/* ---------- Post-processor (HyperDent uyumlu) ---------- */
+C.post = function(sections, P){
+  var out = [], n = 0, num = P.numbers !== false;
+  function add(s){ n++; out.push(num ? 'N' + n + ' ' + s : s); }
+  function tpl(t, v){ return String(t || '').split(/\r?\n/).filter(function(l){ return l.length; }).map(function(l){
+    return l.replace(/\{(\w+)\}/g, function(_, k){ return v[k] !== undefined ? v[k] : ''; }); }); }
+  if (P.percent !== false) out.push('%');
+  var curT = null, curS = null;
+  sections.forEach(function(sec){
+    var vars = {T: sec.tool, S: sec.S, A: C.fmt(sec.A), B: C.fmt(sec.B), SAFE: C.fmt(sec.safe)}, first = false;
+    if (sec.tool !== curT){
+      tpl(curT === null ? P.first : P.change, vars).forEach(add);
+      curT = sec.tool; curS = sec.S; first = true;
+    } else if (sec.S !== curS){ add('S' + sec.S + ' M03 '); curS = sec.S; }
+    tpl(P.section, vars).forEach(add);
+    tpl(first ? P.ab1 : P.ab, vars).forEach(add);
+    var mode = 0, lx = null, ly = null, lz = null, lf = null, wasRapid = true, g = sec.g;
+    for (var i = 0; i < g.length; i++){
+      var w = [], gi = g[i];
+      var x = sec.x[i], y = sec.y[i], z = sec.z[i], s;
+      if (!isNaN(x)){ s = C.fmt(x); if (s !== lx){ w.push('X' + s); lx = s; } }
+      if (!isNaN(y)){ s = C.fmt(y); if (s !== ly){ w.push('Y' + s); ly = s; } }
+      if (!isNaN(z)){ s = C.fmt(z); if (s !== lz){ w.push('Z' + s); lz = s; } }
+      if (!w.length) continue;
+      if (gi !== mode){ w.unshift(gi ? 'G01' : 'G00'); mode = gi; }
+      if (gi){ var fs = C.fmt(sec.f[i]); if (fs !== lf || wasRapid){ w.push('F' + fs); lf = fs; } wasRapid = false; }
+      else wasRapid = true;
+      add(w.join(' ') + ' ');
+    }
+  });
+  tpl(P.end, {T: curT, S: curS}).forEach(add);
+  return {text: out.join(P.crlf === false ? '\n' : '\r\n'), lines: n};
+};
+
+/* ---------- Önizleme çizgileri (parça çerçevesinde) ---------- */
+C.preview = function(sections){
+  return sections.map(function(sec){
+    var inv = M.inv(sec.Ms), cut = [], rap = [], px = NaN, py = NaN, pz = sec.safe;
+    for (var i = 0; i < sec.g.length; i++){
+      var x = isNaN(sec.x[i]) ? px : sec.x[i], y = isNaN(sec.y[i]) ? py : sec.y[i], z = isNaN(sec.z[i]) ? pz : sec.z[i];
+      if (!isNaN(px) && !isNaN(x)){
+        var a = M.ap(inv, px, py, pz), b = M.ap(inv, x, y, z), arr = sec.g[i] ? cut : rap;
+        arr.push(a[0], a[1], a[2], b[0], b[1], b[2]);
+      }
+      px = x; py = y; pz = z;
+    }
+    return {name: sec.name, tool: sec.tool, opIndex: sec.opIndex, cut: new Float32Array(cut), rap: new Float32Array(rap)};
+  });
+};
+
+/* ---------- NC okuyucu (görüntüleme için) ---------- */
+C.parseNC = function(text, mc){
+  var lines = text.split(/\r?\n/), st = {X: NaN, Y: NaN, Z: NaN, A: 0, B: 0, G: 0}, tool = '?';
+  var groups = {}, inv = M.inv(C.machineMatrix(0, 0, mc)), key = '';
+  var re = /([GXYZABFPST])\s*(-?\d*\.?\d*)/gi;
+  function grp(t){ return groups[t] || (groups[t] = {cut: [], rap: []}); }
+  for (var li = 0; li < lines.length; li++){
+    var l = lines[li].replace(/\(.*?\)/g, '').replace(/^N\d+\s*/i, '');
+    if (!l) continue;
+    var m, nw = {}, tc = false, moved = false, rot = false;
+    re.lastIndex = 0;
+    while ((m = re.exec(l))){
+      var k = m[1].toUpperCase(), v = parseFloat(m[2]);
+      if (k === 'G'){ if (v === 0 || v === 1) st.G = v; if (v === 200) tc = true; }
+      else if (k === 'P' && tc){ tool = m[2]; }
+      else if ('XYZ'.indexOf(k) >= 0){ nw[k] = v; moved = true; }
+      else if (k === 'A' || k === 'B'){ st[k] = v; rot = true; }
+    }
+    if (rot){ key = st.A + '/' + st.B; inv = M.inv(C.machineMatrix(st.A, st.B, mc)); }
+    if (!moved) continue;
+    var nx = 'X' in nw ? nw.X : st.X, ny = 'Y' in nw ? nw.Y : st.Y, nz = 'Z' in nw ? nw.Z : st.Z;
+    if (!isNaN(st.X) && !isNaN(st.Y) && !isNaN(st.Z) && !isNaN(nx) && !isNaN(ny) && !isNaN(nz) && st.Z < 40 && nz < 40){
+      var a = M.ap(inv, st.X, st.Y, st.Z), b = M.ap(inv, nx, ny, nz), gr = grp(tool);
+      (st.G ? gr.cut : gr.rap).push(a[0], a[1], a[2], b[0], b[1], b[2]);
+    }
+    st.X = nx; st.Y = ny; st.Z = nz;
+  }
+  return Object.keys(groups).map(function(t){ return {tool: t, cut: new Float32Array(groups[t].cut), rap: new Float32Array(groups[t].rap)}; });
+};
+
+/* Ana iş parçacığı için kaba siluet (otomatik bağlantı) */
+C.silhouette = function(tris, res, pad){
+  var b = C.bbox(tris);
+  var g = C.makeGrid(b.min[0]-pad, b.min[1]-pad, b.max[0]+pad, b.max[1]+pad, res, NEG);
+  C.rasterize(g, tris);
+  var neg = new Float32Array(tris.length); for (var i = 0; i < tris.length; i += 3){ neg[i] = tris[i]; neg[i+1] = tris[i+1]; neg[i+2] = -tris[i+2]; }
+  var gb = new Grid(g.x0, g.y0, res, g.nx, g.ny, NEG); C.rasterize(gb, neg);
+  var N = g.nx*g.ny, occ = new Uint8Array(N);
+  for (i = 0; i < N; i++) occ[i] = g.h[i] > NEG/2 ? 1 : 0;
+  var dist = C.edt(occ, g.nx, g.ny);
+  return {g: g, gb: gb, occ: occ, dist: dist};
+};
+
+root.CAM = C;
+})(typeof self !== 'undefined' ? self : this);
+</script>
+
+<!-- ======================= ARAYÜZ ======================= -->
+<script>
+(function(){
+"use strict";
+var C = window.CAM, $ = function(id){ return document.getElementById(id); };
+var LS_KEY = 'digicadcam.v1';
+
+/* ---------- Varsayılanlar (yüklenen HyperDent NC dosyasından çıkarıldı) ---------- */
+function defaultTools(){ return [
+  {P:'04', name:'Kaba küresel', type:'ball', d:2.5, r:0, S:18000, F:1000, Fp:500},
+  {P:'07', name:'İnce küresel', type:'ball', d:1.0, r:0, S:20000, F:1000, Fp:400},
+  {P:'06', name:'Detay küresel', type:'ball', d:0.6, r:0, S:22000, F:600, Fp:300},
+  {P:'10', name:'Arayüz / bölgesel', type:'ball', d:0.3, r:0, S:24000, F:300, Fp:150}
+]; }
+var opSeq = 0;
+function mkOp(type, side, tool, extra){
+  var base = {id: ++opSeq, on: true, type: type, side: side, tool: tool, dir: 'x', allow: 0, stepover: 0.12, stepdown: 0.6, skipFloor: true, zMin: ''};
+  if (type === 'rough'){ base.allow = 0.15; base.stepover = 1.0; base.stepdown = 0.6; }
+  if (type === 'ind'){ base.A = 0; base.B = 0; base.cx = 0; base.cy = 0; base.cz = 0; base.radius = 2.5; base.stepover = 0.08; base.dir = 'x'; }
+  return Object.assign(base, extra || {});
+}
+function defaultOps(){ return [
+  mkOp('rough', 'top', '04'), mkOp('rough', 'bottom', '04'),
+  mkOp('finish', 'top', '07', {stepover: 0.12}), mkOp('finish', 'bottom', '07', {stepover: 0.12}),
+  mkOp('finish', 'top', '06', {stepover: 0.06, on: false}), mkOp('finish', 'bottom', '06', {stepover: 0.06, on: false})
+]; }
+function defaultMachine(){ return {
+  signA: 1, signB: 1, order: 'BA', pivot: [0, 0, 0], safeZ: 11.15, maxTilt: 25,
+  post: {
+    first: 'G200 P{T}\nG54 P{T}\nM07 \nS{S} M03 ',
+    change: 'M09\nM05 \nG200 P{T}\nG54 P{T}\nM07 \nS{S} M03 ',
+    section: '(RETRACT TO SAFE HEIGHT)\nG90 G00 Z45.\nG90 G00 X-55.0 Y48.0\nG90 G00 B0.',
+    ab1: 'G00 G90 B{B} A{A} ', ab: 'G90 B{B} A{A} ',
+    end: 'M05 \n(RETRACT TO SAFE HEIGHT)\nG90 G00 Z45.\nG90 G00 X-55.0 Y48.0\nG90 G00 B0.\nG90 G00 Z45.\nM09\nG200 P0\nG90 G00 X-112.0 Y48.0\nG00 B17.0 A50.0\nM09\nM30',
+    numbers: true, crlf: true, percent: true
+  }
+}; }
+function defaultSettings(){ return {res: 0.04, stockRes: 0.1, Bo: 3.0, overlap: 0.5, split: 0, tolF: 0.004, tolR: 0.02, linkMax: 2.0}; }
+
+var S = {
+  files: [], center0: [0, 0, 0],
+  xf: {tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0},
+  disc: {D: 98.5, T: 14},
+  set: defaultSettings(),
+  conn: {d: 2.5, count: 8, list: []},
+  tools: defaultTools(), ops: defaultOps(), mc: defaultMachine()
+};
+function saveLS(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({disc: S.disc, set: S.set, conn: {d: S.conn.d, count: S.conn.count}, tools: S.tools, ops: S.ops, mc: S.mc})); } catch(e){}
+}
+function loadLS(){
+  try {
+    var d = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (!d) return;
+    applyProfile(d);
+  } catch(e){}
+}
+function applyProfile(d){
+  if (d.disc) S.disc = Object.assign(S.disc, d.disc);
+  if (d.set) S.set = Object.assign(defaultSettings(), d.set);
+  if (d.conn){ S.conn.d = d.conn.d || S.conn.d; S.conn.count = d.conn.count || S.conn.count; }
+  if (d.tools && d.tools.length) S.tools = d.tools;
+  if (d.ops && d.ops.length){ S.ops = d.ops; opSeq = Math.max.apply(null, S.ops.map(function(o){ return o.id || 0; })); }
+  if (d.mc){ var dm = defaultMachine(); S.mc = Object.assign(dm, d.mc); S.mc.post = Object.assign(dm.post, d.mc.post || {}); }
+}
+
+/* ---------- Günlük / durum ---------- */
+function log(msg, cls){
+  var el = $('log'), d = document.createElement('div'); if (cls) d.className = cls;
+  d.textContent = new Date().toLocaleTimeString('tr-TR') + '  ' + msg; el.appendChild(d); el.scrollTop = el.scrollHeight;
+}
+function status(msg, p){ $('status').textContent = msg; if (p !== undefined && p !== null) $('progBar').style.width = Math.round(p*100) + '%'; }
+
+/* ---------- 3B Sahne ---------- */
+var renderer, scene, camera, controls, partMesh = null, discGroup, connGroup, pathGroup, ncGroup, markGroup;
+var show = {model: true, disc: true, conn: true, path: true, rapid: false, nc: true};
+var PALETTE = [0x3fa7ff, 0xffb547, 0x4ade80, 0xf472b6, 0xa78bfa, 0x22d3ee, 0xfb7185, 0xfacc15, 0x34d399, 0x60a5fa];
+function initScene(){
+  var cv = $('cv');
+  renderer = new THREE.WebGLRenderer({canvas: cv, antialias: true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(35, 1, 0.5, 3000);
+  camera.up.set(0, 0, 1);
+  controls = new THREE.OrbitControls(camera, cv);
+  controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = true;
+  scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x223044, 0.75));
+  var d1 = new THREE.DirectionalLight(0xffffff, 0.75); d1.position.set(60, -80, 120); scene.add(d1);
+  var d2 = new THREE.DirectionalLight(0xffffff, 0.35); d2.position.set(-70, 60, -90); scene.add(d2);
+  discGroup = new THREE.Group(); connGroup = new THREE.Group(); pathGroup = new THREE.Group(); ncGroup = new THREE.Group(); markGroup = new THREE.Group();
+  scene.add(discGroup, connGroup, pathGroup, ncGroup, markGroup);
+  var axes = new THREE.AxesHelper(12); scene.add(axes);
+  setView('iso'); buildDisc(); resize();
+  window.addEventListener('resize', resize);
+  (function loop(){ requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+  cv.addEventListener('pointerdown', onPointerDown);
+  cv.addEventListener('pointerup', onPointerUp);
+}
+function resize(){
+  var el = $('cv').parentElement, w = el.clientWidth, h = el.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / Math.max(1, h); camera.updateProjectionMatrix();
+}
+function setView(v){
+  var d = Math.max(110, S.disc.D * 1.25);
+  controls.target.set(0, 0, 0);
+  if (v === 'top') camera.position.set(0, -0.001, d);
+  else if (v === 'bottom') camera.position.set(0, 0.001, -d);
+  else if (v === 'front') camera.position.set(0, -d, 0);
+  else camera.position.set(d*0.45, -d*0.75, d*0.6);
+  camera.lookAt(0, 0, 0);
+}
+function buildDisc(){
+  discGroup.clear();
+  var R = S.disc.D/2, T = S.disc.T;
+  var geo = new THREE.CylinderGeometry(R, R, T, 120, 1, false); geo.rotateX(Math.PI/2);
+  var mat = new THREE.MeshStandardMaterial({color: 0xbcd3f0, transparent: true, opacity: 0.07, depthWrite: false, side: THREE.DoubleSide});
+  discGroup.add(new THREE.Mesh(geo, mat));
+  [T/2, -T/2, 0].forEach(function(z, i){
+    var pts = []; for (var k = 0; k <= 160; k++){ var a = k/160*Math.PI*2; pts.push(new THREE.Vector3(Math.cos(a)*R, Math.sin(a)*R, z)); }
+    var g = new THREE.BufferGeometry().setFromPoints(pts);
+    discGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({color: i === 2 ? 0x35577f : 0x6f93c0, transparent: true, opacity: i === 2 ? 0.5 : 0.8})));
+  });
+  discGroup.visible = show.disc;
+}
+
+/* ---------- Model ---------- */
+function modelMatrix(){
+  var x = S.xf, c = S.center0, M = C.M, D = Math.PI/180;
+  var m = M.t(-c[0], -c[1], -c[2]);
+  m = M.mul(M.rx(x.rx*D), m); m = M.mul(M.ry(x.ry*D), m); m = M.mul(M.rz(x.rz*D), m);
+  return M.mul(M.t(x.tx, x.ty, x.tz), m);
+}
+function worldTris(){
+  if (!S.files.length) return new Float32Array(0);
+  return C.transform(C.concat(S.files.map(function(f){ return f.tris; })), modelMatrix());
+}
+var silCache = null;
+function updateModel(){
+  silCache = null;
+  if (partMesh){ scene.remove(partMesh); partMesh.geometry.dispose(); partMesh = null; }
+  var t = worldTris();
+  if (t.length){
+    var geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(t, 3)); geo.computeVertexNormals();
+    partMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color: 0xf2e9d8, roughness: 0.55, metalness: 0.02, side: THREE.DoubleSide}));
+    partMesh.visible = show.model; scene.add(partMesh);
+    var b = C.bbox(t);
+    var fits = b.max[2] <= S.disc.T/2 && b.min[2] >= -S.disc.T/2;
+    var rr = 0; for (var i = 0; i < t.length; i += 3){ var r = Math.hypot(t[i], t[i+1]); if (r > rr) rr = r; }
+    $('mInfo').innerHTML =
+      '<div>Boyut X×Y×Z</div><div>' + (b.max[0]-b.min[0]).toFixed(2) + ' × ' + (b.max[1]-b.min[1]).toFixed(2) + ' × ' + (b.max[2]-b.min[2]).toFixed(2) + ' mm</div>' +
+      '<div>Z aralığı</div><div class="' + (fits ? 'good' : 'bad') + '">' + b.min[2].toFixed(2) + ' … ' + b.max[2].toFixed(2) + (fits ? ' ✓' : ' ✗ diske sığmıyor') + '</div>' +
+      '<div>Merkezden maks. yarıçap</div><div class="' + (rr + S.set.Bo < S.disc.D/2 ? 'good' : 'warn') + '">' + rr.toFixed(2) + ' mm</div>' +
+      '<div>Üçgen sayısı</div><div>' + (t.length/9).toLocaleString('tr-TR') + '</div>';
+  } else $('mInfo').innerHTML = '';
+  buildConnectors();
+}
+function loadFiles(list){
+  var arr = Array.prototype.slice.call(list).filter(function(f){ return /\.stl$/i.test(f.name); });
+  if (!arr.length){ log('STL dosyası seçilmedi.', 'warn'); return; }
+  var pending = arr.length;
+  arr.forEach(function(f){
+    var rd = new FileReader();
+    rd.onload = function(){
+      try {
+        var tris = C.parseSTL(rd.result);
+        S.files.push({name: f.name, tris: tris}); log(f.name + ' yüklendi (' + (tris.length/9).toLocaleString('tr-TR') + ' üçgen)', 'good');
+      } catch(e){ log(f.name + ': ' + e.message, 'bad'); }
+      if (--pending === 0){
+        var all = C.concat(S.files.map(function(x){ return x.tris; })), b = C.bbox(all);
+        S.center0 = [(b.min[0]+b.max[0])/2, (b.min[1]+b.max[1])/2, (b.min[2]+b.max[2])/2];
+        S.xf = {tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0}; S.conn.list = [];
+        syncXfInputs(); renderFiles(); updateModel(); clearPaths(); setView('iso');
+        status('Model yüklendi. Bağlantıları yerleştirip “NC Hesapla”ya basın.', 0);
+      }
+    };
+    rd.readAsArrayBuffer(f);
+  });
+}
+function renderFiles(){
+  $('fileList').innerHTML = S.files.map(function(f, i){
+    return '<div class="it"><span class="grow">' + esc(f.name) + '</span><span class="chip">' + (f.tris.length/9).toLocaleString('tr-TR') + ' △</span><button class="btn sm" data-rmf="' + i + '">✕</button></div>';
+  }).join('');
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function syncXfInputs(){
+  $('tX').value = S.xf.tx; $('tY').value = S.xf.ty; $('tZ').value = S.xf.tz;
+  $('rX').value = S.xf.rx; $('rY').value = S.xf.ry; $('rZ').value = S.xf.rz;
+}
+
+/* ---------- Bağlantılar ---------- */
+function connWorld(c){
+  var m = modelMatrix(); return {a: C.M.ap(m, c.a[0], c.a[1], c.a[2]), b: C.M.ap(m, c.b[0], c.b[1], c.b[2]), d: c.d};
+}
+function buildConnectors(){
+  connGroup.clear();
+  var mat = new THREE.MeshStandardMaterial({color: 0xff8a3d, roughness: 0.5});
+  S.conn.list.forEach(function(c){
+    var w = connWorld(c), t = C.cylinderTris(w.a, w.b, w.d/2, 20), g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(t, 3)); g.computeVertexNormals();
+    connGroup.add(new THREE.Mesh(g, mat));
+  });
+  connGroup.visible = show.conn;
+  $('connList').innerHTML = S.conn.list.map(function(c, i){
+    var w = connWorld(c);
+    return '<div class="it"><span class="grow">#' + (i+1) + '  Ø' + c.d + '  (' + w.a[0].toFixed(1) + ', ' + w.a[1].toFixed(1) + ', ' + w.a[2].toFixed(1) + ')  L=' +
+      Math.hypot(w.b[0]-w.a[0], w.b[1]-w.a[1], w.b[2]-w.a[2]).toFixed(1) + '</span><button class="btn sm" data-rmc="' + i + '">✕</button></div>';
+  }).join('') || '<div class="muted">Henüz bağlantı yok.</div>';
+}
+function maxToolR(){
+  var r = 0; S.ops.forEach(function(o){ if (!o.on || o.type === 'ind') return; var t = toolMap()[o.tool]; if (t) r = Math.max(r, t.d/2 + (+o.allow || 0)); });
+  return r || 1.25;
+}
+function sil(){
+  if (silCache) return silCache;
+  var t = worldTris(); if (!t.length) return null;
+  silCache = C.silhouette(t, 0.15, S.set.Bo + maxToolR() + 25);
+  return silCache;
+}
+/* start: parça kenarındaki nokta (dünya), dir: XY birim yön. Duvara ulaşan bitiş noktasını bulur */
+function connectorFrom(start, dir, z){
+  var s = sil(); if (!s) return null;
+  var g = s.g, res = g.res, need = (S.set.Bo + maxToolR() + 1.0) / res, x = start[0], y = start[1], left = false;
+  for (var k = 0; k < 400; k++){
+    x += dir[0]*res*0.5; y += dir[1]*res*0.5;
+    var i = Math.round((x-g.x0)/res), j = Math.round((y-g.y0)/res);
+    if (i < 0 || j < 0 || i >= g.nx || j >= g.ny) return null;
+    var id = j*g.nx + i;
+    if (!s.occ[id]) left = true; else if (left) return null;
+    if (s.dist[id] >= need){
+      x += dir[0]*0.8; y += dir[1]*0.8;
+      if (Math.hypot(x, y) > S.disc.D/2 - 1.5) return null;
+      return {a: [start[0] - dir[0]*0.5, start[1] - dir[1]*0.5, z], b: [x, y, z]};
+    }
+  }
+  return null;
+}
+function addConnectorWorld(cw){
+  var inv = C.M.inv(modelMatrix());
+  S.conn.list.push({a: C.M.ap(inv, cw.a[0], cw.a[1], cw.a[2]), b: C.M.ap(inv, cw.b[0], cw.b[1], cw.b[2]), d: S.conn.d});
+}
+function autoConnectors(){
+  var s = sil(); if (!s){ log('Önce STL yükleyin.', 'warn'); return; }
+  var g = s.g, sx = 0, sy = 0, n = 0;
+  for (var j = 0; j < g.ny; j++) for (var i = 0; i < g.nx; i++) if (s.occ[j*g.nx+i]){ sx += i; sy += j; n++; }
+  var ci = sx/n, cj = sy/n, K = Math.max(1, S.conn.count|0), added = 0, starts = [];
+  S.conn.list = [];
+  for (var k = 0; k < K*3 && added < K; k++){
+    var ang = (k % K) / K * Math.PI*2 + Math.floor(k / K) * (Math.PI / K) * 0.66 + Math.PI/2;
+    var dx = Math.cos(ang), dy = Math.sin(ang), last = -1;
+    for (var t = 0; t < 4000; t++){
+      var ii = Math.round(ci + dx*t*0.5), jj = Math.round(cj + dy*t*0.5);
+      if (ii < 0 || jj < 0 || ii >= g.nx || jj >= g.ny) break;
+      if (s.occ[jj*g.nx+ii]) last = jj*g.nx + ii;
+    }
+    if (last < 0) continue;
+    var li = last % g.nx, lj = (last / g.nx) | 0, px = g.x0 + li*g.res, py = g.y0 + lj*g.res;
+    if (starts.some(function(p){ return Math.hypot(p[0]-px, p[1]-py) < Math.max(5, S.conn.d*2.5); })) continue;
+    var zt = g.h[last], zb = -s.gb.h[last], z = (zt + zb) / 2;
+    var cw = connectorFrom([px, py], [dx, dy], z);
+    if (!cw) continue;
+    addConnectorWorld(cw); starts.push([px, py]); added++;
+  }
+  buildConnectors();
+  log(added + ' bağlantı otomatik yerleştirildi.', added ? 'good' : 'warn');
+}
+
+/* ---------- Seçim (tıklama) ---------- */
+var pickMode = null, downPos = null;
+function onPointerDown(e){ downPos = [e.clientX, e.clientY]; }
+function onPointerUp(e){
+  if (!pickMode || !partMesh || !downPos) return;
+  if (Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]) > 4) return;
+  var r = $('cv').getBoundingClientRect(), v = new THREE.Vector2(((e.clientX - r.left)/r.width)*2 - 1, -((e.clientY - r.top)/r.height)*2 + 1);
+  var rc = new THREE.Raycaster(); rc.setFromCamera(v, camera);
+  var hit = rc.intersectObject(partMesh)[0]; if (!hit) return;
+  var p = [hit.point.x, hit.point.y, hit.point.z], n = hit.face.normal.clone();
+  if (pickMode.type === 'conn'){
+    var d = [n.x, n.y], L = Math.hypot(d[0], d[1]);
+    if (L < 0.25){ d = [p[0], p[1]]; L = Math.hypot(d[0], d[1]) || 1; }
+    d = [d[0]/L, d[1]/L];
+    var cw = connectorFrom(p, d, p[2]);
+    if (!cw){ log('Bu noktadan duvara ulaşan bağlantı bulunamadı (başka parçaya çarpıyor veya disk dışı).', 'warn'); return; }
+    addConnectorWorld(cw); buildConnectors(); log('Bağlantı eklendi.', 'good');
+  } else if (pickMode.type === 'axis'){
+    var op = S.ops.filter(function(o){ return o.id === pickMode.id; })[0]; if (!op) return;
+    var nn = avgNormal(p, 1.5);
+    var up = nn[2] >= 0 ? [0, 0, 1] : [0, 0, -1], ang = Math.acos(Math.min(1, Math.abs(nn[2]))) / Math.PI * 180, mt = +S.mc.maxTilt || 25;
+    if (ang > mt){ var f = mt / ang; nn = slerp(up, nn, f); }
+    var ab = C.axisToAB(nn, S.mc);
+    op.A = +ab.A.toFixed(3); op.B = +ab.B.toFixed(3); op.cx = +p[0].toFixed(3); op.cy = +p[1].toFixed(3); op.cz = +p[2].toFixed(3);
+    op.side = nn[2] >= 0 ? 'top' : 'bottom';
+    pickMode = null; renderOps(); drawMarkers(); saveLS();
+    log(opName(op) + ': eksen seçildi A=' + op.A + ' B=' + op.B, 'good');
+  }
+}
+function avgNormal(p, rad){
+  var t = partMesh.geometry.attributes.position.array, sx = 0, sy = 0, sz = 0;
+  for (var i = 0; i < t.length; i += 9){
+    var cx = (t[i]+t[i+3]+t[i+6])/3, cy = (t[i+1]+t[i+4]+t[i+7])/3, cz = (t[i+2]+t[i+5]+t[i+8])/3;
+    if (Math.hypot(cx-p[0], cy-p[1], cz-p[2]) > rad) continue;
+    var ux = t[i+3]-t[i], uy = t[i+4]-t[i+1], uz = t[i+5]-t[i+2], vx = t[i+6]-t[i], vy = t[i+7]-t[i+1], vz = t[i+8]-t[i+2];
+    sx += uy*vz - uz*vy; sy += uz*vx - ux*vz; sz += ux*vy - uy*vx;
+  }
+  var L = Math.hypot(sx, sy, sz) || 1; return [sx/L, sy/L, sz/L];
+}
+function slerp(a, b, f){
+  var d = Math.max(-1, Math.min(1, a[0]*b[0]+a[1]*b[1]+a[2]*b[2])), th = Math.acos(d);
+  if (th < 1e-6) return b;
+  var s = Math.sin(th), wa = Math.sin((1-f)*th)/s, wb = Math.sin(f*th)/s;
+  return [a[0]*wa+b[0]*wb, a[1]*wa+b[1]*wb, a[2]*wa+b[2]*wb];
+}
+function drawMarkers(){
+  markGroup.clear();
+  S.ops.forEach(function(op){
+    if (op.type !== 'ind') return;
+    var inv = C.M.inv(C.machineMatrix(+op.A || 0, +op.B || 0, S.mc)), ax = C.M.apv(inv, 0, 0, 1);
+    var o = new THREE.Vector3(+op.cx || 0, +op.cy || 0, +op.cz || 0);
+    var arrow = new THREE.ArrowHelper(new THREE.Vector3(ax[0], ax[1], ax[2]), o, 8, 0x22d3ee, 1.6, 0.8);
+    markGroup.add(arrow);
+    var ring = [], r = +op.radius || 2;
+    var e1 = C.M.apv(inv, 1, 0, 0), e2 = C.M.apv(inv, 0, 1, 0);
+    for (var k = 0; k <= 48; k++){ var a = k/48*Math.PI*2; ring.push(new THREE.Vector3(o.x + (e1[0]*Math.cos(a)+e2[0]*Math.sin(a))*r, o.y + (e1[1]*Math.cos(a)+e2[1]*Math.sin(a))*r, o.z + (e1[2]*Math.cos(a)+e2[2]*Math.sin(a))*r)); }
+    markGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ring), new THREE.LineBasicMaterial({color: 0x22d3ee})));
+  });
+}
+
+/* ---------- İşlemler arayüzü ---------- */
+function toolMap(){ var m = {}; S.tools.forEach(function(t){ m[t.P] = t; }); return m; }
+var TYPE_TR = {rough: 'Kaba', finish: 'İnce', ind: '3+2 Açılı'};
+function opName(op){ return TYPE_TR[op.type] + ' ' + (op.type === 'ind' ? ('A' + op.A + ' B' + op.B) : (op.side === 'top' ? 'Üst' : 'Alt')) + ' (P' + op.tool + ')'; }
+function fld(label, key, val, step, kind){
+  if (kind === 'sel') return '<div class="f"><label>' + label + '</label><select data-k="' + key + '">' + step + '</select></div>';
+  return '<div class="f"><label>' + label + '</label><input type="number" data-k="' + key + '" value="' + (val === undefined ? '' : val) + '" step="' + step + '"></div>';
+}
+function opts(list, cur){ return list.map(function(o){ return '<option value="' + o[0] + '"' + (String(o[0]) === String(cur) ? ' selected' : '') + '>' + o[1] + '</option>'; }).join(''); }
+function renderOps(){
+  var tl = S.tools.map(function(t){ return [t.P, 'P' + t.P + ' – Ø' + t.d + ' ' + ({ball:'küre', flat:'düz', bull:'radyuslu'})[t.type]]; });
+  $('opList').innerHTML = S.ops.map(function(op, i){
+    var h = '<div class="card op' + (op.on ? '' : ' dis') + '" data-op="' + op.id + '"><div class="hd">' +
+      '<input type="checkbox" data-k="on"' + (op.on ? ' checked' : '') + '><b>' + (i+1) + '. ' + esc(opName(op)) + '</b>' +
+      '<button class="btn sm" data-act="up">▲</button><button class="btn sm" data-act="down">▼</button><button class="btn sm" data-act="del">✕</button></div><div class="row">';
+    h += fld('Takım', 'tool', null, opts(tl, op.tool), 'sel');
+    if (op.type !== 'ind') h += fld('Taraf', 'side', null, opts([['top', 'Üst (A0)'], ['bottom', 'Alt (A180)']], op.side), 'sel');
+    h += fld('Yön', 'dir', null, opts(op.type === 'rough' ? [['x', 'X'], ['y', 'Y']] : [['x', 'X'], ['y', 'Y'], ['xy', 'X+Y']], op.dir), 'sel');
+    h += '</div><div class="row">' + fld('Adım (mm)', 'stepover', op.stepover, 0.01);
+    if (op.type === 'rough') h += fld('Kat derinliği', 'stepdown', op.stepdown, 0.1);
+    h += fld('Pay (mm)', 'allow', op.allow, 0.01);
+    if (op.type !== 'rough') h += fld('Min Z', 'zMin', op.zMin, 0.1);
+    h += '</div>';
+    if (op.type === 'finish') h += '<label class="muted"><input type="checkbox" data-k="skipFloor"' + (op.skipFloor !== false ? ' checked' : '') + '> Sadece model yüzeyi (boş tabanı atla)</label>';
+    if (op.type === 'ind'){
+      h += '<div class="row">' + fld('A (°)', 'A', op.A, 0.1) + fld('B (°)', 'B', op.B, 0.1) + fld('Bölge R', 'radius', op.radius, 0.1) + '</div>' +
+        '<div class="row">' + fld('Merkez X', 'cx', op.cx, 0.1) + fld('Merkez Y', 'cy', op.cy, 0.1) + fld('Merkez Z', 'cz', op.cz, 0.1) + '</div>' +
+        '<div class="row"><button class="btn sm' + (pickMode && pickMode.id === op.id ? ' on' : '') + '" data-act="pick">Modelden nokta/eksen seç</button></div>';
+    }
+    return h + '</div>';
+  }).join('');
+}
+function renderTools(){
+  $('toolList').innerHTML = S.tools.map(function(t, i){
+    return '<div class="card" data-tool="' + i + '"><div class="row">' +
+      '<div class="f" style="max-width:70px"><label>P no</label><input type="text" data-k="P" value="' + esc(t.P) + '"></div>' +
+      '<div class="f"><label>Ad</label><input type="text" data-k="name" value="' + esc(t.name) + '"></div>' +
+      '<button class="btn sm" data-act="del" style="align-self:flex-end">✕</button></div><div class="row">' +
+      '<div class="f"><label>Tip</label><select data-k="type">' + opts([['ball', 'Küresel'], ['flat', 'Düz'], ['bull', 'Radyuslu']], t.type) + '</select></div>' +
+      fld('Çap (mm)', 'd', t.d, 0.1) + fld('Köşe R', 'r', t.r, 0.05) + '</div><div class="row">' +
+      fld('Devir S', 'S', t.S, 500) + fld('İlerleme F', 'F', t.F, 50) + fld('Dalma F', 'Fp', t.Fp, 50) + '</div></div>';
+  }).join('');
+}
+function bindNum(id, getObj, key){
+  var el = $(id);
+  el.addEventListener('change', function(){ getObj()[key] = parseFloat(el.value); saveLS(); onSettingsChanged(id); });
+}
+function onSettingsChanged(id){
+  if (id === 'dD' || id === 'dT'){ buildDisc(); updateModel(); }
+  if (id === 'sBo') silCache = null;
+}
+function renderMachine(){
+  var m = S.mc, p = m.post;
+  $('mSA').value = String(m.signA); $('mSB').value = String(m.signB); $('mOrd').value = m.order;
+  $('mPX').value = m.pivot[0]; $('mPY').value = m.pivot[1]; $('mPZ').value = m.pivot[2];
+  $('mSafe').value = m.safeZ; $('mTilt').value = m.maxTilt;
+  $('tFirst').value = p.first; $('tChange').value = p.change; $('tSec').value = p.section; $('tAB1').value = p.ab1; $('tAB').value = p.ab; $('tEnd').value = p.end;
+  $('mNum').checked = p.numbers !== false; $('mCRLF').checked = p.crlf !== false; $('mPct').checked = p.percent !== false;
+}
+function readMachine(){
+  var m = S.mc, p = m.post;
+  m.signA = +$('mSA').value; m.signB = +$('mSB').value; m.order = $('mOrd').value;
+  m.pivot = [+$('mPX').value || 0, +$('mPY').value || 0, +$('mPZ').value || 0];
+  m.safeZ = +$('mSafe').value; m.maxTilt = +$('mTilt').value;
+  p.first = $('tFirst').value; p.change = $('tChange').value; p.section = $('tSec').value; p.ab1 = $('tAB1').value; p.ab = $('tAB').value; p.end = $('tEnd').value;
+  p.numbers = $('mNum').checked; p.crlf = $('mCRLF').checked; p.percent = $('mPct').checked;
+  saveLS(); drawMarkers();
+  if (lastNcText) showNC(lastNcText);
+}
+
+/* ---------- Hesaplama (Web Worker) ---------- */
+var worker = null, lastResult = null, lastNcText = null, busy = false;
+function makeWorker(){
+  var src = $('cam-core').textContent + '\n;self.onmessage=function(e){try{var r=CAM.run(e.data,function(p,m){self.postMessage({type:"progress",p:p,msg:m});});' +
+    'var tr=[];r.preview.forEach(function(s){tr.push(s.cut.buffer,s.rap.buffer);});self.postMessage({type:"done",r:r},tr);}catch(err){self.postMessage({type:"error",msg:String(err&&err.message||err),stack:String(err&&err.stack||"")});}};';
+  return new Worker(URL.createObjectURL(new Blob([src], {type: 'application/javascript'})));
+}
+function calc(){
+  if (busy) return;
+  if (!S.files.length){ log('Önce STL yükleyin.', 'warn'); return; }
+  readMachine();
+  var tm = toolMap(), tools = {};
+  S.tools.forEach(function(t){ tools[t.P] = {d: +t.d, r: +t.r || 0, type: t.type, S: t.S, F: +t.F, Fp: +t.Fp || +t.F}; });
+  var job = {
+    part: worldTris(), conns: S.conn.list.map(connWorld), disc: S.disc,
+    settings: Object.assign({}, S.set, {stockRes: Math.max(S.set.stockRes, S.set.res)}),
+    tools: tools, machine: {signA: S.mc.signA, signB: S.mc.signB, order: S.mc.order, pivot: S.mc.pivot, safeZ: S.mc.safeZ},
+    post: S.mc.post,
+    ops: S.ops.map(function(o){ return Object.assign({}, o, {name: opName(o)}); })
+  };
+  if (!job.ops.some(function(o){ return o.on; })){ log('Etkin işlem yok.', 'warn'); return; }
+  busy = true; $('bCalc').disabled = true; $('bSave').disabled = true;
+  var t0 = performance.now();
+  if (worker) worker.terminate();
+  worker = makeWorker();
+  status('Hesaplanıyor...', 0); log('Hesaplama başladı.');
+  worker.onmessage = function(e){
+    var d = e.data;
+    if (d.type === 'progress'){ status(d.msg || '', d.p); return; }
+    busy = false; $('bCalc').disabled = false;
+    if (d.type === 'error'){ log('Hata: ' + d.msg, 'bad'); console.error(d.stack); status('Hata oluştu.', 0); return; }
+    lastResult = d.r; $('bSave').disabled = false;
+    d.r.warnings.forEach(function(w){ log('Uyarı: ' + w, 'warn'); });
+    var sec = ((performance.now() - t0)/1000).toFixed(1);
+    log('Tamamlandı (' + sec + ' sn): ' + d.r.stats.lines.toLocaleString('tr-TR') + ' satır.', 'good');
+    status('Hazır – NC indirilebilir.', 1);
+    showPaths(d.r.preview); showStats(d.r.stats);
+  };
+  worker.onerror = function(e){ busy = false; $('bCalc').disabled = false; log('Worker hatası: ' + e.message, 'bad'); };
+  var tr = [job.part.buffer];
+  worker.postMessage(job, tr);
+}
+function fmtTime(min){ var m = Math.round(min); return Math.floor(m/60) + ' sa ' + (m % 60) + ' dk'; }
+function showStats(st){
+  var h = '<div>NC satır</div><div>' + st.lines.toLocaleString('tr-TR') + '</div><div>Tahmini süre</div><div>' + fmtTime(st.time) + '</div>';
+  st.perOp.forEach(function(o){ h += '<div>' + esc(o.name) + '</div><div>' + fmtTime(o.time) + '</div>'; });
+  $('resInfo').innerHTML = h;
+}
+function clearPaths(){ pathGroup.clear(); lastResult = null; $('bSave').disabled = true; }
+function lineSeg(arr, color, opacity){
+  var g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  return new THREE.LineSegments(g, new THREE.LineBasicMaterial({color: color, transparent: opacity < 1, opacity: opacity}));
+}
+function showPaths(prev){
+  pathGroup.clear();
+  var leg = [];
+  prev.forEach(function(s, i){
+    var col = PALETTE[i % PALETTE.length], grp = new THREE.Group();
+    var c = lineSeg(s.cut, col, 0.9); var r = lineSeg(s.rap, 0xff4d4d, 0.35); r.userData.rapid = true; r.visible = show.rapid;
+    grp.add(c, r); pathGroup.add(grp);
+    leg.push('<span><i style="background:#' + col.toString(16).padStart(6, '0') + '"></i>' + esc(s.name) + '</span>');
+  });
+  pathGroup.visible = show.path;
+  $('legend').style.display = 'block'; $('legend').innerHTML = '<div class="legend">' + leg.join('') + '</div>';
+}
+function showNC(text){
+  ncGroup.clear();
+  var groups = C.parseNC(text, S.mc), leg = [];
+  groups.forEach(function(gp, i){
+    var col = PALETTE[(i + 3) % PALETTE.length];
+    var c = lineSeg(gp.cut, col, 0.8), r = lineSeg(gp.rap, 0xff4d4d, 0.3); r.userData.rapid = true; r.visible = show.rapid;
+    ncGroup.add(c, r);
+    leg.push('<span><i style="background:#' + col.toString(16).padStart(6, '0') + '"></i>NC P' + esc(gp.tool) + '</span>');
+  });
+  ncGroup.visible = show.nc;
+  $('legend').style.display = 'block'; $('legend').innerHTML = '<div class="legend">' + leg.join('') + '</div>';
+}
+function saveNC(){
+  if (!lastResult) return;
+  var name = (S.files[0] ? S.files[0].name.replace(/\.stl$/i, '') : 'is') + '.nc';
+  var blob = new Blob([lastResult.nc], {type: 'text/plain'}), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  log(name + ' indirildi.', 'good');
+}
+
+/* ---------- Olaylar ---------- */
+function bindUI(){
+  document.querySelectorAll('.tab').forEach(function(t){ t.addEventListener('click', function(){
+    document.querySelectorAll('.tab').forEach(function(x){ x.classList.toggle('act', x === t); });
+    document.querySelectorAll('.pane').forEach(function(p){ p.classList.toggle('act', p.id === 'p-' + t.dataset.t); });
+  }); });
+  $('bLoad').onclick = function(){ $('fStl').click(); };
+  $('drop').onclick = function(){ $('fStl').click(); };
+  $('fStl').onchange = function(e){ loadFiles(e.target.files); e.target.value = ''; };
+  var dz = $('drop');
+  ['dragover', 'dragenter'].forEach(function(ev){ document.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add('hv'); }); });
+  ['dragleave', 'drop'].forEach(function(ev){ document.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove('hv'); }); });
+  document.addEventListener('drop', function(e){
+    var fl = e.dataTransfer && e.dataTransfer.files; if (!fl || !fl.length) return;
+    var nc = Array.prototype.filter.call(fl, function(f){ return /\.(nc|cnc|tap|iso|txt)$/i.test(f.name); });
+    if (nc.length) readNC(nc[0]); else loadFiles(fl);
+  });
+  $('fileList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-rmf]'); if (!b) return;
+    S.files.splice(+b.dataset.rmf, 1); renderFiles(); updateModel(); clearPaths();
+  });
+  ['tX', 'tY', 'tZ', 'rX', 'rY', 'rZ'].forEach(function(id){
+    $(id).addEventListener('change', function(){
+      var k = {tX: 'tx', tY: 'ty', tZ: 'tz', rX: 'rx', rY: 'ry', rZ: 'rz'}[id];
+      S.xf[k] = parseFloat($(id).value) || 0; updateModel(); clearPaths();
+    });
+  });
+  $('bCenter').onclick = function(){ S.xf.tx = 0; S.xf.ty = 0; S.xf.tz = 0; syncXfInputs(); updateModel(); clearPaths(); };
+  $('bFlip').onclick = function(){ S.xf.rx = ((S.xf.rx || 0) + 180) % 360; syncXfInputs(); updateModel(); clearPaths(); };
+  $('bReset').onclick = function(){ S.xf = {tx: 0, ty: 0, tz: 0, rx: 0, ry: 0, rz: 0}; syncXfInputs(); updateModel(); clearPaths(); };
+  var gD = function(){ return S.disc; }, gS = function(){ return S.set; }, gC = function(){ return S.conn; };
+  bindNum('dD', gD, 'D'); bindNum('dT', gD, 'T');
+  bindNum('sBo', gS, 'Bo'); bindNum('cD', gC, 'd'); bindNum('cN', gC, 'count');
+  bindNum('sRes', gS, 'res'); bindNum('sStk', gS, 'stockRes'); bindNum('sSplit', gS, 'split'); bindNum('sOv', gS, 'overlap');
+  bindNum('sTolF', gS, 'tolF'); bindNum('sTolR', gS, 'tolR'); bindNum('sLink', gS, 'linkMax');
+  $('bAutoConn').onclick = autoConnectors;
+  $('bPickConn').onclick = function(){
+    pickMode = pickMode && pickMode.type === 'conn' ? null : {type: 'conn'};
+    $('bPickConn').classList.toggle('on', !!pickMode); renderOps();
+  };
+  $('bClrConn').onclick = function(){ S.conn.list = []; buildConnectors(); };
+  $('connList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-rmc]'); if (!b) return; S.conn.list.splice(+b.dataset.rmc, 1); buildConnectors();
+  });
+  document.querySelectorAll('[data-add]').forEach(function(b){ b.onclick = function(){
+    var t = b.dataset.add;
+    S.ops.push(t === 'rough' ? mkOp('rough', 'top', '04') : t === 'finish' ? mkOp('finish', 'top', '07') : mkOp('ind', 'top', '06'));
+    renderOps(); saveLS();
+  }; });
+  $('bOpsDefault').onclick = function(){ S.ops = defaultOps(); renderOps(); drawMarkers(); saveLS(); };
+  $('opList').addEventListener('change', function(e){
+    var card = e.target.closest('[data-op]'), k = e.target.dataset.k; if (!card || !k) return;
+    var op = S.ops.filter(function(o){ return o.id === +card.dataset.op; })[0];
+    if (e.target.type === 'checkbox') op[k] = e.target.checked;
+    else if (e.target.tagName === 'SELECT') op[k] = e.target.value;
+    else op[k] = e.target.value === '' ? '' : parseFloat(e.target.value);
+    saveLS(); renderOps(); drawMarkers();
+  });
+  $('opList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-act]'), card = e.target.closest('[data-op]'); if (!b || !card) return;
+    var i = S.ops.findIndex(function(o){ return o.id === +card.dataset.op; }), a = b.dataset.act;
+    if (a === 'del') S.ops.splice(i, 1);
+    if (a === 'up' && i > 0) S.ops.splice(i-1, 0, S.ops.splice(i, 1)[0]);
+    if (a === 'down' && i < S.ops.length-1) S.ops.splice(i+1, 0, S.ops.splice(i, 1)[0]);
+    if (a === 'pick'){ pickMode = {type: 'axis', id: S.ops[i].id}; $('bPickConn').classList.remove('on'); log('Modelde işlenecek bölgeye tıklayın.'); }
+    renderOps(); drawMarkers(); saveLS();
+  });
+  $('toolList').addEventListener('change', function(e){
+    var card = e.target.closest('[data-tool]'), k = e.target.dataset.k; if (!card || !k) return;
+    var t = S.tools[+card.dataset.tool], old = t.P;
+    t[k] = (k === 'P' || k === 'name' || k === 'type') ? e.target.value : parseFloat(e.target.value);
+    if (k === 'P') S.ops.forEach(function(o){ if (o.tool === old) o.tool = t.P; });
+    saveLS(); renderOps();
+  });
+  $('toolList').addEventListener('click', function(e){
+    var b = e.target.closest('[data-act="del"]'), card = e.target.closest('[data-tool]'); if (!b || !card) return;
+    S.tools.splice(+card.dataset.tool, 1); renderTools(); renderOps(); saveLS();
+  });
+  $('bAddTool').onclick = function(){ S.tools.push({P: String(S.tools.length + 1).padStart(2, '0'), name: 'Yeni takım', type: 'ball', d: 1, r: 0, S: 20000, F: 800, Fp: 300}); renderTools(); renderOps(); saveLS(); };
+  ['mSA', 'mSB', 'mOrd', 'mPX', 'mPY', 'mPZ', 'mSafe', 'mTilt', 'tFirst', 'tChange', 'tSec', 'tAB1', 'tAB', 'tEnd', 'mNum', 'mCRLF', 'mPct'].forEach(function(id){ $(id).addEventListener('change', readMachine); });
+  $('bProfSave').onclick = function(){
+    readMachine();
+    var blob = new Blob([JSON.stringify({disc: S.disc, set: S.set, conn: {d: S.conn.d, count: S.conn.count}, tools: S.tools, ops: S.ops, mc: S.mc}, null, 2)], {type: 'application/json'});
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'digicadcam-profil.json'; a.click();
+  };
+  $('bProfLoad').onclick = function(){ $('fProf').click(); };
+  $('fProf').onchange = function(e){
+    var f = e.target.files[0]; if (!f) return; var rd = new FileReader();
+    rd.onload = function(){ try { applyProfile(JSON.parse(rd.result)); refreshAll(); saveLS(); log('Profil yüklendi.', 'good'); } catch(err){ log('Profil okunamadı: ' + err.message, 'bad'); } };
+    rd.readAsText(f); e.target.value = '';
+  };
+  $('bProfReset').onclick = function(){
+    if (!confirm('Tüm ayarlar fabrika değerlerine dönsün mü?')) return;
+    S.tools = defaultTools(); S.ops = defaultOps(); S.mc = defaultMachine(); S.set = defaultSettings(); S.disc.D = 98.5; S.disc.T = 14;
+    refreshAll(); saveLS();
+  };
+  $('bCalc').onclick = calc; $('bSave').onclick = saveNC;
+  $('bNcView').onclick = function(){ $('fNc').click(); };
+  $('fNc').onchange = function(e){ if (e.target.files[0]) readNC(e.target.files[0]); e.target.value = ''; };
+  document.querySelectorAll('[data-view]').forEach(function(b){ b.onclick = function(){ setView(b.dataset.view); }; });
+  document.querySelectorAll('[data-show]').forEach(function(b){ b.onclick = function(){
+    var k = b.dataset.show; show[k] = !show[k]; b.classList.toggle('on', show[k]);
+    if (partMesh) partMesh.visible = show.model; discGroup.visible = show.disc; connGroup.visible = show.conn;
+    pathGroup.visible = show.path; ncGroup.visible = show.nc;
+    [pathGroup, ncGroup].forEach(function(gr){ gr.traverse(function(o){ if (o.userData.rapid) o.visible = show.rapid; }); });
+  }; });
+}
+function readNC(f){
+  status('NC okunuyor: ' + f.name, 0);
+  var rd = new FileReader();
+  rd.onload = function(){
+    lastNcText = rd.result;
+    try { showNC(lastNcText); log(f.name + ' görüntülendi.', 'good'); status('NC görüntülendi: ' + f.name, 1); }
+    catch(e){ log('NC okunamadı: ' + e.message, 'bad'); }
+  };
+  rd.readAsText(f);
+}
+function refreshAll(){
+  $('dD').value = S.disc.D; $('dT').value = S.disc.T; $('sBo').value = S.set.Bo; $('cD').value = S.conn.d; $('cN').value = S.conn.count;
+  $('sRes').value = S.set.res; $('sStk').value = S.set.stockRes; $('sSplit').value = S.set.split; $('sOv').value = S.set.overlap;
+  $('sTolF').value = S.set.tolF; $('sTolR').value = S.set.tolR; $('sLink').value = S.set.linkMax;
+  renderOps(); renderTools(); renderMachine(); buildDisc(); updateModel(); drawMarkers();
+}
+
+window.addEventListener('load', function(){
+  if (!window.THREE || !THREE.OrbitControls){ document.body.innerHTML = '<div style="padding:30px">3B kütüphanesi yüklenemedi. İnternet bağlantınızı kontrol edin.</div>'; return; }
+  loadLS(); initScene(); bindUI(); refreshAll();
+  log('DIGICAD CAM hazır. STL dosyanızı yükleyin.');
+});
+})();
+</script>
+</body>
+</html>
