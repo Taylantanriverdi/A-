@@ -538,12 +538,42 @@ function chooseMove(st, level) {
   const fireTex = softTexture([[0, 'rgba(255,246,214,1)'], [0.3, 'rgba(255,170,70,0.75)'], [0.7, 'rgba(200,60,10,0.18)'], [1, 'rgba(0,0,0,0)']]);
 
   // ---------- Materials ----------
-  const stoneW = new THREE.MeshStandardMaterial({ map: marbleTex, bumpMap: marbleTex, bumpScale: 0.012, color: 0xfff8ee, roughness: 0.42 });
-  const stoneB = new THREE.MeshStandardMaterial({ map: basaltTex, bumpMap: basaltTex, bumpScale: 0.016, color: 0xc4c4cc, roughness: 0.36 });
-  const stoneW2 = stoneW.clone(); stoneW2.side = THREE.DoubleSide;
-  const stoneB2 = stoneB.clone(); stoneB2.side = THREE.DoubleSide;
-  const accentW = new THREE.MeshStandardMaterial({ color: 0xc9a25a, roughness: 0.35, metalness: 0.55 });
-  const accentB = new THREE.MeshStandardMaterial({ color: 0x77737d, roughness: 0.32, metalness: 0.55 });
+  // Pieces: weathered, unpolished granite (pale grey and dark slate) with mica flecks and pits,
+  // darkened towards the ground like real outdoor stone.
+  renderer.localClippingEnabled = true;
+  const graniteW = canvasTex(256, (u, v) => {
+    const n = nzA(u, v, 4, 6), m = nzB(u, v, 16, 3), s = nzC(u, v, 64, 2), pit = nzA(u, v, 32, 1);
+    let c = 168 + 46 * (n - 0.5) + 20 * (m - 0.5);
+    if (s > 0.8) c -= 58; else if (s < 0.2) c += 24;
+    if (pit > 0.8) c *= 0.66;
+    return [c * 1.03, c, c * 0.92];
+  });
+  const graniteB = canvasTex(256, (u, v) => {
+    const n = nzB(u, v, 4, 6), m = nzA(u, v, 16, 3), s = nzC(u, v, 64, 2), pit = nzB(u, v, 32, 1);
+    let c = 64 + 26 * (n - 0.5) + 12 * (m - 0.5);
+    if (s > 0.82) c += 46;
+    if (pit > 0.8) c *= 0.7;
+    return [c, c * 0.99, c * 1.06];
+  });
+  graniteW.repeat.set(2, 2); graniteB.repeat.set(2, 2);
+  function weather(mat) {
+    mat.userData.weather = true;
+    mat.onBeforeCompile = (sh) => {
+      sh.vertexShader = 'varying float vWY;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n  vWY = (modelMatrix * vec4(transformed, 1.0)).y;');
+      sh.fragmentShader = 'varying float vWY;\n' + sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n  diffuseColor.rgb *= mix(0.52, 1.0, smoothstep(-0.05, 0.6, vWY));');
+    };
+    mat.customProgramCacheKey = () => 'weather';
+    return mat;
+  }
+  function cloneMat(m) { const c = m.clone(); if (m.userData.weather) weather(c); return c; }
+  const stoneW = weather(new THREE.MeshStandardMaterial({ map: graniteW, bumpMap: graniteW, bumpScale: 0.04, color: 0xf4efe6, roughness: 0.86 }));
+  const stoneB = weather(new THREE.MeshStandardMaterial({ map: graniteB, bumpMap: graniteB, bumpScale: 0.04, color: 0xd8d8e0, roughness: 0.74 }));
+  const stoneW2 = cloneMat(stoneW); stoneW2.side = THREE.DoubleSide;
+  const stoneB2 = cloneMat(stoneB); stoneB2.side = THREE.DoubleSide;
+  const fragW = cloneMat(stoneW); fragW.flatShading = true;
+  const fragB = cloneMat(stoneB); fragB.flatShading = true;
+  const accentW = new THREE.MeshStandardMaterial({ color: 0x8c6c3c, roughness: 0.5, metalness: 0.55 });
+  const accentB = new THREE.MeshStandardMaterial({ color: 0x4d4b52, roughness: 0.42, metalness: 0.6 });
   const voidMat = new THREE.MeshStandardMaterial({ color: 0x0a0807, roughness: 1 });
 
   // ---------- Lights ----------
@@ -714,67 +744,114 @@ function chooseMove(st, level) {
     [-4.5, 4.5].forEach((x) => { const l = label(String(i + 1)); l.position.set(x, 0.001, 3.5 - i); scene.add(l); });
   }
 
-  // ---------- Statue pieces ----------
+  // ---------- Statue pieces (rigged: head, right arm/weapon, left arm) ----------
   const G = {};
   const geo = (k, f) => G[k] || (G[k] = f());
   const lathe = (k, pts, seg) => geo(k, () => new THREE.LatheGeometry(pts.map((p) => new THREE.Vector2(p[0], p[1])), seg || 32));
   const sphere = (r) => geo('s' + r, () => new THREE.SphereGeometry(r, 24, 16));
-  const box = (x, y, z) => geo('b' + x + y + z, () => new THREE.BoxGeometry(x, y, z));
-  const cyl = (r1, r2, h, seg) => geo('c' + r1 + r2 + h + seg, () => new THREE.CylinderGeometry(r1, r2, h, seg || 16));
-  const cone = (r, h) => geo('k' + r + h, () => new THREE.ConeGeometry(r, h, 14));
+  const box = (x, y, z) => geo('b' + x + '_' + y + '_' + z, () => new THREE.BoxGeometry(x, y, z));
+  const cyl = (r1, r2, h, seg) => geo('c' + r1 + '_' + r2 + '_' + h + '_' + seg, () => new THREE.CylinderGeometry(r1, r2, h, seg || 16));
+  const cone = (r, h) => geo('k' + r + '_' + h, () => new THREE.ConeGeometry(r, h, 14));
+  const torus = (r, t, arc) => geo('t' + r + '_' + t + '_' + (arc || 0), () => new THREE.TorusGeometry(r, t, 8, 28, arc || Math.PI * 2));
   const PED = [[0, 0], [0.37, 0], [0.37, 0.05], [0.335, 0.075], [0.335, 0.12], [0.3, 0.14], [0, 0.14]];
-  function robe(k, h, r0, waist, chest, sh) {
-    const y = (f) => 0.14 + f * (h - 0.14);
-    return lathe(k, [[0, 0.14], [r0, 0.14], [r0 * 0.97, 0.19], [r0 * 0.8, y(0.3)], [waist, y(0.6)], [chest, y(0.8)], [sh, y(0.93)], [sh * 0.55, h], [0.05, h + 0.01], [0, h + 0.01]], 28);
+  const ZERO = new V3();
+  const contactMat = new THREE.MeshBasicMaterial({ map: softTex, color: 0x000000, transparent: true, opacity: 0.55, depthWrite: false });
+  // Robe with carved drapery folds that deepen towards the hem
+  function robe(k, h, r0, waist, chest, sh, folds) {
+    return geo(k, () => {
+      const y = (f) => 0.14 + f * (h - 0.14);
+      const pts = [[0, 0.14], [r0, 0.14], [r0 * 0.97, 0.19], [r0 * 0.8, y(0.3)], [waist, y(0.6)], [chest, y(0.8)], [sh, y(0.93)], [sh * 0.55, h], [0.05, h + 0.01], [0, h + 0.01]];
+      const g = new THREE.LatheGeometry(pts.map((p) => new THREE.Vector2(p[0], p[1])), 48);
+      const pa = g.attributes.position;
+      for (let i = 0; i < pa.count; i++) {
+        const x = pa.getX(i), yy = pa.getY(i), z = pa.getZ(i), r = Math.hypot(x, z);
+        if (r < 1e-4) continue;
+        const a = Math.atan2(x, z), f = Math.max(0, 1 - (yy - 0.14) / (h - 0.14));
+        const nr = r * (1 + (0.07 * f * f + 0.012) * Math.sin(a * folds) + 0.02 * f * Math.sin(a * folds * 2 + 1.3));
+        pa.setXYZ(i, x / r * nr, yy, z / r * nr);
+      }
+      g.computeVertexNormals();
+      return g;
+    });
   }
-  const HEIGHTS = { p: 0.82, r: 1.12, n: 1.18, b: 1.3, q: 1.36, k: 1.5 };
+  const HEIGHTS = { p: 0.86, r: 1.14, n: 1.2, b: 1.32, q: 1.38, k: 1.52 };
 
   function makePiece(ch) {
     const t = ch.toLowerCase(), white = ch !== t;
     const M = white ? stoneW : stoneB, M2 = white ? stoneW2 : stoneB2, A = white ? accentW : accentB;
-    const root = new THREE.Group(), body = new THREE.Group();
+    const root = new THREE.Group(), body = new THREE.Group(), rig = {};
     root.add(body);
-    function add(g, mat, x, y, z, rx, ry, rz, sx, sy, sz) {
-      const m = new THREE.Mesh(g, mat);
-      m.position.set(x || 0, y || 0, z || 0);
+    function pivot(name, x, y, z, parent) {
+      const g = new THREE.Group(), pp = parent ? parent.userData.pv : ZERO;
+      g.userData.pv = new V3(x, y, z);
+      g.position.set(x - pp.x, y - pp.y, z - pp.z);
+      (parent || body).add(g); rig[name] = g;
+      return g;
+    }
+    function add(g, mat, x, y, z, rx, ry, rz, sx, sy, sz, into) {
+      const m = new THREE.Mesh(g, mat), pv = into ? into.userData.pv : ZERO;
+      m.position.set((x || 0) - pv.x, (y || 0) - pv.y, (z || 0) - pv.z);
       m.rotation.set(rx || 0, ry || 0, rz || 0);
       if (sx) m.scale.set(sx, sy, sz);
       m.castShadow = true; m.receiveShadow = true;
-      body.add(m); return m;
+      (into || body).add(m);
+      return m;
     }
-    function limb(a, b, r, mat) {
+    function limb(a, b, r, into, mat) {
       const from = new V3(a[0], a[1], a[2]), to = new V3(b[0], b[1], b[2]), d = new V3().subVectors(to, from), len = d.length();
-      const m = add(geo('limb' + r, () => new THREE.CylinderGeometry(r, r * 0.8, 1, 10)), mat || M);
-      m.scale.y = len; m.position.copy(from).addScaledVector(d, 0.5);
+      const m = add(geo('limb' + r, () => new THREE.CylinderGeometry(r, r * 0.8, 1, 10)), mat || M, 0, 0, 0, 0, 0, 0, 0, 0, 0, into);
+      const pv = into ? into.userData.pv : ZERO;
+      m.scale.set(1, len, 1);
+      m.position.copy(from).addScaledVector(d, 0.5).sub(pv);
       m.quaternion.setFromUnitVectors(new V3(0, 1, 0), d.normalize());
-      add(sphere(+(r * 1.3).toFixed(3)), mat || M, b[0], b[1], b[2]);
+      add(sphere(+(r * 1.3).toFixed(3)), mat || M, b[0], b[1], b[2], 0, 0, 0, 0, 0, 0, into);
+    }
+    // Torso, belt and a head with a carved face; returns the head pivot
+    function figure(k, h, r0, waist, chest, sh, headR, folds) {
+      add(robe(k, h, r0, waist, chest, sh, folds), M);
+      add(torus(waist + 0.012, 0.016), A, 0, 0.14 + 0.6 * (h - 0.14), 0, Math.PI / 2, 0, 0);
+      [-1, 1].forEach((s) => add(geo('pauld' + sh, () => new THREE.SphereGeometry(0.06, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2)), M, s * (sh - 0.02), h - 0.04, 0, 0, 0, s * 0.5));
+      const head = pivot('head', 0, h, 0);
+      const hy = h + headR * 0.95;
+      add(cyl(headR * 0.45, headR * 0.55, 0.06, 10), M, 0, h + 0.01, 0, 0, 0, 0, 0, 0, 0, head);
+      add(sphere(headR), M, 0, hy, 0, 0, 0, 0, 0.95, 1.05, 1, head);
+      add(box(0.022, 0.04, 0.03), M, 0, hy - 0.004, headR * 0.93, -0.2, 0, 0, 0, 0, 0, head);
+      [-1, 1].forEach((s) => add(sphere(0.013), voidMat, s * headR * 0.36, hy + headR * 0.18, headR * 0.82, 0, 0, 0, 0, 0, 0, head));
+      add(box(headR * 1.1, 0.014, 0.02), M, 0, hy + headR * 0.32, headR * 0.86, 0, 0, 0, 0, 0, 0, head);
+      return { head, hy };
     }
     add(lathe('ped', PED, 8), M);
 
-    if (t === 'p') { // shield-bearing foot soldier
-      add(robe('pr', 0.56, 0.22, 0.13, 0.15, 0.16), M);
-      add(sphere(0.085), M, 0, 0.65);
-      add(geo('helm', () => new THREE.SphereGeometry(0.097, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2)), M, 0, 0.665);
-      add(box(0.03, 0.06, 0.17), M, 0, 0.77, -0.01);
-      add(cyl(0.145, 0.145, 0.035, 22), M, -0.12, 0.36, 0.17, Math.PI / 2, 0, 0).rotation.z = 0.35;
-      add(sphere(0.035), A, -0.128, 0.36, 0.195);
-      limb([-0.14, 0.5, 0], [-0.1, 0.38, 0.13], 0.04);
-      limb([0.14, 0.5, 0], [0.17, 0.42, 0.12], 0.04);
-      add(cyl(0.014, 0.014, 0.92, 8), M, 0.17, 0.52, 0.12);
-      add(cone(0.032, 0.11), A, 0.17, 1.03, 0.12);
-    } else if (t === 'r') { // fortified tower
+    if (t === 'p') { // shield-bearing foot soldier with spear
+      const { head, hy } = figure('pr', 0.56, 0.22, 0.13, 0.15, 0.16, 0.082, 11);
+      add(geo('helm', () => new THREE.SphereGeometry(0.094, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2)), M, 0, hy + 0.005, 0, -0.1, 0, 0, 0, 0, 0, head);
+      add(box(0.026, 0.07, 0.17), M, 0, hy + 0.1, -0.01, 0, 0, 0, 0, 0, 0, head);
+      add(box(0.016, 0.06, 0.016), M, 0, hy - 0.005, 0.09, 0, 0, 0, 0, 0, 0, head);
+      const armL = pivot('armL', -0.14, 0.5, 0);
+      limb([-0.14, 0.5, 0], [-0.1, 0.38, 0.13], 0.04, armL);
+      const sh = add(cyl(0.145, 0.145, 0.035, 22), M, -0.12, 0.36, 0.17, Math.PI / 2, 0, 0, 0, 0, 0, armL);
+      sh.rotation.z = 0.35; sh.userData.part = 'shield';
+      const boss = new THREE.Mesh(sphere(0.035), A); boss.position.set(0, 0.025, 0); sh.add(boss);
+      const rim = new THREE.Mesh(torus(0.14, 0.012), A); rim.rotation.x = Math.PI / 2; sh.add(rim);
+      const armR = pivot('armR', 0.14, 0.5, 0);
+      limb([0.14, 0.5, 0], [0.17, 0.42, 0.12], 0.04, armR);
+      add(cyl(0.014, 0.014, 0.92, 8), M, 0.17, 0.52, 0.12, 0, 0, 0, 0, 0, 0, armR);
+      add(cone(0.032, 0.11), A, 0.17, 1.03, 0.12, 0, 0, 0, 0, 0, 0, armR);
+    } else if (t === 'r') { // fortified tower of stacked blocks
       add(lathe('rt', [[0, 0.14], [0.31, 0.14], [0.31, 0.2], [0.27, 0.25], [0.245, 0.8], [0.3, 0.85], [0.32, 0.93], [0.32, 1.02], [0.24, 1.02], [0.24, 0.96], [0, 0.96]], 14), M);
+      for (let row = 0; row < 5; row++) add(torus(0.252 - row * 0.003, 0.008), M, 0, 0.32 + row * 0.11, 0, Math.PI / 2, 0, 0);
       for (let k = 0; k < 8; k++) {
         const a = k / 8 * Math.PI * 2;
         add(box(0.11, 0.12, 0.09), M, Math.sin(a) * 0.28, 1.08, Math.cos(a) * 0.28, 0, a, 0);
       }
       add(box(0.13, 0.2, 0.03), voidMat, 0, 0.32, 0.262);
       add(cyl(0.065, 0.065, 0.03, 16), voidMat, 0, 0.42, 0.262, Math.PI / 2, 0, 0);
-      [0, Math.PI / 2, -Math.PI / 2, Math.PI].forEach((a) => add(box(0.035, 0.13, 0.03), voidMat, Math.sin(a) * 0.25, 0.66, Math.cos(a) * 0.25, 0, a, 0));
-      add(geo('rband', () => new THREE.TorusGeometry(0.255, 0.014, 8, 32)), M, 0, 0.5, 0, Math.PI / 2, 0, 0);
-    } else if (t === 'n') { // war-horse bust
+      add(box(0.17, 0.035, 0.05), M, 0, 0.5, 0.27);
+      [0, Math.PI / 2, -Math.PI / 2, Math.PI].forEach((a) => add(box(0.035, 0.13, 0.03), voidMat, Math.sin(a) * 0.25, 0.7, Math.cos(a) * 0.25, 0, a, 0));
+    } else if (t === 'n') { // war-horse bust; the head is a pivot so it can nod and toss
       add(lathe('np', [[0, 0.14], [0.27, 0.14], [0.27, 0.22], [0.23, 0.26], [0, 0.26]], 24), M);
-      const head = add(geo('nh', () => {
+      const headP = pivot('head', 0, 0.26, -0.04);
+      const hd = add(geo('nh', () => {
         const s = new THREE.Shape();
         s.moveTo(-0.22, 0); s.lineTo(0.2, 0);
         s.quadraticCurveTo(0.25, 0.2, 0.14, 0.36);
@@ -787,10 +864,10 @@ function chooseMove(st, level) {
         s.quadraticCurveTo(-0.12, 0.86, -0.18, 0.7);
         s.quadraticCurveTo(-0.28, 0.45, -0.26, 0.2);
         s.lineTo(-0.22, 0);
-        const g = new THREE.ExtrudeGeometry(s, { depth: 0.2, bevelEnabled: true, bevelThickness: 0.06, bevelSize: 0.045, bevelSegments: 4, curveSegments: 12 });
-        g.translate(0, 0, -0.1);
+        const g = new THREE.ExtrudeGeometry(s, { depth: 0.24, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.05, bevelSegments: 5, curveSegments: 12 });
+        g.translate(0, 0, -0.12);
         return g;
-      }), M, 0, 0.26, 0, 0, -Math.PI / 2, 0);
+      }), M, 0, 0.26, 0, 0, -Math.PI / 2, 0, 0, 0, 0, headP);
       const mane = new THREE.Mesh(geo('nm', () => {
         const s = new THREE.Shape();
         s.moveTo(0.04, 0.95); s.quadraticCurveTo(-0.16, 0.92, -0.25, 0.7); s.quadraticCurveTo(-0.35, 0.45, -0.33, 0.16);
@@ -799,67 +876,80 @@ function chooseMove(st, level) {
         g.translate(0, 0, -0.05);
         return g;
       }), M);
-      mane.castShadow = true; head.add(mane);
+      mane.castShadow = true; hd.add(mane);
       [-1, 1].forEach((side) => {
-        const eye = new THREE.Mesh(sphere(0.026), voidMat); eye.position.set(0.25, 0.78, side * 0.15); head.add(eye);
-        const nost = new THREE.Mesh(sphere(0.018), voidMat); nost.position.set(0.47, 0.67, side * 0.08); head.add(nost);
+        const eye = new THREE.Mesh(sphere(0.026), voidMat); eye.position.set(0.25, 0.78, side * 0.19); hd.add(eye);
+        const nost = new THREE.Mesh(sphere(0.018), voidMat); nost.position.set(0.47, 0.67, side * 0.1); hd.add(nost);
       });
-      const rein = new THREE.Mesh(geo('rein', () => new THREE.TorusGeometry(0.16, 0.012, 6, 24)), A);
-      rein.position.set(0.36, 0.63, 0); rein.rotation.y = Math.PI / 2; rein.scale.set(1, 0.55, 1); head.add(rein);
-    } else if (t === 'b') { // robed priest with crook
-      add(robe('br', 0.84, 0.25, 0.13, 0.15, 0.17), M);
-      add(sphere(0.09), M, 0, 0.94);
-      add(lathe('mitre', [[0, 0], [0.088, 0], [0.11, 0.1], [0.1, 0.2], [0.06, 0.28], [0, 0.31]], 20), M, 0, 0.99);
-      add(geo('mband', () => new THREE.TorusGeometry(0.09, 0.013, 6, 24)), A, 0, 1.01, 0, Math.PI / 2, 0, 0);
+      const rein = new THREE.Mesh(torus(0.16, 0.012), A);
+      rein.position.set(0.36, 0.63, 0); rein.rotation.y = Math.PI / 2; rein.scale.set(1, 0.55, 1); hd.add(rein);
+    } else if (t === 'b') { // robed priest with a crook
+      const { head, hy } = figure('br', 0.84, 0.25, 0.13, 0.15, 0.17, 0.088, 13);
+      add(lathe('mitre', [[0, 0], [0.088, 0], [0.11, 0.1], [0.1, 0.2], [0.06, 0.28], [0, 0.31]], 20), M, 0, hy + 0.04, 0, 0, 0, 0, 0, 0, 0, head);
+      add(torus(0.09, 0.013), A, 0, hy + 0.06, 0, Math.PI / 2, 0, 0, 0, 0, 0, head);
       add(box(0.05, 0.5, 0.012), A, 0, 0.55, 0.15, -0.12, 0, 0);
-      limb([0.16, 0.76, 0], [0.2, 0.64, 0.11], 0.042);
-      limb([-0.16, 0.76, 0], [-0.03, 0.58, 0.17], 0.042);
-      add(cyl(0.017, 0.017, 1.12, 8), M, 0.2, 0.7, 0.11);
-      add(geo('crook', () => new THREE.TorusGeometry(0.065, 0.016, 8, 20, Math.PI * 1.25)), A, 0.2 - 0.065, 1.27, 0.11, 0, 0, -0.2);
+      const armL = pivot('armL', -0.16, 0.76, 0);
+      limb([-0.16, 0.76, 0], [-0.03, 0.58, 0.17], 0.042, armL);
+      const armR = pivot('armR', 0.16, 0.76, 0);
+      limb([0.16, 0.76, 0], [0.2, 0.64, 0.11], 0.042, armR);
+      add(cyl(0.017, 0.017, 1.12, 8), M, 0.2, 0.7, 0.11, 0, 0, 0, 0, 0, 0, armR);
+      add(torus(0.065, 0.016, Math.PI * 1.25), A, 0.2 - 0.065, 1.27, 0.11, 0, 0, -0.2, 0, 0, 0, armR);
     } else if (t === 'q') { // crowned queen with sceptre
-      add(robe('qr', 0.94, 0.33, 0.13, 0.16, 0.18), M);
-      add(sphere(0.092), M, 0, 1.04);
-      add(cyl(0.09, 0.08, 0.06, 18), A, 0, 1.11);
+      const { head, hy } = figure('qr', 0.94, 0.33, 0.13, 0.16, 0.18, 0.09, 15);
+      add(geo('hair', () => new THREE.SphereGeometry(0.1, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.62)), M, 0, hy, -0.012, -0.35, 0, 0, 0, 0, 0, head);
+      const crown = pivot('crown', 0, hy + 0.075, 0, head);
+      add(cyl(0.09, 0.08, 0.06, 18), A, 0, hy + 0.075, 0, 0, 0, 0, 0, 0, 0, crown);
       for (let k = 0; k < 7; k++) {
         const a = k / 7 * Math.PI * 2;
-        add(cone(0.02, 0.09), A, Math.sin(a) * 0.088, 1.18, Math.cos(a) * 0.088);
+        add(cone(0.02, 0.09), A, Math.sin(a) * 0.088, hy + 0.145, Math.cos(a) * 0.088, 0, 0, 0, 0, 0, 0, crown);
       }
       add(geo('qcape', () => new THREE.CylinderGeometry(0.17, 0.33, 0.8, 22, 1, true, Math.PI / 2, Math.PI)), M2, 0, 0.56, -0.02);
-      limb([0.18, 0.86, 0], [0.2, 0.68, 0.17], 0.042);
-      limb([-0.18, 0.86, 0], [-0.07, 0.64, 0.19], 0.042);
-      add(cyl(0.016, 0.016, 0.42, 8), A, 0.2, 0.82, 0.17);
-      add(sphere(0.045), A, 0.2, 1.05, 0.17);
-    } else { // king resting both hands on a great sword
-      add(robe('kr', 1.03, 0.33, 0.15, 0.18, 0.2), M);
-      add(sphere(0.1), M, 0, 1.14);
-      add(cone(0.075, 0.16), M, 0, 1.04, 0.06, Math.PI, 0, 0);
-      add(cyl(0.1, 0.092, 0.08, 18), A, 0, 1.24);
+      const armL = pivot('armL', -0.18, 0.86, 0);
+      limb([-0.18, 0.86, 0], [-0.07, 0.64, 0.19], 0.042, armL);
+      const armR = pivot('armR', 0.18, 0.86, 0);
+      limb([0.18, 0.86, 0], [0.2, 0.68, 0.17], 0.042, armR);
+      add(cyl(0.016, 0.016, 0.42, 8), A, 0.2, 0.82, 0.17, 0, 0, 0, 0, 0, 0, armR);
+      add(sphere(0.045), A, 0.2, 1.05, 0.17, 0, 0, 0, 0, 0, 0, armR);
+    } else { // bearded king resting both hands on a great sword
+      const { head, hy } = figure('kr', 1.03, 0.33, 0.15, 0.18, 0.2, 0.098, 15);
+      add(cone(0.075, 0.17), M, 0, hy - 0.1, 0.055, Math.PI, 0, 0, 0, 0, 0, head);
+      const crown = pivot('crown', 0, hy + 0.09, 0, head);
+      add(cyl(0.1, 0.092, 0.08, 18), A, 0, hy + 0.09, 0, 0, 0, 0, 0, 0, 0, crown);
       for (let k = 0; k < 5; k++) {
         const a = k / 5 * Math.PI * 2;
-        add(cone(0.024, 0.09), A, Math.sin(a) * 0.098, 1.32, Math.cos(a) * 0.098);
+        add(cone(0.024, 0.09), A, Math.sin(a) * 0.098, hy + 0.17, Math.cos(a) * 0.098, 0, 0, 0, 0, 0, 0, crown);
       }
-      add(box(0.045, 0.2, 0.045), A, 0, 1.4);
-      add(box(0.14, 0.045, 0.045), A, 0, 1.43);
+      add(box(0.045, 0.2, 0.045), A, 0, hy + 0.25, 0, 0, 0, 0, 0, 0, 0, crown);
+      add(box(0.14, 0.045, 0.045), A, 0, hy + 0.28, 0, 0, 0, 0, 0, 0, 0, crown);
       add(geo('kcape', () => new THREE.CylinderGeometry(0.19, 0.34, 0.88, 22, 1, true, Math.PI / 2, Math.PI)), M2, 0, 0.6, -0.02);
-      limb([0.19, 0.95, 0], [0.035, 0.86, 0.3], 0.045);
-      limb([-0.19, 0.95, 0], [-0.035, 0.86, 0.3], 0.045);
-      add(cyl(0.017, 0.017, 0.11, 8), A, 0, 0.87, 0.31);
-      add(sphere(0.03), A, 0, 0.94, 0.31);
-      add(box(0.26, 0.03, 0.035), A, 0, 0.8, 0.31);
-      add(box(0.045, 0.48, 0.012), A, 0, 0.55, 0.31);
-      add(cone(0.024, 0.06), A, 0, 0.28, 0.31, Math.PI, 0, 0);
+      const armR = pivot('armR', 0, 0.93, 0.02);
+      limb([0.19, 0.95, 0], [0.035, 0.86, 0.3], 0.045, armR);
+      limb([-0.19, 0.95, 0], [-0.035, 0.86, 0.3], 0.045, armR);
+      add(cyl(0.017, 0.017, 0.11, 8), A, 0, 0.87, 0.31, 0, 0, 0, 0, 0, 0, armR);
+      add(sphere(0.03), A, 0, 0.94, 0.31, 0, 0, 0, 0, 0, 0, armR);
+      add(box(0.26, 0.03, 0.035), A, 0, 0.8, 0.31, 0, 0, 0, 0, 0, 0, armR);
+      add(box(0.045, 0.48, 0.012), A, 0, 0.55, 0.31, 0, 0, 0, 0, 0, 0, armR);
+      add(cone(0.024, 0.06), A, 0, 0.28, 0.31, Math.PI, 0, 0, 0, 0, 0, armR);
     }
-    root.userData = { key: ch, body, lift: 0, anim: false, phase: Math.random() * 6.3, yaw: white ? Math.PI : 0, H: HEIGHTS[t] };
+    const contact = new THREE.Mesh(planeGeo, contactMat);
+    contact.rotation.x = -Math.PI / 2; contact.position.y = 0.003; contact.scale.setScalar(0.95);
+    root.add(contact);
+    root.userData = { key: ch, type: t, body, rig, lift: 0, anim: false, phase: Math.random() * 6.3, yaw: white ? Math.PI : 0, H: HEIGHTS[t], headBias: t === 'n' ? (Math.random() < 0.5 ? -0.55 : 0.55) : 0 };
     root.rotation.y = root.userData.yaw;
     return root;
   }
+  function resetRig(u) {
+    u.body.rotation.set(0, 0, 0); u.body.position.set(0, 0, 0); u.body.scale.set(1, 1, 1);
+    Object.keys(u.rig).forEach((k) => u.rig[k].rotation.set(0, 0, 0));
+  }
 
   // Colossal statues watching from the edge of the hall
+  const colossi = [];
   [['k', -9, -27, 0], ['q', 9, -27, 0], ['K', 9, 27, Math.PI], ['Q', -9, 27, Math.PI]].forEach(([ch, x, z, yaw]) => {
     const o = makePiece(ch);
     o.scale.setScalar(7.5); o.position.set(x, -0.55, z); o.rotation.y = yaw;
     o.traverse((m) => { m.castShadow = false; });
-    scene.add(o);
+    scene.add(o); colossi.push(o);
   });
 
   // ---------- Sound (synthesised, starts after the first tap) ----------
@@ -886,46 +976,64 @@ function chooseMove(st, level) {
     const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + 0.05);
   }
-  function thud(vol, delay) {
+  function thud(vol, delay, f0) {
     const c = audio(); if (!c) return;
     const t = c.currentTime + (delay || 0);
     const o = c.createOscillator(); o.type = 'sine';
-    o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(36, t + 0.4);
+    o.frequency.setValueAtTime(f0 || 120, t); o.frequency.exponentialRampToValueAtTime(34, t + 0.4);
     const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
     o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.55);
   }
-  function sndStep(dur) { noiseHit('bandpass', 500, 260, 0.09, Math.min(0.9, dur), 0); }
-  function sndCrash() {
-    noiseHit('lowpass', 3200, 260, 0.75, 0.9, 0);
-    thud(0.9, 0);
-    for (let i = 0; i < 6; i++) noiseHit('highpass', 2400, 1800, 0.12, 0.06, 0.25 + i * rand(0.06, 0.12));
+  function hum(f, vol, dur) {
+    const c = audio(); if (!c) return;
+    const t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(f, t); o.frequency.exponentialRampToValueAtTime(f * 2.2, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05);
   }
+  function rattle(n, start, spread) { for (let i = 0; i < n; i++) noiseHit('highpass', 2600, 1800, 0.1, 0.05, start + Math.random() * spread); }
+  function sndStep(dur) { noiseHit('bandpass', 500, 260, 0.09, Math.min(0.9, dur), 0); }
+  const SND = {
+    p: () => { noiseHit('lowpass', 3600, 300, 0.7, 0.7, 0); thud(0.7, 0); rattle(7, 0.2, 0.7); },
+    r: () => { noiseHit('lowpass', 900, 120, 0.9, 1.8, 0); thud(1, 0, 80); thud(0.6, 0.35, 70); thud(0.5, 0.7, 60); rattle(10, 0.3, 1.3); },
+    n: () => { noiseHit('lowpass', 2600, 300, 0.6, 0.5, 0); thud(0.7, 0); },
+    b: () => { noiseHit('bandpass', 4200, 900, 0.5, 0.35, 0); thud(0.5, 0.05, 150); },
+    q: () => { hum(160, 0.18, 0.6); noiseHit('lowpass', 5000, 400, 0.8, 1.1, 0.55); thud(0.8, 0.55); rattle(12, 0.8, 1.2); },
+    k: () => { noiseHit('lowpass', 2000, 160, 0.9, 1.4, 0); thud(1, 0, 90); rattle(10, 0.2, 1.2); }
+  };
 
   // ---------- Animation timeline ----------
-  let actions = [], frags = [], puffs = [], shake = 0, pendingVictims = [];
+  let actions = [], frags = [], puffs = [], rigids = [], fxObjs = [], shake = 0, pendingVictims = [];
   function addAction(delay, dur, a) { a.t0 = now() + delay; a.dur = dur; actions.push(a); return dur; }
   function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
   function angDiff(a, b) { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return d; }
 
   function walk(obj, from, to, delay, opts) {
     opts = opts || {};
-    const dist = from.distanceTo(to), knight = obj.userData.key.toLowerCase() === 'n', body = obj.userData.body;
+    const u = obj.userData, dist = from.distanceTo(to), knight = u.type === 'n', rook = u.type === 'r', body = u.body;
     const dur = (knight ? 560 : 320 + dist * 190) * SPEED;
-    const heading = Math.atan2(to.x - from.x, to.z - from.z), base = obj.userData.yaw;
+    const heading = Math.atan2(to.x - from.x, to.z - from.z), base = u.yaw;
     const steps = Math.max(2, Math.round(dist * 2.4));
     let y0 = 0, yaw0 = 0;
     return addAction(delay, dur, {
-      start() { obj.userData.anim = true; y0 = body.position.y; yaw0 = obj.rotation.y; sndStep(dur / 1000); },
+      start() { u.anim = true; y0 = body.position.y; yaw0 = obj.rotation.y; sndStep(dur / 1000); },
       update(k) {
-        const e = ease(k);
+        const e = ease(k), R = u.rig, sw = Math.sin(Math.PI * k * steps);
         obj.position.set(from.x + (to.x - from.x) * e, 0, from.z + (to.z - from.z) * e);
         if (knight) {
           body.position.y = y0 * (1 - k) + Math.sin(Math.PI * k) * 0.7;
           body.rotation.x = -0.28 * Math.sin(Math.PI * 2 * k);
+          if (R.head) R.head.rotation.x = 0.2 * Math.sin(Math.PI * 2 * k);
+        } else if (rook) {
+          body.position.y = y0 * (1 - k) + Math.abs(sw) * 0.02;
+          body.rotation.z = 0.015 * sw;
         } else {
-          body.position.y = y0 * (1 - k) + Math.abs(Math.sin(Math.PI * k * steps)) * 0.045;
-          body.rotation.x = 0.07 * Math.sin(Math.PI * k);
-          body.rotation.z = 0.03 * Math.sin(Math.PI * k * steps);
+          body.position.y = y0 * (1 - k) + Math.abs(sw) * 0.05;
+          body.rotation.x = 0.08 * Math.sin(Math.PI * k);
+          body.rotation.z = 0.035 * sw;
+          if (R.armR) R.armR.rotation.x = 0.25 * sw;
+          if (R.armL) R.armL.rotation.x = -0.25 * sw;
+          if (R.head) R.head.rotation.y *= 0.9;
         }
         if (dist < 0.05) return;
         const turnIn = opts.turnIn !== false, hy = turnIn ? heading : yaw0;
@@ -933,38 +1041,72 @@ function chooseMove(st, level) {
         if (opts.turnOut !== false && k > 0.8) obj.rotation.y = hy + angDiff(hy, base) * ((k - 0.8) / 0.2);
       },
       end() {
-        body.position.y = 0; body.rotation.x = 0; body.rotation.z = 0;
+        resetRig(u);
         obj.position.set(to.x, 0, to.z);
-        if (opts.turnOut !== false) { obj.rotation.y = base; obj.userData.anim = false; }
+        if (opts.turnOut !== false) { obj.rotation.y = base; u.anim = false; }
         if (knight) thud(0.35, 0);
         if (opts.done) opts.done();
       }
     });
   }
+
+  // Each attacker has its own blow. pose(k) sets limbs and returns body lean / forward step / lift.
+  function seg(k, a, b) { return Math.min(1, Math.max(0, (k - a) / (b - a))); }
+  const STRIKES = {
+    p: { dur: 640, hit: 0.55, pose(R, k) { // spear thrust
+      const w = ease(seg(k, 0, 0.4)), th = seg(k, 0.4, 0.55), back = ease(seg(k, 0.55, 1));
+      R.armR.rotation.x = (-0.55 * w + 2.0 * th) * (1 - back);
+      if (R.armL) R.armL.rotation.x = 0.4 * th * (1 - back);
+      return { lean: (-0.12 * w + 0.36 * th) * (1 - back), fwd: 0.26 * th * (1 - back), lift: 0 };
+    } },
+    r: { dur: 640, hit: 0.6, pose(R, k) { // rises and rams
+      const up = ease(seg(k, 0, 0.42)), slam = seg(k, 0.42, 0.6), back = ease(seg(k, 0.6, 1));
+      return { lean: (-0.12 * up + 0.4 * slam) * (1 - back), fwd: 0.38 * slam * (1 - back), lift: 0.28 * up * (1 - slam) };
+    } },
+    n: { dur: 720, hit: 0.62, pose(R, k) { // rears up and stomps
+      const rear = ease(seg(k, 0, 0.45)), st = seg(k, 0.45, 0.62), back = ease(seg(k, 0.62, 1));
+      if (R.head) R.head.rotation.x = (-0.45 * rear + 0.7 * st) * (1 - back);
+      return { lean: (-0.6 * rear + 0.95 * st) * (1 - back), fwd: 0.22 * st * (1 - back), lift: 0.26 * rear * (1 - st) };
+    } },
+    b: { dur: 760, hit: 0.6, pose(R, k) { // crook raised overhead, brought down
+      const up = ease(seg(k, 0, 0.45)), dn = seg(k, 0.45, 0.6), back = ease(seg(k, 0.6, 1));
+      R.armR.rotation.x = (-2.5 * up + 3.4 * dn) * (1 - back);
+      return { lean: (-0.15 * up + 0.4 * dn) * (1 - back), fwd: 0.15 * dn * (1 - back), lift: 0 };
+    } },
+    q: { dur: 760, hit: 0.6, pose(R, k, body) { // twisting sceptre swing
+      const w = ease(seg(k, 0, 0.45)), sw = seg(k, 0.45, 0.6), back = ease(seg(k, 0.6, 1));
+      body.rotation.y = (-0.8 * w + 1.5 * sw) * (1 - back);
+      R.armR.rotation.x = (-1.7 * w + 2.3 * sw) * (1 - back);
+      R.armR.rotation.z = (0.5 * w - 0.8 * sw) * (1 - back);
+      return { lean: 0.25 * sw * (1 - back), fwd: 0.18 * sw * (1 - back), lift: 0 };
+    } },
+    k: { dur: 820, hit: 0.6, pose(R, k) { // two-handed overhead sword chop
+      const up = ease(seg(k, 0, 0.47)), dn = seg(k, 0.47, 0.6), back = ease(seg(k, 0.6, 1));
+      R.armR.rotation.x = (-2.7 * up + 3.3 * dn) * (1 - back);
+      return { lean: (-0.12 * up + 0.42 * dn) * (1 - back), fwd: 0.2 * dn * (1 - back), lift: 0 };
+    } }
+  };
   function strike(obj, target, delay, onImpact) {
-    const body = obj.userData.body, knight = obj.userData.key.toLowerCase() === 'n';
+    const u = obj.userData, body = u.body, S = STRIKES[u.type];
     let yaw0, heading, p0, hit = false;
-    return addAction(delay, 600 * SPEED, {
+    return addAction(delay, S.dur * SPEED, {
       start() {
-        obj.userData.anim = true; yaw0 = obj.rotation.y; p0 = obj.position.clone();
+        u.anim = true; yaw0 = obj.rotation.y; p0 = obj.position.clone();
         heading = Math.atan2(target.x - p0.x, target.z - p0.z);
+        noiseHit('bandpass', 700, 1400, 0.06, 0.25, 0.1);
       },
       update(k) {
         obj.rotation.y = yaw0 + angDiff(yaw0, heading) * Math.min(1, k / 0.25);
-        let lean, fwd;
-        if (k < 0.45) { lean = -0.24 * ease(k / 0.45); fwd = 0; }
-        else if (k < 0.6) { const q = (k - 0.45) / 0.15; lean = -0.24 + 0.8 * q; fwd = 0.2 * q; }
-        else { const q = ease((k - 0.6) / 0.4); lean = 0.56 * (1 - q); fwd = 0.2 * (1 - q); }
-        body.rotation.x = lean;
-        body.position.y = knight ? Math.max(0, -lean) * 0.6 : 0;
-        obj.position.set(p0.x + Math.sin(heading) * fwd, 0, p0.z + Math.cos(heading) * fwd);
-        if (!hit && k >= 0.58) { hit = true; onImpact(new V3(Math.sin(heading), 0, Math.cos(heading))); }
+        const r = S.pose(u.rig, k, body);
+        body.rotation.x = r.lean; body.position.y = r.lift;
+        obj.position.set(p0.x + Math.sin(heading) * r.fwd, 0, p0.z + Math.cos(heading) * r.fwd);
+        if (!hit && k >= S.hit) { hit = true; onImpact(new V3(Math.sin(heading), 0, Math.cos(heading))); }
       },
-      end() { body.rotation.x = 0; body.position.y = 0; obj.position.copy(p0); }
+      end() { resetRig(u); obj.position.copy(p0); }
     });
   }
 
-  // ---------- Shatter effect ----------
+  // ---------- Destruction: one simulation per piece type ----------
   const FRAG_GEOS = [new THREE.DodecahedronGeometry(1, 0), new THREE.TetrahedronGeometry(1, 0), new THREE.OctahedronGeometry(1, 0), new THREE.BoxGeometry(1, 1, 1)];
   function puff(P, opts) {
     const n = opts.n, pos = new Float32Array(n * 3), vel = [];
@@ -975,51 +1117,224 @@ function chooseMove(st, level) {
       vel.push(new V3(Math.cos(a) * sp, rand(opts.up0, opts.up1), Math.sin(a) * sp));
     }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const mat = new THREE.PointsMaterial({ color: opts.color, size: opts.s0, map: opts.tex || softTex, transparent: true, opacity: opts.op, depthWrite: false, blending: opts.add ? THREE.AdditiveBlending : THREE.NormalBlending });
+    const mat = new THREE.PointsMaterial({ color: opts.color, size: opts.s0, map: softTex, transparent: true, opacity: opts.op, depthWrite: false, blending: opts.add ? THREE.AdditiveBlending : THREE.NormalBlending });
     const pts = new THREE.Points(g, mat); scene.add(pts);
     puffs.push({ pts, vel, age: 0, o: opts });
   }
-  function shatter(victim, dir) {
-    pendingVictims = pendingVictims.filter((v) => v !== victim);
-    const white = victim.userData.key !== victim.userData.key.toLowerCase();
-    const mat = white ? stoneW : stoneB, P = victim.position.clone(), H = victim.userData.H;
-    scene.remove(victim);
-    const n = reduceMotion ? 20 : 60;
-    for (let i = 0; i < n; i++) {
-      const big = i < 12, s = big ? rand(0.1, 0.19) : rand(0.03, 0.09);
-      const m = new THREE.Mesh(FRAG_GEOS[i % 4], mat);
-      m.scale.set(s * rand(0.6, 1.3), s * rand(0.6, 1.3), s * rand(0.6, 1.3));
-      const a = Math.random() * Math.PI * 2, r = Math.random() * 0.24;
-      m.position.set(P.x + Math.cos(a) * r, rand(0.15, H), P.z + Math.sin(a) * r);
-      m.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
+  function dust(P, white, scale, h) {
+    scale = scale || 1;
+    puff(P, { n: Math.round(90 * scale), color: white ? 0xd6d0c4 : 0x5d5a60, s0: 0.45, s1: 1.6 * scale, op: 0.7, r: 0.3, v0: 0.3, v1: 1.4 * scale, up0: 0.15, up1: 1.0, h: h || 0.6, dur: 1.8, grav: -0.2, drag: 1.8 });
+  }
+  function sparks(P, color, n, h) {
+    puff(P, { n, color, s0: 0.12, s1: 0.03, op: 1, v0: 1.4, v1: 4.2, up0: 1, up1: 4, h: h || 0.6, y0: 0.2, dur: 0.75, grav: 7, drag: 0.5, add: true });
+  }
+  function flash(P, power) { flashLight.position.set(P.x, 0.9, P.z); flashT = power || 1; }
+  // o: { n, at(i) -> V3, vel(i, pos) -> V3, size [min,max], mat, delay(i), lowG seconds, swirl {c, t, k}, block [x,y,z], rotY(i), life [min,max], spin }
+  function shards(o) {
+    for (let i = 0; i < o.n; i++) {
+      const pos = o.at(i), m = new THREE.Mesh(FRAG_GEOS[o.block ? 3 : i % 3], o.mat);
+      if (o.block) m.scale.set(o.block[0] * rand(0.85, 1.05), o.block[1] * rand(0.85, 1.05), o.block[2] * rand(0.85, 1.05));
+      else { const s = rand(o.size[0], o.size[1]); m.scale.set(s * rand(0.6, 1.3), s * rand(0.6, 1.3), s * rand(0.6, 1.3)); }
+      m.position.copy(pos);
+      if (o.rotY) m.rotation.y = o.rotY(i); else m.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
       m.castShadow = true;
-      const v = dir.clone().multiplyScalar(rand(1, 3.4)).add(new V3(Math.cos(a), 0, Math.sin(a)).multiplyScalar(rand(0.4, 1.9)));
-      v.y = rand(0.8, 3.6);
-      frags.push({ m, v, w: new V3(rand(-12, 12), rand(-12, 12), rand(-12, 12)), s0: m.scale.clone(), r: Math.max(m.scale.x, m.scale.y, m.scale.z) * 0.7, age: 0, life: rand(2.4, 3.2) });
+      const sp = o.spin === undefined ? 12 : o.spin;
+      frags.push({
+        m, v: o.vel(i, pos), w: new V3(rand(-sp, sp), rand(-sp, sp), rand(-sp, sp)), s0: m.scale.clone(),
+        r: Math.min(m.scale.x, m.scale.y, m.scale.z) * 0.55, age: 0, life: rand((o.life || [2.4, 3.2])[0], (o.life || [2.4, 3.2])[1]),
+        delay: o.delay ? o.delay(i) : 0, lowG: o.lowG || 0, swirl: o.swirl || null
+      });
       scene.add(m);
     }
-    puff(P, { n: 110, color: white ? 0xe2dbcf : 0x6a666e, s0: 0.5, s1: 1.7, op: 0.75, v0: 0.3, v1: 1.4, up0: 0.2, up1: 1.1, h: H, dur: 1.7, grav: -0.2, drag: 1.8 });
-    puff(P, { n: 60, color: 0xffb24a, s0: 0.12, s1: 0.03, op: 1, v0: 1.5, v1: 4.5, up0: 1, up1: 4, h: H, y0: 0.2, dur: 0.75, grav: 7, drag: 0.5, add: true });
-    flashLight.position.set(P.x, 0.9, P.z); flashT = 1;
-    shake = Math.max(shake, reduceMotion ? 0.03 : 0.17);
-    sndCrash();
+  }
+  const inCyl = (P, r, y0, y1) => () => { const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * r; return new V3(P.x + Math.cos(a) * rr, rand(y0, y1), P.z + Math.sin(a) * rr); };
+  function outward(P, dir, kDir, kRad, up) {
+    return (i, pos) => {
+      const rad = new V3(pos.x - P.x, 0, pos.z - P.z); if (rad.lengthSq() < 1e-6) rad.set(rand(-1, 1), 0, rand(-1, 1)); rad.normalize();
+      const v = dir.clone().multiplyScalar(rand(kDir[0], kDir[1])).addScaledVector(rad, rand(kRad[0], kRad[1]));
+      v.y = rand(up[0], up[1]); return v;
+    };
+  }
+  function glowify(obj) {
+    const mats = [];
+    obj.traverse((m) => {
+      if (!m.isMesh || m.material === contactMat) return;
+      m.material = cloneMat(m.material); mats.push(m.material);
+      if (m.material.emissive) m.material.emissive.set(0xff6a1e);
+      m.material.emissiveIntensity = 0;
+    });
+    return mats;
+  }
+  function detach(group) { scene.attach(group); fxObjs.push(group); return group; }
+  function rigid(obj, v, w, r, breakAt, onBreak) { rigids.push({ obj, v, w, r, bounces: 0, breakAt, onBreak, age: 0 }); }
+
+  // Pawn: bursts apart; the shield flies off spinning and cracks when it lands
+  function breakPawn(victim, dir, P, white, mat) {
+    const shield = victim.userData.rig.armL.children.find((c) => c.userData.part === 'shield');
+    scene.remove(victim);
+    if (shield) {
+      detach(shield);
+      const side = new V3(dir.z, 0, -dir.x).multiplyScalar(rand(-1.2, 1.2));
+      rigid(shield, dir.clone().multiplyScalar(3).add(side).setY(2.6), new V3(rand(-9, 9), rand(-4, 4), rand(-9, 9)), 0.05, 2, (o) => {
+        shards({ n: 10, at: inCyl(o.position, 0.12, o.position.y, o.position.y + 0.05), vel: outward(o.position, dir, [0.2, 0.8], [0.3, 1.2], [0.6, 1.8]), size: [0.03, 0.07], mat });
+        dust(o.position, white, 0.4, 0.1); noiseHit('highpass', 3000, 1500, 0.25, 0.2, 0);
+      });
+    }
+    shards({ n: reduceMotion ? 18 : 48, at: inCyl(P, 0.22, 0.1, 0.86), vel: outward(P, dir, [1, 3.4], [0.4, 1.8], [0.8, 3.6]), size: [0.03, 0.12], mat });
+    dust(P, white, 1, 0.8); sparks(P, 0xffb24a, 40, 0.8); flash(P);
+    shake = Math.max(shake, 0.15);
+  }
+  // Rook: the tower collapses into its own stacked blocks, from the base upwards, raising a ring of dust
+  function breakRook(victim, dir, P, white, mat) {
+    scene.remove(victim);
+    const ROWS = 7, PER = 8, list = [];
+    for (let row = 0; row < ROWS; row++) for (let k = 0; k < PER; k++) list.push({ row, a: (k + (row % 2) * 0.5) / PER * Math.PI * 2 });
+    shards({
+      n: list.length, block: [0.18, 0.115, 0.1], mat,
+      at: (i) => { const { row, a } = list[i]; return new V3(P.x + Math.sin(a) * 0.26, 0.2 + row * 0.12, P.z + Math.cos(a) * 0.26); },
+      rotY: (i) => list[i].a,
+      vel: (i) => { const { row, a } = list[i], rad = new V3(Math.sin(a), 0, Math.cos(a)); const v = rad.multiplyScalar(rand(0.2, 0.7) + row * 0.12).addScaledVector(dir, rand(0.2, 0.9)); v.y = rand(-0.3, 0.3); return v; },
+      delay: (i) => list[i].row * 0.075 + rand(0, 0.05), spin: 3, life: [3.2, 3.8]
+    });
+    shards({
+      n: 8, block: [0.11, 0.12, 0.09], mat,
+      at: (i) => { const a = i / 8 * Math.PI * 2; return new V3(P.x + Math.sin(a) * 0.28, 1.08, P.z + Math.cos(a) * 0.28); },
+      rotY: (i) => i / 8 * Math.PI * 2,
+      vel: (i) => { const a = i / 8 * Math.PI * 2; return new V3(Math.sin(a) * rand(0.8, 1.6), rand(0.6, 1.6), Math.cos(a) * rand(0.8, 1.6)); },
+      delay: () => 0.5, spin: 6, life: [3.2, 3.8]
+    });
+    shards({ n: 24, at: inCyl(P, 0.25, 0.1, 1.0), vel: outward(P, dir, [0, 0.4], [0.3, 1.2], [0, 1]), size: [0.03, 0.07], mat, delay: () => rand(0, 0.5) });
+    puff(P, { n: 130, color: white ? 0xcfc8bb : 0x5a575d, s0: 0.5, s1: 2.1, op: 0.7, r: 0.35, v0: 1.4, v1: 3.2, up0: 0.05, up1: 0.4, h: 0.2, dur: 2.4, grav: -0.05, drag: 1.4 });
+    puff(P, { n: 60, color: white ? 0xd9d3c8 : 0x6a676e, s0: 0.4, s1: 1.5, op: 0.55, r: 0.3, v0: 0.2, v1: 0.6, up0: 0.5, up1: 1.6, h: 1.0, dur: 2.2, grav: -0.1, drag: 1.2 });
+    flash(P, 0.6);
+    shake = Math.max(shake, 0.24);
+  }
+  // Knight: the head is struck clean off, tumbles away and breaks on its second bounce
+  function breakKnight(victim, dir, P, white, mat) {
+    const head = victim.userData.rig.head;
+    detach(head);
+    scene.remove(victim);
+    const side = new V3(dir.z, 0, -dir.x).multiplyScalar(rand(-0.8, 0.8));
+    rigid(head, dir.clone().multiplyScalar(2.6).add(side).setY(3.2), new V3(dir.z * 9, rand(-3, 3), -dir.x * 9), 0.22, 2, (o) => {
+      const c = o.position.clone();
+      shards({ n: 26, at: inCyl(c, 0.2, c.y - 0.1, c.y + 0.25), vel: outward(c, dir, [0.3, 1.4], [0.4, 1.6], [0.8, 2.4]), size: [0.04, 0.12], mat });
+      dust(c, white, 0.7, 0.3); thud(0.6, 0); noiseHit('lowpass', 2500, 300, 0.5, 0.5, 0);
+      shake = Math.max(shake, 0.1);
+    });
+    shards({ n: 16, at: inCyl(P, 0.25, 0.05, 0.3), vel: outward(P, dir, [0.2, 1], [0.3, 1.2], [0.4, 1.6]), size: [0.04, 0.1], mat });
+    dust(P, white, 0.6, 0.3); sparks(P, 0xffb24a, 24, 0.9); flash(P, 0.8);
+    shake = Math.max(shake, 0.12);
+  }
+  // Bishop: a glowing crack splits the statue in two; each half falls outward and smashes
+  function breakBishop(victim, dir, P, white, mat) {
+    scene.remove(victim);
+    const side = new V3(dir.z, 0, -dir.x), H = victim.userData.H;
+    const halves = [1, -1].map((sgn) => {
+      const n = side.clone().multiplyScalar(sgn);
+      const piv = new THREE.Group(); piv.position.copy(P).addScaledVector(n, 0.3); piv.position.y = 0;
+      const half = new THREE.Group(); half.rotation.copy(victim.rotation); half.add(victim.userData.body.clone()); half.position.copy(P).sub(piv.position);
+      piv.add(half); scene.add(piv); fxObjs.push(piv);
+      const plane0 = new THREE.Plane().setFromNormalAndCoplanarPoint(n, P), plane = plane0.clone();
+      const mats = glowify(half);
+      mats.forEach((m) => { m.clippingPlanes = [plane]; m.clipShadows = true; m.side = THREE.DoubleSide; });
+      piv.updateMatrixWorld();
+      return { piv, n, sgn, plane0, plane, mats, inv0: new THREE.Matrix4().copy(piv.matrixWorld).invert(), half };
+    });
+    const crack = new THREE.Mesh(new THREE.PlaneGeometry(0.05, H), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    crack.position.set(P.x, H / 2, P.z); crack.rotation.y = Math.atan2(dir.x, dir.z); scene.add(crack); fxObjs.push(crack);
+    sparks(P, 0xffc060, 30, H); flash(P, 0.8);
+    shake = Math.max(shake, 0.08);
+    const delta = new THREE.Matrix4(), q = new THREE.Quaternion();
+    addAction(0, 1150 * SPEED, {
+      update(k) {
+        const glow = k < 0.25 ? k / 0.25 : Math.max(0, 1 - (k - 0.25) / 0.5);
+        crack.material.opacity = k < 0.3 ? glow : 0;
+        const f = seg(k, 0.25, 1), ang = f * f * 1.45;
+        halves.forEach((h) => {
+          q.setFromAxisAngle(dir, -h.sgn * ang); h.piv.quaternion.copy(q);
+          h.piv.position.y = 0.02 * f;
+          h.piv.updateMatrixWorld();
+          delta.multiplyMatrices(h.piv.matrixWorld, h.inv0);
+          h.plane.copy(h.plane0).applyMatrix4(delta);
+          h.mats.forEach((m) => { m.emissiveIntensity = 0.7 * glow; });
+        });
+      },
+      end() {
+        halves.forEach((h) => {
+          h.piv.updateMatrixWorld();
+          delta.multiplyMatrices(h.piv.matrixWorld, h.inv0);
+          const c = h.piv.localToWorld(new V3(0, 0.3, 0));
+          shards({ n: 28, mat, at: () => new V3(P.x, 0, P.z).addScaledVector(h.n, rand(0.02, 0.24)).add(new V3(rand(-0.15, 0.15) * dir.x, rand(0.05, H), rand(-0.15, 0.15) * dir.z)).applyMatrix4(delta), vel: outward(c, h.n, [0.4, 1.4], [0.2, 0.8], [0.4, 1.8]), size: [0.04, 0.12] });
+          scene.remove(h.piv); h.mats.forEach((m) => m.dispose());
+          dust(c, white, 0.6, 0.3);
+        });
+        scene.remove(crack);
+        thud(0.7, 0); noiseHit('lowpass', 2400, 200, 0.6, 0.7, 0);
+        shake = Math.max(shake, 0.12);
+      }
+    });
+  }
+  // Queen: magic glows through the stone, she rises and spins, then bursts into a whirlwind of shards
+  function breakQueen(victim, dir, P, white, mat) {
+    fxObjs.push(victim);
+    const mats = glowify(victim), yaw0 = victim.rotation.y;
+    sparks(P, 0xffd27a, 30, 1.2);
+    addAction(0, 600 * SPEED, {
+      update(k) {
+        victim.position.y = 0.32 * ease(k);
+        victim.rotation.y = yaw0 + k * k * 4;
+        victim.position.x = P.x + Math.sin(k * 90) * 0.01 * k;
+        mats.forEach((m) => { m.emissiveIntensity = 0.9 * k; });
+      },
+      end() {
+        scene.remove(victim); mats.forEach((m) => m.dispose());
+        const c = new V3(P.x, 0, P.z);
+        shards({
+          n: reduceMotion ? 24 : 70, mat, size: [0.025, 0.1], at: inCyl(P, 0.22, 0.35, 1.6), lowG: 1.0, swirl: { c, k: 7 }, life: [2.8, 3.6],
+          vel: (i, pos) => { const r = new V3(pos.x - c.x, 0, pos.z - c.z).normalize(); return new V3(-r.z, 0, r.x).multiplyScalar(rand(2, 3.6)).addScaledVector(r, rand(0.3, 0.9)).setY(rand(0.8, 2.6)); }
+        });
+        puff(P, { n: 50, color: 0xffcf70, s0: 0.14, s1: 0.03, op: 1, r: 0.3, v0: 0.8, v1: 3, up0: 1, up1: 3.5, h: 1.2, y0: 0.3, dur: 1.2, grav: 1.5, drag: 0.8, add: true });
+        dust(P, white, 1.1, 1.4); flash(P, 1.3);
+        shake = Math.max(shake, 0.2);
+      }
+    });
+  }
+  const BREAKS = { p: breakPawn, r: breakRook, n: breakKnight, b: breakBishop, q: breakQueen };
+  const PAUSE = { p: 200, r: 500, n: 260, b: 600, q: 750, k: 200 };
+  function shatter(victim, dir) {
+    pendingVictims = pendingVictims.filter((v) => v !== victim);
+    const u = victim.userData, white = u.key !== u.type;
+    victim.updateMatrixWorld(true);
+    SND[u.type] && SND[u.type]();
+    (BREAKS[u.type] || breakPawn)(victim, dir, victim.position.clone(), white, white ? fragW : fragB);
   }
   function promoGlow(s) {
     const P = sqPos(s);
     puff(P, { n: 50, color: 0xffd47a, s0: 0.12, s1: 0.02, op: 1, v0: 0.2, v1: 1.2, up0: 0.6, up1: 2.4, h: 0.4, dur: 1.1, grav: 0.4, drag: 1, add: true });
-    flashLight.position.set(P.x, 1.2, P.z); flashT = 0.6;
+    flash(P, 0.6);
     noiseHit('bandpass', 1800, 3600, 0.12, 0.6, 0);
   }
+  // King (checkmate): topples, smashes on the board, and the crown rolls away
   function toppleKing(color) {
-    const o = pieceObjs[kingSq(state.b, color)];
+    const ks = kingSq(state.b, color), o = pieceObjs[ks];
     if (!o || o.userData.toppled) return;
-    o.userData.toppled = true; o.userData.anim = true;
-    const b = o.userData.body;
-    addAction(500, 1400 * SPEED, {
-      update(k) { const e = k * k; b.rotation.x = -1.32 * e; b.position.y = 0.3 * e; },
+    const u = o.userData, b = u.body;
+    u.toppled = true; u.anim = true;
+    addAction(500, 1300 * SPEED, {
+      update(k) { const e = k * k; b.rotation.x = -1.3 * e; b.position.y = 0.3 * e; if (u.rig.armR) u.rig.armR.rotation.x = 0.6 * e; },
       end() {
-        puff(o.position, { n: 40, color: 0x9a9288, s0: 0.3, s1: 1, op: 0.5, v0: 0.3, v1: 1.2, up0: 0.1, up1: 0.6, h: 0.2, dur: 1.4, grav: -0.1, drag: 1.6 });
-        shake = Math.max(shake, 0.1); thud(0.8, 0); noiseHit('lowpass', 1400, 200, 0.4, 0.6, 0);
+        const white = u.key !== u.type, mat = white ? fragW : fragB;
+        o.updateMatrixWorld(true);
+        const crown = u.rig.crown;
+        if (crown) {
+          detach(crown);
+          const back = new V3(0, 0, -1).applyQuaternion(o.quaternion);
+          rigid(crown, back.multiplyScalar(1.6).add(new V3(rand(-0.6, 0.6), 0, rand(-0.6, 0.6))).setY(1.4), new V3(rand(-5, 5), rand(-8, 8), rand(-5, 5)), 0.06, 0, null);
+        }
+        shards({ n: 50, mat, size: [0.05, 0.16], at: () => b.localToWorld(new V3(rand(-0.22, 0.22), rand(0.05, u.H - 0.2), rand(-0.2, 0.2))), vel: () => new V3(rand(-1, 1), rand(0.4, 2), rand(-1, 1)), life: [3.5, 4.5] });
+        scene.remove(o); u.broken = true;
+        dust(o.position, white, 1.2, 0.4); SND.k();
+        shake = Math.max(shake, 0.22);
       }
     });
   }
@@ -1028,6 +1343,9 @@ function chooseMove(st, level) {
     frags.forEach((f) => scene.remove(f.m)); frags = [];
     puffs.forEach((p) => { scene.remove(p.pts); p.pts.geometry.dispose(); p.pts.material.dispose(); }); puffs = [];
     pendingVictims.forEach((v) => scene.remove(v)); pendingVictims = [];
+    rigids = [];
+    fxObjs.forEach((o) => { if (o.parent) o.parent.remove(o); }); fxObjs = [];
+    flashT = 0; flashLight.intensity = 0;
   }
 
   // ---------- Pieces on the board ----------
@@ -1036,28 +1354,34 @@ function chooseMove(st, level) {
     for (let s = 0; s < 64; s++) {
       const ch = state.b[s];
       let obj = pieceObjs[s];
-      if (obj && (!ch || obj.userData.key !== ch)) { scene.remove(obj); pieceObjs[s] = obj = null; }
+      if (obj && (!ch || obj.userData.key !== ch || obj.userData.broken)) { scene.remove(obj); pieceObjs[s] = obj = null; }
       if (ch && !obj) { obj = makePiece(ch); scene.add(obj); pieceObjs[s] = obj; }
       if (obj) {
         const p = sqPos(s), u = obj.userData;
         obj.position.set(p.x, 0, p.z); obj.rotation.y = u.yaw;
         u.sq = s; u.anim = false; u.toppled = false;
-        u.body.rotation.set(0, 0, 0); u.body.position.set(0, 0, 0); u.body.scale.set(1, 1, 1);
+        resetRig(u);
       }
     }
   }
 
   // ---------- Highlights ----------
   const C_LAST = new THREE.Color(0xe0a94a), C_SEL = new THREE.Color(0xffd27a), C_CHECK = new THREE.Color(0xe0442c);
+  let threatened = new Set();
   function setOverlay(s, color, op) { const o = overlays[s]; o.material.color.copy(color); o.material.opacity = op; o.visible = true; }
   function refreshMarks() {
     for (let s = 0; s < 64; s++) { overlays[s].visible = false; dots[s].visible = false; rings[s].visible = false; }
+    threatened = new Set();
     const last = history.length ? history[history.length - 1].m : null;
     if (last) { setOverlay(last.from, C_LAST, 0.22); setOverlay(last.to, C_LAST, 0.32); }
     if (inCheck(state)) setOverlay(kingSq(state.b, state.turn), C_CHECK, 0.5);
     if (selected !== null) {
       setOverlay(selected, C_SEL, 0.35);
-      legal.forEach((m) => { if (m.from === selected) (m.cap ? rings : dots)[m.to].visible = true; });
+      legal.forEach((m) => {
+        if (m.from !== selected) return;
+        (m.cap ? rings : dots)[m.to].visible = true;
+        if (m.cap) threatened.add(m.ep ? m.to + (state.turn === 'w' ? -8 : 8) : m.to);
+      });
     }
     for (let i = 0; i < 64; i++) if (pieceObjs[i]) pieceObjs[i].userData.lift = i === selected ? 0.16 : 0;
   }
@@ -1080,7 +1404,7 @@ function chooseMove(st, level) {
       let t = 0;
       if (stop.distanceTo(F) > 0.05) t += walk(obj, F, stop, 0, { turnOut: false });
       t += strike(obj, VP, t, (hitDir) => shatter(victim, hitDir));
-      t += 200 * SPEED;
+      t += (PAUSE[victim.userData.type] || 200) * SPEED;
       walk(obj, stop, T, t, { done });
     } else {
       walk(obj, F, T, 0, { done });
@@ -1334,24 +1658,47 @@ function chooseMove(st, level) {
       if (k >= 1) { const i = actions.indexOf(a); if (i >= 0) actions.splice(i, 1); if (a.end) a.end(); }
     }
 
-    if (!reduceMotion) {
-      for (let i = 0; i < 64; i++) {
-        const o = pieceObjs[i];
-        if (!o || o.userData.anim) continue;
-        const u = o.userData, b = u.body;
-        b.position.y += (u.lift - b.position.y) * 0.18;
-        b.rotation.z = Math.sin(t * 0.7 + u.phase) * 0.012;
-        b.rotation.x = Math.sin(t * 0.53 + u.phase * 1.7) * 0.008;
-        b.scale.y = 1 + Math.sin(t * 1.3 + u.phase) * 0.006;
+    const selObj = selected !== null ? pieceObjs[selected] : null;
+    for (let i = 0; i < 64; i++) {
+      const o = pieceObjs[i];
+      if (!o || o.userData.anim) continue;
+      const u = o.userData, b = u.body, R = u.rig, ph = u.phase;
+      b.position.y += (u.lift - b.position.y) * 0.18;
+      if (reduceMotion) continue;
+      b.rotation.z = Math.sin(t * 0.7 + ph) * 0.014;
+      b.rotation.x = Math.sin(t * 0.53 + ph * 1.7) * 0.01;
+      b.scale.y = 1 + Math.sin(t * 1.3 + ph) * 0.008;
+      b.position.x = threatened.has(i) ? Math.sin(t * 52 + ph) * 0.008 : 0;
+      if (R.head) {
+        let ty;
+        if (selObj && selObj !== o) {
+          const d = selObj.position.clone().sub(o.position);
+          ty = Math.max(-0.9, Math.min(0.9, angDiff(o.rotation.y, Math.atan2(d.x, d.z))));
+        } else if (selObj === o) ty = 0;
+        else ty = u.headBias + 0.4 * Math.sin(t * 0.21 + ph * 3) * Math.sin(t * 0.13 + ph);
+        R.head.rotation.y += (ty - R.head.rotation.y) * 0.05;
+        R.head.rotation.x = u.type === 'n'
+          ? 0.06 * Math.sin(t * 1.3 + ph) - 0.25 * Math.pow(Math.max(0, Math.sin(t * 0.37 + ph)), 12)
+          : 0.04 * Math.sin(t * 0.9 + ph);
       }
-    } else {
-      for (let i = 0; i < 64; i++) { const o = pieceObjs[i]; if (o && !o.userData.anim) o.userData.body.position.y = o.userData.lift; }
+      if (R.armR) {
+        const tr = (selected === i ? -0.5 : 0) + Math.sin(t * 0.8 + ph) * 0.06;
+        R.armR.rotation.x += (tr - R.armR.rotation.x) * 0.08;
+      }
+      if (R.armL) R.armL.rotation.x = Math.sin(t * 0.8 + ph + 1.2) * 0.05 + (threatened.has(i) ? -0.3 : 0);
     }
+    if (!reduceMotion) colossi.forEach((o, i) => { o.userData.rig.head.rotation.y = 0.35 * Math.sin(t * 0.07 + i * 2); });
 
     frags = frags.filter((f) => {
+      if (f.delay > 0) { f.delay -= dt; return true; }
       f.age += dt;
       const m = f.m;
-      f.v.y -= 9.8 * dt;
+      f.v.y -= 9.8 * (f.age < f.lowG ? 0.12 : 1) * dt;
+      if (f.swirl && f.age < f.lowG) {
+        const rx = m.position.x - f.swirl.c.x, rz = m.position.z - f.swirl.c.z, rl = Math.hypot(rx, rz) || 1;
+        f.v.x += (-rz / rl * f.swirl.k - rx / rl * 4) * dt;
+        f.v.z += (rx / rl * f.swirl.k - rz / rl * 4) * dt;
+      }
       m.position.addScaledVector(f.v, dt);
       m.rotation.x += f.w.x * dt; m.rotation.y += f.w.y * dt; m.rotation.z += f.w.z * dt;
       const g = groundAt(m.position.x, m.position.z) + f.r;
@@ -1365,6 +1712,27 @@ function chooseMove(st, level) {
         if (k >= 1) { scene.remove(m); return false; }
         m.scale.copy(f.s0).multiplyScalar(1 - k);
       }
+      return true;
+    });
+
+    rigids = rigids.filter((r) => {
+      r.age += dt;
+      const o = r.obj;
+      r.v.y -= 9.8 * dt;
+      o.position.addScaledVector(r.v, dt);
+      o.rotation.x += r.w.x * dt; o.rotation.y += r.w.y * dt; o.rotation.z += r.w.z * dt;
+      const g = groundAt(o.position.x, o.position.z) + r.r;
+      if (o.position.y < g) {
+        o.position.y = g;
+        if (r.v.y < -0.8) {
+          r.bounces++;
+          r.v.y = -r.v.y * 0.35;
+          thud(0.25, 0, 160);
+          if (r.breakAt && r.bounces >= r.breakAt) { r.onBreak(o); scene.remove(o); return false; }
+        } else r.v.y = 0;
+        r.v.x *= 0.7; r.v.z *= 0.7; r.w.multiplyScalar(0.6);
+      }
+      if (r.age > 7) { scene.remove(o); return false; }
       return true;
     });
 
