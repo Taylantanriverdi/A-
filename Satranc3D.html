@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<style>body{margin:0}</style>
+</head>
+<body>
+<title>Satranç 3B</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  /* Layout: full-height 3D board on the left, a walnut side panel on the right (stacks below on phones). Single dark look by choice. */
+  :root {
+    --bg: #15120f;
+    --panel: #1d1915;
+    --raised: #27211b;
+    --line: #3b3229;
+    --fg: #efe6d6;
+    --muted: #a8998a;
+    --accent: #d6a25a;
+    --accent-ink: #1b140c;
+    --danger: #e26b55;
+    --ok: #9cc58a;
+    --display: "Marcellus", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --body: "Manrope", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--body); overflow: hidden; }
+  #app { display: grid; grid-template-columns: minmax(0, 1fr) 320px; height: 100%; }
+  #stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; touch-action: none; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  #toast {
+    position: absolute; left: 50%; top: 16px; transform: translateX(-50%);
+    background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--line);
+    color: var(--fg); padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px;
+    pointer-events: none; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis;
+  }
+  #toast.check { border-color: var(--danger); color: var(--danger); }
+  #toast.over { border-color: var(--accent); color: var(--accent); }
+  #loadErr { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; color: var(--muted); }
+
+  #panel {
+    background: var(--panel); border-left: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 16px; padding: 20px 16px; overflow-y: auto; min-height: 0;
+  }
+  h1 { font-family: var(--display); font-weight: 400; font-size: 30px; letter-spacing: 0.02em; margin: 0; line-height: 1; }
+  h1 small { display: block; font-family: var(--body); font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-top: 8px; }
+  .status { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; }
+  .turnchip { width: 22px; height: 22px; border-radius: 50%; flex: none; border: 2px solid var(--line); }
+  .turnchip.w { background: #f1e5cd; }
+  .turnchip.b { background: #2b221c; border-color: #6b5a4a; }
+  .status b { display: block; font-size: 15px; }
+  .status span { font-size: 13px; color: var(--muted); }
+  .status.check b { color: var(--danger); }
+  .status.over b { color: var(--accent); }
+
+  .field { display: grid; gap: 6px; }
+  .field label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  select {
+    font: inherit; font-size: 14px; color: var(--fg); background: var(--raised); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 10px; width: 100%;
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  button {
+    font: inherit; font-size: 13px; font-weight: 600; color: var(--fg); background: var(--raised);
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 6px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  .caps { display: grid; gap: 6px; font-size: 13px; }
+  .caps div { display: flex; align-items: center; gap: 8px; min-height: 24px; }
+  .caps .who { width: 72px; color: var(--muted); flex: none; }
+  .caps .glyphs { font-size: 20px; line-height: 1; letter-spacing: 1px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .caps .adv { color: var(--ok); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .moves-h { display: flex; justify-content: space-between; align-items: baseline; }
+  .moves-h h2 { font-family: var(--display); font-weight: 400; font-size: 18px; margin: 0; }
+  .moves-h span { font-size: 11px; color: var(--muted); }
+  #moves {
+    display: grid; grid-template-columns: 34px 1fr 1fr; gap: 2px 8px; font-size: 14px; font-variant-numeric: tabular-nums;
+    background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    min-height: 60px; max-height: 260px; overflow-y: auto; align-content: start;
+  }
+  #moves .n { color: var(--muted); }
+  #moves .last { color: var(--accent); font-weight: 700; }
+  #moves .empty { grid-column: 1 / -1; color: var(--muted); font-size: 13px; }
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0; }
+
+  #promo { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 8, 6, 0.55); padding: 16px; }
+  #promo .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 12px; max-width: 100%; }
+  #promo h3 { font-family: var(--display); font-weight: 400; margin: 0; font-size: 20px; text-align: center; }
+  #promo .opts { display: grid; grid-template-columns: repeat(4, 64px); gap: 10px; }
+  #promo button { display: grid; gap: 4px; justify-items: center; padding: 10px 4px; font-size: 11px; }
+  #promo button i { font-style: normal; font-size: 32px; line-height: 1; }
+
+  @media (max-width: 760px) {
+    #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+    #panel { border-left: 0; border-top: 1px solid var(--line); max-height: 44vh; padding: 14px 16px; gap: 12px; }
+    h1 { font-size: 22px; }
+    h1 small { display: none; }
+    #moves { max-height: 120px; }
+    .hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div id="app">
+  <div id="stage">
+    <div id="toast">Yükleniyor…</div>
+    <div id="promo" hidden>
+      <div class="box" role="dialog" aria-label="Terfi taşı seçin">
+        <h3>Piyon terfi ediyor</h3>
+        <div class="opts">
+          <button data-p="q"><i class="g">♕</i>Vezir</button>
+          <button data-p="r"><i class="g">♖</i>Kale</button>
+          <button data-p="b"><i class="g">♗</i>Fil</button>
+          <button data-p="n"><i class="g">♘</i>At</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <aside id="panel">
+    <h1>Satranç 3B<small>Fildişi ve abanoz, ceviz tahtada</small></h1>
+    <div class="status" id="status"><div class="turnchip w" id="chip"></div><div><b id="statusMain">Beyazın sırası</b><span id="statusSub">Bir taşa dokunun</span></div></div>
+    <div class="row">
+      <div class="field"><label for="mode">Oyun</label>
+        <select id="mode">
+          <option value="pvc-w">Bilgisayara karşı · Beyaz</option>
+          <option value="pvc-b">Bilgisayara karşı · Siyah</option>
+          <option value="pvp">İki oyuncu</option>
+        </select></div>
+      <div class="field"><label for="level">Zorluk</label>
+        <select id="level">
+          <option value="1">Kolay</option>
+          <option value="2" selected>Orta</option>
+          <option value="3">Zor</option>
+        </select></div>
+    </div>
+    <div class="btns">
+      <button class="primary" id="btnNew">Yeni oyun</button>
+      <button id="btnUndo">Geri al</button>
+      <button id="btnFlip">Çevir</button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="autoFlip"> İki oyuncuda tahtayı her hamlede çevir</label>
+    <div class="caps">
+      <div><span class="who">Beyaz aldı</span><span class="glyphs" id="capW"></span><span class="adv" id="advW"></span></div>
+      <div><span class="who">Siyah aldı</span><span class="glyphs" id="capB"></span><span class="adv" id="advB"></span></div>
+    </div>
+    <div class="moves-h"><h2>Hamleler</h2><span>Ş şah · V vezir · K kale · F fil · A at</span></div>
+    <div id="moves"></div>
+    <p class="hint">Taşa tıklayın, sonra yeşil noktalı kareye. Tahtayı döndürmek için sürükleyin, yakınlaştırmak için kaydırın.</p>
+  </div>
+</div>
+
+<script id="engine">
+// ===== Chess rules engine (no DOM). Board: 64 cells, index = rank*8 + file, rank 0 = White's first rank. =====
+var FILES = 'abcdefgh';
+var KN = [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+var KG = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
+var DIAG = [[1,1],[1,-1],[-1,1],[-1,-1]], ORTH = [[1,0],[-1,0],[0,1],[0,-1]];
+function colorOf(p) { return p ? (p === p.toUpperCase() ? 'w' : 'b') : null; }
+function sqName(s) { return FILES[s & 7] + ((s >> 3) + 1); }
+function initState() {
+  var b = new Array(64).fill(null), back = 'RNBQKBNR';
+  for (var c = 0; c < 8; c++) { b[c] = back[c]; b[8 + c] = 'P'; b[48 + c] = 'p'; b[56 + c] = back[c].toLowerCase(); }
+  return { b: b, turn: 'w', cr: { K: true, Q: true, k: true, q: true }, ep: -1, half: 0, full: 1 };
+}
+function attacked(b, s, by) {
+  var r = s >> 3, c = s & 7, i, rr, cc, d, p;
+  var pr = by === 'w' ? r - 1 : r + 1, pp = by === 'w' ? 'P' : 'p';
+  if (pr >= 0 && pr < 8) {
+    if (c > 0 && b[pr * 8 + c - 1] === pp) return true;
+    if (c < 7 && b[pr * 8 + c + 1] === pp) return true;
+  }
+  var N = by === 'w' ? 'N' : 'n', K = by === 'w' ? 'K' : 'k';
+  for (i = 0; i < 8; i++) {
+    rr = r + KN[i][0]; cc = c + KN[i][1];
+    if (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && b[rr * 8 + cc] === N) return true;
+    rr = r + KG[i][0]; cc = c + KG[i][1];
+    if (rr >= 0 && rr < 8 && cc >= 0 && cc < 8 && b[rr * 8 + cc] === K) return true;
+  }
+  var B = by === 'w' ? 'B' : 'b', R = by === 'w' ? 'R' : 'r', Q = by === 'w' ? 'Q' : 'q';
+  for (i = 0; i < 4; i++) {
+    d = DIAG[i]; rr = r + d[0]; cc = c + d[1];
+    while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+      p = b[rr * 8 + cc];
+      if (p) { if (p === B || p === Q) return true; break; }
+      rr += d[0]; cc += d[1];
+    }
+    d = ORTH[i]; rr = r + d[0]; cc = c + d[1];
+    while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+      p = b[rr * 8 + cc];
+      if (p) { if (p === R || p === Q) return true; break; }
+      rr += d[0]; cc += d[1];
+    }
+  }
+  return false;
+}
+function kingSq(b, color) { var k = color === 'w' ? 'K' : 'k'; for (var i = 0; i < 64; i++) if (b[i] === k) return i; return -1; }
+function inCheck(st) { return attacked(st.b, kingSq(st.b, st.turn), st.turn === 'w' ? 'b' : 'w'); }
+function pseudoMoves(st) {
+  var b = st.b, turn = st.turn, opp = turn === 'w' ? 'b' : 'w', ms = [];
+  function add(from, to, p, extra) {
+    var m = { from: from, to: to, p: p, cap: b[to] };
+    if (extra) for (var k in extra) m[k] = extra[k];
+    ms.push(m);
+  }
+  for (var s = 0; s < 64; s++) {
+    var p = b[s];
+    if (!p || colorOf(p) !== turn) continue;
+    var r = s >> 3, c = s & 7, t = p.toLowerCase(), i, rr, cc, to;
+    if (t === 'p') {
+      var dir = turn === 'w' ? 1 : -1, start = turn === 'w' ? 1 : 6, last = turn === 'w' ? 7 : 0, r1 = r + dir;
+      if (r1 < 0 || r1 > 7) continue;
+      var push = function (from, to, p) {
+        if ((to >> 3) === last) { ['q', 'r', 'b', 'n'].forEach(function (pr) { add(from, to, p, { promo: pr }); }); }
+        else add(from, to, p);
+      };
+      if (!b[r1 * 8 + c]) {
+        push(s, r1 * 8 + c, p);
+        if (r === start && !b[(r + 2 * dir) * 8 + c]) add(s, (r + 2 * dir) * 8 + c, p, { dbl: true });
+      }
+      for (i = -1; i <= 1; i += 2) {
+        cc = c + i; if (cc < 0 || cc > 7) continue;
+        to = r1 * 8 + cc;
+        if (b[to] && colorOf(b[to]) === opp) push(s, to, p);
+        else if (to === st.ep) add(s, to, p, { ep: true, cap: turn === 'w' ? 'p' : 'P' });
+      }
+    } else if (t === 'n' || t === 'k') {
+      var steps = t === 'n' ? KN : KG;
+      for (i = 0; i < 8; i++) {
+        rr = r + steps[i][0]; cc = c + steps[i][1];
+        if (rr < 0 || rr > 7 || cc < 0 || cc > 7) continue;
+        to = rr * 8 + cc;
+        if (!b[to] || colorOf(b[to]) === opp) add(s, to, p);
+      }
+      if (t === 'k') {
+        var base = turn === 'w' ? 0 : 56, rook = turn === 'w' ? 'R' : 'r';
+        var kc = turn === 'w' ? 'K' : 'k', qc = turn === 'w' ? 'Q' : 'q';
+        if (s === base + 4 && !attacked(b, s, opp)) {
+          if (st.cr[kc] && !b[base + 5] && !b[base + 6] && b[base + 7] === rook &&
+              !attacked(b, base + 5, opp) && !attacked(b, base + 6, opp)) add(s, base + 6, p, { castle: 'K' });
+          if (st.cr[qc] && !b[base + 3] && !b[base + 2] && !b[base + 1] && b[base] === rook &&
+              !attacked(b, base + 3, opp) && !attacked(b, base + 2, opp)) add(s, base + 2, p, { castle: 'Q' });
+        }
+      }
+    } else {
+      var dirs = t === 'b' ? DIAG : t === 'r' ? ORTH : DIAG.concat(ORTH);
+      for (i = 0; i < dirs.length; i++) {
+        rr = r + dirs[i][0]; cc = c + dirs[i][1];
+        while (rr >= 0 && rr < 8 && cc >= 0 && cc < 8) {
+          to = rr * 8 + cc;
+          if (b[to]) { if (colorOf(b[to]) === opp) add(s, to, p); break; }
+          add(s, to, p);
+          rr += dirs[i][0]; cc += dirs[i][1];
+        }
+      }
+    }
+  }
+  return ms;
+}
+function makeMove(st, m) {
+  var b = st.b.slice(), turn = st.turn;
+  b[m.to] = m.promo ? (turn === 'w' ? m.promo.toUpperCase() : m.promo) : b[m.from];
+  b[m.from] = null;
+  if (m.ep) b[m.to + (turn === 'w' ? -8 : 8)] = null;
+  var base = turn === 'w' ? 0 : 56;
+  if (m.castle === 'K') { b[base + 5] = b[base + 7]; b[base + 7] = null; }
+  if (m.castle === 'Q') { b[base + 3] = b[base]; b[base] = null; }
+  var cr = { K: st.cr.K, Q: st.cr.Q, k: st.cr.k, q: st.cr.q };
+  if (m.p === 'K') cr.K = cr.Q = false;
+  if (m.p === 'k') cr.k = cr.q = false;
+  [m.from, m.to].forEach(function (s) {
+    if (s === 0) cr.Q = false; if (s === 7) cr.K = false;
+    if (s === 56) cr.q = false; if (s === 63) cr.k = false;
+  });
+  var pawn = m.p === 'P' || m.p === 'p';
+  return {
+    b: b, turn: turn === 'w' ? 'b' : 'w', cr: cr,
+    ep: m.dbl ? (m.from + m.to) / 2 : -1,
+    half: (pawn || m.cap) ? 0 : st.half + 1,
+    full: st.full + (turn === 'b' ? 1 : 0)
+  };
+}
+function legalMoves(st) {
+  var opp = st.turn === 'w' ? 'b' : 'w';
+  return pseudoMoves(st).filter(function (m) {
+    var ns = makeMove(st, m);
+    return !attacked(ns.b, kingSq(ns.b, st.turn), opp);
+  });
+}
+function posKey(st) {
+  return st.b.map(function (p) { return p || '.'; }).join('') + st.turn +
+    (st.cr.K ? 'K' : '') + (st.cr.Q ? 'Q' : '') + (st.cr.k ? 'k' : '') + (st.cr.q ? 'q' : '') + st.ep;
+}
+function insufficient(b) {
+  var minors = 0;
+  for (var i = 0; i < 64; i++) {
+    var p = b[i]; if (!p) continue;
+    var t = p.toLowerCase();
+    if (t === 'k') continue;
+    if (t === 'n' || t === 'b') { minors++; continue; }
+    return false;
+  }
+  return minors <= 1;
+}
+var TR = { k: 'Ş', q: 'V', r: 'K', b: 'F', n: 'A', p: '' };
+function toSAN(st, m, legal) {
+  var s;
+  if (m.castle) s = m.castle === 'K' ? 'O-O' : 'O-O-O';
+  else {
+    var t = m.p.toLowerCase();
+    if (t === 'p') {
+      s = m.cap ? FILES[m.from & 7] + 'x' : '';
+      s += sqName(m.to);
+      if (m.promo) s += '=' + TR[m.promo];
+    } else {
+      s = TR[t];
+      var others = legal.filter(function (o) { return o.p === m.p && o.to === m.to && o.from !== m.from; });
+      if (others.length) {
+        var sameFile = others.some(function (o) { return (o.from & 7) === (m.from & 7); });
+        var sameRank = others.some(function (o) { return (o.from >> 3) === (m.from >> 3); });
+        if (!sameFile) s += FILES[m.from & 7];
+        else if (!sameRank) s += (m.from >> 3) + 1;
+        else s += sqName(m.from);
+      }
+      if (m.cap) s += 'x';
+      s += sqName(m.to);
+    }
+  }
+  var ns = makeMove(st, m);
+  if (inCheck(ns)) s += legalMoves(ns).length ? '+' : '#';
+  return s;
+}
+function perft(st, d) {
+  if (d === 0) return 1;
+  var ms = legalMoves(st), n = 0;
+  for (var i = 0; i < ms.length; i++) n += perft(makeMove(st, ms[i]), d - 1);
+  return n;
+}
+
+// ----- Computer player: alpha-beta negamax with a capture search at the leaves -----
+var VAL = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+var PST = {
+  p: [0,0,0,0,0,0,0,0, 50,50,50,50,50,50,50,50, 10,10,20,30,30,20,10,10, 5,5,10,25,25,10,5,5,
+      0,0,0,20,20,0,0,0, 5,-5,-10,0,0,-10,-5,5, 5,10,10,-20,-20,10,10,5, 0,0,0,0,0,0,0,0],
+  n: [-50,-40,-30,-30,-30,-30,-40,-50, -40,-20,0,0,0,0,-20,-40, -30,0,10,15,15,10,0,-30, -30,5,15,20,20,15,5,-30,
+      -30,0,15,20,20,15,0,-30, -30,5,10,15,15,10,5,-30, -40,-20,0,5,5,0,-20,-40, -50,-40,-30,-30,-30,-30,-40,-50],
+  b: [-20,-10,-10,-10,-10,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,10,10,5,0,-10, -10,5,5,10,10,5,5,-10,
+      -10,0,10,10,10,10,0,-10, -10,10,10,10,10,10,10,-10, -10,5,0,0,0,0,5,-10, -20,-10,-10,-10,-10,-10,-10,-20],
+  r: [0,0,0,0,0,0,0,0, 5,10,10,10,10,10,10,5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5,
+      -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, -5,0,0,0,0,0,0,-5, 0,0,0,5,5,0,0,0],
+  q: [-20,-10,-10,-5,-5,-10,-10,-20, -10,0,0,0,0,0,0,-10, -10,0,5,5,5,5,0,-10, -5,0,5,5,5,5,0,-5,
+      0,0,5,5,5,5,0,-5, -10,5,5,5,5,5,0,-10, -10,0,5,0,0,0,0,-10, -20,-10,-10,-5,-5,-10,-10,-20],
+  k: [-30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30, -30,-40,-40,-50,-50,-40,-40,-30,
+      -20,-30,-30,-40,-40,-30,-30,-20, -10,-20,-20,-20,-20,-20,-20,-10, 20,20,0,0,0,0,20,20, 20,30,10,0,0,10,30,20]
+};
+function evaluate(st) {
+  var s = 0, b = st.b;
+  for (var i = 0; i < 64; i++) {
+    var p = b[i]; if (!p) continue;
+    var t = p.toLowerCase(), white = p !== t, r = i >> 3, c = i & 7;
+    var v = VAL[t] + PST[t][white ? (7 - r) * 8 + c : r * 8 + c];
+    s += white ? v : -v;
+  }
+  return st.turn === 'w' ? s : -s;
+}
+function moveScore(m) {
+  var s = 0;
+  if (m.cap) s += 1000 + 10 * VAL[m.cap.toLowerCase()] - VAL[m.p.toLowerCase()];
+  if (m.promo) s += 800 + VAL[m.promo];
+  return s;
+}
+function quiesce(st, alpha, beta, d) {
+  var stand = evaluate(st);
+  if (d === 0) return stand;
+  if (stand >= beta) return beta;
+  if (stand > alpha) alpha = stand;
+  var ms = legalMoves(st).filter(function (m) { return m.cap || m.promo === 'q'; });
+  ms.sort(function (a, b) { return moveScore(b) - moveScore(a); });
+  for (var i = 0; i < ms.length; i++) {
+    var v = -quiesce(makeMove(st, ms[i]), -beta, -alpha, d - 1);
+    if (v >= beta) return beta;
+    if (v > alpha) alpha = v;
+  }
+  return alpha;
+}
+function negamax(st, depth, alpha, beta, ply, qd) {
+  var ms = legalMoves(st);
+  if (!ms.length) return inCheck(st) ? -100000 + ply : 0;
+  if (st.half >= 100) return 0;
+  if (depth === 0) return quiesce(st, alpha, beta, qd);
+  ms.sort(function (a, b) { return moveScore(b) - moveScore(a); });
+  for (var i = 0; i < ms.length; i++) {
+    var v = -negamax(makeMove(st, ms[i]), depth - 1, -beta, -alpha, ply + 1, qd);
+    if (v > alpha) alpha = v;
+    if (alpha >= beta) break;
+  }
+  return alpha;
+}
+function chooseMove(st, level) {
+  var cfg = { 1: { d: 1, q: 1, noise: 90 }, 2: { d: 2, q: 3, noise: 15 }, 3: { d: 3, q: 4, noise: 0 } }[level] || { d: 2, q: 3, noise: 15 };
+  var ms = legalMoves(st);
+  if (!ms.length) return null;
+  ms.sort(function (a, b) { return moveScore(b) - moveScore(a); });
+  var best = null, bestV = -Infinity, alpha = -Infinity;
+  for (var i = 0; i < ms.length; i++) {
+    var v = -negamax(makeMove(st, ms[i]), cfg.d - 1, -Infinity, cfg.noise ? Infinity : -alpha, 1, cfg.q);
+    if (cfg.noise) v += (Math.random() * 2 - 1) * cfg.noise;
+    if (v > bestV) { bestV = v; best = ms[i]; }
+    if (v > alpha) alpha = v;
+  }
+  return { from: best.from, to: best.to, promo: best.promo || null };
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var stage = $('stage'), toast = $('toast');
+  if (!window.THREE || !THREE.OrbitControls) {
+    toast.hidden = true;
+    var e = document.createElement('div'); e.id = 'loadErr';
+    e.textContent = '3B motoru yüklenemedi. İnternet bağlantınızı kontrol edip sayfayı yenileyin.';
+    stage.appendChild(e);
+    return;
+  }
+
+  // ---------- Game state ----------
+  var state = initState(), history = [], legal = legalMoves(state);
+  var mode = 'pvc-w', level = 2, selected = null, busy = false, over = null, thinking = false;
+  var searchId = 0, worker = null;
+
+  // ---------- Three.js scene ----------
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.9;
+  stage.insertBefore(renderer.domElement, stage.firstChild);
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x15120f);
+  scene.fog = new THREE.Fog(0x15120f, 22, 46);
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+  camera.position.set(0, 11.5, 10.5);
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0, 0.3);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.enablePan = false;
+  controls.minDistance = 7;
+  controls.maxDistance = 26;
+  controls.maxPolarAngle = Math.PI / 2.2;
+  controls.update();
+
+  scene.add(new THREE.HemisphereLight(0xfff1dc, 0x2a1f16, 0.4));
+  var sun = new THREE.DirectionalLight(0xffe7c4, 1.25);
+  sun.position.set(5, 12, 6);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  var sc = sun.shadow.camera; sc.left = -7; sc.right = 7; sc.top = 7; sc.bottom = -7; sc.near = 1; sc.far = 30;
+  sun.shadow.bias = -0.0006;
+  scene.add(sun);
+  var rim = new THREE.DirectionalLight(0x9fb4ff, 0.25);
+  rim.position.set(-6, 5, -8);
+  scene.add(rim);
+
+  function sqPos(s) { return new THREE.Vector3((s & 7) - 3.5, 0, 3.5 - (s >> 3)); }
+
+  // Table, frame and squares
+  var table = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ color: 0x0d0907, roughness: 0.9 }));
+  table.rotation.x = -Math.PI / 2; table.position.y = -0.32; table.receiveShadow = true;
+  scene.add(table);
+  var frame = new THREE.Mesh(new THREE.BoxGeometry(9.3, 0.3, 9.3), new THREE.MeshStandardMaterial({ color: 0x2c160b, roughness: 0.45 }));
+  frame.position.y = -0.165; frame.receiveShadow = true; frame.castShadow = true;
+  scene.add(frame);
+
+  var squares = [], overlays = [], dots = [], rings = [];
+  var lightMat = new THREE.MeshStandardMaterial({ color: 0xc7a273, roughness: 0.5 });
+  var darkMat = new THREE.MeshStandardMaterial({ color: 0x5a3018, roughness: 0.5 });
+  var sqGeo = new THREE.BoxGeometry(1, 0.2, 1);
+  var planeGeo = new THREE.PlaneGeometry(1, 1);
+  var dotGeo = new THREE.CircleGeometry(0.15, 32);
+  var ringGeo = new THREE.RingGeometry(0.38, 0.47, 48);
+  var dotMat = new THREE.MeshBasicMaterial({ color: 0x3f7d3a, transparent: true, opacity: 0.75, depthWrite: false });
+  var ringMat = new THREE.MeshBasicMaterial({ color: 0xc8452f, transparent: true, opacity: 0.8, depthWrite: false });
+  for (var s = 0; s < 64; s++) {
+    var p = sqPos(s), isLight = ((s >> 3) + (s & 7)) % 2 === 1;
+    var m = new THREE.Mesh(sqGeo, isLight ? lightMat : darkMat);
+    m.position.set(p.x, -0.1, p.z); m.receiveShadow = true; m.userData.sq = s;
+    scene.add(m); squares.push(m);
+    var o = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false }));
+    o.rotation.x = -Math.PI / 2; o.position.set(p.x, 0.004, p.z); o.visible = false;
+    scene.add(o); overlays.push(o);
+    var d = new THREE.Mesh(dotGeo, dotMat); d.rotation.x = -Math.PI / 2; d.position.set(p.x, 0.007, p.z); d.visible = false;
+    scene.add(d); dots.push(d);
+    var g = new THREE.Mesh(ringGeo, ringMat); g.rotation.x = -Math.PI / 2; g.position.set(p.x, 0.007, p.z); g.visible = false;
+    scene.add(g); rings.push(g);
+  }
+
+  // Coordinate labels on the frame
+  function label(text) {
+    var cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    var cx = cv.getContext('2d');
+    cx.fillStyle = '#d9bf8f'; cx.font = '600 40px Georgia, serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(text, 32, 34);
+    var tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+    var mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.34), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+    mesh.rotation.x = -Math.PI / 2;
+    return mesh;
+  }
+  for (var i = 0; i < 8; i++) {
+    [4.33, -4.33].forEach(function (z) { var l = label(FILES[i]); l.position.set(i - 3.5, 0.001, z); scene.add(l); });
+    [-4.33, 4.33].forEach(function (x) { var l = label(String(i + 1)); l.position.set(x, 0.001, 3.5 - i); scene.add(l); });
+  }
+
+  // ---------- Piece models ----------
+  var ivory = new THREE.MeshStandardMaterial({ color: 0xe9d7b4, roughness: 0.32, metalness: 0.02 });
+  var ebony = new THREE.MeshStandardMaterial({ color: 0x1a120d, roughness: 0.26, metalness: 0.08 });
+  var geoCache = {};
+  function lathe(key, pts) {
+    if (!geoCache[key]) geoCache[key] = new THREE.LatheGeometry(pts.map(function (q) { return new THREE.Vector2(q[0], q[1]); }), 40);
+    return geoCache[key];
+  }
+  function cached(key, make) { if (!geoCache[key]) geoCache[key] = make(); return geoCache[key]; }
+  var BASE = [[0, 0], [0.38, 0], [0.38, 0.07], [0.32, 0.12], [0.3, 0.16], [0.26, 0.2]];
+  function makePiece(ch) {
+    var t = ch.toLowerCase(), white = ch !== t, mat = white ? ivory : ebony, grp = new THREE.Group();
+    function add(geo, x, y, z, sx, sy, sz) {
+      var mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x || 0, y || 0, z || 0);
+      if (sx) mesh.scale.set(sx, sy, sz);
+      mesh.castShadow = true; mesh.receiveShadow = true;
+      grp.add(mesh); return mesh;
+    }
+    if (t === 'p') {
+      add(lathe('p', [[0, 0], [0.33, 0], [0.33, 0.06], [0.27, 0.1], [0.24, 0.14], [0.15, 0.22], [0.11, 0.4], [0.18, 0.44], [0.18, 0.48], [0.1, 0.5], [0, 0.5]]));
+      add(cached('ph', function () { return new THREE.SphereGeometry(0.15, 32, 20); }), 0, 0.62);
+    } else if (t === 'r') {
+      add(lathe('r', BASE.concat([[0.23, 0.26], [0.21, 0.62], [0.3, 0.68], [0.3, 0.84], [0.2, 0.84], [0.2, 0.78], [0, 0.78]])));
+      var cren = cached('rc', function () { return new THREE.BoxGeometry(0.12, 0.13, 0.1); });
+      for (var k = 0; k < 6; k++) {
+        var a = k / 6 * Math.PI * 2, cm = add(cren, Math.cos(a) * 0.25, 0.9, Math.sin(a) * 0.25);
+        cm.rotation.y = -a;
+      }
+    } else if (t === 'n') {
+      add(lathe('n', BASE.concat([[0.25, 0.26], [0, 0.26]])));
+      var head = add(cached('nh', function () {
+        var sh = new THREE.Shape();
+        sh.moveTo(-0.24, 0); sh.lineTo(0.22, 0); sh.lineTo(0.17, 0.22); sh.lineTo(0.1, 0.34);
+        sh.lineTo(0.3, 0.44); sh.quadraticCurveTo(0.4, 0.5, 0.34, 0.6); sh.lineTo(0.22, 0.68);
+        sh.lineTo(0.1, 0.78); sh.lineTo(0.06, 0.92); sh.lineTo(-0.02, 0.82);
+        sh.quadraticCurveTo(-0.22, 0.76, -0.26, 0.5); sh.lineTo(-0.27, 0.2); sh.lineTo(-0.24, 0);
+        var g = new THREE.ExtrudeGeometry(sh, { depth: 0.24, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.04, bevelSegments: 3, curveSegments: 10 });
+        g.translate(0, 0, -0.12);
+        return g;
+      }), 0, 0.24);
+      head.rotation.y = white ? Math.PI / 2 : -Math.PI / 2;
+    } else if (t === 'b') {
+      add(lathe('b', BASE.concat([[0.14, 0.32], [0.1, 0.62], [0.2, 0.66], [0.2, 0.7], [0.1, 0.72], [0, 0.72]])));
+      add(cached('bm', function () { return new THREE.SphereGeometry(0.16, 32, 20); }), 0, 0.88, 0, 1, 1.45, 1);
+      add(cached('bt', function () { return new THREE.SphereGeometry(0.055, 16, 12); }), 0, 1.13);
+    } else if (t === 'q') {
+      add(lathe('q', BASE.concat([[0.15, 0.36], [0.11, 0.82], [0.23, 0.87], [0.23, 0.91], [0.14, 0.94], [0.25, 1.12], [0.17, 1.1], [0, 1.06]])));
+      var bead = cached('qb', function () { return new THREE.SphereGeometry(0.045, 14, 10); });
+      for (var j = 0; j < 9; j++) { var aa = j / 9 * Math.PI * 2; add(bead, Math.cos(aa) * 0.24, 1.14, Math.sin(aa) * 0.24); }
+      add(cached('qt', function () { return new THREE.SphereGeometry(0.08, 20, 14); }), 0, 1.16);
+    } else {
+      add(lathe('k', BASE.concat([[0.16, 0.38], [0.12, 0.88], [0.24, 0.93], [0.24, 0.97], [0.15, 1.0], [0.22, 1.18], [0, 1.2]])));
+      add(cached('kv', function () { return new THREE.BoxGeometry(0.075, 0.3, 0.075); }), 0, 1.36);
+      add(cached('kh', function () { return new THREE.BoxGeometry(0.22, 0.075, 0.075); }), 0, 1.4);
+    }
+    grp.userData.key = ch;
+    grp.userData.lift = 0;
+    return grp;
+  }
+
+  var pieceObjs = new Array(64).fill(null), dying = [], tweens = [];
+  function placePiece(obj, s) { var p = sqPos(s); obj.position.set(p.x, 0, p.z); obj.userData.sq = s; }
+  function syncPieces() {
+    for (var s = 0; s < 64; s++) {
+      var ch = state.b[s], obj = pieceObjs[s];
+      if (obj && (!ch || obj.userData.key !== ch)) { scene.remove(obj); pieceObjs[s] = obj = null; }
+      if (ch && !obj) { obj = makePiece(ch); placePiece(obj, s); scene.add(obj); pieceObjs[s] = obj; }
+      if (obj) { obj.userData.sq = s; obj.scale.set(1, 1, 1); }
+    }
+  }
+
+  // ---------- Highlights ----------
+  var C_LAST = new THREE.Color(0xe0b354), C_SEL = new THREE.Color(0x6fb35a), C_CHECK = new THREE.Color(0xe0442c);
+  function setOverlay(s, color, op) { var o = overlays[s]; o.material.color.copy(color); o.material.opacity = op; o.visible = true; }
+  function refreshMarks() {
+    for (var s = 0; s < 64; s++) { overlays[s].visible = false; dots[s].visible = false; rings[s].visible = false; }
+    var last = history.length ? history[history.length - 1].m : null;
+    if (last) { setOverlay(last.from, C_LAST, 0.32); setOverlay(last.to, C_LAST, 0.45); }
+    if (inCheck(state)) setOverlay(kingSq(state.b, state.turn), C_CHECK, 0.55);
+    if (selected !== null) {
+      setOverlay(selected, C_SEL, 0.5);
+      legal.forEach(function (m) {
+        if (m.from !== selected) return;
+        if (m.cap) rings[m.to].visible = true; else dots[m.to].visible = true;
+      });
+    }
+    for (var i = 0; i < 64; i++) if (pieceObjs[i]) pieceObjs[i].userData.lift = i === selected ? 0.22 : 0;
+  }
+
+  // ---------- Moves ----------
+  function aiColor() { return mode === 'pvc-w' ? 'b' : mode === 'pvc-b' ? 'w' : null; }
+  function humanTurn() { return state.turn !== aiColor(); }
+
+  function animateMove(m, done) {
+    var obj = pieceObjs[m.from], capSq = m.ep ? m.to + (state.turn === 'w' ? -8 : 8) : m.to;
+    var victim = m.cap ? pieceObjs[capSq] : null;
+    pieceObjs[m.from] = null;
+    if (victim) { pieceObjs[capSq] = null; dying.push({ obj: victim, t0: performance.now() + 220 }); }
+    pieceObjs[m.to] = obj;
+    var dur = reduceMotion ? 1 : 420, jump = m.p.toLowerCase() === 'n' ? 0.9 : 0.35;
+    tweens.push({ obj: obj, from: obj.position.clone(), to: sqPos(m.to), t0: performance.now(), dur: dur, arc: jump, done: done });
+    obj.userData.sq = m.to;
+    if (m.castle) {
+      var base = state.turn === 'w' ? 0 : 56, rf = m.castle === 'K' ? base + 7 : base, rt = m.castle === 'K' ? base + 5 : base + 3;
+      var rook = pieceObjs[rf]; pieceObjs[rf] = null; pieceObjs[rt] = rook; rook.userData.sq = rt;
+      tweens.push({ obj: rook, from: rook.position.clone(), to: sqPos(rt), t0: performance.now() + 120, dur: dur, arc: 0.5 });
+    }
+  }
+
+  function commitMove(m) {
+    var san = toSAN(state, m, legal);
+    busy = true; selected = null;
+    animateMove(m, function () {
+      busy = false;
+      syncPieces();
+      afterChange();
+    });
+    history.push({ state: state, m: m, san: san });
+    state = makeMove(state, m);
+    legal = legalMoves(state);
+    refreshMarks();
+    updateUI();
+  }
+
+  function result() {
+    if (!legal.length) {
+      if (inCheck(state)) return { main: 'Şah mat!', sub: (state.turn === 'w' ? 'Siyah' : 'Beyaz') + ' kazandı' };
+      return { main: 'Pat', sub: 'Oyun berabere bitti' };
+    }
+    if (state.half >= 100) return { main: 'Berabere', sub: '50 hamle kuralı' };
+    if (insufficient(state.b)) return { main: 'Berabere', sub: 'Mat için yeterli taş yok' };
+    var key = posKey(state), n = 1;
+    history.forEach(function (h) { if (posKey(h.state) === key) n++; });
+    if (n >= 3) return { main: 'Berabere', sub: 'Aynı pozisyon üç kez tekrarlandı' };
+    return null;
+  }
+
+  function afterChange() {
+    over = result();
+    updateUI();
+    if (over) return;
+    if (mode === 'pvp' && $('autoFlip').checked) flipTo(state.turn);
+    if (aiColor() === state.turn) runAI();
+  }
+
+  // ---------- Computer player (Web Worker, main-thread fallback) ----------
+  function getWorker() {
+    if (worker) return worker;
+    try {
+      var src = $('engine').textContent + '\nonmessage=function(e){postMessage({id:e.data.id,move:chooseMove(e.data.st,e.data.level)});};';
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      worker.onmessage = function (e) { onAIMove(e.data.id, e.data.move); };
+      worker.onerror = function () { worker = false; };
+    } catch (err) { worker = false; }
+    return worker;
+  }
+  function stopAI() {
+    searchId++;
+    if (thinking && worker) { worker.terminate(); worker = null; }
+    thinking = false;
+  }
+  function runAI() {
+    thinking = true; updateUI();
+    var id = ++searchId, w = getWorker();
+    var minWait = performance.now() + 350;
+    var deliver = function (mv) { setTimeout(function () { onAIMove(id, mv); }, Math.max(0, minWait - performance.now())); };
+    if (w) {
+      w.onmessage = function (e) { deliver(e.data.move); };
+      w.postMessage({ id: id, st: state, level: level });
+    } else {
+      setTimeout(function () { deliver(chooseMove(state, level)); }, 30);
+    }
+  }
+  function onAIMove(id, mv) {
+    if (id !== searchId) return;
+    thinking = false;
+    if (!mv) { updateUI(); return; }
+    var m = legal.filter(function (x) { return x.from === mv.from && x.to === mv.to && (x.promo || null) === mv.promo; })[0];
+    if (m) commitMove(m); else updateUI();
+  }
+
+  // ---------- Input ----------
+  var ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), downAt = null;
+  function pick(ev) {
+    var r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    var targets = squares.slice();
+    for (var i = 0; i < 64; i++) if (pieceObjs[i]) targets.push(pieceObjs[i]);
+    var hits = ray.intersectObjects(targets, true);
+    for (var h = 0; h < hits.length; h++) {
+      var o = hits[h].object;
+      while (o && o.userData.sq === undefined) o = o.parent;
+      if (o) return o.userData.sq;
+    }
+    return null;
+  }
+  renderer.domElement.addEventListener('pointerdown', function (ev) { downAt = { x: ev.clientX, y: ev.clientY }; });
+  renderer.domElement.addEventListener('pointerup', function (ev) {
+    if (!downAt) return;
+    var moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
+    downAt = null;
+    if (moved > 6) return;
+    var s = pick(ev);
+    if (s !== null) onSquare(s);
+  });
+  renderer.domElement.addEventListener('pointermove', function (ev) {
+    if (downAt || ev.pointerType !== 'mouse') return;
+    var s = pick(ev), can = false;
+    if (s !== null && !busy && !over && humanTurn() && !thinking) {
+      can = colorOf(state.b[s]) === state.turn || (selected !== null && legal.some(function (m) { return m.from === selected && m.to === s; }));
+    }
+    renderer.domElement.style.cursor = can ? 'pointer' : '';
+  });
+
+  var pendingPromo = null;
+  function onSquare(s) {
+    if (busy || over || thinking || !humanTurn() || pendingPromo) return;
+    if (selected !== null) {
+      var c = legal.filter(function (m) { return m.from === selected && m.to === s; });
+      if (c.length > 1) { pendingPromo = c; $('promo').hidden = false; setPromoGlyphs(); return; }
+      if (c.length === 1) { commitMove(c[0]); return; }
+    }
+    selected = (colorOf(state.b[s]) === state.turn && selected !== s) ? s : null;
+    refreshMarks(); updateUI();
+  }
+  function setPromoGlyphs() {
+    var w = state.turn === 'w', g = w ? { q: '♕', r: '♖', b: '♗', n: '♘' } : { q: '♛', r: '♜', b: '♝', n: '♞' };
+    document.querySelectorAll('#promo button').forEach(function (b) { b.querySelector('i').textContent = g[b.dataset.p]; });
+    document.querySelector('#promo button').focus();
+  }
+  document.querySelectorAll('#promo button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var m = pendingPromo && pendingPromo.filter(function (x) { return x.promo === b.dataset.p; })[0];
+      pendingPromo = null; $('promo').hidden = true;
+      if (m) commitMove(m);
+    });
+  });
+
+  // ---------- Camera ----------
+  var camAnim = null, reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function flipTo(color) {
+    var cur = Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
+    var target = color === 'w' ? 0 : Math.PI, delta = target - cur;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    if (Math.abs(delta) < 0.01) return;
+    camAnim = { a0: cur, a1: cur + delta, t0: performance.now(), dur: reduceMotion ? 1 : 900 };
+  }
+  $('btnFlip').addEventListener('click', function () {
+    var cur = Math.atan2(camera.position.x - controls.target.x, camera.position.z - controls.target.z);
+    flipTo(Math.abs(cur) < Math.PI / 2 ? 'b' : 'w');
+  });
+
+  // ---------- Controls ----------
+  function newGame() {
+    stopAI();
+    state = initState(); history = []; legal = legalMoves(state); selected = null; over = null; busy = false;
+    tweens = []; pendingPromo = null; $('promo').hidden = true;
+    dying.forEach(function (d) { scene.remove(d.obj); }); dying = [];
+    syncPieces(); refreshMarks();
+    flipTo(mode === 'pvc-b' ? 'b' : 'w');
+    afterChange();
+  }
+  function undo() {
+    if (busy || !history.length) return;
+    stopAI();
+    var human = aiColor() ? (aiColor() === 'w' ? 'b' : 'w') : null;
+    do {
+      state = history.pop().state;
+    } while (human && history.length && state.turn !== human);
+    legal = legalMoves(state); selected = null; over = null; pendingPromo = null; $('promo').hidden = true;
+    syncPieces(); refreshMarks();
+    afterChange();
+  }
+  $('btnNew').addEventListener('click', newGame);
+  $('btnUndo').addEventListener('click', undo);
+  $('mode').addEventListener('change', function (e) { mode = e.target.value; save(); newGame(); });
+  $('level').addEventListener('change', function (e) { level = +e.target.value; save(); });
+  function save() { try { localStorage.setItem('satranc3d', JSON.stringify({ mode: mode, level: level })); } catch (err) {} }
+
+  // ---------- Panel ----------
+  var GLYPH = { P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', p: '♟', n: '♞', b: '♝', r: '♜', q: '♛' };
+  var ORDER = 'qrbnp';
+  function updateUI() {
+    var st = $('status'), main, sub;
+    st.className = 'status';
+    toast.className = '';
+    if (over) {
+      main = over.main; sub = over.sub; st.classList.add('over'); toast.classList.add('over');
+      toast.textContent = over.main + ' ' + over.sub;
+    } else {
+      var who = state.turn === 'w' ? 'Beyaz' : 'Siyah';
+      main = who + 'ın sırası';
+      if (thinking) sub = 'Bilgisayar düşünüyor…';
+      else if (aiColor() && humanTurn()) sub = selected !== null ? 'Hedef kareyi seçin' : 'Hamle sizde';
+      else sub = selected !== null ? 'Hedef kareyi seçin' : 'Bir taşa dokunun';
+      toast.textContent = thinking ? 'Bilgisayar düşünüyor…' : main;
+      if (inCheck(state)) { main = 'Şah! ' + main; st.classList.add('check'); toast.classList.add('check'); toast.textContent = 'Şah! ' + who + ' tehdit altında'; }
+    }
+    $('chip').className = 'turnchip ' + state.turn;
+    $('statusMain').textContent = main;
+    $('statusSub').textContent = sub;
+    $('btnUndo').disabled = !history.length;
+
+    var takenByW = [], takenByB = [];
+    history.forEach(function (h) { if (h.m.cap) (colorOf(h.m.cap) === 'b' ? takenByW : takenByB).push(h.m.cap); });
+    var sortCaps = function (a, b) { return ORDER.indexOf(a.toLowerCase()) - ORDER.indexOf(b.toLowerCase()); };
+    $('capW').textContent = takenByW.sort(sortCaps).map(function (c) { return GLYPH[c]; }).join('');
+    $('capB').textContent = takenByB.sort(sortCaps).map(function (c) { return GLYPH[c]; }).join('');
+    var mat = 0;
+    state.b.forEach(function (p) { if (p) mat += (colorOf(p) === 'w' ? 1 : -1) * VAL[p.toLowerCase()]; });
+    var pts = Math.round(mat / 100);
+    $('advW').textContent = pts > 0 ? '+' + pts : '';
+    $('advB').textContent = pts < 0 ? '+' + (-pts) : '';
+
+    var mv = $('moves'), html = '';
+    if (!history.length) html = '<div class="empty">Henüz hamle yok. Beyaz başlar.</div>';
+    for (var i = 0; i < history.length; i += 2) {
+      var lastIdx = history.length - 1;
+      html += '<span class="n">' + (i / 2 + 1) + '.</span>' +
+        '<span' + (i === lastIdx ? ' class="last"' : '') + '>' + history[i].san + '</span>' +
+        '<span' + (i + 1 === lastIdx ? ' class="last"' : '') + '>' + (history[i + 1] ? history[i + 1].san : '') + '</span>';
+    }
+    mv.innerHTML = html;
+    mv.scrollTop = mv.scrollHeight;
+  }
+
+  // ---------- Render loop ----------
+  function ease(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
+  function resize() {
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.fov = w / h < 0.8 ? 58 : 42;
+    camera.updateProjectionMatrix();
+  }
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize', resize);
+  resize();
+
+  function loop(now) {
+    requestAnimationFrame(loop);
+    var moving = {};
+    tweens = tweens.filter(function (tw) {
+      var t = Math.min(1, Math.max(0, (now - tw.t0) / tw.dur)), k = ease(t);
+      moving[tw.obj.id] = true;
+      tw.obj.position.x = tw.from.x + (tw.to.x - tw.from.x) * k;
+      tw.obj.position.z = tw.from.z + (tw.to.z - tw.from.z) * k;
+      tw.obj.position.y = tw.from.y * (1 - k) + Math.sin(Math.PI * t) * tw.arc;
+      if (t >= 1) { tw.obj.position.y = 0; if (tw.done) tw.done(); return false; }
+      return true;
+    });
+    for (var i = 0; i < 64; i++) {
+      var o = pieceObjs[i];
+      if (o && !moving[o.id]) o.position.y += (o.userData.lift - o.position.y) * 0.2;
+    }
+    dying = dying.filter(function (d) {
+      var t = (now - d.t0) / 300;
+      if (t < 0) return true;
+      var sc = Math.max(0.001, 1 - t);
+      d.obj.scale.set(sc, sc, sc); d.obj.position.y = -0.3 * t;
+      if (t >= 1) { scene.remove(d.obj); return false; }
+      return true;
+    });
+    if (camAnim) {
+      var t = Math.min(1, (now - camAnim.t0) / camAnim.dur), a = camAnim.a0 + (camAnim.a1 - camAnim.a0) * ease(t);
+      var dx = camera.position.x - controls.target.x, dz = camera.position.z - controls.target.z, rad = Math.hypot(dx, dz);
+      camera.position.x = controls.target.x + Math.sin(a) * rad;
+      camera.position.z = controls.target.z + Math.cos(a) * rad;
+      if (t >= 1) camAnim = null;
+    }
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  // ---------- Boot (keeps an in-progress game across live updates) ----------
+  function start(data) {
+    data = data || {};
+    try { var saved = JSON.parse(localStorage.getItem('satranc3d') || 'null'); if (saved) { mode = saved.mode || mode; level = saved.level || level; } } catch (err) {}
+    if (data.mode) mode = data.mode;
+    if (data.level) level = data.level;
+    $('mode').value = mode; $('level').value = String(level);
+    (data.moves || []).forEach(function (mv) {
+      var m = legal.filter(function (x) { return x.from === mv.from && x.to === mv.to && (x.promo || null) === mv.promo; })[0];
+      if (!m) return;
+      history.push({ state: state, m: m, san: toSAN(state, m, legal) });
+      state = makeMove(state, m); legal = legalMoves(state);
+    });
+    syncPieces(); refreshMarks();
+    if (mode === 'pvc-b') { var a = Math.PI; camera.position.x = Math.sin(a) * 10.5; camera.position.z = 0.3 + Math.cos(a) * 10.2; controls.update(); }
+    requestAnimationFrame(loop);
+    afterChange();
+  }
+  try {
+    window.claude && window.claude.hot && window.claude.hot.snapshot && window.claude.hot.snapshot(function () {
+      return { mode: mode, level: level, moves: history.map(function (h) { return { from: h.m.from, to: h.m.to, promo: h.m.promo || null }; }) };
+    });
+  } catch (err) {}
+  var hot = window.claude && window.claude.hot;
+  if (hot && hot.ready) hot.ready(start); else start((hot && hot.data) || {});
+})();
+</script>
+
+</body>
+</html>
