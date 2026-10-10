@@ -2814,6 +2814,7 @@ async function geoCompare() {
 function applyViewMode() {
   const m = +$('#vMode').value;
   setUniform('mode', m);
+  if (stl && stl.wallPts) { stl.wallPts.visible = m === 6 && stl.wallShow !== false; needRender = true; }
   const lg = $('#legend');
   if (!job1) { lg.style.display = 'none'; return; }
   const turboCss = 'linear-gradient(90deg,#30123b,#4662d7,#36aaf9,#1ae4b6,#72fe5e,#c8ef34,#faba39,#f66b19,#ca2a04,#7a0403)';
@@ -3029,7 +3030,7 @@ function prepSTL(tri, name) {
       acc += step;
     }
   }
-  return { name, tri, n, c0, size: [x1 - x0, y1 - y0, z1 - z0], samples: new Float32Array(S), xf: { tx: 0, ty: 0, tz: 0, rz: 0, rx: 0, ry: 0, flip: false, base: null }, tolUm: 10, rangeUm: 100, devDone: false };
+  return { name, tri, n, c0, size: [x1 - x0, y1 - y0, z1 - z0], samples: new Float32Array(S), sampleArea: tot / 2 / Math.max(1, S.length / 6), xf: { tx: 0, ty: 0, tz: 0, rz: 0, rx: 0, ry: 0, flip: false, base: null }, tolUm: 10, rangeUm: 100, devDone: false };
 }
 // simüle yüzeyin (üst/alt) ikili doğrusal yüksekliği
 function simHeight(x, y, side) {
@@ -3266,6 +3267,96 @@ function rasterizeSTL(st, g) {
   return { top, bot, ntop, nbot };
 }
 const pct = (arr, p) => arr.length ? arr[Math.min(arr.length - 1, Math.max(0, Math.floor(arr.length * p)))] : NaN;
+// ── Dik duvarların ölçümü ──
+// Yükseklik haritası dik duvarları Z yönünde ölçemez. Bunun yerine tasarım STL'inin her duvar noktasından
+// (|normal_z| < 0.4) duvarın dışa baktığı yönde YATAY ilerlenir ve simüle malzemenin o yükseklikte bittiği
+// yer bulunur: (+) duvarda fazla malzeme, (−) duvar fazla kesilmiş. Hassasiyet ızgara aralığıyla sınırlıdır
+// (≈ ±çözünürlük/2): 0.1 mm'de ±50 µm, 0.03 mm detayda ±15 µm.
+const WALL_MAX = 1.0; // mm: bundan uzun süren malzeme = bağlantı çubuğu / kesilmemiş blok
+function measureWalls(st) {
+  const g = sim.g, b = sim.buf, res = g.res, nx = g.nx, R = xfMatrix(st.xf), xf = st.xf, S = st.samples;
+  // Noktanın malzeme içinde olma ölçüsü (+ içeride, − dışarıda), ±res ile sınırlanıp çift doğrusal enterpole edilir
+  const cv = (k, z) => {
+    if (!sim.mask[k]) return -res;
+    const t = b[4 * k], bo = b[4 * k + 1];
+    if (t - bo <= 1e-4) return -res;
+    const d = Math.min(t - z, z - bo);
+    return d > res ? res : d < -res ? -res : d;
+  };
+  const F = (x, y, z) => {
+    const fx = (x - g.x0) / res, fy = (y - g.y0) / res, i = Math.floor(fx), j = Math.floor(fy);
+    if (i < 0 || j < 0 || i >= nx - 1 || j >= g.ny - 1) return -res;
+    const tx = fx - i, ty = fy - j, k = j * nx + i;
+    return (cv(k, z) * (1 - tx) + cv(k + 1, z) * tx) * (1 - ty) + (cv(k + nx, z) * (1 - tx) + cv(k + nx + 1, z) * tx) * ty;
+  };
+  const colTop = (x, y) => {
+    const i = Math.round((x - g.x0) / res), j = Math.round((y - g.y0) / res);
+    if (i < 0 || j < 0 || i >= nx || j >= g.ny) return null;
+    const k = j * nx + i;
+    return sim.mask[k] && b[4 * k] - b[4 * k + 1] > 1e-4 ? [b[4 * k], b[4 * k + 1]] : null;
+  };
+  const step = res / 3, edgeMargin = Math.max(0.05, res);
+  const devs = [], pts = [], cols = [];
+  let total = 0, flat = 0, conn = 0, edge = 0, lost = 0;
+  for (let q = 0; q < S.length / 6; q++) {
+    const o = q * 6, x = S[o], y = S[o + 1], z = S[o + 2];
+    total++;
+    const nxw = R[0] * S[o + 3] + R[1] * S[o + 4] + R[2] * S[o + 5], nyw = R[3] * S[o + 3] + R[4] * S[o + 4] + R[5] * S[o + 5], nzw = R[6] * S[o + 3] + R[7] * S[o + 4] + R[8] * S[o + 5];
+    if (Math.abs(nzw) >= 0.4) { flat++; continue; }
+    const hl = Math.hypot(nxw, nyw); if (hl < 1e-6) { edge++; continue; }
+    const hx = nxw / hl, hy = nyw / hl;
+    const px = R[0] * x + R[1] * y + R[2] * z + xf.tx, py = R[3] * x + R[4] * y + R[5] * z + xf.ty, pz = R[6] * x + R[7] * y + R[8] * z + xf.tz;
+    // duvarın üst/alt kenarına çok yakın noktalar (yüzeye geçiş) güvenilir ölçülemez
+    const ic = colTop(px - hx * 0.3, py - hy * 0.3);
+    if (ic && (ic[0] - pz < edgeMargin || pz - ic[1] < edgeMargin)) { edge++; continue; }
+    const G0 = F(px, py, pz);
+    let dev = NaN;
+    if (G0 >= 0) { // tasarım yüzeyinde malzeme var → dışarı doğru malzemenin bittiği yeri ara
+      let ps = 0, pg = G0;
+      for (let s = step; s <= WALL_MAX + 1e-9; s += step) { const gv = F(px + hx * s, py + hy * s, pz); if (gv < 0) { dev = ps + (s - ps) * pg / (pg - gv); break; } ps = s; pg = gv; }
+      if (isNaN(dev)) { conn++; continue; }
+    } else { // tasarım yüzeyinde malzeme yok → içeri doğru malzemenin başladığı yeri ara
+      let ps = 0, pg = G0;
+      for (let s = -step; s >= -WALL_MAX - 1e-9; s -= step) { const gv = F(px + hx * s, py + hy * s, pz); if (gv >= 0) { dev = ps + (s - ps) * pg / (pg - gv); break; } ps = s; pg = gv; }
+      if (isNaN(dev)) { lost++; continue; }
+    }
+    devs.push(dev);
+    pts.push(px + hx * (dev + 0.012), py + hy * (dev + 0.012), pz);
+  }
+  const sorted = devs.slice().sort((a, c) => a - c);
+  const tol = st.tolUm / 1000, A = st.sampleArea || 0;
+  return {
+    n: devs.length, total, flat, conn, edge, lost, res,
+    withinPct: devs.length ? devs.filter((d) => Math.abs(d) <= tol).length / devs.length * 100 : NaN,
+    within2Pct: devs.length ? devs.filter((d) => Math.abs(d) <= Math.max(2 * tol, res / 2)).length / devs.length * 100 : NaN,
+    p05: pct(sorted, 0.05), p50: pct(sorted, 0.5), p95: pct(sorted, 0.95), p005: pct(sorted, 0.005), p995: pct(sorted, 0.995),
+    excessArea: devs.filter((d) => d > Math.max(2 * tol, res / 2)).length * A,
+    overArea: devs.filter((d) => d < -Math.max(2 * tol, res / 2)).length * A,
+    area: devs.length * A, devs, pts,
+  };
+}
+function wallColor(d, tol, max) {
+  if (Math.abs(d) <= tol) return [0.30, 0.78, 0.42];
+  const t = Math.max(-1, Math.min(1, d / max)), m = (a, c, u) => a.map((v, i) => v + (c[i] - v) * u);
+  return t > 0 ? m([0.98, 0.88, 0.25], [0.85, 0.05, 0.05], t) : m([0.35, 0.85, 0.95], [0.08, 0.2, 0.85], -t);
+}
+function updateWallPts() {
+  if (!stl) return;
+  if (stl.wallPts) { blockGroup.remove(stl.wallPts); stl.wallPts.geometry.dispose(); stl.wallPts.material.dispose(); stl.wallPts = null; }
+  const w = stl.wall;
+  if (!w || !stl.devDone || !w.n) return;
+  const tol = stl.tolUm / 1000, max = stl.rangeUm / 1000, col = new Float32Array(w.n * 3);
+  for (let i = 0; i < w.n; i++) { const c = wallColor(w.devs[i], tol, max); col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2]; }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(w.pts), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const size = Math.max(0.08, Math.min(0.3, Math.sqrt(stl.sampleArea || 0.02) * 1.4));
+  stl.wallPts = new THREE.Points(geo, new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: true }));
+  stl.wallPts.frustumCulled = false;
+  blockGroup.add(stl.wallPts);
+  stl.wallPts.visible = +$('#vMode').value === 6 && stl.wallShow !== false;
+  needRender = true;
+}
 async function computeDeviation() {
   if (!stl || !sim || !surf) return;
   if (sim.k < job1.n) await runTo(job1.n, 'Simülasyon sona kadar hesaplanıyor');
@@ -3303,8 +3394,11 @@ async function computeDeviation() {
     excessArea: all.filter((d) => d > 2 * tol).length * g.res * g.res,
   };
   stl.devDone = true;
+  showBusy('Dik duvarlar ölçülüyor…', 0.8); await nextFrame();
+  stl.wall = measureWalls(stl);
   setUniform('devTol', tol); setUniform('devMax', stl.rangeUm / 1000);
   updateStlMesh();
+  updateWallPts();
   showBusy(null);
   $('#vMode').value = '6'; applyViewMode();
   renderStl(); renderAdvice();
@@ -3323,6 +3417,23 @@ function updateStlMesh() {
   stl.mesh.matrix.copy(m); stl.mesh.matrixWorldNeedsUpdate = true;
   stl.mesh.visible = !!($('#stlShow') && $('#stlShow').checked);
   needRender = true;
+}
+function wallCard() {
+  const w = stl && stl.wall;
+  if (!w) return '';
+  const um = (v) => isFinite(v) ? (v * 1000 > 0 ? '+' : '') + fmt(v * 1000, 1) + ' µm' : '–';
+  const tol2 = Math.max(2 * stl.tolUm, w.res * 500);
+  const kapsam = w.total ? (w.flat + w.n) / w.total * 100 : 0;
+  return `<div class="card" style="grid-column:1/-1;margin-top:8px;border-color:#3b4b5e"><div class="k">Dik duvarlar (yan yüzeyler) — yatay ölçüm</div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">
+      <div><div class="v" style="color:${w.within2Pct > 80 ? 'var(--ok)' : w.within2Pct > 50 ? 'var(--warn)' : 'var(--bad)'}">%${fmt(w.within2Pct, 0)}</div><div class="s">±${fmt(tol2, 0)} µm içinde · ${fmtInt(w.n)} nokta · ${fmt(w.area, 0)} mm²</div></div>
+      <div><div class="v" style="font-size:15px">${um(w.p50)}</div><div class="s">medyan · %5: ${um(w.p05)} · %95: ${um(w.p95)}</div></div>
+      <div><div class="v" style="font-size:15px;color:${w.excessArea > 0.5 ? 'var(--bad)' : 'inherit'}">${fmt(w.excessArea, 1)} mm²</div><div class="s">duvarda fazla malzeme (en çok ${um(w.p995)})</div></div>
+      <div><div class="v" style="font-size:15px;color:${w.overArea > 0.5 ? 'var(--warn)' : 'inherit'}">${fmt(w.overArea, 1)} mm²</div><div class="s">duvarda fazla kesilmiş (en çok ${um(w.p005)})</div></div>
+    </div>
+    <div class="s" style="margin-top:6px">Hassasiyet ≈ ±${fmt(w.res * 500, 0)} µm (ızgara ${w.res} mm); ±10 µm karar için parçayı 0.02–0.03 mm detayda simüle edin. Ölçülen yüzey: %${fmt(kapsam, 0)} (önceden %${fmt(w.total ? w.flat / w.total * 100 : 0, 0)}).
+    ${w.conn ? ` Bağlantı çubuğu / kesilmemiş blok değen ${fmtInt(w.conn)} nokta (≥${WALL_MAX} mm malzeme) hariç tutuldu.` : ''}${w.edge ? ` Kenar geçişindeki ${fmtInt(w.edge)} nokta ölçülmedi.` : ''}</div>
+    <label style="display:inline-flex;gap:6px;margin-top:6px"><input type="checkbox" id="stlWallShow" ${stl.wallShow !== false ? 'checked' : ''}> Duvar ölçüm noktalarını 3B görünümde göster</label></div>`;
 }
 function renderStl() {
   const el = $('#tStl');
@@ -3351,7 +3462,8 @@ function renderStl() {
         <div class="card"><div class="k">Üst / alt yüzey medyan</div><div class="v" style="font-size:14px">${um(s.top50)} / ${um(s.bot50)}</div><div class="s">%95: ${um(s.top95)} / ${um(s.bot95)}</div></div>
         <div class="card"><div class="k">Fazla malzeme alanı (> ${2 * stl.tolUm} µm)</div><div class="v">${fmt(s.excessArea, 1)} mm²</div><div class="s">en fazla ${um(s.p995)}</div></div>
         <div class="card"><div class="k">Fazla kesilmiş</div><div class="v">${um(s.p005)}</div><div class="s">tasarım alanında boş kalan: %${fmt(s.emptyPct, 1)}</div></div></div>
-        <div class="note">Pozitif (+) = tasarımdan fazla malzeme var (parça büyük çıkar, üstüne geçen parça oturmaz). Negatif (−) = fazla kesilmiş. Dik duvarlar ızgara yöntemiyle güvenilir ölçülemediği için değerlendirme dışıdır (gri). Simülasyon ızgarası: ${sim ? sim.g.res : '–'} mm — daha kesin sonuç için parçayı 0.02–0.03 mm detay bölgesinde simüle edip “Sapmayı yeniden hesapla” deyin.</div>`;
+        ${wallCard()}
+        <div class="note">Pozitif (+) = tasarımdan fazla malzeme var (parça büyük çıkar, üstüne geçen parça oturmaz). Negatif (−) = fazla kesilmiş. Dik duvarlar yüzey haritasında gri kalır; onlar ayrıca yatay yönde ölçülüp 3B görünümde renkli noktalarla gösterilir (yukarıdaki “Dik duvarlar” kartı). Simülasyon ızgarası: ${sim ? sim.g.res : '–'} mm — daha kesin sonuç için parçayı 0.02–0.03 mm detay bölgesinde simüle edip “Sapmayı yeniden hesapla” deyin.</div>`;
     }
   }
   el.innerHTML = h;
@@ -3370,12 +3482,13 @@ function renderStl() {
   $('#stlAuto').addEventListener('click', autoAlign);
   $('#stlCalc').addEventListener('click', computeDeviation);
   $('#stlShow').addEventListener('change', () => { updateStlMesh(); });
+  const ws = $('#stlWallShow'); if (ws) ws.addEventListener('change', () => { stl.wallShow = ws.checked; if (stl.wallPts) { stl.wallPts.visible = ws.checked && +$('#vMode').value === 6; needRender = true; } });
   $('#stlApply').addEventListener('click', () => {
     el.querySelectorAll('[data-xf]').forEach((i) => { stl.xf[i.dataset.xf] = i.type === 'checkbox' ? i.checked : +i.value; });
     stl.align = alignScore(stl, stl.xf, 20000); computeDeviation();
   });
   $('#stlTol').addEventListener('change', () => { stl.tolUm = Math.max(1, +$('#stlTol').value); if (stl.devDone) computeDeviation(); });
-  $('#stlRange').addEventListener('change', () => { stl.rangeUm = Math.max(10, +$('#stlRange').value); setUniform('devMax', stl.rangeUm / 1000); applyViewMode(); });
+  $('#stlRange').addEventListener('change', () => { stl.rangeUm = Math.max(10, +$('#stlRange').value); setUniform('devMax', stl.rangeUm / 1000); updateWallPts(); applyViewMode(); });
 }
 
 // ───────────────────────────── otomatik öneriler ─────────────────────────────
@@ -3403,6 +3516,12 @@ function renderAdvice() {
     if (s.p50 > tol) items.push({ lvl: 'warn', t: `Yüzeyin genelinde fazla malzeme: medyan +${fmt(s.p50 * 1000, 1)} µm`, b: 'Finiş sekanslarındaki Allowance (pay) değerlerini kontrol edin; birleşim yüzeylerinde 0 olmalı.' });
     if (s.p005 < -2 * tol) items.push({ lvl: 'warn', t: `Fazla kesilmiş bölgeler var (en çok ${fmt(s.p005 * 1000, 0)} µm)`, b: 'Önce hizalamayı kontrol edin (STL\'i göster). Hizalama iyiyse takım çapı tanımı veya CAD tasarımı kontrol edilmeli.' });
     if (!(s.band50 > 2 * tol) && s.band90 > 3 * tol) items.push({ lvl: 'warn', t: `Kenar bölgesinin bir kısmında fazla malzeme (%90: +${fmt(s.band90 * 1000, 0)} µm, ${s.bandSide} yüzey)`, b: 'Kenarın tamamında değil, belirli bölgelerde fazlalık var. “Tasarımdan sapma” haritasında bu bölgeleri bulup yüzeye tıklayarak hangi operasyonun son kestiğini görün.' });
+    const w = stl.wall;
+    if (w && w.n) {
+      const lim = Math.max(2 * tol, w.res / 2);
+      if (w.excessArea > 0.5) items.push({ lvl: w.excessArea > 3 ? 'bad' : 'warn', t: `Dik duvarlarda fazla malzeme: ${fmt(w.excessArea, 1)} mm² (en çok +${fmt(w.p995 * 1000, 0)} µm)`, b: `Yan yüzeylerde tasarımdan ${fmt(lim * 1000, 0)} µm'den fazla malzeme kalan bölgeler var (3B görünümde kırmızı/sarı noktalar). Genelde takım yarıçapının giremediği dar oluk ve dişler arası bölgelerdir: daha küçük çaplı takımla artık malzeme (rest) işlemesi ekleyin veya mevcut rest işlemesinin sınırını genişletin.` });
+      if (w.overArea > 0.5) items.push({ lvl: 'warn', t: `Dik duvarlarda fazla kesilmiş bölge: ${fmt(w.overArea, 1)} mm² (en çok ${fmt(w.p005 * 1000, 0)} µm)`, b: 'Yan yüzeyin tasarımdan içeri kesildiği noktalar (mavi). Önce hizalamayı kontrol edin; iyiyse takım çapı/yarıçap tanımını ve eğik operasyonların kinematik ayarını doğrulayın.' });
+    }
     if (s.withinPct >= 80 && s.band50 <= 2 * tol && s.band90 <= 3 * tol) items.push({ lvl: 'ok', t: `Tasarıma uyum iyi: yüzeyin %${fmt(s.withinPct, 0)}'i ±${stl.tolUm} µm içinde`, b: '' });
   } else items.push({ lvl: 'info', t: 'Uyum sorunu varsa tasarım STL\'ini yükleyin', b: '<b>Uyum (STL)</b> sekmesinden parçanın CAD STL\'ini yükleyince, tasarıma göre nerede kaç µm fazla/eksik malzeme kaldığı ölçülür ve buraya somut ayar önerisi gelir.' });
   // 4) işleme toleransı (yaklaşık aynı değerdeki ardışık operasyonlar gruplanır)
@@ -3460,7 +3579,7 @@ async function startSim(grid, runToK) {
   sim = new Sim(job1, grid); sim2 = null;
   buildSurface(sim); buildHelpers(); buildDiscWall(grid); applyViewMode();
   roughStats = null; analysisState = { rough: false, diff: false };
-  if (stl) stl.devDone = false;
+  if (stl) { stl.devDone = false; updateWallPts(); }
   target = 0;
   if (runToK) await runTo(runToK);
   refreshFrame(true);
@@ -3619,7 +3738,8 @@ $('#btnCsv').addEventListener('click', () => {
     rows.push([op.idx + 1, 'T' + op.tool, td.type, td.d, op.A, op.B, op.sideTxt, op.kind, op.S, op.cut.toFixed(2), op.time.toFixed(3), op.nF, fmt(op.segAvg, 4), fmt(op.zStep, 4), fmt(op.stepover, 4), fmt(op.scallop, 3), sim ? fmt(sim.opDepth[op.idx], 4) : '', sim ? fmt(sim.opVol[op.idx], 2) : '', op.line + 1, isFinite(op.tolEst) ? fmt(op.tolEst * 1000, 1) : '', fmt(op.vc, 0), fmt(op.fz, 4), op.plunges]);
   }
   if (parts.length) { rows.push([]); rows.push(['Parca', 'MerkezX', 'MerkezY', 'BoyutX', 'BoyutY', 'Yukseklik', 'KenaraMesafe', 'KomsuyaMesafe']); for (const p of parts) rows.push([p.name, fmt(p.cx, 3), fmt(p.cy, 3), fmt(p.x1 - p.x0, 3), fmt(p.y1 - p.y0, 3), fmt(p.ztop - p.zbot, 3), fmt(p.edge, 3), isFinite(p.gap) ? fmt(p.gap, 3) : '']); }
-  if (stl && stl.devDone && stl.stats) { const t = stl.stats, u = (v) => fmt(v * 1000, 1); rows.push([]); rows.push(['STL_uyum', stl.name, 'Tolerans_um', stl.tolUm, 'ToleransIcinde_%', fmt(t.withinPct, 1), 'Medyan_um', u(t.p50), 'KenarUst_um', u(t.bandTop50), 'KenarAlt_um', u(t.bandBot50), 'P95_um', u(t.p95)]); }
+  if (stl && stl.devDone && stl.stats) { const t = stl.stats, u = (v) => fmt(v * 1000, 1); rows.push([]); rows.push(['STL_uyum', stl.name, 'Tolerans_um', stl.tolUm, 'ToleransIcinde_%', fmt(t.withinPct, 1), 'Medyan_um', u(t.p50), 'KenarUst_um', u(t.bandTop50), 'KenarAlt_um', u(t.bandBot50), 'P95_um', u(t.p95)]);
+    const w = stl.wall; if (w && w.n) rows.push(['STL_duvar', 'Nokta', w.n, 'Izgara_mm', w.res, 'Icinde_%', fmt(w.within2Pct, 1), 'Medyan_um', u(w.p50), 'P05_um', u(w.p05), 'P95_um', u(w.p95), 'FazlaMalzeme_mm2', fmt(w.excessArea, 2), 'FazlaKesilmis_mm2', fmt(w.overArea, 2)]); }
   const csv = '﻿' + rows.map((r) => r.map((v) => String(v).replace(/;/g, ',')).join(';')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = job1.name.replace(/\.[^.]+$/, '') + '_rapor.csv'; a.click();
