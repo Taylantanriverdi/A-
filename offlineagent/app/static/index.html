@@ -8,12 +8,12 @@
   :root {
     --bg: #f6f7f9; --panel: #ffffff; --kenar: #e3e6eb; --yazi: #1d2330; --soluk: #6b7383;
     --vurgu: #2f6fed; --vurgu-yazi: #ffffff; --kullanici: #e8effd; --kod-bg: #f0f2f5;
-    --iyi: #1f9d55; --kotu: #d64545; --uyari: #c98a00;
+    --iyi: #1f9d55; --kotu: #d64545; --uyari: #c98a00; --uyari-bg: #fff6e0;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #12151b; --panel: #1a1e26; --kenar: #2a303b; --yazi: #e6e9ef; --soluk: #8e97a8;
-      --vurgu: #5b8cff; --vurgu-yazi: #0d1017; --kullanici: #22304d; --kod-bg: #10131a;
+      --vurgu: #5b8cff; --vurgu-yazi: #0d1017; --kullanici: #22304d; --kod-bg: #10131a; --uyari-bg: #2e2714;
     }
   }
   * { box-sizing: border-box; }
@@ -22,7 +22,11 @@
   button { font: inherit; cursor: pointer; border: 1px solid var(--kenar); background: var(--panel); color: var(--yazi); border-radius: 8px; padding: 7px 12px; }
   button:hover { border-color: var(--vurgu); }
   button.ana { background: var(--vurgu); color: var(--vurgu-yazi); border-color: var(--vurgu); }
+  button.tehlike { background: var(--kotu); color: #fff; border-color: var(--kotu); }
   button:disabled { opacity: .5; cursor: default; }
+  button.simge { padding: 6px 9px; line-height: 1; font-size: 17px; background: none; border-color: transparent; }
+  button.simge:hover { border-color: var(--kenar); }
+  button.simge.aktif { color: var(--kotu); border-color: var(--kotu); }
 
   aside { width: 270px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--kenar); display: flex; flex-direction: column; }
   .marka { padding: 16px 16px 8px; font-weight: 700; font-size: 17px; display: flex; align-items: center; gap: 8px; }
@@ -51,40 +55,64 @@
   .secici button.secili { background: var(--vurgu); color: var(--vurgu-yazi); }
   label.anahtar { display: inline-flex; align-items: center; gap: 6px; color: var(--soluk); cursor: pointer; user-select: none; }
   #modelBilgi { margin-left: auto; color: var(--soluk); font-size: 13px; }
+  #ajanBilgi { display: none; max-width: 820px; margin: 0 auto 14px; padding: 10px 14px; border-radius: 10px; background: var(--uyari-bg); font-size: 13.5px; }
+  body.mod-ajan #ajanBilgi { display: block; }
 
   #mesajlar { flex: 1; overflow-y: auto; padding: 24px 16px; }
-  .mesaj { max-width: 820px; margin: 0 auto 18px; display: flex; }
-  .mesaj.user { justify-content: flex-end; }
+  .mesaj { max-width: 820px; margin: 0 auto 14px; display: flex; flex-direction: column; }
+  .mesaj.user { align-items: flex-end; }
   .balon { padding: 10px 14px; border-radius: 12px; max-width: 100%; overflow-wrap: anywhere; }
   .mesaj.user .balon { background: var(--kullanici); white-space: pre-wrap; max-width: 85%; }
-  .mesaj.assistant .balon { background: transparent; padding-left: 0; width: 100%; }
+  .mesaj.assistant .balon { background: transparent; padding: 0; width: 100%; }
   .balon p { margin: 0 0 10px; } .balon p:last-child { margin-bottom: 0; }
   .balon h1, .balon h2, .balon h3, .balon h4 { margin: 14px 0 8px; line-height: 1.3; }
   .balon ul, .balon ol { margin: 0 0 10px; padding-left: 22px; }
   .balon code { background: var(--kod-bg); padding: 1px 5px; border-radius: 4px; font: 13px/1.5 Consolas, "Cascadia Mono", monospace; }
+  .resimler { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; justify-content: flex-end; }
+  .resimler img { max-height: 160px; max-width: 220px; border-radius: 8px; border: 1px solid var(--kenar); }
   .kod { position: relative; margin: 0 0 12px; }
-  .kod pre { background: var(--kod-bg); border: 1px solid var(--kenar); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 0; }
+  .kod pre, pre.cikti { background: var(--kod-bg); border: 1px solid var(--kenar); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 0; font: 13px/1.5 Consolas, "Cascadia Mono", monospace; }
+  pre.cikti { max-height: 300px; overflow-y: auto; white-space: pre-wrap; }
   .kod pre code { background: none; padding: 0; }
   .kod .kopyala { position: absolute; top: 6px; right: 6px; padding: 2px 8px; font-size: 12px; }
   .kod .dil { position: absolute; top: 8px; right: 70px; font-size: 11px; color: var(--soluk); }
+  .eylemler { margin-top: 4px; display: flex; gap: 2px; }
+  .eylemler button { padding: 2px 6px; font-size: 13px; border-color: transparent; background: none; color: var(--soluk); }
+  .eylemler button:hover { border-color: var(--kenar); }
   .kaynaklar { margin-top: 10px; font-size: 12.5px; color: var(--soluk); }
   .kaynaklar details summary { cursor: pointer; }
   .kaynaklar .kaynak { margin: 6px 0; padding: 6px 8px; border-left: 3px solid var(--kenar); white-space: pre-wrap; max-height: 140px; overflow-y: auto; }
+  .arac { border: 1px solid var(--kenar); border-radius: 10px; padding: 8px 12px; background: var(--panel); font-size: 13.5px; }
+  .arac summary { cursor: pointer; color: var(--soluk); }
+  .arac .baslik { font-weight: 600; margin-bottom: 6px; }
+  .arac pre { margin-top: 6px; }
+  .onay { border: 2px solid var(--uyari); border-radius: 12px; padding: 12px 14px; background: var(--uyari-bg); }
+  .onay .dugmeler { display: flex; gap: 8px; margin-top: 10px; }
   .hata { color: var(--kotu); }
   .imlec::after { content: "▍"; animation: yanip 1s steps(1) infinite; }
   @keyframes yanip { 50% { opacity: 0; } }
-  .bos { max-width: 620px; margin: 10vh auto 0; text-align: center; color: var(--soluk); }
+  .bos { max-width: 620px; margin: 8vh auto 0; text-align: center; color: var(--soluk); }
   .bos h2 { color: var(--yazi); margin-bottom: 6px; }
   .oneriler { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
 
   footer { padding: 12px 16px 16px; background: var(--bg); }
-  .yazma { max-width: 820px; margin: 0 auto; display: flex; gap: 8px; align-items: flex-end; background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 8px; }
+  #ekler { max-width: 820px; margin: 0 auto 6px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #ekler .ek { position: relative; }
+  #ekler img { height: 64px; border-radius: 8px; border: 1px solid var(--kenar); display: block; }
+  #ekler button { position: absolute; top: -6px; right: -6px; padding: 0 6px; border-radius: 50%; font-size: 12px; }
+  .yazma { max-width: 820px; margin: 0 auto; display: flex; gap: 4px; align-items: flex-end; background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 6px; }
   .yazma:focus-within { border-color: var(--vurgu); }
-  textarea { flex: 1; border: 0; outline: 0; resize: none; background: none; color: var(--yazi); font: inherit; max-height: 220px; padding: 6px; }
+  textarea { flex: 1; border: 0; outline: 0; resize: none; background: none; color: var(--yazi); font: inherit; max-height: 220px; padding: 7px 6px; }
   .ipucu { max-width: 820px; margin: 6px auto 0; font-size: 12px; color: var(--soluk); text-align: center; }
 
   #surukle { display: none; position: fixed; inset: 0; background: rgba(47,111,237,.15); border: 3px dashed var(--vurgu); z-index: 10; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; }
   body.surukleniyor #surukle { display: flex; }
+
+  /* Panellere gömülü küçük sürüm */
+  body.gomulu aside, body.gomulu [data-mod=ajan], body.gomulu #menuDugme, body.gomulu .ipucu { display: none !important; }
+  body.gomulu header { padding: 8px 10px; gap: 8px; }
+  body.gomulu #mesajlar { padding: 14px 10px; }
+  body.gomulu footer { padding: 8px; }
 
   @media (max-width: 760px) {
     aside { position: fixed; inset: 0 auto 0 0; z-index: 5; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 30px rgba(0,0,0,.3); }
@@ -106,13 +134,14 @@
     <div class="satir">
       <button id="belgeYukle" title="Dosya seç ve belgeler klasörüne ekle">Ekle</button>
       <button id="belgeTara" title="Belgeler klasöründeki yeni/değişen dosyaları işle">Tara</button>
-      <button id="klasorAc" title="Belgeler klasörünü Gezgin'de aç">Klasör</button>
+      <button data-klasor="belgeler" title="Belgeler klasörünü Gezgin'de aç">Klasör</button>
     </div>
-    <input type="file" id="dosyaSec" multiple hidden accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.log">
+    <input type="file" id="dosyaSec" multiple hidden accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.log,.png,.jpg,.jpeg,.webp,.bmp">
   </div>
   <div class="bolum">
     <h3>Sistem</h3>
     <div id="sistemDurum"><span class="nokta"></span>Kontrol ediliyor…</div>
+    <div class="satir"><button data-klasor="calisma" title="Ajanın dosya yazdığı klasörü aç">Çalışma klasörü</button></div>
   </div>
 </aside>
 
@@ -120,21 +149,27 @@
   <header>
     <button id="menuDugme" aria-label="Menü">☰</button>
     <div class="secici" role="group" aria-label="Mod">
-      <button data-mod="genel" class="secili">Genel</button>
-      <button data-mod="kod">Kod</button>
+      <button data-mod="genel" class="secili" title="Sohbet, yazı, özet, çeviri">Genel</button>
+      <button data-mod="kod" title="Programlama yardımı">Kod</button>
+      <button data-mod="ajan" title="Dosya okuyup yazabilir, kod ve komut çalıştırabilir (onayınla)">Ajan</button>
     </div>
-    <label class="anahtar"><input type="checkbox" id="belgeKullan"> Belgelerimi kullan</label>
+    <label class="anahtar" id="belgeAnahtar"><input type="checkbox" id="belgeKullan"> Belgelerimi kullan</label>
+    <label class="anahtar" title="Cevapları sesli oku"><input type="checkbox" id="sesliCevap"> Sesli cevap</label>
     <span id="modelBilgi"></span>
   </header>
 
   <div id="mesajlar"></div>
 
   <footer>
+    <div id="ekler"></div>
     <div class="yazma">
+      <button class="simge" id="resimEkle" title="Resim ekle (veya Ctrl+V ile yapıştır)">📎</button>
       <textarea id="girdi" rows="1" placeholder="Bir şey sor… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
+      <button class="simge" id="mikrofon" title="Sesle yaz">🎤</button>
       <button class="ana" id="gonder">Gönder</button>
       <button id="durdur" hidden>Durdur</button>
     </div>
+    <input type="file" id="resimSec" multiple hidden accept="image/*">
     <div class="ipucu">Tamamen bu bilgisayarda çalışır, internete hiçbir veri gönderilmez.</div>
   </footer>
 </main>
@@ -142,30 +177,37 @@
 
 <script>
 const $ = (s) => document.querySelector(s);
-const DEPO = "oa_sohbetler", AYAR = "oa_ayar";
+const GOMULU = new URLSearchParams(location.search).get("gomulu") === "1";
+const DEPO = GOMULU ? "oa_gomulu_sohbetler" : "oa_sohbetler", AYAR = "oa_ayar";
 
 function oku(anahtar, varsayilan) {
   try { return JSON.parse(localStorage.getItem(anahtar)) ?? varsayilan; } catch { return varsayilan; }
 }
 function yaz(anahtar, deger) {
-  try { localStorage.setItem(anahtar, JSON.stringify(deger)); } catch { /* depolama kapalıysa sessizce geç */ }
+  try { localStorage.setItem(anahtar, JSON.stringify(deger)); return true; } catch { return false; }
 }
 
 let sohbetler = oku(DEPO, []);
-let ayar = Object.assign({ mod: "genel", belgeler: false }, oku(AYAR, {}));
+let ayar = Object.assign({ mod: "genel", belgeler: false, sesli: false }, oku(AYAR, {}));
+if (GOMULU && ayar.mod === "ajan") ayar.mod = "genel";
 let aktifId = sohbetler[0]?.id ?? null;
 let iptal = null;
 let durumBilgi = null;
+let ekResimler = [];
+let canli = [];
 
 // ---------- Markdown (basit, güvenli) ----------
 function kacis(s) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 function satirIci(s) {
   return s
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+}
+function kodKutusu(kod, dil = "") {
+  return `<div class="kod">${dil ? `<span class="dil">${kacis(dil)}</span>` : ""}<button class="kopyala">Kopyala</button><pre><code>${kacis(kod)}</code></pre></div>`;
 }
 function markdown(metin) {
   const parcalar = metin.split(/```/);
@@ -175,7 +217,7 @@ function markdown(metin) {
       const ilkSatir = parca.indexOf("\n");
       const dil = ilkSatir >= 0 ? parca.slice(0, ilkSatir).trim() : "";
       const kod = ilkSatir >= 0 ? parca.slice(ilkSatir + 1) : parca;
-      html += `<div class="kod">${dil ? `<span class="dil">${kacis(dil)}</span>` : ""}<button class="kopyala">Kopyala</button><pre><code>${kacis(kod.replace(/\n$/, ""))}</code></pre></div>`;
+      html += kodKutusu(kod.replace(/\n$/, ""), dil);
       return;
     }
     let liste = null, paragraf = [];
@@ -206,7 +248,12 @@ function markdown(metin) {
 
 // ---------- Sohbet listesi ----------
 function aktif() { return sohbetler.find((s) => s.id === aktifId); }
-function kaydet() { yaz(DEPO, sohbetler); }
+function kaydet() {
+  if (yaz(DEPO, sohbetler)) return;
+  // Depolama doldu: eski mesajlardaki resimleri atıp tekrar dene
+  for (const s of sohbetler) s.mesajlar.slice(0, -2).forEach((m) => delete m.images);
+  if (!yaz(DEPO, sohbetler)) console.warn("Sohbetler kaydedilemedi (tarayıcı depolaması dolu).");
+}
 
 function listeyiCiz() {
   const kutu = $("#sohbetListesi");
@@ -215,8 +262,8 @@ function listeyiCiz() {
     const oge = document.createElement("div");
     oge.className = "sohbet-oge" + (s.id === aktifId ? " aktif" : "");
     oge.innerHTML = `<span></span><button title="Sil">✕</button>`;
-    oge.querySelector("span").textContent = s.baslik || "Yeni sohbet";
-    oge.onclick = () => { aktifId = s.id; listeyiCiz(); mesajlariCiz(); document.body.classList.remove("menu-acik"); };
+    oge.querySelector("span").textContent = (s.ajan ? "🤖 " : "") + (s.baslik || "Yeni sohbet");
+    oge.onclick = () => { if (iptal) return; aktifId = s.id; listeyiCiz(); mesajlariCiz(); document.body.classList.remove("menu-acik"); };
     oge.querySelector("button").onclick = (e) => {
       e.stopPropagation();
       if (!confirm("Bu sohbet silinsin mi?")) return;
@@ -229,6 +276,7 @@ function listeyiCiz() {
 }
 
 function yeniSohbet() {
+  if (iptal) return;
   const s = { id: Date.now().toString(36), baslik: "", mesajlar: [] };
   sohbetler.unshift(s);
   aktifId = s.id;
@@ -236,122 +284,325 @@ function yeniSohbet() {
   $("#girdi").focus();
 }
 
-// ---------- Mesajlar ----------
-const ONERILER = [
-  "Bana bugün için bir yapılacaklar listesi hazırla",
-  "Bu metni resmi bir dille yeniden yaz:",
-  "Python ile bir klasördeki dosyaları tarihe göre sıralayan kod yaz",
-  "Belgelerimde neler var? Kısaca özetle",
-];
+// ---------- Mesajları çizme ----------
+const ONERILER = {
+  genel: ["Bana bugün için bir yapılacaklar listesi hazırla", "Bu metni resmi bir dille yeniden yaz:", "Belgelerimde neler var? Kısaca özetle"],
+  kod: ["Python ile bir klasördeki dosyaları tarihe göre sıralayan kod yaz", "Bu JavaScript kodundaki hatayı bul:", "Excel'de iki tarih arasındaki iş günü formülü nedir?"],
+  ajan: ["Çalışma klasöründe ne var?", "1'den 100'e kadar asal sayıları bulan bir Python kodu yaz ve çalıştır", "Bilgisayarımın disk doluluk durumunu göster", "Masaüstümdeki dosyaları listele"],
+};
+const ARAC_ADLARI = {
+  tarih_saat: "Tarih/saat", belge_ara: "Belgelerde arama", dosya_listele: "Klasör listeleme", dosya_oku: "Dosya okuma",
+  dosya_yaz: "Dosya yazma", python_calistir: "Python çalıştırma", komut_calistir: "PowerShell komutu",
+};
 
 function mesajlariCiz() {
   const kutu = $("#mesajlar");
   const s = aktif();
-  kutu.innerHTML = "";
-  if (!s || !s.mesajlar.length) {
-    kutu.innerHTML = `<div class="bos"><h2>Merhaba 👋</h2><p>Her şey bu bilgisayarda çalışıyor. Ne yapmak istersin?</p><div class="oneriler"></div></div>`;
-    for (const o of ONERILER) {
+  kutu.innerHTML = `<div id="ajanBilgi">🤖 <strong>Ajan modu:</strong> Dosya okuyabilir; dosya yazmak, kod veya komut çalıştırmak için her seferinde <strong>senin onayını</strong> ister. Onaylamadan önce ne yapacağını mutlaka oku.</div>`;
+  const liste = [...(s?.mesajlar || []), ...canli];
+  if (!liste.length) {
+    const bos = document.createElement("div");
+    bos.className = "bos";
+    bos.innerHTML = `<h2>Merhaba 👋</h2><p>Her şey bu bilgisayarda çalışıyor. Ne yapmak istersin?</p><div class="oneriler"></div>`;
+    for (const o of ONERILER[ayar.mod]) {
       const b = document.createElement("button");
       b.textContent = o;
       b.onclick = () => { $("#girdi").value = o; $("#girdi").focus(); boyutla(); };
-      kutu.querySelector(".oneriler").appendChild(b);
+      bos.querySelector(".oneriler").appendChild(b);
     }
+    kutu.appendChild(bos);
     return;
   }
-  for (const m of s.mesajlar) kutu.appendChild(mesajOgesi(m));
+  liste.forEach((m, i) => kutu.appendChild(mesajOgesi(m, iptal && i === liste.length - 1)));
+  if (s?.bekleyen && !iptal) kutu.appendChild(onayKarti(s.bekleyen));
   kutu.scrollTop = kutu.scrollHeight;
 }
 
-function mesajOgesi(m) {
-  const oge = document.createElement("div");
-  oge.className = "mesaj " + m.role;
-  oge.innerHTML = `<div class="balon"></div>`;
-  mesajiGuncelle(oge, m);
-  return oge;
+function argumanHtml(ad, arg) {
+  if (ad === "python_calistir") return kodKutusu(arg.kod || "", "python");
+  if (ad === "komut_calistir") return kodKutusu(arg.komut || "", "powershell");
+  if (ad === "dosya_yaz") return `<div>Dosya: <code>${kacis(arg.yol || "")}</code></div>` + kodKutusu(arg.icerik || "");
+  const ozet = Object.entries(arg).map(([k, v]) => `${k}: ${v}`).join(", ");
+  return ozet ? `<div><code>${kacis(ozet)}</code></div>` : "";
 }
 
-function mesajiGuncelle(oge, m, yaziliyor = false) {
-  const balon = oge.querySelector(".balon");
-  if (m.role === "user") { balon.textContent = m.content; return; }
+function mesajOgesi(m, yaziliyor = false) {
+  const oge = document.createElement("div");
+  oge.className = "mesaj " + (m.role === "user" ? "user" : "assistant");
+  if (m.role === "user") {
+    if (m.images?.length) {
+      const r = document.createElement("div");
+      r.className = "resimler";
+      for (const b64 of m.images) { const img = new Image(); img.src = "data:image/jpeg;base64," + b64; r.appendChild(img); }
+      oge.appendChild(r);
+    }
+    const balon = document.createElement("div");
+    balon.className = "balon";
+    balon.textContent = m.content;
+    if (m.content) oge.appendChild(balon);
+    return oge;
+  }
+  if (m.role === "tool") {
+    oge.innerHTML = `<details class="arac"><summary>✔ ${kacis(ARAC_ADLARI[m.tool_name] || m.tool_name)} sonucu</summary><pre class="cikti">${kacis(m.content)}</pre></details>`;
+    return oge;
+  }
+  const balon = document.createElement("div");
+  balon.className = "balon";
   let html = markdown(m.content || "");
+  for (const c of m.tool_calls || []) {
+    const ad = c.function?.name, arg = c.function?.arguments || {};
+    html += `<div class="arac"><div class="baslik">🔧 ${kacis(ARAC_ADLARI[ad] || ad)}</div>${argumanHtml(ad, arg)}</div>`;
+  }
   if (m.hata) html += `<p class="hata">⚠ ${kacis(m.hata)}</p>`;
   if (m.kaynaklar?.length) {
     html += `<div class="kaynaklar"><details><summary>Kaynaklar (${m.kaynaklar.length})</summary>` +
       m.kaynaklar.map((k, i) => `<div class="kaynak"><strong>[${i + 1}] ${kacis(k.kaynak)}${k.sayfa ? ", " + kacis(k.sayfa) : ""}</strong>\n${kacis(k.metin)}</div>`).join("") +
       `</details></div>`;
   }
-  balon.innerHTML = html || (yaziliyor ? "" : "<p></p>");
+  balon.innerHTML = html;
   balon.classList.toggle("imlec", yaziliyor);
+  oge.appendChild(balon);
+  if (!yaziliyor && m.content) {
+    const e = document.createElement("div");
+    e.className = "eylemler";
+    e.innerHTML = `<button title="Sesli oku">🔊</button><button title="Kopyala">📋</button>`;
+    e.children[0].onclick = () => seslendir(m.content, true);
+    e.children[1].onclick = () => navigator.clipboard.writeText(m.content);
+    oge.appendChild(e);
+  }
+  return oge;
+}
+
+function onayKarti(b) {
+  const oge = document.createElement("div");
+  oge.className = "mesaj assistant";
+  oge.innerHTML = `<div class="onay"><strong>⚠ Onay gerekiyor: ${kacis(ARAC_ADLARI[b.ad] || b.ad)}</strong>
+    <div style="margin-top:6px">Ajan yukarıdaki işlemi yapmak istiyor. İçeriğini kontrol et.</div>
+    <div class="dugmeler"><button class="ana">✓ Onayla ve çalıştır</button><button>✕ Reddet</button></div></div>`;
+  const [evet, hayir] = oge.querySelectorAll("button");
+  evet.onclick = () => ajanaGonder(true);
+  hayir.onclick = () => ajanaGonder(false);
+  return oge;
+}
+
+// ---------- Gönderme ----------
+async function akisiOku(yanit, olay) {
+  const okuyucu = yanit.body.getReader();
+  const cozucu = new TextDecoder();
+  let tampon = "";
+  for (;;) {
+    const { value, done } = await okuyucu.read();
+    if (done) break;
+    tampon += cozucu.decode(value, { stream: true });
+    const satirlar = tampon.split("\n");
+    tampon = satirlar.pop();
+    for (const satir of satirlar) if (satir) olay(JSON.parse(satir));
+  }
+}
+
+let cizimBekliyor = false;
+function canliCiz() {
+  if (cizimBekliyor) return;
+  cizimBekliyor = true;
+  requestAnimationFrame(() => {
+    cizimBekliyor = false;
+    const kutu = $("#mesajlar");
+    const altta = kutu.scrollHeight - kutu.scrollTop - kutu.clientHeight < 120;
+    mesajlariCiz();
+    if (!altta) return;
+    kutu.scrollTop = kutu.scrollHeight;
+  });
+}
+
+function basla() {
+  iptal = new AbortController();
+  $("#gonder").hidden = true; $("#durdur").hidden = false;
+}
+function bitir() {
+  iptal = null;
+  $("#gonder").hidden = false; $("#durdur").hidden = true;
+}
+function hataMetni(e) {
+  return e.message.includes("fetch") ? "Sunucuya ulaşılamadı. BASLAT.bat açık mı?" : e.message;
 }
 
 async function gonder() {
   const girdi = $("#girdi");
   const metin = girdi.value.trim();
-  if (!metin || iptal) return;
+  if ((!metin && !ekResimler.length) || iptal) return;
   if (!aktif()) yeniSohbet();
   const s = aktif();
-  s.mesajlar.push({ role: "user", content: metin });
-  if (!s.baslik) { s.baslik = metin.slice(0, 50); listeyiCiz(); }
+  if (s.bekleyen) { s.bekleyen = null; s.mesajlar.push({ role: "tool", tool_name: "iptal", content: "Kullanıcı işlemi onaylamadan yeni mesaj yazdı." }); }
+  const kullanici = { role: "user", content: metin };
+  if (ekResimler.length) kullanici.images = ekResimler.map((r) => r.b64);
+  s.mesajlar.push(kullanici);
+  if (!s.baslik) { s.baslik = (metin || "Resim").slice(0, 50); }
+  if (ayar.mod === "ajan") s.ajan = true;
+  listeyiCiz();
+  girdi.value = ""; ekResimler = []; ekleriCiz(); boyutla();
+  kaydet();
+  if (ayar.mod === "ajan") return ajanaGonder(null);
+  return sohbetGonder(s);
+}
+
+async function sohbetGonder(s) {
   const cevap = { role: "assistant", content: "" };
-  s.mesajlar.push(cevap);
-  girdi.value = ""; boyutla();
-  mesajlariCiz();
-  const kutu = $("#mesajlar");
-  const oge = kutu.lastElementChild;
-  mesajiGuncelle(oge, cevap, true);
-
-  iptal = new AbortController();
-  $("#gonder").hidden = true; $("#durdur").hidden = false;
-  let bekleyen = false;
-  const ciz = () => {
-    if (bekleyen) return;
-    bekleyen = true;
-    requestAnimationFrame(() => {
-      bekleyen = false;
-      const altta = kutu.scrollHeight - kutu.scrollTop - kutu.clientHeight < 80;
-      mesajiGuncelle(oge, cevap, true);
-      if (altta) kutu.scrollTop = kutu.scrollHeight;
-    });
-  };
-
+  canli = [cevap];
+  basla(); mesajlariCiz();
   try {
     const yanit = await fetch("/api/sohbet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        mesajlar: s.mesajlar.slice(0, -1).map(({ role, content }) => ({ role, content })),
-        mod: ayar.mod,
-        belgeler: ayar.belgeler,
+        mesajlar: s.mesajlar.filter((m) => m.role !== "tool").map(({ role, content, images }) => ({ role, content, images })),
+        mod: ayar.mod, belgeler: ayar.belgeler,
       }),
       signal: iptal.signal,
     });
     if (!yanit.ok) throw new Error(`Sunucu hatası (${yanit.status})`);
-    const okuyucu = yanit.body.getReader();
-    const cozucu = new TextDecoder();
-    let tampon = "";
-    for (;;) {
-      const { value, done } = await okuyucu.read();
-      if (done) break;
-      tampon += cozucu.decode(value, { stream: true });
-      const satirlar = tampon.split("\n");
-      tampon = satirlar.pop();
-      for (const satir of satirlar) {
-        if (!satir) continue;
-        const veri = JSON.parse(satir);
-        if (veri.t) cevap.content += veri.t;
-        if (veri.kaynaklar) cevap.kaynaklar = veri.kaynaklar;
-        if (veri.model) $("#modelBilgi").textContent = veri.model;
-        if (veri.hata) cevap.hata = veri.hata;
-      }
-      ciz();
-    }
+    await akisiOku(yanit, (v) => {
+      if (v.t) cevap.content += v.t;
+      if (v.kaynaklar) cevap.kaynaklar = v.kaynaklar;
+      if (v.model) $("#modelBilgi").textContent = v.model;
+      if (v.hata) cevap.hata = v.hata;
+      canliCiz();
+    });
   } catch (e) {
-    if (e.name !== "AbortError") cevap.hata = e.message.includes("fetch") ? "Sunucuya ulaşılamadı. BASLAT.bat açık mı?" : e.message;
-  } finally {
-    iptal = null;
-    $("#gonder").hidden = false; $("#durdur").hidden = true;
-    mesajiGuncelle(oge, cevap, false);
-    kaydet();
+    if (e.name !== "AbortError") cevap.hata = hataMetni(e);
+  }
+  s.mesajlar.push(cevap);
+  canli = [];
+  bitir(); kaydet(); mesajlariCiz();
+  if (ayar.sesli && !cevap.hata) seslendir(cevap.content);
+}
+
+async function ajanaGonder(karar) {
+  const s = aktif();
+  if (!s || iptal) return;
+  s.bekleyen = null;
+  canli = [];
+  let metin = { role: "assistant", content: "" };
+  let sonGecmis = null, onay = null, hata = null;
+  basla(); mesajlariCiz();
+  try {
+    const yanit = await fetch("/api/ajan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mesajlar: s.mesajlar, karar }),
+      signal: iptal.signal,
+    });
+    if (!yanit.ok) throw new Error(`Sunucu hatası (${yanit.status})`);
+    await akisiOku(yanit, (v) => {
+      if (v.model) $("#modelBilgi").textContent = v.model + " (ajan)";
+      if (v.t) { if (!canli.includes(metin)) canli.push(metin); metin.content += v.t; }
+      if (v.arac) {
+        canli.push({ role: "assistant", content: "", tool_calls: [{ function: { name: v.arac.ad, arguments: v.arac.argumanlar } }] });
+        canli.push({ role: "tool", tool_name: v.arac.ad, content: v.arac.sonuc });
+        metin = { role: "assistant", content: "" };
+      }
+      if (v.onay) onay = v.onay;
+      if (v.hata) hata = v.hata;
+      if (v.gecmis) sonGecmis = v.gecmis;
+      canliCiz();
+    });
+  } catch (e) {
+    if (e.name !== "AbortError") hata = hataMetni(e);
+  }
+  if (sonGecmis) s.mesajlar = sonGecmis;
+  if (hata) s.mesajlar.push({ role: "assistant", content: "", hata });
+  s.bekleyen = onay;
+  canli = [];
+  bitir(); kaydet(); mesajlariCiz();
+  const son = s.mesajlar[s.mesajlar.length - 1];
+  if (ayar.sesli && !onay && son?.role === "assistant" && son.content) seslendir(son.content);
+}
+
+// ---------- Resim ekleme ----------
+function resmiKucult(dosya) {
+  return new Promise((coz, reddet) => {
+    const img = new Image();
+    img.onload = () => {
+      const olcek = Math.min(1, 1280 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * olcek); c.height = Math.round(img.height * olcek);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      coz(c.toDataURL("image/jpeg", 0.85).split(",")[1]);
+    };
+    img.onerror = reddet;
+    img.src = URL.createObjectURL(dosya);
+  });
+}
+async function resimleriEkle(dosyalar) {
+  for (const d of dosyalar) {
+    if (!d.type.startsWith("image/") || ekResimler.length >= 4) continue;
+    try { ekResimler.push({ b64: await resmiKucult(d) }); } catch { /* bozuk resim */ }
+  }
+  if (ayar.mod === "ajan" && ekResimler.length) alert("Ajan modu resim göremez. Resim sorusu için Genel moda geçin.");
+  ekleriCiz();
+}
+function ekleriCiz() {
+  const kutu = $("#ekler");
+  kutu.innerHTML = "";
+  ekResimler.forEach((r, i) => {
+    const d = document.createElement("div");
+    d.className = "ek";
+    d.innerHTML = `<img src="data:image/jpeg;base64,${r.b64}"><button title="Kaldır">✕</button>`;
+    d.querySelector("button").onclick = () => { ekResimler.splice(i, 1); ekleriCiz(); };
+    kutu.appendChild(d);
+  });
+}
+
+// ---------- Ses: konuşmayı yazıya çevirme ----------
+let kaydedici = null;
+async function mikrofonTikla() {
+  const dugme = $("#mikrofon");
+  if (kaydedici) { kaydedici.stop(); return; }
+  let akis;
+  try { akis = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch { alert("Mikrofona erişilemedi. Tarayıcıda mikrofon iznini verin."); return; }
+  const parcalar = [];
+  kaydedici = new MediaRecorder(akis);
+  kaydedici.ondataavailable = (e) => parcalar.push(e.data);
+  kaydedici.onstop = async () => {
+    akis.getTracks().forEach((t) => t.stop());
+    kaydedici = null;
+    dugme.classList.remove("aktif"); dugme.textContent = "⏳"; dugme.disabled = true;
+    try {
+      const form = new FormData();
+      form.append("ses_dosyasi", new Blob(parcalar, { type: "audio/webm" }), "ses.webm");
+      const yanit = await fetch("/api/ses", { method: "POST", body: form });
+      const veri = await yanit.json();
+      if (!yanit.ok) throw new Error(veri.detail || "Ses çevrilemedi");
+      const g = $("#girdi");
+      g.value = (g.value ? g.value + " " : "") + veri.metin;
+      boyutla(); g.focus();
+      if (ayar.sesli && veri.metin) gonder();  // Sesli konuşma modunda direkt gönder
+    } catch (e) { alert(e.message); }
+    dugme.textContent = "🎤"; dugme.disabled = false;
+  };
+  kaydedici.start();
+  dugme.classList.add("aktif"); dugme.textContent = "⏹"; dugme.title = "Kaydı bitir";
+}
+
+// ---------- Ses: cevabı okuma ----------
+function turkceSes() {
+  const sesler = speechSynthesis.getVoices().filter((v) => v.lang?.toLowerCase().startsWith("tr"));
+  return sesler.find((v) => v.localService) || null;
+}
+function seslendir(metin, elle = false) {
+  if (!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const ses = turkceSes();
+  if (!ses) {
+    if (elle) alert("Bilgisayarda Türkçe ses bulunamadı.\nWindows Ayarlar > Saat ve dil > Konuşma > Ses ekle bölümünden Türkçe sesi ekleyin.");
+    return;
+  }
+  const temiz = metin.replace(/```[\s\S]*?```/g, " (kod) ").replace(/[*#`>|]/g, "").trim();
+  for (const parca of temiz.match(/[^.!?\n]+[.!?\n]*/g) || []) {
+    const u = new SpeechSynthesisUtterance(parca.trim());
+    u.voice = ses; u.lang = ses.lang;
+    speechSynthesis.speak(u);
   }
 }
 
@@ -366,6 +617,7 @@ async function durumuYenile() {
       : `<span class="nokta kotu"></span>Ollama çalışmıyor`;
     if (d.ollama && d.eksik_modeller.length)
       html += `<div class="uyari">Eksik model: ${d.eksik_modeller.map(kacis).join(", ")}<br>GUNCELLE.bat ile indirin.</div>`;
+    if (!d.ses_modeli) html += `<div class="uyari">Ses modeli yok (mikrofon çalışmaz). GUNCELLE.bat ile indirin.</div>`;
     $("#sistemDurum").innerHTML = html;
     modelBilgisi();
 
@@ -383,7 +635,9 @@ async function durumuYenile() {
 }
 
 function modelBilgisi() {
-  if (durumBilgi) $("#modelBilgi").textContent = ayar.mod === "kod" ? durumBilgi.modeller.kod : durumBilgi.modeller.genel;
+  if (!durumBilgi || iptal) return;
+  const m = durumBilgi.modeller;
+  $("#modelBilgi").textContent = { genel: m.genel, kod: m.kod, ajan: m.genel + " (ajan)" }[ayar.mod];
 }
 
 async function dosyalariYukle(dosyalar) {
@@ -405,31 +659,52 @@ function boyutla() {
   g.style.height = "auto";
   g.style.height = Math.min(g.scrollHeight, 220) + "px";
 }
+function moduUygula() {
+  document.querySelectorAll(".secici button").forEach((x) => x.classList.toggle("secili", x.dataset.mod === ayar.mod));
+  document.body.classList.toggle("mod-ajan", ayar.mod === "ajan");
+  $("#belgeAnahtar").style.display = ayar.mod === "ajan" ? "none" : "";
+  modelBilgisi();
+}
 
+if (GOMULU) { document.body.classList.add("gomulu"); $("#girdi").placeholder = "Bir şey sor…"; }
 $("#girdi").addEventListener("input", boyutla);
 $("#girdi").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); gonder(); }
+});
+$("#girdi").addEventListener("paste", (e) => {
+  const resimler = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith("image/"));
+  if (resimler.length) { e.preventDefault(); resimleriEkle(resimler); }
 });
 $("#gonder").onclick = gonder;
 $("#durdur").onclick = () => iptal?.abort();
 $("#yeniSohbet").onclick = yeniSohbet;
 $("#menuDugme").onclick = () => document.body.classList.toggle("menu-acik");
+$("#resimEkle").onclick = () => $("#resimSec").click();
+$("#resimSec").onchange = (e) => { resimleriEkle([...e.target.files]); e.target.value = ""; };
+$("#mikrofon").onclick = mikrofonTikla;
 
 document.querySelectorAll(".secici button").forEach((b) => {
-  b.classList.toggle("secili", b.dataset.mod === ayar.mod);
   b.onclick = () => {
     ayar.mod = b.dataset.mod; yaz(AYAR, ayar);
-    document.querySelectorAll(".secici button").forEach((x) => x.classList.toggle("secili", x === b));
-    modelBilgisi();
+    moduUygula();
+    if (!aktif()?.mesajlar.length) mesajlariCiz();
   };
 });
 $("#belgeKullan").checked = ayar.belgeler;
 $("#belgeKullan").onchange = (e) => { ayar.belgeler = e.target.checked; yaz(AYAR, ayar); };
+$("#sesliCevap").checked = ayar.sesli;
+$("#sesliCevap").onchange = (e) => {
+  ayar.sesli = e.target.checked; yaz(AYAR, ayar);
+  if (!ayar.sesli) speechSynthesis?.cancel();
+  else if (!turkceSes()) alert("Bilgisayarda Türkçe ses bulunamadı.\nWindows Ayarlar > Saat ve dil > Konuşma > Ses ekle bölümünden Türkçe sesi ekleyin.");
+};
 
 $("#belgeYukle").onclick = () => $("#dosyaSec").click();
 $("#dosyaSec").onchange = (e) => { dosyalariYukle([...e.target.files]); e.target.value = ""; };
 $("#belgeTara").onclick = async () => { await fetch("/api/belgeler/tara", { method: "POST" }); durumuYenile(); };
-$("#klasorAc").onclick = () => fetch("/api/belgeler/klasoru-ac", { method: "POST" });
+document.querySelectorAll("[data-klasor]").forEach((b) => {
+  b.onclick = () => fetch(`/api/klasor-ac/${b.dataset.klasor}`, { method: "POST" });
+});
 
 $("#mesajlar").addEventListener("click", (e) => {
   if (!e.target.classList.contains("kopyala")) return;
@@ -438,15 +713,22 @@ $("#mesajlar").addEventListener("click", (e) => {
   setTimeout(() => (e.target.textContent = "Kopyala"), 1500);
 });
 
-let surukleSayac = 0;
-addEventListener("dragenter", (e) => { if (e.dataTransfer?.types.includes("Files")) { surukleSayac++; document.body.classList.add("surukleniyor"); } });
-addEventListener("dragleave", () => { if (--surukleSayac <= 0) { surukleSayac = 0; document.body.classList.remove("surukleniyor"); } });
-addEventListener("dragover", (e) => e.preventDefault());
-addEventListener("drop", (e) => {
-  e.preventDefault(); surukleSayac = 0; document.body.classList.remove("surukleniyor");
-  dosyalariYukle([...(e.dataTransfer?.files || [])]);
-});
+if (!GOMULU) {
+  let surukleSayac = 0;
+  addEventListener("dragenter", (e) => { if (e.dataTransfer?.types.includes("Files")) { surukleSayac++; document.body.classList.add("surukleniyor"); } });
+  addEventListener("dragleave", () => { if (--surukleSayac <= 0) { surukleSayac = 0; document.body.classList.remove("surukleniyor"); } });
+  addEventListener("dragover", (e) => e.preventDefault());
+  addEventListener("drop", (e) => {
+    e.preventDefault(); surukleSayac = 0; document.body.classList.remove("surukleniyor");
+    const dosyalar = [...(e.dataTransfer?.files || [])];
+    // Resimleri soruya ekle, diğer dosyaları belgelere
+    resimleriEkle(dosyalar.filter((d) => d.type.startsWith("image/")));
+    dosyalariYukle(dosyalar.filter((d) => !d.type.startsWith("image/")));
+  });
+}
+if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
 
+moduUygula();
 listeyiCiz();
 mesajlariCiz();
 durumuYenile();

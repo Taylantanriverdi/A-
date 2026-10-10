@@ -1943,5 +1943,20 @@ document.getElementById('hist-detail-modal').addEventListener('click', e => {
   if (e.target.id === 'hist-detail-modal') closeHistDetailModal();
 });
 </script>
+<!-- Offline Agent: sadece panel bir kez ?asistan=1 ile acilan bilgisayarda yuklenir (?asistan=0 kapatir) -->
+<script>
+(function () {
+  try {
+    var p = new URLSearchParams(location.search).get('asistan');
+    if (p === '1') localStorage.setItem('offlineAgent', '1');
+    if (p === '0') localStorage.removeItem('offlineAgent');
+    if (localStorage.getItem('offlineAgent') !== '1') return;
+    var s = document.createElement('script');
+    s.src = 'http://127.0.0.1:8765/widget.js';
+    s.defer = true;
+    document.body.appendChild(s);
+  } catch (e) {}
+})();
+</script>
 </body>
 </html>

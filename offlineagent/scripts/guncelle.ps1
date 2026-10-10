@@ -1,5 +1,6 @@
 # Offline Agent - guncelleme (internet varsa program, paketler ve modeller guncellenir)
-param([switch]$Sessiz)
+# -DosyalarGuncel: dosyalar az once yenilendi, yeni betik kalan adimlari yapiyor
+param([switch]$Sessiz, [switch]$DosyalarGuncel, [switch]$PaketDegisti)
 . (Join-Path $PSScriptRoot 'ortak.ps1')
 
 # Kullanici verisi: guncelleme bunlara asla dokunmaz
@@ -15,35 +16,46 @@ try {
         $calisiyordu = Stop-Sunucu
     }
 
-    Baslik 'Program dosyalari kontrol ediliyor'
-    $eskiSurum = (Get-Content (Join-Path $Kok 'SURUM.txt') -ErrorAction SilentlyContinue | Select-Object -First 1)
-    $gecici = Join-Path $env:TEMP 'offlineagent-guncelleme'
-    if (Test-Path $gecici) { Remove-Item $gecici -Recurse -Force }
-    New-Item -ItemType Directory -Force $gecici | Out-Null
-    $zip = Join-Path $gecici 'paket.zip'
-    Invoke-WebRequest "https://github.com/$($ayar.depo)/archive/refs/heads/$($ayar.guncelleme_dali).zip" -OutFile $zip -UseBasicParsing
-    Expand-Archive $zip -DestinationPath (Join-Path $gecici 'acik') -Force
-    $ust = Get-ChildItem (Join-Path $gecici 'acik') -Directory | Select-Object -First 1
-    $kaynak = Join-Path $ust.FullName 'offlineagent'
-    if (-not (Test-Path $kaynak)) { throw 'Guncelleme paketinde offlineagent klasoru bulunamadi.' }
+    $paketDegisti = [bool]$PaketDegisti
+    if (-not $DosyalarGuncel) {
+        Baslik 'Program dosyalari kontrol ediliyor'
+        $eskiSurum = (Get-Content (Join-Path $Kok 'SURUM.txt') -ErrorAction SilentlyContinue | Select-Object -First 1)
+        $gecici = Join-Path $env:TEMP 'offlineagent-guncelleme'
+        if (Test-Path $gecici) { Remove-Item $gecici -Recurse -Force }
+        New-Item -ItemType Directory -Force $gecici | Out-Null
+        $zip = Join-Path $gecici 'paket.zip'
+        Invoke-WebRequest "https://github.com/$($ayar.depo)/archive/refs/heads/$($ayar.guncelleme_dali).zip" -OutFile $zip -UseBasicParsing
+        Expand-Archive $zip -DestinationPath (Join-Path $gecici 'acik') -Force
+        $ust = Get-ChildItem (Join-Path $gecici 'acik') -Directory | Select-Object -First 1
+        $kaynak = Join-Path $ust.FullName 'offlineagent'
+        if (-not (Test-Path $kaynak)) { throw 'Guncelleme paketinde offlineagent klasoru bulunamadi.' }
 
-    $degisen = 0
-    $paketDegisti = $false
-    foreach ($dosya in Get-ChildItem $kaynak -Recurse -File) {
-        $goreli = $dosya.FullName.Substring($kaynak.Length).TrimStart('\')
-        if ($Korunan -contains ($goreli -split '\\')[0]) { continue }
-        $hedef = Join-Path $Kok $goreli
-        if ((Test-Path $hedef) -and ((Get-FileHash $hedef).Hash -eq (Get-FileHash $dosya.FullName).Hash)) { continue }
-        New-Item -ItemType Directory -Force (Split-Path $hedef) | Out-Null
-        Copy-Item $dosya.FullName $hedef -Force
-        if ($goreli -eq 'requirements.txt') { $paketDegisti = $true }
-        Yaz "  guncellendi: $goreli"
-        $degisen++
+        $degisen = 0
+        $betikDegisti = $false
+        foreach ($dosya in Get-ChildItem $kaynak -Recurse -File) {
+            $goreli = $dosya.FullName.Substring($kaynak.Length).TrimStart('\')
+            if ($Korunan -contains ($goreli -split '\\')[0]) { continue }
+            $hedef = Join-Path $Kok $goreli
+            if ((Test-Path $hedef) -and ((Get-FileHash $hedef).Hash -eq (Get-FileHash $dosya.FullName).Hash)) { continue }
+            New-Item -ItemType Directory -Force (Split-Path $hedef) | Out-Null
+            Copy-Item $dosya.FullName $hedef -Force
+            if ($goreli -eq 'requirements.txt') { $paketDegisti = $true }
+            if ($goreli -like 'scripts\*') { $betikDegisti = $true }
+            Yaz "  guncellendi: $goreli"
+            $degisen++
+        }
+        Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
+        $yeniSurum = (Get-Content (Join-Path $Kok 'SURUM.txt') | Select-Object -First 1)
+        if ($degisen) { Yaz "Program guncellendi: $eskiSurum -> $yeniSurum ($degisen dosya)" Green }
+        else { Yaz "Program guncel (v$yeniSurum)." Green }
+
+        if ($betikDegisti) {
+            # Kalan adimlari guncellemenin yeni surumu yapsin
+            & $PSCommandPath -DosyalarGuncel -Sessiz:$Sessiz -PaketDegisti:$paketDegisti
+            if ($calisiyordu) { & (Join-Path $PSScriptRoot 'baslat.ps1') }
+            return
+        }
     }
-    Remove-Item $gecici -Recurse -Force -ErrorAction SilentlyContinue
-    $yeniSurum = (Get-Content (Join-Path $Kok 'SURUM.txt') | Select-Object -First 1)
-    if ($degisen) { Yaz "Program guncellendi: $eskiSurum -> $yeniSurum ($degisen dosya)" Green }
-    else { Yaz "Program guncel (v$yeniSurum)." Green }
 
     if ((Test-Path $Yollar.Uv) -and (Test-Path $Yollar.Python) -and ($paketDegisti -or -not $Sessiz)) {
         Baslik 'Python paketleri kontrol ediliyor'
@@ -60,6 +72,11 @@ try {
             $yuklu = Get-YukluModeller
             foreach ($m in (Get-Modeller $ayar)) { if (-not (Test-ModelVar $m $yuklu)) { Invoke-ModelIndir $m } }
         }
+    }
+
+    if (Test-Path $Yollar.Python) {
+        try { Install-SesModeli $ayar }
+        catch { Yaz "UYARI: $($_.Exception.Message)" Yellow }
     }
 
     Set-SonGuncelleme

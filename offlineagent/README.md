@@ -3,9 +3,17 @@
 Tamamen kendi bilgisayarında çalışan, internet ve API gerektirmeyen yapay zeka asistanı.
 Bir kez kurulur; sonrasında hiçbir ücret ya da bağlantı gerekmez.
 
-- **Genel sohbet**: soru-cevap, yazı yazma, özet, çeviri (`qwen2.5:7b`)
-- **Kod modu**: programlama yardımı (`qwen2.5-coder:7b`)
-- **Belgelerim**: PDF, Word, Excel, TXT dosyalarından cevap verir (`nomic-embed-text`)
+| Özellik | Ne yapar | Model |
+|---|---|---|
+| **Genel** | Soru-cevap, yazı, özet, çeviri | `qwen2.5:7b` |
+| **Kod** | Programlama yardımı | `qwen2.5-coder:7b` |
+| **Ajan** | Dosya okur/yazar, Python ve PowerShell çalıştırır; her riskli işlemde **onayını** ister | `qwen2.5:7b` |
+| **Resim anlama** | 📎 ile resim ekle ya da Ctrl+V ile ekran görüntüsü yapıştır, sorunu sor | `gemma3:4b` |
+| **Belgelerim** | PDF, Word, Excel, TXT dosyalarından kaynak göstererek cevap verir | `nomic-embed-text` |
+| **OCR** | Taranmış PDF ve resim dosyalarındaki yazıyı okuyup belgelere ekler | `gemma3:4b` |
+| **Sesle yazma** | 🎤 ile konuş, yazıya çevrilsin | Whisper `small` |
+| **Sesli cevap** | Cevapları Windows'un Türkçe sesiyle okur | Windows sesi |
+| **Panel düğmesi** | Hekim/Teknisyen/Gelen İşler panellerinde sağ altta asistan düğmesi | — |
 
 ## Kurulum (bir kez, internet gerekir)
 
@@ -25,8 +33,9 @@ Kurulum şunları yapar:
 2. Modellerin `D:\offlineagent\modeller` klasöründe saklanmasını ayarlar. Daha önce C: diskine indirilmiş modeller varsa onları buraya kopyalar.
 3. Python'u bu klasöre kurar (`araclar\`). Sisteme hiçbir şey eklemez.
 4. Gerekli paketleri kurar.
-5. Modelleri indirir (yaklaşık 10 GB).
-6. Masaüstüne **Offline Agent** kısayolu ekler. İstersen Windows açılışında otomatik başlatmayı da açar.
+5. Modelleri indirir (yaklaşık 13 GB).
+6. Ses modelini indirir (yaklaşık 500 MB).
+7. Masaüstüne **Offline Agent** kısayolu ekler. İstersen Windows açılışında otomatik başlatmayı da açar.
 
 Bir adım yarıda kalırsa `KUR.bat`'ı tekrar çalıştır; kaldığı yerden devam eder.
 
@@ -47,7 +56,31 @@ Bir adım yarıda kalırsa `KUR.bat`'ı tekrar çalıştır; kaldığı yerden d
 2. Klasöre elle kopyaladıysan **Tara** düğmesine bas. Yeni ve değişen dosyalar işlenir.
 3. Üstteki **Belgelerimi kullan** kutusunu işaretle ve sorunu sor. Cevabın altında hangi belgeden alındığı görünür.
 
-Desteklenenler: `.pdf .docx .xlsx .txt .md .csv .json .log`. Taranmış (resim) PDF'lerden metin okunamaz.
+Desteklenenler: `.pdf .docx .xlsx .txt .md .csv .json .log` ve resimler (`.png .jpg .jpeg .webp .bmp`). Taranmış PDF sayfaları ve resimlerdeki yazı OCR ile okunur. OCR sayfa başına 10-30 saniye sürebilir; ilerleme sol altta görünür.
+
+## Ajan modu
+
+Üstten **Ajan**'ı seç ve ne istediğini yaz. Örnekler: "Masaüstümdeki dosyaları listele", "Şu Excel'deki toplamları hesaplayan bir Python kodu yaz ve çalıştır", "Disk doluluk durumunu göster".
+
+- **Onaysız çalışan işlemler:** dosya ve klasör okuma, belgelerde arama, tarih/saat.
+- **Onay isteyen işlemler:** dosya yazma (sadece `D:\offlineagent\calisma` klasörüne), Python kodu ve PowerShell komutu çalıştırma. Ajan ne yapacağını gösterir; **Onayla** demeden hiçbir şey çalışmaz.
+- Kod ve komutlar senin kullanıcı yetkinle çalışır. Onaylamadan önce mutlaka oku, özellikle silme komutlarını.
+- Küçük modeller hata yapabilir. Ajan hatayı görünce genelde kendisi düzeltip tekrar dener.
+
+## Ses
+
+- **Sesle yazma (🎤):** Bir kez tıkla ve konuş, bitince tekrar tıkla. Konuşman yazıya çevrilir. İlk kullanımda model belleğe yüklendiği için birkaç saniye sürer. Tarayıcı mikrofon izni ister.
+- **Sesli cevap:** Windows'ta Türkçe ses yüklü olmalıdır. Yüklü değilse: Ayarlar > Saat ve dil > Konuşma > **Ses ekle** > Türkçe. Sesli cevap açıkken 🎤 ile konuştuğunda mesaj kendiliğinden gönderilir; böylece eller serbest sohbet edebilirsin.
+
+## Panellere asistan düğmesi
+
+Paneller (Hekim Portalı, Teknisyen Paneli, Gelen İşler) herkes tarafından kullanıldığı için düğme **sadece senin açtığın bilgisayarda** görünür:
+
+1. Paneli bu bilgisayarda bir kez adresin sonuna `?asistan=1` ekleyerek aç (ör. `...HekimPortaliMobil.html?asistan=1`).
+2. Bundan sonra o tarayıcıda sağ altta **AI** düğmesi çıkar. Kapatmak için `?asistan=0` ile aç.
+3. Offline Agent çalışmıyorsa düğme görünmez; panel normal çalışır. Diğer kullanıcılar hiçbir değişiklik görmez.
+
+Gömülü pencerede güvenlik için ajan modu ve dosya yükleme kapalıdır.
 
 ## Klasör yapısı
 
@@ -56,6 +89,7 @@ D:\offlineagent\
   KUR.bat  BASLAT.bat  GUNCELLE.bat  DURDUR.bat
   ayarlar.json        <- senin ayarların (güncelleme bunu değiştirmez)
   belgeler\           <- senin belgelerin
+  calisma\            <- ajanın dosya yazdığı klasör
   modeller\           <- yapay zeka modelleri
   veri\               <- belge indeksi ve kayıtlar (sunucu-hata.log)
   araclar\  .venv\    <- Python ve araçlar
@@ -70,6 +104,10 @@ Sohbet geçmişi tarayıcıda saklanır.
 |---|---|---|
 | `genel_model` | `qwen2.5:7b` | Sohbet modeli |
 | `kod_model` | `qwen2.5-coder:7b` | Kod modeli |
+| `gorsel_model` | `gemma3:4b` | Resim anlama ve OCR modeli |
+| `ses_modeli` | `small` | Whisper boyutu: `base` daha hızlı, `medium` daha doğru ama yavaş |
+| `ses_dili` | `tr` | Konuşma dili (boş bırakılırsa otomatik algılar) |
+| `ocr` | `true` | Taranmış PDF ve resimlerden yazı okuma |
 | `embed_model` | `nomic-embed-text` | Belge arama modeli |
 | `baglam_uzunlugu` | `8192` | Modelin aynı anda aklında tutabileceği metin miktarı. Ekran kartı belleği yetmezse `4096` yap |
 | `port` | `8765` | Arayüz adresi |

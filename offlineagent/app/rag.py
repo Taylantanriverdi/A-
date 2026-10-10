@@ -15,6 +15,12 @@ import httpx
 import numpy as np
 
 from belge_oku import DESTEKLENEN, belgeyi_oku
+from ollama_api import gorsel_oku
+
+OCR_ISTEMI = (
+    "Bu görseldeki tüm yazıyı, satır düzenini koruyarak olduğu gibi yaz. "
+    "Yorum veya açıklama ekleme. Görselde yazı yoksa hiçbir şey yazma."
+)
 
 PARCA_BOYU = 1000
 ORTUSME = 150
@@ -44,11 +50,11 @@ def parcala(metin: str) -> list[str]:
 
 
 class BelgeIndeksi:
-    def __init__(self, belge_dizini: Path, indeks_dizini: Path, ollama_url: str, model_getir: Callable[[], str]):
+    def __init__(self, belge_dizini: Path, indeks_dizini: Path, ollama_url: str, ayar_getir: Callable[[], dict]):
         self.belge_dizini = belge_dizini
         self.indeks_dizini = indeks_dizini
         self.ollama_url = ollama_url
-        self.model_getir = model_getir
+        self.ayar_getir = ayar_getir
         self.kilit = threading.Lock()
         self.dosyalar: dict[str, dict] = {}
         self._matris: np.ndarray | None = None
@@ -75,7 +81,7 @@ class BelgeIndeksi:
             for i in range(0, len(metinler), TOPLU):
                 yanit = istemci.post(
                     f"{self.ollama_url}/api/embed",
-                    json={"model": self.model_getir(), "input": [onek + m for m in metinler[i:i + TOPLU]]},
+                    json={"model": self.ayar_getir()["embed_model"], "input": [onek + m for m in metinler[i:i + TOPLU]]},
                 )
                 yanit.raise_for_status()
                 vektorler.extend(yanit.json()["embeddings"])
@@ -92,7 +98,7 @@ class BelgeIndeksi:
     def _tara(self) -> None:
         try:
             self.belge_dizini.mkdir(parents=True, exist_ok=True)
-            model = self.model_getir()
+            model = self.ayar_getir()["embed_model"]
             mevcut = {}
             for yol in self.belge_dizini.rglob("*"):
                 if yol.is_file() and yol.suffix.lower() in DESTEKLENEN and not yol.name.startswith("~$"):
@@ -124,8 +130,14 @@ class BelgeIndeksi:
             self.bilgi["son_tarama"] = time.strftime("%Y-%m-%d %H:%M")
 
     def _isle(self, rel: str, imza: str, model: str) -> None:
+        ayarlar = self.ayar_getir()
+        ocr = None
+        if ayarlar.get("ocr", True):
+            def ocr(resim_b64: str) -> str:
+                self.bilgi["mesaj"] = f"{rel} (yazı okunuyor…)"
+                return gorsel_oku(ayarlar["gorsel_model"], resim_b64, OCR_ISTEMI)
         parcalar = []
-        for sayfa, metin in belgeyi_oku(self.belge_dizini / rel):
+        for sayfa, metin in belgeyi_oku(self.belge_dizini / rel, ocr):
             parcalar.extend({"sayfa": sayfa, "metin": p} for p in parcala(metin))
         vektor = self._embed([p["metin"] for p in parcalar], "search_document: ") if parcalar else np.zeros((0, 1), np.float32)
         kayit = {"rel": rel, "imza": imza, "model": model, "parcalar": parcalar}

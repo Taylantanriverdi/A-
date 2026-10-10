@@ -14,7 +14,7 @@ try {
     $ayar = Get-Ayarlar
 
     # 1) Ollama
-    Baslik '1/6 Ollama kontrol ediliyor'
+    Baslik '1/7 Ollama kontrol ediliyor'
     $ollama = Get-OllamaExe
     if (-not $ollama) {
         if (-not (Test-Internet)) { throw 'Ollama yuklu degil ve internet baglantisi yok.' }
@@ -30,7 +30,7 @@ try {
     Yaz "Ollama bulundu: $ollama" Green
 
     # 2) Modellerin bu klasorde durmasi
-    Baslik '2/6 Model klasoru ayarlaniyor'
+    Baslik '2/7 Model klasoru ayarlaniyor'
     $mevcut = [Environment]::GetEnvironmentVariable('OLLAMA_MODELS', 'User')
     if ($mevcut -ne $Yollar.Modeller) {
         $eski = if ($mevcut) { $mevcut } else { Join-Path $HOME '.ollama\models' }
@@ -48,7 +48,7 @@ try {
     Yaz "Modeller burada saklanacak: $($Yollar.Modeller)" Green
 
     # 3) uv (Python yoneticisi)
-    Baslik '3/6 Python ortami hazirlaniyor'
+    Baslik '3/7 Python ortami hazirlaniyor'
     if (-not (Test-Path $Yollar.Uv)) {
         Yaz 'uv indiriliyor...'
         $zip = Join-Path $Yollar.Araclar 'uv.zip'
@@ -68,18 +68,23 @@ try {
     }
 
     # 4) Python paketleri
-    Baslik '4/6 Python paketleri kuruluyor'
+    Baslik '4/7 Python paketleri kuruluyor'
     Install-PythonPaketleri
 
     # 5) Modeller
-    Baslik '5/6 Yapay zeka modelleri indiriliyor (ilk seferde ~10 GB)'
+    Baslik '5/7 Yapay zeka modelleri indiriliyor (ilk seferde ~13 GB)'
     $yuklu = Get-YukluModeller
     foreach ($m in (Get-Modeller $ayar)) {
         if (Test-ModelVar $m $yuklu) { Yaz "Zaten var: $m" Green } else { Invoke-ModelIndir $m }
     }
 
-    # 6) Kisayollar
-    Baslik '6/6 Kisayollar olusturuluyor'
+    # 6) Ses modeli
+    Baslik '6/7 Ses modeli indiriliyor (~500 MB)'
+    try { Install-SesModeli $ayar }
+    catch { Yaz "UYARI: $($_.Exception.Message) Mikrofon ozelligi calismaz; sonra GUNCELLE.bat ile tekrar deneyin." Yellow }
+
+    # 7) Kisayollar
+    Baslik '7/7 Kisayollar olusturuluyor'
     $kabuk = New-Object -ComObject WScript.Shell
     $masaustu = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Offline Agent.lnk'
     $k = $kabuk.CreateShortcut($masaustu)

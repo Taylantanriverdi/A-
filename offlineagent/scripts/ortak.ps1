@@ -23,6 +23,8 @@ $env:UV_PYTHON_INSTALL_DIR = Join-Path $Yollar.Araclar 'python'
 $env:UV_CACHE_DIR = Join-Path $Yollar.Araclar 'uv-cache'
 $env:UV_PYTHON_PREFERENCE = 'only-managed'
 $env:OLLAMA_MODELS = $Yollar.Modeller
+$env:HF_HOME = Join-Path $Yollar.Araclar 'hf'
+$env:HF_HUB_DISABLE_TELEMETRY = '1'
 
 function Yaz([string]$Mesaj, [string]$Renk = 'Gray') { Write-Host $Mesaj -ForegroundColor $Renk }
 function Baslik([string]$Mesaj) { Write-Host ''; Write-Host "==> $Mesaj" -ForegroundColor Cyan }
@@ -41,7 +43,7 @@ function Get-Ayarlar {
     return $ayar
 }
 
-function Get-Modeller($Ayar) { @($Ayar.genel_model, $Ayar.kod_model, $Ayar.embed_model) }
+function Get-Modeller($Ayar) { @($Ayar.genel_model, $Ayar.kod_model, $Ayar.gorsel_model, $Ayar.embed_model) }
 
 function Test-Internet {
     try { $null = Invoke-WebRequest 'https://github.com' -Method Head -UseBasicParsing -TimeoutSec 5; return $true }
@@ -124,4 +126,10 @@ function Get-SonGuncelleme {
 function Install-PythonPaketleri {
     & $Yollar.Uv pip install --python $Yollar.Python -r (Join-Path $Kok 'requirements.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Python paketleri kurulamadi.' }
+}
+
+function Install-SesModeli($Ayar) {
+    # Konusmayi yaziya ceviren Whisper modeli (yoksa indirir, varsa hicbir sey yapmaz)
+    & $Yollar.Python (Join-Path $Yollar.App 'ses.py') $Ayar.ses_modeli
+    if ($LASTEXITCODE -ne 0) { throw 'Ses modeli indirilemedi.' }
 }

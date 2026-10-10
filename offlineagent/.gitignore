@@ -3,6 +3,7 @@
 araclar/
 modeller/
 veri/
+calisma/
 belgeler/*
 !belgeler/BENIOKU.txt
 ayarlar.json

@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,11 +17,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
+import ajan
+import ses
 from ayarlar import KOK, ayarlari_oku, surum
 from belge_oku import DESTEKLENEN
+from ollama_api import OLLAMA, OllamaHatasi, sohbet_akisi
 from rag import BelgeIndeksi
 
-OLLAMA = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 BELGELER = KOK / "belgeler"
 PORT = int(os.environ.get("OFFLINEAGENT_PORT") or ayarlari_oku()["port"])
 IZINLI_HOSTLAR = {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
@@ -38,7 +41,7 @@ SISTEM = {
     ),
 }
 
-indeks = BelgeIndeksi(BELGELER, KOK / "veri" / "indeks", OLLAMA, lambda: ayarlari_oku()["embed_model"])
+indeks = BelgeIndeksi(BELGELER, KOK / "veri" / "indeks", OLLAMA, ayarlari_oku)
 
 
 @asynccontextmanager
@@ -59,33 +62,46 @@ async def yerel_koruma(request: Request, call_next):
     origin = request.headers.get("origin")
     if request.method not in ("GET", "HEAD") and origin and origin not in {f"http://{h}" for h in IZINLI_HOSTLAR}:
         return JSONResponse({"hata": "İzin verilmeyen kaynak"}, status_code=403)
-    return await call_next(request)
-
-
-class Mesaj(BaseModel):
-    role: str
-    content: str
+    yanit = await call_next(request)
+    # Tam arayüz (ajan modu dahil) başka sayfaların içine gömülemez. Panellere gömülen
+    # ?gomulu=1 sürümünde ajan ve dosya işlemleri kapalıdır.
+    gomulebilir = request.url.path in ("/", "/index.html") and request.query_params.get("gomulu") == "1"
+    if not gomulebilir and not request.url.path.endswith(".js"):
+        yanit.headers["Content-Security-Policy"] = "frame-ancestors 'self'"
+        yanit.headers["X-Frame-Options"] = "SAMEORIGIN"
+    return yanit
 
 
 class SohbetIstegi(BaseModel):
-    mesajlar: list[Mesaj]
+    mesajlar: list[dict]
     mod: str = "genel"
     belgeler: bool = False
 
 
-class OllamaHatasi(Exception):
-    pass
+class AjanIstegi(BaseModel):
+    mesajlar: list[dict]
+    karar: bool | None = None
 
 
 def _tam_ad(model: str) -> str:
     return model if ":" in model else f"{model}:latest"
 
 
+def _temizle(m: dict) -> dict:
+    temiz = {"role": m.get("role"), "content": str(m.get("content") or "")}
+    if m.get("images"):
+        temiz["images"] = [str(r) for r in m["images"]][:4]
+    return temiz
+
+
 async def _hazirla(istek: SohbetIstegi) -> tuple[str, list[dict], list[dict]]:
     ayarlar = ayarlari_oku()
     mod = "kod" if istek.mod == "kod" else "genel"
-    model = ayarlar["kod_model"] if mod == "kod" else ayarlar["genel_model"]
-    gecmis = [m.model_dump() for m in istek.mesajlar if m.role in ("user", "assistant")][-20:]
+    gecmis = [_temizle(m) for m in istek.mesajlar if m.get("role") in ("user", "assistant")][-20:]
+    if any(m.get("images") for m in gecmis):
+        model = ayarlar["gorsel_model"]
+    else:
+        model = ayarlar["kod_model"] if mod == "kod" else ayarlar["genel_model"]
     sistem = SISTEM[mod]
     kaynaklar: list[dict] = []
     son_soru = next((m["content"] for m in reversed(gecmis) if m["role"] == "user"), "")
@@ -109,32 +125,8 @@ async def _hazirla(istek: SohbetIstegi) -> tuple[str, list[dict], list[dict]]:
     return model, [{"role": "system", "content": sistem}, *gecmis], kaynaklar
 
 
-async def _ollama_akis(model: str, mesajlar: list[dict]):
-    govde = {
-        "model": model,
-        "messages": mesajlar,
-        "stream": True,
-        "options": {"num_ctx": int(ayarlari_oku()["baglam_uzunlugu"])},
-    }
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(None, connect=5)) as istemci:
-            async with istemci.stream("POST", f"{OLLAMA}/api/chat", json=govde) as yanit:
-                if yanit.status_code != 200:
-                    metin = (await yanit.aread()).decode("utf-8", "replace")
-                    raise OllamaHatasi(f"Ollama hatası ({yanit.status_code}): {metin[:300]}")
-                async for satir in yanit.aiter_lines():
-                    if not satir:
-                        continue
-                    veri = json.loads(satir)
-                    if "error" in veri:
-                        raise OllamaHatasi(veri["error"])
-                    parca = veri.get("message", {}).get("content", "")
-                    if parca:
-                        yield parca
-                    if veri.get("done"):
-                        break
-    except httpx.ConnectError as hata:
-        raise OllamaHatasi("Ollama'ya bağlanılamadı. Ollama çalışıyor mu?") from hata
+def _baglam() -> int:
+    return int(ayarlari_oku()["baglam_uzunlugu"])
 
 
 def _satir(veri: dict) -> str:
@@ -147,11 +139,24 @@ async def sohbet(istek: SohbetIstegi):
         try:
             model, mesajlar, kaynaklar = await _hazirla(istek)
             yield _satir({"model": model, "kaynaklar": kaynaklar})
-            async for parca in _ollama_akis(model, mesajlar):
-                yield _satir({"t": parca})
+            async for olay in sohbet_akisi(model, mesajlar, _baglam()):
+                if "t" in olay:
+                    yield _satir(olay)
             yield _satir({"bitti": True})
         except OllamaHatasi as hata:
             yield _satir({"hata": str(hata)})
+
+    return StreamingResponse(akis(), media_type="application/x-ndjson")
+
+
+@app.post("/api/ajan")
+async def ajan_sohbet(istek: AjanIstegi):
+    model = ayarlari_oku()["genel_model"]
+
+    async def akis():
+        yield _satir({"model": model})
+        async for olay in ajan.ajan_akisi(istek.mesajlar, istek.karar, model, _baglam(), indeks.ara):
+            yield _satir(olay)
 
     return StreamingResponse(akis(), media_type="application/x-ndjson")
 
@@ -161,10 +166,23 @@ async def sor(istek: SohbetIstegi):
     """Akışsız, tek seferlik cevap (diğer programlardan kullanım için)."""
     try:
         model, mesajlar, kaynaklar = await _hazirla(istek)
-        cevap = "".join([p async for p in _ollama_akis(model, mesajlar)])
+        cevap = "".join([o["t"] async for o in sohbet_akisi(model, mesajlar, _baglam()) if "t" in o])
     except OllamaHatasi as hata:
         raise HTTPException(502, str(hata)) from hata
     return {"cevap": cevap, "model": model, "kaynaklar": kaynaklar}
+
+
+@app.post("/api/ses")
+async def ses_yazi(ses_dosyasi: UploadFile = File(...)):
+    gecici = Path(tempfile.mkstemp(suffix=".webm")[1])
+    try:
+        gecici.write_bytes(await ses_dosyasi.read())
+        metin = await run_in_threadpool(ses.yaziya_cevir, gecici, ayarlari_oku())
+    except RuntimeError as hata:
+        raise HTTPException(503, str(hata)) from hata
+    finally:
+        gecici.unlink(missing_ok=True)
+    return {"metin": metin}
 
 
 @app.get("/api/saglik")
@@ -175,22 +193,24 @@ async def saglik():
 @app.get("/api/durum")
 async def durum():
     ayarlar = ayarlari_oku()
-    gerekli = [ayarlar["genel_model"], ayarlar["kod_model"], ayarlar["embed_model"]]
+    modeller = {k: ayarlar[f"{k}_model"] for k in ("genel", "kod", "gorsel", "embed")}
     sonuc = {
         "surum": surum(),
         "ollama": False,
         "ollama_surum": None,
-        "modeller": {"genel": ayarlar["genel_model"], "kod": ayarlar["kod_model"], "embed": ayarlar["embed_model"]},
-        "eksik_modeller": gerekli,
+        "modeller": modeller,
+        "eksik_modeller": list(modeller.values()),
+        "ses_modeli": ses.model_var(ayarlar["ses_modeli"]),
         "indeks": indeks.durum(),
         "belge_klasoru": str(BELGELER),
+        "calisma_klasoru": str(ajan.CALISMA),
     }
     try:
         async with httpx.AsyncClient(timeout=3) as istemci:
             sonuc["ollama_surum"] = (await istemci.get(f"{OLLAMA}/api/version")).json().get("version")
             yuklu = {m["name"] for m in (await istemci.get(f"{OLLAMA}/api/tags")).json().get("models", [])}
         sonuc["ollama"] = True
-        sonuc["eksik_modeller"] = [m for m in gerekli if _tam_ad(m) not in yuklu]
+        sonuc["eksik_modeller"] = [m for m in modeller.values() if _tam_ad(m) not in yuklu]
     except (httpx.HTTPError, ValueError):
         pass
     return sonuc
@@ -229,12 +249,15 @@ async def belge_tara():
     return {"basladi": indeks.tara_baslat(), "indeks": indeks.durum()}
 
 
-@app.post("/api/belgeler/klasoru-ac")
-async def klasoru_ac():
-    BELGELER.mkdir(parents=True, exist_ok=True)
+@app.post("/api/klasor-ac/{hangisi}")
+async def klasoru_ac(hangisi: str):
+    klasor = {"belgeler": BELGELER, "calisma": ajan.CALISMA}.get(hangisi)
+    if not klasor:
+        raise HTTPException(404, "Bilinmeyen klasör")
+    klasor.mkdir(parents=True, exist_ok=True)
     if sys.platform != "win32":
         raise HTTPException(501, "Sadece Windows'ta desteklenir")
-    os.startfile(BELGELER)  # noqa: S606 - yerel klasörü Gezgin'de açar
+    os.startfile(klasor)  # noqa: S606 - yerel klasörü Gezgin'de açar
     return {"ok": True}
 
 
