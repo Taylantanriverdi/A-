@@ -1,0 +1,169 @@
+DENTAL NC SIMULATORU  (hyperDENT 5 eksen NC dosyalari icin)
+=============================================================
+
+KURULUM GEREKTIRMEZ. Internet gerekmez. Windows 10/11 + Microsoft Edge
+veya Google Chrome yeterlidir (WebGL2 destekli ekran karti).
+
+Klasoru (NC_Simulator) istediginiz yere kopyalayin; icindeki "app"
+klasorunu silmeyin veya tasimayin.
+
+
+BASLATMA (3 yol)
+----------------
+1) SIMULASYON_BASLAT.bat  -> cift tiklayin. Program acilir. NC dosyasini
+   "NC Dosyasi Ac" dugmesiyle secin ya da pencereye surukleyin.
+
+2) NC dosyasini SIMULASYON_BASLAT.bat dosyasinin UZERINE surukleyip
+   birakin -> dosya yuklenmis olarak acilir.
+   Iki NC dosyasi birden birakirsaniz ikincisi KARSILASTIRMA dosyasi olur.
+
+3) DOSYA_SECEREK_BASLAT.bat -> Windows dosya secme penceresi acilir,
+   1 veya 2 dosya secin.
+
+
+EKRAN
+-----
+Sol panel  : Disk olculeri, kalinlik, cozunurluk, takim tablosu, gorunum.
+Orta       : 3D simulasyon. Altta oynatici (oynat / adim / sonraki op /
+             sona git / zaman cubugu / hiz / satira git).
+Sag sekmeler:
+  Operasyonlar   - Her takim + A/B yonelimi degisimi bir operasyondur.
+                   Satira tiklayinca o operasyona gidilir.
+  Hassasiyet     - NC koordinat cozunurlugu, nokta yogunlugu (ortalama
+                   segment), Z adimi, olculen yanal adim (stepover),
+                   teorik scallop (tepe yuksekligi, um), takimin tek
+                   harekette kaldirdigi maks. derinlik ve hacim, G00 ile
+                   malzemeye giris kontrolu, yuzey dalgalanma haritasi.
+  Blok Yerlesimi - Diskin ustten gorunusu, parcalarin otomatik tespiti:
+                   merkez X/Y (G54 = disk merkezi), boyut, yukseklik,
+                   disk kenarina ve komsu parcaya en kisa mesafe.
+                   Haritada surukleyerek bolge secip o bolgeyi
+                   0.01-0.05 mm cozunurlukte DETAYLI simule edebilirsiniz.
+  Uyarilar       - Disk disina tasma, hizli hareketle (G00) malzemeye
+                   dalma (carpisma riski), varsayilan takim uyarilari.
+  Karsilastirma  - Iki NC dosyasinin kod farki + simule edilmis
+                   yuzeyler arasindaki geometrik fark (um) renkli harita.
+  NC Kodu        - Aktif satirin cevresi; satira tiklayinca oraya gider.
+
+Renklendirme secenekleri: Malzeme, Son kesen takim, Son kesen operasyon,
+Z yuksekligi, Yuzey dalgalanmasi (um), Karsilastirma farki.
+
+Fare: sol tus dondur, sag tus kaydir, tekerlek yakinlas.
+Yuzeye tiklayinca: X/Y, ust/alt Z, kalinlik, o noktayi son kesen
+operasyon/takim ve en yakin NC satiri gosterilir (tiklayip gidilebilir).
+"Olcum modu" acikken iki nokta tiklayarak mesafe olculur.
+Klavye: Bosluk = oynat/durdur, Sag ok = 1 adim (Shift ile 100),
+Sol ok = geri, End = sona git, Home = basa.
+
+"Rapor (CSV)" operasyon/hassasiyet tablosunu ve parca konumlarini
+Excel'de acilabilir CSV olarak kaydeder. "Goruntu" 3D gorunumun PNG'sini
+kaydeder.
+
+
+YENI OZELLIKLER (surum 3)
+-------------------------
+* HYPERDENT TAKIM ADLARI: Takim tablosuna hyperDENT'teki takim adini
+  yazmaniz yeterli (orn. "PD07_BM D2.0R1.0X12"). Cap (D), kose yaricapi
+  (R) ve kesici boy (X) otomatik okunur. Torus (kose yaricapli) takimlar
+  da simule edilir (orn. D2.0R0.2). Agiz sayisi (Z) girilebilir.
+
+* MALZEME: Sol panelden malzeme secin (Titanyum, CoCr, Zirkonya, PMMA,
+  Mum, Cam seramik). Dosya adinda PMMA / ZR / TI gibi bir ifade varsa
+  otomatik secilir. Kesme hizi (vc) ve dis basi talas (fz) bu malzemeye
+  gore kontrol edilir (Operasyonlar tablosunda renkli).
+
+* ISLEME TOLERANSI TAHMINI: Hassasiyet sekmesinde "Tolerans*" sutunu,
+  NC noktalarindan hyperDENT'teki "Machining tolerance" degerini tahmin
+  eder (kendi dosyalarinizda %95 dogrulukla eslesti). Finiste 3-5 um
+  onerilir.
+
+* ONERILER sekmesi: Bulunan sorunlari ve hyperDENT'te hangi alanin
+  neye degistirilecegini tablo halinde listeler: tolerans, devir/ilerleme,
+  dalis ilerlemesi (Feedrate axial), takim asinmasi (ayni takimla
+  finisten once kesilen yol), G00 carpisma, STL uyum sonucu.
+
+* UYUM (STL) sekmesi: CAD'den (exocad vb.) parcanin tasarim STL'ini
+  yukleyin. Program onu simule edilen parcayla OTOMATIK HIZALAR ve her
+  noktada tasarima gore kac um fazla malzeme kaldigini / fazla
+  kesildigini gosterir. Kenar (margin) bandi ust ve alt yuzey icin ayri
+  olculur. Ornek: zirkonya kron titanyum alt yapiya gecmiyorsa, titanyum
+  kenarinda +100 um fazlalik burada kirmizi bant olarak gorunur ve
+  Oneriler sekmesi "Add. margin line allowance -> 0" der.
+  Renklendirme: "Tasarimdan sapma (STL)". Daha kesin sonuc icin parcayi
+  Blok Yerlesimi'nden 0.02-0.03 mm detay bolgesinde simule edip
+  "Sapmayi yeniden hesapla" deyin.
+  OTOMATIK HIZALAMA: STL hangi eksen duzeninde gelirse gelsin (exocad'in
+  Y-yukari ciktisi, ters, yan yatmis ya da egik) parcanin yukari yonu
+  aranir, blok Z eksenine cevrilir, agirlik merkezi eslenir ve ince
+  ayar yapilir (egim +-25 dereceye kadar). Sonucta bulunan yon yazilir
+  (or. "yukari yonu -Y ekseni (16 derece egik)"). Hizalama mesafesi
+  40 um altindaysa sonuc guvenilirdir; ustundeyse STL'in bu NC'ye ait
+  oldugunu kontrol edin.
+
+* WorkNC ve diger postlar: G28/G30/G53 (makine sifirina donus) ve
+  "(Operation N)" yorumlari taninir.
+
+
+ONEMLI AYARLAR
+--------------
+* TAKIM TABLOSU: hyperDENT NC dosyasinda takim capi yazmaz (yalnizca
+  G200 Pxx takim numarasi vardir). Program baslangicta tahmini degerler
+  kullanir (hyperDENT Ti sablonuna gore: T4 = 3.0 mm, T5 = 2.0, T6 = 1.0, T7 = 2.0 kuresel).
+  KENDI TAKIM KUTUPHANENIZE GORE DUZELTIN, sonra "Ayarlari uygula ve
+  yeniden baslat" deyin. Hassasiyet degerleri bu caplara baglidir.
+  Girdiginiz degerler kaydedilir.
+
+* KALINLIK: NC dosyasindaki ilk yaklasma yuksekliginden otomatik tahmin
+  edilir ("oto"). Gercek disk kalinliginizi girin (orn. 14, 16, 18, 20).
+  Bu deger dogru olmazsa "G00 ile malzemeye giris" kontrolu yanlis
+  sonuc verebilir.
+
+* DISK CAPI: varsayilan 98.5 mm. G54 sifiri disk merkezi kabul edilir.
+
+* NC KOORDINATI: hyperDENT cogu post-prosesorde TAKIM UCU (tip)
+  koordinati verir. Bilye merkezi veren bir post kullaniyorsaniz degistirin.
+
+* GELISMIS KINEMATIK: A ekseni diski X etrafinda dondurur (A180 = disk
+  ters cevrilmis, alt taraftan isleme). B egim eksenidir. Egik (3+2)
+  operasyonlar yanlis yerde gorunurse A/B yonunu veya B eksenini
+  degistirip tekrar deneyin. Duz (A0 / A180) operasyonlar bu ayardan
+  etkilenmez.
+
+
+SIMULASYON YONTEMI VE SINIRLARI
+-------------------------------
+* Malzeme kaldirma iki yuzeyli yukseklik haritasiyla (ust ve alt yuzey)
+  hesaplanir. Kuresel takim icin hareket boyunca supurulen kurenin tam
+  analitik zarfi kullanilir (yaklasik degil); duz uclu takim icin disk.
+  Egik operasyonlarda takimin kesici boyu da hesaba katilir.
+* Ust ve alttan isleme (A0 / A180) ve 75 dereceye kadar egik 3+2 isleme
+  desteklenir. Disk yuzeyine dik yondeki alt-kesimler (undercut) tek
+  yukseklik haritasiyla gosterilemez.
+* Hassasiyet, secilen izgara cozunurlugu ile sinirlidir. Tum disk icin
+  0.1 mm onerilir; scallop izlerini gormek icin bir parcayi Blok
+  Yerlesimi sekmesinden 0.02 mm veya daha ince cozunurlukte simule edin.
+* Sureler tahminidir (ilerleme hizi F ve hizli hareket icin ayarlanan
+  deger; makine ivmelenmesi dahil degil).
+
+
+Dosyalar
+--------
+SIMULASYON_BASLAT.bat     Ana baslatici (dosya surukle-birak destekli)
+DOSYA_SECEREK_BASLAT.bat  Dosya secme penceresiyle baslatici
+NC_Simulator.html         Programin tamami (tek dosya). Cift tiklayarak da
+                          acilabilir; ancak .bat ile acmak onerilir.
+arac\baslat.ps1           Edge/Chrome'u ayri profil ve 3D destegi zorlanmis
+                          olarak acar, surukle-birak dosyalarini aktarir.
+
+
+SORUN GIDERME
+-------------
+* "Program baslatilamadi / WebGL2" mesaji: Programi SIMULASYON_BASLAT.bat
+  ile acin. Hala olmuyorsa ekran karti surucusunu guncelleyin; Uzak
+  Masaustu (RDP) ile bagliysaniz dogrudan bilgisayarda calistirin.
+* Sadece bos tarayici aciliyorsa: ZIP'i once klasore cikardiginizdan
+  emin olun (ZIP icinden calistirmayin). Sonra NC_Simulator.html dosyasini
+  Chrome veya Edge'e surukleyip birakmayi deneyin.
+* Siyah PowerShell penceresi hemen kapaniyorsa ve hicbir sey olmuyorsa
+  kurum guvenlik politikasi PowerShell'i engelliyor olabilir; bu durumda
+  NC_Simulator.html dosyasini dogrudan Chrome/Edge ile acin.
