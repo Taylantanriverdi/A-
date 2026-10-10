@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Kazım Usta Orman</title>
+<style>
+  :root {
+    --hud-bg: rgba(10, 20, 10, 0.65);
+    --hud-fg: #f4f1e6;
+    --accent: #e8c547;
+    --danger: #d9443a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; overflow: hidden; height: 100%;
+    background: #0d1a0d; color: var(--hud-fg);
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  canvas { display: block; }
+  #hud {
+    position: fixed; top: 12px; left: 12px; right: 12px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    pointer-events: none; gap: 8px;
+  }
+  .panel {
+    background: var(--hud-bg); border-radius: 10px; padding: 8px 12px;
+    font-size: 15px; line-height: 1.4;
+  }
+  #hearts { font-size: 18px; letter-spacing: 1px; }
+  #hpbar { width: 160px; height: 10px; background: #3a2222; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+  #hpfill { height: 100%; width: 100%; background: linear-gradient(90deg, #d9443a, #f07a4a); transition: width .2s; }
+  #help { font-size: 13px; opacity: .9; }
+  #msg {
+    position: fixed; top: 22%; left: 50%; transform: translateX(-50%);
+    font-size: 28px; font-weight: bold; color: var(--accent);
+    text-shadow: 0 2px 6px #000; pointer-events: none; text-align: center;
+    transition: opacity .4s; opacity: 0; padding: 0 16px;
+  }
+  #hurt {
+    position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(200,0,0,.55));
+    opacity: 0; transition: opacity .25s;
+  }
+  .overlay {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(5, 12, 5, 0.82); z-index: 10; padding: 16px;
+  }
+  .overlay h1 { color: var(--accent); margin: 0 0 8px; font-size: 40px; }
+  .overlay p { max-width: 460px; margin: 6px 0; line-height: 1.5; }
+  .overlay button {
+    margin-top: 18px; font-size: 20px; padding: 12px 34px; border: none;
+    border-radius: 10px; background: var(--accent); color: #222; font-weight: bold; cursor: pointer;
+  }
+  .keys { display: inline-block; background: #333; border: 1px solid #777; border-radius: 4px; padding: 0 6px; font-family: monospace; }
+  .hidden { display: none !important; }
+  /* Dokunmatik kontroller */
+  #touch { position: fixed; bottom: 16px; left: 16px; right: 16px; display: none; justify-content: space-between; pointer-events: none; }
+  #touch .grp { display: grid; gap: 6px; pointer-events: auto; }
+  #dpad { grid-template-columns: 56px 56px 56px; grid-template-rows: 56px 56px; }
+  #acts { grid-template-columns: 72px 72px; align-items: end; }
+  .tb {
+    background: rgba(255,255,255,.18); border: 2px solid rgba(255,255,255,.4);
+    border-radius: 12px; color: #fff; font-size: 22px; font-weight: bold;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .tb.round { border-radius: 50%; height: 72px; }
+  .tb.on { background: rgba(232,197,71,.55); }
+  @media (pointer: coarse) { #touch { display: flex; } #help { display: none; } }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="panel">
+    <div><b>Kazım Usta</b></div>
+    <div id="hearts"></div>
+    <div id="hpbar"><div id="hpfill"></div></div>
+  </div>
+  <div class="panel" id="help">
+    <span class="keys">↑ ↓</span> yürü &nbsp; <span class="keys">← →</span> dön<br>
+    <span class="keys">A</span> zıpla &nbsp; <span class="keys">S</span> vur
+  </div>
+  <div class="panel" style="text-align:right">
+    Öldürülen kurt: <b id="kills">0</b><br>
+    Mesafe: <b id="dist">0</b> m
+  </div>
+</div>
+<div id="msg"></div>
+<div id="hurt"></div>
+
+<div id="touch">
+  <div class="grp" id="dpad">
+    <div></div><div class="tb" data-k="ArrowUp">▲</div><div></div>
+    <div class="tb" data-k="ArrowLeft">◀</div><div class="tb" data-k="ArrowDown">▼</div><div class="tb" data-k="ArrowRight">▶</div>
+  </div>
+  <div class="grp" id="acts">
+    <div class="tb round" data-k="a">A</div>
+    <div class="tb round" data-k="s">S</div>
+  </div>
+</div>
+
+<div class="overlay" id="start">
+  <h1>Kazım Usta</h1>
+  <p>Sonsuz ormanda kurtlar dolaşıyor. Gökten bir kılıç inecek — onu al ve hayatta kal!</p>
+  <p>Kurtlar <b>tek vuruşta</b> ölür. Sen <b>10 ısırıkta</b> ölürsün.</p>
+  <p><span class="keys">↑ ↓ ← →</span> hareket &nbsp; <span class="keys">A</span> zıpla &nbsp; <span class="keys">S</span> vur</p>
+  <button id="startBtn">Oyuna Başla</button>
+</div>
+<div class="overlay hidden" id="over">
+  <h1 style="color:var(--danger)">Kazım Usta düştü!</h1>
+  <p id="overText"></p>
+  <button id="againBtn">Tekrar Oyna</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  // ---------- Ayarlar ----------
+  const MAX_HP = 10;            // 10 ısırıkta ölüyoruz
+  const MAX_WOLVES = 7;         // ormanı kurt basmasın: aynı anda en fazla bu kadar
+  const CHUNK = 40;             // orman parça boyutu
+  const VIEW_CHUNKS = 2;        // etrafta kaç parça orman tutulacak
+  const WALK = 7, TURN = 2.6, JUMP = 8.5, GRAV = 24;
+
+  // ---------- Sahne ----------
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.prepend(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const SKY = 0x9cc7a4;
+  scene.background = new THREE.Color(SKY);
+  scene.fog = new THREE.Fog(SKY, 25, 85);
+
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
+
+  scene.add(new THREE.HemisphereLight(0xdff5d0, 0x2b3a1e, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff2d0, 0.85);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -35, right: 35, top: 35, bottom: -35, near: 1, far: 120 });
+  scene.add(sun, sun.target);
+
+  // Zemin oyuncuyu takip eder, dokusu dünya koordinatına göre kayar -> sonsuz görünür
+  const groundTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#3f6b2f'; g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = ['#355e27', '#4a7a36', '#5a8a3f', '#3a5f2a'][i % 4];
+      g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2 + Math.random() * 3);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(60, 60);
+    return t;
+  })();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(240, 240), new THREE.MeshLambertMaterial({ map: groundTex }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
+  scene.add(ground);
+
+  const mat = (color) => new THREE.MeshLambertMaterial({ color });
+  const box = (w, h, d, m) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.castShadow = true; return o; };
+
+  // ---------- Sonsuz orman ----------
+  const trunkMat = mat(0x5b3a1e), leafMats = [mat(0x2f6b2a), mat(0x24592a), mat(0x3d7a32)];
+  const rockMat = mat(0x7a7a72), bushMat = mat(0x3f7f35);
+  const coneGeo = new THREE.ConeGeometry(1, 1, 7), trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 1, 6);
+  const chunks = new Map();
+
+  function rng(seed) { // deterministik rastgele: aynı parça hep aynı ağaçlar
+    let s = seed >>> 0;
+    return () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+  function makeTree(r) {
+    const g = new THREE.Group(), h = 3 + r() * 3;
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.scale.set(1, h * 0.45, 1); trunk.position.y = h * 0.225; trunk.castShadow = true; g.add(trunk);
+    const lm = leafMats[Math.floor(r() * 3)];
+    for (let i = 0; i < 3; i++) {
+      const c = new THREE.Mesh(coneGeo, lm), s = (1.9 - i * 0.45) * (0.9 + r() * 0.4);
+      c.scale.set(s, h * 0.42, s); c.position.y = h * 0.42 + i * h * 0.22; c.castShadow = true; g.add(c);
+    }
+    return g;
+  }
+  function buildChunk(cx, cz) {
+    const r = rng((cx * 73856093) ^ (cz * 19349663) ^ 0x5bd1e995);
+    const g = new THREE.Group(), colliders = [];
+    const n = 10 + Math.floor(r() * 8);
+    for (let i = 0; i < n; i++) {
+      const x = cx * CHUNK + r() * CHUNK, z = cz * CHUNK + r() * CHUNK;
+      if (Math.hypot(x, z) < 7) continue; // başlangıç açıklığı
+      const t = makeTree(r); t.position.set(x, 0, z); t.rotation.y = r() * 6.28; g.add(t);
+      colliders.push({ x, z, r: 0.7 });
+    }
+    for (let i = 0; i < 6; i++) {
+      const x = cx * CHUNK + r() * CHUNK, z = cz * CHUNK + r() * CHUNK;
+      if (Math.hypot(x, z) < 7) continue;
+      if (r() < 0.4) {
+        const s = 0.4 + r() * 0.8, rk = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockMat);
+        rk.position.set(x, s * 0.5, z); rk.castShadow = true; g.add(rk); colliders.push({ x, z, r: s * 0.9 });
+      } else {
+        const s = 0.5 + r() * 0.5, b = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 0), bushMat);
+        b.position.set(x, s * 0.6, z); b.castShadow = true; g.add(b);
+      }
+    }
+    scene.add(g);
+    return { group: g, colliders };
+  }
+  function updateForest(px, pz) {
+    const ccx = Math.floor(px / CHUNK), ccz = Math.floor(pz / CHUNK), keep = new Set();
+    for (let dx = -VIEW_CHUNKS; dx <= VIEW_CHUNKS; dx++)
+      for (let dz = -VIEW_CHUNKS; dz <= VIEW_CHUNKS; dz++) {
+        const k = (ccx + dx) + ',' + (ccz + dz); keep.add(k);
+        if (!chunks.has(k)) chunks.set(k, buildChunk(ccx + dx, ccz + dz));
+      }
+    for (const [k, c] of chunks) if (!keep.has(k)) {
+      scene.remove(c.group);
+      c.group.traverse(o => { if (o.geometry && o.geometry !== coneGeo && o.geometry !== trunkGeo) o.geometry.dispose(); });
+      chunks.delete(k);
+    }
+  }
+  function collide(pos, radius) {
+    const ccx = Math.floor(pos.x / CHUNK), ccz = Math.floor(pos.z / CHUNK);
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+      const c = chunks.get((ccx + dx) + ',' + (ccz + dz)); if (!c) continue;
+      for (const o of c.colliders) {
+        const ex = pos.x - o.x, ez = pos.z - o.z, d = Math.hypot(ex, ez), min = o.r + radius;
+        if (d < min && d > 1e-4) { pos.x = o.x + ex / d * min; pos.z = o.z + ez / d * min; }
+      }
+    }
+  }
+
+  // ---------- Kazım Usta ----------
+  function makeKazim() {
+    const g = new THREE.Group();
+    const skin = mat(0xe0b08a), shirt = mat(0xb03a2e), pants = mat(0x2d4a7a), boots = mat(0x3a2716), hair = mat(0x222222), cap = mat(0x5c4a2e);
+    const body = new THREE.Group(); body.position.y = 0.95; g.add(body);
+    const torso = box(0.8, 0.9, 0.45, shirt); torso.position.y = 0.45; body.add(torso);
+    const belt = box(0.82, 0.12, 0.47, mat(0x2b1a0d)); belt.position.y = 0.02; body.add(belt);
+    // kafa
+    const head = new THREE.Group(); head.position.y = 1.2; body.add(head);
+    head.add(box(0.55, 0.55, 0.5, skin));
+    const capTop = box(0.6, 0.18, 0.56, cap); capTop.position.y = 0.33; head.add(capTop);
+    const visor = box(0.5, 0.05, 0.25, cap); visor.position.set(0, 0.25, 0.35); head.add(visor);
+    const stache = box(0.36, 0.08, 0.06, hair); stache.position.set(0, -0.08, 0.27); head.add(stache);
+    for (const s of [-1, 1]) {
+      const tip = box(0.08, 0.14, 0.06, hair); tip.position.set(s * 0.18, -0.14, 0.27); head.add(tip);
+      const eye = box(0.08, 0.08, 0.04, hair); eye.position.set(s * 0.13, 0.07, 0.26); head.add(eye);
+      const brow = box(0.14, 0.04, 0.04, hair); brow.position.set(s * 0.13, 0.15, 0.26); head.add(brow);
+    }
+    const nose = box(0.1, 0.12, 0.1, mat(0xd09a74)); nose.position.set(0, 0.0, 0.29); head.add(nose);
+    // kollar (omuzdan döner)
+    const arms = [];
+    for (const s of [-1, 1]) {
+      const a = new THREE.Group(); a.position.set(s * 0.52, 0.85, 0); body.add(a);
+      const up = box(0.24, 0.75, 0.26, shirt); up.position.y = -0.33; a.add(up);
+      const hand = box(0.22, 0.2, 0.22, skin); hand.position.y = -0.78; a.add(hand);
+      arms.push(a);
+    }
+    // bacaklar (kalçadan döner)
+    const legs = [];
+    for (const s of [-1, 1]) {
+      const l = new THREE.Group(); l.position.set(s * 0.2, 0.95, 0); g.add(l);
+      const p = box(0.3, 0.8, 0.32, pants); p.position.y = -0.42; l.add(p);
+      const b = box(0.32, 0.18, 0.42, boots); b.position.set(0, -0.86, 0.05); l.add(b);
+      legs.push(l);
+    }
+    // isim etiketi
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+    const x = c.getContext('2d'); x.font = 'bold 34px Segoe UI, sans-serif'; x.textAlign = 'center';
+    x.lineWidth = 6; x.strokeStyle = '#000'; x.strokeText('Kazım Usta', 128, 44); x.fillStyle = '#ffe680'; x.fillText('Kazım Usta', 128, 44);
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+    tag.scale.set(2.2, 0.55, 1); tag.position.y = 3.05; g.add(tag);
+    return { g, body, arms, legs, head };
+  }
+
+  function makeSword() {
+    const s = new THREE.Group();
+    const steel = new THREE.MeshPhongMaterial({ color: 0xdfe6ee, shininess: 120, emissive: 0x223344 });
+    const gold = new THREE.MeshPhongMaterial({ color: 0xe8c547, shininess: 80 });
+    const blade = box(0.1, 1.3, 0.04, steel); blade.position.y = 0.85; s.add(blade);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.25, 4), steel); tip.position.y = 1.62; tip.rotation.y = Math.PI / 4; s.add(tip);
+    const guard = box(0.45, 0.08, 0.12, gold); guard.position.y = 0.18; s.add(guard);
+    const grip = box(0.08, 0.3, 0.08, mat(0x4a2a12)); grip.position.y = 0; s.add(grip);
+    const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), gold); pommel.position.y = -0.17; s.add(pommel);
+    return s;
+  }
+
+  // ---------- Kurtlar ----------
+  const wolfFur = [mat(0x6e6e6e), mat(0x55504a), mat(0x8a8580)];
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff3020 });
+  function makeWolf() {
+    const g = new THREE.Group(), fur = wolfFur[Math.floor(Math.random() * 3)], dark = mat(0x2a2a2a);
+    const body = box(0.55, 0.5, 1.3, fur); body.position.y = 0.75; g.add(body);
+    const head = new THREE.Group(); head.position.set(0, 1.0, 0.75); g.add(head);
+    head.add(box(0.45, 0.42, 0.45, fur));
+    const snout = box(0.24, 0.2, 0.32, fur); snout.position.set(0, -0.08, 0.35); head.add(snout);
+    const nose = box(0.1, 0.08, 0.06, dark); nose.position.set(0, -0.02, 0.52); head.add(nose);
+    for (const s of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.22, 4), fur); ear.position.set(s * 0.14, 0.3, -0.05); head.add(ear);
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.05, 0.03), eyeMat); eye.position.set(s * 0.12, 0.06, 0.23); head.add(eye);
+    }
+    const tail = box(0.14, 0.14, 0.6, fur); tail.position.set(0, 0.9, -0.85); tail.rotation.x = -0.6; g.add(tail);
+    const legs = [];
+    for (const [lx, lz] of [[-0.18, 0.45], [0.18, 0.45], [-0.18, -0.45], [0.18, -0.45]]) {
+      const l = new THREE.Group(); l.position.set(lx, 0.55, lz); g.add(l);
+      const m = box(0.14, 0.55, 0.14, fur); m.position.y = -0.27; l.add(m); legs.push(l);
+    }
+    return { g, legs, head, tail };
+  }
+
+  // ---------- Oyun durumu ----------
+  let player, sword, state;
+  const wolves = [];
+  const keys = {};
+
+  function reset() {
+    for (const w of wolves) scene.remove(w.m.g);
+    wolves.length = 0;
+    if (player) scene.remove(player.g);
+    if (sword) { if (sword.parent) sword.parent.remove(sword); }
+    player = makeKazim(); scene.add(player.g);
+    sword = makeSword();
+    sword.position.set(0, 30, 2); scene.add(sword);
+    state = {
+      x: 0, z: 0, y: 0, vy: 0, yaw: 0, hp: MAX_HP, kills: 0,
+      hasSword: false, swing: 0, walkT: 0, hurtT: 0, dead: false,
+      spawnT: 3, playing: true, swordGlow: null
+    };
+    // kılıç inişinde parlama ışığı
+    const glow = new THREE.PointLight(0xffe88a, 2, 10); sword.add(glow); state.swordGlow = glow;
+    updateHUD();
+    flash('Gökten bir kılıç geliyor!', 2200);
+  }
+
+  function updateHUD() {
+    document.getElementById('hearts').textContent = '❤'.repeat(state.hp) + '♡'.repeat(MAX_HP - state.hp);
+    document.getElementById('hpfill').style.width = (state.hp / MAX_HP * 100) + '%';
+    document.getElementById('kills').textContent = state.kills;
+  }
+  let msgTimer;
+  function flash(text, ms = 1500) {
+    const m = document.getElementById('msg'); m.textContent = text; m.style.opacity = 1;
+    clearTimeout(msgTimer); msgTimer = setTimeout(() => m.style.opacity = 0, ms);
+  }
+
+  function spawnWolf() {
+    const a = Math.random() * Math.PI * 2, d = 28 + Math.random() * 14;
+    const m = makeWolf();
+    const w = { m, x: state.x + Math.sin(a) * d, z: state.z + Math.cos(a) * d, yaw: 0, t: Math.random() * 10,
+                atkCd: 1, dead: false, deadT: 0, speed: 4.2 + Math.random() * 1.6, wander: Math.random() * 6.28 };
+    m.g.position.set(w.x, 0, w.z); scene.add(m.g); wolves.push(w);
+  }
+
+  function attack() {
+    if (!state.hasSword || state.swing > 0 || state.dead) return;
+    state.swing = 0.35;
+    const fx = Math.sin(state.yaw), fz = Math.cos(state.yaw);
+    let hit = 0;
+    for (const w of wolves) {
+      if (w.dead) continue;
+      const dx = w.x - state.x, dz = w.z - state.z, d = Math.hypot(dx, dz);
+      if (d < 2 || (d < 3.4 && (dx * fx + dz * fz) / (d || 1) > 0.2)) { // dibimizdeki ya da önümüzdeki kurt: tek vuruşta ölür
+        w.dead = true; w.deadT = 0; state.kills++; hit++;
+      }
+    }
+    if (hit) { updateHUD(); if (state.kills % 10 === 0) flash(state.kills + ' kurt avlandı!'); }
+  }
+
+  function hurt() {
+    if (state.dead) return;
+    state.hp--; updateHUD();
+    const h = document.getElementById('hurt'); h.style.opacity = 1; setTimeout(() => h.style.opacity = 0, 180);
+    if (state.hp <= 0) {
+      state.dead = true;
+      setTimeout(() => {
+        document.getElementById('overText').innerHTML =
+          `<b>${state.kills}</b> kurt öldürdün ve ormanda <b>${Math.round(Math.hypot(state.x, state.z))} m</b> ilerledin.`;
+        document.getElementById('over').classList.remove('hidden');
+      }, 1200);
+    }
+  }
+
+  // ---------- Girdi ----------
+  addEventListener('keydown', e => {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (k.startsWith('Arrow')) e.preventDefault();
+    if (keys[k]) return; keys[k] = true;
+    if (!state || !state.playing) return;
+    if (k === 'a' && state.y <= 0.001 && !state.dead) state.vy = JUMP;
+    if (k === 's') attack();
+  });
+  addEventListener('keyup', e => { keys[e.key.length === 1 ? e.key.toLowerCase() : e.key] = false; });
+  for (const b of document.querySelectorAll('#touch .tb')) {
+    const k = b.dataset.k;
+    const down = e => { e.preventDefault(); b.classList.add('on'); dispatchEvent(new KeyboardEvent('keydown', { key: k })); };
+    const up = e => { e.preventDefault(); b.classList.remove('on'); dispatchEvent(new KeyboardEvent('keyup', { key: k })); };
+    b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up);
+    b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
+  }
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+  document.getElementById('startBtn').onclick = () => { document.getElementById('start').classList.add('hidden'); reset(); };
+  document.getElementById('againBtn').onclick = () => { document.getElementById('over').classList.add('hidden'); reset(); };
+
+  // ---------- Döngü ----------
+  const clock = new THREE.Clock();
+  const camPos = new THREE.Vector3(0, 6, -9);
+  updateForest(0, 0);
+
+  function tick() {
+    requestAnimationFrame(tick);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    if (state) step(dt);
+    else { // başlangıç ekranında yavaşça dönen kamera
+      const t = performance.now() / 4000;
+      camera.position.set(Math.sin(t) * 14, 6, Math.cos(t) * 14); camera.lookAt(0, 1.5, 0);
+    }
+    renderer.render(scene, camera);
+  }
+
+  function step(dt) {
+    const s = state, P = player;
+    // --- hareket ---
+    let moving = false;
+    if (!s.dead) {
+      if (keys.ArrowLeft) s.yaw += TURN * dt;
+      if (keys.ArrowRight) s.yaw -= TURN * dt;
+      const f = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 0.6 : 0);
+      if (f) {
+        s.x += Math.sin(s.yaw) * WALK * f * dt; s.z += Math.cos(s.yaw) * WALK * f * dt; moving = true;
+        const p = { x: s.x, z: s.z }; collide(p, 0.45); s.x = p.x; s.z = p.z;
+      }
+    }
+    s.vy -= GRAV * dt; s.y += s.vy * dt;
+    if (s.y < 0) { s.y = 0; s.vy = 0; }
+
+    P.g.position.set(s.x, s.y, s.z); P.g.rotation.y = s.yaw;
+    s.walkT += dt * (moving ? 10 : 0);
+    const sw = moving && s.y === 0 ? Math.sin(s.walkT) * 0.7 : 0;
+    P.legs[0].rotation.x = sw; P.legs[1].rotation.x = -sw;
+    P.arms[0].rotation.x = -sw * 0.8;
+    // sağ kol: kılıç sallama
+    if (s.swing > 0) {
+      s.swing -= dt; const k = 1 - Math.max(s.swing, 0) / 0.35;
+      P.arms[1].rotation.x = -2.6 + k * 3.4; P.arms[1].rotation.z = -0.3 + k * 0.3;
+    } else { P.arms[1].rotation.x = s.hasSword ? -0.5 : sw * 0.8; P.arms[1].rotation.z = 0; }
+    if (s.dead) { P.body.rotation.x = Math.min(P.body.rotation.x + dt * 2, 1.4); }
+
+    // --- kılıç gelişi ---
+    if (!s.hasSword) {
+      const hand = new THREE.Vector3(); P.arms[1].localToWorld(hand.set(0, -0.8, 0));
+      sword.rotation.y += dt * 6;
+      sword.position.y += (hand.y + 0.5 - sword.position.y) * Math.min(dt * 1.1, 1);
+      sword.position.x += (hand.x - sword.position.x) * Math.min(dt * 3, 1);
+      sword.position.z += (hand.z - sword.position.z) * Math.min(dt * 3, 1);
+      if (sword.position.distanceTo(hand) < 0.9) {
+        s.hasSword = true; sword.remove(s.swordGlow);
+        P.arms[1].add(sword); sword.position.set(0, -0.8, 0.05); sword.rotation.set(Math.PI / 2, 0, 0);
+        flash('Kılıcı aldın! S ile vur', 1800);
+      }
+    }
+
+    // --- orman ---
+    updateForest(s.x, s.z);
+    ground.position.set(s.x, 0, s.z);
+    groundTex.offset.set(s.x / 4, -s.z / 4);
+    sun.position.set(s.x + 20, 40, s.z + 10); sun.target.position.set(s.x, 0, s.z);
+
+    // --- kurt doğurma (sınırlı sayıda) ---
+    s.spawnT -= dt;
+    const alive = wolves.filter(w => !w.dead).length;
+    if (s.hasSword && s.spawnT <= 0 && alive < MAX_WOLVES && !s.dead) {
+      spawnWolf(); s.spawnT = 2 + Math.random() * 2.5;
+    }
+
+    // --- kurtlar ---
+    for (let i = wolves.length - 1; i >= 0; i--) {
+      const w = wolves[i], m = w.m;
+      if (w.dead) { // ölüm: yana devrilip yere gömülür
+        w.deadT += dt;
+        m.g.rotation.z = Math.min(w.deadT * 6, Math.PI / 2);
+        if (w.deadT > 1.2) m.g.position.y = -(w.deadT - 1.2) * 1.5;
+        if (w.deadT > 2) { scene.remove(m.g); wolves.splice(i, 1); }
+        continue;
+      }
+      const dx = s.x - w.x, dz = s.z - w.z, d = Math.hypot(dx, dz);
+      if (d > 70) { scene.remove(m.g); wolves.splice(i, 1); continue; } // çok uzaklaşan kurt kaybolur
+      w.t += dt; w.atkCd -= dt;
+      let speed = 0;
+      if (d < 35 && !s.dead) {
+        w.yaw = Math.atan2(dx, dz);
+        if (d > 1.5) speed = w.speed;
+        else if (w.atkCd <= 0 && s.y < 1.2) { w.atkCd = 1.3; hurt(); m.head.position.z = 1.05; }
+      } else {
+        w.wander += (Math.random() - 0.5) * dt; w.yaw = w.wander; speed = 1.5;
+      }
+      if (speed) {
+        w.x += Math.sin(w.yaw) * speed * dt; w.z += Math.cos(w.yaw) * speed * dt;
+        const p = { x: w.x, z: w.z }; collide(p, 0.5); w.x = p.x; w.z = p.z;
+      }
+      // kurtlar birbirini itsin
+      for (const o of wolves) if (o !== w && !o.dead) {
+        const ex = w.x - o.x, ez = w.z - o.z, dd = Math.hypot(ex, ez);
+        if (dd < 1.2 && dd > 1e-4) { w.x += ex / dd * (1.2 - dd) * 0.5; w.z += ez / dd * (1.2 - dd) * 0.5; }
+      }
+      m.g.position.set(w.x, 0, w.z);
+      const cur = m.g.rotation.y; let diff = w.yaw - cur; diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      m.g.rotation.y = cur + diff * Math.min(dt * 8, 1);
+      const ls = Math.sin(w.t * speed * 3) * 0.6 * (speed ? 1 : 0);
+      m.legs[0].rotation.x = ls; m.legs[3].rotation.x = ls; m.legs[1].rotation.x = -ls; m.legs[2].rotation.x = -ls;
+      m.tail.rotation.y = Math.sin(w.t * 8) * 0.3;
+      m.head.position.z += (0.75 - m.head.position.z) * Math.min(dt * 6, 1);
+    }
+
+    // --- kamera ---
+    const back = new THREE.Vector3(s.x - Math.sin(s.yaw) * 9, s.y + 5.5, s.z - Math.cos(s.yaw) * 9);
+    camPos.lerp(back, Math.min(dt * 5, 1));
+    camera.position.copy(camPos);
+    camera.lookAt(s.x, s.y + 1.8, s.z);
+
+    document.getElementById('dist').textContent = Math.round(Math.hypot(s.x, s.z));
+  }
+
+  tick();
+})();
+</script>
+</body>
+</html>
