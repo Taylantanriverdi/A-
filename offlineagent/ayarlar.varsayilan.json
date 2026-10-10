@@ -1,0 +1,10 @@
+{
+  "port": 8765,
+  "genel_model": "qwen2.5:7b",
+  "kod_model": "qwen2.5-coder:7b",
+  "embed_model": "nomic-embed-text",
+  "baglam_uzunlugu": 8192,
+  "otomatik_guncelleme": true,
+  "depo": "Taylantanriverdi/A-",
+  "guncelleme_dali": "claude/keen-wozniak-zjal69"
+}

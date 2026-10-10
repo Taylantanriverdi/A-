@@ -1,0 +1,9 @@
+# Kurulumda olusan, kullaniciya ozel klasorler
+.venv/
+araclar/
+modeller/
+veri/
+belgeler/*
+!belgeler/BENIOKU.txt
+ayarlar.json
+__pycache__/

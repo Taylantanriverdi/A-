@@ -1,0 +1,2 @@
+Bu klasore PDF, Word (.docx), Excel (.xlsx), TXT, MD veya CSV dosyalarinizi koyun.
+Sonra arayuzde "Belgeleri tara" dugmesine basin.
