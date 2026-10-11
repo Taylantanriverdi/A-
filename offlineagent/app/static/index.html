@@ -295,6 +295,7 @@
         <option value="hepsi">Okuma dışındaki her işlemde sor</option>
       </select></div>
     <div class="acik-kapa">
+      <label><input type="checkbox" data-ayar="dusunme"> <span>Düşünerek cevapla<small>qwen3 gibi modellerde cevaptan önce düşünür: zor sorularda daha akıllı ama belirgin şekilde daha yavaş.</small></span></label>
       <label><input type="checkbox" data-ayar="hafiza"> <span>Hafıza<small>Senin hakkında öğrendiklerini her sohbette hatırlar.</small></span></label>
       <label><input type="checkbox" data-ayar="otomatik_hafiza"> <span>Sohbetlerden otomatik öğren<small>Her cevaptan sonra kalıcı bilgileri (adın, işin, tercihlerin) kendisi kaydeder.</small></span></label>
       <label><input type="checkbox" data-ayar="yuz_tanima"> <span>Kamerada yüz tanıma<small>Kişiler sekmesinde öğrettiğin kişileri tanır.</small></span></label>
@@ -1193,7 +1194,8 @@ $("#sohbetAra").addEventListener("input", listeyiCiz);
 
 // ---------- Ayarlar ----------
 const ONERILEN_MODELLER = [
-  ["qwen2.5:7b", "Genel sohbet (önerilen)"], ["qwen3:8b", "Daha yeni, düşünerek cevaplar"],
+  ["qwen3:8b", "Önerilen sohbet modeli: daha akıllı, işleri daha iyi yapar"], ["qwen3:4b", "Hızlı ve hafif, basit işler için"],
+  ["qwen2.5:7b", "Eski varsayılan sohbet modeli"],
   ["qwen2.5-coder:7b", "Kod"], ["gemma3:4b", "Resim ve kamera"], ["llama3.2:3b", "Çok hızlı, basit işler"],
   ["nomic-embed-text", "Belge arama"],
 ];
@@ -1262,8 +1264,11 @@ async function modelleriYukle() {
       const rozetler = Object.entries(roller).filter(([k]) => a[k] === kisa || a[k] === m.ad).map(([, v]) => `<span class="rozet">${v}</span>`).join("");
       const oge = document.createElement("div");
       oge.className = "liste-oge";
-      oge.innerHTML = `<span class="ad"><b>${kacis(m.ad)}</b>${rozetler}<br><small>${boyutYaz(m.boyut)} ${m.parametre ? "· " + kacis(m.parametre) : ""} · ${kacis(m.tarih)}</small></span><button>Sil</button>`;
-      oge.querySelector("button").onclick = async () => {
+      const sohbetModeli = a.genel_model === kisa || a.genel_model === m.ad;
+      const gomme = /embed/i.test(m.ad);
+      oge.innerHTML = `<span class="ad"><b>${kacis(m.ad)}</b>${rozetler}<br><small>${boyutYaz(m.boyut)} ${m.parametre ? "· " + kacis(m.parametre) : ""} · ${kacis(m.tarih)}</small></span>${sohbetModeli || gomme ? "" : `<button class="kullan" title="Sohbet ve iş yaptırma için bu modeli kullan">Kullan</button>`}<button class="sil">Sil</button>`;
+      oge.querySelector(".kullan")?.addEventListener("click", () => sohbetModeliYap(kisa));
+      oge.querySelector(".sil").onclick = async () => {
         if (rozetler && !confirm(m.ad + " şu an kullanılıyor. Yine de silinsin mi?")) return;
         if (!rozetler && !confirm(m.ad + " silinsin mi? (" + boyutYaz(m.boyut) + " yer açılır)")) return;
         try { await api("/api/modeller/" + encodeURIComponent(m.ad), { method: "DELETE" }); modelleriYukle(); } catch (e) { alert(e.message); }
@@ -1299,11 +1304,24 @@ $("#modelIndir").onclick = async () => {
       } else if (v.status) $("#indirmeMetin").textContent = `${ad}: ${v.status}`;
     });
     $("#indirmeMetin").textContent = hata ? "Hata: " + hata : ad + " hazır ✓";
-    if (!hata) $("#indirmeCubuk").style.width = "100%";
+    if (!hata) {
+      $("#indirmeCubuk").style.width = "100%";
+      if (!/embed/i.test(ad) && confirm(ad + " indirildi. Sohbet ve iş yaptırma için şimdi bu model kullanılsın mı?")) await sohbetModeliYap(ad);
+    }
   } catch (e) { $("#indirmeMetin").textContent = "Hata: " + e.message; }
   dugme.disabled = false;
   modelleriYukle();
 };
+
+async function sohbetModeliYap(ad) {
+  try {
+    await api("/api/ayarlar", { method: "POST", body: JSON.stringify({ genel_model: ad }) });
+    $("#indirmeDurum").hidden = false;
+    $("#indirmeMetin").textContent = `Artık ${ad} kullanılıyor ✓ (ilk cevapta model belleğe yüklenirken birkaç saniye sürebilir)`;
+    durumuYenile();
+    modelleriYukle();
+  } catch (e) { alert(e.message); }
+}
 
 async function hafizaYukle() {
   const kutu = $("#hafizaListesi");

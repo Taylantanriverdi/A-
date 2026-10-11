@@ -155,6 +155,16 @@ D:\offlineagent\
 
 Sohbet geçmişi tarayıcıda saklanır.
 
+## Daha iyi model: qwen3:8b
+
+16 GB RAM ve 6 GB ekran kartı için önerilen sohbet modeli **`qwen3:8b`**. İş yapmada (araç kullanma) ve mantıkta `qwen2.5:7b`'den belirgin şekilde iyidir.
+
+1. ⚙ Ayarlar > **Modeller** > öneriler arasından `qwen3:8b`'ye tıkla > **İndir** (~5 GB, internet gerekir).
+2. İndirme bitince "kullanılsın mı?" sorusuna **Tamam** de. (Ya da listede modelin yanındaki **Kullan** düğmesi.)
+3. Hızlı cevap için "Düşünerek cevapla" kapalı kalsın (varsayılan). Zor sorularda Ayarlar > Genel'den açabilirsin; daha akıllı ama daha yavaş olur.
+
+Modeller 30 dakika boyunca bellekte tutulur; böylece her soruda yeniden yüklenmezler.
+
 ## Ayarlar
 
 Çoğu ayar arayüzden değiştirilir: ⚙ **Ayarlar** (sol alt). Aşağıdaki tablo `ayarlar.json` dosyasındaki karşılıklarıdır.

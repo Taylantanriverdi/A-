@@ -9,6 +9,7 @@ import uuid
 import httpx
 
 from ayarlar import KOK
+from ollama_api import ek_alanlar
 
 DEPO = KOK / "veri" / "hafiza.json"
 ISTEM_SINIRI = 3000  # modele gönderilecek hafıza metninin en fazla uzunluğu
@@ -99,6 +100,7 @@ def konusmadan_ogren(ollama_url: str, model: str, soru: str, cevap: str) -> None
                 "stream": False,
                 "format": "json",
                 "options": {"temperature": 0, "num_ctx": 4096},
+                **ek_alanlar(model),
                 "messages": [
                     {"role": "system", "content": CIKARMA_ISTEMI},
                     {"role": "user", "content": f"Zaten bilinenler:\n{bilinen}\n\nKullanıcı: {soru[:2000]}\n\nAsistan: {cevap[:1500]}"},

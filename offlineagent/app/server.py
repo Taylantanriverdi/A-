@@ -27,7 +27,7 @@ import ses
 import yuz
 from ayarlar import KOK, ayarlari_oku, surum
 from belge_oku import DESTEKLENEN
-from ollama_api import OLLAMA, OllamaHatasi, sohbet_akisi
+from ollama_api import OLLAMA, OllamaHatasi, ek_alanlar, sohbet_akisi
 from rag import BelgeIndeksi
 
 BELGELER = KOK / "belgeler"
@@ -190,6 +190,10 @@ def _baglam() -> int:
     return int(ayarlari_oku()["baglam_uzunlugu"])
 
 
+def _dusun() -> bool:
+    return bool(ayarlari_oku().get("dusunme", False))
+
+
 def _satir(veri: dict) -> str:
     return json.dumps(veri, ensure_ascii=False) + "\n"
 
@@ -201,7 +205,7 @@ async def sohbet(istek: SohbetIstegi):
             model, mesajlar, kaynaklar = await _hazirla(istek)
             yield _satir({"model": model, "kaynaklar": kaynaklar})
             cevap = ""
-            async for olay in sohbet_akisi(model, mesajlar, _baglam()):
+            async for olay in sohbet_akisi(model, mesajlar, _baglam(), dusun=_dusun()):
                 if "t" in olay:
                     cevap += olay["t"]
                     yield _satir(olay)
@@ -232,7 +236,7 @@ async def ajan_sohbet(istek: AjanIstegi):
         yield _satir({"model": model})
         cevap = ""
         async for olay in ajan.ajan_akisi(istek.mesajlar, istek.karar, model, _baglam(), indeks.ara,
-                                          ayarlar.get("onay_modu", "riskli"), istek.belgeler):
+                                          ayarlar.get("onay_modu", "riskli"), istek.belgeler, _dusun()):
             cevap += olay.get("t", "")
             if "onay" in olay:
                 cevap = ""  # iş yarıda; hafıza cevabın tamamı gelince öğrenir
@@ -247,7 +251,7 @@ async def sor(istek: SohbetIstegi):
     """Akışsız, tek seferlik cevap (diğer programlardan kullanım için)."""
     try:
         model, mesajlar, kaynaklar = await _hazirla(istek)
-        cevap = "".join([o["t"] async for o in sohbet_akisi(model, mesajlar, _baglam()) if "t" in o])
+        cevap = "".join([o["t"] async for o in sohbet_akisi(model, mesajlar, _baglam(), dusun=_dusun()) if "t" in o])
     except OllamaHatasi as hata:
         raise HTTPException(502, str(hata)) from hata
     return {"cevap": cevap, "model": model, "kaynaklar": kaynaklar}
@@ -392,7 +396,7 @@ async def canli_bak(istek: CanliIstegi):
     try:
         async with httpx.AsyncClient(timeout=120) as istemci:
             yanit = await istemci.post(f"{OLLAMA}/api/chat", json={
-                "model": ayarlar["gorsel_model"], "stream": False, "format": "json",
+                "model": ayarlar["gorsel_model"], "stream": False, "format": "json", **ek_alanlar(ayarlar["gorsel_model"]),
                 "options": {"num_ctx": 4096, "num_predict": 160, "temperature": 0.4},
                 "messages": [{"role": "system", "content": sistem},
                              {"role": "user", "content": kullanici, "images": [istek.resim]}],
@@ -420,7 +424,7 @@ AYAR_KURALLARI = {
     "ses_modeli": ("tiny", "base", "small", "medium"), "ses_dili": str,
     "baglam_uzunlugu": (2048, 32768), "ocr": bool, "otomatik_guncelleme": bool,
     "hafiza": bool, "otomatik_hafiza": bool, "yuz_tanima": bool, "ag_erisimi": bool,
-    "onay_modu": ("riskli", "hepsi"),
+    "onay_modu": ("riskli", "hepsi"), "dusunme": bool,
 }
 YENIDEN_BASLATMA_GEREKEN = {"ag_erisimi"}
 

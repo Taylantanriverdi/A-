@@ -567,7 +567,7 @@ async def _araci_calistir(ad: str, argumanlar: dict, belge_ara) -> str:
 
 
 async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: int, belge_ara,
-                 onay_modu: str, belgeler: bool):
+                 onay_modu: str, belgeler: bool, dusun: bool = False):
     son_soru = mesajlar[-1]["content"] if mesajlar and mesajlar[-1].get("role") == "user" else ""
     if son_soru and (hizli := hizli_komut(son_soru)):
         mesajlar.append({"role": "assistant", "content": "", "tool_calls": [hizli]})
@@ -591,7 +591,7 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
 
         icerik, cagrilar = "", []
         async for olay in sohbet_akisi(model, [{"role": "system", "content": sistem_istemi(belgeler)}, *mesajlar, *itme],
-                                       baglam, ARAC_TANIMLARI):
+                                       baglam, ARAC_TANIMLARI, dusun):
             if "t" in olay:
                 icerik += olay["t"]
                 yield olay
@@ -626,14 +626,14 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
 
 
 async def ajan_akisi(gecmis: list[dict], karar: bool | None, model: str, baglam: int, belge_ara,
-                     onay_modu: str = "riskli", belgeler: bool = False):
+                     onay_modu: str = "riskli", belgeler: bool = False, dusun: bool = False):
     """Olaylar: {"t"}, {"arac": {...}}, {"onay": {...}}, {"hata"}, son olarak {"gecmis": [...]}."""
     CALISMA.mkdir(parents=True, exist_ok=True)
     # Araç kullanan model resim görmez; sohbetteki resimler ve arayüz alanları gönderilmez
     mesajlar = [{k: v for k, v in m.items() if k in ("role", "content", "tool_calls", "tool_name")} for m in gecmis
                 if m.get("role") in ("user", "assistant", "tool")]
     try:
-        async for olay in _dongu(mesajlar, karar, model, baglam, belge_ara, onay_modu, belgeler):
+        async for olay in _dongu(mesajlar, karar, model, baglam, belge_ara, onay_modu, belgeler, dusun):
             yield olay
     except OllamaHatasi as hata:
         yield {"hata": str(hata)}
