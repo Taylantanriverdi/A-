@@ -118,6 +118,19 @@
   #kameraVideo { width: 220px; max-width: 45%; border-radius: 8px; background: #000; transform: scaleX(-1); }
   .kamera-yan { flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-size: 14px; }
   #kameraSelam { font-weight: 600; min-height: 22px; }
+  .video-kutu { position: relative; width: 220px; max-width: 45%; flex-shrink: 0; }
+  .video-kutu #kameraVideo { width: 100%; max-width: none; display: block; }
+  #canliRozet { display: none; position: absolute; top: 6px; left: 6px; background: var(--kotu); color: #fff; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; letter-spacing: .05em; }
+  body.canli-acik #canliRozet { display: block; }
+  body.canli-acik #kameraVideo { outline: 3px solid var(--kotu); outline-offset: -3px; }
+  #canliAlan { width: 100%; border-top: 1px solid var(--kenar); padding-top: 6px; display: flex; flex-direction: column; gap: 6px; }
+  #canliAlan[hidden] { display: none; }
+  #canliYorum { font-size: 15.5px; line-height: 1.45; min-height: 22px; }
+  #canliDurum { font-size: 12.5px; color: var(--soluk); }
+  #canliDurum.dinliyor { color: var(--kotu); font-weight: 600; }
+  #canliGunluk { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--soluk); max-height: 140px; overflow-y: auto; }
+  #canliAlan select { font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--kenar); background: var(--panel); color: var(--yazi); }
+  button#canliDugme.aktif { background: var(--kotu); color: #fff; border-color: var(--kotu); }
   .kamera-yan .satir { display: flex; gap: 6px; flex-wrap: wrap; }
 
   dialog#ayarlar { width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--kenar); border-radius: 14px; background: var(--panel); color: var(--yazi); }
@@ -216,7 +229,7 @@
 
   <footer>
     <div id="kameraPanel" hidden>
-      <video id="kameraVideo" autoplay playsinline muted></video>
+      <div class="video-kutu"><video id="kameraVideo" autoplay playsinline muted></video><span id="canliRozet">● CANLI</span></div>
       <div class="kamera-yan">
         <div id="kameraSelam">Kamera açılıyor…</div>
         <div class="satir">
@@ -225,6 +238,19 @@
           <button id="kameraKapat" title="Kamerayı kapat">✕ Kapat</button>
         </div>
         <label class="anahtar"><input type="checkbox" id="kameraHerMesaj"> Her mesajda görüntü ekle</label>
+        <button id="canliDugme" title="Kamerayı sürekli izlesin, gördüklerini yorumlasın ve seninle sesli konuşsun">🔴 Canlı izle ve konuş</button>
+        <div id="canliAlan" hidden>
+          <div id="canliYorum"></div>
+          <div class="satir">
+            <label class="anahtar"><input type="checkbox" id="canliSesli" checked> Sesli konuş</label>
+            <label class="anahtar"><input type="checkbox" id="canliDinle" checked> Beni dinle</label>
+            <select id="canliKonuskanlik" title="Kendiliğinden ne sıklıkla yorum yapsın">
+              <option value="az">Az konuşsun</option><option value="orta" selected>Ara sıra konuşsun</option><option value="cok">Çok konuşsun</option>
+            </select>
+          </div>
+          <div id="canliDurum"></div>
+          <details><summary class="not" style="cursor:pointer;margin:0">Gözlem günlüğü</summary><ol id="canliGunluk"></ol></details>
+        </div>
       </div>
     </div>
     <div id="ekler"></div>
@@ -576,7 +602,8 @@ async function gonder() {
   if (!aktif()) yeniSohbet();
   const s = aktif();
   if (s.bekleyen) { s.bekleyen = null; s.mesajlar.push({ role: "tool", tool_name: "iptal", content: "Kullanıcı işlemi onaylamadan yeni mesaj yazdı." }); }
-  if (kameraAkisi && $("#kameraHerMesaj").checked && ayar.mod !== "ajan") {
+  if (canliMod && ayar.mod === "ajan") { ayar.mod = "genel"; moduUygula(); }
+  if (kameraAkisi && (canliMod || $("#kameraHerMesaj").checked) && ayar.mod !== "ajan") {
     const k = kare();
     if (k) ekResimler.push({ b64: k });
   }
@@ -603,6 +630,8 @@ async function sohbetGonder(s) {
       body: JSON.stringify({
         mesajlar: s.mesajlar.filter((m) => m.role !== "tool").map(({ role, content, images }) => ({ role, content, images })),
         mod: ayar.mod, belgeler: ayar.belgeler,
+        baglam: canliMod ? canliMod.gozlemler.slice(-6).join("\n") : "",
+        kisa: !!(canliMod && $("#canliSesli").checked),
       }),
       signal: iptal.signal,
     });
@@ -620,7 +649,8 @@ async function sohbetGonder(s) {
   s.mesajlar.push(cevap);
   canli = [];
   bitir(); kaydet(); mesajlariCiz();
-  if (ayar.sesli && !cevap.hata) seslendir(cevap.content);
+  if (!cevap.hata && (ayar.sesli || (canliMod && $("#canliSesli").checked))) seslendir(cevap.content);
+  if (canliMod) { canliMod.soruIsleniyor = false; canliMod.sonKonusma = Date.now(); }
 }
 
 async function ajanaGonder(karar) {
@@ -906,6 +936,7 @@ async function kameraAc() {
   return true;
 }
 function kameraKapat() {
+  canliDurdur();
   kameraAkisi?.getTracks().forEach((t) => t.stop());
   kameraAkisi = null;
   $("#kameraPanel").hidden = true;
@@ -935,6 +966,195 @@ $("#kameraNe").onclick = () => {
   gonder();
 };
 $("#kameraSec").onchange = (e) => { resimleriEkle([...e.target.files]); e.target.value = ""; };
+
+// ---------- Canlı izleme ve eller serbest konuşma ----------
+let canliMod = null;
+const bekle = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const KONUSMA_ARALIGI = { az: 60000, orta: 20000, cok: 8000 };
+// Whisper'ın sessizlikte uydurduğu bilinen kalıplar
+const SES_COPU = /^(altyaz[ıi]|izlediğiniz için teşekkür|abone ol|\.+|m\.?k\.?)/i;
+
+function seslendiriyor() { return "speechSynthesis" in window && (speechSynthesis.speaking || speechSynthesis.pending); }
+function canliDurumYaz(metin, dinliyor = false) {
+  const el = $("#canliDurum");
+  el.textContent = metin;
+  el.classList.toggle("dinliyor", dinliyor);
+}
+function kucukGri() {
+  const v = $("#kameraVideo");
+  if (!v.videoWidth) return null;
+  const c = document.createElement("canvas");
+  c.width = 32; c.height = 24;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(v, 0, 0, 32, 24);
+  const d = x.getImageData(0, 0, 32, 24).data, gri = new Uint8Array(768);
+  for (let i = 0; i < 768; i++) gri[i] = (d[i * 4] * 3 + d[i * 4 + 1] * 6 + d[i * 4 + 2]) / 10;
+  return gri;
+}
+function fark(a, b) {
+  let t = 0;
+  for (let i = 0; i < a.length; i++) t += Math.abs(a[i] - b[i]);
+  return t / a.length;
+}
+
+async function canliBaslat() {
+  if (!(await kameraAc())) return;
+  if (ayar.mod === "ajan") { ayar.mod = "genel"; yaz(AYAR, ayar); moduUygula(); }
+  canliMod = { gozlemler: [], gorulen: new Set(), sonKonusma: 0, sonAnaliz: 0, sonGri: null, soruIsleniyor: false, kayitta: false };
+  document.body.classList.add("canli-acik");
+  $("#canliDugme").classList.add("aktif");
+  $("#canliDugme").textContent = "⏹ Canlı modu durdur";
+  $("#canliAlan").hidden = false;
+  $("#canliGunluk").innerHTML = "";
+  $("#canliYorum").textContent = "Seni görüyorum. Konuşmak istersen bir şey söylemen yeterli.";
+  if ($("#canliSesli").checked && !turkceSes()) canliDurumYaz("⚠ Türkçe ses yok: cevaplar yazılı görünecek. (Windows Ayarlar > Konuşma > Ses ekle)");
+  if ($("#canliDinle").checked) dinlemeBaslat();
+  canliDongu(canliMod);
+}
+function canliDurdur() {
+  if (!canliMod) return;
+  dinlemeDurdur();
+  canliMod = null;
+  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  document.body.classList.remove("canli-acik");
+  $("#canliDugme").classList.remove("aktif");
+  $("#canliDugme").textContent = "🔴 Canlı izle ve konuş";
+  $("#canliAlan").hidden = true;
+}
+
+async function canliDongu(oturum) {
+  while (canliMod === oturum) {
+    // Kullanıcı konuşurken, cevap beklenirken ya da asistan konuşurken bakmayı beklet
+    if (iptal || seslendiriyor() || oturum.kayitta || oturum.soruIsleniyor) { await bekle(700); continue; }
+    const gri = kucukGri();
+    if (!gri) { await bekle(800); continue; }
+    const degisim = oturum.sonGri ? fark(gri, oturum.sonGri) : 255;
+    // Görüntü değişmediyse ekran kartını yorma; yine de 45 sn'de bir bak
+    if (degisim < 9 && Date.now() - oturum.sonAnaliz < 45000) { await bekle(1200); continue; }
+    const resim = kare(768);
+    if (!resim) { await bekle(800); continue; }
+    oturum.sonGri = gri;
+    oturum.sonAnaliz = Date.now();
+    if (!oturum.kayitta) canliDurumYaz("👁 Bakıyorum…");
+    try {
+      const r = await api("/api/canli", {
+        method: "POST",
+        body: JSON.stringify({ resim, gecmis: oturum.gozlemler.slice(-6), konuskanlik: $("#canliKonuskanlik").value }),
+      });
+      if (canliMod !== oturum) break;
+      // Yeni tanınan kişiyi model beklemeden selamla
+      const yeniler = r.kisiler.filter((ad) => !oturum.gorulen.has(ad));
+      yeniler.forEach((ad) => oturum.gorulen.add(ad));
+      let soylenecek = r.soyle;
+      if (yeniler.length) soylenecek = `Hoş geldin ${yeniler.join(" ve ")}! ` + (soylenecek || "");
+      if (r.gozlem) {
+        const saat = new Date().toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit" });
+        oturum.gozlemler.push(`${saat} ${r.gozlem}`);
+        if (oturum.gozlemler.length > 30) oturum.gozlemler.shift();
+        const li = document.createElement("li");
+        li.textContent = `${saat} ${r.gozlem}`;
+        $("#canliGunluk").prepend(li);
+      }
+      const aralik = KONUSMA_ARALIGI[$("#canliKonuskanlik").value] || 20000;
+      if (soylenecek && (yeniler.length || Date.now() - oturum.sonKonusma > aralik)) {
+        oturum.sonKonusma = Date.now();
+        $("#canliYorum").textContent = soylenecek.trim();
+        if ($("#canliSesli").checked) seslendir(soylenecek);
+      }
+      if (!oturum.kayitta) canliDurumYaz(`Son bakış ${r.sure} sn sürdü${$("#canliDinle").checked ? " · dinliyorum" : ""}`);
+    } catch (e) {
+      if (canliMod !== oturum) break;
+      canliDurumYaz("⚠ " + e.message);
+      await bekle(5000);
+    }
+    await bekle(2000);
+  }
+}
+
+// Ses etkinliği algılama: konuşma başlayınca kaydeder, 1,2 sn sessizlikte bitirip yazıya çevirir
+async function dinlemeBaslat() {
+  if (!canliMod || canliMod.dinleme) return;
+  let akis;
+  try { akis = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }); }
+  catch { canliDurumYaz("⚠ Mikrofona erişilemedi; sadece görerek yorum yapacağım."); return; }
+  if (!canliMod) { akis.getTracks().forEach((t) => t.stop()); return; }
+  const ctx = new AudioContext();
+  const analiz = ctx.createAnalyser();
+  analiz.fftSize = 1024;
+  ctx.createMediaStreamSource(akis).connect(analiz);
+  const tampon = new Float32Array(analiz.fftSize);
+  const d = { akis, ctx, esik: 0.02, gurultu: [], baslangic: 0, sessizlik: 0, kayitBas: 0, kaydedici: null, parcalar: [], sonSes: 0 };
+  canliMod.dinleme = d;
+  const oturum = canliMod;
+  d.zamanlayici = setInterval(() => {
+    if (canliMod !== oturum) return;
+    analiz.getFloatTimeDomainData(tampon);
+    let t = 0;
+    for (const v of tampon) t += v * v;
+    const rms = Math.sqrt(t / tampon.length);
+    // İlk 1,5 sn ortam gürültüsü ölçülür
+    if (d.gurultu.length < 25) {
+      d.gurultu.push(rms);
+      if (d.gurultu.length === 25) d.esik = Math.max(0.015, (d.gurultu.reduce((a, b) => a + b) / 25) * 3);
+      return;
+    }
+    // Asistan konuşurken kendi sesini duymasın
+    if (seslendiriyor()) { d.sonSes = Date.now(); d.baslangic = 0; return; }
+    if (Date.now() - d.sonSes < 600 || oturum.soruIsleniyor || iptal) return;
+    if (!d.kaydedici) {
+      d.baslangic = rms > d.esik ? d.baslangic + 1 : 0;
+      if (d.baslangic >= 4) {
+        d.parcalar = [];
+        d.kaydedici = new MediaRecorder(akis);
+        d.kaydedici.ondataavailable = (e) => d.parcalar.push(e.data);
+        d.kaydedici.onstop = () => konusmaBitti(oturum, d);
+        d.kaydedici.start();
+        d.kayitBas = Date.now(); d.sessizlik = 0;
+        oturum.kayitta = true;
+        canliDurumYaz("🎙 Dinliyorum…", true);
+      }
+    } else {
+      d.sessizlik = rms < d.esik * 0.8 ? d.sessizlik + 60 : 0;
+      if (d.sessizlik > 1200 || Date.now() - d.kayitBas > 20000) d.kaydedici.stop();
+    }
+  }, 60);
+}
+function dinlemeDurdur() {
+  const d = canliMod?.dinleme;
+  if (!d) return;
+  clearInterval(d.zamanlayici);
+  if (d.kaydedici?.state === "recording") { d.kaydedici.onstop = null; d.kaydedici.stop(); }
+  d.akis.getTracks().forEach((t) => t.stop());
+  d.ctx.close();
+  canliMod.dinleme = null;
+}
+async function konusmaBitti(oturum, d) {
+  const sure = Date.now() - d.kayitBas;
+  d.kaydedici = null;
+  oturum.kayitta = false;
+  if (canliMod !== oturum || sure < 700) return;
+  oturum.soruIsleniyor = true;
+  canliDurumYaz("✍ Anlıyorum…");
+  try {
+    const form = new FormData();
+    form.append("ses_dosyasi", new Blob(d.parcalar, { type: "audio/webm" }), "ses.webm");
+    const yanit = await fetch("/api/ses", { method: "POST", body: form });
+    const veri = await yanit.json();
+    if (!yanit.ok) throw new Error(veri.detail || "Ses çevrilemedi");
+    const metin = (veri.metin || "").trim();
+    if (canliMod !== oturum || metin.length < 2 || SES_COPU.test(metin)) { oturum.soruIsleniyor = false; canliDurumYaz("Dinliyorum…"); return; }
+    $("#girdi").value = metin;
+    canliDurumYaz("💬 Cevap hazırlanıyor…");
+    await gonder();  // kare otomatik eklenir
+    if (canliMod === oturum) oturum.soruIsleniyor = false;
+  } catch (e) {
+    oturum.soruIsleniyor = false;
+    canliDurumYaz("⚠ " + e.message);
+  }
+}
+$("#canliDugme").onclick = () => (canliMod ? canliDurdur() : canliBaslat());
+$("#canliDinle").onchange = (e) => { if (!canliMod) return; e.target.checked ? dinlemeBaslat() : dinlemeDurdur(); };
+$("#canliSesli").onchange = (e) => { if (!e.target.checked && "speechSynthesis" in window) speechSynthesis.cancel(); };
 
 // ---------- Dışa aktarma ----------
 function indir(veri, ad, tur) {

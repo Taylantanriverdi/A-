@@ -15,6 +15,7 @@ Bir kez kurulur; sonrasında hiçbir ücret ya da bağlantı gerekmez.
 | **Sesli cevap** | Cevapları Windows'un Türkçe sesiyle okur | Windows sesi |
 | **Panel düğmesi** | Hekim/Teknisyen/Gelen İşler panellerinde sağ altta asistan düğmesi | — |
 | **Kamera** | 📷 ile seni görür, ne yaptığını anlatır, öğrettiğin kişileri tanır | `gemma3:4b` + OpenCV |
+| **Canlı mod** | Kamerayı sürekli izler, gördüklerini sesli yorumlar, eller serbest sesli sohbet | `gemma3:4b` + Whisper |
 | **Hafıza** | Senin hakkında öğrendiklerini kalıcı olarak hatırlar | — |
 | **Ayarlar** | ⚙ ile modeller, hafıza, kişiler ve telefon ayarları; arayüzden model indirme/silme | — |
 | **Telefondan erişim** | Aynı Wi-Fi'deki telefondan şifreyle kullanma | — |
@@ -80,7 +81,19 @@ Desteklenenler: `.pdf .docx .xlsx .txt .md .csv .json .log` ve resimler (`.png .
 - **Her mesajda görüntü ekle:** Kamera açıkken yazdığın her mesaja o anki görüntü eklenir; asistan seni görerek cevap verir.
 - **Kişi öğretmek:** ⚙ Ayarlar > **Kişiler** > isim yaz > **Kameradan öğret**. 3 saniyede birkaç kare alınır. Farklı ışıkta birkaç kez öğretmek tanımayı güçlendirir.
 - **Gizlilik:** Fotoğraf saklanmaz. Sadece yüzün sayısal özeti `veri\yuzler.json` dosyasında tutulur ve bilgisayardan çıkmaz. Başka birini eklemeden önce iznini al.
-- Asistan kamerayı sürekli izlemez; görüntüyü sadece sen mesaj gönderdiğinde ya da bir düğmeye bastığında görür.
+- Normal modda asistan görüntüyü sadece sen mesaj gönderdiğinde ya da bir düğmeye bastığında görür. Sürekli izlemesi için **Canlı mod**'u aç.
+
+### Canlı mod: izlesin, yorumlasın, konuşsun
+
+Kamera panelindeki **🔴 Canlı izle ve konuş** düğmesine bas. Videonun etrafında kırmızı çerçeve ve **● CANLI** yazısı çıkar.
+
+- **Görür ve yorumlar:** Görüntüde bir değişiklik olduğunda (hareket ettin, biri geldi, eline bir şey aldın) o kareye bakar. Önemli bir şey görürse sesli söyler. Görüntü değişmezse ekran kartını yormaz; yine de 45 saniyede bir kontrol eder.
+- **Tanır:** Öğrettiğin biri kameraya girince hemen "Hoş geldin Taylan!" der.
+- **Eller serbest konuşma:** "Beni dinle" açıkken konuşmaya başlaman yeterli. Cümlen bitince (1 saniyelik sessizlik) yazıya çevrilir ve o anki görüntüye bakarak kısa, sesli cevap verir. Asistan konuşurken mikrofon kendi sesini duymasın diye beklemeye geçer.
+- **Konuşkanlık:** "Az konuşsun" sadece önemli durumlarda (biri geldi, sana bir şey gösteriyorsun), "Ara sıra" yeni ve dikkat çekici değişikliklerde, "Çok konuşsun" sık sık konuşur.
+- **Gözlem günlüğü:** Neler gördüğünü saatleriyle listeler. Günlük kaydedilmez; canlı mod kapanınca silinir.
+
+**Gerçekçi beklenti:** 6 GB ekran kartında her bakış 2-5 saniye sürer. Bu yüzden video gibi her anı değil, birkaç saniyede bir kareyi yorumlar. Sesli cevap için Windows'ta Türkçe ses yüklü olmalı. Canlı mod telefonda çalışmaz.
 
 ## Hafıza
 

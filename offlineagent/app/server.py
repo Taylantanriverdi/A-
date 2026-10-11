@@ -107,6 +107,8 @@ class SohbetIstegi(BaseModel):
     mesajlar: list[dict]
     mod: str = "genel"
     belgeler: bool = False
+    baglam: str = ""  # canlı modda kameradan son gözlemler
+    kisa: bool = False  # cevap sesli okunacaksa kısa ve sade olsun
 
 
 class AjanIstegi(BaseModel):
@@ -139,6 +141,13 @@ async def _hazirla(istek: SohbetIstegi) -> tuple[str, list[dict], list[dict]]:
     son_resimler = next((m.get("images") for m in reversed(gecmis) if m["role"] == "user"), None)
     if son_resimler and ayarlar.get("yuz_tanima", True) and yuz.modeller_var():
         sistem += await _kisileri_tani(son_resimler[0])
+    if istek.baglam:
+        sistem += "\n\nCanlı kamera gözlemlerin (en yenisi sonda; kullanıcıyı şu an görüyorsun):\n" + istek.baglam[-1500:]
+    if istek.kisa:
+        sistem += (
+            "\n\nCevabın sesli okunacak: en fazla 2-3 kısa cümle kur; madde işareti, başlık, emoji ve kod kullanma. "
+            "Karşındakiyle yüz yüze konuşuyormuş gibi samimi ve doğal ol."
+        )
     if istek.belgeler and son_soru:
         try:
             kaynaklar = await run_in_threadpool(indeks.ara, son_soru)
@@ -193,19 +202,20 @@ async def sohbet(istek: SohbetIstegi):
                     cevap += olay["t"]
                     yield _satir(olay)
             yield _satir({"bitti": True})
-            _hafizaya_ogret(mesajlar, cevap)
+            _hafizaya_ogret(mesajlar, cevap, model)
         except OllamaHatasi as hata:
             yield _satir({"hata": str(hata)})
 
     return StreamingResponse(akis(), media_type="application/x-ndjson")
 
 
-def _hafizaya_ogret(mesajlar: list[dict], cevap: str) -> None:
+def _hafizaya_ogret(mesajlar: list[dict], cevap: str, model: str) -> None:
     ayarlar = ayarlari_oku()
     soru = next((m["content"] for m in reversed(mesajlar) if m["role"] == "user"), "")
     if ayarlar.get("hafiza", True) and ayarlar.get("otomatik_hafiza", True) and len(soru) >= 15 and cevap:
         threading.Thread(
-            target=hafiza.konusmadan_ogren, args=(OLLAMA, ayarlar["genel_model"], soru, cevap), daemon=True
+            # Cevabı veren model kullanılır: küçük ekran kartında model değiştirmek saniyeler sürer
+            target=hafiza.konusmadan_ogren, args=(OLLAMA, model, soru, cevap), daemon=True
         ).start()
 
 
@@ -321,6 +331,75 @@ async def klasoru_ac(hangisi: str):
         raise HTTPException(501, "Sadece Windows'ta desteklenir")
     os.startfile(klasor)  # noqa: S606 - yerel klasörü Gezgin'de açar
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- canlı izleme
+
+CANLI_KONUSKANLIK = {
+    "az": "Sadece gerçekten önemli bir şey olursa konuş: biri geldi ya da gitti, kullanıcı sana bir şey gösteriyor, "
+          "bir tehlike ya da sorun var. Diğer her durumda soyle alanını boş bırak.",
+    "orta": "Yeni ve dikkat çekici bir değişiklik varsa (yeni bir işe başladı, eline bir şey aldı, biri geldi, "
+            "uzun süredir aynı şekilde oturuyor) kısa bir yorum yap. Önemsiz değişikliklerde soyle alanını boş bırak.",
+    "cok": "Gördüklerin hakkında sohbet et: yorum yap, soru sor, öneride bulun. Ama aynı şeyi tekrarlama.",
+}
+
+
+class CanliIstegi(BaseModel):
+    resim: str
+    gecmis: list[str] = []
+    konuskanlik: str = "orta"
+
+
+@app.post("/api/canli")
+async def canli_bak(istek: CanliIstegi):
+    """Canlı modda tek bir kareyi yorumlar: kısa gözlem + (gerekiyorsa) kullanıcıya söylenecek cümle."""
+    import time
+
+    ayarlar = ayarlari_oku()
+    baslangic = time.monotonic()
+    kisiler: list[dict] = []
+    if ayarlar.get("yuz_tanima", True) and yuz.modeller_var():
+        try:
+            kisiler = await run_in_threadpool(yuz.tani, istek.resim)
+        except (ValueError, RuntimeError):
+            pass
+    adlar = [k["ad"] or "tanınmayan biri" for k in kisiler]
+    sistem = (
+        "Sen Offline Agent'sın: kullanıcıyı bilgisayar kamerasından canlı izleyen, onunla konuşan samimi bir asistansın. "
+        "Sana kameradan bir kare ve önceki gözlemlerin veriliyor. Türkçe yaz. "
+        + CANLI_KONUSKANLIK.get(istek.konuskanlik, CANLI_KONUSKANLIK["orta"])
+        + " Kişiler hakkında görünüşleriyle ilgili kırıcı yorum yapma; tanınmayan kişilerin kim olduğunu tahmin etme. "
+        'Sadece şu JSON ile cevap ver: {"gozlem": "karede ne olduğu, tek kısa tarafsız cümle", '
+        '"soyle": "kullanıcıya doğrudan hitap eden en fazla 2 kısa cümle ya da boş"}'
+        + (hafiza.istem_metni() if ayarlar.get("hafiza", True) else "")
+    )
+    kullanici = (
+        "Önceki gözlemlerin:\n" + ("\n".join(istek.gecmis[-6:]) or "(yok, kamera yeni açıldı)")
+        + f"\n\nKameradaki kişi(ler): {', '.join(adlar) if adlar else 'yüz görünmüyor'}."
+        + "\nŞimdiki kareye bak ve JSON ile cevap ver."
+    )
+    try:
+        async with httpx.AsyncClient(timeout=120) as istemci:
+            yanit = await istemci.post(f"{OLLAMA}/api/chat", json={
+                "model": ayarlar["gorsel_model"], "stream": False, "format": "json",
+                "options": {"num_ctx": 4096, "num_predict": 160, "temperature": 0.4},
+                "messages": [{"role": "system", "content": sistem},
+                             {"role": "user", "content": kullanici, "images": [istek.resim]}],
+            })
+        if yanit.status_code != 200:
+            raise HTTPException(502, f"Ollama hatası: {yanit.text[:200]}")
+        icerik = json.loads(yanit.json()["message"]["content"])
+    except httpx.HTTPError as hata:
+        raise HTTPException(502, "Ollama'ya bağlanılamadı") from hata
+    except (ValueError, KeyError, TypeError):
+        icerik = {}
+    return {
+        "gozlem": str(icerik.get("gozlem") or "")[:300],
+        "soyle": str(icerik.get("soyle") or "")[:300],
+        "kisiler": [k["ad"] for k in kisiler if k["ad"]],
+        "yuz_sayisi": len(kisiler),
+        "sure": round(time.monotonic() - baslangic, 1),
+    }
 
 
 # ---------------------------------------------------------------- ayarlar
