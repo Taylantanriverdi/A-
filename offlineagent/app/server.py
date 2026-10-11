@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 
 import ajan
 import erisim
+import primerlab
 import hafiza
 import ses
 import yuz
@@ -288,6 +289,7 @@ async def durum(request: Request):
         "ses_modeli": ses.model_var(ayarlar["ses_modeli"]),
         "yuz_modeli": yuz.modeller_var(),
         "uzak": uzak_mi(request),
+        "primerlab": await run_in_threadpool(primerlab.durum),
         "indeks": indeks.durum(),
         "belge_klasoru": str(BELGELER),
         "calisma_klasoru": str(ajan.CALISMA),

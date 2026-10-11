@@ -20,6 +20,7 @@ from pathlib import Path
 from starlette.concurrency import run_in_threadpool
 
 import hafiza
+import primerlab
 from ayarlar import KOK
 from belge_oku import belgeyi_oku
 from ollama_api import OllamaHatasi, sohbet_akisi
@@ -385,11 +386,19 @@ ARACLAR = {
     "python_calistir": (python_calistir, "riskli", _tanim(
         "python_calistir", "Python kodu çalıştırır ve çıktısını döndürür (hesaplama, Excel/CSV işleme, toplu işler). "
         "Sonucu görmek için print kullan.", {"kod": _metin("Çalıştırılacak tam Python kodu")}, ["kod"])),
+    "primerlab": (None, "okuma", _tanim(
+        "primerlab", "PrimerLab laboratuvar programına sorar: işler/siparişler, hastalar, hekimler, teknisyenler, cari hesap, "
+        "bakiye, tahsilat, gider, raporlar, mesajlar, portal hesapları. İş durumunu değiştirme, teknisyen atama, işi onaylama, "
+        "tahsilat/gider ekleme, mesaj gönderme gibi işlemleri de buradan iste: PrimerLab önerir, kullanıcı onaylar.",
+        {"istek": _metin("Kullanıcının laboratuvarla ilgili sorusu ya da isteği, tam cümle")}, ["istek"])),
+    # Modelin göremediği araç: PrimerLab'ın önerdiği işlemler bununla, kullanıcı onaylayınca uygulanır
+    "primerlab_uygula": (None, "riskli", _tanim(
+        "primerlab_uygula", "PrimerLab'ın önerdiği bir işlemi uygular.", {"etiket": _metin("İşlem")}, ["etiket"])),
     "komut_calistir": (komut_calistir, "riskli", _tanim(
         "komut_calistir", "Windows PowerShell komutu çalıştırır. Hazır bir araç yoksa kullan.",
         {"komut": _metin("PowerShell komutu")}, ["komut"])),
 }
-ARAC_TANIMLARI = [tanim for _, _, tanim in ARACLAR.values()]
+ARAC_TANIMLARI = [tanim for ad, (_, _, tanim) in ARACLAR.items() if ad != "primerlab_uygula"]
 
 
 def onay_gerekli(ad: str, argumanlar: dict, onay_modu: str = "riskli") -> bool:
@@ -422,6 +431,8 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "- Kullanıcı bilgisayarda bir iş isterse ASLA 'yapamam' ya da 'kendiniz yapın' deme: uygun aracı hemen çağır. "
         "Sadece sohbet, bilgi ya da fikir istiyorsa araç kullanmadan cevap ver.\n"
         "- Önce hazır araçları kullan (klasor_olustur, dosya_kopyala, program_ac...); hiçbiri uymazsa komut_calistir.\n"
+        "- Laboratuvarla ilgili her soru ve istekte (işler, hastalar, hekimler, cari, tahsilat, teknisyen, teslim...) "
+        "primerlab aracını kullan; laboratuvar bilgisi uydurma.\n"
         "- Silme, taşıma, üzerine yazma, kod ve komut kullanıcı onayı ister; kullanıcı reddederse başka yol öner.\n"
         "- Bir araç hata verirse hatayı oku, düzelt ve tekrar dene. Emin olmadığın dosya adını önce dosya_listele ile bul.\n"
         "- İş bitince ne yaptığını tek cümleyle söyle (ör. 'Masaüstünde \"Raporlar\" klasörünü oluşturdum.').\n"
@@ -461,6 +472,14 @@ HIZLI_AC = re.compile(r"^\s*(?P<ad>[^\n]{2,60}?)\s+(?:aç|ac|açar\s*m[ıi]s[ıi
 EYLEM_DISI = re.compile(r"(klas[öo]r|dosya|oluştur|olustur|yeni|bir |konu|açıkla|anlat|kapı|pencere|sayfa)", re.I)
 
 
+# Laboratuvar (PrimerLab) soruları: modele sormadan doğrudan Primer AI'a gider
+LAB = re.compile(
+    r"(sipariş|hasta(lar|nın|nin|ya|yı)?\b|hekim|doktor|dr\.|teknisyen|cari|bakiye|tahsilat|ödeme|gider|ciro|termin|"
+    r"teslim|gecik|üretim|tasarım|makyaj|onay bekleyen|gelen onay|portal hesab|primer ?ai|\biş(ler|leri|lerin|imiz)?\b|"
+    r"\b(iş|işi|işin)\s*#?\d+|#\d+)", re.I)
+DOSYA_ISI = re.compile(r"(klas[öo]r|dosya|masaüst|masaust|indirilen|belgeler(?!im)|kopyala|program(ı|i)? aç)", re.I)
+
+
 def _yer_adi(yer: str) -> str:
     yer = yer.casefold().replace(" ", "")
     for anahtar, ad in (("masa", "Masaüstü"), ("belge", "Belgeler"), ("indir", "İndirilenler"), ("resim", "Resimler")):
@@ -479,6 +498,8 @@ def hizli_komut(metin: str) -> dict | None:
     m = HIZLI_UYGULAMA.search(metin)
     if m:
         return {"function": {"name": "program_ac", "arguments": {"hedef": m.group("ad").casefold()}}}
+    if LAB.search(metin) and not DOSYA_ISI.search(metin) and primerlab.kurulu():
+        return {"function": {"name": "primerlab", "arguments": {"istek": metin.strip()}}}
     m = HIZLI_AC.search(metin)
     if m and not EYLEM_DISI.search(m.group("ad")):
         return {"function": {"name": "program_ac", "arguments": {"hedef": m.group("ad").strip(" '’\"")}}}
@@ -553,6 +574,11 @@ async def _araci_calistir(ad: str, argumanlar: dict, belge_ara) -> str:
         return f"Bilinmeyen araç: {ad}"
     fonksiyon = ARACLAR[ad][0]
     try:
+        if ad == "primerlab_uygula":
+            islem = argumanlar.get("islem") or {}
+            etiket = argumanlar.get("etiket") or "PrimerLab işlemi"
+            sonuc = await run_in_threadpool(primerlab.uygula, islem)
+            return f"✅ {etiket} — uygulandı." if sonuc.get("ok") else f"❌ {etiket} — uygulanamadı: {sonuc.get('mesaj')}"
         if ad == "belge_ara":
             sonuclar = await run_in_threadpool(belge_ara, str(argumanlar.get("soru", "")))
             if not sonuclar:
@@ -560,6 +586,8 @@ async def _araci_calistir(ad: str, argumanlar: dict, belge_ara) -> str:
             return _kisalt("\n\n".join(
                 f"[{k['kaynak']}{', ' + k['sayfa'] if k['sayfa'] else ''}]\n{k['metin']}" for k in sonuclar))
         return await run_in_threadpool(fonksiyon, **{k: str(v) for k, v in argumanlar.items()})
+    except primerlab.PrimerLabHatasi as hata:
+        return f"Hata: {hata}"
     except TypeError as hata:
         return f"Araç yanlış parametreyle çağrıldı: {hata}"
     except Exception as hata:  # Hata metni modele dönsün ki düzeltebilsin
@@ -569,11 +597,14 @@ async def _araci_calistir(ad: str, argumanlar: dict, belge_ara) -> str:
 async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: int, belge_ara,
                  onay_modu: str, belgeler: bool, dusun: bool = False):
     son_soru = mesajlar[-1]["content"] if mesajlar and mesajlar[-1].get("role") == "user" else ""
+    dogrudan = False  # PrimerLab'a modelsiz giden soru: cevabı olduğu gibi gösterilir
     if son_soru and (hizli := hizli_komut(son_soru)):
         mesajlar.append({"role": "assistant", "content": "", "tool_calls": [hizli]})
+        dogrudan = hizli["function"]["name"] == "primerlab"
     duzeltme_hakki = 2
     itme: list[dict] = []
     for _ in range(MAKS_TUR):
+        oneriler, oneri_cevabi, son_cevap = [], "", ""
         for cagri in _bekleyen_cagrilar(mesajlar):
             fn = cagri.get("function", {})
             ad, argumanlar = fn.get("name", ""), fn.get("arguments") or {}
@@ -582,12 +613,39 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
                     yield {"onay": {"ad": ad, "argumanlar": argumanlar}}
                     return
                 onaylandi, karar = karar, None
-                sonuc = await _araci_calistir(ad, argumanlar, belge_ara) if onaylandi else \
-                    "Kullanıcı bu işlemi reddetti. Neden reddedildiğini sor veya başka bir yol öner."
+                if onaylandi:
+                    sonuc = await _araci_calistir(ad, argumanlar, belge_ara)
+                elif ad == "primerlab_uygula":
+                    sonuc = f"⏭ {argumanlar.get('etiket', 'İşlem')} — uygulanmadı (reddettin)."
+                else:
+                    sonuc = "Kullanıcı bu işlemi reddetti. Neden reddedildiğini sor veya başka bir yol öner."
+            elif ad == "primerlab":
+                sonuc, yeni = await _primerlaba_sor(str(argumanlar.get("istek", "")), mesajlar, model)
+                if yeni:
+                    oneriler += yeni
+                    oneri_cevabi = sonuc.split("\n\nÖnerilen işlemler")[0]
+                elif dogrudan and not sonuc.startswith("Hata"):
+                    son_cevap = sonuc
             else:
                 sonuc = await _araci_calistir(ad, argumanlar, belge_ara)
             mesajlar.append({"role": "tool", "tool_name": ad, "content": sonuc})
             yield {"arac": {"ad": ad, "argumanlar": argumanlar, "sonuc": sonuc}}
+
+        if oneriler:
+            # PrimerLab'ın önerdiği her işlem ayrı onay kartı olarak kullanıcıya sorulur
+            mesajlar.append({"role": "assistant", "content": oneri_cevabi, "tool_calls": [
+                {"function": {"name": "primerlab_uygula", "arguments": {"islem": o["islem"], "etiket": o["etiket"]}}}
+                for o in oneriler]})
+            yield {"t": oneri_cevabi}
+            continue
+        if son_cevap:
+            mesajlar.append({"role": "assistant", "content": son_cevap})
+            yield {"t": son_cevap}
+            return
+        if (ozet := _uygulama_ozeti(mesajlar)) is not None:
+            mesajlar.append({"role": "assistant", "content": ozet})
+            yield {"t": ozet}
+            return
 
         icerik, cagrilar = "", []
         async for olay in sohbet_akisi(model, [{"role": "system", "content": sistem_istemi(belgeler)}, *mesajlar, *itme],
@@ -623,6 +681,34 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
         if not cagrilar:
             return
     yield {"hata": f"İş {MAKS_TUR} adımda bitmedi; isterseniz 'devam et' yazın."}
+
+
+async def _primerlaba_sor(istek: str, mesajlar: list[dict], model: str) -> tuple[str, list[dict]]:
+    """PrimerLab'ın cevabını ve önerdiği işlemleri döndürür."""
+    son_kullanici = max((i for i, m in enumerate(mesajlar) if m.get("role") == "user"), default=0)
+    try:
+        veri = await run_in_threadpool(primerlab.sor, istek, mesajlar[:son_kullanici], model)
+    except primerlab.PrimerLabHatasi as hata:
+        return f"Hata: {hata}", []
+    oneriler = veri.get("islemler") or []
+    metin = veri.get("cevap") or "(PrimerLab boş cevap verdi)"
+    if oneriler:
+        metin += "\n\nÖnerilen işlemler (kullanıcının onayına sunuldu):\n" + "\n".join(f"- {o['etiket']}" for o in oneriler)
+    return metin, oneriler
+
+
+def _uygulama_ozeti(mesajlar: list[dict]) -> str | None:
+    """PrimerLab işlemlerinin hepsi onaylanıp/reddedilip sonuçlandıysa modele sormadan özet yazar."""
+    for i in range(len(mesajlar) - 1, -1, -1):
+        m = mesajlar[i]
+        if m.get("role") == "assistant":
+            cagrilar = m.get("tool_calls") or []
+            sonuclar = [x["content"] for x in mesajlar[i + 1:] if x.get("role") == "tool"]
+            if cagrilar and all(c.get("function", {}).get("name") == "primerlab_uygula" for c in cagrilar) \
+                    and len(sonuclar) == len(cagrilar):
+                return "\n".join(sonuclar)
+            return None
+    return None
 
 
 async def ajan_akisi(gecmis: list[dict], karar: bool | None, model: str, baglam: int, belge_ara,

@@ -458,7 +458,7 @@ function yeniSohbet() {
 
 // ---------- Mesajları çizme ----------
 const ONERILER = {
-  genel: ["Masaüstünde \"Siparişler 2026\" adında klasör oluştur", "Hesap makinesini aç", "İndirilenler klasöründe ne var?",
+  genel: ["Geciken işler hangileri?", "Masaüstünde \"Siparişler 2026\" adında klasör oluştur", "Hesap makinesini aç", "İndirilenler klasöründe ne var?",
     "Bilgisayarımın disk doluluk durumunu göster", "Bana bugün için bir yapılacaklar listesi hazırla"],
   kod: ["Python ile bir klasördeki dosyaları tarihe göre sıralayan kod yaz", "Bu JavaScript kodundaki hatayı bul:", "Excel'de iki tarih arasındaki iş günü formülü nedir?"],
 };
@@ -466,7 +466,8 @@ const ARAC_ADLARI = {
   tarih_saat: "Tarih/saat", sistem_bilgisi: "Sistem bilgisi", hafizaya_kaydet: "Hafızaya kaydetme", belge_ara: "Belgelerde arama",
   dosya_listele: "Klasör listeleme", dosya_oku: "Dosya okuma", klasor_olustur: "Klasör oluşturma", dosya_kopyala: "Kopyalama",
   program_ac: "Açma", dosya_yaz: "Dosya yazma", dosya_tasi: "Taşıma / yeniden adlandırma", cop_kutusuna_at: "Silme (Geri Dönüşüm Kutusu)",
-  python_calistir: "Python çalıştırma", komut_calistir: "PowerShell komutu",
+  python_calistir: "Python çalıştırma", komut_calistir: "PowerShell komutu", dosya_ara: "Dosya arama",
+  primerlab: "PrimerLab'a soruldu", primerlab_uygula: "PrimerLab işlemi",
 };
 
 function mesajlariCiz() {
@@ -495,6 +496,8 @@ function mesajlariCiz() {
 function argumanHtml(ad, arg) {
   if (ad === "python_calistir") return kodKutusu(arg.kod || "", "python");
   if (ad === "komut_calistir") return kodKutusu(arg.komut || "", "powershell");
+  if (ad === "primerlab_uygula") return `<div style="font-size:15px"><b>${kacis(arg.etiket || "")}</b></div>`;
+  if (ad === "primerlab") return `<div>${kacis(arg.istek || "")}</div>`;
   if (ad === "dosya_yaz") return `<div>Dosya: <code>${kacis(arg.yol || "")}</code></div>` + kodKutusu(arg.icerik || "");
   const ozet = Object.entries(arg).map(([k, v]) => `${k}: ${v}`).join(", ");
   return ozet ? `<div><code>${kacis(ozet)}</code></div>` : "";
@@ -551,7 +554,7 @@ function onayKarti(b) {
   const oge = document.createElement("div");
   oge.className = "mesaj assistant";
   oge.innerHTML = `<div class="onay"><strong>⚠ Onay gerekiyor: ${kacis(ARAC_ADLARI[b.ad] || b.ad)}</strong>
-    <div style="margin-top:6px">Ajan yukarıdaki işlemi yapmak istiyor. İçeriğini kontrol et.</div>
+    <div style="margin-top:6px">Asistan yukarıdaki işlemi yapmak istiyor. Kontrol edip onayla ya da reddet.</div>
     <div class="dugmeler"><button class="ana">✓ Onayla ve çalıştır</button><button>✕ Reddet</button></div></div>`;
   const [evet, hayir] = oge.querySelectorAll("button");
   evet.onclick = () => ajanaGonder(true);
@@ -809,6 +812,8 @@ async function durumuYenile() {
       html += `<div class="uyari">Eksik model: ${d.eksik_modeller.map(kacis).join(", ")}<br>GUNCELLE.bat ile indirin.</div>`;
     if (!d.ses_modeli) html += `<div class="uyari">Ses modeli yok (mikrofon çalışmaz). GUNCELLE.bat ile indirin.</div>`;
     if (!d.yuz_modeli) html += `<div class="uyari">Yüz tanıma modeli yok. GUNCELLE.bat ile indirin.</div>`;
+    if (d.primerlab?.bagli) html += `<div><span class="nokta iyi"></span>PrimerLab ${kacis(d.primerlab.surum || "")} bağlı</div>`;
+    else if (d.primerlab?.kurulu) html += `<div title="${kacis(d.primerlab.hata || "")}"><span class="nokta kotu"></span>PrimerLab kapalı</div>`;
     document.body.classList.toggle("uzak", !!d.uzak);
     $("#sistemDurum").innerHTML = html;
     modelBilgisi();

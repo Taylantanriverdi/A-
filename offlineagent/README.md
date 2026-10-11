@@ -84,6 +84,21 @@ Masaüstü, Belgeler ve İndirilenler klasörlerinin gerçek yerini bilir (OneDr
 
 Küçük model bazen işi yapmak yerine "şu komutu çalıştırın" gibi talimat yazmaya kalkar. Offline Agent bunu fark edip o cevabı geri alır ve işi yaptırır. Sık istekler (klasör oluşturma, uygulama açma) modele bile sorulmadan anında yapılır.
 
+## PrimerLab'ı kontrol etme
+
+PrimerLab **V56 veya sonrası** aynı bilgisayarda kuruluysa Offline Agent onu yönetebilir. Yazman ya da canlı modda söylemen yeterli:
+
+- "Geciken işler hangileri?" / "Bugün teslim edilecekler"
+- "Dr. Ayşe'nin bakiyesi ne kadar?" / "Bu ayın cirosu?"
+- "İş 12'yi üretime al" / "İş 15'e Mehmet'i ata"
+- "Dr. Ayşe'den 5000 TL nakit tahsilat ekle"
+
+Laboratuvarla ilgili sorular doğrudan PrimerLab'daki **Primer AI**'a gider; o da veritabanından cevap verir. **Veri değiştiren her işlem onay kartı olarak gelir**: "Onayla" demeden hiçbir şey değişmez; "Reddet" dersen o işlem atlanır.
+
+Sol alttaki Sistem bölümünde **"PrimerLab V56 bağlı"** yazıyorsa bağlantı hazırdır. "PrimerLab kapalı" yazıyorsa masaüstündeki Primer Lab kısayoluyla PrimerLab'ı aç.
+
+Bağlantı PrimerLab'ın ilk açılışta oluşturduğu `C:\PrimerLab\Uygulama\App_Data\Secrets\offline-agent.anahtar` dosyasıyla kurulur ve sadece bu bilgisayardan çalışır. PrimerLab başka bir klasördeyse `ayarlar.json` içindeki `primerlab_anahtar` ve `primerlab_adresi` değerlerini değiştir.
+
 ## Kamera ve yüz tanıma
 
 - **📷** düğmesi kamerayı açar. Seni tanıyorsa "👋 Merhaba Taylan" der.
