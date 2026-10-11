@@ -111,6 +111,13 @@
   .disari-menu { position: absolute; right: 0; top: 110%; background: var(--panel); border: 1px solid var(--kenar); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 4px; z-index: 6; min-width: 180px; }
   .disari-menu button { display: block; width: 100%; text-align: left; border: 0; }
 
+  #ekranPanel { max-width: 820px; margin: 0 auto 8px; display: flex; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 8px; }
+  #ekranPanel[hidden] { display: none; }
+  #ekranVideo { width: 220px; max-width: 45%; border-radius: 8px; background: #000; outline: 3px solid var(--vurgu); outline-offset: -3px; }
+  #ekranYorum { font-size: 15px; line-height: 1.45; min-height: 22px; }
+  #ekranDurum { font-size: 12.5px; color: var(--soluk); }
+  #ekranGunluk { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--soluk); max-height: 140px; overflow-y: auto; }
+  #ekranPanel select { font: inherit; font-size: 13px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--kenar); background: var(--panel); color: var(--yazi); }
   #kameraPanel { max-width: 820px; margin: 0 auto 8px; display: flex; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 8px; }
   #kameraPanel[hidden] { display: none; }
   #kameraVideo { width: 220px; max-width: 45%; border-radius: 8px; background: #000; transform: scaleX(-1); }
@@ -250,10 +257,31 @@
         </div>
       </div>
     </div>
+    <div id="ekranPanel" hidden>
+      <video id="ekranVideo" autoplay playsinline muted></video>
+      <div class="kamera-yan">
+        <div><b>🖥 Ekran izleniyor</b> <span class="not" style="margin:0">— sadece bakar ve söyler, işlem yapmaz</span></div>
+        <div id="ekranYorum"></div>
+        <div class="satir">
+          <select id="ekranAralik" title="Ne sıklıkla baksın">
+            <option value="10" selected>10 sn'de bir</option><option value="20">20 sn'de bir</option>
+            <option value="30">30 sn'de bir</option><option value="60">Dakikada bir</option>
+          </select>
+          <select id="ekranKonuskanlik" title="Ne zaman söylesin">
+            <option value="az">Sadece hata/uyarıda</option><option value="orta" selected>Önemli şeylerde</option><option value="cok">Sık yorum yapsın</option>
+          </select>
+          <label class="anahtar"><input type="checkbox" id="ekranSesli"> Sesli söyle</label>
+          <button id="ekranKapat">⏹ Durdur</button>
+        </div>
+        <div id="ekranDurum"></div>
+        <details><summary class="not" style="cursor:pointer;margin:0">Ekran günlüğü</summary><ol id="ekranGunluk"></ol></details>
+      </div>
+    </div>
     <div id="ekler"></div>
     <div class="yazma">
       <button class="simge" id="resimEkle" title="Resim ekle (veya Ctrl+V ile yapıştır)">📎</button>
       <textarea id="girdi" rows="1" placeholder="Bir şey sor… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
+      <button class="simge" id="ekranDugme" title="Ekranı izle: belirli aralıklarla bakıp gördüğünü söyler">🖥</button>
       <button class="simge" id="kameraDugme" title="Kamera: seni görsün ve tanısın">📷</button>
       <button class="simge" id="mikrofon" title="Sesle yaz">🎤</button>
       <button class="ana" id="gonder">Gönder</button>
@@ -613,6 +641,9 @@ async function gonder() {
   // Genel modda istekler bilgisayarda iş yapabilen asistana gider; resimli sorular görsel modele
   const isYapabilir = ayar.mod === "genel" && !GOMULU && !document.body.classList.contains("uzak");
   const eylem = isYapabilir && eylemMi(metin);
+  if (ekranIzleme && /(ekran|pencere|bu hata|bu uyarı|bu mesaj|burada ne|şu an ne görüyorsun)/i.test(metin) && !eylem) {
+    try { ekResimler.push({ b64: (await ekranKaresi()).b64 }); } catch { /* ekran karesi alınamazsa sorulur */ }
+  }
   if (kameraAkisi && (canliMod || $("#kameraHerMesaj").checked) && !eylem) {
     const k = kare();
     if (k) ekResimler.push({ b64: k });
@@ -1169,6 +1200,99 @@ async function konusmaBitti(oturum, d) {
 $("#canliDugme").onclick = () => (canliMod ? canliDurdur() : canliBaslat());
 $("#canliDinle").onchange = (e) => { if (!canliMod) return; e.target.checked ? dinlemeBaslat() : dinlemeDurdur(); };
 $("#canliSesli").onchange = (e) => { if (!e.target.checked && "speechSynthesis" in window) speechSynthesis.cancel(); };
+
+// ---------- Ekran izleme (sadece gözlem; işlem yapmaz) ----------
+let ekranIzleme = null;
+const EKRAN_KONUSMA_ARALIGI = { az: 60000, orta: 30000, cok: 10000 };
+
+async function ekranKaresi(enFazla = 1280) {
+  const e = ekranIzleme;
+  let kaynak = $("#ekranVideo");
+  if (e.yakalayici) { try { kaynak = await e.yakalayici.grabFrame(); } catch { /* video öğesine dön */ } }
+  const g = kaynak.videoWidth || kaynak.width, y = kaynak.videoHeight || kaynak.height;
+  if (!g) throw new Error("Ekran görüntüsü henüz hazır değil");
+  const olcek = Math.min(1, enFazla / Math.max(g, y));
+  const c = document.createElement("canvas");
+  c.width = Math.round(g * olcek); c.height = Math.round(y * olcek);
+  c.getContext("2d").drawImage(kaynak, 0, 0, c.width, c.height);
+  const k = document.createElement("canvas");
+  k.width = 48; k.height = 27;
+  const kx = k.getContext("2d", { willReadFrequently: true });
+  kx.drawImage(c, 0, 0, 48, 27);
+  const d = kx.getImageData(0, 0, 48, 27).data, gri = new Uint8Array(48 * 27);
+  for (let i = 0; i < gri.length; i++) gri[i] = (d[i * 4] * 3 + d[i * 4 + 1] * 6 + d[i * 4 + 2]) / 10;
+  return { b64: c.toDataURL("image/jpeg", 0.8).split(",")[1], gri };
+}
+
+async function ekranBaslat() {
+  if (!navigator.mediaDevices?.getDisplayMedia) return alert("Bu tarayıcı ekran paylaşımını desteklemiyor.");
+  let akis;
+  try { akis = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 2 }, audio: false }); }
+  catch { return; }  // kullanıcı paylaşımı iptal etti
+  const iz = akis.getVideoTracks()[0];
+  $("#ekranVideo").srcObject = akis;
+  // Tarayıcının "Paylaşımı durdur" düğmesiyle de durur
+  iz.addEventListener("ended", ekranDurdur);
+  // Arka planda da düzenli çalışsın diye zamanlayıcı ayrı bir işçide (tarayıcı sekme zamanlayıcılarını yavaşlatır)
+  const isci = new Worker(URL.createObjectURL(new Blob(["setInterval(() => postMessage(0), 1000)"], { type: "text/javascript" })));
+  ekranIzleme = { akis, iz, isci, yakalayici: "ImageCapture" in window ? new ImageCapture(iz) : null,
+    gozlemler: [], sonGri: null, sonKontrol: 0, sonAnaliz: 0, sonKonusma: 0, mesgul: false };
+  isci.onmessage = ekranTik;
+  $("#ekranPanel").hidden = false;
+  $("#ekranDugme").classList.add("aktif");
+  $("#ekranYorum").textContent = "Ekranını izliyorum. Önemli bir şey görürsem söyleyeceğim.";
+}
+function ekranDurdur() {
+  const e = ekranIzleme;
+  if (!e) return;
+  ekranIzleme = null;
+  e.isci.terminate();
+  e.akis.getTracks().forEach((t) => t.stop());
+  $("#ekranPanel").hidden = true;
+  $("#ekranDugme").classList.remove("aktif");
+}
+async function ekranTik() {
+  const e = ekranIzleme;
+  if (!e || e.mesgul || iptal) return;
+  if (Date.now() - e.sonKontrol < Number($("#ekranAralik").value) * 1000) return;
+  e.sonKontrol = Date.now();
+  e.mesgul = true;
+  try {
+    const kare = await ekranKaresi();
+    const degisim = e.sonGri ? fark(kare.gri, e.sonGri) : 255;
+    // Ekran değişmediyse modeli çalıştırma; yine de 2 dakikada bir bak
+    if (degisim < 3 && Date.now() - e.sonAnaliz < 120000) { $("#ekranDurum").textContent = "Değişiklik yok · " + saatYaz(); return; }
+    e.sonGri = kare.gri;
+    e.sonAnaliz = Date.now();
+    $("#ekranDurum").textContent = "👁 Bakıyorum…";
+    const r = await api("/api/canli", {
+      method: "POST",
+      body: JSON.stringify({ resim: kare.b64, gecmis: e.gozlemler.slice(-6), konuskanlik: $("#ekranKonuskanlik").value, kaynak: "ekran" }),
+    });
+    if (ekranIzleme !== e) return;
+    if (r.gozlem) {
+      e.gozlemler.push(`${saatYaz()} ${r.gozlem}`);
+      if (e.gozlemler.length > 30) e.gozlemler.shift();
+      const li = document.createElement("li");
+      li.textContent = `${saatYaz()} ${r.gozlem}`;
+      $("#ekranGunluk").prepend(li);
+    }
+    const aralik = EKRAN_KONUSMA_ARALIGI[$("#ekranKonuskanlik").value] || 30000;
+    if (r.soyle && Date.now() - e.sonKonusma > aralik) {
+      e.sonKonusma = Date.now();
+      $("#ekranYorum").textContent = "💬 " + r.soyle;
+      if ($("#ekranSesli").checked) seslendir(r.soyle);
+    }
+    $("#ekranDurum").textContent = `Son bakış ${saatYaz()} · ${r.sure} sn sürdü`;
+  } catch (err) {
+    if (ekranIzleme === e) $("#ekranDurum").textContent = "⚠ " + err.message;
+  } finally {
+    e.mesgul = false;
+  }
+}
+function saatYaz() { return new Date().toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+$("#ekranDugme").onclick = () => (ekranIzleme ? ekranDurdur() : ekranBaslat());
+$("#ekranKapat").onclick = ekranDurdur;
 
 // ---------- Dışa aktarma ----------
 function indir(veri, ad, tur) {

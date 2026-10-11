@@ -99,6 +99,19 @@ Sol alttaki Sistem bölümünde **"PrimerLab V56 bağlı"** yazıyorsa bağlant�
 
 Bağlantı PrimerLab'ın ilk açılışta oluşturduğu `C:\PrimerLab\Uygulama\App_Data\Secrets\offline-agent.anahtar` dosyasıyla kurulur ve sadece bu bilgisayardan çalışır. PrimerLab başka bir klasördeyse `ayarlar.json` içindeki `primerlab_anahtar` ve `primerlab_adresi` değerlerini değiştir.
 
+## Ekran izleme
+
+Yazı kutusunun yanındaki **🖥** düğmesine bas ve paylaşılacak ekranı seç. Offline Agent ekranına **belirli aralıklarla** (varsayılan 10 saniyede bir) bakar:
+
+- **Önemli bir şey görürse söyler:** hata mesajı, uyarı, biten bir işlem, onay bekleyen bir iş gibi. "Sesli söyle" açıksa sesli okur.
+- **Ekran değişmediyse** modeli çalıştırmaz; bilgisayarı boşuna yormaz.
+- **"Ekranda ne var?", "Bu hata ne demek?"** gibi sorularda o anki ekran görüntüsü soruya eklenir.
+- **Ekran günlüğü** neler gördüğünü saatleriyle listeler; kaydedilmez.
+- **Sadece bakar ve söyler, bilgisayarda kendi başına işlem yapmaz.** Bir şey yapılacaksa sen söylersin.
+- Tarayıcının "Paylaşılıyor" göstergesi izleme sürdükçe açık kalır. **⏹ Durdur** ya da tarayıcının "Paylaşımı durdur" düğmesiyle biter.
+
+Offline Agent penceresini simge durumuna küçültme; başka pencerelerin arkasında kalabilir. Görüntüler kaydedilmez ve bilgisayardan çıkmaz.
+
 ## Kamera ve yüz tanıma
 
 - **📷** düğmesi kamerayı açar. Seni tanıyorsa "👋 Merhaba Taylan" der.
