@@ -13,3 +13,4 @@ requests==2.32.3
 huggingface-hub==0.27.1
 opencv-python-headless==4.10.0.84
 segno==1.6.1
+send2trash==1.8.3

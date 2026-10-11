@@ -7,6 +7,7 @@
   "ses_modeli": "small",
   "ses_dili": "tr",
   "ocr": true,
+  "onay_modu": "riskli",
   "yuz_tanima": true,
   "hafiza": true,
   "otomatik_hafiza": true,

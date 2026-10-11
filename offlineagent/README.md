@@ -7,7 +7,7 @@ Bir kez kurulur; sonrasında hiçbir ücret ya da bağlantı gerekmez.
 |---|---|---|
 | **Genel** | Soru-cevap, yazı, özet, çeviri | `qwen2.5:7b` |
 | **Kod** | Programlama yardımı | `qwen2.5-coder:7b` |
-| **Ajan** | Dosya okur/yazar, Python ve PowerShell çalıştırır; her riskli işlemde **onayını** ister | `qwen2.5:7b` |
+| **İş yaptırma** | "Masaüstüne klasör oluştur", "Excel'i aç" dediğinde kendisi yapar; riskli işlerde **onayını** ister | `qwen2.5:7b` |
 | **Resim anlama** | 📎 ile resim ekle ya da Ctrl+V ile ekran görüntüsü yapıştır, sorunu sor | `gemma3:4b` |
 | **Belgelerim** | PDF, Word, Excel, TXT dosyalarından kaynak göstererek cevap verir | `nomic-embed-text` |
 | **OCR** | Taranmış PDF ve resim dosyalarındaki yazıyı okuyup belgelere ekler | `gemma3:4b` |
@@ -64,14 +64,23 @@ Bir adım yarıda kalırsa `KUR.bat`'ı tekrar çalıştır; kaldığı yerden d
 
 Desteklenenler: `.pdf .docx .xlsx .txt .md .csv .json .log` ve resimler (`.png .jpg .jpeg .webp .bmp`). Taranmış PDF sayfaları ve resimlerdeki yazı OCR ile okunur. OCR sayfa başına 10-30 saniye sürebilir; ilerleme sol altta görünür.
 
-## Ajan modu
+## Bilgisayarda iş yaptırma
 
-Üstten **Ajan**'ı seç ve ne istediğini yaz. Örnekler: "Masaüstümdeki dosyaları listele", "Şu Excel'deki toplamları hesaplayan bir Python kodu yaz ve çalıştır", "Disk doluluk durumunu göster".
+Ayrı bir mod seçmen gerekmez: **Genel** modda ne istediğini yazman (ya da canlı modda söylemen) yeterli, asistan işi kendisi yapar.
 
-- **Onaysız çalışan işlemler:** dosya ve klasör okuma, belgelerde arama, tarih/saat.
-- **Onay isteyen işlemler:** dosya yazma (sadece `D:\offlineagent\calisma` klasörüne), Python kodu ve PowerShell komutu çalıştırma. Ajan ne yapacağını gösterir; **Onayla** demeden hiçbir şey çalışmaz.
-- Kod ve komutlar senin kullanıcı yetkinle çalışır. Onaylamadan önce mutlaka oku, özellikle silme komutlarını.
-- Küçük modeller hata yapabilir. Ajan hatayı görünce genelde kendisi düzeltip tekrar dener.
+Örnekler:
+- "Masaüstüne Siparişler 2026 isimli klasör oluştur"
+- "Hesap makinesini aç" / "Excel'i aç" / "İndirilenler klasörünü aç"
+- "İndirilenler'deki PDF'leri Belgeler/Faturalar klasörüne kopyala"
+- "Masaüstündeki eski.txt dosyasını sil"
+- "Disk doluluk durumunu göster"
+- "Şu Excel'deki toplamları hesapla" (Python ile)
+
+Masaüstü, Belgeler ve İndirilenler klasörlerinin gerçek yerini bilir (OneDrive'a taşınmış masaüstü dahil).
+
+**Onay:** Klasör oluşturma, kopyalama, uygulama/klasör/belge açma ve okuma işlemleri hemen yapılır. **Silme** (Geri Dönüşüm Kutusu'na), **taşıma**, **üzerine yazma**, **program dosyası başlatma**, **Python** ve **PowerShell** için ne yapacağını gösterip onayını bekler. Ayarlar > Genel > "İşlem onayı" ile her işlemde sormasını seçebilirsin.
+
+Küçük model bazen işi yapmak yerine "şu komutu çalıştırın" gibi talimat yazmaya kalkar. Offline Agent bunu fark edip o cevabı geri alır ve işi yaptırır. Sık istekler (klasör oluşturma, uygulama açma) modele bile sorulmadan anında yapılır.
 
 ## Kamera ve yüz tanıma
 
@@ -105,7 +114,7 @@ Offline Agent sohbet ettikçe senin hakkında kalıcı bilgileri öğrenir (adı
 2. ⚙ Ayarlar > **Telefon** bölümünde şifre belirle ve **Telefondan erişim açık** kutusunu işaretle. Program kendiliğinden yeniden başlar.
 3. Telefonda gösterilen adresi aç ya da QR kodu okut, şifreyle giriş yap.
 
-Telefondan ajan modu, klasör açma ve ayarlar **kapalıdır**. Tarayıcı güvenliği nedeniyle telefonda mikrofon ve canlı kamera çalışmaz; 📷 düğmesi telefonun kamerasıyla fotoğraf çekip gönderir. Bilgisayar açık ve Offline Agent çalışıyor olmalıdır.
+Telefondan bilgisayarda iş yaptırma, klasör açma ve ayarlar **kapalıdır**. Tarayıcı güvenliği nedeniyle telefonda mikrofon ve canlı kamera çalışmaz; 📷 düğmesi telefonun kamerasıyla fotoğraf çekip gönderir. Bilgisayar açık ve Offline Agent çalışıyor olmalıdır.
 
 ## Sohbetleri arama ve dışa aktarma
 
@@ -125,7 +134,7 @@ Paneller (Hekim Portalı, Teknisyen Paneli, Gelen İşler) herkes tarafından ku
 2. Bundan sonra o tarayıcıda sağ altta **AI** düğmesi çıkar. Kapatmak için `?asistan=0` ile aç.
 3. Offline Agent çalışmıyorsa düğme görünmez; panel normal çalışır. Diğer kullanıcılar hiçbir değişiklik görmez.
 
-Gömülü pencerede güvenlik için ajan modu ve dosya yükleme kapalıdır.
+Gömülü pencerede güvenlik için bilgisayarda iş yaptırma ve dosya yükleme kapalıdır.
 
 ## Klasör yapısı
 

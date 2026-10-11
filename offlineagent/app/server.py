@@ -114,6 +114,7 @@ class SohbetIstegi(BaseModel):
 class AjanIstegi(BaseModel):
     mesajlar: list[dict]
     karar: bool | None = None
+    belgeler: bool = False
 
 
 def _tam_ad(model: str) -> str:
@@ -221,12 +222,19 @@ def _hafizaya_ogret(mesajlar: list[dict], cevap: str, model: str) -> None:
 
 @app.post("/api/ajan")
 async def ajan_sohbet(istek: AjanIstegi):
-    model = ayarlari_oku()["genel_model"]
+    ayarlar = ayarlari_oku()
+    model = ayarlar["genel_model"]
 
     async def akis():
         yield _satir({"model": model})
-        async for olay in ajan.ajan_akisi(istek.mesajlar, istek.karar, model, _baglam(), indeks.ara):
+        cevap = ""
+        async for olay in ajan.ajan_akisi(istek.mesajlar, istek.karar, model, _baglam(), indeks.ara,
+                                          ayarlar.get("onay_modu", "riskli"), istek.belgeler):
+            cevap += olay.get("t", "")
+            if "onay" in olay:
+                cevap = ""  # iş yarıda; hafıza cevabın tamamı gelince öğrenir
             yield _satir(olay)
+        _hafizaya_ogret([m for m in istek.mesajlar if m.get("role") == "user"][-1:], cevap, model)
 
     return StreamingResponse(akis(), media_type="application/x-ndjson")
 
@@ -409,6 +417,7 @@ AYAR_KURALLARI = {
     "ses_modeli": ("tiny", "base", "small", "medium"), "ses_dili": str,
     "baglam_uzunlugu": (2048, 32768), "ocr": bool, "otomatik_guncelleme": bool,
     "hafiza": bool, "otomatik_hafiza": bool, "yuz_tanima": bool, "ag_erisimi": bool,
+    "onay_modu": ("riskli", "hepsi"),
 }
 YENIDEN_BASLATMA_GEREKEN = {"ag_erisimi"}
 
