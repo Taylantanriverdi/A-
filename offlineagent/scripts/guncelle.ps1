@@ -77,6 +77,8 @@ try {
     if (Test-Path $Yollar.Python) {
         try { Install-SesModeli $ayar }
         catch { Yaz "UYARI: $($_.Exception.Message)" Yellow }
+        try { Install-YuzModelleri }
+        catch { Yaz "UYARI: $($_.Exception.Message)" Yellow }
     }
 
     Set-SonGuncelleme

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline Agent Giriş</title>
+<style>
+  :root { --bg: #f6f7f9; --panel: #fff; --kenar: #e3e6eb; --yazi: #1d2330; --soluk: #6b7383; --vurgu: #2f6fed; --kotu: #d64545; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #12151b; --panel: #1a1e26; --kenar: #2a303b; --yazi: #e6e9ef; --soluk: #8e97a8; --vurgu: #5b8cff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--yazi); font: 16px/1.5 system-ui, "Segoe UI", sans-serif; padding: 16px; }
+  form { width: 100%; max-width: 360px; background: var(--panel); border: 1px solid var(--kenar); border-radius: 14px; padding: 28px 24px; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  p { margin: 0 0 18px; color: var(--soluk); font-size: 14px; }
+  input { width: 100%; font: inherit; padding: 11px 12px; border-radius: 9px; border: 1px solid var(--kenar); background: var(--bg); color: var(--yazi); }
+  button { width: 100%; margin-top: 12px; font: inherit; font-weight: 600; padding: 11px; border-radius: 9px; border: 0; background: var(--vurgu); color: #fff; cursor: pointer; }
+  #hata { color: var(--kotu); font-size: 14px; min-height: 20px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<form id="form">
+  <h1>● Offline Agent</h1>
+  <p>Bilgisayarındaki asistana bağlanmak için şifreni gir.</p>
+  <input type="password" id="sifre" placeholder="Şifre" autocomplete="current-password" required autofocus>
+  <button type="submit">Giriş</button>
+  <div id="hata"></div>
+</form>
+<script>
+document.getElementById("form").onsubmit = async (e) => {
+  e.preventDefault();
+  const hata = document.getElementById("hata");
+  hata.textContent = "";
+  try {
+    const r = await fetch("/api/giris", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sifre: document.getElementById("sifre").value }),
+    });
+    if (r.ok) { location.href = "/"; return; }
+    hata.textContent = (await r.json()).detail || "Giriş yapılamadı";
+  } catch { hata.textContent = "Bilgisayara ulaşılamadı. Offline Agent açık mı?"; }
+};
+</script>
+</body>
+</html>

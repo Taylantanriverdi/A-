@@ -1,5 +1,6 @@
 # Offline Agent - baslatma (internet gerekmez)
-param([switch]$Arkaplan)
+# -YenidenBaslat: calisan sunucuyu durdurup yeni ayarlarla acar (arayuzdeki Ayarlar kullanir)
+param([switch]$Arkaplan, [switch]$YenidenBaslat)
 . (Join-Path $PSScriptRoot 'ortak.ps1')
 
 try {
@@ -7,6 +8,12 @@ try {
     $adres = Get-SunucuAdres $ayar
 
     if (-not (Test-Path $Yollar.Python)) { throw 'Kurulum yapilmamis. Once KUR.bat dosyasini calistirin.' }
+
+    if ($YenidenBaslat) {
+        Start-Sleep -Seconds 1   # istegi gonderen sunucu cevabini bitirsin
+        $null = Stop-Sunucu
+        for ($i = 0; $i -lt 20 -and (Test-Sunucu $ayar); $i++) { Start-Sleep -Milliseconds 500 }
+    }
 
     if (Test-Sunucu $ayar) {
         Yaz 'Offline Agent zaten calisiyor.' Green
@@ -29,8 +36,10 @@ try {
     Yaz 'Sunucu baslatiliyor...'
     New-Item -ItemType Directory -Force $Yollar.Veri | Out-Null
     $env:OFFLINEAGENT_PORT = "$($ayar.port)"
+    # Telefondan erisim aciksa yerel agdaki cihazlar da baglanabilir (sifreyle)
+    $env:OFFLINEAGENT_HOST = if ($ayar.ag_erisimi) { '0.0.0.0' } else { '127.0.0.1' }
     $islem = Start-Process -FilePath $Yollar.Pythonw `
-        -ArgumentList '-m', 'uvicorn', 'server:app', '--host', '127.0.0.1', '--port', "$($ayar.port)" `
+        -ArgumentList '-m', 'uvicorn', 'server:app', '--host', $env:OFFLINEAGENT_HOST, '--port', "$($ayar.port)" `
         -WorkingDirectory $Yollar.App -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $Yollar.Veri 'sunucu.log') `
         -RedirectStandardError (Join-Path $Yollar.Veri 'sunucu-hata.log')

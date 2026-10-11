@@ -13,6 +13,7 @@ from pathlib import Path
 from starlette.concurrency import run_in_threadpool
 
 from ayarlar import KOK
+import hafiza
 from belge_oku import belgeyi_oku
 from ollama_api import OllamaHatasi, sohbet_akisi
 
@@ -60,6 +61,10 @@ def _calistir(komut: list[str]) -> str:
 
 
 # ---------- Araçlar ----------
+
+def hafizaya_kaydet(bilgi: str) -> str:
+    return "Hafızaya kaydedildi." if hafiza.ekle(bilgi, "ajan") else "Bu bilgi zaten kayıtlı ya da boş."
+
 
 def tarih_saat() -> str:
     return datetime.datetime.now().strftime("%d.%m.%Y %H:%M, %A")
@@ -124,6 +129,9 @@ def _metin(aciklama: str) -> dict:
 # ad -> (fonksiyon, onay gerekli mi, tanım)
 ARACLAR = {
     "tarih_saat": (tarih_saat, False, _tanim("tarih_saat", "Bugünün tarihini ve saatini verir.", {}, [])),
+    "hafizaya_kaydet": (hafizaya_kaydet, False, _tanim(
+        "hafizaya_kaydet", "Kullanıcı hakkında kalıcı bir bilgiyi hafızaya kaydeder (adı, işi, tercihleri vb.).",
+        {"bilgi": _metin("Tek cümlelik bilgi, ör. 'Kullanıcının laboratuvarının adı Primer Lab.'")}, ["bilgi"])),
     "belge_ara": (None, False, _tanim(
         "belge_ara", "Kullanıcının belgeler klasöründeki dosyalarda anlamca arama yapar ve ilgili bölümleri getirir.",
         {"soru": _metin("Aranacak konu veya soru")}, ["soru"])),
@@ -166,8 +174,9 @@ def sistem_istemi() -> str:
         "- Dosya yazma, kod ve komut çalıştırma kullanıcı onayı ister; kullanıcı reddederse başka yol öner.\n"
         "- Bir araç hata verirse hatayı oku, düzelt ve tekrar dene.\n"
         "- Silme veya geri alınamaz işlemler yapmadan önce kullanıcıya açıkça sor.\n"
-        "- İş bitince sonucu kısaca özetle."
-    )
+        "- İş bitince sonucu kısaca özetle.\n"
+        "- Kullanıcı hakkında kalıcı bir bilgi öğrenirsen hafizaya_kaydet ile kaydet."
+    ) + hafiza.istem_metni()
 
 
 def _bekleyen_cagrilar(mesajlar: list[dict]) -> list[dict]:

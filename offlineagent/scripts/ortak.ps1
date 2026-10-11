@@ -133,3 +133,9 @@ function Install-SesModeli($Ayar) {
     & $Yollar.Python (Join-Path $Yollar.App 'ses.py') $Ayar.ses_modeli
     if ($LASTEXITCODE -ne 0) { throw 'Ses modeli indirilemedi.' }
 }
+
+function Install-YuzModelleri {
+    # Kamerada yuz tanima icin OpenCV modelleri (~40 MB; varsa hicbir sey yapmaz)
+    & $Yollar.Python (Join-Path $Yollar.App 'yuz.py')
+    if ($LASTEXITCODE -ne 0) { throw 'Yuz tanima modelleri indirilemedi.' }
+}

@@ -1,24 +1,30 @@
 """Offline Agent sunucusu: arayüzü sunar, sohbeti yerel Ollama'ya iletir, belgelerden cevap üretir.
 
-Sadece 127.0.0.1 üzerinde dinler; internete hiçbir istek göndermez.
+Varsayılan olarak sadece 127.0.0.1 üzerinde dinler; "Telefondan erişim" açıksa yerel ağdaki
+cihazlar şifreyle bağlanabilir. İnternete hiçbir istek göndermez (model indirme hariç).
 """
 import json
 import os
 import re
 import sys
+import subprocess
 import tempfile
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 import ajan
+import erisim
+import hafiza
 import ses
+import yuz
 from ayarlar import KOK, ayarlari_oku, surum
 from belge_oku import DESTEKLENEN
 from ollama_api import OLLAMA, OllamaHatasi, sohbet_akisi
@@ -32,7 +38,8 @@ SISTEM = {
     "genel": (
         "Sen Offline Agent adında, tamamen bu bilgisayarda çalışan yardımcı bir asistansın. "
         "Kullanıcı hangi dilde yazarsa o dilde cevap ver; varsayılan dilin Türkçe. "
-        "Net ve doğru ol. Emin olmadığın konularda uydurma, bilmediğini açıkça söyle."
+        "Net ve doğru ol. Emin olmadığın konularda uydurma, bilmediğini açıkça söyle. "
+        "Kullanıcı resim veya kamera görüntüsü gönderirse gördüğünü doğal bir dille anlat."
     ),
     "kod": (
         "Sen deneyimli bir yazılım geliştirme asistanısın ve tamamen bu bilgisayarda çalışıyorsun. "
@@ -54,14 +61,38 @@ async def omur(_: FastAPI):
 app = FastAPI(title="Offline Agent", lifespan=omur, docs_url=None, redoc_url=None)
 
 
+# Ağdaki cihazlara (telefon) kapalı uçlar: kod çalıştırma, klasör açma ve yönetim işlemleri
+UZAK_YASAK = ("/api/ajan", "/api/klasor-ac", "/api/erisim", "/api/yeniden-baslat")
+UZAK_SALT_OKUNUR = ("/api/ayarlar", "/api/modeller", "/api/yuz/kisiler", "/api/hafiza", "/api/ses/indir")
+UZAK_SERBEST = ("/giris.html", "/api/giris")
+
+
+def uzak_mi(request: Request) -> bool:
+    return (request.client.host if request.client else "") not in ("127.0.0.1", "::1")
+
+
 @app.middleware("http")
 async def yerel_koruma(request: Request, call_next):
-    # Başka sitelerin tarayıcı üzerinden bu sunucuya erişmesini engeller
-    if request.headers.get("host") not in IZINLI_HOSTLAR:
-        return JSONResponse({"hata": "İzin verilmeyen adres"}, status_code=403)
+    yol = request.url.path
     origin = request.headers.get("origin")
-    if request.method not in ("GET", "HEAD") and origin and origin not in {f"http://{h}" for h in IZINLI_HOSTLAR}:
-        return JSONResponse({"hata": "İzin verilmeyen kaynak"}, status_code=403)
+    yazma = request.method not in ("GET", "HEAD")
+    if not uzak_mi(request):
+        # Başka sitelerin tarayıcı üzerinden bu sunucuya erişmesini engeller
+        if request.headers.get("host") not in IZINLI_HOSTLAR:
+            return JSONResponse({"hata": "İzin verilmeyen adres"}, status_code=403)
+        if yazma and origin and origin not in {f"http://{h}" for h in IZINLI_HOSTLAR}:
+            return JSONResponse({"hata": "İzin verilmeyen kaynak"}, status_code=403)
+    else:
+        if not ayarlari_oku().get("ag_erisimi") or not erisim.sifre_var():
+            return JSONResponse({"hata": "Telefondan erişim kapalı"}, status_code=403)
+        if yazma and origin and origin != f"http://{request.headers.get('host')}":
+            return JSONResponse({"hata": "İzin verilmeyen kaynak"}, status_code=403)
+        if not yol.startswith(UZAK_SERBEST) and not erisim.jeton_gecerli(request.cookies.get(erisim.JETON_CEREZI)):
+            if yol.startswith("/api/"):
+                return JSONResponse({"hata": "Giriş gerekli"}, status_code=401)
+            return RedirectResponse("/giris.html")
+        if yol.startswith(UZAK_YASAK) or (yazma and yol.startswith(UZAK_SALT_OKUNUR)):
+            return JSONResponse({"hata": "Bu işlem sadece Offline Agent'ın kurulu olduğu bilgisayardan yapılabilir"}, status_code=403)
     yanit = await call_next(request)
     # Tam arayüz (ajan modu dahil) başka sayfaların içine gömülemez. Panellere gömülen
     # ?gomulu=1 sürümünde ajan ve dosya işlemleri kapalıdır.
@@ -102,9 +133,12 @@ async def _hazirla(istek: SohbetIstegi) -> tuple[str, list[dict], list[dict]]:
         model = ayarlar["gorsel_model"]
     else:
         model = ayarlar["kod_model"] if mod == "kod" else ayarlar["genel_model"]
-    sistem = SISTEM[mod]
+    sistem = SISTEM[mod] + (hafiza.istem_metni() if ayarlar.get("hafiza", True) else "")
     kaynaklar: list[dict] = []
     son_soru = next((m["content"] for m in reversed(gecmis) if m["role"] == "user"), "")
+    son_resimler = next((m.get("images") for m in reversed(gecmis) if m["role"] == "user"), None)
+    if son_resimler and ayarlar.get("yuz_tanima", True) and yuz.modeller_var():
+        sistem += await _kisileri_tani(son_resimler[0])
     if istek.belgeler and son_soru:
         try:
             kaynaklar = await run_in_threadpool(indeks.ara, son_soru)
@@ -125,6 +159,20 @@ async def _hazirla(istek: SohbetIstegi) -> tuple[str, list[dict], list[dict]]:
     return model, [{"role": "system", "content": sistem}, *gecmis], kaynaklar
 
 
+async def _kisileri_tani(resim: str) -> str:
+    try:
+        yuzler = await run_in_threadpool(yuz.tani, resim)
+    except (ValueError, RuntimeError):
+        return ""
+    if not yuzler:
+        return ""
+    adlar = [y["ad"] or "tanınmayan biri" for y in yuzler]
+    return (
+        f"\n\nYüz tanıma sonucu: görüntüdeki kişi(ler): {', '.join(adlar)}. "
+        "Tanınan kişiye adıyla hitap edebilirsin. Tanınmayan kişiler hakkında tahmin yürütme."
+    )
+
+
 def _baglam() -> int:
     return int(ayarlari_oku()["baglam_uzunlugu"])
 
@@ -139,14 +187,26 @@ async def sohbet(istek: SohbetIstegi):
         try:
             model, mesajlar, kaynaklar = await _hazirla(istek)
             yield _satir({"model": model, "kaynaklar": kaynaklar})
+            cevap = ""
             async for olay in sohbet_akisi(model, mesajlar, _baglam()):
                 if "t" in olay:
+                    cevap += olay["t"]
                     yield _satir(olay)
             yield _satir({"bitti": True})
+            _hafizaya_ogret(mesajlar, cevap)
         except OllamaHatasi as hata:
             yield _satir({"hata": str(hata)})
 
     return StreamingResponse(akis(), media_type="application/x-ndjson")
+
+
+def _hafizaya_ogret(mesajlar: list[dict], cevap: str) -> None:
+    ayarlar = ayarlari_oku()
+    soru = next((m["content"] for m in reversed(mesajlar) if m["role"] == "user"), "")
+    if ayarlar.get("hafiza", True) and ayarlar.get("otomatik_hafiza", True) and len(soru) >= 15 and cevap:
+        threading.Thread(
+            target=hafiza.konusmadan_ogren, args=(OLLAMA, ayarlar["genel_model"], soru, cevap), daemon=True
+        ).start()
 
 
 @app.post("/api/ajan")
@@ -191,7 +251,7 @@ async def saglik():
 
 
 @app.get("/api/durum")
-async def durum():
+async def durum(request: Request):
     ayarlar = ayarlari_oku()
     modeller = {k: ayarlar[f"{k}_model"] for k in ("genel", "kod", "gorsel", "embed")}
     sonuc = {
@@ -201,6 +261,8 @@ async def durum():
         "modeller": modeller,
         "eksik_modeller": list(modeller.values()),
         "ses_modeli": ses.model_var(ayarlar["ses_modeli"]),
+        "yuz_modeli": yuz.modeller_var(),
+        "uzak": uzak_mi(request),
         "indeks": indeks.durum(),
         "belge_klasoru": str(BELGELER),
         "calisma_klasoru": str(ajan.CALISMA),
@@ -259,6 +321,279 @@ async def klasoru_ac(hangisi: str):
         raise HTTPException(501, "Sadece Windows'ta desteklenir")
     os.startfile(klasor)  # noqa: S606 - yerel klasörü Gezgin'de açar
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- ayarlar
+
+AYAR_KURALLARI = {
+    "genel_model": str, "kod_model": str, "gorsel_model": str, "embed_model": str,
+    "ses_modeli": ("tiny", "base", "small", "medium"), "ses_dili": str,
+    "baglam_uzunlugu": (2048, 32768), "ocr": bool, "otomatik_guncelleme": bool,
+    "hafiza": bool, "otomatik_hafiza": bool, "yuz_tanima": bool, "ag_erisimi": bool,
+}
+YENIDEN_BASLATMA_GEREKEN = {"ag_erisimi"}
+
+
+@app.get("/api/ayarlar")
+async def ayarlar_getir():
+    return {k: v for k, v in ayarlari_oku().items() if k in AYAR_KURALLARI}
+
+
+@app.post("/api/ayarlar")
+async def ayarlar_kaydet(degisiklik: dict):
+    temiz = {}
+    for anahtar, deger in degisiklik.items():
+        kural = AYAR_KURALLARI.get(anahtar)
+        if kural is str and isinstance(deger, str) and re.fullmatch(r"[A-Za-z0-9._:/\-]{0,80}", deger):
+            temiz[anahtar] = deger
+        elif kural is bool and isinstance(deger, bool):
+            temiz[anahtar] = deger
+        elif isinstance(kural, tuple) and isinstance(kural[0], str) and deger in kural:
+            temiz[anahtar] = deger
+        elif isinstance(kural, tuple) and isinstance(kural[0], int) and isinstance(deger, int) and kural[0] <= deger <= kural[1]:
+            temiz[anahtar] = deger
+        else:
+            raise HTTPException(400, f"Geçersiz ayar: {anahtar}")
+    if temiz.get("ag_erisimi") and not erisim.sifre_var():
+        raise HTTPException(400, "Telefondan erişimi açmadan önce bir şifre belirleyin.")
+    dosya = KOK / "ayarlar.json"
+    mevcut = {}
+    if dosya.exists():
+        try:
+            mevcut = json.loads(dosya.read_text("utf-8-sig"))
+        except ValueError:
+            pass
+    eski = ayarlari_oku()
+    mevcut.update(temiz)
+    dosya.write_text(json.dumps(mevcut, indent=2, ensure_ascii=False) + "\n", "utf-8")
+    yeniden = any(eski.get(k) != temiz[k] for k in temiz if k in YENIDEN_BASLATMA_GEREKEN)
+    return {"ayarlar": await ayarlar_getir(), "yeniden_baslat": yeniden}
+
+
+@app.post("/api/yeniden-baslat")
+async def yeniden_baslat():
+    """Sunucuyu yeni ayarlarla yeniden başlatır (ör. telefondan erişim açılınca)."""
+    if sys.platform != "win32":
+        raise HTTPException(501, "Sadece Windows'ta desteklenir")
+    betik = KOK / "scripts" / "baslat.ps1"
+    subprocess.Popen(
+        ["powershell.exe", "-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
+         "-File", str(betik), "-Arkaplan", "-YenidenBaslat"],
+        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+    )
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- modeller
+
+@app.get("/api/modeller")
+async def modeller():
+    try:
+        async with httpx.AsyncClient(timeout=5) as istemci:
+            veri = (await istemci.get(f"{OLLAMA}/api/tags")).json()
+    except (httpx.HTTPError, ValueError) as hata:
+        raise HTTPException(502, "Ollama'ya ulaşılamadı") from hata
+    return [
+        {"ad": m["name"], "boyut": m.get("size", 0), "tarih": m.get("modified_at", "")[:10],
+         "parametre": m.get("details", {}).get("parameter_size", "")}
+        for m in sorted(veri.get("models", []), key=lambda m: m["name"])
+    ]
+
+
+class ModelIstegi(BaseModel):
+    ad: str
+
+
+@app.post("/api/modeller/indir")
+async def model_indir(istek: ModelIstegi):
+    if not re.fullmatch(r"[A-Za-z0-9._:/\-]{1,80}", istek.ad):
+        raise HTTPException(400, "Geçersiz model adı")
+
+    async def akis():
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(None, connect=5)) as istemci:
+                async with istemci.stream("POST", f"{OLLAMA}/api/pull", json={"model": istek.ad, "stream": True}) as yanit:
+                    async for satir in yanit.aiter_lines():
+                        if satir:
+                            veri = json.loads(satir)
+                            yield _satir({k: veri[k] for k in ("status", "completed", "total", "error") if k in veri})
+        except httpx.HTTPError as hata:
+            yield _satir({"error": f"Ollama'ya ulaşılamadı: {hata}"})
+
+    return StreamingResponse(akis(), media_type="application/x-ndjson")
+
+
+@app.delete("/api/modeller/{ad:path}")
+async def model_sil(ad: str):
+    async with httpx.AsyncClient(timeout=30) as istemci:
+        yanit = await istemci.request("DELETE", f"{OLLAMA}/api/delete", json={"model": ad})
+    if yanit.status_code != 200:
+        raise HTTPException(400, yanit.text[:200])
+    return {"ok": True}
+
+
+@app.post("/api/ses/indir")
+async def ses_modeli_indir():
+    """Ayarlarda seçilen ses modelini arka planda indirir (internet gerekir)."""
+    boyut = ayarlari_oku()["ses_modeli"]
+    if ses.model_var(boyut):
+        return {"durum": "var"}
+    python = Path(sys.executable)
+    if python.name.lower() == "pythonw.exe":
+        python = python.with_name("python.exe")
+    subprocess.Popen(
+        [str(python), str(Path(__file__).with_name("ses.py")), boyut],
+        cwd=Path(__file__).parent, creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+    )
+    return {"durum": "indiriliyor"}
+
+
+# ---------------------------------------------------------------- hafıza
+
+class HafizaIstegi(BaseModel):
+    metin: str
+
+
+@app.get("/api/hafiza")
+async def hafiza_liste():
+    return hafiza.liste()
+
+
+@app.post("/api/hafiza")
+async def hafiza_ekle(istek: HafizaIstegi):
+    yeni = hafiza.ekle(istek.metin)
+    if not yeni:
+        raise HTTPException(400, "Bilgi boş ya da zaten kayıtlı")
+    return yeni
+
+
+@app.put("/api/hafiza/{kimlik}")
+async def hafiza_guncelle(kimlik: str, istek: HafizaIstegi):
+    if not hafiza.guncelle(kimlik, istek.metin):
+        raise HTTPException(404, "Bulunamadı")
+    return {"ok": True}
+
+
+@app.delete("/api/hafiza/{kimlik}")
+async def hafiza_sil(kimlik: str):
+    if not hafiza.sil(kimlik):
+        raise HTTPException(404, "Bulunamadı")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- yüz tanıma
+
+class YuzKayitIstegi(BaseModel):
+    ad: str
+    resimler: list[str]
+
+
+class YuzTaniIstegi(BaseModel):
+    resim: str
+
+
+@app.get("/api/yuz/kisiler")
+async def yuz_kisiler():
+    return {"kisiler": yuz.kisiler(), "modeller": yuz.modeller_var()}
+
+
+@app.post("/api/yuz/kisiler")
+async def yuz_kaydet(istek: YuzKayitIstegi):
+    try:
+        return await run_in_threadpool(yuz.kaydet, istek.ad, istek.resimler)
+    except (ValueError, RuntimeError) as hata:
+        raise HTTPException(400, str(hata)) from hata
+
+
+@app.delete("/api/yuz/kisiler/{ad}")
+async def yuz_sil(ad: str):
+    if not yuz.sil(ad):
+        raise HTTPException(404, "Bulunamadı")
+    return {"ok": True}
+
+
+@app.post("/api/yuz/tani")
+async def yuz_tani(istek: YuzTaniIstegi):
+    if not ayarlari_oku().get("yuz_tanima", True):
+        return {"yuzler": [], "kapali": True}
+    try:
+        return {"yuzler": await run_in_threadpool(yuz.tani, istek.resim)}
+    except (ValueError, RuntimeError) as hata:
+        raise HTTPException(400, str(hata)) from hata
+
+
+# ---------------------------------------------------------------- telefondan erişim
+
+class SifreIstegi(BaseModel):
+    sifre: str
+
+
+@app.get("/api/erisim")
+async def erisim_durum():
+    ayarlar = ayarlari_oku()
+    adresler = [f"http://{ip}:{PORT}" for ip in erisim.yerel_ipler()]
+    qr = ""
+    if adresler:
+        import segno
+
+        qr = segno.make(adresler[0], error="m").svg_data_uri(scale=5, border=2, dark="#111", light="#fff")
+    return {
+        "acik": bool(ayarlar.get("ag_erisimi")), "sifre_var": erisim.sifre_var(), "adresler": adresler,
+        "qr": qr, "dinleniyor": os.environ.get("OFFLINEAGENT_HOST", "127.0.0.1") == "0.0.0.0",
+    }
+
+
+@app.post("/api/erisim/sifre")
+async def erisim_sifre(istek: SifreIstegi):
+    try:
+        erisim.sifre_belirle(istek.sifre)
+    except ValueError as hata:
+        raise HTTPException(400, str(hata)) from hata
+    return {"ok": True}
+
+
+@app.post("/api/giris")
+async def giris(request: Request, istek: SifreIstegi):
+    ip = request.client.host if request.client else "?"
+    if erisim.kilitli(ip):
+        raise HTTPException(429, "Çok fazla hatalı deneme. 10 dakika sonra tekrar deneyin.")
+    if not erisim.sifre_dogru(istek.sifre):
+        erisim.hata_kaydet(ip)
+        raise HTTPException(401, "Şifre hatalı")
+    yanit = JSONResponse({"ok": True})
+    yanit.set_cookie(erisim.JETON_CEREZI, erisim.jeton_uret(), max_age=erisim.JETON_OMRU, httponly=True, samesite="strict")
+    return yanit
+
+
+# ---------------------------------------------------------------- dışa aktarma
+
+class DisaAktarIstegi(BaseModel):
+    baslik: str
+    mesajlar: list[dict]
+
+
+@app.post("/api/disari/docx")
+async def disari_docx(istek: DisaAktarIstegi):
+    import io
+
+    import docx
+
+    belge = docx.Document()
+    belge.add_heading(istek.baslik[:120] or "Sohbet", level=1)
+    for m in istek.mesajlar:
+        if m.get("role") not in ("user", "assistant") or not m.get("content"):
+            continue
+        baslik = belge.add_paragraph()
+        baslik.add_run("Siz" if m["role"] == "user" else "Offline Agent").bold = True
+        for satir in str(m["content"]).split("\n"):
+            belge.add_paragraph(satir.replace("**", ""))
+    tampon = io.BytesIO()
+    belge.save(tampon)
+    return Response(
+        tampon.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": 'attachment; filename="sohbet.docx"'},
+    )
 
 
 app.mount("/", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="arayuz")

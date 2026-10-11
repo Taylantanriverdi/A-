@@ -14,6 +14,11 @@ Bir kez kurulur; sonrasında hiçbir ücret ya da bağlantı gerekmez.
 | **Sesle yazma** | 🎤 ile konuş, yazıya çevrilsin | Whisper `small` |
 | **Sesli cevap** | Cevapları Windows'un Türkçe sesiyle okur | Windows sesi |
 | **Panel düğmesi** | Hekim/Teknisyen/Gelen İşler panellerinde sağ altta asistan düğmesi | — |
+| **Kamera** | 📷 ile seni görür, ne yaptığını anlatır, öğrettiğin kişileri tanır | `gemma3:4b` + OpenCV |
+| **Hafıza** | Senin hakkında öğrendiklerini kalıcı olarak hatırlar | — |
+| **Ayarlar** | ⚙ ile modeller, hafıza, kişiler ve telefon ayarları; arayüzden model indirme/silme | — |
+| **Telefondan erişim** | Aynı Wi-Fi'deki telefondan şifreyle kullanma | — |
+| **Sohbet araçları** | Sohbetlerde arama; Word, PDF ve Markdown olarak dışa aktarma | — |
 
 ## Kurulum (bir kez, internet gerekir)
 
@@ -67,6 +72,33 @@ Desteklenenler: `.pdf .docx .xlsx .txt .md .csv .json .log` ve resimler (`.png .
 - Kod ve komutlar senin kullanıcı yetkinle çalışır. Onaylamadan önce mutlaka oku, özellikle silme komutlarını.
 - Küçük modeller hata yapabilir. Ajan hatayı görünce genelde kendisi düzeltip tekrar dener.
 
+## Kamera ve yüz tanıma
+
+- **📷** düğmesi kamerayı açar. Seni tanıyorsa "👋 Merhaba Taylan" der.
+- **Fotoğraf ekle:** O anki görüntüyü mesaja ekler.
+- **Ne yapıyorum?:** Görüntüyü gönderir ve ne gördüğünü anlatır.
+- **Her mesajda görüntü ekle:** Kamera açıkken yazdığın her mesaja o anki görüntü eklenir; asistan seni görerek cevap verir.
+- **Kişi öğretmek:** ⚙ Ayarlar > **Kişiler** > isim yaz > **Kameradan öğret**. 3 saniyede birkaç kare alınır. Farklı ışıkta birkaç kez öğretmek tanımayı güçlendirir.
+- **Gizlilik:** Fotoğraf saklanmaz. Sadece yüzün sayısal özeti `veri\yuzler.json` dosyasında tutulur ve bilgisayardan çıkmaz. Başka birini eklemeden önce iznini al.
+- Asistan kamerayı sürekli izlemez; görüntüyü sadece sen mesaj gönderdiğinde ya da bir düğmeye bastığında görür.
+
+## Hafıza
+
+Offline Agent sohbet ettikçe senin hakkında kalıcı bilgileri öğrenir (adın, işin, tercihlerin gibi) ve sonraki sohbetlerde hatırlar. ⚙ Ayarlar > **Hafıza** bölümünden neleri hatırladığını görebilir, düzeltebilir, silebilir ya da kendin ekleyebilirsin. Otomatik öğrenmeyi Ayarlar > Genel'den kapatabilirsin.
+
+## Telefondan erişim
+
+1. `D:\offlineagent\TELEFON_AC.bat` dosyasını bir kez çalıştır. Yönetici izni ister; Windows güvenlik duvarında izin açar ve Wi-Fi ağının "Özel" olup olmadığını kontrol eder.
+2. ⚙ Ayarlar > **Telefon** bölümünde şifre belirle ve **Telefondan erişim açık** kutusunu işaretle. Program kendiliğinden yeniden başlar.
+3. Telefonda gösterilen adresi aç ya da QR kodu okut, şifreyle giriş yap.
+
+Telefondan ajan modu, klasör açma ve ayarlar **kapalıdır**. Tarayıcı güvenliği nedeniyle telefonda mikrofon ve canlı kamera çalışmaz; 📷 düğmesi telefonun kamerasıyla fotoğraf çekip gönderir. Bilgisayar açık ve Offline Agent çalışıyor olmalıdır.
+
+## Sohbetleri arama ve dışa aktarma
+
+- Sol üstteki **arama kutusu** sohbet başlıklarında ve içeriklerinde arar.
+- Sağ üstteki **⤓** düğmesi açık sohbeti **Word**, **PDF** (yazdır > PDF olarak kaydet) ya da **Markdown** olarak indirir.
+
 ## Ses
 
 - **Sesle yazma (🎤):** Bir kez tıkla ve konuş, bitince tekrar tıkla. Konuşman yazıya çevrilir. İlk kullanımda model belleğe yüklendiği için birkaç saniye sürer. Tarayıcı mikrofon izni ister.
@@ -90,6 +122,7 @@ D:\offlineagent\
   ayarlar.json        <- senin ayarların (güncelleme bunu değiştirmez)
   belgeler\           <- senin belgelerin
   calisma\            <- ajanın dosya yazdığı klasör
+  TELEFON_AC.bat      <- telefondan erişim için güvenlik duvarı izni
   modeller\           <- yapay zeka modelleri
   veri\               <- belge indeksi ve kayıtlar (sunucu-hata.log)
   araclar\  .venv\    <- Python ve araçlar
@@ -98,7 +131,11 @@ D:\offlineagent\
 
 Sohbet geçmişi tarayıcıda saklanır.
 
-## Ayarlar (`ayarlar.json`)
+## Ayarlar
+
+Çoğu ayar arayüzden değiştirilir: ⚙ **Ayarlar** (sol alt). Aşağıdaki tablo `ayarlar.json` dosyasındaki karşılıklarıdır.
+
+### `ayarlar.json`
 
 | Ayar | Varsayılan | Açıklama |
 |---|---|---|
@@ -108,6 +145,9 @@ Sohbet geçmişi tarayıcıda saklanır.
 | `ses_modeli` | `small` | Whisper boyutu: `base` daha hızlı, `medium` daha doğru ama yavaş |
 | `ses_dili` | `tr` | Konuşma dili (boş bırakılırsa otomatik algılar) |
 | `ocr` | `true` | Taranmış PDF ve resimlerden yazı okuma |
+| `hafiza` / `otomatik_hafiza` | `true` | Hafıza ve sohbetlerden otomatik öğrenme |
+| `yuz_tanima` | `true` | Kamerada yüz tanıma |
+| `ag_erisimi` | `false` | Telefondan erişim (Ayarlar > Telefon'dan açılır) |
 | `embed_model` | `nomic-embed-text` | Belge arama modeli |
 | `baglam_uzunlugu` | `8192` | Modelin aynı anda aklında tutabileceği metin miktarı. Ekran kartı belleği yetmezse `4096` yap |
 | `port` | `8765` | Arayüz adresi |

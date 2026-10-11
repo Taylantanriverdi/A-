@@ -108,8 +108,52 @@
   #surukle { display: none; position: fixed; inset: 0; background: rgba(47,111,237,.15); border: 3px dashed var(--vurgu); z-index: 10; align-items: center; justify-content: center; font-size: 20px; font-weight: 600; }
   body.surukleniyor #surukle { display: flex; }
 
+  #sohbetAra { margin: 0 12px 6px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--kenar); background: var(--bg); color: var(--yazi); font: inherit; font-size: 14px; }
+  .disari { position: relative; }
+  .disari-menu { position: absolute; right: 0; top: 110%; background: var(--panel); border: 1px solid var(--kenar); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.15); padding: 4px; z-index: 6; min-width: 180px; }
+  .disari-menu button { display: block; width: 100%; text-align: left; border: 0; }
+
+  #kameraPanel { max-width: 820px; margin: 0 auto 8px; display: flex; gap: 12px; align-items: flex-start; background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 8px; }
+  #kameraPanel[hidden] { display: none; }
+  #kameraVideo { width: 220px; max-width: 45%; border-radius: 8px; background: #000; transform: scaleX(-1); }
+  .kamera-yan { flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; font-size: 14px; }
+  #kameraSelam { font-weight: 600; min-height: 22px; }
+  .kamera-yan .satir { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  dialog#ayarlar { width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 40px); padding: 0; border: 1px solid var(--kenar); border-radius: 14px; background: var(--panel); color: var(--yazi); }
+  dialog#ayarlar::backdrop { background: rgba(0,0,0,.4); }
+  .ayar-ust { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--kenar); }
+  .ayar-ust h2 { margin: 0; font-size: 18px; }
+  .sekmeler { display: flex; gap: 2px; padding: 8px 12px 0; border-bottom: 1px solid var(--kenar); overflow-x: auto; }
+  .sekmeler button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; white-space: nowrap; }
+  .sekmeler button.secili { border-bottom-color: var(--vurgu); color: var(--vurgu); font-weight: 600; }
+  .sekme { padding: 16px; overflow-y: auto; max-height: calc(100vh - 170px); }
+  .sekme[hidden] { display: none; }
+  .alan { display: grid; grid-template-columns: 180px 1fr; gap: 6px 12px; align-items: center; margin-bottom: 10px; font-size: 14px; }
+  .alan label { color: var(--soluk); }
+  .alan select, .alan input[type=text], .alan input[type=password], .sekme input.genis { font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--kenar); background: var(--bg); color: var(--yazi); width: 100%; }
+  .acik-kapa { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; font-size: 14px; }
+  .acik-kapa label { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+  .acik-kapa small { color: var(--soluk); display: block; }
+  .liste-oge { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--kenar); border-radius: 8px; margin-bottom: 6px; font-size: 14px; }
+  .liste-oge .ad { flex: 1; overflow-wrap: anywhere; }
+  .liste-oge small { color: var(--soluk); }
+  .rozet { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--kullanici); color: var(--yazi); margin-left: 4px; }
+  .ilerleme { height: 8px; background: var(--kod-bg); border-radius: 4px; overflow: hidden; margin: 8px 0; }
+  .ilerleme div { height: 100%; width: 0; background: var(--vurgu); transition: width .3s; }
+  .not { font-size: 13px; color: var(--soluk); margin: 8px 0; }
+  .qr { background: #fff; display: inline-block; border-radius: 8px; padding: 4px; }
+  .satir-btn { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+
+  @media print {
+    aside, header, footer, .eylemler, .kopyala, #ajanBilgi, #surukle { display: none !important; }
+    body { display: block; background: #fff; color: #000; }
+    #mesajlar { overflow: visible; }
+  }
+
   /* Panellere gömülü küçük sürüm */
-  body.gomulu aside, body.gomulu [data-mod=ajan], body.gomulu #menuDugme, body.gomulu .ipucu { display: none !important; }
+  body.gomulu aside, body.gomulu [data-mod=ajan], body.gomulu #menuDugme, body.gomulu .ipucu, body.gomulu .disari { display: none !important; }
+  body.uzak [data-mod=ajan], body.uzak [data-klasor], body.uzak #ayarDugme { display: none !important; }
   body.gomulu header { padding: 8px 10px; gap: 8px; }
   body.gomulu #mesajlar { padding: 14px 10px; }
   body.gomulu footer { padding: 8px; }
@@ -119,6 +163,7 @@
     body.menu-acik aside { transform: none; }
     #menuDugme { display: inline-block; }
     #modelBilgi { display: none; }
+    .alan { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -126,6 +171,7 @@
 <aside>
   <div class="marka">● Offline Agent <small id="surum"></small></div>
   <button class="yeni ana" id="yeniSohbet">+ Yeni sohbet</button>
+  <input type="search" id="sohbetAra" placeholder="Sohbetlerde ara…">
   <div id="sohbetListesi"></div>
 
   <div class="bolum">
@@ -141,7 +187,7 @@
   <div class="bolum">
     <h3>Sistem</h3>
     <div id="sistemDurum"><span class="nokta"></span>Kontrol ediliyor…</div>
-    <div class="satir"><button data-klasor="calisma" title="Ajanın dosya yazdığı klasörü aç">Çalışma klasörü</button></div>
+    <div class="satir"><button id="ayarDugme" title="Ayarlar, modeller, hafıza, kişiler, telefon">⚙ Ayarlar</button><button data-klasor="calisma" title="Ajanın dosya yazdığı klasörü aç">Çalışma klasörü</button></div>
   </div>
 </aside>
 
@@ -156,23 +202,118 @@
     <label class="anahtar" id="belgeAnahtar"><input type="checkbox" id="belgeKullan"> Belgelerimi kullan</label>
     <label class="anahtar" title="Cevapları sesli oku"><input type="checkbox" id="sesliCevap"> Sesli cevap</label>
     <span id="modelBilgi"></span>
+    <div class="disari">
+      <button class="simge" id="disariDugme" title="Sohbeti dışa aktar">⤓</button>
+      <div class="disari-menu" id="disariMenu" hidden>
+        <button data-disari="docx">📄 Word (.docx)</button>
+        <button data-disari="pdf">🖨 PDF / Yazdır</button>
+        <button data-disari="md">📝 Markdown (.md)</button>
+      </div>
+    </div>
   </header>
 
   <div id="mesajlar"></div>
 
   <footer>
+    <div id="kameraPanel" hidden>
+      <video id="kameraVideo" autoplay playsinline muted></video>
+      <div class="kamera-yan">
+        <div id="kameraSelam">Kamera açılıyor…</div>
+        <div class="satir">
+          <button id="kameraEkle" title="Şu anki görüntüyü mesaja ekle">📸 Fotoğraf ekle</button>
+          <button id="kameraNe" title="Görüntüyü gönder ve ne gördüğünü sor">👀 Ne yapıyorum?</button>
+          <button id="kameraKapat" title="Kamerayı kapat">✕ Kapat</button>
+        </div>
+        <label class="anahtar"><input type="checkbox" id="kameraHerMesaj"> Her mesajda görüntü ekle</label>
+      </div>
+    </div>
     <div id="ekler"></div>
     <div class="yazma">
       <button class="simge" id="resimEkle" title="Resim ekle (veya Ctrl+V ile yapıştır)">📎</button>
       <textarea id="girdi" rows="1" placeholder="Bir şey sor… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
+      <button class="simge" id="kameraDugme" title="Kamera: seni görsün ve tanısın">📷</button>
       <button class="simge" id="mikrofon" title="Sesle yaz">🎤</button>
       <button class="ana" id="gonder">Gönder</button>
       <button id="durdur" hidden>Durdur</button>
     </div>
     <input type="file" id="resimSec" multiple hidden accept="image/*">
+    <input type="file" id="kameraSec" hidden accept="image/*" capture="user">
     <div class="ipucu">Tamamen bu bilgisayarda çalışır, internete hiçbir veri gönderilmez.</div>
   </footer>
 </main>
+<dialog id="ayarlar">
+  <div class="ayar-ust"><h2>⚙ Ayarlar</h2><button class="simge" id="ayarKapat" title="Kapat">✕</button></div>
+  <div class="sekmeler">
+    <button data-sekme="genel" class="secili">Genel</button>
+    <button data-sekme="modeller">Modeller</button>
+    <button data-sekme="hafiza">Hafıza</button>
+    <button data-sekme="kisiler">Kişiler</button>
+    <button data-sekme="telefon">Telefon</button>
+  </div>
+
+  <section class="sekme" data-sekme="genel">
+    <div class="alan"><label for="a_genel_model">Sohbet modeli</label><select id="a_genel_model" data-ayar="genel_model"></select></div>
+    <div class="alan"><label for="a_kod_model">Kod modeli</label><select id="a_kod_model" data-ayar="kod_model"></select></div>
+    <div class="alan"><label for="a_gorsel_model">Resim/kamera modeli</label><select id="a_gorsel_model" data-ayar="gorsel_model"></select></div>
+    <div class="alan"><label for="a_embed_model">Belge arama modeli</label><select id="a_embed_model" data-ayar="embed_model"></select></div>
+    <div class="alan"><label for="a_baglam">Bağlam uzunluğu</label>
+      <select id="a_baglam" data-ayar="baglam_uzunlugu" data-tur="sayi">
+        <option value="4096">4096 (en hızlı, az bellek)</option><option value="8192">8192 (önerilen)</option>
+        <option value="12288">12288</option><option value="16384">16384 (uzun belgeler, daha yavaş)</option>
+      </select></div>
+    <div class="alan"><label for="a_ses">Ses tanıma doğruluğu</label>
+      <select id="a_ses" data-ayar="ses_modeli">
+        <option value="tiny">Çok hızlı (tiny)</option><option value="base">Hızlı (base)</option>
+        <option value="small">Dengeli (small, önerilen)</option><option value="medium">En doğru (medium, yavaş)</option>
+      </select></div>
+    <div class="acik-kapa">
+      <label><input type="checkbox" data-ayar="hafiza"> <span>Hafıza<small>Senin hakkında öğrendiklerini her sohbette hatırlar.</small></span></label>
+      <label><input type="checkbox" data-ayar="otomatik_hafiza"> <span>Sohbetlerden otomatik öğren<small>Her cevaptan sonra kalıcı bilgileri (adın, işin, tercihlerin) kendisi kaydeder.</small></span></label>
+      <label><input type="checkbox" data-ayar="yuz_tanima"> <span>Kamerada yüz tanıma<small>Kişiler sekmesinde öğrettiğin kişileri tanır.</small></span></label>
+      <label><input type="checkbox" data-ayar="ocr"> <span>Taranmış belgelerden yazı oku (OCR)</span></label>
+      <label><input type="checkbox" data-ayar="otomatik_guncelleme"> <span>Otomatik güncelleme<small>İnternet varsa günde bir kez yeni sürümü kontrol eder.</small></span></label>
+    </div>
+    <div class="satir-btn"><button class="ana" id="ayarKaydet">Kaydet</button><span class="not" id="ayarDurum"></span></div>
+  </section>
+
+  <section class="sekme" data-sekme="modeller" hidden>
+    <div class="not">Bilgisayarındaki yapay zeka modelleri. Yeni model indirmek için internet gerekir; indirdikten sonra internetsiz çalışır.</div>
+    <div id="modelListesi">Yükleniyor…</div>
+    <h3 style="font-size:15px;margin:18px 0 6px">Model indir</h3>
+    <div class="satir-btn"><input class="genis" id="modelAdi" placeholder="ör. qwen3:8b" style="flex:1;min-width:160px"><button class="ana" id="modelIndir">İndir</button></div>
+    <div class="not">6 GB ekran kartı için öneriler:</div>
+    <div class="satir-btn" id="modelOnerileri"></div>
+    <div id="indirmeDurum" hidden><div class="ilerleme"><div id="indirmeCubuk"></div></div><div class="not" id="indirmeMetin"></div></div>
+  </section>
+
+  <section class="sekme" data-sekme="hafiza" hidden>
+    <div class="not">Offline Agent'ın senin hakkında hatırladıkları. Her sohbette bunları bilir. Yanlış olanı düzelt ya da sil.</div>
+    <div class="satir-btn"><input class="genis" id="hafizaYeni" placeholder="ör. Laboratuvarımın adı Primer Lab." style="flex:1;min-width:180px"><button class="ana" id="hafizaEkle">Ekle</button></div>
+    <div id="hafizaListesi"></div>
+  </section>
+
+  <section class="sekme" data-sekme="kisiler" hidden>
+    <div class="not">Kamerada tanınacak kişiler. Fotoğraf saklanmaz; sadece yüzün sayısal özeti bu bilgisayarda tutulur. Başkasını eklemeden önce iznini al.</div>
+    <div id="yuzModelUyari" class="uyari" hidden>Yüz tanıma modelleri kurulu değil. İnternet varken GUNCELLE.bat çalıştır.</div>
+    <div id="kisiListesi"></div>
+    <h3 style="font-size:15px;margin:18px 0 6px">Yeni kişi öğret</h3>
+    <div class="satir-btn"><input class="genis" id="kisiAdi" placeholder="İsim (ör. Taylan)" style="flex:1;min-width:160px"><button class="ana" id="kisiOgret">📷 Kameradan öğret</button></div>
+    <div class="not" id="kisiDurum">Kameraya önden, aydınlık bir yerde bak. 3 saniye boyunca birkaç kare alınır; başını hafifçe sağa sola çevirmen tanımayı güçlendirir.</div>
+  </section>
+
+  <section class="sekme" data-sekme="telefon" hidden>
+    <div class="not">Aynı Wi-Fi ağındaki telefon veya tabletten Offline Agent'ı kullanabilirsin. Bilgisayar açık ve Offline Agent çalışıyor olmalı. Telefondan ajan modu ve ayarlar kapalıdır.</div>
+    <ol class="not" style="padding-left:18px">
+      <li><b>D:\offlineagent\TELEFON_AC.bat</b> dosyasını bir kez çalıştır (güvenlik duvarı izni).</li>
+      <li>Aşağıdan bir şifre belirle ve erişimi aç.</li>
+      <li>Telefonda aşağıdaki adresi aç ya da QR kodu okut, şifreyle giriş yap.</li>
+    </ol>
+    <div class="alan"><label for="telSifre">Şifre</label><div class="satir-btn" style="margin:0"><input type="password" id="telSifre" placeholder="En az 6 karakter" style="flex:1"><button id="telSifreKaydet">Şifreyi kaydet</button></div></div>
+    <div class="acik-kapa"><label><input type="checkbox" id="telAcik"> <span>Telefondan erişim açık</span></label></div>
+    <div id="telBilgi" class="not"></div>
+    <div id="telQr"></div>
+  </section>
+</dialog>
 <div id="surukle">Dosyaları belgelere eklemek için bırakın</div>
 
 <script>
@@ -258,7 +399,9 @@ function kaydet() {
 function listeyiCiz() {
   const kutu = $("#sohbetListesi");
   kutu.innerHTML = "";
+  const ara = ($("#sohbetAra")?.value || "").trim().toLocaleLowerCase("tr");
   for (const s of sohbetler) {
+    if (ara && !((s.baslik || "") + " " + s.mesajlar.map((m) => m.content || "").join(" ")).toLocaleLowerCase("tr").includes(ara)) continue;
     const oge = document.createElement("div");
     oge.className = "sohbet-oge" + (s.id === aktifId ? " aktif" : "");
     oge.innerHTML = `<span></span><button title="Sil">✕</button>`;
@@ -433,6 +576,10 @@ async function gonder() {
   if (!aktif()) yeniSohbet();
   const s = aktif();
   if (s.bekleyen) { s.bekleyen = null; s.mesajlar.push({ role: "tool", tool_name: "iptal", content: "Kullanıcı işlemi onaylamadan yeni mesaj yazdı." }); }
+  if (kameraAkisi && $("#kameraHerMesaj").checked && ayar.mod !== "ajan") {
+    const k = kare();
+    if (k) ekResimler.push({ b64: k });
+  }
   const kullanici = { role: "user", content: metin };
   if (ekResimler.length) kullanici.images = ekResimler.map((r) => r.b64);
   s.mesajlar.push(kullanici);
@@ -618,6 +765,9 @@ async function durumuYenile() {
     if (d.ollama && d.eksik_modeller.length)
       html += `<div class="uyari">Eksik model: ${d.eksik_modeller.map(kacis).join(", ")}<br>GUNCELLE.bat ile indirin.</div>`;
     if (!d.ses_modeli) html += `<div class="uyari">Ses modeli yok (mikrofon çalışmaz). GUNCELLE.bat ile indirin.</div>`;
+    if (!d.yuz_modeli) html += `<div class="uyari">Yüz tanıma modeli yok. GUNCELLE.bat ile indirin.</div>`;
+    document.body.classList.toggle("uzak", !!d.uzak);
+    if (d.uzak && ayar.mod === "ajan") { ayar.mod = "genel"; moduUygula(); }
     $("#sistemDurum").innerHTML = html;
     modelBilgisi();
 
@@ -727,6 +877,308 @@ if (!GOMULU) {
   });
 }
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
+
+// ---------- Kamera ----------
+let kameraAkisi = null;
+function kare(enFazla = 1024) {
+  const v = $("#kameraVideo");
+  if (!kameraAkisi || !v.videoWidth) return null;
+  const olcek = Math.min(1, enFazla / Math.max(v.videoWidth, v.videoHeight));
+  const c = document.createElement("canvas");
+  c.width = Math.round(v.videoWidth * olcek); c.height = Math.round(v.videoHeight * olcek);
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85).split(",")[1];
+}
+async function kameraAc() {
+  if (kameraAkisi) return true;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    // Telefonda (şifreli bağlantı olmadan) canlı kamera açılamaz; telefonun kamerasıyla fotoğraf çekilir
+    $("#kameraSec").click();
+    return false;
+  }
+  try { kameraAkisi = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: false }); }
+  catch { alert("Kameraya erişilemedi. Tarayıcıda kamera iznini verin ve başka bir programın kamerayı kullanmadığından emin olun."); return false; }
+  $("#kameraVideo").srcObject = kameraAkisi;
+  $("#kameraPanel").hidden = false;
+  $("#kameraDugme").classList.add("aktif");
+  $("#kameraSelam").textContent = "Kamera açık";
+  setTimeout(kameraSelamla, 1500);
+  return true;
+}
+function kameraKapat() {
+  kameraAkisi?.getTracks().forEach((t) => t.stop());
+  kameraAkisi = null;
+  $("#kameraPanel").hidden = true;
+  $("#kameraDugme").classList.remove("aktif");
+}
+async function kameraSelamla() {
+  const k = kare(800);
+  if (!k || !durumBilgi?.yuz_modeli) return;
+  try {
+    const r = await (await fetch("/api/yuz/tani", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resim: k }) })).json();
+    if (r.kapali || !r.yuzler) return;
+    const adlar = r.yuzler.map((y) => y.ad).filter(Boolean);
+    if (adlar.length) $("#kameraSelam").textContent = "👋 Merhaba " + adlar.join(", ") + "!";
+    else if (r.yuzler.length) $("#kameraSelam").textContent = "Seni henüz tanımıyorum. Ayarlar › Kişiler'den öğretebilirsin.";
+    else $("#kameraSelam").textContent = "Kamera açık (yüz görünmüyor)";
+  } catch { /* tanıma isteğe bağlı */ }
+}
+$("#kameraDugme").onclick = () => (kameraAkisi ? kameraKapat() : kameraAc());
+$("#kameraKapat").onclick = kameraKapat;
+$("#kameraEkle").onclick = () => { const k = kare(); if (k) { ekResimler.push({ b64: k }); ekleriCiz(); } };
+$("#kameraNe").onclick = () => {
+  const k = kare();
+  if (!k) return;
+  if (ayar.mod === "ajan") { ayar.mod = "genel"; yaz(AYAR, ayar); moduUygula(); }
+  ekResimler.push({ b64: k });
+  if (!$("#girdi").value.trim()) $("#girdi").value = "Şu an kamerada ne görüyorsun? Ne yaptığımı kısaca anlat.";
+  gonder();
+};
+$("#kameraSec").onchange = (e) => { resimleriEkle([...e.target.files]); e.target.value = ""; };
+
+// ---------- Dışa aktarma ----------
+function indir(veri, ad, tur) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(veri instanceof Blob ? veri : new Blob([veri], { type: tur }));
+  a.download = ad;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$("#disariDugme").onclick = (e) => { e.stopPropagation(); $("#disariMenu").hidden = !$("#disariMenu").hidden; };
+addEventListener("click", () => { $("#disariMenu").hidden = true; });
+document.querySelectorAll("[data-disari]").forEach((b) => {
+  b.onclick = async () => {
+    const s = aktif();
+    if (!s?.mesajlar.length) return alert("Dışa aktarılacak sohbet yok.");
+    const ad = (s.baslik || "sohbet").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60);
+    const mesajlar = s.mesajlar.filter((m) => (m.role === "user" || m.role === "assistant") && m.content);
+    if (b.dataset.disari === "pdf") return print();
+    if (b.dataset.disari === "md") {
+      return indir(`# ${s.baslik}\n\n` + mesajlar.map((m) => `**${m.role === "user" ? "Siz" : "Offline Agent"}:**\n\n${m.content}`).join("\n\n---\n\n"), ad + ".md", "text/markdown");
+    }
+    const r = await fetch("/api/disari/docx", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ baslik: s.baslik || "Sohbet", mesajlar }) });
+    if (!r.ok) return alert("Word dosyası oluşturulamadı.");
+    indir(await r.blob(), ad + ".docx");
+  };
+});
+$("#sohbetAra").addEventListener("input", listeyiCiz);
+
+// ---------- Ayarlar ----------
+const ONERILEN_MODELLER = [
+  ["qwen2.5:7b", "Genel sohbet (önerilen)"], ["qwen3:8b", "Daha yeni, düşünerek cevaplar"],
+  ["qwen2.5-coder:7b", "Kod"], ["gemma3:4b", "Resim ve kamera"], ["llama3.2:3b", "Çok hızlı, basit işler"],
+  ["nomic-embed-text", "Belge arama"],
+];
+async function api(yol, secenek = {}) {
+  const r = await fetch(yol, { headers: { "Content-Type": "application/json" }, ...secenek });
+  const veri = r.headers.get("content-type")?.includes("json") ? await r.json() : await r.text();
+  if (!r.ok) throw new Error(veri?.detail || veri?.hata || "İşlem başarısız");
+  return veri;
+}
+function boyutYaz(b) { return b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.round(b / 1e6) + " MB"; }
+
+async function ayarlariAc(sekme = "genel") {
+  sekmeSec(sekme);
+  $("#ayarlar").showModal();
+}
+function sekmeSec(ad) {
+  document.querySelectorAll(".sekmeler button").forEach((b) => b.classList.toggle("secili", b.dataset.sekme === ad));
+  document.querySelectorAll("section.sekme").forEach((s) => (s.hidden = s.dataset.sekme !== ad));
+  ({ genel: genelYukle, modeller: modelleriYukle, hafiza: hafizaYukle, kisiler: kisileriYukle, telefon: telefonYukle })[ad]();
+}
+document.querySelectorAll(".sekmeler button").forEach((b) => (b.onclick = () => sekmeSec(b.dataset.sekme)));
+$("#ayarDugme").onclick = () => ayarlariAc();
+$("#ayarKapat").onclick = () => $("#ayarlar").close();
+
+async function genelYukle() {
+  try {
+    const [a, modeller] = await Promise.all([api("/api/ayarlar"), api("/api/modeller").catch(() => [])]);
+    for (const el of document.querySelectorAll("#ayarlar [data-ayar]")) {
+      const deger = a[el.dataset.ayar];
+      if (el.type === "checkbox") { el.checked = !!deger; continue; }
+      if (el.tagName === "SELECT" && el.id.startsWith("a_") && el.id.endsWith("_model")) {
+        const adlar = [...new Set([...modeller.map((m) => m.ad.replace(/:latest$/, "")), deger])];
+        el.innerHTML = adlar.map((m) => `<option value="${kacis(m)}">${kacis(m)}</option>`).join("");
+      }
+      el.value = String(deger);
+    }
+  } catch (e) { $("#ayarDurum").textContent = e.message; }
+}
+$("#ayarKaydet").onclick = async () => {
+  const degisiklik = {};
+  for (const el of document.querySelectorAll("#ayarlar section[data-sekme=genel] [data-ayar]")) {
+    degisiklik[el.dataset.ayar] = el.type === "checkbox" ? el.checked : el.dataset.tur === "sayi" ? Number(el.value) : el.value;
+  }
+  try {
+    await api("/api/ayarlar", { method: "POST", body: JSON.stringify(degisiklik) });
+    $("#ayarDurum").textContent = "Kaydedildi ✓";
+    const d = await api("/api/durum");
+    if (!d.ses_modeli && confirm("Seçilen ses modeli bilgisayarda yok. Şimdi indirilsin mi? (İnternet gerekir)")) {
+      await api("/api/ses/indir", { method: "POST" });
+      $("#ayarDurum").textContent = "Kaydedildi ✓ Ses modeli arka planda indiriliyor…";
+    }
+    durumuYenile();
+  } catch (e) { $("#ayarDurum").textContent = e.message; }
+};
+
+async function modelleriYukle() {
+  const kutu = $("#modelListesi");
+  try {
+    const [modeller, a] = await Promise.all([api("/api/modeller"), api("/api/ayarlar")]);
+    const roller = { genel_model: "Sohbet", kod_model: "Kod", gorsel_model: "Resim", embed_model: "Belge" };
+    kutu.innerHTML = "";
+    let toplam = 0;
+    for (const m of modeller) {
+      toplam += m.boyut;
+      const kisa = m.ad.replace(/:latest$/, "");
+      const rozetler = Object.entries(roller).filter(([k]) => a[k] === kisa || a[k] === m.ad).map(([, v]) => `<span class="rozet">${v}</span>`).join("");
+      const oge = document.createElement("div");
+      oge.className = "liste-oge";
+      oge.innerHTML = `<span class="ad"><b>${kacis(m.ad)}</b>${rozetler}<br><small>${boyutYaz(m.boyut)} ${m.parametre ? "· " + kacis(m.parametre) : ""} · ${kacis(m.tarih)}</small></span><button>Sil</button>`;
+      oge.querySelector("button").onclick = async () => {
+        if (rozetler && !confirm(m.ad + " şu an kullanılıyor. Yine de silinsin mi?")) return;
+        if (!rozetler && !confirm(m.ad + " silinsin mi? (" + boyutYaz(m.boyut) + " yer açılır)")) return;
+        try { await api("/api/modeller/" + encodeURIComponent(m.ad), { method: "DELETE" }); modelleriYukle(); } catch (e) { alert(e.message); }
+      };
+      kutu.appendChild(oge);
+    }
+    kutu.insertAdjacentHTML("beforeend", `<div class="not">Toplam ${modeller.length} model, ${boyutYaz(toplam)}</div>`);
+  } catch (e) { kutu.textContent = e.message; }
+  $("#modelOnerileri").innerHTML = "";
+  for (const [ad, aciklama] of ONERILEN_MODELLER) {
+    const b = document.createElement("button");
+    b.textContent = ad; b.title = aciklama;
+    b.onclick = () => { $("#modelAdi").value = ad; };
+    $("#modelOnerileri").appendChild(b);
+  }
+}
+$("#modelIndir").onclick = async () => {
+  const ad = $("#modelAdi").value.trim();
+  if (!ad) return;
+  const dugme = $("#modelIndir");
+  dugme.disabled = true;
+  $("#indirmeDurum").hidden = false;
+  $("#indirmeCubuk").style.width = "0";
+  $("#indirmeMetin").textContent = ad + " indiriliyor…";
+  try {
+    const yanit = await fetch("/api/modeller/indir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ad }) });
+    let hata = null;
+    await akisiOku(yanit, (v) => {
+      if (v.error) hata = v.error;
+      if (v.total) {
+        $("#indirmeCubuk").style.width = Math.round(((v.completed || 0) / v.total) * 100) + "%";
+        $("#indirmeMetin").textContent = `${ad}: ${boyutYaz(v.completed || 0)} / ${boyutYaz(v.total)}`;
+      } else if (v.status) $("#indirmeMetin").textContent = `${ad}: ${v.status}`;
+    });
+    $("#indirmeMetin").textContent = hata ? "Hata: " + hata : ad + " hazır ✓";
+    if (!hata) $("#indirmeCubuk").style.width = "100%";
+  } catch (e) { $("#indirmeMetin").textContent = "Hata: " + e.message; }
+  dugme.disabled = false;
+  modelleriYukle();
+};
+
+async function hafizaYukle() {
+  const kutu = $("#hafizaListesi");
+  try {
+    const bilgiler = await api("/api/hafiza");
+    kutu.innerHTML = bilgiler.length ? "" : `<div class="not">Henüz bir şey hatırlamıyor. Sohbet ettikçe öğrenir ya da yukarıdan ekleyebilirsin.</div>`;
+    for (const b of [...bilgiler].reverse()) {
+      const oge = document.createElement("div");
+      oge.className = "liste-oge";
+      oge.innerHTML = `<span class="ad"></span><small>${b.kaynak === "otomatik" ? "otomatik" : b.kaynak}</small><button title="Düzelt">✎</button><button title="Sil">✕</button>`;
+      oge.querySelector(".ad").textContent = b.metin;
+      const [duzelt, sil] = oge.querySelectorAll("button");
+      duzelt.onclick = async () => {
+        const yeni = prompt("Bilgiyi düzelt:", b.metin);
+        if (yeni && yeni.trim() !== b.metin) { await api("/api/hafiza/" + b.id, { method: "PUT", body: JSON.stringify({ metin: yeni }) }); hafizaYukle(); }
+      };
+      sil.onclick = async () => { await api("/api/hafiza/" + b.id, { method: "DELETE" }); hafizaYukle(); };
+      kutu.appendChild(oge);
+    }
+  } catch (e) { kutu.textContent = e.message; }
+}
+$("#hafizaEkle").onclick = async () => {
+  const metin = $("#hafizaYeni").value.trim();
+  if (!metin) return;
+  try { await api("/api/hafiza", { method: "POST", body: JSON.stringify({ metin }) }); $("#hafizaYeni").value = ""; hafizaYukle(); }
+  catch (e) { alert(e.message); }
+};
+
+async function kisileriYukle() {
+  const kutu = $("#kisiListesi");
+  try {
+    const v = await api("/api/yuz/kisiler");
+    $("#yuzModelUyari").hidden = v.modeller;
+    kutu.innerHTML = v.kisiler.length ? "" : `<div class="not">Henüz kimse öğretilmedi.</div>`;
+    for (const k of v.kisiler) {
+      const oge = document.createElement("div");
+      oge.className = "liste-oge";
+      oge.innerHTML = `<span class="ad"><b></b><br><small>${k.ornek} örnek · ${kacis(k.tarih || "")}</small></span><button>Sil</button>`;
+      oge.querySelector("b").textContent = k.ad;
+      oge.querySelector("button").onclick = async () => {
+        if (!confirm(k.ad + " silinsin mi?")) return;
+        await api("/api/yuz/kisiler/" + encodeURIComponent(k.ad), { method: "DELETE" }); kisileriYukle();
+      };
+      kutu.appendChild(oge);
+    }
+  } catch (e) { kutu.textContent = e.message; }
+}
+$("#kisiOgret").onclick = async () => {
+  const ad = $("#kisiAdi").value.trim();
+  if (!ad) return alert("Önce isim yaz.");
+  const durum = $("#kisiDurum");
+  if (!(await kameraAc())) return;
+  await new Promise((r) => setTimeout(r, 1200));
+  const kareler = [];
+  for (let i = 0; i < 6; i++) {
+    durum.textContent = `Kare alınıyor ${i + 1}/6… kameraya bak`;
+    const k = kare(800);
+    if (k) kareler.push(k);
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  try {
+    const r = await api("/api/yuz/kisiler", { method: "POST", body: JSON.stringify({ ad, resimler: kareler }) });
+    durum.textContent = `✓ ${r.ad} öğrenildi (${r.eklenen} kare). Tekrar öğretmek tanımayı güçlendirir.`;
+    $("#kisiAdi").value = "";
+    kisileriYukle();
+    kameraSelamla();
+  } catch (e) { durum.textContent = "⚠ " + e.message; }
+};
+
+async function telefonYukle() {
+  try {
+    const v = await api("/api/erisim");
+    $("#telAcik").checked = v.acik;
+    $("#telAcik").disabled = !v.sifre_var;
+    let bilgi = v.sifre_var ? "Şifre belirlenmiş ✓" : "Önce şifre belirle.";
+    if (v.acik && !v.dinleniyor) bilgi += " · Değişikliğin geçerli olması için yeniden başlatılıyor…";
+    if (v.acik && v.dinleniyor && v.adresler.length) bilgi += `<br>Telefonda aç: <b>${v.adresler.map(kacis).join("</b> veya <b>")}</b>`;
+    if (v.acik && !v.adresler.length) bilgi += "<br>Bu bilgisayarın ağ adresi bulunamadı. Wi-Fi'ye bağlı mı?";
+    $("#telBilgi").innerHTML = bilgi + "<br>Not: Telefonda mikrofon ve canlı kamera çalışmaz (tarayıcı güvenliği); 📷 ile telefonun kamerasından fotoğraf gönderebilirsin.";
+    $("#telQr").innerHTML = v.acik && v.dinleniyor && v.qr ? `<div class="qr"><img alt="Telefon adresi QR kodu" src="${v.qr}" width="180" height="180"></div>` : "";
+  } catch (e) { $("#telBilgi").textContent = e.message; }
+}
+$("#telSifreKaydet").onclick = async () => {
+  try {
+    await api("/api/erisim/sifre", { method: "POST", body: JSON.stringify({ sifre: $("#telSifre").value }) });
+    $("#telSifre").value = "";
+    telefonYukle();
+  } catch (e) { alert(e.message); }
+};
+$("#telAcik").onchange = async (e) => {
+  try {
+    const r = await api("/api/ayarlar", { method: "POST", body: JSON.stringify({ ag_erisimi: e.target.checked }) });
+    if (r.yeniden_baslat) {
+      $("#telBilgi").textContent = "Yeniden başlatılıyor…";
+      await api("/api/yeniden-baslat", { method: "POST" }).catch(() => {});
+      for (let i = 0; i < 30; i++) {
+        await new Promise((ok) => setTimeout(ok, 1000));
+        if (i > 2 && (await fetch("/api/saglik").then((x) => x.ok).catch(() => false))) break;
+      }
+    }
+    telefonYukle();
+  } catch (err) { e.target.checked = !e.target.checked; alert(err.message); }
+};
 
 moduUygula();
 listeyiCiz();

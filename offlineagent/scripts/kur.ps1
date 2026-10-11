@@ -79,9 +79,11 @@ try {
     }
 
     # 6) Ses modeli
-    Baslik '6/7 Ses modeli indiriliyor (~500 MB)'
+    Baslik '6/7 Ses ve yuz tanima modelleri indiriliyor (~550 MB)'
     try { Install-SesModeli $ayar }
     catch { Yaz "UYARI: $($_.Exception.Message) Mikrofon ozelligi calismaz; sonra GUNCELLE.bat ile tekrar deneyin." Yellow }
+    try { Install-YuzModelleri }
+    catch { Yaz "UYARI: $($_.Exception.Message) Kamerada tanima calismaz; sonra GUNCELLE.bat ile tekrar deneyin." Yellow }
 
     # 7) Kisayollar
     Baslik '7/7 Kisayollar olusturuluyor'
