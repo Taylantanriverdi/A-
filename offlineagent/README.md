@@ -71,6 +71,8 @@ Ayrı bir mod seçmen gerekmez: **Genel** modda ne istediğini yazman (ya da can
 Örnekler:
 - "Masaüstüne Siparişler 2026 isimli klasör oluştur"
 - "Hesap makinesini aç" / "Excel'i aç" / "İndirilenler klasörünü aç"
+- "PrimerLab'ı aç", "Blender'ı başlat": programı masaüstünde, Başlat menüsünde ve D/E/F sürücülerinde kendisi bulup açar
+- "Ekim faturasını bul": dosyayı adından arar
 - "İndirilenler'deki PDF'leri Belgeler/Faturalar klasörüne kopyala"
 - "Masaüstündeki eski.txt dosyasını sil"
 - "Disk doluluk durumunu göster"

@@ -8,6 +8,7 @@ Onay politikası (ayarlardaki "onay_modu"):
 Sohbet durumu istemcide tutulur: her istek tüm geçmişi gönderir, sunucu güncel geçmişi geri yollar.
 """
 import datetime
+import json
 import os
 import re
 import platform
@@ -210,20 +211,102 @@ def cop_kutusuna_at(yol: str) -> str:
     return f"Geri Dönüşüm Kutusu'na taşındı (geri alınabilir): {p}"
 
 
+_TR = str.maketrans("çğıöşüâî", "cgiosuai")
+_EKLER = ("nın", "nin", "nun", "nün", "yı", "yi", "yu", "yü", "ya", "ye", "na", "ne", "nı", "ni", "nu", "nü",
+          "ı", "i", "u", "ü", "a", "e")
+_ATLANAN = {"Windows", "Program Files", "Program Files (x86)", "node_modules", "AppData"}
+
+
+def _sade(metin: str) -> str:
+    return "".join(c for c in metin.casefold().translate(_TR) if c.isalnum())
+
+
+def _arama_kokleri() -> list[Path]:
+    kokler = [_bilinen_klasor("Masaüstü"), _bilinen_klasor("Belgeler"), _bilinen_klasor("İndirilenler")]
+    if WINDOWS:
+        kokler += [Path(os.environ.get("PUBLIC", "C:/Users/Public")) / "Desktop",
+                   Path(os.environ.get("APPDATA", "")) / "Microsoft/Windows/Start Menu/Programs",
+                   Path(os.environ.get("PROGRAMDATA", "C:/ProgramData")) / "Microsoft/Windows/Start Menu/Programs"]
+        kokler += [Path(f"{h}:/") for h in "DEF" if Path(f"{h}:/").exists()]
+    return [k for k in kokler if k.exists()]
+
+
+def _ara(sorgu: str, en_fazla: int = 30, derinlik: int = 4) -> list[Path]:
+    """Adında sorgu geçen dosya/klasörleri bilinen yerlerde arar (Türkçe karakter ve boşluk duyarsız)."""
+    import time
+
+    hedef = _sade(sorgu)
+    if len(hedef) < 2:
+        return []
+    bulunan, bitis = [], time.monotonic() + 6
+    for kok in _arama_kokleri():
+        yigin = [(kok, 0)]
+        while yigin and len(bulunan) < en_fazla and time.monotonic() < bitis:
+            klasor, d = yigin.pop()
+            try:
+                ogeler = list(os.scandir(klasor))
+            except OSError:
+                continue
+            for oge in ogeler:
+                if oge.name.startswith(("$", ".")) or oge.name in _ATLANAN:
+                    continue
+                if hedef in _sade(Path(oge.name).stem) and Path(oge.path) not in bulunan:
+                    bulunan.append(Path(oge.path))
+                if oge.is_dir(follow_symlinks=False) and d < derinlik:
+                    yigin.append((Path(oge.path), d + 1))
+    return bulunan
+
+
+def dosya_ara(ad: str) -> str:
+    sonuc = _ara(ad)
+    if not sonuc:
+        return f"'{ad}' adında bir şey bulunamadı (Masaüstü, Belgeler, İndirilenler, Başlat menüsü ve D/E/F sürücülerine bakıldı)."
+    return "Bulunanlar:\n" + "\n".join(f"{'[klasör] ' if p.is_dir() else ''}{p}" for p in sonuc)
+
+
+def _en_iyi_eslesme(ad: str) -> Path | None:
+    """Program adı söylenince masaüstü/Başlat menüsünde kısayolunu, yoksa dosya ya da klasörünü bulur."""
+    temiz = ad.strip().rstrip("'’ ")
+    adaylar = [temiz]
+    for ek in _EKLER:  # "PrimerLab'ı", "primerlab a" gibi Türkçe ekleri soy
+        if temiz.casefold().endswith(ek) and len(temiz) - len(ek) >= 3:
+            adaylar.append(temiz[: -len(ek)].rstrip("'’ "))
+    oncelik = {".lnk": 0, ".url": 0, ".exe": 1, ".bat": 2, ".cmd": 2}
+    for aday in adaylar:
+        sonuc = _ara(aday, en_fazla=40, derinlik=3)
+        if sonuc:
+            return sorted(sonuc, key=lambda p: (oncelik.get(p.suffix.lower(), 3 if p.is_dir() else 4), len(p.name)))[0]
+    return None
+
+
 def _ac_hedefi(hedef: str) -> str:
     ad = hedef.strip().strip('"')
-    uygulama = UYGULAMALAR.get(ad.casefold())
+    uygulama = UYGULAMALAR.get(ad.casefold()) or UYGULAMALAR.get(_sade(ad))
     if uygulama:
         return uygulama
     p = _yol(ad)
-    return str(p) if p.exists() else ad
+    if p.exists():
+        return str(p)
+    # Yanlış tahmin edilmiş yolda (ör. C:\Users\X\Desktop\primerlab) son parçanın adıyla aranır
+    eslesme = _en_iyi_eslesme(Path(ad.replace("\\", "/")).name or ad)
+    return str(eslesme) if eslesme else ad
+
+
+def _kisayol_alani(yol: Path) -> bool:
+    """Masaüstü ve Başlat menüsündeki kısayollar çift tıklamak gibidir; onay istemeden açılabilir."""
+    kokler = [k for k in _arama_kokleri() if "Start Menu" in str(k) or k.name in ("Desktop", "Masaüstü")]
+    kokler.append(_bilinen_klasor("Masaüstü"))
+    return yol.suffix.lower() in (".lnk", ".url") and any(k in yol.parents for k in kokler)
 
 
 def program_ac(hedef: str) -> str:
     gercek = _ac_hedefi(hedef)
+    bulundu = gercek in UYGULAMALAR.values() or "://" in gercek or Path(gercek).exists()
+    if not bulundu:
+        return f"'{hedef}' bulunamadı. dosya_ara ile adını arayıp tam yoluyla tekrar dene."
     if not WINDOWS:
         return f"(Bu bilgisayar Windows değil) Açılacaktı: {gercek}"
-    # "start": klasör, belge, kayıtlı uygulama adı (excel, chrome) ve ms-settings: gibi adresleri açar
+    # "start": klasör, belge, kısayol, kayıtlı uygulama adı (excel, chrome) ve adresleri açar
     subprocess.Popen(["cmd", "/c", "start", "", gercek], creationflags=subprocess.CREATE_NO_WINDOW)
     return f"Açıldı: {gercek}"
 
@@ -277,15 +360,19 @@ ARACLAR = {
     "dosya_oku": (dosya_oku, "okuma", _tanim(
         "dosya_oku", "Bir dosyanın içeriğini okur (txt, md, csv, json, py, html, pdf, docx, xlsx...).",
         {"yol": _metin(YOL)}, ["yol"])),
+    "dosya_ara": (dosya_ara, "okuma", _tanim(
+        "dosya_ara", "Adını bildiğin bir dosya, klasör ya da programı bilgisayarda arar (Masaüstü, Belgeler, "
+        "İndirilenler, Başlat menüsü, D/E/F sürücüleri). Yerini bilmediğin her şey için önce bunu kullan.",
+        {"ad": _metin("Aranacak ad ya da adın bir parçası, ör. 'PrimerLab'")}, ["ad"])),
     "klasor_olustur": (klasor_olustur, "zararsiz", _tanim(
         "klasor_olustur", "Yeni klasör oluşturur (ara klasörler de oluşturulur).", {"yol": _metin(YOL)}, ["yol"])),
     "dosya_kopyala": (dosya_kopyala, "zararsiz", _tanim(
         "dosya_kopyala", "Dosya ya da klasörü kopyalar. Hedef bir klasörse içine kopyalar. Üzerine yazmaz.",
         {"kaynak": _metin(YOL), "hedef": _metin(YOL)}, ["kaynak", "hedef"])),
     "program_ac": (program_ac, "zararsiz", _tanim(
-        "program_ac", "Bir klasörü, belgeyi ya da uygulamayı açar. Uygulama adları: not defteri, hesap makinesi, "
-        "paint, dosya gezgini, görev yöneticisi, ayarlar, word, excel, powerpoint, chrome, edge, kamera.",
-        {"hedef": _metin("Uygulama adı ya da açılacak klasör/dosya yolu")}, ["hedef"])),
+        "program_ac", "Bir uygulamayı, klasörü, belgeyi ya da adresi açar. Sadece adını vermen yeterli "
+        "(ör. 'PrimerLab', 'excel', 'hesap makinesi'); yerini kendisi bulur.",
+        {"hedef": _metin("Uygulama/program adı ya da açılacak klasör/dosya yolu")}, ["hedef"])),
     "dosya_yaz": (dosya_yaz, "riskli", _tanim(
         "dosya_yaz", "Metin dosyası oluşturur ya da üzerine yazar (txt, md, csv, html, py...).",
         {"yol": _metin(YOL), "icerik": _metin("Dosyanın tam içeriği")}, ["yol", "icerik"])),
@@ -316,7 +403,10 @@ def onay_gerekli(ad: str, argumanlar: dict, onay_modu: str = "riskli") -> bool:
     if ad == "program_ac":
         # Bilinen uygulama, klasör ve belge açmak serbest; program/betik dosyası başlatmak onay ister
         hedef = str(argumanlar.get("hedef", ""))
-        return hedef.strip().casefold() not in UYGULAMALAR and Path(_ac_hedefi(hedef)).suffix.lower() in CALISTIRILABILIR
+        if hedef.strip().casefold() in UYGULAMALAR:
+            return False
+        gercek = Path(_ac_hedefi(hedef))
+        return gercek.suffix.lower() in CALISTIRILABILIR and not _kisayol_alani(gercek)
     return False
 
 
@@ -365,6 +455,12 @@ HIZLI_UYGULAMA = re.compile(r"^\s*(?P<ad>" + "|".join(sorted(map(re.escape, UYGU
                             + r")\w*\s+(?:aç|ac|açar mısın|açsana|başlat|baslat)\b", re.I)
 
 
+# "PrimerLab'ı aç", "primerlab a ulaş", "Blender'ı başlat" gibi kısa açma istekleri
+HIZLI_AC = re.compile(r"^\s*(?P<ad>[^\n]{2,60}?)\s+(?:aç|ac|açar\s*m[ıi]s[ıi]n|açsana|başlat|baslat|ulaş\w*|ulas\w*)\s*[.!?]*\s*$", re.I)
+# Bunlar "aç" ile bitse de program açma değildir
+EYLEM_DISI = re.compile(r"(klas[öo]r|dosya|oluştur|olustur|yeni|bir |konu|açıkla|anlat|kapı|pencere|sayfa)", re.I)
+
+
 def _yer_adi(yer: str) -> str:
     yer = yer.casefold().replace(" ", "")
     for anahtar, ad in (("masa", "Masaüstü"), ("belge", "Belgeler"), ("indir", "İndirilenler"), ("resim", "Resimler")):
@@ -383,7 +479,60 @@ def hizli_komut(metin: str) -> dict | None:
     m = HIZLI_UYGULAMA.search(metin)
     if m:
         return {"function": {"name": "program_ac", "arguments": {"hedef": m.group("ad").casefold()}}}
+    m = HIZLI_AC.search(metin)
+    if m and not EYLEM_DISI.search(m.group("ad")):
+        return {"function": {"name": "program_ac", "arguments": {"hedef": m.group("ad").strip(" '’\"")}}}
     return None
+
+
+_ARAC_ADI_METNI = re.compile(r'"(?:name|ad|arac|tool)"\s*:\s*"(?P<ad>[a-z_]+)"')
+
+
+def _json_sonu(metin: str, bas: int) -> int:
+    """metin[bas] == "{" ise eşleşen "}" konumunu döndürür (dizgelerin içindeki parantezleri sayar)."""
+    derinlik, dizgide, kacis = 0, False, False
+    for i in range(bas, len(metin)):
+        c = metin[i]
+        if dizgide:
+            if kacis:
+                kacis = False
+            elif c == "\\":
+                kacis = True
+            elif c == '"':
+                dizgide = False
+        elif c == '"':
+            dizgide = True
+        elif c == "{":
+            derinlik += 1
+        elif c == "}":
+            derinlik -= 1
+            if derinlik == 0:
+                return i
+    return -1
+
+
+def metinden_cagrilar(icerik: str) -> list[dict]:
+    """Model aracı çağırmak yerine çağrıyı metin olarak yazdıysa ({"name": "program_ac", "arguments": {...}}) yakalar."""
+    cagrilar = []
+    for m in _ARAC_ADI_METNI.finditer(icerik):
+        if m.group("ad") not in ARACLAR:
+            continue
+        bas = icerik.rfind("{", 0, m.start())
+        son = _json_sonu(icerik, bas) if bas >= 0 else -1
+        try:
+            nesne = json.loads(icerik[bas:son + 1]) if son > 0 else None
+        except ValueError:
+            nesne = None
+        if not isinstance(nesne, dict):
+            continue
+        argumanlar = nesne.get("arguments", nesne.get("parameters", nesne.get("argumanlar", {})))
+        if isinstance(argumanlar, str):
+            try:
+                argumanlar = json.loads(argumanlar)
+            except ValueError:
+                argumanlar = {}
+        cagrilar.append({"function": {"name": m.group("ad"), "arguments": argumanlar if isinstance(argumanlar, dict) else {}}})
+    return cagrilar
 
 
 def _bekleyen_cagrilar(mesajlar: list[dict]) -> list[dict]:
@@ -449,6 +598,9 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
             else:
                 cagrilar.extend(olay["tool_calls"])
         itme = []
+        if not cagrilar and (yazilan := metinden_cagrilar(icerik)):
+            yield {"geri_al": True}
+            cagrilar, icerik = yazilan, ""
         # İş istendiği halde araç çağırmadan talimat yazdıysa: cevabı geri al, modeli işi yapmaya yönlendir
         son_kullanici = max((i for i, m in enumerate(mesajlar) if m.get("role") == "user"), default=-1)
         kullanici_istegi = mesajlar[son_kullanici]["content"] if son_kullanici >= 0 else ""

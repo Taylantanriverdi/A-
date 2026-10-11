@@ -94,6 +94,9 @@ async def yerel_koruma(request: Request, call_next):
         if yol.startswith(UZAK_YASAK) or (yazma and yol.startswith(UZAK_SALT_OKUNUR)):
             return JSONResponse({"hata": "Bu işlem sadece Offline Agent'ın kurulu olduğu bilgisayardan yapılabilir"}, status_code=403)
     yanit = await call_next(request)
+    # Güncellemeden sonra tarayıcı eski arayüzü göstermesin: sayfa her açılışta sunucuya sorulur
+    if request.url.path == "/" or request.url.path.endswith((".html", ".js")):
+        yanit.headers["Cache-Control"] = "no-cache"
     # Tam arayüz (ajan modu dahil) başka sayfaların içine gömülemez. Panellere gömülen
     # ?gomulu=1 sürümünde ajan ve dosya işlemleri kapalıdır.
     gomulebilir = request.url.path in ("/", "/index.html") and request.query_params.get("gomulu") == "1"
