@@ -187,6 +187,29 @@ OTOMATIK YAZDIRMA (hekim is gonderince form kendiliginden yaziciya gider)
 - Program guncellenince acik istasyon kendini yeniler (eski sablonla basmaz).
 - Microsoft Edge (yoksa Google Chrome) gerekir; Windows'ta Edge hazir gelir.
 
+KASA / ARSIV: HEKIM EKSTRESI
+----------------------------
+Kasa / Arsiv tek ekrandir: SOLDA hekimler, SAGDA secilen hekimin ekstresi.
+1. Ustteki "Donem" ile ayi secin (< > oklari, "Bu Ay"). Baska tarihler icin
+   "Ozel tarih araligi" kutusunu isaretleyip baslangic-bitis girin.
+2. Soldan hekime tiklayin. Ekstrede sirasiyla:
+   - "Onceki donemden devir": secilen tarihten onceki kalan BORC toplama
+     EKLENIR, FAZLA ODEME (alacak) DUSULUR. Kutu kaldirilirsa toplama girmez;
+     "degistir" ile tutar ve yonu elle duzeltilebilir.
+   - "Hastalar ve isler": YALNIZ bu donemde tamamlanan isler, hasta hasta
+     (her hastanin altinda o donemdeki isleri ve hasta toplami).
+     Gecmis donemlerin hastalari listede gorunmez.
+   - "Odemeler": bu donemdeki tahsilatlar (toplamdan dusulur).
+   - En altta TOPLAM: "Odenecek" ya da "Fazla odeme (alacak)".
+3. Dugmeler: Yazdir / PDF, WhatsApp (hekimin telefonu kayitliysa dogrudan ona),
+   Kopyala, + Tahsilat, "Cari detayi" (acik donem isleri, odeme gecmisi,
+   donem kapatma - eski ekranlar).
+4. Soldaki "Listedekilerin hepsini yazdir": her hekim ayri sayfa.
+- Is, tamamlandigi (teslim) gune yazilir; devam eden isler girmez.
+- Donem kapatmak zorunlu degildir. Kapanista bakiye elle degistirildiyse
+  (indirim vb.) fark ekstrede "Donem kapanisi duzeltmesi" satiri olur.
+
+
 DOSYA LINKLERI (WeTransfer, Google Drive, Dropbox, iCloud, 3Shape...)
 --------------------------------------------------------------------
 - Hekim, Hekim Portali'nda is gonderirken dosya yuklemek yerine (ya da
