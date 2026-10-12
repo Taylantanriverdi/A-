@@ -31,6 +31,9 @@
   #targetBar { height: 8px; background: #3b2a18; border-radius: 4px; overflow: hidden; margin-top: 4px; }
   #targetFill { height: 100%; background: linear-gradient(90deg, #c98a3c, #f0c94a); width: 100%; transition: width .15s; }
   #msg { position: fixed; top: 26%; left: 50%; transform: translateX(-50%); font-size: 26px; font-weight: bold; color: var(--accent); text-shadow: 0 2px 6px #000; pointer-events: none; text-align: center; transition: opacity .4s; opacity: 0; padding: 0 16px; width: 100%; }
+  #prompt { position: fixed; bottom: 112px; left: 50%; transform: translateX(-50%); background: rgba(20,14,8,.78); color: #ffe9a8; font-weight: bold; font-size: 16px; padding: 8px 16px; border-radius: 20px; pointer-events: none; white-space: nowrap; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity .28s; z-index: 15; }
+  @media (pointer: coarse) { #prompt { bottom: 250px; } }
   #toast { position: fixed; top: 46%; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: bold; color: #ffe9a8; text-shadow: 0 2px 4px #000; pointer-events: none; opacity: 0; }
   #build {
     position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
@@ -67,7 +70,7 @@
     <div id="animals">Hayvanlar: 0/7</div>
   </div>
   <div class="panel" id="help">
-    <span class="keys">↑↓</span> yürü <span class="keys">←→</span> dön <span class="keys">A</span> zıpla <span class="keys">S</span> ağaç / kaya kır<br>
+    <span class="keys">↑↓</span> yürü <span class="keys">←→</span> dön <span class="keys">A</span> zıpla / sandık aç <span class="keys">S</span> ağaç / kaya kır<br>
     <span class="keys">1-7</span> yapı seç <span class="keys">E</span> inşa et (yolda basılı tut) <span class="keys">R</span> döndür <span class="keys">Q</span> vazgeç
   </div>
   <div class="panel" style="text-align:right">
@@ -79,6 +82,8 @@
 <div id="target" class="panel hidden"><span id="targetName"></span><div id="targetBar"><div id="targetFill"></div></div></div>
 <div id="msg"></div>
 <div id="toast"></div>
+<div id="prompt" class="hidden"></div>
+<div id="fade"></div>
 <div id="build"></div>
 
 <div id="touch">
@@ -97,6 +102,7 @@
 <div class="overlay" id="start">
   <h1>Kazım Usta</h1>
   <p>Sık ve rengârenk bir ormandasın. Ağaçları ve kayaları <b>yumruklarınla kır</b>, tahta ve taş topla, <b>yollar döşe ve kendi şehrini kur!</b></p>
+  <p>Kapıya yürüyerek evlerin içine gir; içeride mobilyalar ve <b>A ile açılan sandıklar</b> var, içinden tahta ve taş çıkar!</p>
   <p>Evlerine köylüler yerleşir: yolları kullanır, birbirleriyle sohbet eder, kuyudan su içer ve sana el sallarlar.</p>
   <p><span class="keys">↑↓←→</span> hareket &nbsp;<span class="keys">A</span> zıpla &nbsp;<span class="keys">S</span> vur &nbsp;<span class="keys">1-7</span> yapı seç &nbsp;<span class="keys">E</span> inşa et</p>
   <div>
@@ -979,6 +985,447 @@
   const BMAP = Object.fromEntries(BUILDS.map(b => [b.id, b]));
   const ROAD_IDX = 0;
 
+  // ================= Ev içleri =================
+  const inScene = new THREE.Scene();
+  inScene.background = new THREE.Color(0x15110d);
+  const ENTERABLE = { kulube: 1, ev: 1, konak: 1, kule: 1 };
+  const CHEST_REFILL = 3 * 60 * 1000; // sandık 3 dakikada yeniden dolar
+  let IN = null;                       // aktif iç mekân
+
+  const quiltTex = canvasTex(128, (g, s) => {
+    const n = 6, c = s / n, cols = ['#b5463a', '#efe2c2', '#3a6ea5', '#d09a3a', '#5a8a4a', '#8a5aa5', '#c86a8a'];
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      g.fillStyle = cols[(i * 3 + j * 5 + (i * j) % 3) % cols.length]; g.fillRect(i * c, j * c, c, c);
+      if ((i + j) % 2) { g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.moveTo(i * c + c / 2, j * c + 3); g.lineTo(i * c + c - 3, j * c + c / 2); g.lineTo(i * c + c / 2, j * c + c - 3); g.lineTo(i * c + 3, j * c + c / 2); g.fill(); }
+    }
+    g.strokeStyle = 'rgba(255,250,230,.7)'; g.setLineDash([3, 3]); g.lineWidth = 1;
+    for (let i = 0; i <= n; i++) { g.beginPath(); g.moveTo(i * c, 0); g.lineTo(i * c, s); g.stroke(); g.beginPath(); g.moveTo(0, i * c); g.lineTo(s, i * c); g.stroke(); }
+  });
+  const rugTex = (base, edge) => canvasTex(256, (g, s) => {
+    g.fillStyle = edge; g.fillRect(0, 0, s, s);
+    g.fillStyle = base; g.fillRect(14, 14, s - 28, s - 28);
+    g.strokeStyle = '#e8c870'; g.lineWidth = 4; g.strokeRect(22, 22, s - 44, s - 44);
+    g.strokeStyle = edge; g.lineWidth = 3; g.strokeRect(32, 32, s - 64, s - 64);
+    for (let i = 0; i < 12; i++) { g.fillStyle = '#e8c870'; g.fillRect(40 + i * 15, 8, 6, 4); g.fillRect(40 + i * 15, s - 12, 6, 4); }
+    const m = (cx, cy, r, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(cx, cy - r); g.lineTo(cx + r, cy); g.lineTo(cx, cy + r); g.lineTo(cx - r, cy); g.fill(); };
+    m(s / 2, s / 2, 80, edge); m(s / 2, s / 2, 62, '#e8c870'); m(s / 2, s / 2, 44, base); m(s / 2, s / 2, 20, '#f2ead2');
+    for (const [x, y] of [[60, 60], [s - 60, 60], [60, s - 60], [s - 60, s - 60]]) { m(x, y, 18, '#e8c870'); m(x, y, 9, edge); }
+    for (let i = 0; i < 3000; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.06})`; g.fillRect(Math.random() * s, Math.random() * s, 2, 2); }
+  });
+  const RUGS = [rugTex('#8a2a22', '#2a3a6a'), rugTex('#2a4a6a', '#8a3a22'), rugTex('#5a6a3a', '#6a2a2a')];
+  const PAINTS = [0, 1, 2, 3].map(v => canvasTex(128, (g, s) => {
+    const sky = g.createLinearGradient(0, 0, 0, s * 0.6); sky.addColorStop(0, ['#6aa8e0', '#f0a060', '#8ac0e8', '#c8a0d0'][v]); sky.addColorStop(1, '#f0e6c8');
+    g.fillStyle = sky; g.fillRect(0, 0, s, s);
+    g.fillStyle = '#f8e8a0'; g.beginPath(); g.arc(s * (0.25 + v * 0.15), s * 0.25, 10, 0, 7); g.fill();
+    g.fillStyle = '#7a8aa0'; g.beginPath(); g.moveTo(0, s * 0.6); g.lineTo(s * 0.3, s * 0.3); g.lineTo(s * 0.55, s * 0.55); g.lineTo(s * 0.75, s * 0.35); g.lineTo(s, s * 0.6); g.fill();
+    g.fillStyle = '#4a7a3a'; g.fillRect(0, s * 0.6, s, s * 0.4);
+    g.fillStyle = '#2f5a2a'; for (let i = 0; i < 9; i++) { const x = (i * 37 + v * 13) % s, h = 18 + (i * 7) % 14; g.beginPath(); g.moveTo(x, s * 0.62 - h); g.lineTo(x + 7, s * 0.64); g.lineTo(x - 7, s * 0.64); g.fill(); }
+    if (v % 2) { g.fillStyle = '#c84a3a'; g.fillRect(s * 0.6, s * 0.62, 18, 12); g.fillStyle = '#7a2a2a'; g.beginPath(); g.moveTo(s * 0.6 - 3, s * 0.62); g.lineTo(s * 0.6 + 9, s * 0.54); g.lineTo(s * 0.6 + 21, s * 0.62); g.fill(); }
+  }));
+  const IM = {
+    floor: new THREE.MeshLambertMaterial({ map: TEX.plank, color: 0xb88e68 }),
+    wall: new THREE.MeshLambertMaterial({ map: TEX.plaster, color: 0xf4e8d0 }),
+    wains: new THREE.MeshLambertMaterial({ map: TEX.plank, color: 0x9a7050 }),
+    quilt: new THREE.MeshLambertMaterial({ map: quiltTex }),
+    sky: new THREE.MeshBasicMaterial({ color: 0xcfe6ff }),
+    flame: new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+    flame2: new THREE.MeshBasicMaterial({ color: 0xfff0a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }),
+    steel: new THREE.MeshPhongMaterial({ color: 0xc8d0d8, shininess: 110, specular: 0xffffff }),
+    brass: new THREE.MeshPhongMaterial({ color: 0xc9a040, shininess: 80, specular: 0xfff0c0 }),
+    mirror: new THREE.MeshPhongMaterial({ color: 0xa8bcc8, shininess: 150, specular: 0xffffff, emissive: 0x1a2228 }),
+    glow: new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.85 }),
+  };
+  const sphM = (g, color, x, y, z, sx, sy, sz) => { const o = new THREE.Mesh(GEO.sph, typeof color === 'number' ? mat(color) : color); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+  const WOODS = [0x6b4426, 0x8a5a32, 0x5a3820];
+
+  // ---- mobilyalar (yerel orijin: zemin ortası, ön yüz +z) ----
+  function fCandle(g, x, y, z, light) {
+    g.add(cyl(0.05, 0.06, 0.03, IM.brass, x, y + 0.015, z, 10), cyl(0.025, 0.025, 0.16, 0xf6f0e0, x, y + 0.11, z, 8));
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.06, 6), IM.flame2); f.position.set(x, y + 0.22, z); g.add(f);
+    IN.flames.push({ m: f, base: 1 });
+    if (light) { const l = new THREE.PointLight(0xffb060, 0.7, 5, 2); l.position.set(x, y + 0.35, z); g.add(l); IN.lights.push({ l, base: 0.7 }); }
+  }
+  function fBed(double) {
+    const g = new THREE.Group(), W = double ? 1.6 : 1.0, L = 2.1;
+    g.add(tbox(W + 0.1, 0.25, L, 'plank', 0, 0.28, 0, 1));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cyl(0.05, 0.05, 0.2, DARK, sx * W / 2, 0.1, sz * (L / 2 - 0.05), 8));
+    g.add(tbox(W + 0.16, 1.05, 0.08, 'plank', 0, 0.78, -L / 2, 0.8), tbox(W + 0.16, 0.55, 0.07, 'plank', 0, 0.52, L / 2, 0.8));
+    for (const sx of [-1, 1]) { g.add(cyl(0.06, 0.06, 1.3, DARK, sx * (W / 2 + 0.08), 0.65, -L / 2, 10)); sphM(g, DARK, sx * (W / 2 + 0.08), 1.33, -L / 2, 0.08, 0.08, 0.08); g.add(cyl(0.05, 0.05, 0.75, DARK, sx * (W / 2 + 0.08), 0.37, L / 2, 10)); }
+    g.add(tbox(W, 0.18, L - 0.12, 0xf4f0e6, 0, 0.5, 0));
+    g.add(tbox(W + 0.06, 0.07, L * 0.64, IM.quilt, 0, 0.62, 0.3, 0.9));
+    for (const sx of [-1, 1]) g.add(tbox(0.03, 0.32, L * 0.64, IM.quilt, sx * (W / 2 + 0.04), 0.47, 0.3, 0.9));
+    for (let i = 0; i < (double ? 2 : 1); i++) sphM(g, 0xfaf8f2, double ? (i - 0.5) * 0.7 : 0, 0.66, -L / 2 + 0.32, 0.3, 0.08, 0.17);
+    g.add(tbox(W * 0.92, 0.07, 0.32, anyOf([0x7a3a3a, 0x3a5a7a, 0x5a7a4a]), 0, 0.68, L / 2 - 0.25));
+    return g;
+  }
+  function fNightstand(withCandle) {
+    const g = new THREE.Group();
+    g.add(tbox(0.48, 0.55, 0.42, 'plank', 0, 0.275, 0, 0.6), tbox(0.4, 0.16, 0.02, lerpHex(0x8a5a32, 0, 0.3), 0, 0.38, 0.215));
+    sphM(g, IM.brass, 0, 0.38, 0.235, 0.02, 0.02, 0.02);
+    if (withCandle) fCandle(g, 0.08, 0.55, 0, true);
+    g.add(tbox(0.16, 0.04, 0.12, anyOf([0x7a2a2a, 0x2a4a7a]), -0.1, 0.57, 0.05));
+    return g;
+  }
+  function fTable(w, d, cloth) {
+    const g = new THREE.Group();
+    g.add(tbox(w, 0.07, d, 'plank', 0, 0.76, 0, 1));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(tbox(0.07, 0.73, 0.07, DARK, sx * (w / 2 - 0.08), 0.365, sz * (d / 2 - 0.08)));
+    g.add(tbox(w - 0.16, 0.06, 0.04, DARK, 0, 0.66, d / 2 - 0.08), tbox(w - 0.16, 0.06, 0.04, DARK, 0, 0.66, -d / 2 + 0.08));
+    if (cloth) g.add(tbox(w * 0.35, 0.01, d + 0.06, 0xf2eee2, 0, 0.8, 0));
+    return g;
+  }
+  function setTable(g, w, d, n, y = 0.8) {
+    const seats = n === 2 ? [[0, 1], [0, -1]] : n === 4 ? [[-0.5, 1], [0.5, 1], [-0.5, -1], [0.5, -1]] : [[-0.6, 1], [0, 1], [0.6, 1], [-0.6, -1], [0, -1], [0.6, -1]];
+    for (const [fx, fz] of seats) {
+      const x = fx * w * 0.6, z = fz * (d / 2 - 0.22);
+      g.add(cyl(0.12, 0.1, 0.02, 0xf2f2ee, x, y + 0.01, z, 14), cyl(0.035, 0.03, 0.08, anyOf([0x3a6ea5, 0xb5463a, 0xe8e2d0]), x + 0.18, y + 0.04, z, 8));
+    }
+    sphM(g, 0xc8904a, -0.1, y + 0.06, 0, 0.16, 0.07, 0.09);
+    g.add(cyl(0.06, 0.05, 0.14, 0x6a8ab0, 0.25, y + 0.07, 0.05, 10));
+    for (let i = 0; i < 4; i++) { sphM(g, anyOf([0xd83a4a, 0xf2d34a, 0xffffff]), 0.25 + rnd(-0.05, 0.05), y + 0.2 + rnd(0, 0.05), 0.05 + rnd(-0.05, 0.05), 0.035, 0.035, 0.035); }
+    fCandle(g, -0.35, y, -0.05, false);
+  }
+  function fChair(color) {
+    const g = new THREE.Group(), wd = anyOf(WOODS);
+    g.add(tbox(0.45, 0.05, 0.45, wd, 0, 0.46, 0));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(tbox(0.045, 0.46, 0.045, wd, sx * 0.19, 0.23, sz * 0.19));
+    for (const sx of [-1, 1]) g.add(tbox(0.05, 0.6, 0.05, wd, sx * 0.19, 0.77, -0.2));
+    for (let k = 0; k < 3; k++) g.add(tbox(0.36, 0.05, 0.03, wd, 0, 0.62 + k * 0.15, -0.2));
+    if (color) g.add(tbox(0.4, 0.05, 0.4, color, 0, 0.51, 0.01));
+    return g;
+  }
+  function fFireplace(cook) {
+    const g = new THREE.Group();
+    g.add(tbox(2.1, 0.12, 0.9, 'stone', 0, 0.06, 0.2, 0.8));
+    g.add(tbox(1.9, 1.45, 0.65, 'stone', 0, 0.85, -0.1, 0.8));
+    g.add(tbox(1.05, 0.85, 0.08, 0x150d08, 0, 0.55, 0.23));
+    g.add(tbox(2.1, 0.12, 0.8, 'plank', 0, 1.62, -0.05, 1));
+    g.add(tbox(1.3, 1.2, 0.5, 'stone', 0, 2.25, -0.18, 0.8));
+    for (let i = 0; i < 3; i++) { const l = cyl(0.07, 0.07, 0.7, 'log', -0.12 + i * 0.12, 0.2 + (i === 1 ? 0.1 : 0), 0.12, 8); l.rotation.set(0, 0.3 * (i - 1), Math.PI / 2); g.add(l); }
+    for (let i = 0; i < 5; i++) {
+      const f = new THREE.Mesh(new THREE.ConeGeometry(0.1 + Math.random() * 0.06, 0.4 + Math.random() * 0.2, 7), i % 2 ? IM.flame : IM.flame2);
+      f.position.set(-0.25 + i * 0.12, 0.45, 0.12 + (i % 2) * 0.05); g.add(f); IN.flames.push({ m: f, base: 1 });
+    }
+    const l = new THREE.PointLight(0xff8a30, 1.4, 9, 2); l.position.set(0, 0.8, 0.7); g.add(l); IN.lights.push({ l, base: 1.4 });
+    if (cook) { // asılı kazan
+      g.add(tbox(0.04, 0.5, 0.04, 0x222222, 0, 0.85, 0.12));
+      const pot = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mat(0x2a2a2a)); pot.position.set(0, 0.62, 0.12); g.add(pot);
+    } else {
+      fCandle(g, -0.75, 1.68, -0.05, false); fCandle(g, 0.75, 1.68, -0.05, false);
+      g.add(tbox(0.22, 0.3, 0.12, 0x5a3a22, 0, 1.83, -0.1)); g.add(cyl(0.07, 0.07, 0.02, 0xf2eadb, 0, 1.88, -0.03, 14)); // saat
+      g.add(cyl(0.05, 0.07, 0.2, 0x3a6a8a, 0.4, 1.78, -0.1, 10));
+    }
+    return g;
+  }
+  function fBookshelf(w = 1.2) {
+    const g = new THREE.Group(), h = 2.0, d = 0.36;
+    g.add(tbox(w, h, 0.03, 0x3a2414, 0, h / 2, -d / 2 + 0.015));
+    for (const sx of [-1, 1]) g.add(tbox(0.05, h, d, 'plank', sx * (w / 2 - 0.025), h / 2, 0, 0.8));
+    for (let s = 0; s < 5; s++) {
+      const y = 0.06 + s * 0.46; g.add(tbox(w, 0.04, d, 'plank', 0, y, 0, 0.8));
+      if (s === 4) continue;
+      let x = -w / 2 + 0.07;
+      while (x < w / 2 - 0.1) {
+        const bw = rnd(0.035, 0.075), bh = rnd(0.24, 0.36);
+        if (Math.random() < 0.08) { x += 0.08; continue; }
+        const b = tbox(bw, bh, rnd(0.2, 0.26), anyOf([0x7a2a2a, 0x2a4a6a, 0x3a5a2a, 0x6a4a2a, 0x8a6a2a, 0x4a2a5a, 0x1a1a1a]), x + bw / 2, y + 0.02 + bh / 2, 0.02);
+        if (Math.random() < 0.06) b.rotation.z = 0.25; g.add(b); x += bw + 0.005;
+      }
+    }
+    g.add(tbox(w + 0.06, 0.08, d + 0.04, DARK, 0, h + 0.04, 0));
+    return g;
+  }
+  function fWardrobe() {
+    const g = new THREE.Group(), wd = 0x6b4426;
+    g.add(tbox(1.2, 2.0, 0.6, 'plank', 0, 1.1, 0, 0.9), tbox(1.28, 0.1, 0.66, DARK, 0, 2.15, 0));
+    for (const sx of [-1, 1]) { g.add(tbox(0.52, 1.75, 0.03, lerpHex(wd, 0, 0.15), sx * 0.29, 1.1, 0.31)); sphM(g, IM.brass, sx * 0.06, 1.1, 0.34, 0.025, 0.025, 0.025); }
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(tbox(0.08, 0.1, 0.08, DARK, sx * 0.55, 0.05, sz * 0.25));
+    return g;
+  }
+  function fDresser() {
+    const g = new THREE.Group();
+    g.add(tbox(1.2, 0.85, 0.5, 'plank', 0, 0.43, 0, 0.8), tbox(1.26, 0.05, 0.55, DARK, 0, 0.88, 0));
+    for (let r = 0; r < 3; r++) { g.add(tbox(1.08, 0.22, 0.02, lerpHex(0x8a5a32, 0, 0.25), 0, 0.17 + r * 0.25, 0.255)); for (const sx of [-1, 1]) sphM(g, IM.brass, sx * 0.3, 0.17 + r * 0.25, 0.275, 0.022, 0.022, 0.022); }
+    g.add(tbox(0.7, 0.85, 0.04, DARK, 0, 1.35, -0.2)); const mr = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.75), IM.mirror); mr.position.set(0, 1.35, -0.175); g.add(mr);
+    g.add(cyl(0.08, 0.06, 0.22, 0xe8e2d0, -0.4, 1.0, 0.05, 10), cyl(0.14, 0.1, 0.06, 0xe8e2d0, -0.4, 0.92, 0.05, 14));
+    return g;
+  }
+  function fSofa(color) {
+    const g = new THREE.Group(), c2 = lerpHex(color, 0x000000, 0.2);
+    g.add(tbox(1.9, 0.38, 0.85, color, 0, 0.25, 0), tbox(1.9, 0.6, 0.2, c2, 0, 0.62, -0.33));
+    for (const sx of [-1, 1]) g.add(tbox(0.18, 0.55, 0.85, c2, sx * 0.86, 0.38, 0));
+    for (let i = 0; i < 3; i++) g.add(tbox(0.5, 0.12, 0.6, lerpHex(color, 0xffffff, 0.08), -0.53 + i * 0.53, 0.5, 0.06));
+    sphM(g, anyOf([0xe8c870, 0xf2eee2, 0x8a3a5a]), -0.55, 0.68, -0.15, 0.17, 0.15, 0.06); sphM(g, anyOf([0xe8c870, 0xf2eee2]), 0.55, 0.68, -0.15, 0.17, 0.15, 0.06);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cyl(0.035, 0.03, 0.08, DARK, sx * 0.85, 0.04, sz * 0.35, 6));
+    return g;
+  }
+  function fArmchair(color) {
+    const g = new THREE.Group(), c2 = lerpHex(color, 0x000000, 0.2);
+    g.add(tbox(0.85, 0.38, 0.8, color, 0, 0.25, 0), tbox(0.85, 0.65, 0.18, c2, 0, 0.65, -0.32));
+    for (const sx of [-1, 1]) g.add(tbox(0.15, 0.55, 0.8, c2, sx * 0.36, 0.38, 0));
+    g.add(tbox(0.56, 0.12, 0.6, lerpHex(color, 0xffffff, 0.08), 0, 0.5, 0.05));
+    return g;
+  }
+  function fRug(w, d, tex) { const r = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ map: tex })); r.rotation.x = -Math.PI / 2; r.position.y = 0.012; r.receiveShadow = true; return r; }
+  function fPainting(v) {
+    const g = new THREE.Group();
+    g.add(tbox(0.95, 0.75, 0.05, IM.brass, 0, 0, 0));
+    const c = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshLambertMaterial({ map: PAINTS[v % PAINTS.length] })); c.position.z = 0.03; g.add(c);
+    return g;
+  }
+  function fPlant() {
+    const g = new THREE.Group();
+    g.add(cyl(0.18, 0.13, 0.32, 0xb5653a, 0, 0.16, 0, 12), cyl(0.17, 0.17, 0.02, 0x3a2a1a, 0, 0.31, 0, 12));
+    for (let i = 0; i < 7; i++) { const a = i * 0.9, l = sphM(g, anyOf([0x3f7a2a, 0x4a8a31, 0x5a9a3a]), Math.sin(a) * 0.12, 0.5 + Math.random() * 0.25, Math.cos(a) * 0.12, 0.1, 0.22, 0.05); l.rotation.set(Math.cos(a) * 0.6, a, -Math.sin(a) * 0.6); }
+    return g;
+  }
+  function fBarrel() {
+    const g = new THREE.Group();
+    const geo = new THREE.CylinderGeometry(0.3, 0.3, 0.85, 16, 4), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const y = p.getY(i), k = 1 + 0.12 * (1 - (y / 0.425) ** 2); p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); }
+    geo.computeVertexNormals();
+    const b = new THREE.Mesh(geo, TM.plank); b.position.y = 0.425; b.castShadow = true; g.add(b);
+    for (const y of [0.12, 0.42, 0.72]) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.31 + (y === 0.42 ? 0.035 : 0.012), 0.015, 6, 20), mat(0x2a2a2a)); r.rotation.x = Math.PI / 2; r.position.y = y; g.add(r); }
+    return g;
+  }
+  function fCrate(s = 0.6) {
+    const g = new THREE.Group();
+    g.add(tbox(s, s, s, 'plank', 0, s / 2, 0, 0.6));
+    for (const sz of [-1, 1]) { const x = tbox(s * 1.3, 0.06, 0.02, DARK, 0, s / 2, sz * (s / 2 + 0.01)); x.rotation.z = 0.78; g.add(x); }
+    return g;
+  }
+  function fSack(x, z) { const g = new THREE.Group(); sphM(g, 0xcdb98a, x, 0.28, z, 0.24, 0.3, 0.2); g.add(cyl(0.05, 0.08, 0.1, 0xcdb98a, x, 0.6, z, 8)); g.add(cyl(0.055, 0.055, 0.03, 0x6a4a2a, x, 0.57, z, 8)); return g; }
+  function fCounter(w = 2.2) {
+    const g = new THREE.Group();
+    g.add(tbox(w, 0.85, 0.6, 'plank', 0, 0.425, 0, 0.8), tbox(w + 0.04, 0.06, 0.64, 'stone', 0, 0.88, 0, 0.6));
+    const n = Math.floor(w / 0.55);
+    for (let i = 0; i < n; i++) { const x = -w / 2 + (i + 0.5) * w / n; g.add(tbox(w / n - 0.06, 0.6, 0.02, lerpHex(0x8a5a32, 0, 0.25), x, 0.42, 0.305)); sphM(g, IM.brass, x + 0.15, 0.6, 0.32, 0.02, 0.02, 0.02); }
+    g.add(tbox(0.4, 0.03, 0.28, 0xc89a6a, -0.4, 0.925, 0.05)); sphM(g, 0xd08a3a, -0.4, 0.97, 0.05, 0.08, 0.05, 0.06);
+    g.add(cyl(0.16, 0.14, 0.18, 0x3a3a3a, 0.5, 1.0, 0, 14));
+    for (let i = 0; i < 3; i++) g.add(cyl(0.05, 0.05, 0.16, anyOf([0x8ab0c0, 0xc0a050, 0xa05040]), 0.85 + i * 0.12 - (w < 2 ? 0.4 : 0), 0.99, -0.15, 10));
+    return g;
+  }
+  function fWallShelf(w = 1.4) {
+    const g = new THREE.Group();
+    g.add(tbox(w, 0.05, 0.25, 'plank', 0, 0, 0, 0.8));
+    for (const sx of [-1, 1]) { const b = tbox(0.04, 0.2, 0.18, DARK, sx * (w / 2 - 0.15), -0.12, -0.02); g.add(b); }
+    let x = -w / 2 + 0.12;
+    while (x < w / 2 - 0.1) {
+      if (Math.random() < 0.5) g.add(cyl(0.05, 0.05, 0.16 + Math.random() * 0.08, anyOf([0x8ab0c0, 0xc0a050, 0xa05040, 0x6a8a4a]), x, 0.1, 0, 10));
+      else { const p = cyl(0.11, 0.11, 0.015, 0xf2f2ee, x, 0.13, -0.05, 14); p.rotation.x = 1.3; g.add(p); }
+      x += 0.16;
+    }
+    return g;
+  }
+  function fTorch(g, x, y, z, ry) {
+    const o = new THREE.Group(); o.position.set(x, y, z); o.rotation.y = ry;
+    o.add(tbox(0.06, 0.2, 0.06, 0x222222, 0, 0, 0.02));
+    const st = cyl(0.03, 0.025, 0.4, 0x5a3a22, 0, 0.12, 0.12, 6); st.rotation.x = 0.4; o.add(st);
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 7), IM.flame); f.position.set(0, 0.38, 0.2); o.add(f); IN.flames.push({ m: f, base: 1 });
+    const l = new THREE.PointLight(0xff9a40, 0.9, 6, 2); l.position.set(0, 0.45, 0.35); o.add(l); IN.lights.push({ l, base: 0.9 });
+    g.add(o);
+  }
+  function fWeaponRack() {
+    const g = new THREE.Group();
+    g.add(tbox(1.4, 0.08, 0.3, 'plank', 0, 0.3, 0), tbox(1.4, 0.08, 0.12, 'plank', 0, 1.3, -0.08));
+    for (const sx of [-1, 1]) g.add(tbox(0.08, 1.4, 0.3, DARK, sx * 0.7, 0.7, 0));
+    for (let i = 0; i < 4; i++) {
+      const x = -0.45 + i * 0.3;
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.9, 0.015), IM.steel)).children.slice(-1)[0].position.set(x, 0.8, -0.04);
+      g.add(tbox(0.2, 0.04, 0.05, IM.brass, x, 0.34, -0.04), tbox(0.04, 0.2, 0.04, 0x3a2414, x, 0.22, -0.04));
+    }
+    return g;
+  }
+  function fShield(c) { const g = new THREE.Group(); const s = cyl(0.35, 0.35, 0.05, c, 0, 0, 0, 20); s.rotation.x = Math.PI / 2; g.add(s); const b = cyl(0.1, 0.1, 0.08, IM.brass, 0, 0, 0.02, 12); b.rotation.x = Math.PI / 2; g.add(b); g.add(tbox(0.7, 0.07, 0.06, 0xe8d24a, 0, 0, 0.03)); return g; }
+  function fLadder(h) { const g = new THREE.Group(); for (const sx of [-1, 1]) g.add(tbox(0.06, h, 0.06, 'plank', sx * 0.22, h / 2, 0)); for (let i = 0; i < h / 0.32; i++) g.add(tbox(0.44, 0.04, 0.05, 'plank', 0, 0.25 + i * 0.32, 0)); g.rotation.x = -0.18; return g; }
+
+  // ---- sandık ----
+  function fChest() {
+    const g = new THREE.Group();
+    g.add(tbox(0.9, 0.48, 0.55, 'plank', 0, 0.24, 0, 0.6));
+    for (const sx of [-0.3, 0.3]) g.add(tbox(0.06, 0.5, 0.57, 0x2a2a2a, sx, 0.25, 0));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(tbox(0.08, 0.5, 0.08, 0x2a2a2a, sx * 0.43, 0.25, sz * 0.26));
+    g.add(tbox(0.12, 0.14, 0.04, IM.brass, 0, 0.4, 0.29));
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.45), IM.glow); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.46; glow.visible = false; g.add(glow);
+    const loot = new THREE.Group(); loot.visible = false; g.add(loot);
+    for (let i = 0; i < 3; i++) { const l = cyl(0.07, 0.07, 0.55, 'log', -0.15 + i * 0.13, 0.48, 0, 8); l.rotation.z = Math.PI / 2; l.rotation.y = 0.2; loot.add(l); }
+    for (let i = 0; i < 3; i++) { const s = new THREE.Mesh(shardGeo, mat(0x8a8780)); s.scale.setScalar(0.09); s.position.set(0.2 + i * 0.07, 0.52, -0.1 + i * 0.08); loot.add(s); }
+    const lid = new THREE.Group(); lid.position.set(0, 0.48, -0.275); g.add(lid);
+    const top = new THREE.Mesh(new THREE.CylinderGeometry(0.275, 0.275, 0.9, 14, 1, false, 0, Math.PI), TM.plank);
+    top.rotation.z = Math.PI / 2; top.position.set(0, 0, 0.275); top.scale.set(1, 1, 0.6); top.castShadow = true; lid.add(top);
+    for (const sx of [-0.3, 0.3]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.285, 0.285, 0.06, 14, 1, false, 0, Math.PI), mat(0x2a2a2a)); b.rotation.z = Math.PI / 2; b.position.set(sx, 0, 0.275); b.scale.set(1, 1, 0.62); lid.add(b); }
+    return { g, lid, glow, loot };
+  }
+
+  // ---- oda kabuğu: zemin, duvarlar (kameraya bakan duvar alçalır), pencereler, kapı ----
+  function inWindow(parent, x, y, z, ry) {
+    const o = new THREE.Group(); o.position.set(x, y, z); o.rotation.y = ry;
+    o.add(new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.0), IM.sky));
+    o.add(tbox(1.06, 0.08, 0.1, TRIM, 0, 0.54, 0.03), tbox(1.12, 0.07, 0.2, TRIM, 0, -0.54, 0.08), tbox(0.08, 1.0, 0.1, TRIM, -0.49, 0, 0.03), tbox(0.08, 1.0, 0.1, TRIM, 0.49, 0, 0.03));
+    o.add(tbox(0.04, 1.0, 0.06, TRIM, 0, 0, 0.02), tbox(0.9, 0.04, 0.06, TRIM, 0, 0.1, 0.02));
+    const cc = anyOf([0xb84a3a, 0x3a6aa8, 0xe8d8a8, 0x6a8a4a]);
+    for (const s of [-1, 1]) { const c = tbox(0.32, 1.35, 0.05, cc, s * 0.62, -0.05, 0.1); g_curtainFold(o, s * 0.62, cc); o.add(c); }
+    o.add(tbox(1.5, 0.04, 0.04, IM.brass, 0, 0.72, 0.12));
+    if (Math.random() < 0.6) { const pl = fPlant(); pl.scale.setScalar(0.55); pl.position.set(0.25, -0.5, 0.1); o.add(pl); }
+    parent.add(o);
+  }
+  function g_curtainFold(o, x, c) { for (let k = 0; k < 3; k++) o.add(tbox(0.04, 1.35, 0.06, lerpHex(c, 0, 0.2), x - 0.1 + k * 0.1, -0.05, 0.13)); }
+  function buildShell(hw, hd, H, windows) {
+    const g = new THREE.Group(), walls = [];
+    const fl = tbox(hw * 2, 0.1, hd * 2, IM.floor, 0, -0.05, 0, 1.4); fl.castShadow = false; g.add(fl);
+    const mk = (len, axis, sign, door) => {
+      const full = new THREE.Group(), stub = new THREE.Group();
+      const piece = (w, h, x0, y0, m, d = 0.16) => tbox(w, h, d, m, x0, y0, 0, 1.4);
+      if (door) {
+        const dw = 1.15, dh = 2.15, side = (len - dw) / 2;
+        for (const s of [-1, 1]) { full.add(piece(side, H, s * (dw / 2 + side / 2), H / 2, IM.wall)); full.add(piece(side, 0.9, s * (dw / 2 + side / 2), 0.45, IM.wains, 0.18)); stub.add(piece(side, 0.35, s * (dw / 2 + side / 2), 0.175, IM.wains, 0.18)); }
+        full.add(piece(dw, H - dh, 0, dh + (H - dh) / 2, IM.wall));
+        const dr = tbox(dw - 0.1, dh - 0.05, 0.06, 0x6a2e1e, 0, dh / 2, 0.06, 0.5); full.add(dr); stub.add(tbox(dw - 0.1, 0.35, 0.06, 0x6a2e1e, 0, 0.175, 0.06, 0.5));
+        for (let k = 0; k < 4; k++) full.add(tbox(0.03, dh - 0.15, 0.08, 0x4a1e12, -dw / 2 + 0.1 + (k + 0.5) * (dw - 0.2) / 4, dh / 2, 0.07));
+        full.add(tbox(dw + 0.2, 0.1, 0.22, BEAM, 0, dh + 0.05, 0));
+        sphM(full, IM.brass, dw * 0.32, dh * 0.48, 0.12, 0.04, 0.04, 0.04);
+      } else {
+        full.add(piece(len, H, 0, H / 2, IM.wall)); full.add(piece(len, 0.9, 0, 0.45, IM.wains, 0.18)); stub.add(piece(len, 0.35, 0, 0.175, IM.wains, 0.18));
+      }
+      full.add(tbox(len, 0.08, 0.2, BEAM, 0, 0.92, 0)); full.add(tbox(len, 0.12, 0.22, BEAM, 0, H - 0.06, 0));
+      const holder = new THREE.Group(); holder.add(full, stub);
+      if (axis === 'z') { holder.position.z = sign * hd; holder.rotation.y = sign > 0 ? Math.PI : 0; }
+      else { holder.position.x = sign * hw; holder.rotation.y = sign > 0 ? -Math.PI / 2 : Math.PI / 2; }
+      g.add(holder); stub.visible = false;
+      walls.push({ axis, sign, full, stub });
+      return full;
+    };
+    const back = mk(hw * 2 + 0.3, 'z', -1, false), front = mk(hw * 2 + 0.3, 'z', 1, true);
+    const left = mk(hd * 2 + 0.3, 'x', -1, false), right = mk(hd * 2 + 0.3, 'x', 1, false);
+    const W = { back, front, left, right };
+    for (const [wall, off] of windows) inWindow(W[wall], off, 1.55, 0.1, 0); // duvarın iç yüzü yerel +z
+    return { g, walls };
+  }
+  // ara duvar: x sabit, z0..z1 arasında, kapı boşluğu gz0..gz1
+  function partitionX(x, z0, z1, gz0, gz1, H) {
+    const g = new THREE.Group(), mats = [IM.wall.clone(), IM.wains.clone()];
+    for (const m of mats) m.transparent = true;
+    const seg = (a, b) => { const len = b - a, c = (a + b) / 2; g.add(tbox(0.14, H, len, mats[0], x, H / 2, c, 1.4), tbox(0.17, 0.9, len, mats[1], x, 0.45, c, 1.4)); };
+    seg(z0, gz0); seg(gz1, z1);
+    g.add(tbox(0.14, H - 2.15, gz1 - gz0, mats[0], x, 2.15 + (H - 2.15) / 2, (gz0 + gz1) / 2, 1.4), tbox(0.2, 0.1, gz1 - gz0 + 0.2, BEAM, x, 2.15, (gz0 + gz1) / 2));
+    return { g, mats, x, boxes: [{ x0: x - 0.1, x1: x + 0.1, z0, z1: gz0 }, { x0: x - 0.1, x1: x + 0.1, z0: gz1, z1 }] };
+  }
+
+  // ---- yerleşim: her yapı türü için oda düzeni ----
+  function buildInterior(b) {
+    const T = b.id;
+    const size = { kulube: [2.6, 2.4], ev: [4.2, 3.3], konak: [5.8, 4.2], kule: [2.7, 2.7] }[T];
+    const [hw, hd] = size, H = 2.9;
+    IN = { b, hw, hd, H, group: new THREE.Group(), colliders: [], chests: [], flames: [], lights: [], parts: [], guests: [] };
+    const G = IN.group; inScene.add(G);
+    G.add(new THREE.HemisphereLight(0xfff1dd, 0x5a4636, 0.5));
+    const dl = new THREE.DirectionalLight(0xfff0d8, 0.45); dl.position.set(hw * 0.6, 7, hd * 0.8); dl.castShadow = true;
+    dl.shadow.mapSize.set(1024, 1024); Object.assign(dl.shadow.camera, { left: -hw - 1, right: hw + 1, top: hd + 1, bottom: -hd - 1, near: 1, far: 20 });
+    G.add(dl);
+    const winByType = { kulube: [['back', -1.2], ['right', 0.4]], ev: [['back', -2.6], ['back', 2.6], ['left', -0.8], ['right', 0.6]], konak: [['back', -4.2], ['back', 4.0], ['left', 0], ['right', -1.4], ['right', 1.6]], kule: [['left', 0], ['right', 0]] }[T];
+    const shell = buildShell(hw, hd, H, winByType); G.add(shell.g); IN.walls = shell.walls;
+    // yerleştirici: mobilyayı koyar ve çarpışma kutusu ekler
+    const put = (obj, x, z, ry = 0, w = 0, d = 0) => {
+      obj.position.set(x, obj.position.y, z); obj.rotation.y = ry; G.add(obj);
+      if (w) { const sw = Math.abs(Math.sin(ry)) > 0.5; const ww = (sw ? d : w) / 2, dd = (sw ? w : d) / 2; IN.colliders.push({ x0: x - ww, x1: x + ww, z0: z - dd, z1: z + dd }); }
+      return obj;
+    };
+    const chest = (x, z, ry, idx) => { const c = fChest(); put(c.g, x, z, ry, 0.9, 0.55); c.x = x; c.z = z; c.idx = idx; c.open = 0; c.opening = false; IN.chests.push(c); };
+    const wallObj = (obj, wall, off, y) => { // duvara asılı obje (resim, raf, meşale)
+      const p = { back: [off, -hd + 0.1, 0], front: [off, hd - 0.1, Math.PI], left: [-hw + 0.1, off, Math.PI / 2], right: [hw - 0.1, off, -Math.PI / 2] }[wall];
+      obj.position.set(p[0], y, p[1]); obj.rotation.y = p[2]; G.add(obj); return obj;
+    };
+    const rug = (w, d, tex, x, z) => { const r = fRug(w, d, tex); r.position.set(x, 0.012, z); G.add(r); };
+    const fabric = anyOf([0x7a3a3a, 0x3a5a7a, 0x5a6a3a, 0x8a6a3a]);
+    if (T === 'kulube') {
+      put(fBed(false), -hw + 0.62, -hd + 1.15, 0, 1.1, 2.15);
+      put(fNightstand(true), -0.95, -hd + 0.3, 0, 0.48, 0.42);
+      put(fFireplace(true), 0.9, -hd + 0.45, 0, 2.1, 0.9);
+      const tb = put(fTable(1.0, 0.75, true), 1.3, 0.7, 0, 1.0, 0.75); setTable(tb, 1.0, 0.75, 2);
+      put(fChair(0xb5463a), 1.3, 0.05, 0, 0.45, 0.45); put(fChair(0xb5463a), 1.3, 1.35, Math.PI, 0.45, 0.45);
+      chest(-hw + 0.6, 0.9, Math.PI / 2, 0);
+      put(fBarrel(), hw - 0.4, hd - 0.45, 0, 0.6, 0.6); G.add(fSack(hw - 0.95, hd - 0.4));
+      rug(1.8, 1.3, RUGS[0], -0.2, 0.2);
+      wallObj(fPainting(0), 'left', 1.3, 1.7); wallObj(fWallShelf(1.1), 'back', -0.6, 1.75);
+    } else if (T === 'ev') {
+      const px = 0.9, part = partitionX(px, -hd, hd, -0.3, 0.75, H); G.add(part.g); IN.parts.push(part); IN.colliders.push(...part.boxes);
+      // oturma / yemek odası
+      put(fFireplace(false), -2.0, -hd + 0.45, 0, 2.1, 0.9);
+      put(fArmchair(fabric), -2.0, -1.0, Math.PI, 0.85, 0.8);
+      put(fBookshelf(1.2), -hw + 0.22, -1.6, Math.PI / 2, 1.2, 0.4);
+      const tb = put(fTable(1.5, 0.9, true), -1.6, 1.4, 0, 1.5, 0.9); setTable(tb, 1.5, 0.9, 4);
+      for (const [x, z, r] of [[-1.95, 0.75, 0], [-1.25, 0.75, 0], [-1.95, 2.05, Math.PI], [-1.25, 2.05, Math.PI]]) put(fChair(0x3a6ea5), x, z, r, 0.45, 0.45);
+      put(fCounter(1.6), -hw + 0.35, 0.8, Math.PI / 2, 1.6, 0.62);
+      wallObj(fWallShelf(1.2), 'left', 0.8, 1.6);
+      rug(2.0, 1.4, RUGS[1], -2.0, -0.9);
+      wallObj(fPainting(1), 'back', -0.3, 1.8);
+      put(fPlant(), 0.45, -hd + 0.35, 0, 0.36, 0.36);
+      // yatak odası
+      put(fBed(true), 2.55, -hd + 1.15, 0, 1.8, 2.15);
+      put(fNightstand(true), 1.4, -hd + 0.3, 0, 0.48, 0.42); put(fNightstand(false), 3.7, -hd + 0.3, 0, 0.48, 0.42);
+      put(fWardrobe(), hw - 0.35, 1.4, -Math.PI / 2, 1.2, 0.62);
+      chest(2.55, 0.65, 0, 0);
+      rug(1.8, 1.2, RUGS[2], 2.5, 1.3);
+      wallObj(fPainting(2), 'right', -1.6, 1.8);
+    } else if (T === 'konak') {
+      const pl = partitionX(-1.9, -hd, hd, 0.4, 1.5, H), pr = partitionX(2.1, -hd, hd, 0.4, 1.5, H);
+      for (const p of [pl, pr]) { G.add(p.g); IN.parts.push(p); IN.colliders.push(...p.boxes); }
+      // mutfak (sol)
+      put(fFireplace(true), -3.9, -hd + 0.45, 0, 2.1, 0.9);
+      put(fCounter(2.2), -hw + 0.35, -0.6, Math.PI / 2, 2.2, 0.62);
+      wallObj(fWallShelf(1.4), 'left', -0.6, 1.65); wallObj(fWallShelf(1.2), 'back', -2.6, 1.9);
+      const tb = put(fTable(1.8, 0.9, true), -3.6, 2.2, 0, 1.8, 0.9); setTable(tb, 1.8, 0.9, 6);
+      for (const [x, z, r] of [[-4.3, 1.55, 0], [-3.6, 1.55, 0], [-2.9, 1.55, 0], [-4.3, 2.85, Math.PI], [-3.6, 2.85, Math.PI], [-2.9, 2.85, Math.PI]]) put(fChair(0xb5463a), x, z, r, 0.45, 0.45);
+      put(fBarrel(), -2.35, -hd + 0.4, 0, 0.6, 0.6); G.add(fSack(-2.4, -2.6)); put(fCrate(), -2.4, -1.8, 0.2, 0.62, 0.62);
+      chest(-2.45, 3.4, Math.PI, 0);
+      // salon (orta)
+      put(fFireplace(false), 0.1, -hd + 0.45, 0, 2.1, 0.9);
+      put(fSofa(fabric), 0.1, -0.7, Math.PI, 1.9, 0.85);
+      put(fArmchair(fabric), -1.15, -1.9, Math.PI / 2, 0.85, 0.8); put(fArmchair(fabric), 1.35, -1.9, -Math.PI / 2, 0.85, 0.8);
+      const ct = put(fTable(0.9, 0.55, false), 0.1, -1.9, 0, 0.9, 0.55); ct.scale.y = 0.6; ct.add(cyl(0.05, 0.04, 0.1, 0xe8e2d0, 0.2, 0.84, 0, 10)); ct.add(tbox(0.25, 0.05, 0.18, 0x7a2a2a, -0.15, 0.82, 0));
+      rug(2.6, 1.8, RUGS[0], 0.1, -1.6);
+      put(fBookshelf(0.8), -1.4, -hd + 0.25, 0, 0.8, 0.4); put(fBookshelf(0.8), 1.6, -hd + 0.25, 0, 0.8, 0.4);
+      put(fPlant(), -1.5, hd - 0.45, 0, 0.36, 0.36); put(fPlant(), 1.7, hd - 0.45, 0, 0.36, 0.36);
+      wallObj(fPainting(3), 'left', -2.5, 1.8);
+      // yatak odası (sağ)
+      put(fBed(true), 4.2, -hd + 1.15, 0, 1.8, 2.15);
+      put(fNightstand(true), 3.05, -hd + 0.3, 0, 0.48, 0.42); put(fNightstand(true), 5.35, -hd + 0.3, 0, 0.48, 0.42);
+      put(fWardrobe(), hw - 0.35, 1.0, -Math.PI / 2, 1.2, 0.62);
+      put(fDresser(), 3.4, hd - 0.3, Math.PI, 1.2, 0.52);
+      chest(4.2, 0.65, 0, 1);
+      rug(1.9, 1.3, RUGS[1], 4.2, 1.6);
+      wallObj(fPainting(0), 'right', -2.2, 1.8);
+    } else if (T === 'kule') {
+      put(fWeaponRack(), 0, -hd + 0.25, 0, 1.45, 0.32);
+      wallObj(fShield(0xb5463a), 'left', -1.1, 1.7); wallObj(fShield(0x3a5a8a), 'left', 1.1, 1.7);
+      const tb = put(fTable(1.2, 0.8, false), 0.9, 0.7, 0, 1.2, 0.8);
+      const mp = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.5), new THREE.MeshLambertMaterial({ map: PAINTS[1] })); mp.rotation.x = -Math.PI / 2; mp.position.set(0, 0.805, 0); tb.add(mp);
+      fCandle(tb, -0.4, 0.8, 0.2, false);
+      put(fChair(0), 0.9, 0.05, 0, 0.45, 0.45);
+      put(fBarrel(), -hw + 0.4, hd - 0.9, 0, 0.6, 0.6); put(fBarrel(), -hw + 0.4, hd - 1.6, 0, 0.6, 0.6); put(fCrate(), hw - 0.45, hd - 0.9, 0.1, 0.62, 0.62);
+      const ld = fLadder(3.2); ld.position.set(hw - 0.5, 0, -hd + 0.6); G.add(ld); IN.colliders.push({ x0: hw - 0.8, x1: hw - 0.2, z0: -hd + 0.2, z1: -hd + 1.0 });
+      chest(-1.2, 0.5, Math.PI / 2, 0);
+      const bed = new THREE.Group(); bed.add(tbox(0.8, 0.08, 1.9, 0x6a5a3a, 0, 0.04, 0)); sphM(bed, 0xe8e2d0, 0, 0.12, -0.75, 0.25, 0.06, 0.15); put(bed, -1.2, -1.5, 0.1);
+      fTorch(G, 1.3, 1.8, hd - 0.12, Math.PI); fTorch(G, 0, 1.8, -hd + 0.12, 0);
+    }
+    // evde oturan köylüler içeride görünsün
+    for (const v of villagers) if (v.home === b && v.hidden) {
+      for (let tries = 0; tries < 40; tries++) {
+        const x = rnd(-hw + 0.6, hw - 0.6), z = rnd(-hd + 0.6, hd - 1.4);
+        if (IN.colliders.some(c => x > c.x0 - 0.4 && x < c.x1 + 0.4 && z > c.z0 - 0.4 && z < c.z1 + 0.4)) continue;
+        scene.remove(v.h.g); v.h.g.visible = true; v.h.g.position.set(x, 0, z); v.h.g.rotation.y = rnd(0, 6.28); G.add(v.h.g);
+        IN.guests.push({ v, x, z, yaw: v.h.g.rotation.y, wave: 0, t: Math.random() * 9 }); break;
+      }
+    }
+  }
+  function disposeInterior() {
+    if (!IN) return;
+    for (const gu of IN.guests) { IN.group.remove(gu.v.h.g); gu.v.h.g.visible = false; scene.add(gu.v.h.g); }
+    inScene.remove(IN.group);
+    IN.group.traverse(o => { if (o.geometry && !Object.values(GEO).includes(o.geometry) && o.geometry !== shardGeo) o.geometry.dispose(); });
+    IN = null;
+  }
+
   // ================= Köylüler (yuvarlak hatlı insan modeli) =================
   const humanMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0 });
   const HS = new THREE.SphereGeometry(1, 14, 10), HHEMI = new THREE.SphereGeometry(1, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -1213,6 +1660,20 @@
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       const t = actx.currentTime, dur = { hit: 0.12, rock: 0.09, break: 0.5, crumble: 0.45, build: 0.25, jump: 0.15, pop: 0.12, step: 0.05 }[type] || 0.1;
+      if (type === 'chest' || type === 'door') {
+        const o = actx.createOscillator(), gn = actx.createGain(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(type === 'chest' ? 140 : 90, t); o.frequency.exponentialRampToValueAtTime(type === 'chest' ? 70 : 60, t + 0.4);
+        gn.gain.setValueAtTime(0.05, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        o.connect(gn).connect(actx.destination); o.start(t); o.stop(t + 0.4); return;
+      }
+      if (type === 'coin') {
+        for (const [fq, dl] of [[880, 0], [1320, 0.09], [1760, 0.18]]) {
+          const o = actx.createOscillator(), gn = actx.createGain(); o.frequency.value = fq;
+          gn.gain.setValueAtTime(0.0001, t + dl); gn.gain.exponentialRampToValueAtTime(0.08, t + dl + 0.01); gn.gain.exponentialRampToValueAtTime(0.001, t + dl + 0.3);
+          o.connect(gn).connect(actx.destination); o.start(t + dl); o.stop(t + dl + 0.32);
+        }
+        return;
+      }
       if (type === 'jump' || type === 'pop') {
         const o = actx.createOscillator(), gn = actx.createGain();
         o.frequency.setValueAtTime(type === 'jump' ? 300 : 600, t); o.frequency.exponentialRampToValueAtTime(type === 'jump' ? 600 : 900, t + dur);
@@ -1272,7 +1733,7 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         wood: S.wood, stone: S.stone, broken: [...broken], roads: [...roads], seen: [...S.seen], px: S.x, pz: S.z, yaw: S.yaw,
-        buildings: buildings.map(b => ({ id: b.id, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: b.rot })),
+        buildings: buildings.map(b => ({ id: b.id, x: +b.x.toFixed(2), z: +b.z.toFixed(2), rot: b.rot, chest: b.chest })),
       }));
     } catch (e) { /* kayıt yapılamazsa oyun yine çalışır */ }
     dirty = false;
@@ -1348,6 +1809,7 @@
   function stepVillager(v, dt) {
     v.t += dt;
     if (v.hidden) {
+      if (IN && IN.b === v.home) return;
       v.timer -= dt;
       if (v.timer <= 0) { const d = doorOf(v.home); v.x = d.x; v.z = d.z; v.yaw = v.home.rot; v.hidden = false; v.h.g.visible = true; setIdle(v, rnd(1, 3)); }
       return;
@@ -1428,18 +1890,18 @@
 
   // ================= Oyun =================
   let player, ghost = null, ghostValid = null;
-  const S = { x: 0, z: 0, y: 0, vy: 0, yaw: 0, wood: 0, stone: 0, punch: 0, walkT: 0, sel: -1, extraRot: 0, seen: new Set(), playing: false };
+  const S = { x: 0, z: 0, y: 0, vy: 0, yaw: 0, wood: 0, stone: 0, punch: 0, walkT: 0, sel: -1, extraRot: 0, seen: new Set(), playing: false, reach: 0, inside: false, fading: false, ix: 0, iz: 0 };
   const keys = {};
 
   function footprint(def, rot) {
     const k = ((Math.round(rot / (Math.PI / 2)) % 4) + 4) % 4, swap = k % 2 === 1;
     return { hw: (swap ? def.d : def.w) / 2, hd: (swap ? def.w : def.d) / 2 };
   }
-  function addBuilding(id, x, z, rot, fresh) {
+  function addBuilding(id, x, z, rot, fresh, chest) {
     const def = BMAP[id], g = def.make();
     g.position.set(x, 0, z); g.rotation.y = rot;
     scene.add(g);
-    const b = { id, x, z, rot, group: g, ...footprint(def, rot), chimneys: [], smokeT: Math.random() };
+    const b = { id, x, z, rot, group: g, ...footprint(def, rot), chimneys: [], smokeT: Math.random(), chest: chest || [] };
     g.updateMatrixWorld(true);
     for (const c of g.userData.chimneys || []) b.chimneys.push(c.clone().applyMatrix4(g.matrixWorld));
     buildings.push(b);
@@ -1456,7 +1918,7 @@
     S.wood = data ? data.wood : 0; S.stone = data ? data.stone || 0 : 0; S.seen = new Set(data ? data.seen || [] : []);
     S.x = data ? data.px : 0; S.z = data ? data.pz : 0; S.yaw = data ? data.yaw : 0;
     for (const [k, c] of chunks) { scene.remove(c.group); chunks.delete(k); }
-    if (data) for (const b of data.buildings) addBuilding(b.id, b.x, b.z, b.rot, false);
+    if (data) for (const b of data.buildings) addBuilding(b.id, b.x, b.z, b.rot, false, b.chest);
     updateForest(S.x, S.z, true);
     player = makeKazim(); scene.add(player.g);
     S.playing = true; S.lastTitle = cityTitle(homesCount());
@@ -1602,6 +2064,10 @@
     if (k.startsWith('Arrow') || k === ' ') e.preventDefault();
     if (keys[k]) return; keys[k] = true;
     if (!S.playing) return;
+    if (S.inside) { // ev içi: A sandığı açar (yakında sandık yoksa zıplar)
+      if (k === 'a' && !tryChest() && S.y <= 0.001) { S.vy = JUMP; sfx('jump'); }
+      return;
+    }
     if (k === 'a' && S.y <= 0.001) { S.vy = JUMP; sfx('jump'); }
     else if (k === 's') punch();
     else if (k === 'e') placeBuild();
@@ -1643,10 +2109,144 @@
     sky.position.copy(camera.position);
     clouds.position.set(camera.position.x, 0, camera.position.z);
     for (const c of clouds.children) { c.position.x += dt * 1.2; if (c.position.x > 170) c.position.x = -170; }
-    renderer.render(scene, camera);
+    renderer.render(S.inside ? inScene : scene, camera);
+  }
+
+  // ================= Evin içi: giriş, çıkış, sandık =================
+  let lastPrompt = null;
+  function showPrompt(t) { if (t === lastPrompt) return; lastPrompt = t; const el = $('prompt'); el.textContent = t; el.classList.toggle('hidden', !t); }
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  function pushBox(p, r, c) { // daireyi dikdörtgenin dışına it
+    const qx = clamp(p.x, c.x0, c.x1), qz = clamp(p.z, c.z0, c.z1), ex = p.x - qx, ez = p.z - qz, d = Math.hypot(ex, ez);
+    if (d > 1e-4) { if (d < r) { p.x = qx + ex / d * r; p.z = qz + ez / d * r; } return; }
+    const l = p.x - c.x0, rr = c.x1 - p.x, f = p.z - c.z0, bk = c.z1 - p.z, m = Math.min(l, rr, f, bk);
+    if (m === l) p.x = c.x0 - r; else if (m === rr) p.x = c.x1 + r; else if (m === f) p.z = c.z0 - r; else p.z = c.z1 + r;
+  }
+  function enterHouse(b) {
+    if (S.fading) return;
+    S.fading = true; $('fade').style.opacity = 1; selectBuild(-1); showPrompt(''); sfx('door');
+    setTimeout(() => {
+      buildInterior(b);
+      scene.remove(player.g); IN.group.add(player.g); player.g.children.forEach(o => { if (o.isSprite) o.visible = false; });
+      S.inside = true; S.ix = 0; S.iz = IN.hd - 0.9; S.yaw = Math.PI; S.y = 0; S.vy = 0;
+      camPos.set(0, 3.9, IN.hd + 2.9);
+      $('build').classList.add('hidden'); $('target').classList.add('hidden');
+      $('cityDist').textContent = BMAP[b.id].name + ' içindesin';
+      $('fade').style.opacity = 0; S.fading = false;
+      if (!S.chestHint) { S.chestHint = true; flash('Sandığı bul ve A ile aç!', 2200); }
+    }, 300);
+  }
+  function exitHouse() {
+    if (S.fading) return;
+    S.fading = true; $('fade').style.opacity = 1; sfx('door'); showPrompt('');
+    setTimeout(() => {
+      const b = IN.b; IN.group.remove(player.g); disposeInterior(); scene.add(player.g); player.g.children.forEach(o => { if (o.isSprite) o.visible = true; });
+      const dd = BMAP[b.id].d / 2 + 1.3;
+      S.x = b.x + Math.sin(b.rot) * dd; S.z = b.z + Math.cos(b.rot) * dd; S.yaw = b.rot; S.inside = false; S.y = 0;
+      player.g.position.set(S.x, 0, S.z);
+      camPos.set(S.x - Math.sin(S.yaw) * 8, 6, S.z - Math.cos(S.yaw) * 8);
+      $('build').classList.remove('hidden'); $('fade').style.opacity = 0; S.fading = false;
+    }, 300);
+  }
+  const chestLeft = (c) => { const t = IN.b.chest[c.idx]; return t ? Math.max(0, CHEST_REFILL - (Date.now() - t)) : 0; };
+  const fmtTime = (ms) => { const s = Math.ceil(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const LOOT = { kulube: [[4, 8], [2, 5]], ev: [[6, 12], [4, 8]], konak: [[10, 18], [6, 12]], kule: [[5, 10], [8, 14]] };
+  function tryChest() {
+    const c = IN && IN.nearChest; if (!c) return false;
+    c.opening = true; S.reach = 0.6; sfx('chest');
+    const left = chestLeft(c);
+    if (left > 0) { flash('Sandık boş! ' + fmtTime(left) + ' sonra yeniden dolacak.', 1800); return true; }
+    const [rw, rs] = LOOT[IN.b.id], w = rw[0] + Math.floor(Math.random() * (rw[1] - rw[0] + 1)), st = rs[0] + Math.floor(Math.random() * (rs[1] - rs[0] + 1));
+    S.wood += w; S.stone += st; IN.b.chest[c.idx] = Date.now(); dirty = true;
+    c.glow.visible = true; c.loot.visible = true;
+    setTimeout(() => {
+      if (!IN) return;
+      sfx('coin'); c.loot.visible = false; c.glow.visible = false;
+      for (let i = 0; i < Math.min(w, 6) + Math.min(st, 5); i++) {
+        const isLog = i < Math.min(w, 6), m = new THREE.Mesh(isLog ? logGeo : stoneGeo, mat(isLog ? 0x8b5a2b : 0x8a8780));
+        m.position.set(c.x + rnd(-0.2, 0.2), 0.6, c.z + rnd(-0.2, 0.2)); m.castShadow = true; IN.group.add(m);
+        IN.fly.push({ m, t: -i * 0.06, vx: rnd(-1.5, 1.5), vy: rnd(3.5, 5), vz: rnd(-1.5, 1.5) });
+      }
+      toast('+' + w + ' 🪵  +' + st + ' 🪨'); flash('Sandıktan tahta ve taş çıktı!', 1600); updateHUD();
+    }, 450);
+    return true;
+  }
+  function stepInside(dt) {
+    const I = IN; if (!I) return;
+    I.fly = I.fly || [];
+    if (keys.ArrowLeft) S.yaw += TURN * dt;
+    if (keys.ArrowRight) S.yaw -= TURN * dt;
+    const f = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 0.6 : 0);
+    if (f && !S.fading) {
+      const p = { x: S.ix + Math.sin(S.yaw) * 3.6 * f * dt, z: S.iz + Math.cos(S.yaw) * 3.6 * f * dt };
+      if (p.z > I.hd - 0.5 && Math.abs(p.x) < 0.5 && f > 0 && Math.cos(S.yaw) > 0.5) { exitHouse(); return; }
+      for (const c of I.colliders) pushBox(p, 0.32, c);
+      for (const gu of I.guests) { const ex = p.x - gu.x, ez = p.z - gu.z, d = Math.hypot(ex, ez); if (d < 0.6 && d > 1e-4) { p.x = gu.x + ex / d * 0.6; p.z = gu.z + ez / d * 0.6; } }
+      S.ix = clamp(p.x, -I.hw + 0.35, I.hw - 0.35); S.iz = clamp(p.z, -I.hd + 0.35, I.hd - 0.35);
+    }
+    S.vy -= GRAV * dt; S.y += S.vy * dt; if (S.y < 0) { S.y = 0; S.vy = 0; }
+    player.g.position.set(S.ix, S.y, S.iz);
+    animatePlayer(!!f, dt);
+    // kamera: arkadan ve yukarıdan; kameraya bakan duvarlar alçalır (kesit görünüm)
+    camPos.lerp(new THREE.Vector3(S.ix - Math.sin(S.yaw) * 3.8, S.y + 3.9, S.iz - Math.cos(S.yaw) * 3.8), Math.min(dt * 5, 1));
+    camera.position.copy(camPos); camera.lookAt(S.ix, S.y + 1.0, S.iz);
+    const cx = camera.position.x, cz = camera.position.z;
+    for (const w of I.walls) {
+      const out = w.axis === 'z' ? (w.sign > 0 ? cz > I.hd - 0.3 : cz < -I.hd + 0.3) : (w.sign > 0 ? cx > I.hw - 0.3 : cx < -I.hw + 0.3);
+      w.full.visible = !out; w.stub.visible = out;
+    }
+    for (const pt of I.parts) { const opp = Math.sign(cx - pt.x) !== Math.sign(S.ix - pt.x); for (const m of pt.mats) m.opacity += ((opp ? 0.18 : 1) - m.opacity) * Math.min(dt * 8, 1); }
+    const t = performance.now() / 1000;
+    for (const fl of I.flames) fl.m.scale.set(1, 0.85 + Math.sin(t * 17 + fl.m.id) * 0.12 + Math.random() * 0.08, 1);
+    for (const l of I.lights) l.l.intensity = l.base * (0.88 + Math.sin(t * 11 + l.base * 7) * 0.07 + Math.random() * 0.06);
+    let near = null;
+    for (const c of I.chests) {
+      if (c.opening) { c.open = Math.min(1, c.open + dt * 2.2); c.lid.rotation.x = -1.95 * (1 - Math.pow(1 - c.open, 3)); }
+      if (!c.opening && Math.hypot(c.x - S.ix, c.z - S.iz) < 1.5) near = c;
+    }
+    I.nearChest = near;
+    if (near) { const left = chestLeft(near); showPrompt(left > 0 ? '🧰 Sandık boş — ' + fmtTime(left) + ' sonra dolacak' : '🧰 A: Sandığı aç'); }
+    else if (S.iz > I.hd - 1.6 && Math.abs(S.ix) < 1.2) showPrompt('🚪 Kapıya yürü: dışarı çık');
+    else showPrompt('');
+    for (let i = I.fly.length - 1; i >= 0; i--) {
+      const l = I.fly[i]; l.t += dt; if (l.t < 0) continue;
+      if (l.t < 0.45) { l.vy -= 14 * dt; l.m.position.x += l.vx * dt; l.m.position.y += l.vy * dt; l.m.position.z += l.vz * dt; }
+      else { l.m.position.lerp(new THREE.Vector3(S.ix, S.y + 1.2, S.iz), Math.min(dt * 9, 1)); l.m.scale.multiplyScalar(0.95); }
+      l.m.rotation.y += dt * 8;
+      if (l.t > 1.0) { I.group.remove(l.m); I.fly.splice(i, 1); }
+    }
+    for (const gu of I.guests) { // evdeki köylüler: Kazım Usta'ya döner, el sallar
+      const h = gu.v.h; gu.t += dt;
+      const dx = S.ix - gu.x, dz = S.iz - gu.z, d = Math.hypot(dx, dz);
+      if (d < 3.2) gu.yaw += angDiff(Math.atan2(dx, dz), gu.yaw) * Math.min(dt * 3, 1);
+      if (d < 3.2 && !gu.waved) { gu.waved = true; gu.wave = 2.2; }
+      animateHuman(h, 0, 0, dt); h.g.rotation.y = gu.yaw;
+      h.head.rotation.y = d < 3.2 ? 0 : Math.sin(gu.t * 0.5) * 0.6;
+      if (gu.wave > 0) { gu.wave -= dt; h.arms[1].sh.rotation.x = 0; h.arms[1].sh.rotation.z = 2.5 + Math.sin(gu.t * 10) * 0.3; h.arms[1].el.rotation.x = -0.3; }
+      else h.arms[1].sh.rotation.z = 0.08;
+    }
+    // dünya yaşamaya devam eder
+    stepAnimals(dt);
+    for (const v of villagers) { if (Math.abs(v.x - S.x) < 80 && Math.abs(v.z - S.z) < 80) stepVillager(v, dt); }
+    saveT += dt;
+    if (saveT > 4 || (dirty && saveT > 1)) { saveT = 0; writeSave(); }
+  }
+
+  function animatePlayer(moving, dt) {
+    const Pl = player;
+    Pl.g.rotation.y = S.yaw;
+    if (moving) S.walkT += dt * 9;
+    const sw = moving && S.y === 0 ? Math.sin(S.walkT) * 0.6 : 0;
+    Pl.legs[0].rotation.x = sw; Pl.legs[1].rotation.x = -sw;
+    Pl.legs[0].userData.knee.rotation.x = Math.max(0, -sw) * 0.9; Pl.legs[1].userData.knee.rotation.x = Math.max(0, sw) * 0.9;
+    Pl.arms[0].rotation.x = -sw * 0.7;
+    if (S.punch > 0) { S.punch -= dt; const k = 1 - Math.max(S.punch, 0) / 0.3; Pl.arms[1].rotation.x = -1.7 * Math.sin(k * Math.PI); Pl.body.rotation.y = -0.25 * Math.sin(k * Math.PI); }
+    else if (S.reach > 0) { S.reach -= dt; Pl.arms[0].rotation.x = Pl.arms[1].rotation.x = -1.1 * Math.sin(Math.min(1, S.reach / 0.6) * Math.PI); }
+    else { Pl.arms[1].rotation.x = sw * 0.7; Pl.body.rotation.y = 0; }
   }
 
   function step(dt) {
+    if (S.inside) { stepInside(dt); return; }
     const Pl = player;
     if (keys.ArrowLeft) S.yaw += TURN * dt;
     if (keys.ArrowRight) S.yaw -= TURN * dt;
@@ -1657,15 +2257,20 @@
       collide(p, 0.4); S.x = p.x; S.z = p.z;
     }
     S.vy -= GRAV * dt; S.y += S.vy * dt; if (S.y < 0) { S.y = 0; S.vy = 0; }
-    Pl.g.position.set(S.x, S.y, S.z); Pl.g.rotation.y = S.yaw;
-    if (moving) S.walkT += dt * 9;
-    const sw = moving && S.y === 0 ? Math.sin(S.walkT) * 0.6 : 0;
-    Pl.legs[0].rotation.x = sw; Pl.legs[1].rotation.x = -sw;
-    Pl.legs[0].userData.knee.rotation.x = Math.max(0, -sw) * 0.9; Pl.legs[1].userData.knee.rotation.x = Math.max(0, sw) * 0.9;
-    Pl.arms[0].rotation.x = -sw * 0.7;
-    if (S.punch > 0) { S.punch -= dt; const k = 1 - Math.max(S.punch, 0) / 0.3; Pl.arms[1].rotation.x = -1.7 * Math.sin(k * Math.PI); Pl.body.rotation.y = -0.25 * Math.sin(k * Math.PI); }
-    else { Pl.arms[1].rotation.x = sw * 0.7; Pl.body.rotation.y = 0; }
+    Pl.g.position.set(S.x, S.y, S.z);
+    animatePlayer(moving, dt);
     if (S.sel === ROAD_IDX && keys.e) placeRoad(true); // basılı tutarak yol döşeme
+
+    // ev kapısı: kapıya doğru yürüyünce içeri gir
+    let doorHint = null;
+    for (const b of buildings) {
+      if (!ENTERABLE[b.id] || b.grow !== undefined || Math.abs(b.x - S.x) > 9 || Math.abs(b.z - S.z) > 9) continue;
+      const dd = BMAP[b.id].d / 2 + 0.4, dx = b.x + Math.sin(b.rot) * dd, dz = b.z + Math.cos(b.rot) * dd;
+      const dist = Math.hypot(S.x - dx, S.z - dz);
+      if (dist < 2.6) doorHint = b;
+      if (dist < 0.8 && keys.ArrowUp && Math.cos(S.yaw - (b.rot + Math.PI)) > 0.5) { enterHouse(b); return; }
+    }
+    showPrompt(doorHint && S.sel < 0 ? '🚪 Kapıya doğru yürü, içeri gir (' + BMAP[doorHint.id].name + ')' : '');
 
     updateForest(S.x, S.z, false);
     lodT -= dt;
