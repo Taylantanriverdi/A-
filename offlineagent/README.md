@@ -84,6 +84,17 @@ Masaüstü, Belgeler ve İndirilenler klasörlerinin gerçek yerini bilir (OneDr
 
 Küçük model bazen işi yapmak yerine "şu komutu çalıştırın" gibi talimat yazmaya kalkar. Offline Agent bunu fark edip o cevabı geri alır ve işi yaptırır. Sık istekler (klasör oluşturma, uygulama açma) modele bile sorulmadan anında yapılır.
 
+## Klasör izleme ve bildirim
+
+"Taylan klasörünü 30 saniyede bir kontrol et, yeni gelen klasörleri bana bildir" gibi bir şey yazman yeterli:
+
+- Klasörü adından bulur (Masaüstü, Belgeler, İndirilenler, D/E/F sürücüleri) ya da tam yolu kullanır.
+- Arka planda belirttiğin aralıkla (en az 5 sn) bakar; **yeni gelen her öğeyi bir kez** bildirir.
+- Sadece klasörleri, sadece dosyaları ya da hepsini izleyebilir.
+- Bildirim sağ üstte çıkar. Sol alttaki **"🔔 Windows bildirimlerini aç"** düğmesine bir kez basarsan, pencere arkadayken de Windows bildirimi gelir. "Sesli cevap" açıksa sesli okur.
+- İzlenen klasörler sol taraftaki **"İzlenen klasörler"** bölümünde görünür; ✕ ile durdurulur ya da "Taylan klasörünü izlemeyi bırak" yazabilirsin.
+- Sadece içine bakar, hiçbir şeyi değiştirmez. Offline Agent açık olduğu sürece çalışır; yeniden açılınca kaldığı yerden devam eder ve kapalıyken gelenleri de bildirir.
+
 ## PrimerLab'ı kontrol etme
 
 PrimerLab **V56 veya sonrası** aynı bilgisayarda kuruluysa Offline Agent onu yönetebilir. Yazman ya da canlı modda söylemen yeterli:

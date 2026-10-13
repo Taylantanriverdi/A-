@@ -169,6 +169,11 @@
     #mesajlar { overflow: visible; }
   }
 
+  #bildirimKutusu { position: fixed; top: 14px; right: 14px; z-index: 20; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 28px)); }
+  .bildirim { background: var(--panel); border: 1px solid var(--kenar); border-left: 4px solid var(--vurgu); border-radius: 10px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: 14px; display: flex; gap: 8px; align-items: flex-start; }
+  .bildirim span { flex: 1; overflow-wrap: anywhere; }
+  .bildirim button { border: 0; background: none; padding: 0 4px; color: var(--soluk); }
+
   /* Panellere gömülü küçük sürüm */
   body.gomulu aside, body.gomulu #menuDugme, body.gomulu .ipucu, body.gomulu .disari { display: none !important; }
   body.uzak [data-klasor], body.uzak #ayarDugme { display: none !important; }
@@ -201,6 +206,11 @@
       <button data-klasor="belgeler" title="Belgeler klasörünü Gezgin'de aç">Klasör</button>
     </div>
     <input type="file" id="dosyaSec" multiple hidden accept=".pdf,.docx,.xlsx,.txt,.md,.csv,.json,.log,.png,.jpg,.jpeg,.webp,.bmp">
+  </div>
+  <div class="bolum" id="izlemeBolumu" hidden>
+    <h3>İzlenen klasörler</h3>
+    <div id="izlemeListesi"></div>
+    <div class="satir"><button id="bildirimIzni" hidden title="Pencere arkadayken de Windows bildirimi gelsin">🔔 Windows bildirimlerini aç</button></div>
   </div>
   <div class="bolum">
     <h3>Sistem</h3>
@@ -371,6 +381,7 @@
     <div id="telQr"></div>
   </section>
 </dialog>
+<div id="bildirimKutusu" aria-live="polite"></div>
 <div id="surukle">Dosyaları belgelere eklemek için bırakın</div>
 
 <script>
@@ -496,6 +507,7 @@ const ARAC_ADLARI = {
   program_ac: "Açma", dosya_yaz: "Dosya yazma", dosya_tasi: "Taşıma / yeniden adlandırma", cop_kutusuna_at: "Silme (Geri Dönüşüm Kutusu)",
   python_calistir: "Python çalıştırma", komut_calistir: "PowerShell komutu", dosya_ara: "Dosya arama",
   primerlab: "PrimerLab'a soruldu", primerlab_uygula: "PrimerLab işlemi",
+  klasoru_izle: "Klasör izleme başlatıldı", izlemeleri_listele: "İzlenen klasörler", izlemeyi_durdur: "Klasör izleme durduruldu",
 };
 
 function mesajlariCiz() {
@@ -847,6 +859,7 @@ async function durumuYenile() {
     else if (d.primerlab?.kurulu) html += `<div title="${kacis(d.primerlab.hata || "")}"><span class="nokta kotu"></span>PrimerLab kapalı</div>`;
     document.body.classList.toggle("uzak", !!d.uzak);
     $("#sistemDurum").innerHTML = html;
+    izlemeleriCiz(d.izlemeler || []);
     modelBilgisi();
 
     const i = d.indeks;
@@ -1293,6 +1306,51 @@ async function ekranTik() {
 function saatYaz() { return new Date().toLocaleTimeString("tr", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
 $("#ekranDugme").onclick = () => (ekranIzleme ? ekranDurdur() : ekranBaslat());
 $("#ekranKapat").onclick = ekranDurdur;
+
+// ---------- Klasör izleme bildirimleri ----------
+const BILDIRIM_ANAHTARI = "oa_son_bildirim";
+let sonBildirim = Number(oku(BILDIRIM_ANAHTARI, 0)) || 0;
+
+function izlemeleriCiz(izlemeler) {
+  $("#izlemeBolumu").hidden = !izlemeler.length;
+  $("#bildirimIzni").hidden = !("Notification" in window) || Notification.permission !== "default";
+  const kutu = $("#izlemeListesi");
+  kutu.innerHTML = "";
+  for (const i of izlemeler) {
+    const oge = document.createElement("div");
+    oge.className = "sohbet-oge";
+    oge.style.padding = "4px 2px";
+    oge.innerHTML = `<span title=""></span><button title="İzlemeyi durdur" style="visibility:visible">✕</button>`;
+    oge.querySelector("span").textContent = `📁 ${i.yol.split(/[\\/]/).pop()} · ${i.aralik} sn`;
+    oge.querySelector("span").title = i.yol;
+    oge.querySelector("button").onclick = async () => { await fetch("/api/izlemeler/" + i.id, { method: "DELETE" }); durumuYenile(); };
+    kutu.appendChild(oge);
+  }
+}
+function bildirimGoster(metin) {
+  const b = document.createElement("div");
+  b.className = "bildirim";
+  b.innerHTML = `<span></span><button title="Kapat">✕</button>`;
+  b.querySelector("span").textContent = "🔔 " + metin;
+  b.querySelector("button").onclick = () => b.remove();
+  $("#bildirimKutusu").prepend(b);
+  setTimeout(() => b.remove(), 20000);
+  // Pencere arkadayken Windows bildirimi
+  if ("Notification" in window && Notification.permission === "granted" && document.visibilityState !== "visible") {
+    try { new Notification("Offline Agent", { body: metin }); } catch { /* bazı tarayıcılar desteklemez */ }
+  }
+  if (ayar.sesli) seslendir(metin);
+}
+async function bildirimleriKontrolEt() {
+  try {
+    const r = await (await fetch("/api/bildirimler?son=" + sonBildirim)).json();
+    if (r.son < sonBildirim) sonBildirim = 0;  // Offline Agent yeniden başlatıldı; numaralar baştan başladı
+    for (const b of r.bildirimler.slice(-5)) bildirimGoster(`${b.zaman} · ${b.metin}`);
+    if (r.son !== sonBildirim) { sonBildirim = r.son; yaz(BILDIRIM_ANAHTARI, sonBildirim); }
+  } catch { /* sunucu kapalıysa sonra tekrar */ }
+}
+$("#bildirimIzni").onclick = async () => { await Notification.requestPermission(); durumuYenile(); };
+if (!GOMULU) { bildirimleriKontrolEt(); setInterval(bildirimleriKontrolEt, 4000); }
 
 // ---------- Dışa aktarma ----------
 function indir(veri, ad, tur) {

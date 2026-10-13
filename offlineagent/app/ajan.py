@@ -20,6 +20,7 @@ from pathlib import Path
 from starlette.concurrency import run_in_threadpool
 
 import hafiza
+import izleyici
 import primerlab
 from ayarlar import KOK
 from belge_oku import belgeyi_oku
@@ -312,6 +313,45 @@ def program_ac(hedef: str) -> str:
     return f"Açıldı: {gercek}"
 
 
+def _klasor_bul(klasor: str) -> Path | None:
+    """"Masaüstü/Taylan", tam yol ya da sadece "Taylan" verilebilir; sadece ad verilirse bilinen yerlerde aranır."""
+    p = _yol(klasor)
+    if p.is_dir():
+        return p
+    ad = Path(str(klasor).replace("\\", "/")).name or str(klasor)
+    adaylar = [x for x in _ara(ad, en_fazla=20, derinlik=3) if x.is_dir() and _sade(x.name) == _sade(ad)]
+    return adaylar[0] if adaylar else None
+
+
+def klasoru_izle(klasor: str, aralik_saniye: str = "30", tur: str = "hepsi") -> str:
+    p = _klasor_bul(klasor)
+    if p is None:
+        return f"'{klasor}' klasörü bulunamadı. dosya_ara ile yerini bulup tam yoluyla tekrar dene."
+    aralik = int(re.sub(r"\D", "", str(aralik_saniye)) or 30)
+    tur = {"klasör": "klasor", "klasörler": "klasor", "dosyalar": "dosya"}.get(str(tur).casefold(), str(tur).casefold())
+    i = izleyici.ekle(str(p), aralik, tur)
+    ne = {"klasor": "klasör", "dosya": "dosya"}.get(i["tur"], "dosya ya da klasör")
+    on_ek = "Bu klasör zaten izleniyordu; aralık güncellendi. " if i.get("zaten_vardi") else ""
+    return (f"{on_ek}İzleme başladı: {p} — her {i['aralik']} saniyede bir bakılacak; yeni {ne} gelince kullanıcıya "
+            f"bir kez bildirim gidecek (izleme no: {i['id']}). Offline Agent açık olduğu sürece arka planda çalışır.")
+
+
+def izlemeleri_listele() -> str:
+    izlemeler = izleyici.liste()
+    if not izlemeler:
+        return "Şu an izlenen klasör yok."
+    return "\n".join(f"- {i['id']}: {i['yol']} (her {i['aralik']} sn, {i['tur']}, başlangıç {i['baslangic']})" for i in izlemeler)
+
+
+def izlemeyi_durdur(izleme_no: str) -> str:
+    izleme_no = str(izleme_no).strip()
+    hedef = next((i for i in izleyici.liste() if i["id"] == izleme_no or _sade(Path(i["yol"]).name) == _sade(izleme_no)), None)
+    if not hedef:
+        return "Böyle bir izleme bulunamadı. izlemeleri_listele ile numarasına bak."
+    izleyici.durdur(hedef["id"])
+    return f"İzleme durduruldu: {hedef['yol']}"
+
+
 def python_calistir(kod: str) -> str:
     betik = CALISMA / "_ajan_kodu.py"
     betik.write_text(kod, "utf-8")
@@ -374,6 +414,16 @@ ARACLAR = {
         "program_ac", "Bir uygulamayı, klasörü, belgeyi ya da adresi açar. Sadece adını vermen yeterli "
         "(ör. 'PrimerLab', 'excel', 'hesap makinesi'); yerini kendisi bulur.",
         {"hedef": _metin("Uygulama/program adı ya da açılacak klasör/dosya yolu")}, ["hedef"])),
+    "klasoru_izle": (klasoru_izle, "zararsiz", _tanim(
+        "klasoru_izle", "Bir klasörü arka planda sürekli izler; belirtilen aralıkla bakar ve yeni dosya/klasör gelince "
+        "kullanıcıya bir kez bildirim gönderir. 'X klasörünü izle', 'yeni gelenleri bildir' gibi isteklerde kullan.",
+        {"klasor": _metin(YOL + " ya da sadece klasörün adı"),
+         "aralik_saniye": _metin("Kaç saniyede bir bakılacağı (varsayılan 30, en az 5)"),
+         "tur": {"type": "string", "enum": ["hepsi", "klasor", "dosya"], "description": "Neyin bildirileceği"}}, ["klasor"])),
+    "izlemeleri_listele": (izlemeleri_listele, "okuma", _tanim(
+        "izlemeleri_listele", "Arka planda izlenen klasörleri listeler.", {}, [])),
+    "izlemeyi_durdur": (izlemeyi_durdur, "zararsiz", _tanim(
+        "izlemeyi_durdur", "Bir klasör izlemesini durdurur.", {"izleme_no": _metin("İzleme numarası ya da klasör adı")}, ["izleme_no"])),
     "dosya_yaz": (dosya_yaz, "riskli", _tanim(
         "dosya_yaz", "Metin dosyası oluşturur ya da üzerine yazar (txt, md, csv, html, py...).",
         {"yol": _metin(YOL), "icerik": _metin("Dosyanın tam içeriği")}, ["yol", "icerik"])),
@@ -431,6 +481,8 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "- Kullanıcı bilgisayarda bir iş isterse ASLA 'yapamam' ya da 'kendiniz yapın' deme: uygun aracı hemen çağır. "
         "Sadece sohbet, bilgi ya da fikir istiyorsa araç kullanmadan cevap ver.\n"
         "- Önce hazır araçları kullan (klasor_olustur, dosya_kopyala, program_ac...); hiçbiri uymazsa komut_calistir.\n"
+        "- Bir klasörü sürekli takip etmen ya da yeni gelenleri bildirmen istenirse klasoru_izle aracını kullan. "
+        "Asla döngü ya da bekleme içeren komut yazma: komutlar en fazla 2 dakika çalışabilir.\n"
         "- Laboratuvarla ilgili her soru ve istekte (işler, hastalar, hekimler, cari, tahsilat, teknisyen, teslim...) "
         "primerlab aracını kullan; laboratuvar bilgisi uydurma.\n"
         "- Silme, taşıma, üzerine yazma, kod ve komut kullanıcı onayı ister; kullanıcı reddederse başka yol öner.\n"
@@ -670,7 +722,7 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
             itme = [
                 {"role": "assistant", "content": icerik},
                 {"role": "user", "content": "Bana nasıl yapacağımı anlatma, talimat ya da komut yazma. Bu işi araçlarınla "
-                                            "ŞİMDİ kendin yap: uygun aracı çağır (ör. klasor_olustur, program_ac, "
+                                            "ŞİMDİ kendin yap: uygun aracı çağır (ör. klasor_olustur, program_ac, klasoru_izle, "
                                             "dosya_kopyala; hiçbiri uymuyorsa komut_calistir)."},
             ]
             continue

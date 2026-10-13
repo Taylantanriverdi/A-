@@ -22,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 
 import ajan
 import erisim
+import izleyici
 import primerlab
 import hafiza
 import ses
@@ -56,6 +57,7 @@ indeks = BelgeIndeksi(BELGELER, KOK / "veri" / "indeks", OLLAMA, ayarlari_oku)
 async def omur(_: FastAPI):
     indeks.yukle()
     indeks.tara_baslat()  # Açılışta yeni/değişen belgeleri işle
+    izleyici.baslat()  # kayıtlı klasör izlemeleri kaldığı yerden devam eder
     yield
 
 
@@ -64,7 +66,7 @@ app = FastAPI(title="Offline Agent", lifespan=omur, docs_url=None, redoc_url=Non
 
 # Ağdaki cihazlara (telefon) kapalı uçlar: kod çalıştırma, klasör açma ve yönetim işlemleri
 UZAK_YASAK = ("/api/ajan", "/api/klasor-ac", "/api/erisim", "/api/yeniden-baslat")
-UZAK_SALT_OKUNUR = ("/api/ayarlar", "/api/modeller", "/api/yuz/kisiler", "/api/hafiza", "/api/ses/indir")
+UZAK_SALT_OKUNUR = ("/api/ayarlar", "/api/modeller", "/api/yuz/kisiler", "/api/hafiza", "/api/ses/indir", "/api/izlemeler")
 UZAK_SERBEST = ("/giris.html", "/api/giris")
 
 
@@ -290,6 +292,7 @@ async def durum(request: Request):
         "yuz_modeli": yuz.modeller_var(),
         "uzak": uzak_mi(request),
         "primerlab": await run_in_threadpool(primerlab.durum),
+        "izlemeler": izleyici.liste(),
         "indeks": indeks.durum(),
         "belge_klasoru": str(BELGELER),
         "calisma_klasoru": str(ajan.CALISMA),
@@ -347,6 +350,20 @@ async def klasoru_ac(hangisi: str):
     if sys.platform != "win32":
         raise HTTPException(501, "Sadece Windows'ta desteklenir")
     os.startfile(klasor)  # noqa: S606 - yerel klasörü Gezgin'de açar
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- klasör izleme bildirimleri
+
+@app.get("/api/bildirimler")
+async def bildirimler(son: int = 0):
+    return {"bildirimler": izleyici.bildirimler(son), "son": izleyici.son_no()}
+
+
+@app.delete("/api/izlemeler/{izleme_id}")
+async def izleme_durdur(izleme_id: str):
+    if not izleyici.durdur(izleme_id):
+        raise HTTPException(404, "Bulunamadı")
     return {"ok": True}
 
 
