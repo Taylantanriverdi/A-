@@ -5,6 +5,8 @@ Onay politikası (ayarlardaki "onay_modu"):
 - "riskli" (varsayılan): okuma ve zararsız işler (klasör oluşturma, kopyalama, belge/klasör açma)
   hemen yapılır; silme, taşıma, üzerine yazma, program başlatma, kod ve komut onay ister.
 - "hepsi": okuma dışındaki her işlem onay ister.
+Dosyalar klasörünün (D:\\offlineagent\\dosyalar) içinde kalan dosya işleri iki modda da onaysız yapılır
+(Ayarlar > "Dosyalar klasöründe onay sorma"). Python/PowerShell her zaman onay ister: kod bir klasöre hapsedilemez.
 Sohbet durumu istemcide tutulur: her istek tüm geçmişi gönderir, sunucu güncel geçmişi geri yollar.
 """
 import datetime
@@ -26,7 +28,14 @@ from ayarlar import KOK, ayarlari_oku
 from belge_oku import belgeyi_oku
 from ollama_api import OllamaHatasi, sohbet_akisi
 
-CALISMA = KOK / "calisma"
+# Kullanıcının dosyalar klasörü: buraya koyulan her şeyde asistan onay sormadan çalışır
+CALISMA = KOK / "dosyalar"
+_ESKI_CALISMA = KOK / "calisma"
+if _ESKI_CALISMA.is_dir() and not CALISMA.exists():
+    try:
+        _ESKI_CALISMA.rename(CALISMA)  # eski sürümlerin "calisma" klasörü taşınır
+    except OSError:
+        pass
 MAKS_TUR = 12
 MAKS_CIKTI = 8000
 ZAMAN_ASIMI = 120
@@ -91,7 +100,10 @@ def _yol(yol: str) -> Path:
     """"Masaüstü/Rapor" gibi takma adları gerçek klasöre çevirir; göreli yollar çalışma klasörüne göredir."""
     metin = os.path.expandvars(os.path.expanduser(str(yol).strip().strip('"') or "."))
     parcalar = metin.replace("\\", "/").split("/", 1)
-    takma = KLASOR_TAKMA_ADLARI.get(parcalar[0].strip().casefold())
+    ilk = parcalar[0].strip().casefold()
+    if ilk in ("dosyalar", "dosyalarım", "dosyalarim"):
+        return CALISMA / parcalar[1] if len(parcalar) > 1 and parcalar[1] else CALISMA
+    takma = KLASOR_TAKMA_ADLARI.get(ilk)
     if takma:
         kok = _bilinen_klasor(takma)
         return kok / parcalar[1] if len(parcalar) > 1 and parcalar[1] else kok
@@ -203,6 +215,52 @@ def dosya_tasi(kaynak: str, hedef: str) -> str:
     return f"Taşındı / yeniden adlandırıldı: {k} → {h}"
 
 
+def _klasor_icinde(yol: str, kok_dahil: bool = False) -> bool:
+    """Yol dosyalar klasörünün içinde mi? (kısayol/üst klasör hilelerine karşı gerçek yola bakılır)"""
+    try:
+        p, kok = _yol(yol).resolve(), CALISMA.resolve()
+    except (OSError, ValueError):
+        return False
+    return kok in p.parents or (kok_dahil and p == kok)
+
+
+def icerikte_ara(metin: str, klasor: str = "") -> str:
+    """Dosyaların İÇİNDE metin arar (varsayılan: dosyalar klasörü)."""
+    import time
+
+    kok = _yol(klasor) if klasor else CALISMA
+    if not kok.is_dir():
+        return f"Klasör bulunamadı: {kok}"
+    aranan = metin.strip().casefold()
+    if len(aranan) < 2:
+        return "Aranacak metin en az 2 karakter olmalı."
+    from belge_oku import DESTEKLENEN
+    okunur = (DESTEKLENEN - {".png", ".jpg", ".jpeg", ".webp", ".bmp"}) | {
+        ".py", ".js", ".html", ".css", ".xml", ".ini", ".cfg", ".yaml", ".yml", ".ps1", ".bat", ".sql", ".cs", ".ts"}
+    sonuclar, bakilan, bitis = [], 0, time.monotonic() + 20
+    for dosya in sorted(kok.rglob("*")):
+        if time.monotonic() > bitis or len(sonuclar) >= 30:
+            break
+        if not dosya.is_file() or dosya.suffix.lower() not in okunur or dosya.stat().st_size > 20_000_000:
+            continue
+        bakilan += 1
+        try:
+            parcalar = belgeyi_oku(dosya)
+        except Exception:  # bozuk ya da şifreli dosya aramayı durdurmasın
+            continue
+        for kaynak, icerik in parcalar:
+            konum = icerik.casefold().find(aranan)
+            if konum < 0:
+                continue
+            alinti = " ".join(icerik[max(0, konum - 80): konum + len(aranan) + 80].split())
+            yer = dosya.relative_to(kok).as_posix() + (f" [{kaynak}]" if kaynak else "")
+            sonuclar.append(f"- {yer}: …{alinti}…")
+            break
+    if not sonuclar:
+        return f"'{metin}' hiçbir dosyanın içinde bulunamadı ({kok} içinde {bakilan} dosyaya bakıldı)."
+    return f"'{metin}' geçen dosyalar ({kok}):\n" + "\n".join(sonuclar)
+
+
 def cop_kutusuna_at(yol: str) -> str:
     from send2trash import send2trash
 
@@ -224,7 +282,7 @@ def _sade(metin: str) -> str:
 
 
 def _arama_kokleri() -> list[Path]:
-    kokler = [_bilinen_klasor("Masaüstü"), _bilinen_klasor("Belgeler"), _bilinen_klasor("İndirilenler")]
+    kokler = [CALISMA, _bilinen_klasor("Masaüstü"), _bilinen_klasor("Belgeler"), _bilinen_klasor("İndirilenler")]
     if WINDOWS:
         kokler += [Path(os.environ.get("PUBLIC", "C:/Users/Public")) / "Desktop",
                    Path(os.environ.get("APPDATA", "")) / "Microsoft/Windows/Start Menu/Programs",
@@ -405,6 +463,11 @@ ARACLAR = {
         "dosya_ara", "Adını bildiğin bir dosya, klasör ya da programı bilgisayarda arar (Masaüstü, Belgeler, "
         "İndirilenler, Başlat menüsü, D/E/F sürücüleri). Yerini bilmediğin her şey için önce bunu kullan.",
         {"ad": _metin("Aranacak ad ya da adın bir parçası, ör. 'PrimerLab'")}, ["ad"])),
+    "icerikte_ara": (icerikte_ara, "okuma", _tanim(
+        "icerikte_ara", "Dosyaların İÇİNDE geçen bir kelime/metni arar (pdf, docx, xlsx, txt, kod...). Klasör verilmezse "
+        "kullanıcının dosyalar klasöründe arar. 'Hangi dosyada X yazıyor', 'X geçen dosyaları bul' gibi isteklerde kullan.",
+        {"metin": _metin("Aranacak kelime ya da metin"), "klasor": _metin("İsteğe bağlı klasör; boşsa dosyalar klasörü")},
+        ["metin"])),
     "klasor_olustur": (klasor_olustur, "zararsiz", _tanim(
         "klasor_olustur", "Yeni klasör oluşturur (ara klasörler de oluşturulur).", {"yol": _metin(YOL)}, ["yol"])),
     "dosya_kopyala": (dosya_kopyala, "zararsiz", _tanim(
@@ -462,12 +525,25 @@ def arac_tanimlari() -> list[dict]:
     return [t for t in ARAC_TANIMLARI if t["function"]["name"] != "primerlab"]
 
 
+# Dosyalar klasörünün içindeyken onaysız yapılan araçlar ve yol argümanları
+DOSYALAR_SERBEST = {
+    "dosya_yaz": ("yol",), "dosya_tasi": ("kaynak", "hedef"), "cop_kutusuna_at": ("yol",),
+    "klasor_olustur": ("yol",), "dosya_kopyala": ("kaynak", "hedef"),
+}
+
+
 def onay_gerekli(ad: str, argumanlar: dict, onay_modu: str = "riskli") -> bool:
     if ad not in ARACLAR:
         return False
     risk = ARACLAR[ad][1]
     if risk == "okuma":
         return False
+    if ad in DOSYALAR_SERBEST and ayarlari_oku().get("dosyalar_serbest", True):
+        # Dosyalar klasörünün içinde kalan dosya işleri hiç onay sormaz (klasörün kendisini silmek hariç)
+        yollar = [str(argumanlar.get(a, "")) for a in DOSYALAR_SERBEST[ad]]
+        if all(y.strip() and _klasor_icinde(y, kok_dahil=(ad == "klasor_olustur" or a == "hedef"))
+               for y, a in zip(yollar, DOSYALAR_SERBEST[ad])):
+            return False
     if risk == "riskli" or onay_modu == "hepsi":
         return True
     if ad == "program_ac":
@@ -486,7 +562,11 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "Sen Offline Agent'sın: kullanıcının Windows bilgisayarında tamamen yerel çalışan, onun yerine iş yapan "
         "bir asistansın. Araçlarla gerçekten klasör/dosya oluşturabilir, kopyalayabilir, taşıyabilir, silebilir, "
         "program ve belge açabilir, dosya okuyabilir, belgelerde arayabilir, Python ve PowerShell çalıştırabilirsin.\n"
-        f"Bilinen klasörler: {klasorler}. Çalışma klasörün: {CALISMA}\n"
+        f"Bilinen klasörler: {klasorler}.\n"
+        f"Kullanıcının dosyalar klasörü: {CALISMA} — kullanıcı kontrol etmeni istediği dosyaları buraya koyar. "
+        "'Dosyalarım', 'dosyalar klasörü', 'yüklediğim dosyalar' denince burası kastedilir. Bu klasörün içinde okuma, "
+        "arama, yazma, düzenleme, yeniden adlandırma, taşıma ve silme işlerini HİÇ SORMADAN, onay beklemeden hemen yap. "
+        "Göreli yollar (ör. 'rapor.txt', 'Faturalar/ocak.pdf') bu klasöre göredir. İçerikte arama için icerikte_ara kullan.\n"
         "Kurallar:\n"
         "- Türkçe, kısa ve samimi konuş.\n"
         "- Kullanıcı bilgisayarda bir iş isterse ASLA 'yapamam' ya da 'kendiniz yapın' deme: uygun aracı hemen çağır. "
@@ -496,7 +576,8 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "Asla döngü ya da bekleme içeren komut yazma: komutlar en fazla 2 dakika çalışabilir.\n"
         + ("- Laboratuvarla ilgili her soru ve istekte (işler, hastalar, hekimler, cari, tahsilat, teknisyen, teslim...) "
            "primerlab aracını kullan; laboratuvar bilgisi uydurma.\n" if primerlab_acik() else "") +
-        "- Silme, taşıma, üzerine yazma, kod ve komut kullanıcı onayı ister; kullanıcı reddederse başka yol öner.\n"
+        "- Dosyalar klasörü dışında silme, taşıma, üzerine yazma ile her yerde kod ve komut kullanıcı onayı ister; "
+        "onayı sistem kendisi sorar, sen kullanıcıya 'yapayım mı?' diye sorma, aracı çağır. Reddederse başka yol öner.\n"
         "- Bir araç hata verirse hatayı oku, düzelt ve tekrar dene. Emin olmadığın dosya adını önce dosya_listele ile bul.\n"
         "- İş bitince ne yaptığını tek cümleyle söyle (ör. 'Masaüstünde \"Raporlar\" klasörünü oluşturdum.').\n"
         "- Kullanıcı hakkında kalıcı bir bilgi öğrenirsen hafizaya_kaydet ile kaydet."

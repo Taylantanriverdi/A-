@@ -8,6 +8,7 @@
   "ses_dili": "tr",
   "ocr": true,
   "onay_modu": "riskli",
+  "dosyalar_serbest": true,
   "yuz_tanima": true,
   "hafiza": true,
   "otomatik_hafiza": true,

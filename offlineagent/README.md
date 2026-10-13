@@ -56,6 +56,26 @@ Bir adım yarıda kalırsa `KUR.bat`'ı tekrar çalıştır; kaldığı yerden d
 
 **Otomatik güncelleme:** `BASLAT.bat` her açılışta (günde en fazla bir kez) internet olup olmadığına bakar. İnternet varsa program dosyalarını sessizce günceller, yoksa hiçbir şey yapmadan çalışmaya devam eder.
 
+## Dosyalarım: sormadan her işi yapan klasör
+
+Kontrol etmesini istediğin her şeyi `D:\offlineagent\dosyalar` klasörüne koy: sol menüdeki **📂 Dosyalarım > Ekle** düğmesi, dosyaları pencereye sürükle-bırak ya da klasöre Gezgin'den kopyala. Her tür dosya olur (pdf, Word, Excel, resim, kod, zip...).
+
+Bu klasörün içinde asistan **hiç onay sormadan** her işi yapar: okur, içinde arar, yeni dosya yazar, düzenler/üzerine yazar, yeniden adlandırır, alt klasörlere taşır, kopyalar, siler (Geri Dönüşüm Kutusu'na, geri alınabilir).
+
+Örnekler:
+- "Dosyalarımda ne var?"
+- "Hangi dosyada 'Ahmet Yılmaz' geçiyor?" (dosyaların içinde arar: pdf, docx, xlsx, txt, kod)
+- "fatura.pdf'i oku ve toplam tutarı söyle"
+- "PDF'leri Faturalar klasörüne, Excel'leri Tablolar klasörüne taşı"
+- "notlar.txt'nin sonuna bugünün özetini ekle" / "eski taslakları sil"
+
+Kurallar:
+- Göreli yollar (ör. `rapor.txt`, `Faturalar/ocak.pdf`) bu klasöre göredir.
+- **Python ve PowerShell** her yerde onay ister: kod çalışınca bir klasörle sınırlanamaz, bütün bilgisayara dokunabilir.
+- Klasörün dışındaki silme/taşıma/üzerine yazma önceki gibi onay ister.
+- İstersen Ayarlar > Genel > "Dosyalar klasöründe onay sorma" kutusundan bu serbestliği kapatabilirsin.
+- Eski sürümlerdeki `calisma` klasörü varsa ilk açılışta `dosyalar` olarak taşınır.
+
 ## Belgelerimden cevap
 
 1. Dosyaları arayüze sürükle-bırak yap, **Ekle** düğmesini kullan ya da `D:\offlineagent\belgeler` klasörüne kopyala.
@@ -80,7 +100,7 @@ Ayrı bir mod seçmen gerekmez: **Genel** modda ne istediğini yazman (ya da can
 
 Masaüstü, Belgeler ve İndirilenler klasörlerinin gerçek yerini bilir (OneDrive'a taşınmış masaüstü dahil).
 
-**Onay:** Klasör oluşturma, kopyalama, uygulama/klasör/belge açma ve okuma işlemleri hemen yapılır. **Silme** (Geri Dönüşüm Kutusu'na), **taşıma**, **üzerine yazma**, **program dosyası başlatma**, **Python** ve **PowerShell** için ne yapacağını gösterip onayını bekler. Ayarlar > Genel > "İşlem onayı" ile her işlemde sormasını seçebilirsin.
+**Onay:** Dosyalarım klasörünün içinde hiçbir şey sorulmaz (Python/PowerShell hariç). Diğer yerlerde: klasör oluşturma, kopyalama, uygulama/klasör/belge açma ve okuma işlemleri hemen yapılır. **Silme** (Geri Dönüşüm Kutusu'na), **taşıma**, **üzerine yazma**, **program dosyası başlatma**, **Python** ve **PowerShell** için ne yapacağını gösterip onayını bekler. Ayarlar > Genel > "İşlem onayı" ile her işlemde sormasını seçebilirsin.
 
 Küçük model bazen işi yapmak yerine "şu komutu çalıştırın" gibi talimat yazmaya kalkar. Offline Agent bunu fark edip o cevabı geri alır ve işi yaptırır. Sık istekler (klasör oluşturma, uygulama açma) modele bile sorulmadan anında yapılır.
 
@@ -186,7 +206,7 @@ D:\offlineagent\
   KUR.bat  BASLAT.bat  GUNCELLE.bat  DURDUR.bat
   ayarlar.json        <- senin ayarların (güncelleme bunu değiştirmez)
   belgeler\           <- senin belgelerin
-  calisma\            <- ajanın dosya yazdığı klasör
+  dosyalar\           <- Dosyalarım: içinde asistan sormadan her işi yapar
   TELEFON_AC.bat      <- telefondan erişim için güvenlik duvarı izni
   modeller\           <- yapay zeka modelleri
   veri\               <- belge indeksi ve kayıtlar (sunucu-hata.log)
@@ -222,6 +242,7 @@ Modeller 30 dakika boyunca bellekte tutulur; böylece her soruda yeniden yüklen
 | `ocr` | `true` | Taranmış PDF ve resimlerden yazı okuma |
 | `hafiza` / `otomatik_hafiza` | `true` | Hafıza ve sohbetlerden otomatik öğrenme |
 | `yuz_tanima` | `true` | Kamerada yüz tanıma |
+| `dosyalar_serbest` | `true` | Dosyalarım klasöründe onay sormadan çalışma |
 | `ag_erisimi` | `false` | Telefondan erişim (Ayarlar > Telefon'dan açılır) |
 | `embed_model` | `nomic-embed-text` | Belge arama modeli |
 | `baglam_uzunlugu` | `8192` | Modelin aynı anda aklında tutabileceği metin miktarı. Ekran kartı belleği yetmezse `4096` yap |

@@ -65,7 +65,7 @@ app = FastAPI(title="Offline Agent", lifespan=omur, docs_url=None, redoc_url=Non
 
 
 # Ağdaki cihazlara (telefon) kapalı uçlar: kod çalıştırma, klasör açma ve yönetim işlemleri
-UZAK_YASAK = ("/api/ajan", "/api/klasor-ac", "/api/erisim", "/api/yeniden-baslat")
+UZAK_YASAK = ("/api/ajan", "/api/klasor-ac", "/api/dosyalar", "/api/erisim", "/api/yeniden-baslat")
 UZAK_SALT_OKUNUR = ("/api/ayarlar", "/api/modeller", "/api/yuz/kisiler", "/api/hafiza", "/api/ses/indir", "/api/izlemeler")
 UZAK_SERBEST = ("/giris.html", "/api/giris")
 
@@ -296,6 +296,7 @@ async def durum(request: Request):
         "indeks": indeks.durum(),
         "belge_klasoru": str(BELGELER),
         "calisma_klasoru": str(ajan.CALISMA),
+        "dosyalar": await run_in_threadpool(_dosyalar_ozeti),
     }
     try:
         async with httpx.AsyncClient(timeout=3) as istemci:
@@ -336,6 +337,49 @@ async def belge_yukle(dosyalar: list[UploadFile] = File(...)):
     return {"kaydedilen": kaydedilen, "atlanan": atlanan}
 
 
+def _dosyalar_ozeti() -> dict:
+    ajan.CALISMA.mkdir(parents=True, exist_ok=True)
+    sayi = boyut = 0
+    for y in ajan.CALISMA.rglob("*"):
+        if y.is_file() and y.name != "_ajan_kodu.py":
+            sayi += 1
+            boyut += y.stat().st_size
+            if sayi >= 100000:
+                break
+    return {"klasor": str(ajan.CALISMA), "sayi": sayi, "boyut": boyut}
+
+
+@app.get("/api/dosyalar")
+async def dosyalar_listesi():
+    ajan.CALISMA.mkdir(parents=True, exist_ok=True)
+    return [
+        {"ad": y.relative_to(ajan.CALISMA).as_posix(), "boyut": y.stat().st_size}
+        for y in sorted(ajan.CALISMA.rglob("*"))[:2000]
+        if y.is_file() and y.name != "_ajan_kodu.py"
+    ]
+
+
+@app.post("/api/dosyalar/yukle")
+async def dosya_yukle(dosyalar: list[UploadFile] = File(...)):
+    """Her türlü dosya dosyalar klasörüne kaydedilir; aynı ad varsa sonuna (2), (3)... eklenir."""
+    ajan.CALISMA.mkdir(parents=True, exist_ok=True)
+    kaydedilen = []
+    for dosya in dosyalar:
+        ad = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", Path(dosya.filename or "").name).strip(" .")
+        if not ad:
+            continue
+        hedef = ajan.CALISMA / ad
+        n = 2
+        while hedef.exists():
+            hedef = ajan.CALISMA / f"{Path(ad).stem} ({n}){Path(ad).suffix}"
+            n += 1
+        with open(hedef, "wb") as cikti:
+            while parca := await dosya.read(1024 * 1024):
+                cikti.write(parca)
+        kaydedilen.append(hedef.name)
+    return {"kaydedilen": kaydedilen, "klasor": str(ajan.CALISMA)}
+
+
 @app.post("/api/belgeler/tara")
 async def belge_tara():
     return {"basladi": indeks.tara_baslat(), "indeks": indeks.durum()}
@@ -343,7 +387,7 @@ async def belge_tara():
 
 @app.post("/api/klasor-ac/{hangisi}")
 async def klasoru_ac(hangisi: str):
-    klasor = {"belgeler": BELGELER, "calisma": ajan.CALISMA}.get(hangisi)
+    klasor = {"belgeler": BELGELER, "calisma": ajan.CALISMA, "dosyalar": ajan.CALISMA}.get(hangisi)
     if not klasor:
         raise HTTPException(404, "Bilinmeyen klasör")
     klasor.mkdir(parents=True, exist_ok=True)
@@ -468,7 +512,7 @@ AYAR_KURALLARI = {
     "ses_modeli": ("tiny", "base", "small", "medium"), "ses_dili": str,
     "baglam_uzunlugu": (2048, 32768), "ocr": bool, "otomatik_guncelleme": bool,
     "hafiza": bool, "otomatik_hafiza": bool, "yuz_tanima": bool, "ag_erisimi": bool,
-    "onay_modu": ("riskli", "hepsi"), "dusunme": bool, "primerlab": bool,
+    "onay_modu": ("riskli", "hepsi"), "dusunme": bool, "primerlab": bool, "dosyalar_serbest": bool,
 }
 YENIDEN_BASLATMA_GEREKEN = {"ag_erisimi"}
 

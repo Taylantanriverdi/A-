@@ -176,7 +176,7 @@
 
   /* Panellere gömülü küçük sürüm */
   body.gomulu aside, body.gomulu #menuDugme, body.gomulu .ipucu, body.gomulu .disari { display: none !important; }
-  body.uzak [data-klasor], body.uzak #ayarDugme { display: none !important; }
+  body.uzak [data-klasor], body.uzak #ayarDugme, body.uzak #dosyaEkle { display: none !important; }
   body.gomulu header { padding: 8px 10px; gap: 8px; }
   body.gomulu #mesajlar { padding: 14px 10px; }
   body.gomulu footer { padding: 8px; }
@@ -198,6 +198,15 @@
   <div id="sohbetListesi"></div>
 
   <div class="bolum">
+    <h3>📂 Dosyalarım</h3>
+    <div id="dosyaDurum" title="Bu klasördeki dosyalarda asistan onay sormadan her işi yapar">Yükleniyor…</div>
+    <div class="satir">
+      <button id="dosyaEkle" title="Dosya seç ve dosyalar klasörüne ekle (her tür dosya)">Ekle</button>
+      <button data-klasor="dosyalar" title="Dosyalar klasörünü Gezgin'de aç">Klasör</button>
+    </div>
+    <input type="file" id="dosyalarSec" multiple hidden>
+  </div>
+  <div class="bolum">
     <h3>Belgelerim</h3>
     <div id="belgeDurum">Yükleniyor…</div>
     <div class="satir">
@@ -215,7 +224,7 @@
   <div class="bolum">
     <h3>Sistem</h3>
     <div id="sistemDurum"><span class="nokta"></span>Kontrol ediliyor…</div>
-    <div class="satir"><button id="ayarDugme" title="Ayarlar, modeller, hafıza, kişiler, telefon">⚙ Ayarlar</button><button data-klasor="calisma" title="Ajanın dosya yazdığı klasörü aç">Çalışma klasörü</button></div>
+    <div class="satir"><button id="ayarDugme" title="Ayarlar, modeller, hafıza, kişiler, telefon">⚙ Ayarlar</button></div>
   </div>
 </aside>
 
@@ -333,6 +342,7 @@
         <option value="hepsi">Okuma dışındaki her işlemde sor</option>
       </select></div>
     <div class="acik-kapa">
+      <label><input type="checkbox" data-ayar="dosyalar_serbest"> <span>Dosyalar klasöründe onay sorma<small>Dosyalarım klasörünün içinde okuma, yazma, taşıma, silme gibi işleri sormadan yapar. Python/PowerShell yine sorar.</small></span></label>
       <label><input type="checkbox" data-ayar="dusunme"> <span>Düşünerek cevapla<small>qwen3 gibi modellerde cevaptan önce düşünür: zor sorularda daha akıllı ama belirgin şekilde daha yavaş.</small></span></label>
       <label><input type="checkbox" data-ayar="hafiza"> <span>Hafıza<small>Senin hakkında öğrendiklerini her sohbette hatırlar.</small></span></label>
       <label><input type="checkbox" data-ayar="otomatik_hafiza"> <span>Sohbetlerden otomatik öğren<small>Her cevaptan sonra kalıcı bilgileri (adın, işin, tercihlerin) kendisi kaydeder.</small></span></label>
@@ -383,7 +393,7 @@
   </section>
 </dialog>
 <div id="bildirimKutusu" aria-live="polite"></div>
-<div id="surukle">Dosyaları belgelere eklemek için bırakın</div>
+<div id="surukle">Dosyaları “Dosyalarım” klasörüne eklemek için bırakın</div>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -498,7 +508,7 @@ function yeniSohbet() {
 
 // ---------- Mesajları çizme ----------
 const ONERILER = {
-  genel: ["Masaüstünde \"Siparişler 2026\" adında klasör oluştur", "Hesap makinesini aç", "İndirilenler klasöründe ne var?",
+  genel: ["Masaüstünde \"Siparişler 2026\" adında klasör oluştur", "Hesap makinesini aç", "Dosyalarımda ne var?",
     "Bilgisayarımın disk doluluk durumunu göster", "Bana bugün için bir yapılacaklar listesi hazırla"],
   kod: ["Python ile bir klasördeki dosyaları tarihe göre sıralayan kod yaz", "Bu JavaScript kodundaki hatayı bul:", "Excel'de iki tarih arasındaki iş günü formülü nedir?"],
 };
@@ -506,7 +516,7 @@ const ARAC_ADLARI = {
   tarih_saat: "Tarih/saat", sistem_bilgisi: "Sistem bilgisi", hafizaya_kaydet: "Hafızaya kaydetme", belge_ara: "Belgelerde arama",
   dosya_listele: "Klasör listeleme", dosya_oku: "Dosya okuma", klasor_olustur: "Klasör oluşturma", dosya_kopyala: "Kopyalama",
   program_ac: "Açma", dosya_yaz: "Dosya yazma", dosya_tasi: "Taşıma / yeniden adlandırma", cop_kutusuna_at: "Silme (Geri Dönüşüm Kutusu)",
-  python_calistir: "Python çalıştırma", komut_calistir: "PowerShell komutu", dosya_ara: "Dosya arama",
+  python_calistir: "Python çalıştırma", komut_calistir: "PowerShell komutu", dosya_ara: "Dosya arama", icerikte_ara: "Dosya içinde arama",
   primerlab: "PrimerLab'a soruldu", primerlab_uygula: "PrimerLab işlemi",
   klasoru_izle: "Klasör izleme başlatıldı", izlemeleri_listele: "İzlenen klasörler", izlemeyi_durdur: "Klasör izleme durduruldu",
 };
@@ -868,6 +878,7 @@ async function durumuYenile() {
     if (i.calisiyor) b = `İşleniyor ${i.islenen}/${i.toplam}…<br><small>${kacis(i.mesaj)}</small>`;
     else if (i.hatalar?.length) b += `<div class="uyari" title="${kacis(i.hatalar.join("\n"))}">${i.hatalar.length} dosya okunamadı</div>`;
     $("#belgeDurum").innerHTML = b;
+    if (d.dosyalar) $("#dosyaDurum").innerHTML = `${d.dosyalar.sayi} dosya, ${boyutYaz(d.dosyalar.boyut)}<br><small>${kacis(d.dosyalar.klasor)}</small>`;
     $("#belgeTara").disabled = i.calisiyor;
     setTimeout(durumuYenile, i.calisiyor ? 1500 : 10000);
   } catch {
@@ -880,6 +891,18 @@ function modelBilgisi() {
   if (!durumBilgi || iptal) return;
   const m = durumBilgi.modeller;
   $("#modelBilgi").textContent = ayar.mod === "kod" ? m.kod : m.genel;
+}
+
+async function dosyalaraEkle(dosyalar) {
+  if (!dosyalar.length) return;
+  const form = new FormData();
+  for (const d of dosyalar) form.append("dosyalar", d);
+  $("#dosyaDurum").textContent = "Yükleniyor…";
+  try {
+    const r = await fetch("/api/dosyalar/yukle", { method: "POST", body: form });
+    if (!r.ok) throw new Error();
+  } catch { alert("Yükleme başarısız."); }
+  durumuYenile();
 }
 
 async function dosyalariYukle(dosyalar) {
@@ -941,6 +964,8 @@ $("#sesliCevap").onchange = (e) => {
 };
 
 $("#belgeYukle").onclick = () => $("#dosyaSec").click();
+$("#dosyaEkle").onclick = () => $("#dosyalarSec").click();
+$("#dosyalarSec").onchange = (e) => { dosyalaraEkle([...e.target.files]); e.target.value = ""; };
 $("#dosyaSec").onchange = (e) => { dosyalariYukle([...e.target.files]); e.target.value = ""; };
 $("#belgeTara").onclick = async () => { await fetch("/api/belgeler/tara", { method: "POST" }); durumuYenile(); };
 document.querySelectorAll("[data-klasor]").forEach((b) => {
@@ -962,9 +987,9 @@ if (!GOMULU) {
   addEventListener("drop", (e) => {
     e.preventDefault(); surukleSayac = 0; document.body.classList.remove("surukleniyor");
     const dosyalar = [...(e.dataTransfer?.files || [])];
-    // Resimleri soruya ekle, diğer dosyaları belgelere
+    // Resimleri soruya ekle, diğer dosyaları Dosyalarım klasörüne
     resimleriEkle(dosyalar.filter((d) => d.type.startsWith("image/")));
-    dosyalariYukle(dosyalar.filter((d) => !d.type.startsWith("image/")));
+    dosyalaraEkle(dosyalar.filter((d) => !d.type.startsWith("image/")));
   });
 }
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
@@ -1393,7 +1418,7 @@ async function api(yol, secenek = {}) {
   if (!r.ok) throw new Error(veri?.detail || veri?.hata || "İşlem başarısız");
   return veri;
 }
-function boyutYaz(b) { return b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : Math.round(b / 1e6) + " MB"; }
+function boyutYaz(b) { return b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b >= 1e6 ? Math.round(b / 1e6) + " MB" : Math.ceil(b / 1e3) + " KB"; }
 
 async function ayarlariAc(sekme = "genel") {
   sekmeSec(sekme);

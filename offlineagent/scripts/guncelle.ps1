@@ -4,7 +4,7 @@ param([switch]$Sessiz, [switch]$DosyalarGuncel, [switch]$PaketDegisti)
 . (Join-Path $PSScriptRoot 'ortak.ps1')
 
 # Kullanici verisi: guncelleme bunlara asla dokunmaz
-$Korunan = @('ayarlar.json', '.venv', 'araclar', 'modeller', 'veri', 'belgeler')
+$Korunan = @('ayarlar.json', '.venv', 'araclar', 'modeller', 'veri', 'belgeler', 'dosyalar', 'calisma')
 
 try {
     $ayar = Get-Ayarlar
