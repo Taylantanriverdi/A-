@@ -1665,15 +1665,50 @@
       const tp = []; for (let i = 0; i < 6; i++) { const a = i / 5 * 2.6; E(tp, i % 2 ? 0xb8693a : C, 0, Math.sin(a) * 0.17, -Math.sin(a * 0.5) * 0.12 + (i > 3 ? (i - 3) * 0.03 : 0), 0.05 + i * 0.006, 0.06, 0.05); }
       tail.add(am(tp));
       return { g, legs: [], head, tail }; } },
+    horoz: { name: 'Horoz', walk: 1.1, run: 4.5, flee: 3, w: 3, village: true, peck: true, crow: true, make() {
+      const g = new THREE.Group(), C = 0x9a3a16, GOLD = 0xe0902a, p = [];
+      E(p, C, 0, 0.42, 0, 0.15, 0.16, 0.21); E(p, 0x2a2620, 0, 0.38, 0.09, 0.12, 0.13, 0.12);
+      E(p, GOLD, 0, 0.5, 0.11, 0.075, 0.12, 0.075, -0.35, 0, 0); E(p, 0xf0b040, 0, 0.44, 0.13, 0.08, 0.08, 0.06);
+      for (const s of [-1, 1]) { E(p, 0x6a2a10, s * 0.115, 0.41, -0.02, 0.035, 0.09, 0.15, 0.2, 0, 0); E(p, 0x1f3a33, s * 0.12, 0.37, -0.1, 0.03, 0.05, 0.08, 0.3, 0, 0); }
+      g.add(am(p));
+      const head = new THREE.Group(); head.position.set(0, 0.6, 0.15); g.add(head);
+      const hp = [];
+      E(hp, GOLD, 0, 0, 0, 0.048, 0.055, 0.058);
+      for (let i = 0; i < 4; i++) E(hp, 0xd41e1e, 0, 0.06 + Math.sin(i / 3 * Math.PI) * 0.025, 0.04 - i * 0.028, 0.012, 0.03, 0.018); // ibik
+      E(hp, 0xd41e1e, 0, -0.055, 0.035, 0.016, 0.035, 0.014); E(hp, 0xd41e1e, 0, -0.03, 0.045, 0.02, 0.022, 0.012); // sakal
+      hp.push(P(new THREE.ConeGeometry(0.018, 0.05, 8), 0xf0b030, 0, -0.005, 0.075, 1, 1, 1, Math.PI / 2, 0, 0));
+      for (const s of [-1, 1]) { E(hp, 0xf09030, s * 0.04, 0.012, 0.03, 0.012, 0.012, 0.008); E(hp, 0x111111, s * 0.045, 0.012, 0.032, 0.006, 0.006, 0.005); E(hp, 0xf2f2f2, s * 0.045, -0.015, 0.0, 0.008, 0.01, 0.006); }
+      head.add(am(hp));
+      const tail = new THREE.Group(); tail.position.set(0, 0.46, -0.16); g.add(tail);
+      const tp = [], tcols = [0x173a2c, 0x0f2a20, 0x24503c, 0x173a2c, 0x8a3412];
+      for (let i = 0; i < 9; i++) { // kıvrık, parlak orak tüyler
+        const r = 0.1 + (i % 4) * 0.025 + (i > 5 ? 0.03 : 0);
+        tp.push(P(new THREE.TorusGeometry(r, 0.022, 5, 16, 3.0 + (i % 3) * 0.25), tcols[i % tcols.length], (i - 4) * 0.012, 0.02 * (i % 3), r * Math.cos(0) * 0 - 0.01, 1, 1, 0.45, -0.25 + i * 0.09, -Math.PI / 2, 0));
+      }
+      for (let i = 0; i < 5; i++) E(tp, 0x5a2410, (i - 2) * 0.03, 0.02, -0.02, 0.03, 0.06, 0.08, 0.6, 0, 0); // kuyruk dibi
+      tail.add(am(tp));
+      const legs = [-1, 1].map(s => {
+        const l = legGroup(g, s * 0.055, 0.29, 0.0, 0xe8b030, 0.022, 0.017, 0.25, null);
+        const fp = []; E(fp, 0x7a2a10, 0, 0.02, 0, 0.045, 0.06, 0.05); // tüylü üst bacak
+        for (const a of [-0.5, 0, 0.5]) E(fp, 0xe8b030, Math.sin(a) * 0.035, -0.265, Math.cos(a) * 0.035, 0.009, 0.007, 0.038, 0, a, 0); E(fp, 0xe8b030, 0, -0.265, -0.025, 0.007, 0.007, 0.025);
+        l.add(am(fp)); return l;
+      });
+      return { g, legs, head, tail, headZ: 0.15 }; } },
   };
   const AN_KEYS = Object.keys(ANIMALS), AN_W = AN_KEYS.reduce((s, k) => s + ANIMALS[k].w, 0);
   const animals = [], birds = [];
   const ALL_SPECIES = AN_KEYS.length + 1;
-  function spawnAnimal() {
+  function spawnAnimal(force) {
     let w = Math.random() * AN_W, type = AN_KEYS[0];
     for (const k of AN_KEYS) { w -= ANIMALS[k].w; if (w <= 0) { type = k; break; } }
+    if (force) type = force;
     const def = ANIMALS[type], m = def.make(), a = Math.random() * 6.28, d = 22 + Math.random() * 18;
-    const an = { type, def, m, x: S.x + Math.sin(a) * d, z: S.z + Math.cos(a) * d, yaw: Math.random() * 6.28, want: 0, speed: 0, target: 0, timer: 0, t: Math.random() * 9, fleeT: 0, graze: 0 };
+    let x = S.x + Math.sin(a) * d, z = S.z + Math.cos(a) * d;
+    if (def.village && buildings.length && Math.random() < 0.75) { // horozlar çoğunlukla köyün etrafında
+      const b = anyOf(buildings), r = Math.max(b.hw, b.hd) + 2 + Math.random() * 4, aa = Math.random() * 6.28;
+      x = b.x + Math.sin(aa) * r; z = b.z + Math.cos(aa) * r;
+    }
+    const an = { type, def, m, x, z, crowT: 3 + Math.random() * 12, crowing: 0, yaw: Math.random() * 6.28, want: 0, speed: 0, target: 0, timer: 0, t: Math.random() * 9, fleeT: 0, graze: 0 };
     an.want = an.yaw; m.g.rotation.y = an.yaw;
     m.g.position.set(an.x, 0, an.z); scene.add(m.g); animals.push(an);
   }
@@ -1710,7 +1745,7 @@
 
   // ================= Ses =================
   let actx;
-  function sfx(type) {
+  function sfx(type, vol = 1) {
     try {
       if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
       const t = actx.currentTime, dur = { hit: 0.12, rock: 0.09, break: 0.5, crumble: 0.45, build: 0.25, jump: 0.15, pop: 0.12, step: 0.05 }[type] || 0.1;
@@ -1719,6 +1754,19 @@
         o.frequency.setValueAtTime(type === 'chest' ? 140 : 90, t); o.frequency.exponentialRampToValueAtTime(type === 'chest' ? 70 : 60, t + 0.4);
         gn.gain.setValueAtTime(0.05, t); gn.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
         o.connect(gn).connect(actx.destination); o.start(t); o.stop(t + 0.4); return;
+      }
+      if (type === 'crow') { // kikirikiii
+        const notes = [[0, 0.11, 620, 820], [0.15, 0.11, 640, 840], [0.3, 0.14, 760, 980], [0.5, 0.7, 960, 640]];
+        for (const [dl, du, f0, f1] of notes) {
+          const o = actx.createOscillator(), o2 = actx.createOscillator(), f = actx.createBiquadFilter(), gn = actx.createGain();
+          o.type = 'sawtooth'; o2.type = 'square'; o.frequency.setValueAtTime(f0, t + dl); o.frequency.linearRampToValueAtTime(f1, t + dl + du);
+          o2.frequency.setValueAtTime(f0 * 1.01, t + dl); o2.frequency.linearRampToValueAtTime(f1 * 1.01, t + dl + du);
+          f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 2;
+          gn.gain.setValueAtTime(0.0001, t + dl); gn.gain.exponentialRampToValueAtTime(0.09 * vol, t + dl + 0.03); gn.gain.setValueAtTime(0.09 * vol, t + dl + du - 0.05); gn.gain.exponentialRampToValueAtTime(0.0001, t + dl + du);
+          o.connect(f); o2.connect(f); f.connect(gn).connect(actx.destination);
+          o.start(t + dl); o2.start(t + dl); o.stop(t + dl + du + 0.02); o2.stop(t + dl + du + 0.02);
+        }
+        return;
       }
       if (type === 'coin') {
         for (const [fq, dl] of [[880, 0], [1320, 0.09], [1760, 0.18]]) {
@@ -2512,7 +2560,7 @@
       // köyün içine girmesinler: yapılara yaklaşınca uzaklaşsınlar
       let nearB = null; for (const b of buildings) if (Math.hypot(b.x - a.x, b.z - a.z) < 10) { nearB = b; break; }
       if (a.fleeT > 0 || (def.flee && d < def.flee)) { a.want = Math.atan2(-dx, -dz); a.target = def.run; if (a.fleeT <= 0) a.fleeT = 1.2; a.graze = 0; }
-      else if (nearB && a.timer > 0.5) { a.want = Math.atan2(a.x - nearB.x, a.z - nearB.z); a.target = def.walk; }
+      else if (nearB && !def.village && a.timer > 0.5) { a.want = Math.atan2(a.x - nearB.x, a.z - nearB.z); a.target = def.walk; }
       else if (a.timer <= 0) {
         a.timer = 2.5 + Math.random() * 4;
         if (Math.random() < 0.4) { a.target = 0; a.graze = def.legs !== false ? 1 : 0; }  // durup otla
@@ -2530,8 +2578,16 @@
       const ph = a.t * (a.speed > 3 ? 13 : 7);
       m.g.position.set(a.x, def.hop && a.speed > 0.3 ? Math.abs(Math.sin(ph)) * 0.25 : 0, a.z);
       const ls = Math.sin(ph) * 0.6 * Math.min(a.speed / def.walk, 1.2);
+      if (m.legs.length === 2) { m.legs[0].rotation.x = ls; m.legs[1].rotation.x = -ls; }
       if (m.legs.length === 4) { m.legs[0].rotation.x = ls; m.legs[3].rotation.x = ls; m.legs[1].rotation.x = -ls; m.legs[2].rotation.x = -ls; }
-      if (m.head) m.head.rotation.x += ((a.graze && a.speed < 0.2 ? 0.7 + Math.sin(a.t * 3) * 0.08 : 0) - m.head.rotation.x) * Math.min(dt * 4, 1);
+      if (def.crow) { // horoz: yemi gagalar, ara sıra öter
+        a.crowT -= dt;
+        if (a.crowT <= 0 && a.speed < 0.3) { a.crowT = 12 + Math.random() * 18; a.crowing = 1.4; if (d < 35) sfx('crow', Math.max(0.15, 1 - d / 35)); }
+        if (a.crowing > 0) { a.crowing -= dt; m.head.rotation.x += (-0.7 - m.head.rotation.x) * Math.min(dt * 8, 1); }
+        else m.head.rotation.x = a.graze && a.speed < 0.2 ? (Math.sin(a.t * 9) > 0.3 ? 1.1 : 0.2) : 0;
+        m.head.position.z = m.headZ + (a.speed > 0.2 ? Math.sin(ph * 2) * 0.025 : 0);
+      }
+      else if (m.head) m.head.rotation.x += ((a.graze && a.speed < 0.2 ? 0.7 + Math.sin(a.t * 3) * 0.08 : 0) - m.head.rotation.x) * Math.min(dt * 4, 1);
       if (m.tail) m.tail.rotation.y = Math.sin(a.t * 6) * 0.3;
     }
     for (let i = birds.length - 1; i >= 0; i--) {
