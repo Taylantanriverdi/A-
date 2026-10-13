@@ -17,6 +17,7 @@
   "otomatik_guncelleme": true,
   "depo": "Taylantanriverdi/A-",
   "guncelleme_dali": "claude/keen-wozniak-zjal69",
+  "primerlab": false,
   "primerlab_adresi": "http://127.0.0.1:5169",
   "primerlab_anahtar": "C:\\PrimerLab\\Uygulama\\App_Data\\Secrets\\offline-agent.anahtar"
 }

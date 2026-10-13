@@ -22,7 +22,7 @@ from starlette.concurrency import run_in_threadpool
 import hafiza
 import izleyici
 import primerlab
-from ayarlar import KOK
+from ayarlar import KOK, ayarlari_oku
 from belge_oku import belgeyi_oku
 from ollama_api import OllamaHatasi, sohbet_akisi
 
@@ -451,6 +451,17 @@ ARACLAR = {
 ARAC_TANIMLARI = [tanim for ad, (_, _, tanim) in ARACLAR.items() if ad != "primerlab_uygula"]
 
 
+def primerlab_acik() -> bool:
+    """PrimerLab bağlantısı Ayarlar'dan açılıp kapatılır (varsayılan kapalı)."""
+    return bool(ayarlari_oku().get("primerlab", False))
+
+
+def arac_tanimlari() -> list[dict]:
+    if primerlab_acik():
+        return ARAC_TANIMLARI
+    return [t for t in ARAC_TANIMLARI if t["function"]["name"] != "primerlab"]
+
+
 def onay_gerekli(ad: str, argumanlar: dict, onay_modu: str = "riskli") -> bool:
     if ad not in ARACLAR:
         return False
@@ -483,8 +494,8 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "- Önce hazır araçları kullan (klasor_olustur, dosya_kopyala, program_ac...); hiçbiri uymazsa komut_calistir.\n"
         "- Bir klasörü sürekli takip etmen ya da yeni gelenleri bildirmen istenirse klasoru_izle aracını kullan. "
         "Asla döngü ya da bekleme içeren komut yazma: komutlar en fazla 2 dakika çalışabilir.\n"
-        "- Laboratuvarla ilgili her soru ve istekte (işler, hastalar, hekimler, cari, tahsilat, teknisyen, teslim...) "
-        "primerlab aracını kullan; laboratuvar bilgisi uydurma.\n"
+        + ("- Laboratuvarla ilgili her soru ve istekte (işler, hastalar, hekimler, cari, tahsilat, teknisyen, teslim...) "
+           "primerlab aracını kullan; laboratuvar bilgisi uydurma.\n" if primerlab_acik() else "") +
         "- Silme, taşıma, üzerine yazma, kod ve komut kullanıcı onayı ister; kullanıcı reddederse başka yol öner.\n"
         "- Bir araç hata verirse hatayı oku, düzelt ve tekrar dene. Emin olmadığın dosya adını önce dosya_listele ile bul.\n"
         "- İş bitince ne yaptığını tek cümleyle söyle (ör. 'Masaüstünde \"Raporlar\" klasörünü oluşturdum.').\n"
@@ -550,7 +561,7 @@ def hizli_komut(metin: str) -> dict | None:
     m = HIZLI_UYGULAMA.search(metin)
     if m:
         return {"function": {"name": "program_ac", "arguments": {"hedef": m.group("ad").casefold()}}}
-    if LAB.search(metin) and not DOSYA_ISI.search(metin) and primerlab.kurulu():
+    if primerlab_acik() and LAB.search(metin) and not DOSYA_ISI.search(metin) and primerlab.kurulu():
         return {"function": {"name": "primerlab", "arguments": {"istek": metin.strip()}}}
     m = HIZLI_AC.search(metin)
     if m and not EYLEM_DISI.search(m.group("ad")):
@@ -701,7 +712,7 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
 
         icerik, cagrilar = "", []
         async for olay in sohbet_akisi(model, [{"role": "system", "content": sistem_istemi(belgeler)}, *mesajlar, *itme],
-                                       baglam, ARAC_TANIMLARI, dusun):
+                                       baglam, arac_tanimlari(), dusun):
             if "t" in olay:
                 icerik += olay["t"]
                 yield olay

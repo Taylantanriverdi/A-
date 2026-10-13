@@ -97,6 +97,8 @@ Küçük model bazen işi yapmak yerine "şu komutu çalıştırın" gibi talima
 
 ## PrimerLab'ı kontrol etme
 
+> **Şimdilik kapalı.** Açmak için ⚙ Ayarlar > Genel > **PrimerLab bağlantısı**.
+
 PrimerLab **V56 veya sonrası** aynı bilgisayarda kuruluysa Offline Agent onu yönetebilir. Yazman ya da canlı modda söylemen yeterli:
 
 - "Geciken işler hangileri?" / "Bugün teslim edilecekler"

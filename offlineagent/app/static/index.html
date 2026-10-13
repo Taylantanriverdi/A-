@@ -338,6 +338,7 @@
       <label><input type="checkbox" data-ayar="otomatik_hafiza"> <span>Sohbetlerden otomatik öğren<small>Her cevaptan sonra kalıcı bilgileri (adın, işin, tercihlerin) kendisi kaydeder.</small></span></label>
       <label><input type="checkbox" data-ayar="yuz_tanima"> <span>Kamerada yüz tanıma<small>Kişiler sekmesinde öğrettiğin kişileri tanır.</small></span></label>
       <label><input type="checkbox" data-ayar="ocr"> <span>Taranmış belgelerden yazı oku (OCR)</span></label>
+      <label><input type="checkbox" data-ayar="primerlab"> <span>PrimerLab bağlantısı<small>Açıkken laboratuvar soruları PrimerLab'a (V56+) gider. Şimdilik kapalı.</small></span></label>
       <label><input type="checkbox" data-ayar="otomatik_guncelleme"> <span>Otomatik güncelleme<small>İnternet varsa günde bir kez yeni sürümü kontrol eder.</small></span></label>
     </div>
     <div class="satir-btn"><button class="ana" id="ayarKaydet">Kaydet</button><span class="not" id="ayarDurum"></span></div>
@@ -497,7 +498,7 @@ function yeniSohbet() {
 
 // ---------- Mesajları çizme ----------
 const ONERILER = {
-  genel: ["Geciken işler hangileri?", "Masaüstünde \"Siparişler 2026\" adında klasör oluştur", "Hesap makinesini aç", "İndirilenler klasöründe ne var?",
+  genel: ["Masaüstünde \"Siparişler 2026\" adında klasör oluştur", "Hesap makinesini aç", "İndirilenler klasöründe ne var?",
     "Bilgisayarımın disk doluluk durumunu göster", "Bana bugün için bir yapılacaklar listesi hazırla"],
   kod: ["Python ile bir klasördeki dosyaları tarihe göre sıralayan kod yaz", "Bu JavaScript kodundaki hatayı bul:", "Excel'de iki tarih arasındaki iş günü formülü nedir?"],
 };

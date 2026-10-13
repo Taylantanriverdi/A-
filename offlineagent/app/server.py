@@ -291,7 +291,7 @@ async def durum(request: Request):
         "ses_modeli": ses.model_var(ayarlar["ses_modeli"]),
         "yuz_modeli": yuz.modeller_var(),
         "uzak": uzak_mi(request),
-        "primerlab": await run_in_threadpool(primerlab.durum),
+        "primerlab": await run_in_threadpool(primerlab.durum) if ayarlar.get("primerlab", False) else None,
         "izlemeler": izleyici.liste(),
         "indeks": indeks.durum(),
         "belge_klasoru": str(BELGELER),
@@ -468,7 +468,7 @@ AYAR_KURALLARI = {
     "ses_modeli": ("tiny", "base", "small", "medium"), "ses_dili": str,
     "baglam_uzunlugu": (2048, 32768), "ocr": bool, "otomatik_guncelleme": bool,
     "hafiza": bool, "otomatik_hafiza": bool, "yuz_tanima": bool, "ag_erisimi": bool,
-    "onay_modu": ("riskli", "hepsi"), "dusunme": bool,
+    "onay_modu": ("riskli", "hepsi"), "dusunme": bool, "primerlab": bool,
 }
 YENIDEN_BASLATMA_GEREKEN = {"ag_erisimi"}
 
