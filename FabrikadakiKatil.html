@@ -135,6 +135,20 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   width: 60px; height: 60px; border-radius: 50%; border: 0; background: #59616d; color: #fff;
   font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
 }
+.shh span {
+  display: inline-block; font-family: var(--font-display); font-size: clamp(64px, 20vw, 150px); color: #fff;
+  background: var(--danger); padding: 10px 34px; border-radius: 22px; transform: rotate(-6deg);
+  box-shadow: 0 10px 0 #5a0b0b; animation: shhPop .4s ease-out;
+}
+@keyframes shhPop { from { transform: rotate(-6deg) scale(.3); } to { transform: rotate(-6deg) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .shh span { animation: none; } }
+#roleCard { display: flex; flex-direction: column; gap: 14px; }
+#sabBtn {
+  position: absolute; right: calc(186px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; border-radius: 50%; border: 0; background: #2a2f38; color: var(--hazard);
+  font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
+}
+#info .warn-line { color: var(--danger); font-weight: 900; margin-bottom: 4px; }
 #minimap {
   position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
   width: 180px; height: 132px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
@@ -162,6 +176,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <button id="worldBtn" type="button" aria-label="Başka dünyaya git">D</button>
   <button id="reportBtn" type="button" aria-label="Ölüyü raporla">R</button>
   <button id="ventBtn" type="button" aria-label="Havalandırmaya gir">V</button>
+  <button id="sabBtn" type="button" aria-label="Işıkları söndür">S</button>
 </div>
 
 <div class="screen" id="menu">
@@ -174,7 +189,8 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>← ↑ → ↓</kbd><span>Yürü (ok tuşları)</span>
       <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
-      <kbd>R</kbd><span>Ölüyü raporla, toplantıda katili seç</span>
+      <kbd>R</kbd><span>Ölüyü raporla ya da ortadaki kırmızı acil durum düğmesine bas</span>
+      <kbd>S</kbd><span>Katilsen ışıkları söndür (sabotaj)</span>
       <kbd>F</kbd><span>Tam ekran aç / kapat</span>
       <kbd>V</kbd><span>Katilsen havalandırmadan başka yere ışınlan</span>
       <kbd>M</kbd><span>Sesi aç / kapat</span>
@@ -189,9 +205,12 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
 
 <div class="screen" id="reveal" hidden>
   <div class="card" style="background:transparent;border:0;box-shadow:none">
+    <div id="shh" class="shh"><span>ŞŞŞT!</span></div>
+    <div id="roleCard" hidden>
     <p class="muted" style="font-family:var(--font-display)">BU OYUNDA SEN...</p>
     <h2 id="revealTitle">MASUMSUN</h2>
     <p id="revealText"></p>
+    </div>
   </div>
 </div>
 
@@ -527,12 +546,12 @@ function updateParticles(dt, time) {
 function setWorld(i) {
   worldIndex = i;
   const w = WORLDS[i];
-  scene.background.setHex(w.bg); scene.fog.color.setHex(w.bg);
   floor.material.color.setHex(w.floor);
   wallMat.color.setHex(w.wall); crateMat.color.setHex(w.crate);
   machineMat.color.setHex(w.machine); barrelMat.color.setHex(w.barrel);
-  hemi.color.setHex(w.sky); hemi.groundColor.setHex(w.ground); hemi.intensity = w.hemiI;
-  sun.color.setHex(w.sun); sun.intensity = w.sunI;
+  hemi.color.setHex(w.sky); hemi.groundColor.setHex(w.ground);
+  sun.color.setHex(w.sun);
+  applyLights();
   lamps.forEach(l => l.color.setHex(w.lamp));
   particles.visible = !!w.particles;
   if (w.particles) { pMat.color.setHex(w.particles.color); pMat.size = w.particles.size; resetParticles(w.particles); }
@@ -620,6 +639,72 @@ TASKS.forEach(t => {
   t.gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35), new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0xffaa00, emissiveIntensity: .8 }));
   t.gem.position.set(t.x, 3, t.z); scene.add(t.gem);
 });
+// ---------- Acil durum masası (ortada, R ile toplantı) ----------
+const BUTTON = { x: 0, z: -4 };
+{
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.4, .9, 32), mat(0x5a6470, { metalness: .4 }));
+  table.position.set(BUTTON.x, .45, BUTTON.z); table.castShadow = table.receiveShadow = true; scene.add(table);
+  const btn = new THREE.Mesh(new THREE.CylinderGeometry(.38, .42, .18, 24), new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0x880000 }));
+  btn.position.set(BUTTON.x, 1, BUTTON.z); scene.add(btn);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(.55, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xcfefff, transparent: true, opacity: .3, roughness: .05 }));
+  dome.position.set(BUTTON.x, .9, BUTTON.z); scene.add(dome);
+  obstacles.push({ x1: BUTTON.x - 1.3, x2: BUTTON.x + 1.3, z1: BUTTON.z - 1.3, z2: BUTTON.z + 1.3 });
+}
+let meetingsLeft = 1;
+const nearButton = () => player && Math.hypot(player.g.position.x - BUTTON.x, player.g.position.z - BUTTON.z) < 3.4;
+
+// ---------- Elektrik panosu ve ışık sabotajı ----------
+const PANEL = { x: -18, z: -19.6 };
+const panelLamp = new THREE.MeshBasicMaterial({ color: 0x22ff66 });
+box(1.6, 2, .3, PANEL.x, 1.6, -21.8, mat(0xd8b020, { metalness: .4 }), false);
+box(.5, .5, .1, PANEL.x, 2.1, -21.6, panelLamp, false);
+let lightsOut = false, lightsT = 0, fixProgress = 0, sabCd = 15, npcSabT = 40;
+const seeR = () => lightsOut ? 3 : 7;
+
+function applyLights() {
+  const w = WORLDS[worldIndex];
+  const dark = lightsOut && !isKiller;   // katil karanlıkta da görür
+  hemi.intensity = w.hemiI * (dark ? .3 : 1);
+  sun.intensity = w.sunI * (dark ? .15 : 1);
+  scene.background.setHex(dark ? 0x000000 : w.bg);
+  scene.fog.color.setHex(dark ? 0x000000 : w.bg);
+  scene.fog.near = dark ? 14 : 45; scene.fog.far = dark ? 24 : 90;  // kamera oyuncudan ~17 birim uzakta
+  panelLamp.color.setHex(lightsOut ? 0xff2222 : 0x22ff66);
+}
+function sabotageLights() {
+  if (lightsOut || state !== 'play') return;
+  lightsOut = true; lightsT = 30; fixProgress = 0;
+  applyLights();
+  sfx.lightsOff();
+  toast(isKiller ? 'Işıkları söndürdün! Artık kimse uzağı göremez.' : 'Işıklar söndü! Elektrik panosunu tamir et!');
+}
+function restoreLights(fixed) {
+  if (!lightsOut) return;
+  lightsOut = false;
+  applyLights();
+  sfx.lightsOn();
+  if (fixed) toast('Işıkları tamir ettin!');
+  else if (state === 'play') toast('Işıklar geri geldi.');
+}
+function updateSabotage(dt) {
+  if (isKiller) sabCd = Math.max(0, sabCd - dt);
+  else if (!lightsOut) {
+    npcSabT -= dt;
+    if (npcSabT <= 0) { npcSabT = 45 + Math.random() * 25; if (npcs.some(n => n.impostor && n.alive)) sabotageLights(); }
+  }
+  if (lightsOut) {
+    lightsT -= dt;
+    if (lightsT <= 0) restoreLights(false);
+  }
+}
+function playerSabotage() {
+  if (state !== 'play' || !isKiller || lightsOut) return;
+  if (sabCd > 0) { toast(`Sabotaj için bekle: ${Math.ceil(sabCd)} sn`); return; }
+  sabCd = 45;
+  sabotageLights();
+}
+
 // ---------- Havalandırmalar (sadece katil kullanır) ----------
 const VENTS = [[-24, -8], [-12, -18], [24, -8], [20, 4], [12, 18], [-20, 4]].map(([x, z]) => {
   const g = new THREE.Group();
@@ -643,7 +728,7 @@ function useVent() {
   if (state !== 'play' || !isKiller) return;
   const i = nearestVent();
   if (i < 0) return;
-  const seen = aliveNpcs().filter(n => dist(n, player) < 7);
+  const seen = aliveNpcs().filter(n => dist(n, player) < seeR());
   const next = VENTS[(i + 1) % VENTS.length];
   player.g.position.set(next.x, 0, next.z);
   sfx.vent();
@@ -757,6 +842,9 @@ const sfx = {
   revealKiller() { beep(110, 1.4, 'sawtooth', .1, 55); beep(165, 1.4, 'sawtooth', .06, 82, .1); },
   revealCrew() { [523, 659, 784].forEach((f, i) => beep(f, .5, 'triangle', .1, 0, i * .12)); },
   step() { noise(.05, .04, 900, 500); },
+  shh() { noise(1.1, .18, 5000, 3500, .1); beep(80, .6, 'sine', .3, 40); },
+  lightsOff() { beep(400, 1, 'sawtooth', .12, 40); noise(.3, .2, 1200, 200); },
+  lightsOn() { beep(60, .6, 'sawtooth', .1, 300); [523, 784].forEach((f, i) => beep(f, .15, 'triangle', .1, 0, .5 + i * .1)); },
   vent() { noise(.25, .3, 300, 120); noise(.4, .15, 2000, 400, .2); beep(140, .3, 'square', .08, 60, .05); },
   win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => beep(f, i === 6 ? .6 : .18, 'triangle', .15, 0, i * .13)); },
   lose() { [392, 370, 349, 294].forEach((f, i) => beep(f, i === 3 ? .9 : .35, 'sawtooth', .1, i === 3 ? 220 : 0, i * .38)); },
@@ -768,7 +856,7 @@ const COLORS = [
   ['Pembe', 0xff8ccf], ['Mavi', 0x2457ff], ['Yeşil', 0x1fa64a], ['Sarı', 0xf2d40c],
   ['Turuncu', 0xff8a1c], ['Mor', 0x8b45d6], ['Camgöbeği', 0x2fe0d8], ['Beyaz', 0xe9eef2],
 ];
-let state = 'menu';
+let state = 'menu', roleShown = false;
 let player = null, npcs = [], corpses = [], isKiller = false, killCd = 0, revealT = 0, caughtT = -1, witnessName = '';
 let actionHeld = false, actionPressed = false;
 const keys = new Set();
@@ -776,6 +864,7 @@ const joy = { x: 0, z: 0 };
 
 function clearRound() {
   meetOutcome = null;
+  if (lightsOut) { lightsOut = false; applyLights(); }
   [player, ...npcs].forEach(e => e && scene.remove(e.g));
   corpses.forEach(c => scene.remove(c));
   npcs = []; corpses = []; player = null;
@@ -787,10 +876,10 @@ function newRound() {
   clearRound();
   isKiller = Math.random() < 1 / 3;
   player = Object.assign(makeCrew(0xe53935), { name: 'Kırmızı', isPlayer: true, alive: true, color: 0xe53935 });
-  player.g.position.set(0, 0, -4);
+  player.g.position.set(0, 0, -1);
   const pool = COLORS.slice().sort(() => Math.random() - .5).slice(0, 7);
   pool.forEach(([name, color], i) => {
-    const a = (i / pool.length) * Math.PI * 2;
+    const a = ((i + 1) / (pool.length + 1)) * Math.PI * 2 + Math.PI / 2;
     const n = Object.assign(makeCrew(color), { name, color, alive: true, target: randomWaypoint(), wait: Math.random() * 2,
       stuck: 0, detour: null, detourT: 0, impostor: false, killTimer: 0, prey: null, huntT: 0, lastPos: null });
     n.g.position.set(Math.cos(a) * 3, 0, -4 + Math.sin(a) * 3);
@@ -803,6 +892,8 @@ function newRound() {
   }
   killCd = 10;
   caughtT = -1;
+  meetingsLeft = 1; sabCd = 15; npcSabT = 40 + Math.random() * 20;
+  lightsOut = false; applyLights();
   TASKS.forEach(t => {
     t.done = false; t.progress = 0;
     t.ring.visible = t.gem.visible = !isKiller;
@@ -813,9 +904,11 @@ function newRound() {
   $('revealText').textContent = isKiller
     ? 'Herkesi tek tek yakala. Ama dikkat et, yakında başka biri varsa seni görür!'
     : 'Sarı yerlerdeki görevleri yap. Aranızda gizli bir katil var, ondan kaç!';
+  // Önce "Şşşt!" ekranı, sonra rol
+  $('shh').hidden = false; $('roleCard').hidden = true;
   show('reveal');
-  state = 'reveal'; revealT = 2.8;
-  isKiller ? sfx.revealKiller() : sfx.revealCrew();
+  state = 'reveal'; revealT = 4.3; roleShown = false;
+  sfx.shh();
 }
 
 function show(id) {
@@ -838,16 +931,22 @@ const hex = c => '#' + c.toString(16).padStart(6, '0');
 let meetOutcome = null;
 
 function report() {
+  if (state !== 'play') return;
   const c = nearestCorpse();
-  if (!c || state !== 'play') return;
+  const emergency = !c && nearButton() && meetingsLeft > 0;
+  if (!c && !emergency) return;
+  if (emergency) meetingsLeft--;
+  restoreLights(false);
   state = 'meeting';
   keys.clear(); actionHeld = false;
   sfx.alarm();
   corpses.forEach(o => scene.remove(o));
   corpses = [];
-  $('meetText').textContent = isKiller
-    ? `${c.userData.name} karakterinin cesedini rapor ettin. Suçu kime atacaksın?`
-    : `${c.userData.name} karakterinin cesedini buldun! Sence katil kim? Birini seç.`;
+  $('meetText').textContent = emergency
+    ? (isKiller ? 'Acil durum düğmesine bastın! Suçu kime atacaksın?' : 'Acil durum toplantısı! Sence katil kim? Birini seç.')
+    : isKiller
+      ? `${c.userData.name} karakterinin cesedini rapor ettin. Suçu kime atacaksın?`
+      : `${c.userData.name} karakterinin cesedini buldun! Sence katil kim? Birini seç.`;
   $('meetResult').textContent = '';
   $('meetBtn').hidden = true;
   const list = $('voteList');
@@ -930,7 +1029,7 @@ function endMeeting() {
   const group = [player, ...aliveNpcs()];
   group.forEach((e, i) => {
     const a = (i / group.length) * Math.PI * 2;
-    e.g.position.set(i === 0 ? 0 : Math.cos(a) * 3, 0, i === 0 ? -4 : -4 + Math.sin(a) * 3);
+    e.g.position.set(BUTTON.x + Math.cos(a + Math.PI / 2) * 3, 0, BUTTON.z + Math.sin(a + Math.PI / 2) * 3);
   });
   npcs.forEach(n => { if (n.impostor) { n.killTimer = 15 + Math.random() * 6; n.prey = null; } });
   killCd = 10;
@@ -996,7 +1095,7 @@ function doKill(killer, victim) {
 function aliveNpcs() { return npcs.filter(n => n.alive); }
 
 function witnesses(victim, killer) {
-  return aliveNpcs().filter(n => n !== victim && n !== killer && dist(n, victim) < 7);
+  return aliveNpcs().filter(n => n !== victim && n !== killer && dist(n, victim) < seeR());
 }
 
 function endGame(win, title, text) {
@@ -1131,9 +1230,23 @@ function interact(dt) {
     }
   }
   if (nearestCorpse()) html += `<div class="report">R: Ölüyü raporla</div>`;
+  else if (nearButton()) html += meetingsLeft > 0
+    ? `<div class="report">R: Acil durum düğmesine bas</div>`
+    : `<div>Acil durum düğmesini zaten kullandın</div>`;
+  if (lightsOut && !isKiller) {
+    const dp = Math.hypot(player.g.position.x - PANEL.x, player.g.position.z - PANEL.z);
+    if (dp < 2.4) {
+      if (actionHeld) { fixProgress = Math.min(1, fixProgress + dt / 1.5); if (Math.random() < .2) sfx.taskTick(); }
+      if (fixProgress >= 1) restoreLights(true);
+      else html = `<div>E tuşuna basılı tut: Işıkları tamir et</div><div class="bar"><i style="width:${fixProgress * 100}%"></i></div>` + html;
+    } else {
+      html += `<div class="warn">Işıklar sönük! Elektrik panosu sol üst köşede.</div>`;
+    }
+  }
+  if (isKiller && !lightsOut && sabCd <= 0) html += `<div class="report">S: Işıkları söndür</div>`;
   if (isKiller && nearestVent() >= 0) {
     html += `<div class="report">V: Havalandırmaya gir</div>`;
-    const seen = aliveNpcs().filter(n => dist(n, player) < 7);
+    const seen = aliveNpcs().filter(n => dist(n, player) < seeR());
     if (seen.length) html += `<div class="warn">Dikkat! ${seen[0].name} girdiğini görür!</div>`;
   }
   actionPressed = false;
@@ -1162,6 +1275,12 @@ function drawMinimap() {
     mctx.fillStyle = '#9aa4ad';
     VENTS.forEach(v => mctx.fillRect(sx(v.x) - 7, sz(v.z) - 5, 14, 10));
   }
+  mctx.fillStyle = '#ff2a2a';
+  mctx.beginPath(); mctx.arc(sx(BUTTON.x), sz(BUTTON.z), 6, 0, Math.PI * 2); mctx.fill();
+  if (lightsOut && !isKiller && Math.floor(performance.now() / 300) % 2) {
+    mctx.fillStyle = '#ffe14a';
+    mctx.fillRect(sx(PANEL.x) - 8, sz(PANEL.z) - 8, 16, 16);
+  }
   mctx.strokeStyle = '#ff3d3d'; mctx.lineWidth = 4;
   corpses.forEach(c => {
     const x = sx(c.position.x), y = sz(c.position.z);
@@ -1177,12 +1296,12 @@ function drawHud() {
   if (!player) return;
   if (isKiller) {
     const left = aliveNpcs().length;
-    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>
+    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>${lightsOut ? '<div class="warn-line">Işıklar sönük, kimse uzağı göremez</div>' : sabCd > 0 ? `<div class="muted">Sabotaj: ${Math.ceil(sabCd)} sn</div>` : '<div class="warn-line">S: Işıkları söndür</div>'}
       <div>Kalan kişi: <b>${left}</b> / ${npcs.length}</div>
       <div class="muted" style="margin-top:4px">Yalnız birini bul, yanına git, E'ye bas.</div>`;
   } else {
     const done = TASKS.filter(t => t.done).length;
-    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>
+    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>${lightsOut ? '<div class="warn-line">IŞIKLAR SÖNDÜ!</div>' : ''}
       <div class="count">Görevler: ${done} / ${TASKS.length}</div>
       <ul>${TASKS.map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('')}</ul>
       <div class="bar"><i style="width:${done / TASKS.length * 100}%"></i></div>`;
@@ -1218,12 +1337,17 @@ function frame(now) {
 
   if (state === 'reveal') {
     revealT -= dt;
+    if (!roleShown && revealT <= 2.8) {
+      roleShown = true;
+      $('shh').hidden = true; $('roleCard').hidden = false;
+      isKiller ? sfx.revealKiller() : sfx.revealCrew();
+    }
     if (revealT <= 0) { state = 'play'; show(null); drawHud(); }
   }
   if (state === 'play' || state === 'reveal') {
     if (state === 'play') updatePlayer(dt);
     npcs.forEach(n => updateNpc(n, dt));
-    if (state === 'play') interact(dt);
+    if (state === 'play') { interact(dt); updateSabotage(dt); }
     if (caughtT > 0 && state === 'play') {
       caughtT -= dt;
       if (caughtT <= 0) endGame(false, 'YAKALANDIN!', `${witnessName} seni gördü ve herkese söyledi. Bir dahakine kimse yokken yap!`);
@@ -1278,6 +1402,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (e.code === 'KeyR' && !e.repeat && state === 'play') { report(); return; }
+  if (e.code === 'KeyS' && !e.repeat && state === 'play') { playerSabotage(); return; }
   if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
   if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
   if (e.code === 'KeyV' && !e.repeat) { useVent(); return; }
@@ -1300,6 +1425,7 @@ $('startBtn').addEventListener('click', startGame);
 $('worldBtn').addEventListener('click', nextWorld);
 $('reportBtn').addEventListener('click', report);
 $('ventBtn').addEventListener('click', useVent);
+$('sabBtn').addEventListener('click', playerSabotage);
 $('meetBtn').addEventListener('click', endMeeting);
 $('quit').addEventListener('click', toMenu);
 $('deadBtn').addEventListener('click', newRound);
