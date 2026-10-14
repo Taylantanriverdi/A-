@@ -11,6 +11,7 @@
   --fg: #f4efe4;
   --muted: #a3acb6;
   --pink: #ff8ccf;
+  --red: #ff5a52;
   --hazard: #ffc928;
   --danger: #ff3d3d;
   --ok: #4ade80;
@@ -66,6 +67,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
   min-width: 180px; max-width: min(300px, calc(100vw - 120px)); font-size: 14px;
 }
+#info .world { color: var(--hazard); font-size: 13px; font-weight: 800; margin-bottom: 4px; }
 #info .role { font-family: var(--font-display); font-size: 18px; margin-bottom: 6px; }
 #info ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 #info li.done { color: var(--ok); text-decoration: line-through; }
@@ -103,6 +105,11 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   width: 86px; height: 86px; border-radius: 50%; border: 0; background: var(--hazard); color: #1a1400;
   font-family: var(--font-display); font-size: 26px; pointer-events: auto; touch-action: none;
 }
+#worldBtn {
+  position: absolute; right: calc(124px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; border-radius: 50%; border: 0; background: #8fd3ff; color: #0b2233;
+  font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
+}
 @media (pointer: fine) { #touch { display: none; } }
 @media (pointer: coarse) { #prompt { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { #flash, #toast, #info .bar > i { transition: none; } }
@@ -121,19 +128,22 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
   <button id="actBtn" type="button">E</button>
+  <button id="worldBtn" type="button" aria-label="Başka dünyaya git">D</button>
 </div>
 
 <div class="screen" id="menu">
   <div class="card">
     <div class="hazard"></div>
     <h1>FABRİKADAKİ KATİL</h1>
-    <p>Sen <b style="color:var(--pink)">pembe</b> karaktersin. Fabrikada senin gibi 7 arkadaşın daha var, hepsinin rengi farklı.
+    <p>Sen <b style="color:var(--red)">kırmızı</b> karaktersin. Fabrikada senin gibi 7 arkadaşın daha var, hepsinin rengi farklı.
       Her oyunda <b>3'te 1</b> ihtimalle <b style="color:var(--danger)">KATİL</b> sen olursun!</p>
     <div class="keys">
-      <kbd>W A S D</kbd><span>Yürü (ok tuşları da olur)</span>
+      <kbd>← ↑ → ↓</kbd><span>Yürü (ok tuşları)</span>
+      <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman</span>
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
+    <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
     <button class="big" id="startBtn" type="button">OYNA</button>
     <p class="muted" style="font-size:13px">Enter tuşuna da basabilirsin</p>
     <div class="hazard"></div>
@@ -193,17 +203,19 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-scene.add(new THREE.HemisphereLight(0xcfe3ff, 0x2a2018, 0.55));
+const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x2a2018, 0.55);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2dd, 0.85);
 sun.position.set(-14, 30, 18);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 30, bottom: -30, near: 1, far: 80 });
 scene.add(sun);
-[[-18, 0, 0xffa040], [18, 0, 0xffa040], [0, -16, 0x80c0ff], [0, 16, 0xffd080]].forEach(([x, z, c]) => {
+const lamps = [[-18, 0, 0xffa040], [18, 0, 0xffa040], [0, -16, 0x80c0ff], [0, 16, 0xffd080]].map(([x, z, c]) => {
   const p = new THREE.PointLight(c, 0.7, 26, 2);
   p.position.set(x, 7, z);
   scene.add(p);
+  return p;
 });
 
 function canvasTex(size, draw, rx = 1, ry = 1) {
@@ -217,12 +229,12 @@ function canvasTex(size, draw, rx = 1, ry = 1) {
   return t;
 }
 const floorTex = canvasTex(256, (g, s) => {
-  g.fillStyle = '#5b6068'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#c4c8ce'; g.fillRect(0, 0, s, s);
   for (let i = 0; i < 1400; i++) {
     g.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '255,255,255'},${Math.random() * .06})`;
     g.fillRect(Math.random() * s, Math.random() * s, 3, 3);
   }
-  g.strokeStyle = '#3d4148'; g.lineWidth = 4; g.strokeRect(0, 0, s, s);
+  g.strokeStyle = '#8a9098'; g.lineWidth = 4; g.strokeRect(0, 0, s, s);
 }, 15, 11);
 const hazardTex = canvasTex(64, (g, s) => {
   g.fillStyle = '#16181c'; g.fillRect(0, 0, s, s);
@@ -268,8 +280,9 @@ const pipeMat = mat(0x9aa4ad, { metalness: .7, roughness: .35 });
 
 // Makineler
 const pistons = [], beacons = [], blinkers = [];
+const machineMat = mat(0x7d8691, { metalness: .5, roughness: .45 });
 function machine(x, z, w, d, color) {
-  box(w, 3.2, d, x, 1.6, z, mat(0x7d8691, { metalness: .5, roughness: .45 }));
+  box(w, 3.2, d, x, 1.6, z, machineMat);
   box(w - .6, .5, d - .6, x, 3.45, z, mat(0x4a525c, { metalness: .5 }), false);
   [-1, 1].forEach(s => {
     box(w * .5, 1.2, .1, x, 1.9, z + s * (d / 2 + .05), mat(0x111418, { emissive: color, emissiveIntensity: .35 }), false);
@@ -312,11 +325,139 @@ box(2, 2, 2, -8, 1, -4, crateMat); box(1.4, 1.4, 1.4, -8, 2.7, -4, crateMat, fal
 box(3, 1.6, 3, 10, .8, -4, crateMat); box(1.6, 1.6, 1.6, 10.4, 2.4, -4.3, crateMat, false);
 box(2, 2.4, 4, -26, 1.2, 0, crateMat); box(2, 2.4, 4, 26, 1.2, 0, crateMat);
 box(3, 1.8, 2, 8, .9, 15, crateMat);
+const barrelMat = mat(0x2f7d4a, { metalness: .3 });
 [[-26, -18], [-24.8, -18.6], [26, 18], [24.6, 18.4], [12, 0]].forEach(([x, z]) => {
-  const b = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, 1.3, 16), mat(0x2f7d4a, { metalness: .3 }));
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, 1.3, 16), barrelMat);
   b.position.set(x, .65, z); b.castShadow = true; scene.add(b);
   obstacles.push({ x1: x - .55, x2: x + .55, z1: z - .55, z2: z + .55 });
 });
+
+// ---------- Dünyalar (D tuşuyla sıradakine geçilir) ----------
+const WORLDS = [
+  { name: 'Fabrika', bg: 0x0c0f13, floor: 0x74787f, wall: 0x6b4a3c, crate: 0xa8743c, machine: 0x7d8691, barrel: 0x2f7d4a,
+    sky: 0xcfe3ff, ground: 0x2a2018, hemiI: .55, sun: 0xfff2dd, sunI: .85, lamp: 0xffa040,
+    tasks: ['Makineyi tamir et', 'Kabloları bağla', 'Fırını ayarla', 'Konveyörü çalıştır', 'Boruyu kontrol et', 'Kutuları say'] },
+  { name: 'Buz Dünyası', bg: 0x1b2a3d, floor: 0xc6dcee, wall: 0x8fc6e8, crate: 0xbfe6ff, machine: 0xa9c4d8, barrel: 0x6fb6e0,
+    sky: 0xe6f4ff, ground: 0x6a8cab, hemiI: .7, sun: 0xffffff, sunI: .75, lamp: 0x9fe0ff, decor: 'ice',
+    particles: { color: 0xffffff, size: .25, vy: -2.5 },
+    tasks: ['Buzu kır', 'Kardan adam yap', 'Isıtıcıyı yak', 'Kızağı onar', 'Penguenleri say', 'Buz kristali topla'] },
+  { name: 'Lav Dünyası', bg: 0x1a0604, floor: 0x6a4842, wall: 0x3b1612, crate: 0x5a3a30, machine: 0x5b4a4a, barrel: 0xb33a12,
+    sky: 0xff9a6a, ground: 0x3a0a00, hemiI: .55, sun: 0xffb080, sunI: .7, lamp: 0xff4a10, decor: 'lava',
+    particles: { color: 0xff7a20, size: .22, vy: 2 },
+    tasks: ['Lavı soğut', 'Ateş taşını taşı', 'Volkanı ölç', 'Köprüyü onar', 'Dumanı temizle', 'Kor topla'] },
+  { name: 'Uzay Üssü', bg: 0x02030a, floor: 0x5c6290, wall: 0x2c2f55, crate: 0x9aa0c8, machine: 0x8088b0, barrel: 0x6a4ad6,
+    sky: 0xb8b8ff, ground: 0x10102a, hemiI: .55, sun: 0xd8dcff, sunI: .75, lamp: 0x7a6aff, decor: 'space',
+    particles: { color: 0xffffff, size: .35, vy: 0, sky: true },
+    tasks: ['Motoru çalıştır', 'Oksijeni doldur', 'Radarı ayarla', 'Roketi yakıtla', 'Uyduyu bağla', 'Yıldızları say'] },
+  { name: 'Orman', bg: 0x16331f, floor: 0x5f9a50, wall: 0x6b4a2a, crate: 0x8a5a2a, machine: 0x7a8a6a, barrel: 0x4a7a2a,
+    sky: 0xe8ffd8, ground: 0x2a4a1a, hemiI: .7, sun: 0xfff0c0, sunI: .9, lamp: 0xffe080, decor: 'forest',
+    particles: { color: 0xd8ff60, size: .25, vy: .3, firefly: true },
+    tasks: ['Ağaç dik', 'Mantar topla', 'Kulübeyi onar', 'Dereyi temizle', 'Kuşları besle', 'Çiçek sula'] },
+];
+let worldIndex = 0;
+const worldDecor = new THREE.Group();
+scene.add(worldDecor);
+
+const PCOUNT = 600;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(PCOUNT * 3);
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color: 0xffffff, size: .25, transparent: true, opacity: .9, depthWrite: false });
+const particles = new THREE.Points(pGeo, pMat);
+particles.frustumCulled = false;
+scene.add(particles);
+
+function decorMesh(geo, material, x, y, z) {
+  const m = new THREE.Mesh(geo, material);
+  m.position.set(x, y, z); m.castShadow = true;
+  worldDecor.add(m);
+  return m;
+}
+// Duvarların dışındaki süslemeler: oyuncunun yolunu kapatmaz
+const OUTSIDE = [];
+for (let x = -34; x <= 34; x += 5) OUTSIDE.push([x, -25 - Math.random() * 4]);
+for (let z = -20; z <= 20; z += 5) { OUTSIDE.push([-33 - Math.random() * 3, z]); OUTSIDE.push([33 + Math.random() * 3, z]); }
+
+function buildDecor(kind) {
+  while (worldDecor.children.length) worldDecor.remove(worldDecor.children[0]);
+  if (kind === 'ice') {
+    const ice = new THREE.MeshStandardMaterial({ color: 0xaee6ff, emissive: 0x2a6a9a, emissiveIntensity: .4, transparent: true, opacity: .85, roughness: .1 });
+    OUTSIDE.forEach(([x, z]) => decorMesh(new THREE.ConeGeometry(1 + Math.random(), 6 + Math.random() * 6, 6), ice, x, 4, z).rotation.z = (Math.random() - .5) * .4);
+    const snow = mat(0xffffff, { roughness: 1 });
+    [[-28, -20], [28, -20], [-28, 20], [28, 20], [-12, -20], [12, 20]].forEach(([x, z]) => decorMesh(new THREE.SphereGeometry(1.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), snow, x, 0, z));
+  } else if (kind === 'lava') {
+    const lava = new THREE.MeshBasicMaterial({ color: 0xff5a10 });
+    [[-25, -12], [25, -6], [-14, 18], [24, -19], [-25, 9], [13, 19]].forEach(([x, z]) => {
+      const pool = decorMesh(new THREE.CircleGeometry(1.4 + Math.random(), 20), lava, x, .03, z);
+      pool.rotation.x = -Math.PI / 2;
+    });
+    const rock = mat(0x2a1210, { roughness: 1 });
+    OUTSIDE.forEach(([x, z]) => decorMesh(new THREE.ConeGeometry(2 + Math.random() * 1.5, 8 + Math.random() * 7, 7), rock, x, 5, z));
+    decorMesh(new THREE.SphereGeometry(1.2, 12, 8), lava, 0, 13, -32);
+  } else if (kind === 'space') {
+    decorMesh(new THREE.SphereGeometry(9, 32, 20), mat(0xd06a3a, { emissive: 0x5a2010, roughness: 1 }), 22, 20, -45);
+    const ring = decorMesh(new THREE.RingGeometry(11, 15, 48), new THREE.MeshBasicMaterial({ color: 0xe8c890, side: THREE.DoubleSide, transparent: true, opacity: .6 }), 22, 20, -45);
+    ring.rotation.x = 1.2;
+    decorMesh(new THREE.SphereGeometry(3, 24, 16), mat(0xb8bcc8, { emissive: 0x30323a, roughness: 1 }), -26, 24, -40);
+    const antenna = mat(0x9aa4ad, { metalness: .7, roughness: .3 });
+    OUTSIDE.filter((_, i) => i % 3 === 0).forEach(([x, z]) => {
+      decorMesh(new THREE.CylinderGeometry(.15, .15, 9, 8), antenna, x, 4.5, z);
+      decorMesh(new THREE.SphereGeometry(.4, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3355 }), x, 9.2, z);
+    });
+  } else if (kind === 'forest') {
+    const trunk = mat(0x6a4422, { roughness: 1 }), leaves = mat(0x2f8a3a, { roughness: .9 }), leaves2 = mat(0x4aa83a, { roughness: .9 });
+    OUTSIDE.forEach(([x, z], i) => {
+      const h = 7 + Math.random() * 5;
+      decorMesh(new THREE.CylinderGeometry(.5, .7, h * .4, 8), trunk, x, h * .2, z);
+      decorMesh(new THREE.ConeGeometry(2.6, h * .7, 9), i % 2 ? leaves : leaves2, x, h * .4 + h * .3, z);
+    });
+    const shroom = mat(0xe03a3a), stem = mat(0xf2ead8);
+    [[-27, -19], [27, -12], [-20, 19], [22, 19.5], [-27, 6]].forEach(([x, z]) => {
+      decorMesh(new THREE.CylinderGeometry(.12, .15, .5, 8), stem, x, .25, z);
+      decorMesh(new THREE.SphereGeometry(.4, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), shroom, x, .5, z);
+    });
+  }
+}
+
+function resetParticles(cfg) {
+  for (let i = 0; i < PCOUNT; i++) {
+    if (cfg && cfg.sky) {
+      const a = Math.random() * Math.PI * 2, r = 45 + Math.random() * 30;
+      pPos[i * 3] = Math.cos(a) * r; pPos[i * 3 + 1] = 5 + Math.random() * 40; pPos[i * 3 + 2] = Math.sin(a) * r - 10;
+    } else {
+      pPos[i * 3] = (Math.random() - .5) * 64; pPos[i * 3 + 1] = Math.random() * 14; pPos[i * 3 + 2] = (Math.random() - .5) * 48;
+    }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+}
+function updateParticles(dt, time) {
+  const cfg = WORLDS[worldIndex].particles;
+  if (!cfg || !cfg.vy && !cfg.firefly) return;
+  for (let i = 0; i < PCOUNT; i++) {
+    let y = pPos[i * 3 + 1] + cfg.vy * dt;
+    if (y < 0) y = 14; else if (y > 14) y = 0;
+    pPos[i * 3 + 1] = y;
+    if (cfg.firefly) { pPos[i * 3] += Math.sin(time * 2 + i) * dt * .6; pPos[i * 3 + 2] += Math.cos(time * 1.7 + i) * dt * .6; }
+    else pPos[i * 3] += Math.sin(time + i) * dt * .3;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+}
+
+function setWorld(i) {
+  worldIndex = i;
+  const w = WORLDS[i];
+  scene.background.setHex(w.bg); scene.fog.color.setHex(w.bg);
+  floor.material.color.setHex(w.floor);
+  wallMat.color.setHex(w.wall); crateMat.color.setHex(w.crate);
+  machineMat.color.setHex(w.machine); barrelMat.color.setHex(w.barrel);
+  hemi.color.setHex(w.sky); hemi.groundColor.setHex(w.ground); hemi.intensity = w.hemiI;
+  sun.color.setHex(w.sun); sun.intensity = w.sunI;
+  lamps.forEach(l => l.color.setHex(w.lamp));
+  particles.visible = !!w.particles;
+  if (w.particles) { pMat.color.setHex(w.particles.color); pMat.size = w.particles.size; resetParticles(w.particles); }
+  buildDecor(w.decor);
+  TASKS.forEach((t, k) => { t.name = w.tasks[k]; });
+}
 
 // ---------- Karakterler ----------
 const visorMat = new THREE.MeshStandardMaterial({ color: 0x7cc8ff, metalness: .6, roughness: .15, emissive: 0x0d2a4a });
@@ -381,6 +522,14 @@ const WAYPOINTS = TASKS.map(t => ({ x: t.x, z: t.z })).concat([
   { x: 0, z: 0 }, { x: -15, z: 0 }, { x: 15, z: 0 }, { x: -22, z: -18 }, { x: 22, z: -18 },
   { x: -22, z: 18 }, { x: 22, z: 18 }, { x: 0, z: 19 }, { x: 0, z: -19 }, { x: -14, z: 7 }, { x: 14, z: 7 }, { x: 4, z: -7 },
 ]);
+setWorld(0);
+
+function nextWorld() {
+  setWorld((worldIndex + 1) % WORLDS.length);
+  beep(440, .12, 'triangle', .07, 880); setTimeout(() => beep(880, .15, 'triangle', .06, 1320), 100);
+  if (state !== 'menu') { toast(`${WORLDS[worldIndex].name}'na gittin!`); drawHud(); }
+  else $('menuWorld').textContent = WORLDS[worldIndex].name;
+}
 
 // ---------- Çarpışma ----------
 const R = .55;
@@ -415,7 +564,7 @@ const sfx = {
 
 // ---------- Oyun durumu ----------
 const COLORS = [
-  ['Kırmızı', 0xe53935], ['Mavi', 0x2457ff], ['Yeşil', 0x1fa64a], ['Sarı', 0xf2d40c],
+  ['Pembe', 0xff8ccf], ['Mavi', 0x2457ff], ['Yeşil', 0x1fa64a], ['Sarı', 0xf2d40c],
   ['Turuncu', 0xff8a1c], ['Mor', 0x8b45d6], ['Camgöbeği', 0x2fe0d8], ['Beyaz', 0xe9eef2],
 ];
 let state = 'menu';
@@ -435,7 +584,7 @@ function randomWaypoint() { return WAYPOINTS[Math.floor(Math.random() * WAYPOINT
 function newRound() {
   clearRound();
   isKiller = Math.random() < 1 / 3;
-  player = Object.assign(makeCrew(0xff8ccf), { name: 'Pembe', isPlayer: true, alive: true, color: 0xff8ccf });
+  player = Object.assign(makeCrew(0xe53935), { name: 'Kırmızı', isPlayer: true, alive: true, color: 0xe53935 });
   player.g.position.set(0, 0, -4);
   const pool = COLORS.slice().sort(() => Math.random() - .5).slice(0, 7);
   pool.forEach(([name, color], i) => {
@@ -533,10 +682,10 @@ function face(e, dx, dz, dt) {
 
 function updatePlayer(dt) {
   let dx = 0, dz = 0;
-  if (keys.has('KeyW') || keys.has('ArrowUp')) dz -= 1;
-  if (keys.has('KeyS') || keys.has('ArrowDown')) dz += 1;
-  if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
-  if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
+  if (keys.has('ArrowUp')) dz -= 1;
+  if (keys.has('ArrowDown')) dz += 1;
+  if (keys.has('ArrowLeft')) dx -= 1;
+  if (keys.has('ArrowRight')) dx += 1;
   dx += joy.x; dz += joy.z;
   const len = Math.hypot(dx, dz);
   if (len > .1) {
@@ -642,12 +791,12 @@ function drawHud() {
   if (!player) return;
   if (isKiller) {
     const left = aliveNpcs().length;
-    info.innerHTML = `<div class="role role-killer">KATİL</div>
+    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>
       <div>Kalan kişi: <b>${left}</b> / ${npcs.length}</div>
       <div class="muted" style="margin-top:4px">Yalnız birini bul, yanına git, E'ye bas.</div>`;
   } else {
     const done = TASKS.filter(t => t.done).length;
-    info.innerHTML = `<div class="role role-crew">MASUM</div>
+    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>
       <ul>${TASKS.map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('')}</ul>
       <div class="bar"><i style="width:${done / TASKS.length * 100}%"></i></div>`;
   }
@@ -661,6 +810,7 @@ function frame(now) {
   last = now; time += dt;
 
   beltTex.offset.x -= dt * .5;
+  updateParticles(dt, time);
   beltCrates.forEach(c => { c.position.x += dt * 2; if (c.position.x > 7.6) c.position.x = -7.6; });
   pistons.forEach(p => { p.m.position.y = 4 + Math.sin(time * 2.4 + p.phase) * .5; });
   beacons.forEach((b, i) => { b.material.color.setHex(Math.sin(time * 6 + i) > 0 ? 0xff7a1a : 0x552200); });
@@ -705,7 +855,7 @@ function frame(now) {
 
 // Menü arkasında dolaşan örnek ekip
 function menuCrew() {
-  COLORS.slice(0, 6).concat([['Pembe', 0xff8ccf]]).forEach(([name, color], i) => {
+  COLORS.slice(0, 6).concat([['Kırmızı', 0xe53935]]).forEach(([name, color], i) => {
     const n = Object.assign(makeCrew(color), { name, color, alive: true, target: randomWaypoint(), wait: 0, stuck: 0, detourT: 0, impostor: false });
     n.g.position.set(-6 + i * 2, 0, -2);
     npcs.push(n);
@@ -725,6 +875,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (state === 'menu' && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); startGame(); return; }
+  if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
   if (e.code === 'KeyE' || e.code === 'Space') {
     e.preventDefault();
     if (!e.repeat) actionPressed = true;
@@ -740,6 +891,7 @@ window.addEventListener('keyup', e => {
 window.addEventListener('blur', () => { keys.clear(); actionHeld = false; });
 
 $('startBtn').addEventListener('click', startGame);
+$('worldBtn').addEventListener('click', nextWorld);
 $('quit').addEventListener('click', toMenu);
 $('deadBtn').addEventListener('click', newRound);
 $('endBtn').addEventListener('click', newRound);
