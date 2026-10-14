@@ -163,6 +163,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
       <kbd>R</kbd><span>Ölüyü raporla, toplantıda katili seç</span>
       <kbd>F</kbd><span>Tam ekran aç / kapat</span>
+      <kbd>M</kbd><span>Sesi aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
     <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
@@ -592,7 +593,7 @@ setWorld(0);
 
 function nextWorld() {
   setWorld((worldIndex + 1) % WORLDS.length);
-  beep(440, .12, 'triangle', .07, 880); setTimeout(() => beep(880, .15, 'triangle', .06, 1320), 100);
+  sfx.world();
   if (state !== 'menu') { toast(`${WORLDS[worldIndex].name}'na gittin!`); drawHud(); }
   else $('menuWorld').textContent = WORLDS[worldIndex].name;
 }
@@ -612,21 +613,70 @@ function moveBy(e, dx, dz) {
 const dist = (a, b) => Math.hypot(a.g.position.x - b.g.position.x, a.g.position.z - b.g.position.z);
 
 // ---------- Ses ----------
-let actx = null;
-function beep(f, d, type = 'square', v = .06, slide = 0) {
-  if (!actx) return;
-  const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+// Tüm sesler Web Audio ile üretilir; ilk tıklama ya da tuşla açılır.
+let actx = null, master = null, muted = false;
+function unlockAudio() {
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain(); master.gain.value = .9; master.connect(actx.destination);
+    } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+}
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+
+function beep(f, d, type = 'square', v = .12, slide = 0, delay = 0) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
   o.type = type; o.frequency.setValueAtTime(f, t);
   if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(master); o.start(t); o.stop(t + d + .02);
+}
+let noiseBuf = null;
+function noise(d, v = .2, from = 3000, to = 300, delay = 0) {
+  if (!actx || muted) return;
+  if (!noiseBuf) {
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const ch = noiseBuf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  }
+  const t = actx.currentTime + delay, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  src.buffer = noiseBuf; f.type = 'bandpass'; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + d);
   g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
-  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d);
+  src.connect(f).connect(g).connect(master); src.start(t); src.stop(t + d);
 }
 const sfx = {
-  kill() { beep(220, .35, 'sawtooth', .09, 60); beep(90, .5, 'square', .05, 40); },
-  task() { beep(660, .12); setTimeout(() => beep(990, .18), 110); },
-  win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, .2, 'triangle', .08), i * 130)); },
-  lose() { [400, 300, 200].forEach((f, i) => setTimeout(() => beep(f, .3, 'sawtooth', .06), i * 180)); },
+  click() { beep(700, .06, 'square', .08); },
+  // Bıçak sesi + düşüş
+  kill(v = 1) {
+    noise(.18, .35 * v, 6000, 1500);
+    beep(520, .35, 'sawtooth', .12 * v, 140, .05);
+    beep(70, .4, 'sine', .3 * v, 40, .12);
+  },
+  // Biz öldüğümüzde: dramatik akor
+  died() {
+    this.kill();
+    [[196, 'sawtooth'], [233, 'sawtooth'], [98, 'square']].forEach(([f, ty]) => beep(f, 1.6, ty, .08, f * .6, .35));
+  },
+  taskTick() { beep(1200 + Math.random() * 300, .04, 'square', .05); },
+  task() { [784, 988, 1175, 1568].forEach((f, i) => beep(f, .16, 'triangle', .14, 0, i * .08)); },
+  alarm() { for (let i = 0; i < 4; i++) beep(600, .32, 'sawtooth', .1, 1100, i * .34); },
+  vote() { beep(500, .08, 'square', .1, 800); },
+  eject() { noise(1.2, .25, 400, 3000); beep(300, 1.2, 'sine', .15, 60, .1); },
+  world() { noise(.5, .12, 800, 6000); [523, 784, 1046, 1568].forEach((f, i) => beep(f, .2, 'sine', .12, 0, i * .06)); },
+  killReady() { beep(300, .15, 'square', .08, 180); beep(180, .25, 'square', .06, 120, .12); },
+  revealKiller() { beep(110, 1.4, 'sawtooth', .1, 55); beep(165, 1.4, 'sawtooth', .06, 82, .1); },
+  revealCrew() { [523, 659, 784].forEach((f, i) => beep(f, .5, 'triangle', .1, 0, i * .12)); },
+  step() { noise(.05, .04, 900, 500); },
+  win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => beep(f, i === 6 ? .6 : .18, 'triangle', .15, 0, i * .13)); },
+  lose() { [392, 370, 349, 294].forEach((f, i) => beep(f, i === 3 ? .9 : .35, 'sawtooth', .1, i === 3 ? 220 : 0, i * .38)); },
 };
+function toggleMute() { muted = !muted; toast(muted ? 'Ses kapalı (M)' : 'Ses açık (M)'); }
 
 // ---------- Oyun durumu ----------
 const COLORS = [
@@ -680,6 +730,7 @@ function newRound() {
     : 'Sarı yerlerdeki görevleri yap. Aranızda gizli bir katil var, ondan kaç!';
   show('reveal');
   state = 'reveal'; revealT = 2.8;
+  isKiller ? sfx.revealKiller() : sfx.revealCrew();
 }
 
 function show(id) {
@@ -706,7 +757,7 @@ function report() {
   if (!c || state !== 'play') return;
   state = 'meeting';
   keys.clear(); actionHeld = false;
-  [0, 1, 2].forEach(i => setTimeout(() => beep(880, .18, 'square', .07, 440), i * 220));
+  sfx.alarm();
   corpses.forEach(o => scene.remove(o));
   corpses = [];
   $('meetText').textContent = isKiller
@@ -732,6 +783,7 @@ function report() {
 
 function castVote(choice) {
   if (state !== 'meeting' || meetOutcome) return;
+  sfx.vote();
   const tally = new Map();
   const add = t => { if (t) tally.set(t, (tally.get(t) || 0) + 1); };
   add(choice);
@@ -769,6 +821,7 @@ function castVote(choice) {
   else {
     top.alive = false;
     scene.remove(top.g);
+    setTimeout(() => sfx.eject(), 300);
     if (top.impostor) { text = `${top.name} atıldı. ${top.name} KATİLDİ!`; meetOutcome = 'win'; }
     else if (isKiller) { text = `${top.name} atıldı. Kimse senden şüphelenmedi!`; meetOutcome = aliveNpcs().length ? 'continue' : 'win'; }
     else { text = `${top.name} atıldı. Ama ${top.name} katil değildi...`; meetOutcome = 'continue'; }
@@ -821,7 +874,7 @@ function toggleFull() { fsEl() ? exitFull() : enterFull(); }
 
 function startGame() {
   enterFull();
-  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+  unlockAudio();
   newRound();
 }
 
@@ -837,15 +890,18 @@ function doKill(killer, victim) {
   corpses.push(body);
   scene.remove(victim.g);
   if (!blocked(p.x + .9, p.z)) killer.g.position.set(p.x + .9, 0, p.z);
-  sfx.kill();
   if (victim.isPlayer) {
     state = 'dead';
     flash();
-    sfx.lose();
+    sfx.died();
     $('deadText').textContent = `Seni ${killer.name} öldürdü! Katil oydu.`;
     setTimeout(() => { if (state === 'dead') show('dead'); }, 900);
   } else if (!isKiller) {
+    // Uzaktaki cinayet daha kısık duyulur
+    sfx.kill(Math.max(.25, 1 - dist(player, killer) / 40));
     toast(`${victim.name} öldürüldü!`);
+  } else {
+    sfx.kill();
   }
 }
 
@@ -892,7 +948,9 @@ function updatePlayer(dt) {
     moveBy(player, dx * s, dz * s);
     face(player, dx, dz, dt);
   }
+  const stepBefore = Math.floor(player.walk / Math.PI);
   animateWalk(player, len > .1, dt);
+  if (len > .1 && Math.floor(player.walk / Math.PI) !== stepBefore) sfx.step();
 }
 
 function updateNpc(n, dt) {
@@ -951,7 +1009,9 @@ function interact(dt) {
     });
     if (best) {
       if (actionHeld) {
+        const before = best.progress;
         best.progress = Math.min(1, best.progress + dt / 2.5);
+        if (Math.floor(before * 12) !== Math.floor(best.progress * 12)) sfx.taskTick();
         if (best.progress >= 1) {
           best.done = true; sfx.task(); toast(`Görev bitti: ${best.name}`);
           best.ring.material.color.set(0x4ade80); best.gem.material.color.set(0x4ade80); best.gem.material.emissive.set(0x1a7a40);
@@ -961,7 +1021,9 @@ function interact(dt) {
       html = `<div>E tuşuna basılı tut: ${best.name}</div><div class="bar"><i style="width:${best.progress * 100}%"></i></div>`;
     }
   } else {
+    const wasWaiting = killCd > 0;
     killCd = Math.max(0, killCd - dt);
+    if (wasWaiting && killCd === 0) { sfx.killReady(); toast('Öldürmeye hazırsın!'); }
     let best = null, bd = 2;
     aliveNpcs().forEach(n => { const d = dist(player, n); if (d < bd) { bd = d; best = n; } });
     if (best) {
@@ -1081,6 +1143,7 @@ window.addEventListener('keydown', e => {
   }
   if (e.code === 'KeyR' && !e.repeat && state === 'play') { report(); return; }
   if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
+  if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
   if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
   if (e.code === 'KeyE' || e.code === 'Space') {
     e.preventDefault();
