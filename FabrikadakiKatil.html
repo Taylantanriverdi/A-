@@ -162,6 +162,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
       <kbd>R</kbd><span>Ölüyü raporla, toplantıda katili seç</span>
+      <kbd>F</kbd><span>Tam ekran aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
     <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
@@ -800,9 +801,26 @@ function endMeeting() {
   drawHud();
 }
 
-function toMenu() { clearRound(); state = 'menu'; show('menu'); menuCrew(); }
+function toMenu() { clearRound(); state = 'menu'; show('menu'); menuCrew(); exitFull(); }
+
+// Oyun sırasında ekranda sadece oyun görünsün: tam ekran
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function enterFull() {
+  if (fsEl()) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) { /* tam ekran desteklenmiyor */ }
+}
+function exitFull() {
+  if (!fsEl()) return;
+  const ex = document.exitFullscreen || document.webkitExitFullscreen;
+  try { const r = ex.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) { /* yok say */ }
+}
+function toggleFull() { fsEl() ? exitFull() : enterFull(); }
 
 function startGame() {
+  enterFull();
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
   newRound();
 }
@@ -1062,6 +1080,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (e.code === 'KeyR' && !e.repeat && state === 'play') { report(); return; }
+  if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
   if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
   if (e.code === 'KeyE' || e.code === 'Space') {
     e.preventDefault();
