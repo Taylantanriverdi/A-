@@ -139,7 +139,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       Her oyunda <b>3'te 1</b> ihtimalle <b style="color:var(--danger)">KATİL</b> sen olursun!</p>
     <div class="keys">
       <kbd>← ↑ → ↓</kbd><span>Yürü (ok tuşları)</span>
-      <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman</span>
+      <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
@@ -353,6 +353,10 @@ const WORLDS = [
     sky: 0xe8ffd8, ground: 0x2a4a1a, hemiI: .7, sun: 0xfff0c0, sunI: .9, lamp: 0xffe080, decor: 'forest',
     particles: { color: 0xd8ff60, size: .25, vy: .3, firefly: true },
     tasks: ['Ağaç dik', 'Mantar topla', 'Kulübeyi onar', 'Dereyi temizle', 'Kuşları besle', 'Çiçek sula'] },
+  { name: 'Doğum Günü Dünyası', bg: 0x2a1438, floor: 0xf2b8d8, wall: 0x8a4ac8, crate: 0xff6aa8, machine: 0x6ac8ff, barrel: 0xffd23a,
+    sky: 0xfff0fa, ground: 0x6a3a7a, hemiI: .75, sun: 0xfff4e0, sunI: .8, lamp: 0xff8ad8, decor: 'party',
+    particles: { color: 0xffffff, size: .3, vy: -1.6, confetti: true },
+    tasks: ['Pastayı kes', 'Balon şişir', 'Hediyeleri paketle', 'Mumları yak', 'Konfeti at', 'Doğum günü şarkısı söyle'] },
 ];
 let worldIndex = 0;
 const worldDecor = new THREE.Group();
@@ -362,7 +366,10 @@ const PCOUNT = 600;
 const pGeo = new THREE.BufferGeometry();
 const pPos = new Float32Array(PCOUNT * 3);
 pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-const pMat = new THREE.PointsMaterial({ color: 0xffffff, size: .25, transparent: true, opacity: .9, depthWrite: false });
+const pCol = new Float32Array(PCOUNT * 3).fill(1);
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const pMat = new THREE.PointsMaterial({ color: 0xffffff, size: .25, transparent: true, opacity: .9, depthWrite: false, vertexColors: true });
+const PARTY = [0xff4f8b, 0xffd23a, 0x4fd2ff, 0x7aff6a, 0xb36aff, 0xff8a2a];
 const particles = new THREE.Points(pGeo, pMat);
 particles.frustumCulled = false;
 scene.add(particles);
@@ -404,6 +411,30 @@ function buildDecor(kind) {
       decorMesh(new THREE.CylinderGeometry(.15, .15, 9, 8), antenna, x, 4.5, z);
       decorMesh(new THREE.SphereGeometry(.4, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3355 }), x, 9.2, z);
     });
+  } else if (kind === 'party') {
+    // Duvarların dışında uçan balonlar
+    OUTSIDE.forEach(([x, z], i) => {
+      const y = 7 + Math.random() * 6;
+      const balloon = decorMesh(new THREE.SphereGeometry(1, 18, 14), mat(PARTY[i % PARTY.length], { roughness: .25, metalness: .1 }), x, y, z);
+      balloon.scale.y = 1.2;
+      decorMesh(new THREE.CylinderGeometry(.03, .03, y - 1, 4), shineMat, x, (y - 1) / 2, z);
+    });
+    // Arka duvarın ardında dev pasta
+    const cake1 = mat(0xfff0e0, { roughness: .8 }), cake2 = mat(0xff8ac0, { roughness: .8 }), cake3 = mat(0x8a4a2a, { roughness: .9 });
+    decorMesh(new THREE.CylinderGeometry(9, 9, 4, 40), cake3, 0, 2, -34);
+    decorMesh(new THREE.CylinderGeometry(9.2, 9.2, .8, 40), cake2, 0, 4.2, -34);
+    decorMesh(new THREE.CylinderGeometry(6, 6, 4, 40), cake1, 0, 6.5, -34);
+    decorMesh(new THREE.CylinderGeometry(6.2, 6.2, .8, 40), cake2, 0, 8.7, -34);
+    [-3, -1, 1, 3].forEach((x, i) => {
+      decorMesh(new THREE.CylinderGeometry(.25, .25, 2, 10), mat(PARTY[i]), x, 10, -32);
+      decorMesh(new THREE.SphereGeometry(.35, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb020 }), x, 11.3, -32).scale.y = 1.5;
+    });
+    // Köşelerde hediye kutuları
+    [[-28, -20], [28, -20], [-28, 20], [28, 20], [-22, 20.5], [22, -20.5]].forEach(([x, z], i) => {
+      decorMesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), mat(PARTY[i]), x, .6, z);
+      decorMesh(new THREE.BoxGeometry(1.5, .3, .3), mat(0xffffff), x, 1.22, z);
+      decorMesh(new THREE.BoxGeometry(.3, .3, 1.5), mat(0xffffff), x, 1.22, z);
+    });
   } else if (kind === 'forest') {
     const trunk = mat(0x6a4422, { roughness: 1 }), leaves = mat(0x2f8a3a, { roughness: .9 }), leaves2 = mat(0x4aa83a, { roughness: .9 });
     OUTSIDE.forEach(([x, z], i) => {
@@ -421,6 +452,8 @@ function buildDecor(kind) {
 
 function resetParticles(cfg) {
   for (let i = 0; i < PCOUNT; i++) {
+    const c = new THREE.Color(cfg && cfg.confetti ? PARTY[i % PARTY.length] : 0xffffff);
+    pCol[i * 3] = c.r; pCol[i * 3 + 1] = c.g; pCol[i * 3 + 2] = c.b;
     if (cfg && cfg.sky) {
       const a = Math.random() * Math.PI * 2, r = 45 + Math.random() * 30;
       pPos[i * 3] = Math.cos(a) * r; pPos[i * 3 + 1] = 5 + Math.random() * 40; pPos[i * 3 + 2] = Math.sin(a) * r - 10;
@@ -429,6 +462,7 @@ function resetParticles(cfg) {
     }
   }
   pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
 }
 function updateParticles(dt, time) {
   const cfg = WORLDS[worldIndex].particles;
