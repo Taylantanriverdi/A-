@@ -61,6 +61,20 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
 .win-title { color: var(--ok); text-shadow: 0 6px 0 #14532d; }
 .press { font-family: var(--font-display); font-size: 18px; color: var(--hazard); }
 
+.meet-title { color: var(--hazard); text-shadow: 0 5px 0 #5a4200; font-size: clamp(34px, 10vw, 60px); }
+.votes { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.vote {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; cursor: pointer;
+  background: #20262f; color: var(--fg); border: 2px solid #3a434f; font: 800 16px var(--font-body); text-align: left;
+}
+.vote:hover:not(:disabled) { border-color: var(--hazard); }
+.vote:disabled { cursor: default; }
+.vote.picked { border-color: var(--hazard); }
+.vote.out { border-color: var(--danger); background: #3a1414; }
+.vote i { width: 22px; height: 26px; border-radius: 11px 11px 6px 6px; flex: none; }
+.vote span { margin-left: auto; white-space: nowrap; color: var(--hazard); font-family: var(--font-display); font-size: 14px; }
+.vote.skip { justify-content: center; color: var(--muted); }
+#prompt .report { color: var(--hazard); margin-top: 4px; }
 #hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
 #info {
   position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
@@ -110,6 +124,11 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   width: 60px; height: 60px; border-radius: 50%; border: 0; background: #8fd3ff; color: #0b2233;
   font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
 }
+#reportBtn {
+  position: absolute; right: calc(34px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; border-radius: 50%; border: 0; background: var(--danger); color: #fff;
+  font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
+}
 @media (pointer: fine) { #touch { display: none; } }
 @media (pointer: coarse) { #prompt { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { #flash, #toast, #info .bar > i { transition: none; } }
@@ -129,6 +148,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <div id="stick"><div id="knob"></div></div>
   <button id="actBtn" type="button">E</button>
   <button id="worldBtn" type="button" aria-label="Başka dünyaya git">D</button>
+  <button id="reportBtn" type="button" aria-label="Ölüyü raporla">R</button>
 </div>
 
 <div class="screen" id="menu">
@@ -141,6 +161,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>← ↑ → ↓</kbd><span>Yürü (ok tuşları)</span>
       <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
+      <kbd>R</kbd><span>Ölüyü raporla, toplantıda katili seç</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
     <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
@@ -155,6 +176,16 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
     <p class="muted" style="font-family:var(--font-display)">BU OYUNDA SEN...</p>
     <h2 id="revealTitle">MASUMSUN</h2>
     <p id="revealText"></p>
+  </div>
+</div>
+
+<div class="screen" id="meeting" hidden>
+  <div class="card">
+    <h2 class="meet-title">TOPLANTI!</h2>
+    <p id="meetText"></p>
+    <div id="voteList" class="votes"></div>
+    <p id="meetResult" class="press"></p>
+    <button class="big" id="meetBtn" type="button" hidden>DEVAM</button>
   </div>
 </div>
 
@@ -608,6 +639,7 @@ const keys = new Set();
 const joy = { x: 0, z: 0 };
 
 function clearRound() {
+  meetOutcome = null;
   [player, ...npcs].forEach(e => e && scene.remove(e.g));
   corpses.forEach(c => scene.remove(c));
   npcs = []; corpses = []; player = null;
@@ -650,9 +682,122 @@ function newRound() {
 }
 
 function show(id) {
-  ['menu', 'reveal', 'dead', 'end'].forEach(s => { $(s).hidden = s !== id; });
+  ['menu', 'reveal', 'meeting', 'dead', 'end'].forEach(s => { $(s).hidden = s !== id; });
   $('hud').hidden = !(id === null || id === 'reveal');
   $('touch').hidden = id !== null;
+}
+
+// ---------- Rapor ve toplantı ----------
+function nearestCorpse() {
+  if (!player) return null;
+  let best = null, bd = 2.5;
+  corpses.forEach(c => {
+    const d = Math.hypot(c.position.x - player.g.position.x, c.position.z - player.g.position.z);
+    if (d < bd) { bd = d; best = c; }
+  });
+  return best;
+}
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+let meetOutcome = null;
+
+function report() {
+  const c = nearestCorpse();
+  if (!c || state !== 'play') return;
+  state = 'meeting';
+  keys.clear(); actionHeld = false;
+  [0, 1, 2].forEach(i => setTimeout(() => beep(880, .18, 'square', .07, 440), i * 220));
+  corpses.forEach(o => scene.remove(o));
+  corpses = [];
+  $('meetText').textContent = isKiller
+    ? `${c.userData.name} karakterinin cesedini rapor ettin. Suçu kime atacaksın?`
+    : `${c.userData.name} karakterinin cesedini buldun! Sence katil kim? Birini seç.`;
+  $('meetResult').textContent = '';
+  $('meetBtn').hidden = true;
+  const list = $('voteList');
+  list.innerHTML = '';
+  aliveNpcs().forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'vote';
+    b.innerHTML = `<i style="background:${hex(n.color)}"></i>${n.name}`;
+    b.addEventListener('click', () => castVote(n));
+    list.appendChild(b);
+  });
+  const skip = document.createElement('button');
+  skip.type = 'button'; skip.className = 'vote skip'; skip.textContent = 'Oy verme';
+  skip.addEventListener('click', () => castVote(null));
+  list.appendChild(skip);
+  show('meeting');
+}
+
+function castVote(choice) {
+  if (state !== 'meeting' || meetOutcome) return;
+  const tally = new Map();
+  const add = t => { if (t) tally.set(t, (tally.get(t) || 0) + 1); };
+  add(choice);
+  aliveNpcs().forEach(v => {
+    const r = Math.random();
+    let t = null;
+    if (isKiller && r < .3) t = player;
+    else if (choice && choice !== v && r < .7) t = choice;
+    else if (Math.random() < .8) {
+      const opts = aliveNpcs().filter(o => o !== v);
+      if (isKiller) opts.push(player);
+      if (opts.length) t = opts[Math.floor(Math.random() * opts.length)];
+    }
+    add(t);
+  });
+  let top = null, topV = 0, tie = false;
+  tally.forEach((v, k) => { if (v > topV) { top = k; topV = v; tie = false; } else if (v === topV) tie = true; });
+  if (tie) top = null;
+
+  const list = $('voteList');
+  list.innerHTML = '';
+  const rows = aliveNpcs().slice();
+  if (isKiller) rows.unshift(player);
+  rows.forEach(n => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.disabled = true;
+    b.className = 'vote' + (n === top ? ' out' : '') + (n === choice ? ' picked' : '');
+    b.innerHTML = `<i style="background:${hex(n.color)}"></i>${n.isPlayer ? 'Sen' : n.name}<span>${tally.get(n) || 0} oy</span>`;
+    list.appendChild(b);
+  });
+
+  let text;
+  if (!top) { text = 'Oylar eşit çıktı, kimse atılmadı.'; meetOutcome = 'continue'; }
+  else if (top === player) { text = 'Herkes seni seçti! Katil olduğun anlaşıldı.'; meetOutcome = 'lose'; }
+  else {
+    top.alive = false;
+    scene.remove(top.g);
+    if (top.impostor) { text = `${top.name} atıldı. ${top.name} KATİLDİ!`; meetOutcome = 'win'; }
+    else if (isKiller) { text = `${top.name} atıldı. Kimse senden şüphelenmedi!`; meetOutcome = aliveNpcs().length ? 'continue' : 'win'; }
+    else { text = `${top.name} atıldı. Ama ${top.name} katil değildi...`; meetOutcome = 'continue'; }
+  }
+  $('meetResult').textContent = text;
+  $('meetBtn').hidden = false;
+  $('meetBtn').focus();
+}
+
+function endMeeting() {
+  if (state !== 'meeting' || !meetOutcome) return;
+  const outcome = meetOutcome;
+  meetOutcome = null;
+  if (outcome === 'win') {
+    show(null);
+    endGame(true, 'KAZANDIN!', isKiller ? 'Herkes gitti, fabrikanın tek sahibi sensin!' : 'Katili buldun ve attın. Fabrika kurtuldu!');
+    return;
+  }
+  if (outcome === 'lose') { show(null); endGame(false, 'YAKALANDIN!', 'Toplantıda herkes seni katil olarak seçti.'); return; }
+  // Herkes toplantı masasına döner
+  const group = [player, ...aliveNpcs()];
+  group.forEach((e, i) => {
+    const a = (i / group.length) * Math.PI * 2;
+    e.g.position.set(i === 0 ? 0 : Math.cos(a) * 3, 0, i === 0 ? -4 : -4 + Math.sin(a) * 3);
+  });
+  npcs.forEach(n => { if (n.impostor) { n.killTimer = 15 + Math.random() * 6; n.prey = null; } });
+  killCd = 10;
+  state = 'play';
+  show(null);
+  drawHud();
 }
 
 function toMenu() { clearRound(); state = 'menu'; show('menu'); menuCrew(); }
@@ -669,7 +814,9 @@ function flash() { const f = $('flash'); f.style.transition = 'none'; f.style.op
 function doKill(killer, victim) {
   victim.alive = false;
   const p = victim.g.position;
-  corpses.push(makeCorpse(victim.color, p.x, p.z, victim.g.rotation.y));
+  const body = makeCorpse(victim.color, p.x, p.z, victim.g.rotation.y);
+  body.userData.name = victim.name;
+  corpses.push(body);
   scene.remove(victim.g);
   if (!blocked(p.x + .9, p.z)) killer.g.position.set(p.x + .9, 0, p.z);
   sfx.kill();
@@ -815,6 +962,7 @@ function interact(dt) {
       html = `<div>Öldürmek için bekle: ${Math.ceil(killCd)} sn</div>`;
     }
   }
+  if (nearestCorpse()) html += `<div class="report">R: Ölüyü raporla</div>`;
   actionPressed = false;
   prompt.hidden = !html;
   if (html && prompt.innerHTML !== html) prompt.innerHTML = html;
@@ -905,10 +1053,15 @@ window.addEventListener('keydown', e => {
   if (isC(e)) {
     e.preventDefault();
     if (state === 'dead' || state === 'over') newRound();
-    else if (state === 'play' || state === 'reveal') toMenu();
+    else if (state === 'play' || state === 'reveal' || state === 'meeting') toMenu();
     return;
   }
   if (state === 'menu' && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); startGame(); return; }
+  if (state === 'meeting') {
+    if ((e.key === 'Enter' || e.code === 'Space') && meetOutcome) { e.preventDefault(); endMeeting(); }
+    return;
+  }
+  if (e.code === 'KeyR' && !e.repeat && state === 'play') { report(); return; }
   if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
   if (e.code === 'KeyE' || e.code === 'Space') {
     e.preventDefault();
@@ -926,6 +1079,8 @@ window.addEventListener('blur', () => { keys.clear(); actionHeld = false; });
 
 $('startBtn').addEventListener('click', startGame);
 $('worldBtn').addEventListener('click', nextWorld);
+$('reportBtn').addEventListener('click', report);
+$('meetBtn').addEventListener('click', endMeeting);
 $('quit').addEventListener('click', toMenu);
 $('deadBtn').addEventListener('click', newRound);
 $('endBtn').addEventListener('click', newRound);
