@@ -129,6 +129,16 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   width: 60px; height: 60px; border-radius: 50%; border: 0; background: var(--danger); color: #fff;
   font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
 }
+#ventBtn {
+  position: absolute; right: calc(110px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px));
+  width: 60px; height: 60px; border-radius: 50%; border: 0; background: #59616d; color: #fff;
+  font-family: var(--font-display); font-size: 22px; pointer-events: auto; touch-action: none;
+}
+#minimap {
+  position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: 180px; height: 132px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+}
+@media (pointer: coarse) { #minimap { bottom: auto; top: calc(64px + env(safe-area-inset-top, 0px)); width: 132px; height: 97px; } }
 @media (pointer: fine) { #touch { display: none; } }
 @media (pointer: coarse) { #prompt { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { #flash, #toast, #info .bar > i { transition: none; } }
@@ -141,6 +151,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <button id="quit" type="button" aria-label="Oyundan çık">Ç · ÇIK</button>
   <div id="toast"></div>
   <div id="prompt" hidden></div>
+  <canvas id="minimap" width="360" height="264" aria-label="Mini harita"></canvas>
 </div>
 <div id="flash"></div>
 
@@ -149,6 +160,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <button id="actBtn" type="button">E</button>
   <button id="worldBtn" type="button" aria-label="Başka dünyaya git">D</button>
   <button id="reportBtn" type="button" aria-label="Ölüyü raporla">R</button>
+  <button id="ventBtn" type="button" aria-label="Havalandırmaya gir">V</button>
 </div>
 
 <div class="screen" id="menu">
@@ -163,6 +175,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
       <kbd>R</kbd><span>Ölüyü raporla, toplantıda katili seç</span>
       <kbd>F</kbd><span>Tam ekran aç / kapat</span>
+      <kbd>V</kbd><span>Katilsen havalandırmadan başka yere ışınlan</span>
       <kbd>M</kbd><span>Sesi aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
@@ -585,6 +598,37 @@ TASKS.forEach(t => {
   t.gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35), new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0xffaa00, emissiveIntensity: .8 }));
   t.gem.position.set(t.x, 3, t.z); scene.add(t.gem);
 });
+// ---------- Havalandırmalar (sadece katil kullanır) ----------
+const VENTS = [[-24, -8], [-12, -18], [24, -8], [20, 4], [12, 18], [-20, 4]].map(([x, z]) => {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.7, .08, 1.3), mat(0x3a4048, { metalness: .6, roughness: .4 }));
+  base.position.y = .04; base.receiveShadow = true; g.add(base);
+  for (let i = -2; i <= 2; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.4, .1, .12), mat(0x14171b));
+    slat.position.set(0, .07, i * .22); g.add(slat);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  return { x, z };
+});
+function nearestVent() {
+  if (!player) return -1;
+  let best = -1, bd = 1.7;
+  VENTS.forEach((v, i) => { const d = Math.hypot(v.x - player.g.position.x, v.z - player.g.position.z); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function useVent() {
+  if (state !== 'play' || !isKiller) return;
+  const i = nearestVent();
+  if (i < 0) return;
+  const seen = aliveNpcs().filter(n => dist(n, player) < 7);
+  const next = VENTS[(i + 1) % VENTS.length];
+  player.g.position.set(next.x, 0, next.z);
+  sfx.vent();
+  toast('Havalandırmadan geçtin!');
+  if (seen.length && caughtT <= 0) { caughtT = 1; witnessName = seen[0].name; }
+}
+
 const WAYPOINTS = TASKS.map(t => ({ x: t.x, z: t.z })).concat([
   { x: 0, z: 0 }, { x: -15, z: 0 }, { x: 15, z: 0 }, { x: -22, z: -18 }, { x: 22, z: -18 },
   { x: -22, z: 18 }, { x: 22, z: 18 }, { x: 0, z: 19 }, { x: 0, z: -19 }, { x: -14, z: 7 }, { x: 14, z: 7 }, { x: 4, z: -7 },
@@ -673,6 +717,7 @@ const sfx = {
   revealKiller() { beep(110, 1.4, 'sawtooth', .1, 55); beep(165, 1.4, 'sawtooth', .06, 82, .1); },
   revealCrew() { [523, 659, 784].forEach((f, i) => beep(f, .5, 'triangle', .1, 0, i * .12)); },
   step() { noise(.05, .04, 900, 500); },
+  vent() { noise(.25, .3, 300, 120); noise(.4, .15, 2000, 400, .2); beep(140, .3, 'square', .08, 60, .05); },
   win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => beep(f, i === 6 ? .6 : .18, 'triangle', .15, 0, i * .13)); },
   lose() { [392, 370, 349, 294].forEach((f, i) => beep(f, i === 3 ? .9 : .35, 'sawtooth', .1, i === 3 ? 220 : 0, i * .38)); },
 };
@@ -1043,9 +1088,45 @@ function interact(dt) {
     }
   }
   if (nearestCorpse()) html += `<div class="report">R: Ölüyü raporla</div>`;
+  if (isKiller && nearestVent() >= 0) {
+    html += `<div class="report">V: Havalandırmaya gir</div>`;
+    const seen = aliveNpcs().filter(n => dist(n, player) < 7);
+    if (seen.length) html += `<div class="warn">Dikkat! ${seen[0].name} girdiğini görür!</div>`;
+  }
   actionPressed = false;
   prompt.hidden = !html;
   if (html && prompt.innerHTML !== html) prompt.innerHTML = html;
+}
+
+// ---------- Mini harita ----------
+const mm = $('minimap'), mctx = mm.getContext('2d');
+function drawMinimap() {
+  if (!player) return;
+  const w = mm.width, h = mm.height, pad = 10;
+  const sx = x => pad + (x + W) / (W * 2) * (w - pad * 2);
+  const sz = z => pad + (z + D) / (D * 2) * (h - pad * 2);
+  mctx.clearRect(0, 0, w, h);
+  mctx.fillStyle = 'rgba(255,255,255,.08)';
+  mctx.fillRect(sx(-W), sz(-D), sx(W) - sx(-W), sz(D) - sz(-D));
+  mctx.fillStyle = 'rgba(255,255,255,.35)';
+  obstacles.forEach(o => mctx.fillRect(sx(o.x1), sz(o.z1), sx(o.x2) - sx(o.x1), sz(o.z2) - sz(o.z1)));
+  if (!isKiller) {
+    TASKS.forEach(t => {
+      mctx.fillStyle = t.done ? '#4ade80' : '#ffc928';
+      mctx.beginPath(); mctx.arc(sx(t.x), sz(t.z), t.done ? 5 : 7, 0, Math.PI * 2); mctx.fill();
+    });
+  } else {
+    mctx.fillStyle = '#9aa4ad';
+    VENTS.forEach(v => mctx.fillRect(sx(v.x) - 7, sz(v.z) - 5, 14, 10));
+  }
+  mctx.strokeStyle = '#ff3d3d'; mctx.lineWidth = 4;
+  corpses.forEach(c => {
+    const x = sx(c.position.x), y = sz(c.position.z);
+    mctx.beginPath(); mctx.moveTo(x - 6, y - 6); mctx.lineTo(x + 6, y + 6); mctx.moveTo(x + 6, y - 6); mctx.lineTo(x - 6, y + 6); mctx.stroke();
+  });
+  const px = sx(player.g.position.x), py = sz(player.g.position.z);
+  mctx.fillStyle = '#e53935'; mctx.strokeStyle = '#fff'; mctx.lineWidth = 3;
+  mctx.beginPath(); mctx.arc(px, py, 9, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
 }
 
 function drawHud() {
@@ -1095,6 +1176,7 @@ function frame(now) {
     }
     hudTimer -= dt;
     if (hudTimer <= 0) { drawHud(); hudTimer = .2; }
+    drawMinimap();
   } else if (state === 'dead' || state === 'over' || state === 'menu') {
     npcs.forEach(n => updateNpc(n, dt));
   }
@@ -1144,6 +1226,7 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyR' && !e.repeat && state === 'play') { report(); return; }
   if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
   if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
+  if (e.code === 'KeyV' && !e.repeat) { useVent(); return; }
   if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
   if (e.code === 'KeyE' || e.code === 'Space') {
     e.preventDefault();
@@ -1162,6 +1245,7 @@ window.addEventListener('blur', () => { keys.clear(); actionHeld = false; });
 $('startBtn').addEventListener('click', startGame);
 $('worldBtn').addEventListener('click', nextWorld);
 $('reportBtn').addEventListener('click', report);
+$('ventBtn').addEventListener('click', useVent);
 $('meetBtn').addEventListener('click', endMeeting);
 $('quit').addEventListener('click', toMenu);
 $('deadBtn').addEventListener('click', newRound);
