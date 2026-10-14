@@ -1,0 +1,767 @@
+<title>Fabrikadaki Katil</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Tam ekran 3B sahne; üstünde fabrika tabelası gibi duran HUD ve ekran kartları */
+:root {
+  --bg: #0c0f13;
+  --panel: rgba(16, 20, 26, 0.86);
+  --fg: #f4efe4;
+  --muted: #a3acb6;
+  --pink: #ff8ccf;
+  --hazard: #ffc928;
+  --danger: #ff3d3d;
+  --ok: #4ade80;
+  --line: rgba(255, 255, 255, 0.14);
+  --font-display: 'Bungee', Impact, 'Arial Black', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+#game { position: fixed; inset: 0; }
+#game canvas { display: block; width: 100%; height: 100%; }
+
+.screen {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(8, 10, 14, 0.55); z-index: 10; box-sizing: border-box;
+}
+.card {
+  background: var(--panel); border: 2px solid var(--line); border-radius: 14px;
+  padding: 24px 22px; max-width: 520px; width: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.hazard { height: 10px; border-radius: 4px; background: repeating-linear-gradient(-45deg, var(--hazard) 0 12px, #15171b 12px 24px); }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0; line-height: 1.05; text-wrap: balance; }
+h1 { font-size: clamp(30px, 8vw, 54px); color: var(--pink); text-shadow: 0 4px 0 #6e1d4c; }
+h2 { font-size: clamp(40px, 12vw, 80px); }
+p { margin: 0; line-height: 1.5; font-size: 16px; }
+.muted { color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; font-size: 15px; align-items: center; }
+kbd {
+  font-family: var(--font-display); font-size: 13px; background: #20262f; border: 1px solid #3a434f;
+  border-bottom-width: 3px; border-radius: 6px; padding: 2px 8px; color: var(--fg); white-space: nowrap; justify-self: start;
+}
+button.big {
+  font-family: var(--font-display); font-size: 22px; padding: 14px 20px; border: 0; border-radius: 10px;
+  background: var(--pink); color: #2a0b1d; cursor: pointer; box-shadow: 0 5px 0 #a13d78;
+}
+button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 #a13d78; }
+button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
+.role-killer { color: var(--danger); text-shadow: 0 5px 0 #5a0b0b; }
+.role-crew { color: #8fd3ff; text-shadow: 0 5px 0 #173c5c; }
+.dead-title { color: var(--danger); text-shadow: 0 6px 0 #4d0606; letter-spacing: 0.04em; }
+.win-title { color: var(--ok); text-shadow: 0 6px 0 #14532d; }
+.press { font-family: var(--font-display); font-size: 18px; color: var(--hazard); }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#info {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  min-width: 180px; max-width: min(300px, calc(100vw - 120px)); font-size: 14px;
+}
+#info .role { font-family: var(--font-display); font-size: 18px; margin-bottom: 6px; }
+#info ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+#info li.done { color: var(--ok); text-decoration: line-through; }
+#info .bar { height: 8px; background: #2a313b; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+#info .bar > i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+#quit {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px));
+  pointer-events: auto; font-family: var(--font-display); font-size: 14px; background: var(--panel); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+#prompt {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; text-align: center;
+  font-weight: 800; font-size: 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
+}
+#prompt .warn { color: var(--danger); font-size: 14px; margin-top: 4px; }
+#prompt .bar { height: 10px; width: 220px; max-width: 100%; background: #2a313b; border-radius: 5px; overflow: hidden; margin: 8px auto 0; }
+#prompt .bar > i { display: block; height: 100%; background: var(--hazard); width: 0; }
+#toast {
+  position: absolute; top: calc(70px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  font-family: var(--font-display); font-size: 18px; color: var(--hazard); text-shadow: 0 2px 0 #000; text-align: center;
+  max-width: calc(100vw - 32px); transition: opacity .4s;
+}
+#flash { position: fixed; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 8; transition: opacity .5s; }
+
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#stick {
+  position: absolute; left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid var(--line);
+  pointer-events: auto; touch-action: none;
+}
+#knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,140,207,.7); }
+#actBtn {
+  position: absolute; right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px));
+  width: 86px; height: 86px; border-radius: 50%; border: 0; background: var(--hazard); color: #1a1400;
+  font-family: var(--font-display); font-size: 26px; pointer-events: auto; touch-action: none;
+}
+@media (pointer: fine) { #touch { display: none; } }
+@media (pointer: coarse) { #prompt { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); } }
+@media (prefers-reduced-motion: reduce) { #flash, #toast, #info .bar > i { transition: none; } }
+</style>
+
+<div id="game"></div>
+
+<div id="hud" hidden>
+  <div id="info"></div>
+  <button id="quit" type="button" aria-label="Oyundan çık">Ç · ÇIK</button>
+  <div id="toast"></div>
+  <div id="prompt" hidden></div>
+</div>
+<div id="flash"></div>
+
+<div id="touch" hidden>
+  <div id="stick"><div id="knob"></div></div>
+  <button id="actBtn" type="button">E</button>
+</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <div class="hazard"></div>
+    <h1>FABRİKADAKİ KATİL</h1>
+    <p>Sen <b style="color:var(--pink)">pembe</b> karaktersin. Fabrikada senin gibi 7 arkadaşın daha var, hepsinin rengi farklı.
+      Her oyunda <b>3'te 1</b> ihtimalle <b style="color:var(--danger)">KATİL</b> sen olursun!</p>
+    <div class="keys">
+      <kbd>W A S D</kbd><span>Yürü (ok tuşları da olur)</span>
+      <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür</span>
+      <kbd>Ç</kbd><span>Oyundan çık</span>
+    </div>
+    <button class="big" id="startBtn" type="button">OYNA</button>
+    <p class="muted" style="font-size:13px">Enter tuşuna da basabilirsin</p>
+    <div class="hazard"></div>
+  </div>
+</div>
+
+<div class="screen" id="reveal" hidden>
+  <div class="card" style="background:transparent;border:0;box-shadow:none">
+    <p class="muted" style="font-family:var(--font-display)">BU OYUNDA SEN...</p>
+    <h2 id="revealTitle">MASUMSUN</h2>
+    <p id="revealText"></p>
+  </div>
+</div>
+
+<div class="screen" id="dead" hidden>
+  <div class="card">
+    <h2 class="dead-title">ÖLDÜN</h2>
+    <p id="deadText"></p>
+    <p class="press">Oyun en baştan başlayacak.<br>Çıkmak için Ç harfine bas</p>
+    <button class="big" id="deadBtn" type="button">Ç</button>
+  </div>
+</div>
+
+<div class="screen" id="end" hidden>
+  <div class="card">
+    <h2 id="endTitle" class="win-title">KAZANDIN!</h2>
+    <p id="endText"></p>
+    <p class="press">Yeni oyun için Ç harfine bas</p>
+    <button class="big" id="endBtn" type="button">Ç</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+// ---------- Sahne ----------
+const W = 30, D = 22;           // fabrika: x -30..30, z -22..22
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+$('game').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0f13);
+scene.fog = new THREE.Fog(0x0c0f13, 45, 90);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+scene.add(new THREE.HemisphereLight(0xcfe3ff, 0x2a2018, 0.55));
+const sun = new THREE.DirectionalLight(0xfff2dd, 0.85);
+sun.position.set(-14, 30, 18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 30, bottom: -30, near: 1, far: 80 });
+scene.add(sun);
+[[-18, 0, 0xffa040], [18, 0, 0xffa040], [0, -16, 0x80c0ff], [0, 16, 0xffd080]].forEach(([x, z, c]) => {
+  const p = new THREE.PointLight(c, 0.7, 26, 2);
+  p.position.set(x, 7, z);
+  scene.add(p);
+});
+
+function canvasTex(size, draw, rx = 1, ry = 1) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = 4;
+  return t;
+}
+const floorTex = canvasTex(256, (g, s) => {
+  g.fillStyle = '#5b6068'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 1400; i++) {
+    g.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '255,255,255'},${Math.random() * .06})`;
+    g.fillRect(Math.random() * s, Math.random() * s, 3, 3);
+  }
+  g.strokeStyle = '#3d4148'; g.lineWidth = 4; g.strokeRect(0, 0, s, s);
+}, 15, 11);
+const hazardTex = canvasTex(64, (g, s) => {
+  g.fillStyle = '#16181c'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#ffc928';
+  for (let i = -s; i < s * 2; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 16, 0); g.lineTo(i + 16 - s, s); g.lineTo(i - s, s); g.fill(); }
+});
+const beltTex = canvasTex(64, (g, s) => {
+  g.fillStyle = '#23262b'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#3a3f46'; for (let i = 0; i < s; i += 16) g.fillRect(i, 0, 6, s);
+}, 8, 1);
+
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .7, metalness: .15 }, o));
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(W * 2, D * 2), new THREE.MeshStandardMaterial({ map: floorTex, roughness: .9 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+const obstacles = [];
+function box(w, h, d, x, y, z, material, solid = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  m.position.set(x, y, z);
+  m.castShadow = m.receiveShadow = true;
+  scene.add(m);
+  if (solid) obstacles.push({ x1: x - w / 2, x2: x + w / 2, z1: z - d / 2, z2: z + d / 2 });
+  return m;
+}
+
+// Duvarlar: arkada yüksek, kameraya bakan önde alçak
+const wallMat = mat(0x6b4a3c, { roughness: .95 });
+box(W * 2 + 1, 7, 1, 0, 3.5, -D - .5, wallMat, false);
+box(1, 7, D * 2, -W - .5, 3.5, 0, wallMat, false);
+box(1, 7, D * 2, W + .5, 3.5, 0, wallMat, false);
+box(W * 2 + 1, 1, 1, 0, .5, D + .5, mat(0x3a3f46), false);
+for (let x = -24; x <= 24; x += 8) {
+  box(5, 2.2, .1, x, 4.6, -D + .02, new THREE.MeshBasicMaterial({ color: 0x9ec8e8 }), false);
+}
+const pipeMat = mat(0x9aa4ad, { metalness: .7, roughness: .35 });
+[1.6, 2.4].forEach((y, i) => {
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(.25, .25, W * 2, 12), i ? mat(0xc0392b, { metalness: .5 }) : pipeMat);
+  p.rotation.z = Math.PI / 2; p.position.set(0, y, -D + .4); p.castShadow = true; scene.add(p);
+});
+
+// Makineler
+const pistons = [], beacons = [], blinkers = [];
+function machine(x, z, w, d, color) {
+  box(w, 3.2, d, x, 1.6, z, mat(0x7d8691, { metalness: .5, roughness: .45 }));
+  box(w - .6, .5, d - .6, x, 3.45, z, mat(0x4a525c, { metalness: .5 }), false);
+  [-1, 1].forEach(s => {
+    box(w * .5, 1.2, .1, x, 1.9, z + s * (d / 2 + .05), mat(0x111418, { emissive: color, emissiveIntensity: .35 }), false);
+    const lamp = box(.3, .3, .1, x + w * .32, 2.5, z + s * (d / 2 + .06), new THREE.MeshBasicMaterial({ color: 0x22ff66 }), false);
+    blinkers.push(lamp);
+    box(w, .25, .1, x, .12, z + s * (d / 2 + .05), new THREE.MeshStandardMaterial({ map: hazardTex }), false);
+  });
+  const pis = new THREE.Mesh(new THREE.CylinderGeometry(.35, .35, 1.6, 16), pipeMat);
+  pis.position.set(x - w * .25, 4, z); pis.castShadow = true; scene.add(pis);
+  pistons.push({ m: pis, phase: Math.random() * 6 });
+  const bc = new THREE.Mesh(new THREE.CylinderGeometry(.25, .3, .4, 12), new THREE.MeshBasicMaterial({ color: 0xff7a1a }));
+  bc.position.set(x + w * .3, 3.9, z); scene.add(bc);
+  beacons.push(bc);
+}
+machine(-18, -12, 6, 4, 0x22ccff);
+machine(0, -14, 8, 4, 0xff4fa0);
+machine(18, -12, 6, 4, 0x22ff88);
+machine(-18, 12, 6, 4, 0xffaa22);
+machine(18, 12, 6, 4, 0x9a66ff);
+
+// Konveyör bandı
+box(16, .9, 2, 0, .45, 4, mat(0x3a3f46, { metalness: .4 }));
+const belt = new THREE.Mesh(new THREE.BoxGeometry(16, .06, 1.7), new THREE.MeshStandardMaterial({ map: beltTex, roughness: .8 }));
+belt.position.set(0, .93, 4); belt.receiveShadow = true; scene.add(belt);
+const beltCrates = [];
+for (let i = 0; i < 6; i++) {
+  const c = box(.9, .7, .9, -8 + i * 2.7, 1.32, 4, mat(0xb07a3e), false);
+  beltCrates.push(c);
+}
+
+// Tank, kasalar, variller
+const tank = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 5, 28), mat(0xd4dade, { metalness: .6, roughness: .3 }));
+tank.position.set(-5, 2.5, 15); tank.castShadow = true; scene.add(tank);
+obstacles.push({ x1: -7, x2: -3, z1: 13, z2: 17 });
+const tankPipe = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, 5, 12), mat(0xc0392b, { metalness: .5 }));
+tankPipe.rotation.x = Math.PI / 2; tankPipe.position.set(-5, 4.2, 19.5); scene.add(tankPipe);
+
+const crateMat = mat(0xa8743c, { roughness: .9 });
+box(2, 2, 2, -8, 1, -4, crateMat); box(1.4, 1.4, 1.4, -8, 2.7, -4, crateMat, false);
+box(3, 1.6, 3, 10, .8, -4, crateMat); box(1.6, 1.6, 1.6, 10.4, 2.4, -4.3, crateMat, false);
+box(2, 2.4, 4, -26, 1.2, 0, crateMat); box(2, 2.4, 4, 26, 1.2, 0, crateMat);
+box(3, 1.8, 2, 8, .9, 15, crateMat);
+[[-26, -18], [-24.8, -18.6], [26, 18], [24.6, 18.4], [12, 0]].forEach(([x, z]) => {
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, 1.3, 16), mat(0x2f7d4a, { metalness: .3 }));
+  b.position.set(x, .65, z); b.castShadow = true; scene.add(b);
+  obstacles.push({ x1: x - .55, x2: x + .55, z1: z - .55, z2: z + .55 });
+});
+
+// ---------- Karakterler ----------
+const visorMat = new THREE.MeshStandardMaterial({ color: 0x7cc8ff, metalness: .6, roughness: .15, emissive: 0x0d2a4a });
+const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+function makeCrew(color) {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color, roughness: .45, metalness: .05 });
+  const parts = [];
+  const add = (geo, x, y, z, material = m, parent = g) => {
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.set(x, y, z); mesh.castShadow = true; parent.add(mesh); parts.push(mesh); return mesh;
+  };
+  add(new THREE.CylinderGeometry(.62, .6, 1.05, 28), 0, 1.2, 0);
+  add(new THREE.SphereGeometry(.62, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.72, 0);
+  add(new THREE.SphereGeometry(.6, 28, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 0, .68, 0).scale.y = .3;
+  add(new THREE.SphereGeometry(.5, 24, 16), 0, 1.55, .42, visorMat).scale.set(1, .55, .6);
+  add(new THREE.SphereGeometry(.09, 10, 8), .2, 1.64, .7, shineMat).scale.set(1.6, .7, .5);
+  add(new THREE.BoxGeometry(.75, .82, .4), 0, 1.22, -.66);
+  const legs = [-.3, .3].map(x => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, .72, 0); g.add(pivot);
+    add(new THREE.CylinderGeometry(.24, .24, .66, 16), 0, -.33, 0, m, pivot);
+    return pivot;
+  });
+  scene.add(g);
+  return { g, legL: legs[0], legR: legs[1], walk: 0 };
+}
+
+function makeCorpse(color, x, z, rot) {
+  const g = new THREE.Group();
+  const m = new THREE.MeshStandardMaterial({ color, roughness: .45 });
+  const puddle = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), new THREE.MeshBasicMaterial({ color: 0x7a0000 }));
+  puddle.rotation.x = -Math.PI / 2; puddle.position.y = .02; g.add(puddle);
+  const low = new THREE.Mesh(new THREE.CylinderGeometry(.62, .6, .5, 28), m); low.position.y = .45; g.add(low);
+  const cut = new THREE.Mesh(new THREE.CylinderGeometry(.58, .58, .02, 28), new THREE.MeshBasicMaterial({ color: 0x8a1010 }));
+  cut.position.y = .71; g.add(cut);
+  const bone = new THREE.Mesh(new THREE.CylinderGeometry(.1, .1, .4, 10), shineMat); bone.position.y = .9; g.add(bone);
+  [-.09, .09].forEach(dx => { const k = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), shineMat); k.position.set(dx, 1.1, 0); g.add(k); });
+  [-.3, .3].forEach(dx => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.24, .24, .3, 14), m); l.position.set(dx, .15, 0); g.add(l); });
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.position.set(x, 0, z); g.rotation.y = rot;
+  scene.add(g);
+  return g;
+}
+
+// ---------- Görevler ----------
+const TASKS = [
+  { name: 'Makineyi tamir et', x: -18, z: -8.6 },
+  { name: 'Kabloları bağla', x: 0, z: -10.6 },
+  { name: 'Fırını ayarla', x: 18, z: -8.6 },
+  { name: 'Konveyörü çalıştır', x: -9.8, z: 4 },
+  { name: 'Boruyu kontrol et', x: -5, z: 11.4 },
+  { name: 'Kutuları say', x: 18, z: 8.6 },
+];
+TASKS.forEach(t => {
+  t.ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.2, 32), new THREE.MeshBasicMaterial({ color: 0xffc928, transparent: true, opacity: .85 }));
+  t.ring.rotation.x = -Math.PI / 2; t.ring.position.set(t.x, .03, t.z); scene.add(t.ring);
+  t.gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35), new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0xffaa00, emissiveIntensity: .8 }));
+  t.gem.position.set(t.x, 3, t.z); scene.add(t.gem);
+});
+const WAYPOINTS = TASKS.map(t => ({ x: t.x, z: t.z })).concat([
+  { x: 0, z: 0 }, { x: -15, z: 0 }, { x: 15, z: 0 }, { x: -22, z: -18 }, { x: 22, z: -18 },
+  { x: -22, z: 18 }, { x: 22, z: 18 }, { x: 0, z: 19 }, { x: 0, z: -19 }, { x: -14, z: 7 }, { x: 14, z: 7 }, { x: 4, z: -7 },
+]);
+
+// ---------- Çarpışma ----------
+const R = .55;
+function blocked(x, z) {
+  if (x < -W + R || x > W - R || z < -D + R || z > D - R) return true;
+  for (const o of obstacles) if (x > o.x1 - R && x < o.x2 + R && z > o.z1 - R && z < o.z2 + R) return true;
+  return false;
+}
+function moveBy(e, dx, dz) {
+  const p = e.g.position;
+  if (!blocked(p.x + dx, p.z)) p.x += dx;
+  if (!blocked(p.x, p.z + dz)) p.z += dz;
+}
+const dist = (a, b) => Math.hypot(a.g.position.x - b.g.position.x, a.g.position.z - b.g.position.z);
+
+// ---------- Ses ----------
+let actx = null;
+function beep(f, d, type = 'square', v = .06, slide = 0) {
+  if (!actx) return;
+  const t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(actx.destination); o.start(t); o.stop(t + d);
+}
+const sfx = {
+  kill() { beep(220, .35, 'sawtooth', .09, 60); beep(90, .5, 'square', .05, 40); },
+  task() { beep(660, .12); setTimeout(() => beep(990, .18), 110); },
+  win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => beep(f, .2, 'triangle', .08), i * 130)); },
+  lose() { [400, 300, 200].forEach((f, i) => setTimeout(() => beep(f, .3, 'sawtooth', .06), i * 180)); },
+};
+
+// ---------- Oyun durumu ----------
+const COLORS = [
+  ['Kırmızı', 0xe53935], ['Mavi', 0x2457ff], ['Yeşil', 0x1fa64a], ['Sarı', 0xf2d40c],
+  ['Turuncu', 0xff8a1c], ['Mor', 0x8b45d6], ['Camgöbeği', 0x2fe0d8], ['Beyaz', 0xe9eef2],
+];
+let state = 'menu';
+let player = null, npcs = [], corpses = [], isKiller = false, killCd = 0, revealT = 0, caughtT = -1, witnessName = '';
+let actionHeld = false, actionPressed = false;
+const keys = new Set();
+const joy = { x: 0, z: 0 };
+
+function clearRound() {
+  [player, ...npcs].forEach(e => e && scene.remove(e.g));
+  corpses.forEach(c => scene.remove(c));
+  npcs = []; corpses = []; player = null;
+}
+
+function randomWaypoint() { return WAYPOINTS[Math.floor(Math.random() * WAYPOINTS.length)]; }
+
+function newRound() {
+  clearRound();
+  isKiller = Math.random() < 1 / 3;
+  player = Object.assign(makeCrew(0xff8ccf), { name: 'Pembe', isPlayer: true, alive: true, color: 0xff8ccf });
+  player.g.position.set(0, 0, -4);
+  const pool = COLORS.slice().sort(() => Math.random() - .5).slice(0, 7);
+  pool.forEach(([name, color], i) => {
+    const a = (i / pool.length) * Math.PI * 2;
+    const n = Object.assign(makeCrew(color), { name, color, alive: true, target: randomWaypoint(), wait: Math.random() * 2,
+      stuck: 0, detour: null, detourT: 0, impostor: false, killTimer: 0, prey: null, huntT: 0, lastPos: null });
+    n.g.position.set(Math.cos(a) * 3, 0, -4 + Math.sin(a) * 3);
+    n.g.rotation.y = a + Math.PI;
+    npcs.push(n);
+  });
+  if (!isKiller) {
+    const imp = npcs[Math.floor(Math.random() * npcs.length)];
+    imp.impostor = true; imp.killTimer = 20 + Math.random() * 6;
+  }
+  killCd = 10;
+  caughtT = -1;
+  TASKS.forEach(t => {
+    t.done = false; t.progress = 0;
+    t.ring.visible = t.gem.visible = !isKiller;
+    t.ring.material.color.set(0xffc928); t.gem.material.color.set(0xffc928); t.gem.material.emissive.set(0xffaa00);
+  });
+  $('revealTitle').textContent = isKiller ? 'KATİLSİN!' : 'MASUMSUN';
+  $('revealTitle').className = isKiller ? 'role-killer' : 'role-crew';
+  $('revealText').textContent = isKiller
+    ? 'Herkesi tek tek yakala. Ama dikkat et, yakında başka biri varsa seni görür!'
+    : 'Sarı yerlerdeki görevleri yap. Aranızda gizli bir katil var, ondan kaç!';
+  show('reveal');
+  state = 'reveal'; revealT = 2.8;
+}
+
+function show(id) {
+  ['menu', 'reveal', 'dead', 'end'].forEach(s => { $(s).hidden = s !== id; });
+  $('hud').hidden = !(id === null || id === 'reveal');
+  $('touch').hidden = id !== null;
+}
+
+function toMenu() { clearRound(); state = 'menu'; show('menu'); menuCrew(); }
+
+function startGame() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+  newRound();
+}
+
+let toastTimer = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; toastTimer = 2.5; }
+function flash() { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = .45; requestAnimationFrame(() => { f.style.transition = ''; f.style.opacity = 0; }); }
+
+function doKill(killer, victim) {
+  victim.alive = false;
+  const p = victim.g.position;
+  corpses.push(makeCorpse(victim.color, p.x, p.z, victim.g.rotation.y));
+  scene.remove(victim.g);
+  if (!blocked(p.x + .9, p.z)) killer.g.position.set(p.x + .9, 0, p.z);
+  sfx.kill();
+  if (victim.isPlayer) {
+    state = 'dead';
+    flash();
+    sfx.lose();
+    $('deadText').textContent = `Seni ${killer.name} öldürdü! Katil oydu.`;
+    setTimeout(() => { if (state === 'dead') show('dead'); }, 900);
+  } else if (!isKiller) {
+    toast(`${victim.name} öldürüldü!`);
+  }
+}
+
+function aliveNpcs() { return npcs.filter(n => n.alive); }
+
+function witnesses(victim, killer) {
+  return aliveNpcs().filter(n => n !== victim && n !== killer && dist(n, victim) < 7);
+}
+
+function endGame(win, title, text) {
+  state = 'over';
+  $('endTitle').textContent = title;
+  $('endTitle').className = win ? 'win-title' : 'dead-title';
+  $('endText').textContent = text;
+  win ? sfx.win() : sfx.lose();
+  setTimeout(() => show('end'), 600);
+}
+
+// ---------- Hareket / yapay zekâ ----------
+function animateWalk(e, moving, dt) {
+  e.walk = moving ? e.walk + dt * 11 : 0;
+  const s = Math.sin(e.walk) * .7;
+  e.legL.rotation.x = s; e.legR.rotation.x = -s;
+  e.g.position.y = moving ? Math.abs(Math.sin(e.walk)) * .08 : 0;
+}
+function face(e, dx, dz, dt) {
+  const target = Math.atan2(dx, dz);
+  let diff = target - e.g.rotation.y;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  e.g.rotation.y += diff * Math.min(1, dt * 12);
+}
+
+function updatePlayer(dt) {
+  let dx = 0, dz = 0;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) dz -= 1;
+  if (keys.has('KeyS') || keys.has('ArrowDown')) dz += 1;
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) dx -= 1;
+  if (keys.has('KeyD') || keys.has('ArrowRight')) dx += 1;
+  dx += joy.x; dz += joy.z;
+  const len = Math.hypot(dx, dz);
+  if (len > .1) {
+    const s = 6 * dt / Math.max(1, len);
+    moveBy(player, dx * s, dz * s);
+    face(player, dx, dz, dt);
+  }
+  animateWalk(player, len > .1, dt);
+}
+
+function updateNpc(n, dt) {
+  if (!n.alive) return;
+  let goal = n.target, speed = 2.6, hunting = false;
+  if (n.impostor && state === 'play') {
+    n.killTimer -= dt;
+    if (n.killTimer <= 0) {
+      if (!n.prey || !n.prey.alive) {
+        const options = aliveNpcs().filter(o => o !== n);
+        n.prey = (Math.random() < .55 || !options.length) ? player : options[Math.floor(Math.random() * options.length)];
+        n.huntT = 0;
+      }
+      hunting = true; speed = 4.2; n.huntT += dt;
+      goal = { x: n.prey.g.position.x, z: n.prey.g.position.z };
+      if (dist(n, n.prey) < 1.3 && witnesses(n.prey, n).length === 0) {
+        doKill(n, n.prey);
+        n.prey = null; n.killTimer = 15 + Math.random() * 8;
+        return;
+      }
+      if (n.huntT > 14) { n.prey = null; n.killTimer = 4; }
+    }
+  }
+  if (!hunting && n.wait > 0) { n.wait -= dt; animateWalk(n, false, dt); return; }
+  if (n.detourT > 0) { n.detourT -= dt; goal = n.detour; }
+  const p = n.g.position;
+  const dx = goal.x - p.x, dz = goal.z - p.z, d = Math.hypot(dx, dz);
+  if (d < .6) {
+    if (n.detourT > 0) { n.detourT = 0; }
+    else if (!hunting) { n.target = randomWaypoint(); n.wait = 1 + Math.random() * 3.5; }
+    animateWalk(n, false, dt);
+    return;
+  }
+  const bx = p.x, bz = p.z;
+  moveBy(n, dx / d * speed * dt, dz / d * speed * dt);
+  const moved = Math.hypot(p.x - bx, p.z - bz);
+  if (moved < speed * dt * .3) {
+    n.stuck += dt;
+    if (n.stuck > .4) { n.stuck = 0; n.detour = randomWaypoint(); n.detourT = 1.6; if (!hunting) n.target = randomWaypoint(); }
+  } else n.stuck = 0;
+  face(n, dx, dz, dt);
+  animateWalk(n, true, dt);
+}
+
+// ---------- Etkileşim ve HUD ----------
+let hudTimer = 0;
+function interact(dt) {
+  const prompt = $('prompt');
+  let html = '';
+  if (!isKiller) {
+    let best = null, bd = 2.2;
+    TASKS.forEach(t => {
+      if (t.done) return;
+      const d = Math.hypot(player.g.position.x - t.x, player.g.position.z - t.z);
+      if (d < bd) { bd = d; best = t; }
+    });
+    if (best) {
+      if (actionHeld) {
+        best.progress = Math.min(1, best.progress + dt / 2.5);
+        if (best.progress >= 1) {
+          best.done = true; sfx.task(); toast(`Görev bitti: ${best.name}`);
+          best.ring.material.color.set(0x4ade80); best.gem.material.color.set(0x4ade80); best.gem.material.emissive.set(0x1a7a40);
+          if (TASKS.every(t => t.done)) endGame(true, 'KAZANDIN!', 'Bütün görevleri yaptın ve katilden kaçtın. Fabrika kurtuldu!');
+        }
+      }
+      html = `<div>E tuşuna basılı tut: ${best.name}</div><div class="bar"><i style="width:${best.progress * 100}%"></i></div>`;
+    }
+  } else {
+    killCd = Math.max(0, killCd - dt);
+    let best = null, bd = 2;
+    aliveNpcs().forEach(n => { const d = dist(player, n); if (d < bd) { bd = d; best = n; } });
+    if (best) {
+      const seen = witnesses(best, player);
+      if (killCd > 0) html = `<div>Bekle: ${Math.ceil(killCd)} saniye</div>`;
+      else html = `<div>E: ${best.name} karakteri yakala</div>`;
+      if (seen.length) html += `<div class="warn">Dikkat! ${seen.map(s => s.name).join(', ')} seni görür!</div>`;
+      if (actionPressed && killCd <= 0) {
+        doKill(player, best);
+        flash();
+        killCd = 10;
+        if (seen.length) { caughtT = 1; witnessName = seen[0].name; }
+        else if (!aliveNpcs().length) endGame(true, 'KAZANDIN!', 'Kimse seni görmeden herkesi yakaladın. Fabrikanın tek sahibi sensin!');
+      }
+    } else if (killCd > 0) {
+      html = `<div>Öldürmek için bekle: ${Math.ceil(killCd)} sn</div>`;
+    }
+  }
+  actionPressed = false;
+  prompt.hidden = !html;
+  if (html && prompt.innerHTML !== html) prompt.innerHTML = html;
+}
+
+function drawHud() {
+  const info = $('info');
+  if (!player) return;
+  if (isKiller) {
+    const left = aliveNpcs().length;
+    info.innerHTML = `<div class="role role-killer">KATİL</div>
+      <div>Kalan kişi: <b>${left}</b> / ${npcs.length}</div>
+      <div class="muted" style="margin-top:4px">Yalnız birini bul, yanına git, E'ye bas.</div>`;
+  } else {
+    const done = TASKS.filter(t => t.done).length;
+    info.innerHTML = `<div class="role role-crew">MASUM</div>
+      <ul>${TASKS.map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('')}</ul>
+      <div class="bar"><i style="width:${done / TASKS.length * 100}%"></i></div>`;
+  }
+}
+
+// ---------- Döngü ----------
+const camTarget = new THREE.Vector3(), camPos = new THREE.Vector3(0, 30, 30);
+let last = performance.now(), time = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000);
+  last = now; time += dt;
+
+  beltTex.offset.x -= dt * .5;
+  beltCrates.forEach(c => { c.position.x += dt * 2; if (c.position.x > 7.6) c.position.x = -7.6; });
+  pistons.forEach(p => { p.m.position.y = 4 + Math.sin(time * 2.4 + p.phase) * .5; });
+  beacons.forEach((b, i) => { b.material.color.setHex(Math.sin(time * 6 + i) > 0 ? 0xff7a1a : 0x552200); });
+  blinkers.forEach((b, i) => { b.material.color.setHex(Math.sin(time * 3 + i * 1.7) > 0 ? 0x22ff66 : 0x0a3318); });
+  TASKS.forEach(t => {
+    if (!t.done) { t.gem.rotation.y += dt * 2; t.gem.position.y = 3 + Math.sin(time * 3) * .25; t.ring.material.opacity = .55 + Math.sin(time * 4) * .3; }
+  });
+
+  if (state === 'reveal') {
+    revealT -= dt;
+    if (revealT <= 0) { state = 'play'; show(null); drawHud(); }
+  }
+  if (state === 'play' || state === 'reveal') {
+    if (state === 'play') updatePlayer(dt);
+    npcs.forEach(n => updateNpc(n, dt));
+    if (state === 'play') interact(dt);
+    if (caughtT > 0 && state === 'play') {
+      caughtT -= dt;
+      if (caughtT <= 0) endGame(false, 'YAKALANDIN!', `${witnessName} seni gördü ve herkese söyledi. Bir dahakine kimse yokken yap!`);
+    }
+    hudTimer -= dt;
+    if (hudTimer <= 0) { drawHud(); hudTimer = .2; }
+  } else if (state === 'dead' || state === 'over' || state === 'menu') {
+    npcs.forEach(n => updateNpc(n, dt));
+  }
+  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').style.opacity = 0; }
+
+  if (player && state !== 'menu') {
+    const p = player.g.position;
+    camTarget.set(p.x, 1, p.z);
+    const want = new THREE.Vector3(p.x, 13, p.z + 11);
+    camPos.lerp(want, Math.min(1, dt * 5));
+  } else {
+    camTarget.set(0, 0, 0);
+    camPos.set(Math.sin(time * .12) * 34, 24, Math.cos(time * .12) * 34);
+  }
+  camera.position.copy(camPos);
+  camera.lookAt(camTarget);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// Menü arkasında dolaşan örnek ekip
+function menuCrew() {
+  COLORS.slice(0, 6).concat([['Pembe', 0xff8ccf]]).forEach(([name, color], i) => {
+    const n = Object.assign(makeCrew(color), { name, color, alive: true, target: randomWaypoint(), wait: 0, stuck: 0, detourT: 0, impostor: false });
+    n.g.position.set(-6 + i * 2, 0, -2);
+    npcs.push(n);
+  });
+}
+menuCrew();
+
+requestAnimationFrame(frame);
+
+// ---------- Girdi ----------
+const isC = e => e.key === 'ç' || e.key === 'Ç' || e.key === 'Escape';
+window.addEventListener('keydown', e => {
+  if (isC(e)) {
+    e.preventDefault();
+    if (state === 'dead' || state === 'over') newRound();
+    else if (state === 'play' || state === 'reveal') toMenu();
+    return;
+  }
+  if (state === 'menu' && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); startGame(); return; }
+  if (e.code === 'KeyE' || e.code === 'Space') {
+    e.preventDefault();
+    if (!e.repeat) actionPressed = true;
+    actionHeld = true;
+  }
+  if (e.code.startsWith('Arrow')) e.preventDefault();
+  keys.add(e.code);
+});
+window.addEventListener('keyup', e => {
+  keys.delete(e.code);
+  if (e.code === 'KeyE' || e.code === 'Space') actionHeld = false;
+});
+window.addEventListener('blur', () => { keys.clear(); actionHeld = false; });
+
+$('startBtn').addEventListener('click', startGame);
+$('quit').addEventListener('click', toMenu);
+$('deadBtn').addEventListener('click', newRound);
+$('endBtn').addEventListener('click', newRound);
+
+const act = $('actBtn');
+act.addEventListener('pointerdown', e => { e.preventDefault(); actionPressed = true; actionHeld = true; });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => act.addEventListener(ev, () => { actionHeld = false; }));
+
+const stick = $('stick'), knob = $('knob');
+let stickId = null;
+function stickMove(e) {
+  const r = stick.getBoundingClientRect();
+  let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+  const m = Math.hypot(x, y), max = r.width / 2;
+  if (m > max) { x *= max / m; y *= max / m; }
+  knob.style.transform = `translate(${x}px, ${y}px)`;
+  joy.x = x / max; joy.z = y / max;
+}
+stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stickMove(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+['pointerup', 'pointercancel'].forEach(ev => stick.addEventListener(ev, () => {
+  stickId = null; joy.x = joy.z = 0; knob.style.transform = '';
+}));
+})();
+</script>
