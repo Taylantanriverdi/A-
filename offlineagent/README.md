@@ -75,6 +75,7 @@ Kurallar:
 - Klasörün dışındaki silme/taşıma/üzerine yazma önceki gibi onay ister.
 - İstersen Ayarlar > Genel > "Dosyalar klasöründe onay sorma" kutusundan bu serbestliği kapatabilirsin.
 - Eski sürümlerdeki `calisma` klasörü varsa ilk açılışta `dosyalar` olarak taşınır.
+- Klasörü `dosyalarım` adıyla kendin oluşturduysan (`D:\offlineagent\dosyalarım`) otomatik olarak o kullanılır. Başka bir yer istersen `ayarlar.json`'a `"dosyalar_klasoru": "E:\\Arsiv"` yaz ve BASLAT.bat'ı çalıştır.
 
 ## Belgelerimden cevap
 
@@ -243,6 +244,7 @@ Modeller 30 dakika boyunca bellekte tutulur; böylece her soruda yeniden yüklen
 | `hafiza` / `otomatik_hafiza` | `true` | Hafıza ve sohbetlerden otomatik öğrenme |
 | `yuz_tanima` | `true` | Kamerada yüz tanıma |
 | `dosyalar_serbest` | `true` | Dosyalarım klasöründe onay sormadan çalışma |
+| `dosyalar_klasoru` | (boş) | Dosyalarım klasörünün yeri. Boşsa `dosyalarım` varsa o, yoksa `dosyalar` |
 | `ag_erisimi` | `false` | Telefondan erişim (Ayarlar > Telefon'dan açılır) |
 | `embed_model` | `nomic-embed-text` | Belge arama modeli |
 | `baglam_uzunlugu` | `8192` | Modelin aynı anda aklında tutabileceği metin miktarı. Ekran kartı belleği yetmezse `4096` yap |

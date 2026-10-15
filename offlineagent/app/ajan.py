@@ -28,14 +28,30 @@ from ayarlar import KOK, ayarlari_oku
 from belge_oku import belgeyi_oku
 from ollama_api import OllamaHatasi, sohbet_akisi
 
-# Kullanıcının dosyalar klasörü: buraya koyulan her şeyde asistan onay sormadan çalışır
-CALISMA = KOK / "dosyalar"
-_ESKI_CALISMA = KOK / "calisma"
-if _ESKI_CALISMA.is_dir() and not CALISMA.exists():
-    try:
-        _ESKI_CALISMA.rename(CALISMA)  # eski sürümlerin "calisma" klasörü taşınır
-    except OSError:
-        pass
+
+
+def _dosyalar_klasoru() -> Path:
+    """Kullanıcının dosyalar klasörü: buraya koyulan her şeyde asistan onay sormadan çalışır.
+    ayarlar.json'da "dosyalar_klasoru" verilmişse o kullanılır; yoksa D:\\offlineagent içinde
+    "dosyalarım" adlı bir klasör varsa o, yoksa "dosyalar"."""
+    secilen = str(ayarlari_oku().get("dosyalar_klasoru", "") or "").strip().strip('"')
+    if secilen:
+        yol = Path(os.path.expandvars(secilen))
+        return yol if yol.is_absolute() else KOK / yol
+    for ad in ("dosyalarım", "Dosyalarım", "dosyalarim", "Dosyalarim"):
+        if (KOK / ad).is_dir():
+            return KOK / ad
+    varsayilan = KOK / "dosyalar"
+    eski = KOK / "calisma"
+    if eski.is_dir() and not varsayilan.exists():
+        try:
+            eski.rename(varsayilan)  # eski sürümlerin "calisma" klasörü taşınır
+        except OSError:
+            pass
+    return varsayilan
+
+
+CALISMA = _dosyalar_klasoru()
 MAKS_TUR = 12
 MAKS_CIKTI = 8000
 ZAMAN_ASIMI = 120
