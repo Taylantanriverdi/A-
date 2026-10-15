@@ -249,6 +249,10 @@ Ayarlar > Genel > **Akıl seviyesi**:
 
 Düşünme qwen3 ve deepseek-r1 gibi modellerde çalışır.
 
+**Rastgelelik kapalı:** Model her zaman en olası cevabı seçer; aynı soruya aynı cevabı verir (sohbet, iş yaptırma, kamera/ekran, OCR ve `uygulamalar` adresinden açılan programlar dahil).
+
+**Dürüstlük:** Asistan bir işi önce araçlarla yapmayı dener. Gerçekten yapamazsa "Bunu yapamadım: <neden>" der; yapmadığı işi yaptım demez, sonuç uydurmaz. Hiç denemeden "yapamam" derse bir kez denemesi istenir.
+
 ## Ayarlar
 
 Çoğu ayar arayüzden değiştirilir: ⚙ **Ayarlar** (sol alt). Aşağıdaki tablo `ayarlar.json` dosyasındaki karşılıklarıdır.

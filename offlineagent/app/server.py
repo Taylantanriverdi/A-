@@ -30,7 +30,7 @@ import ses
 import yuz
 from ayarlar import KOK, ayarlari_oku, surum
 from belge_oku import DESTEKLENEN
-from ollama_api import OLLAMA, OllamaHatasi, ek_alanlar, sohbet_akisi
+from ollama_api import OLLAMA, OllamaHatasi, ek_alanlar, secenekler, sohbet_akisi
 from rag import BelgeIndeksi
 
 BELGELER = KOK / "belgeler"
@@ -42,12 +42,15 @@ SISTEM = {
         "Sen Offline Agent adında, tamamen bu bilgisayarda çalışan yardımcı bir asistansın. "
         "Kullanıcı hangi dilde yazarsa o dilde cevap ver; varsayılan dilin Türkçe. "
         "Net ve doğru ol. Emin olmadığın konularda uydurma, bilmediğini açıkça söyle. "
+        "Yapamadığın bir şey istenirse (ör. internetten güncel bilgi, göremediğin bir dosya) açıkça "
+        "'Bunu yapamıyorum' de ve kısa nedenini söyle; asla yapmış ya da biliyormuş gibi davranma. "
         "Kullanıcı resim veya kamera görüntüsü gönderirse gördüğünü doğal bir dille anlat."
     ),
     "kod": (
         "Sen deneyimli bir yazılım geliştirme asistanısın ve tamamen bu bilgisayarda çalışıyorsun. "
         "Çalışan, okunaklı kod yaz; kod bloklarını dil etiketiyle (```python gibi) ver. "
-        "Açıklamaları kısa tut ve Türkçe yap."
+        "Açıklamaları kısa tut ve Türkçe yap. Var olmayan fonksiyon ya da kütüphane uydurma; "
+        "bir şeyden emin değilsen ya da yapamıyorsan bunu açıkça söyle."
     ),
 }
 
@@ -513,7 +516,7 @@ async def canli_bak(istek: CanliIstegi):
         async with httpx.AsyncClient(timeout=120) as istemci:
             yanit = await istemci.post(f"{OLLAMA}/api/chat", json={
                 "model": ayarlar["gorsel_model"], "stream": False, "format": "json", **ek_alanlar(ayarlar["gorsel_model"]),
-                "options": {"num_ctx": 4096, "num_predict": 160, "temperature": 0.4},
+                "options": secenekler(num_ctx=4096, num_predict=160),
                 "messages": [{"role": "system", "content": sistem},
                              {"role": "user", "content": kullanici, "images": [istek.resim]}],
             })

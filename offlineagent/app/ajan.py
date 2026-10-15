@@ -589,7 +589,7 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "ve kullanıcının istediğini yap; istek yoksa kısaca özetle.\n"
         "Kurallar:\n"
         "- Türkçe, kısa ve samimi konuş.\n"
-        "- Kullanıcı bilgisayarda bir iş isterse ASLA 'yapamam' ya da 'kendiniz yapın' deme: uygun aracı hemen çağır. "
+        "- Kullanıcı bilgisayarda bir iş isterse önce uygun aracı hemen çağırarak yapmayı dene; 'kendiniz yapın' deme. "
         "Sadece sohbet, bilgi ya da fikir istiyorsa araç kullanmadan cevap ver.\n"
         "- Önce hazır araçları kullan (klasor_olustur, dosya_kopyala, program_ac...); hiçbiri uymazsa komut_calistir.\n"
         "- Bir klasörü sürekli takip etmen ya da yeni gelenleri bildirmen istenirse klasoru_izle aracını kullan. "
@@ -600,6 +600,10 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "onayı sistem kendisi sorar, sen kullanıcıya 'yapayım mı?' diye sorma, aracı çağır. Reddederse başka yol öner.\n"
         "- Bir araç hata verirse hatayı oku, düzelt ve tekrar dene. Emin olmadığın dosya adını önce dosya_listele ile bul.\n"
         "- İş bitince ne yaptığını tek cümleyle söyle (ör. 'Masaüstünde \"Raporlar\" klasörünü oluşturdum.').\n"
+        "- DÜRÜSTLÜK: Bir işi gerçekten yapamadıysan (uygun araç yok, araç hata verdi ve düzeltemedin, kullanıcı "
+        "reddetti, gereken bilgi yok) bunu açıkça 'Bunu yapamadım: <kısa neden>' diye söyle. Yapmadığın bir işi "
+        "yaptım deme; araç sonucunu, dosya içeriğini ya da bilgiyi asla uydurma, sadece araç sonuçlarında gördüğünü söyle. "
+        "İşin bir kısmını yapabildiysen hangi kısmı yapıp hangisini yapamadığını ayrı ayrı söyle.\n"
         "- Kullanıcı hakkında kalıcı bir bilgi öğrenirsen hafizaya_kaydet ile kaydet."
         + ("\n- Kullanıcı belgelerini kullanmanı istiyor: soruyu cevaplamadan önce belge_ara ile belgelerde ara ve kaynağı belirt."
            if belgeler else "")
@@ -616,9 +620,11 @@ EYLEM = re.compile(
 # Modelin işi yapmak yerine kullanıcıya talimat verdiğini gösteren ifadeler
 TALIMAT = re.compile(
     r"(```|çalıştırabilirsiniz|kopyalayıp|yapıştırın|yapabilirsiniz|kendiniz|sağ tık|komutunu|komutu kullan|"
-    r"yapamıyorum|yapamam|gerçekleştiremiyorum|erişimim (yok|bulunmamakta)|New-Item|mkdir )",
+    r"New-Item|mkdir )",
     re.IGNORECASE,
 )
+# Hiç denemeden "yapamam" demesi: bir kez araçlarla denemesi istenir; denedikten sonra "yapamadım" diyebilir
+YAPAMAM = re.compile(r"(yapamıyorum|yapamam|gerçekleştiremiyorum|erişimim (yok|bulunmamakta)|mümkün değil)", re.IGNORECASE)
 _YER = r"(?P<yer>masa ?[üu]st[üu]\w*|belgeler\w*|indirilenler\w*|resimler\w*)"
 _AD = r"[\"'“”]?(?P<ad>[^\"'“”\n]{1,80}?)[\"'“”]?"
 HIZLI_KLASOR = [
@@ -776,6 +782,7 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
         mesajlar.append({"role": "assistant", "content": "", "tool_calls": [hizli]})
         dogrudan = hizli["function"]["name"] == "primerlab"
     duzeltme_hakki = 2
+    yapamam_hakki = 1
     itme: list[dict] = []
     for _ in range(MAKS_TUR):
         oneriler, oneri_cevabi, son_cevap = [], "", ""
@@ -848,6 +855,17 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
                 {"role": "user", "content": "Bana nasıl yapacağımı anlatma, talimat ya da komut yazma. Bu işi araçlarınla "
                                             "ŞİMDİ kendin yap: uygun aracı çağır (ör. klasor_olustur, program_ac, klasoru_izle, "
                                             "dosya_kopyala; hiçbiri uymuyorsa komut_calistir)."},
+            ]
+            continue
+        if (not cagrilar and yapamam_hakki and hic_arac_yok and EYLEM.search(kullanici_istegi)
+                and YAPAMAM.search(icerik)):
+            yapamam_hakki -= 1
+            yield {"geri_al": True}
+            itme = [
+                {"role": "assistant", "content": icerik},
+                {"role": "user", "content": "Denemeden 'yapamam' deme. Önce araçlarınla dene (dosya_ara, dosya_listele, "
+                                            "program_ac, komut_calistir...). Denedikten sonra yine yapamazsan "
+                                            "'Bunu yapamadım: <neden>' de."},
             ]
             continue
         yanit = {"role": "assistant", "content": icerik}

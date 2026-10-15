@@ -9,6 +9,14 @@ OLLAMA = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
 BELLEKTE_TUT = "30m"
 # Cevaptan önce "düşünebilen" model aileleri; düşünme kapalıyken çok daha hızlı cevap verirler
 DUSUNEN_MODELLER = ("qwen3", "deepseek-r1", "magistral")
+# Rastgelelik kapalı: aynı soruya her seferinde aynı (en olası) cevap verilir
+SABIT = {"temperature": 0, "seed": 42}
+# Cevap uzunluğu sınırı (düşünme dahil); model kendini tekrar eden bir döngüye girerse sonsuza kadar yazmasın
+EN_FAZLA_CEVAP = 4096
+
+
+def secenekler(**ek) -> dict:
+    return {**SABIT, **ek}
 
 
 def ek_alanlar(model: str, dusun: bool = False) -> dict:
@@ -27,7 +35,8 @@ class OllamaHatasi(Exception):
 async def sohbet_akisi(model: str, mesajlar: list[dict], baglam: int, araclar: list[dict] | None = None,
                        dusun: bool = False):
     """Ollama'dan cevabı parça parça getirir: {"t": metin} veya {"tool_calls": [...]}."""
-    govde = {"model": model, "messages": mesajlar, "stream": True, "options": {"num_ctx": baglam},
+    govde = {"model": model, "messages": mesajlar, "stream": True,
+             "options": secenekler(num_ctx=baglam, num_predict=EN_FAZLA_CEVAP),
              **ek_alanlar(model, dusun)}
     if araclar:
         govde["tools"] = araclar
@@ -78,7 +87,7 @@ def gorsel_oku(model: str, resim_b64: str, istem: str) -> str:
             "model": model,
             "stream": False,
             "messages": [{"role": "user", "content": istem, "images": [resim_b64]}],
-            "options": {"temperature": 0, "num_ctx": 4096},
+            "options": secenekler(num_ctx=4096),
             **ek_alanlar(model),
         },
         timeout=600,

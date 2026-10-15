@@ -7,6 +7,7 @@ Offline Agent arayüzünden ayrı bir adres (port) kullanılır: bu sayfalar aja
 erişemez. Sadece bu bilgisayardan (127.0.0.1) açılabilir; başka sitelerden gelen istekler reddedilir.
 """
 import html
+import json
 import re
 import threading
 import urllib.parse
@@ -17,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from ayarlar import KOK, ayarlari_oku
-from ollama_api import OLLAMA
+from ollama_api import OLLAMA, SABIT
 
 KLASOR = KOK / "uygulamalar"
 PORT = int(ayarlari_oku().get("port", 8765)) + 1
@@ -65,9 +66,18 @@ async def ollama_vekil(yol: str, request: Request):
     if (request.method, yol) not in OLLAMA_UCLARI:
         raise HTTPException(404, "Bu Ollama ucu kapalı")
     # Cevap parça parça aktarılır: sayfa kelimeleri geldikçe gösterebilir
+    govde = await request.body()
+    if request.method == "POST" and govde:
+        # Rastgelelik kapalı: sayfa ne gönderirse göndersin aynı soruya aynı cevap
+        try:
+            veri = json.loads(govde)
+            veri["options"] = {**(veri.get("options") or {}), **SABIT}
+            govde = json.dumps(veri, ensure_ascii=False).encode("utf-8")
+        except (ValueError, AttributeError):
+            pass
     istemci = httpx.AsyncClient(timeout=300)
     try:
-        istek = istemci.build_request(request.method, f"{OLLAMA}/{yol}", content=await request.body(),
+        istek = istemci.build_request(request.method, f"{OLLAMA}/{yol}", content=govde,
                                       headers={"Content-Type": "application/json"})
         yanit = await istemci.send(istek, stream=True)
     except httpx.HTTPError as hata:
