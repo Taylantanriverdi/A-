@@ -7,6 +7,13 @@ param([switch]$Sessiz, [switch]$DosyalarGuncel, [switch]$PaketDegisti)
 $Korunan = @('ayarlar.json', '.venv', 'araclar', 'modeller', 'veri', 'belgeler', 'dosyalar', 'calisma')
 
 try {
+    if (-not (Test-Path $Yollar.Python)) {
+        # Kurulmamis bir kopya (or. Indirilenler'e acilmis zip) guncellenmez; kurulu program ayri klasorde
+        Yaz "Bu klasorde kurulu bir Offline Agent yok: $Kok" Yellow
+        Yaz 'Kurulu programi guncellemek icin o klasordeki GUNCELLE.bat dosyasini calistirin (or. D:\offlineagent\GUNCELLE.bat).' Yellow
+        Yaz 'Bu klasore yeni kurulum yapmak icin KUR.bat dosyasini calistirin.' Yellow
+        return
+    }
     $ayar = Get-Ayarlar
     if (-not (Test-Internet)) { Yaz 'Internet baglantisi yok, guncelleme atlandi.' Yellow; return }
 

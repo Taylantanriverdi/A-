@@ -116,7 +116,10 @@ function Stop-Sunucu {
     return $false
 }
 
-function Set-SonGuncelleme { Set-Content -Path $Yollar.SonGunc -Value (Get-Date -Format 'o') }
+function Set-SonGuncelleme {
+    New-Item -ItemType Directory -Force (Split-Path $Yollar.SonGunc) | Out-Null
+    Set-Content -Path $Yollar.SonGunc -Value (Get-Date -Format 'o')
+}
 
 function Get-SonGuncelleme {
     try { return [datetime]::Parse((Get-Content $Yollar.SonGunc -ErrorAction Stop | Select-Object -First 1)) }
