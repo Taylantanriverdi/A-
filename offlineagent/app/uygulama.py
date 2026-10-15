@@ -14,7 +14,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from ayarlar import KOK, ayarlari_oku
 from ollama_api import OLLAMA
@@ -64,13 +64,26 @@ async def liste():
 async def ollama_vekil(yol: str, request: Request):
     if (request.method, yol) not in OLLAMA_UCLARI:
         raise HTTPException(404, "Bu Ollama ucu kapalı")
+    # Cevap parça parça aktarılır: sayfa kelimeleri geldikçe gösterebilir
+    istemci = httpx.AsyncClient(timeout=300)
     try:
-        async with httpx.AsyncClient(timeout=300) as istemci:
-            yanit = await istemci.request(request.method, f"{OLLAMA}/{yol}", content=await request.body(),
-                                          headers={"Content-Type": "application/json"})
+        istek = istemci.build_request(request.method, f"{OLLAMA}/{yol}", content=await request.body(),
+                                      headers={"Content-Type": "application/json"})
+        yanit = await istemci.send(istek, stream=True)
     except httpx.HTTPError as hata:
+        await istemci.aclose()
         return JSONResponse({"error": f"Ollama'ya ulaşılamadı: {hata}"}, status_code=502)
-    return Response(yanit.content, status_code=yanit.status_code, media_type="application/json")
+
+    async def akis():
+        try:
+            async for parca in yanit.aiter_raw():
+                yield parca
+        finally:
+            await yanit.aclose()
+            await istemci.aclose()
+
+    return StreamingResponse(akis(), status_code=yanit.status_code,
+                             media_type=yanit.headers.get("content-type", "application/json"))
 
 
 @app.get("/{ad}")
