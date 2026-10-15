@@ -139,7 +139,9 @@ Bağlantı PrimerLab'ın ilk açılışta oluşturduğu `C:\PrimerLab\Uygulama\A
 
 PrimerLab'ın web sürümündeki **AI Mail Analizi** ve **Yardım Asistanı**, OpenAI yerine bu bilgisayardaki modeli kullanabilir (PrimerLab Ayarlar > Yapay zeka: "Offline Agent").
 
-Ollama güvenlik gereği internet sitelerine kapalıdır. PrimerLab'ın yayınlandığı siteye izin vermek için bir kez **`PRIMERLAB_BAGLA.bat`**'ı çalıştır: siteye izin verir, Ollama'yı yeniden başlatır ve bağlantıyı dener. Varsayılan site depo sahibinin `https://<ad>.github.io` adresidir; farklıysa `ayarlar.json`'a `"izinli_siteler": ["https://site.adresi"]` yaz. Sadece listedeki siteler izin alır. Bilgisayarda çift tıklanarak açılan `.html` dosyaları bağlanamaz, site adresini kullan.
+**En kolayı:** PrimerLab `.html` dosyasını İndirilenler'e ya da `D:\offlineagent` içine koy ve **`PRIMERLAB_AC.bat`**'a çift tıkla. Dosyayı bulur, `uygulamalar` klasörüne koyar, gerekirse Offline Agent'ı başlatır ve PrimerLab'ı `http://localhost:8766/PrimerLab.html` adresinden açar. Bu adresten açılan PrimerLab yapay zekayı doğrudan kullanır; hiçbir siteye izin açılmaz. Bu adres Offline Agent arayüzünden ayrıdır, oradan bilgisayarı yöneten işlemlere erişilemez ve sadece bu bilgisayardan açılabilir. Kendi başka web programlarını da `uygulamalar` klasörüne koyup `http://localhost:8766` adresinden açabilirsin.
+
+**Site olarak (GitHub Pages) kullanıyorsan:** ollama güvenlik gereği internet sitelerine kapalıdır. PrimerLab'ın yayınlandığı siteye izin vermek için bir kez **`PRIMERLAB_BAGLA.bat`**'ı çalıştır: siteye izin verir, Ollama'yı yeniden başlatır ve bağlantıyı dener. Varsayılan site depo sahibinin `https://<ad>.github.io` adresidir; farklıysa `ayarlar.json`'a `"izinli_siteler": ["https://site.adresi"]` yaz. Sadece listedeki siteler izin alır. Bilgisayarda çift tıklanarak açılan `.html` dosyaları bağlanamaz, site adresini kullan.
 
 ## Ekran izleme
 
@@ -217,7 +219,9 @@ D:\offlineagent\
   belgeler\           <- senin belgelerin
   dosyalar\           <- Dosyalarım: içinde asistan sormadan her işi yapar
   TELEFON_AC.bat      <- telefondan erişim için güvenlik duvarı izni
+  PRIMERLAB_AC.bat    <- PrimerLab'ı yapay zekayla aç (localhost:8766)
   PRIMERLAB_BAGLA.bat <- PrimerLab sitesine yerel yapay zeka izni
+  uygulamalar\        <- kendi web programların (.html)
   modeller\           <- yapay zeka modelleri
   veri\               <- belge indeksi ve kayıtlar (sunucu-hata.log)
   araclar\  .venv\    <- Python ve araçlar

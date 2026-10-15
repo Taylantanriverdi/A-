@@ -23,6 +23,7 @@ from starlette.concurrency import run_in_threadpool
 import ajan
 import erisim
 import izleyici
+import uygulama
 import primerlab
 import hafiza
 import ses
@@ -58,6 +59,7 @@ async def omur(_: FastAPI):
     indeks.yukle()
     indeks.tara_baslat()  # Açılışta yeni/değişen belgeleri işle
     izleyici.baslat()  # kayıtlı klasör izlemeleri kaldığı yerden devam eder
+    uygulama.baslat()  # kendi web programların (ör. PrimerLab) için ayrı adres: localhost:port+1
     yield
 
 
