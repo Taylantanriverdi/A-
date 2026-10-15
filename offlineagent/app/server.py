@@ -195,8 +195,31 @@ def _baglam() -> int:
     return int(ayarlari_oku()["baglam_uzunlugu"])
 
 
-def _dusun() -> bool:
-    return bool(ayarlari_oku().get("dusunme", False))
+# Zor soru belirtileri: hesap, karşılaştırma, analiz, plan, neden-sonuç, uzun ve çok parçalı sorular
+ZOR_SORU = re.compile(
+    r"(neden|niçin|niye|nasıl olur|hesapla|hesabı|karşılaştır|kıyasla|analiz|değerlendir|yorumla|açıkla|"
+    r"plan(la|ı)?\b|strateji|kanıtla|ispat|çöz|problem|mantık|avantaj|dezavantaj|farkı|hangisi daha|"
+    r"öner(i|ir misin)|tavsiye|optimum|en iyi|olasılık|ihtimal|yüzde|oran|ortalama|denklem|formül|"
+    r"\d+\s*[-+*/x×÷^%]\s*\d+|adım adım|detaylı|ayrıntılı|kod yaz|hata(yı)? bul|neden çalışmıyor)",
+    re.IGNORECASE,
+)
+
+
+def _dusun(soru: str = "") -> bool:
+    """Akıl seviyesi: hızlı = hiç düşünmez, maksimum = hep düşünür, otomatik = sadece zor sorularda düşünür."""
+    ayarlar = ayarlari_oku()
+    seviye = ayarlar.get("akil_seviyesi") or "otomatik"
+    if seviye == "otomatik" and ayarlar.get("dusunme"):  # eski "Düşünerek cevapla" ayarı açıksa
+        seviye = "maksimum"
+    if seviye == "maksimum":
+        return True
+    if seviye == "hizli":
+        return False
+    return len(soru) > 400 or bool(ZOR_SORU.search(soru))
+
+
+def _son_soru(mesajlar: list[dict]) -> str:
+    return next((str(m.get("content") or "") for m in reversed(mesajlar) if m.get("role") == "user"), "")
 
 
 def _satir(veri: dict) -> str:
@@ -210,9 +233,11 @@ async def sohbet(istek: SohbetIstegi):
             model, mesajlar, kaynaklar = await _hazirla(istek)
             yield _satir({"model": model, "kaynaklar": kaynaklar})
             cevap = ""
-            async for olay in sohbet_akisi(model, mesajlar, _baglam(), dusun=_dusun()):
+            async for olay in sohbet_akisi(model, mesajlar, _baglam(), dusun=_dusun(_son_soru(istek.mesajlar))):
                 if "t" in olay:
                     cevap += olay["t"]
+                    yield _satir(olay)
+                elif "dusunuyor" in olay:
                     yield _satir(olay)
             yield _satir({"bitti": True})
             _hafizaya_ogret(mesajlar, cevap, model)
@@ -241,7 +266,8 @@ async def ajan_sohbet(istek: AjanIstegi):
         yield _satir({"model": model})
         cevap = ""
         async for olay in ajan.ajan_akisi(istek.mesajlar, istek.karar, model, _baglam(), indeks.ara,
-                                          ayarlar.get("onay_modu", "riskli"), istek.belgeler, _dusun()):
+                                          ayarlar.get("onay_modu", "riskli"), istek.belgeler,
+                                          _dusun(_son_soru(istek.mesajlar))):
             cevap += olay.get("t", "")
             if "onay" in olay:
                 cevap = ""  # iş yarıda; hafıza cevabın tamamı gelince öğrenir
@@ -256,7 +282,7 @@ async def sor(istek: SohbetIstegi):
     """Akışsız, tek seferlik cevap (diğer programlardan kullanım için)."""
     try:
         model, mesajlar, kaynaklar = await _hazirla(istek)
-        cevap = "".join([o["t"] async for o in sohbet_akisi(model, mesajlar, _baglam(), dusun=_dusun()) if "t" in o])
+        cevap = "".join([o["t"] async for o in sohbet_akisi(model, mesajlar, _baglam(), dusun=_dusun(_son_soru(istek.mesajlar))) if "t" in o])
     except OllamaHatasi as hata:
         raise HTTPException(502, str(hata)) from hata
     return {"cevap": cevap, "model": model, "kaynaklar": kaynaklar}
@@ -514,7 +540,7 @@ AYAR_KURALLARI = {
     "ses_modeli": ("tiny", "base", "small", "medium"), "ses_dili": str,
     "baglam_uzunlugu": (2048, 32768), "ocr": bool, "otomatik_guncelleme": bool,
     "hafiza": bool, "otomatik_hafiza": bool, "yuz_tanima": bool, "ag_erisimi": bool,
-    "onay_modu": ("riskli", "hepsi"), "dusunme": bool, "primerlab": bool, "dosyalar_serbest": bool,
+    "onay_modu": ("riskli", "hepsi"), "dusunme": bool, "akil_seviyesi": ("hizli", "otomatik", "maksimum"), "primerlab": bool, "dosyalar_serbest": bool,
 }
 YENIDEN_BASLATMA_GEREKEN = {"ag_erisimi"}
 
@@ -539,6 +565,8 @@ async def ayarlar_kaydet(degisiklik: dict):
             temiz[anahtar] = deger
         else:
             raise HTTPException(400, f"Geçersiz ayar: {anahtar}")
+    if "akil_seviyesi" in temiz:  # eski ayarla çelişmesin
+        temiz["dusunme"] = temiz["akil_seviyesi"] == "maksimum"
     if temiz.get("ag_erisimi") and not erisim.sifre_var():
         raise HTTPException(400, "Telefondan erişimi açmadan önce bir şifre belirleyin.")
     dosya = KOK / "ayarlar.json"

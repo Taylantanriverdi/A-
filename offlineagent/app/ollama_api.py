@@ -50,7 +50,8 @@ async def sohbet_akisi(model: str, mesajlar: list[dict], baglam: int, araclar: l
 
 
 async def _satirlar(yanit):
-    """Ollama akışındaki satırları metin ve araç çağrısı olaylarına çevirir."""
+    """Ollama akışındaki satırları metin, araç çağrısı ve "düşünüyor" olaylarına çevirir."""
+    dusunce_bildirildi = False
     async for satir in yanit.aiter_lines():
         if not satir:
             continue
@@ -58,6 +59,9 @@ async def _satirlar(yanit):
         if "error" in veri:
             raise OllamaHatasi(veri["error"])
         mesaj = veri.get("message", {})
+        if mesaj.get("thinking") and not dusunce_bildirildi:  # model cevaptan önce düşünüyor (arayüzde gösterilir)
+            dusunce_bildirildi = True
+            yield {"dusunuyor": True}
         if mesaj.get("content"):
             yield {"t": mesaj["content"]}
         if mesaj.get("tool_calls"):

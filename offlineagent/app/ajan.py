@@ -827,8 +827,10 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
             if "t" in olay:
                 icerik += olay["t"]
                 yield olay
-            else:
+            elif "tool_calls" in olay:
                 cagrilar.extend(olay["tool_calls"])
+            else:
+                yield olay  # "düşünüyor" bildirimi
         itme = []
         if not cagrilar and (yazilan := metinden_cagrilar(icerik)):
             yield {"geri_al": True}

@@ -87,6 +87,8 @@
   .onay { border: 2px solid var(--uyari); border-radius: 12px; padding: 12px 14px; background: var(--uyari-bg); }
   .onay .dugmeler { display: flex; gap: 8px; margin-top: 10px; }
   .hata { color: var(--kotu); }
+  .dusunuyor { color: var(--soluk); font-style: italic; animation: nabiz 1.4s ease-in-out infinite; }
+  @keyframes nabiz { 50% { opacity: .45; } }
   .imlec::after { content: "▍"; animation: yanip 1s steps(1) infinite; }
   @keyframes yanip { 50% { opacity: 0; } }
   .bos { max-width: 620px; margin: 8vh auto 0; text-align: center; color: var(--soluk); }
@@ -339,6 +341,12 @@
         <option value="tiny">Çok hızlı (tiny)</option><option value="base">Hızlı (base)</option>
         <option value="small">Dengeli (small, önerilen)</option><option value="medium">En doğru (medium, yavaş)</option>
       </select></div>
+    <div class="alan"><label for="a_akil">Akıl seviyesi</label>
+      <select id="a_akil" data-ayar="akil_seviyesi">
+        <option value="hizli">Hızlı: hiç düşünmeden cevaplar</option>
+        <option value="otomatik">Akıllı (önerilen): zor sorularda (hesap, analiz, plan, neden) önce düşünür</option>
+        <option value="maksimum">Maksimum: her soruda önce düşünür (en mantıklı, en yavaş)</option>
+      </select></div>
     <div class="alan"><label for="a_onay">İşlem onayı</label>
       <select id="a_onay" data-ayar="onay_modu">
         <option value="riskli">Sadece riskli işlemlerde sor (silme, taşıma, kod, program başlatma)</option>
@@ -346,7 +354,6 @@
       </select></div>
     <div class="acik-kapa">
       <label><input type="checkbox" data-ayar="dosyalar_serbest"> <span>Dosyalar klasöründe onay sorma<small>Dosyalarım klasörünün içinde okuma, yazma, taşıma, silme gibi işleri sormadan yapar. Python/PowerShell yine sorar.</small></span></label>
-      <label><input type="checkbox" data-ayar="dusunme"> <span>Düşünerek cevapla<small>qwen3 gibi modellerde cevaptan önce düşünür: zor sorularda daha akıllı ama belirgin şekilde daha yavaş.</small></span></label>
       <label><input type="checkbox" data-ayar="hafiza"> <span>Hafıza<small>Senin hakkında öğrendiklerini her sohbette hatırlar.</small></span></label>
       <label><input type="checkbox" data-ayar="otomatik_hafiza"> <span>Sohbetlerden otomatik öğren<small>Her cevaptan sonra kalıcı bilgileri (adın, işin, tercihlerin) kendisi kaydeder.</small></span></label>
       <label><input type="checkbox" data-ayar="yuz_tanima"> <span>Kamerada yüz tanıma<small>Kişiler sekmesinde öğrettiğin kişileri tanır.</small></span></label>
@@ -588,6 +595,7 @@ function mesajOgesi(m, yaziliyor = false) {
   const balon = document.createElement("div");
   balon.className = "balon";
   let html = markdown(m.content || "");
+  if (yaziliyor && !m.content && m.dusunuyor) html = `<p class="dusunuyor">🧠 Düşünüyor…</p>`;
   for (const c of m.tool_calls || []) {
     const ad = c.function?.name, arg = c.function?.arguments || {};
     html += `<div class="arac"><div class="baslik">🔧 ${kacis(ARAC_ADLARI[ad] || ad)}</div>${argumanHtml(ad, arg)}</div>`;
@@ -720,6 +728,7 @@ async function sohbetGonder(s) {
     });
     if (!yanit.ok) throw new Error(`Sunucu hatası (${yanit.status})`);
     await akisiOku(yanit, (v) => {
+      if (v.dusunuyor) cevap.dusunuyor = true;
       if (v.t) cevap.content += v.t;
       if (v.kaynaklar) cevap.kaynaklar = v.kaynaklar;
       if (v.model) $("#modelBilgi").textContent = v.model;
@@ -729,6 +738,7 @@ async function sohbetGonder(s) {
   } catch (e) {
     if (e.name !== "AbortError") cevap.hata = hataMetni(e);
   }
+  delete cevap.dusunuyor;
   s.mesajlar.push(cevap);
   canli = [];
   bitir(); kaydet(); mesajlariCiz();
@@ -754,6 +764,7 @@ async function ajanaGonder(karar) {
     if (!yanit.ok) throw new Error(`Sunucu hatası (${yanit.status})`);
     await akisiOku(yanit, (v) => {
       if (v.model) $("#modelBilgi").textContent = v.model;
+      if (v.dusunuyor) { if (!canli.includes(metin)) canli.push(metin); metin.dusunuyor = true; }
       if (v.t) { if (!canli.includes(metin)) canli.push(metin); metin.content += v.t; }
       if (v.arac) {
         canli.push({ role: "assistant", content: "", tool_calls: [{ function: { name: v.arac.ad, arguments: v.arac.argumanlar } }] });

@@ -240,6 +240,15 @@ Sohbet geçmişi tarayıcıda saklanır.
 
 Modeller 30 dakika boyunca bellekte tutulur; böylece her soruda yeniden yüklenmezler.
 
+## Akıl seviyesi
+
+Ayarlar > Genel > **Akıl seviyesi**:
+- **Hızlı**: hiç düşünmeden hemen cevaplar.
+- **Akıllı (önerilen)**: basit isteklerde hızlı; hesap, karşılaştırma, analiz, plan, "neden" gibi zor sorularda cevaptan önce düşünür. Düşünürken mesajda "🧠 Düşünüyor…" görünür.
+- **Maksimum**: her soruda önce düşünür. En mantıklı cevaplar, ama belirgin şekilde daha yavaş.
+
+Düşünme qwen3 ve deepseek-r1 gibi modellerde çalışır.
+
 ## Ayarlar
 
 Çoğu ayar arayüzden değiştirilir: ⚙ **Ayarlar** (sol alt). Aşağıdaki tablo `ayarlar.json` dosyasındaki karşılıklarıdır.
@@ -258,6 +267,7 @@ Modeller 30 dakika boyunca bellekte tutulur; böylece her soruda yeniden yüklen
 | `yuz_tanima` | `true` | Kamerada yüz tanıma |
 | `dosyalar_serbest` | `true` | Dosyalarım klasöründe onay sormadan çalışma |
 | `dosyalar_klasoru` | (boş) | Dosyalarım klasörünün yeri. Boşsa `dosyalarım` varsa o, yoksa `dosyalar` |
+| `akil_seviyesi` | `otomatik` | `hizli`, `otomatik` (zor sorularda düşünür) ya da `maksimum` |
 | `ag_erisimi` | `false` | Telefondan erişim (Ayarlar > Telefon'dan açılır) |
 | `embed_model` | `nomic-embed-text` | Belge arama modeli |
 | `baglam_uzunlugu` | `8192` | Modelin aynı anda aklında tutabileceği metin miktarı. Ekran kartı belleği yetmezse `4096` yap |

@@ -17,6 +17,7 @@
   "ag_erisimi": false,
   "baglam_uzunlugu": 8192,
   "dusunme": false,
+  "akil_seviyesi": "otomatik",
   "otomatik_guncelleme": true,
   "depo": "Taylantanriverdi/A-",
   "guncelleme_dali": "claude/keen-wozniak-zjal69",
