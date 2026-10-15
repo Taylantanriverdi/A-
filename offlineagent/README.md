@@ -135,6 +135,12 @@ Sol alttaki Sistem bölümünde **"PrimerLab V56 bağlı"** yazıyorsa bağlant�
 
 Bağlantı PrimerLab'ın ilk açılışta oluşturduğu `C:\PrimerLab\Uygulama\App_Data\Secrets\offline-agent.anahtar` dosyasıyla kurulur ve sadece bu bilgisayardan çalışır. PrimerLab başka bir klasördeyse `ayarlar.json` içindeki `primerlab_anahtar` ve `primerlab_adresi` değerlerini değiştir.
 
+## PrimerLab (web sürümü) yapay zekası
+
+PrimerLab'ın web sürümündeki **AI Mail Analizi** ve **Yardım Asistanı**, OpenAI yerine bu bilgisayardaki modeli kullanabilir (PrimerLab Ayarlar > Yapay zeka: "Offline Agent").
+
+Ollama güvenlik gereği internet sitelerine kapalıdır. PrimerLab'ın yayınlandığı siteye izin vermek için bir kez **`PRIMERLAB_BAGLA.bat`**'ı çalıştır: siteye izin verir, Ollama'yı yeniden başlatır ve bağlantıyı dener. Varsayılan site depo sahibinin `https://<ad>.github.io` adresidir; farklıysa `ayarlar.json`'a `"izinli_siteler": ["https://site.adresi"]` yaz. Sadece listedeki siteler izin alır. Bilgisayarda çift tıklanarak açılan `.html` dosyaları bağlanamaz, site adresini kullan.
+
 ## Ekran izleme
 
 Yazı kutusunun yanındaki **🖥** düğmesine bas ve paylaşılacak ekranı seç. Offline Agent ekranına **belirli aralıklarla** (varsayılan 10 saniyede bir) bakar:
@@ -211,6 +217,7 @@ D:\offlineagent\
   belgeler\           <- senin belgelerin
   dosyalar\           <- Dosyalarım: içinde asistan sormadan her işi yapar
   TELEFON_AC.bat      <- telefondan erişim için güvenlik duvarı izni
+  PRIMERLAB_BAGLA.bat <- PrimerLab sitesine yerel yapay zeka izni
   modeller\           <- yapay zeka modelleri
   veri\               <- belge indeksi ve kayıtlar (sunucu-hata.log)
   araclar\  .venv\    <- Python ve araçlar
