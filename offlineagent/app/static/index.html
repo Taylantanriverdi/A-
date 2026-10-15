@@ -97,6 +97,9 @@
   #ekler { max-width: 820px; margin: 0 auto 6px; display: flex; gap: 6px; flex-wrap: wrap; }
   #ekler .ek { position: relative; }
   #ekler img { height: 64px; border-radius: 8px; border: 1px solid var(--kenar); display: block; }
+  #ekler .dosya { display: flex; align-items: center; height: 40px; padding: 0 12px; border: 1px solid var(--kenar); border-radius: 8px; background: var(--panel); font-size: 13px; max-width: 260px; }
+  #ekler .dosya span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .balon .ekli-dosya { margin-top: 6px; font-size: 13px; opacity: .85; }
   #ekler button { position: absolute; top: -6px; right: -6px; padding: 0 6px; border-radius: 50%; font-size: 12px; }
   .yazma { max-width: 820px; margin: 0 auto; display: flex; gap: 4px; align-items: flex-end; background: var(--panel); border: 1px solid var(--kenar); border-radius: 12px; padding: 6px; }
   .yazma:focus-within { border-color: var(--vurgu); }
@@ -298,7 +301,7 @@
     </div>
     <div id="ekler"></div>
     <div class="yazma">
-      <button class="simge" id="resimEkle" title="Resim ekle (veya Ctrl+V ile yapıştır)">📎</button>
+      <button class="simge" id="resimEkle" title="Dosya ya da resim ekle (pdf, Word, Excel... veya Ctrl+V ile resim yapıştır)">📎</button>
       <textarea id="girdi" rows="1" placeholder="Bir şey sor… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
       <button class="simge" id="ekranDugme" title="Ekranı izle: belirli aralıklarla bakıp gördüğünü söyler">🖥</button>
       <button class="simge" id="kameraDugme" title="Kamera: seni görsün ve tanısın">📷</button>
@@ -306,7 +309,7 @@
       <button class="ana" id="gonder">Gönder</button>
       <button id="durdur" hidden>Durdur</button>
     </div>
-    <input type="file" id="resimSec" multiple hidden accept="image/*">
+    <input type="file" id="resimSec" multiple hidden>
     <input type="file" id="kameraSec" hidden accept="image/*" capture="user">
     <div class="ipucu">Tamamen bu bilgisayarda çalışır, internete hiçbir veri gönderilmez.</div>
   </footer>
@@ -393,7 +396,7 @@
   </section>
 </dialog>
 <div id="bildirimKutusu" aria-live="polite"></div>
-<div id="surukle">Dosyaları “Dosyalarım” klasörüne eklemek için bırakın</div>
+<div id="surukle">Dosyaları mesaja eklemek için bırakın (Dosyalarım klasörüne kaydedilir)</div>
 
 <script>
 const $ = (s) => document.querySelector(s);
@@ -566,7 +569,15 @@ function mesajOgesi(m, yaziliyor = false) {
     }
     const balon = document.createElement("div");
     balon.className = "balon";
-    balon.textContent = m.content;
+    // Eklenen dosyalar notu balonda yazı yerine dosya adı olarak gösterilir
+    const not = (m.content || "").match(/\n*\[Ekli dosyalar \(Dosyalarım klasöründe\): (.+?)\]\s*$/);
+    balon.textContent = not ? m.content.slice(0, not.index) : m.content;
+    if (not) for (const ad of not[1].split(" | ")) {
+      const e = document.createElement("div");
+      e.className = "ekli-dosya";
+      e.textContent = "📄 " + ad;
+      balon.appendChild(e);
+    }
     if (m.content) oge.appendChild(balon);
     return oge;
   }
@@ -657,12 +668,12 @@ function hataMetni(e) {
 async function gonder() {
   const girdi = $("#girdi");
   const metin = girdi.value.trim();
-  if ((!metin && !ekResimler.length) || iptal) return;
+  if ((!metin && !ekResimler.length && !ekDosyalar.length) || iptal) return;
   if (!aktif()) yeniSohbet();
   const s = aktif();
   if (s.bekleyen) { s.bekleyen = null; s.mesajlar.push({ role: "tool", tool_name: "iptal", content: "Kullanıcı işlemi onaylamadan yeni mesaj yazdı." }); }
   // Genel modda istekler bilgisayarda iş yapabilen asistana gider; resimli sorular görsel modele
-  const isYapabilir = ayar.mod === "genel" && !GOMULU && !document.body.classList.contains("uzak");
+  const isYapabilir = (ayar.mod === "genel" || ekDosyalar.length > 0) && !GOMULU && !document.body.classList.contains("uzak");
   const eylem = isYapabilir && eylemMi(metin);
   if (ekranIzleme && /(ekran|pencere|bu hata|bu uyarı|bu mesaj|burada ne|şu an ne görüyorsun)/i.test(metin) && !eylem) {
     try { ekResimler.push({ b64: (await ekranKaresi()).b64 }); } catch { /* ekran karesi alınamazsa sorulur */ }
@@ -671,12 +682,17 @@ async function gonder() {
     const k = kare();
     if (k) ekResimler.push({ b64: k });
   }
-  const kullanici = { role: "user", content: metin };
+  let icerik = metin;
+  if (ekDosyalar.length) {
+    // Sunucu bu notu görünce dosyaları hemen okur
+    icerik = (metin || "Bu dosyayı oku ve kısaca özetle.") + `\n\n[Ekli dosyalar (Dosyalarım klasöründe): ${ekDosyalar.map((d) => d.ad).join(" | ")}]`;
+  }
+  const kullanici = { role: "user", content: icerik };
   if (ekResimler.length) kullanici.images = ekResimler.map((r) => r.b64);
   s.mesajlar.push(kullanici);
-  if (!s.baslik) { s.baslik = (metin || "Resim").slice(0, 50); }
+  if (!s.baslik) { s.baslik = (metin || ekDosyalar[0]?.ad || "Resim").slice(0, 50); }
   listeyiCiz();
-  girdi.value = ""; ekResimler = []; ekleriCiz(); boyutla();
+  girdi.value = ""; ekResimler = []; ekDosyalar = []; ekleriCiz(); boyutla();
   kaydet();
   if (isYapabilir && !kullanici.images) return ajanaGonder(null);
   return sohbetGonder(s);
@@ -781,6 +797,23 @@ function resmiKucult(dosya) {
     img.src = URL.createObjectURL(dosya);
   });
 }
+// Resim olmayan dosyalar Dosyalarım klasörüne yüklenir ve mesaja eklenir; asistan onları okur
+let ekDosyalar = [];
+async function dosyalariMesajaEkle(dosyalar) {
+  if (!dosyalar.length) return;
+  if (GOMULU || document.body.classList.contains("uzak")) { alert("Dosya ekleme sadece bilgisayardaki pencereden yapılabilir."); return; }
+  const form = new FormData();
+  for (const d of dosyalar) form.append("dosyalar", d);
+  ekDosyalar.push({ ad: "Yükleniyor…", yukleniyor: true }); ekleriCiz();
+  try {
+    const r = await fetch("/api/dosyalar/yukle", { method: "POST", body: form });
+    if (!r.ok) throw new Error();
+    const sonuc = await r.json();
+    ekDosyalar = ekDosyalar.filter((d) => !d.yukleniyor).concat(sonuc.kaydedilen.map((ad) => ({ ad })));
+  } catch { ekDosyalar = ekDosyalar.filter((d) => !d.yukleniyor); alert("Dosya yüklenemedi."); }
+  ekleriCiz(); durumuYenile();
+  $("#girdi").focus();
+}
 async function resimleriEkle(dosyalar) {
   for (const d of dosyalar) {
     if (!d.type.startsWith("image/") || ekResimler.length >= 4) continue;
@@ -796,6 +829,13 @@ function ekleriCiz() {
     d.className = "ek";
     d.innerHTML = `<img src="data:image/jpeg;base64,${r.b64}"><button title="Kaldır">✕</button>`;
     d.querySelector("button").onclick = () => { ekResimler.splice(i, 1); ekleriCiz(); };
+    kutu.appendChild(d);
+  });
+  ekDosyalar.forEach((f, i) => {
+    const d = document.createElement("div");
+    d.className = "ek dosya";
+    d.innerHTML = `<span>📄 ${kacis(f.ad)}</span>${f.yukleniyor ? "" : `<button title="Mesajdan çıkar (dosya Dosyalarım'da kalır)">✕</button>`}`;
+    d.querySelector("button")?.addEventListener("click", () => { ekDosyalar.splice(i, 1); ekleriCiz(); });
     kutu.appendChild(d);
   });
 }
@@ -944,7 +984,12 @@ $("#durdur").onclick = () => iptal?.abort();
 $("#yeniSohbet").onclick = yeniSohbet;
 $("#menuDugme").onclick = () => document.body.classList.toggle("menu-acik");
 $("#resimEkle").onclick = () => $("#resimSec").click();
-$("#resimSec").onchange = (e) => { resimleriEkle([...e.target.files]); e.target.value = ""; };
+$("#resimSec").onchange = (e) => {
+  const secilen = [...e.target.files];
+  resimleriEkle(secilen.filter((d) => d.type.startsWith("image/")));
+  dosyalariMesajaEkle(secilen.filter((d) => !d.type.startsWith("image/")));
+  e.target.value = "";
+};
 $("#mikrofon").onclick = mikrofonTikla;
 
 document.querySelectorAll(".secici button").forEach((b) => {
@@ -987,9 +1032,9 @@ if (!GOMULU) {
   addEventListener("drop", (e) => {
     e.preventDefault(); surukleSayac = 0; document.body.classList.remove("surukleniyor");
     const dosyalar = [...(e.dataTransfer?.files || [])];
-    // Resimleri soruya ekle, diğer dosyaları Dosyalarım klasörüne
+    // Resimleri soruya ekle; diğer dosyalar Dosyalarım klasörüne yüklenip mesaja eklenir
     resimleriEkle(dosyalar.filter((d) => d.type.startsWith("image/")));
-    dosyalaraEkle(dosyalar.filter((d) => !d.type.startsWith("image/")));
+    dosyalariMesajaEkle(dosyalar.filter((d) => !d.type.startsWith("image/")));
   });
 }
 if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};

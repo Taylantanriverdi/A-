@@ -60,6 +60,8 @@ Bir adım yarıda kalırsa `KUR.bat`'ı tekrar çalıştır; kaldığı yerden d
 
 Kontrol etmesini istediğin her şeyi `D:\offlineagent\dosyalar` klasörüne koy: sol menüdeki **📂 Dosyalarım > Ekle** düğmesi, dosyaları pencereye sürükle-bırak ya da klasöre Gezgin'den kopyala. Her tür dosya olur (pdf, Word, Excel, resim, kod, zip...).
 
+**Sohbete dosya vermek:** mesaj kutusundaki **📎** düğmesiyle pdf, Word, Excel gibi dosyaları seç (ya da pencereye sürükle). Dosya Dosyalarım'a kaydedilir, mesaja eklenir ve asistan gönderir göndermez okur. İstersen yanına "bunun toplamını çıkar" gibi bir istek yaz; boş gönderirsen özetler.
+
 Bu klasörün içinde asistan **hiç onay sormadan** her işi yapar: okur, içinde arar, yeni dosya yazar, düzenler/üzerine yazar, yeniden adlandırır, alt klasörlere taşır, kopyalar, siler (Geri Dönüşüm Kutusu'na, geri alınabilir).
 
 Örnekler:

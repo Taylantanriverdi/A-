@@ -583,6 +583,10 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "'Dosyalarım', 'dosyalar klasörü', 'yüklediğim dosyalar' denince burası kastedilir. Bu klasörün içinde okuma, "
         "arama, yazma, düzenleme, yeniden adlandırma, taşıma ve silme işlerini HİÇ SORMADAN, onay beklemeden hemen yap. "
         "Göreli yollar (ör. 'rapor.txt', 'Faturalar/ocak.pdf') bu klasöre göredir. İçerikte arama için icerikte_ara kullan.\n"
+        "Kullanıcı sana dosya (pdf, Word, Excel...) vermek isterse şöyle yapacağını söyle: mesaj kutusundaki 📎 düğmesine "
+        "basıp dosyayı seçer ya da dosyayı pencereye sürükleyip bırakır; dosya bu klasöre kaydedilir ve sen okursun. "
+        "Mesajın sonunda '[Ekli dosyalar ...]' görürsen o dosyalar az önce yüklendi: okunmamış olanları dosya_oku ile oku "
+        "ve kullanıcının istediğini yap; istek yoksa kısaca özetle.\n"
         "Kurallar:\n"
         "- Türkçe, kısa ve samimi konuş.\n"
         "- Kullanıcı bilgisayarda bir iş isterse ASLA 'yapamam' ya da 'kendiniz yapın' deme: uygun aracı hemen çağır. "
@@ -646,6 +650,10 @@ def _yer_adi(yer: str) -> str:
         if yer.startswith(anahtar):
             return ad
     return "Masaüstü"
+
+
+# Arayüzün 📎 ile eklenen dosyalar için mesajın sonuna koyduğu not
+EKLI_DOSYALAR = re.compile(r"\[Ekli dosyalar \(Dosyalarım klasöründe\): (.+?)\]\s*$")
 
 
 def hizli_komut(metin: str) -> dict | None:
@@ -758,7 +766,13 @@ async def _dongu(mesajlar: list[dict], karar: bool | None, model: str, baglam: i
                  onay_modu: str, belgeler: bool, dusun: bool = False):
     son_soru = mesajlar[-1]["content"] if mesajlar and mesajlar[-1].get("role") == "user" else ""
     dogrudan = False  # PrimerLab'a modelsiz giden soru: cevabı olduğu gibi gösterilir
-    if son_soru and (hizli := hizli_komut(son_soru)):
+    ekli = EKLI_DOSYALAR.search(son_soru) if son_soru else None
+    if ekli:
+        # Mesaja eklenen dosyalar modele bırakılmadan hemen okunur (en fazla 3 tanesi; gerisini model okur)
+        adlar = [a.strip() for a in ekli.group(1).split(" | ") if a.strip()][:3]
+        mesajlar.append({"role": "assistant", "content": "", "tool_calls": [
+            {"function": {"name": "dosya_oku", "arguments": {"yol": ad}}} for ad in adlar]})
+    elif son_soru and (hizli := hizli_komut(son_soru)):
         mesajlar.append({"role": "assistant", "content": "", "tool_calls": [hizli]})
         dogrudan = hizli["function"]["name"] == "primerlab"
     duzeltme_hakki = 2
