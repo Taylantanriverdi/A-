@@ -1,0 +1,2391 @@
+<title>Amangas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* AMANGAS: Fabrikadaki Katil'in büyümüş hali. Tam ekran 3B sahne, üstünde HUD ve ekran kartları */
+:root {
+  --bg: #0c0f13;
+  --panel: rgba(16, 20, 26, 0.86);
+  --fg: #f4efe4;
+  --muted: #a3acb6;
+  --pink: #ff8ccf;
+  --red: #ff5a52;
+  --hazard: #ffc928;
+  --danger: #ff3d3d;
+  --ok: #4ade80;
+  --navy: #3a63ff;
+  --line: rgba(255, 255, 255, 0.14);
+  --font-display: 'Bungee', Impact, 'Arial Black', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+#game { position: fixed; inset: 0; }
+#game canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.screen {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(8, 10, 14, 0.55); z-index: 10; box-sizing: border-box; overflow-y: auto;
+}
+.card {
+  background: var(--panel); border: 2px solid var(--line); border-radius: 14px;
+  padding: 24px 22px; max-width: 560px; width: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); margin: auto;
+}
+.hazard { height: 10px; border-radius: 4px; background: repeating-linear-gradient(-45deg, var(--hazard) 0 12px, #15171b 12px 24px); }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0; line-height: 1.05; text-wrap: balance; }
+h1 { font-size: clamp(44px, 13vw, 76px); color: var(--danger); text-shadow: 0 5px 0 #5a0b0b, 0 0 30px rgba(255, 61, 61, .35); letter-spacing: .04em; }
+h2 { font-size: clamp(40px, 12vw, 80px); }
+p { margin: 0; line-height: 1.5; font-size: 16px; }
+.muted { color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; font-size: 15px; align-items: center; }
+kbd {
+  font-family: var(--font-display); font-size: 13px; background: #20262f; border: 1px solid #3a434f;
+  border-bottom-width: 3px; border-radius: 6px; padding: 2px 8px; color: var(--fg); white-space: nowrap; justify-self: start;
+}
+button.big {
+  font-family: var(--font-display); font-size: 22px; padding: 14px 20px; border: 0; border-radius: 10px;
+  background: var(--pink); color: #2a0b1d; cursor: pointer; box-shadow: 0 5px 0 #a13d78;
+}
+button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 #a13d78; }
+button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
+.role-killer { color: var(--danger); text-shadow: 0 5px 0 #5a0b0b; }
+.role-crew { color: #8fd3ff; text-shadow: 0 5px 0 #173c5c; }
+.role-ghost { color: #d7e3ff; text-shadow: 0 5px 0 #34405a; }
+.dead-title { color: var(--danger); text-shadow: 0 6px 0 #4d0606; letter-spacing: 0.04em; }
+.win-title { color: var(--ok); text-shadow: 0 6px 0 #14532d; }
+.press { font-family: var(--font-display); font-size: 18px; color: var(--hazard); }
+
+.roster { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: #1a2028; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 4px; font-size: 13px; font-weight: 800; }
+.chip i { width: 16px; height: 19px; border-radius: 8px 8px 5px 5px; border: 1px solid rgba(255,255,255,.35); }
+.chip.team { border-color: var(--hazard); }
+.lock { border: 1px dashed #5a6a8a; border-radius: 10px; padding: 8px 10px; font-size: 14px; background: rgba(58, 99, 255, .08); }
+.foot { font-size: 13px; color: var(--muted); }
+.foot b { color: var(--hazard); }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#info {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: calc(12px + env(safe-area-inset-left, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px;
+  min-width: 190px; max-width: min(310px, calc(100vw - 120px)); font-size: 14px;
+  max-height: 48vh; overflow-y: auto; pointer-events: auto;
+}
+#info .world { color: var(--hazard); font-size: 13px; font-weight: 800; margin-bottom: 2px; }
+#info .where { color: #8fd3ff; font-size: 13px; font-weight: 800; margin-bottom: 4px; }
+#info .role { font-family: var(--font-display); font-size: 18px; margin-bottom: 6px; }
+#info ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: 12.5px; }
+#info ul li small { color: var(--muted); }
+#info .count { font-weight: 900; margin-bottom: 4px; }
+#info li.done { color: var(--ok); text-decoration: line-through; }
+#info .bar { height: 8px; background: #2a313b; border-radius: 4px; overflow: hidden; margin-top: 8px; }
+#info .bar > i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+#quit {
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px));
+  pointer-events: auto; font-family: var(--font-display); font-size: 14px; background: var(--panel); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+#prompt {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; text-align: center;
+  font-weight: 800; font-size: 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
+}
+#prompt .warn { color: var(--danger); font-size: 14px; margin-top: 4px; }
+#prompt .report { color: var(--hazard); margin-top: 4px; }
+#prompt .bar { height: 10px; width: 220px; max-width: 100%; background: #2a313b; border-radius: 5px; overflow: hidden; margin: 8px auto 0; }
+#prompt .bar > i { display: block; height: 100%; background: var(--hazard); width: 0; }
+#toast {
+  position: fixed; top: calc(70px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); z-index: 12; pointer-events: none;
+  font-family: var(--font-display); font-size: 18px; color: var(--hazard); text-shadow: 0 2px 0 #000; text-align: center;
+  max-width: calc(100vw - 32px); transition: opacity .4s; opacity: 0;
+}
+#flash { position: fixed; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 8; transition: opacity .5s; }
+
+#minimap {
+  position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  border-radius: 10px; border: 1px solid var(--line); background: var(--panel);
+}
+#minimap.big {
+  position: fixed; left: 50%; top: 50%; right: auto; bottom: auto; transform: translate(-50%, -50%);
+  background: rgba(10, 12, 18, .96); border: 2px solid var(--hazard); z-index: 9; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .55);
+}
+@media (pointer: coarse) { #minimap:not(.big) { bottom: auto; top: calc(64px + env(safe-area-inset-top, 0px)); } }
+
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#stick {
+  position: absolute; left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid var(--line);
+  pointer-events: auto; touch-action: none;
+}
+#knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,140,207,.7); }
+#touch button { position: absolute; border: 0; border-radius: 50%; font-family: var(--font-display); pointer-events: auto; touch-action: none; }
+#actBtn { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); width: 86px; height: 86px; background: var(--hazard); color: #1a1400; font-size: 26px; }
+#worldBtn { right: calc(124px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); width: 60px; height: 60px; background: #8fd3ff; color: #0b2233; font-size: 22px; }
+#reportBtn { right: calc(34px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px)); width: 60px; height: 60px; background: var(--danger); color: #fff; font-size: 22px; }
+#ventBtn { right: calc(110px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px)); width: 60px; height: 60px; background: #59616d; color: #fff; font-size: 22px; }
+#sabBtn { right: calc(186px + env(safe-area-inset-right, 0px)); bottom: calc(134px + env(safe-area-inset-bottom, 0px)); width: 60px; height: 60px; background: #2a2f38; color: var(--hazard); font-size: 22px; }
+#vipBtn, #mapBtn, #modBtn { left: calc(30px + env(safe-area-inset-left, 0px)); width: 52px; height: 52px; font-size: 19px; }
+#vipBtn { bottom: calc(158px + env(safe-area-inset-bottom, 0px)); background: #ffd23a; color: #3a2a00; }
+#mapBtn { bottom: calc(218px + env(safe-area-inset-bottom, 0px)); background: #4ade80; color: #08311a; }
+#modBtn { bottom: calc(278px + env(safe-area-inset-bottom, 0px)); background: #b67cff; color: #1e0a3a; }
+/* Küçük ekranda görev listesi kapalı başlar, dokununca açılır */
+#info .more { display: none; color: var(--muted); font-size: 12px; margin-top: 4px; }
+@media (max-width: 640px) {
+  #info { max-width: min(250px, calc(100vw - 170px)); padding: 8px 10px; font-size: 13px; }
+  #info:not(.open) ul, #info:not(.open) .other { display: none; }
+  #info .more { display: block; }
+}
+@media (pointer: fine) { #touch { display: none; } }
+@media (pointer: coarse) { #prompt { bottom: calc(230px + env(safe-area-inset-bottom, 0px)); } }
+
+.shh span {
+  display: inline-block; font-family: var(--font-display); font-size: clamp(64px, 20vw, 150px); color: #fff;
+  background: var(--danger); padding: 10px 34px; border-radius: 22px; transform: rotate(-6deg);
+  box-shadow: 0 10px 0 #5a0b0b; animation: shhPop .4s ease-out;
+}
+@keyframes shhPop { from { transform: rotate(-6deg) scale(.3); } to { transform: rotate(-6deg) scale(1); } }
+#roleCard { display: flex; flex-direction: column; gap: 14px; }
+#info .warn-line { color: var(--danger); font-weight: 900; margin-bottom: 4px; }
+
+/* Toplantı: amonguslar etrafını sarar, birine dokunup oy verirsin */
+#meetHud { position: fixed; inset: 0; pointer-events: none; z-index: 7; }
+#meetTop {
+  position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  width: min(560px, calc(100vw - 24px)); background: var(--panel); border: 2px solid var(--line); border-radius: 14px;
+  padding: 10px 14px; text-align: center; box-sizing: border-box;
+}
+#meetTitle { color: var(--hazard); text-shadow: 0 4px 0 #5a4200; font-size: clamp(28px, 8vw, 44px); }
+#meetText { font-weight: 800; }
+#meetHint { font-family: var(--font-display); font-size: 15px; color: #8fd3ff; margin-top: 4px; }
+#meetTimer { font-family: var(--font-display); font-size: 14px; color: var(--muted); }
+#chat {
+  position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); bottom: calc(90px + env(safe-area-inset-bottom, 0px));
+  width: min(330px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 800;
+}
+#chat div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 5px 10px; animation: chatIn .25s ease-out; }
+@keyframes chatIn { from { opacity: 0; transform: translateY(8px); } }
+#skipBtn { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); pointer-events: auto; background: #8fd3ff; color: #0b2233; box-shadow: 0 5px 0 #2a6a90; font-size: 18px; }
+
+/* Uzaya atılma sahnesi */
+#ejectHud { position: fixed; left: 0; right: 0; bottom: calc(10vh + env(safe-area-inset-bottom, 0px)); z-index: 7; text-align: center; pointer-events: none; padding: 0 16px; }
+#ejText { font-family: var(--font-display); font-size: clamp(26px, 7vw, 54px); color: #fff; text-shadow: 0 4px 0 #000; min-height: 1.2em; }
+#ejText.imp { color: var(--danger); }
+#ejSub { font-size: 20px; font-weight: 900; color: var(--hazard); margin-top: 8px; min-height: 1.4em; }
+#ejCount { font-family: var(--font-display); color: var(--muted); margin-top: 6px; }
+
+/* Asansör kapıları */
+#elev { position: fixed; inset: 0; z-index: 9; pointer-events: none; overflow: hidden; }
+#elev .door { position: absolute; top: 0; bottom: 0; width: 50.5%; background: repeating-linear-gradient(90deg, #8d969f 0 14px, #a7b0b9 14px 28px); box-shadow: inset 0 0 40px rgba(0,0,0,.5); }
+#elev .door.l { left: 0; animation: doorL 2.4s ease-in-out forwards; }
+#elev .door.r { right: 0; animation: doorR 2.4s ease-in-out forwards; }
+@keyframes doorL { 0% { transform: translateX(-100%); } 28%, 72% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
+@keyframes doorR { 0% { transform: translateX(100%); } 28%, 72% { transform: translateX(0); } 100% { transform: translateX(100%); } }
+#elev .elev-text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; background: #111; border: 3px solid var(--hazard); border-radius: 14px; padding: 14px 24px; animation: elevTxt 2.4s forwards; }
+@keyframes elevTxt { 0%, 22% { opacity: 0; } 30%, 70% { opacity: 1; } 80%, 100% { opacity: 0; } }
+#elevArrow { font-family: var(--font-display); font-size: 54px; color: var(--ok); line-height: 1; }
+#elevFloor { font-family: var(--font-display); font-size: 30px; color: #ffb020; }
+
+/* VIP dolabı */
+#vip { justify-content: flex-end; background: rgba(8, 10, 14, .25); }
+#vip .card { max-width: 380px; margin: auto 0 auto auto; }
+.vip-title { color: #ffd23a; text-shadow: 0 5px 0 #6a4a00; font-size: clamp(32px, 9vw, 46px); }
+.vipgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.outfit { background: #1a2028; border: 2px solid #3a434f; border-radius: 12px; padding: 10px 6px; color: var(--fg); cursor: pointer; font: 800 14px var(--font-body); display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.outfit b { font-size: 34px; line-height: 1; }
+.outfit.on { border-color: #ffd23a; background: #3a3010; }
+.outfit.on::after { content: 'GİYİLİ ✔'; font-family: var(--font-display); font-size: 11px; color: #ffd23a; }
+@media (max-width: 520px) { #vip { justify-content: center; } #vip .card { margin: auto; } }
+@media (prefers-reduced-motion: reduce) { .shh span, #chat div { animation: none; } #flash, #toast, #info .bar > i { transition: none; } }
+</style>
+
+<div id="game"></div>
+
+<div id="hud" hidden>
+  <div id="info"></div>
+  <button id="quit" type="button" aria-label="Oyundan çık">Ç · ÇIK</button>
+  <div id="prompt" hidden></div>
+  <canvas id="minimap" aria-label="Harita"></canvas>
+</div>
+<div id="toast"></div>
+<div id="flash"></div>
+
+<div id="touch" hidden>
+  <div id="stick"><div id="knob"></div></div>
+  <button id="actBtn" type="button">E</button>
+  <button id="worldBtn" type="button" aria-label="Başka dünyaya git">D</button>
+  <button id="reportBtn" type="button" aria-label="Ölüyü raporla">R</button>
+  <button id="ventBtn" type="button" aria-label="Havalandırmaya gir">V</button>
+  <button id="sabBtn" type="button" aria-label="Işıkları söndür">S</button>
+  <button id="vipBtn" type="button" aria-label="VIP dolabı">Ü</button>
+  <button id="mapBtn" type="button" aria-label="Büyük harita">H</button>
+  <button id="modBtn" type="button" aria-label="Piyon modu">M</button>
+</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <div class="hazard"></div>
+    <h1>AMANGAS</h1>
+    <p>Sen <b style="color:var(--red)">Mahunched</b>'sin (kırmızı). Takımın <b style="color:var(--hazard)">TİT</b>:
+      <b style="color:var(--navy)">Dulutsoy İpek</b> (koyu mavi) her oyunda seninle oynar.
+      Dev fabrikada <b>26 görev</b>, asansörle çıkılan 2. katta <b>6 görev</b> daha var.
+      Her oyunda <b>3'te 1</b> ihtimalle <b style="color:var(--danger)">KATİL</b> sen olursun!</p>
+    <div class="roster" id="roster"></div>
+    <p class="muted" style="font-size:13px">Herkesin rengi ve adı hep aynıdır; dünya değişse de isimler değişmez.</p>
+    <div class="keys">
+      <kbd>← ↑ → ↓</kbd><span>Yürü (ok tuşları)</span>
+      <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür (bazen bıçakla, bazen dille!)</span>
+      <kbd>R</kbd><span>Ölüyü raporla ya da kafeteryadaki kırmızı düğmeye bas</span>
+      <kbd>H</kbd><span>Haritayı tam ekran yap · <b>Ç</b> ile kapat</span>
+      <kbd>Ü</kbd><span>VIP dolabı: kıyafetler</span>
+      <kbd>M</kbd><span>Mod: herkes 3 boyutlu piyona dönüşür</span>
+      <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
+      <kbd>S</kbd><span>Katilsen ışıkları söndür (sabotaj)</span>
+      <kbd>V</kbd><span>Katilsen havalandırmadan başka yere ışınlan</span>
+      <kbd>F</kbd><span>Tam ekran aç / kapat</span>
+      <kbd>N</kbd><span>Sesi aç / kapat</span>
+      <kbd>Ç</kbd><span>Oyundan çık</span>
+    </div>
+    <div class="lock">🔒 <b>Özel oda: TİT</b> · Bu oyunda sadece Mahunched ve Dulutsoy İpek'in takımı var</div>
+    <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
+    <button class="big" id="startBtn" type="button">OYNA</button>
+    <p class="muted" style="font-size:13px">Enter tuşuna da basabilirsin</p>
+    <p class="foot">İletişim: <b>amangashesap.com</b> · Oyun <b>bedava</b> ve <b>reklamsız</b></p>
+    <div class="hazard"></div>
+  </div>
+</div>
+
+<div class="screen" id="reveal" hidden>
+  <div class="card" style="background:transparent;border:0;box-shadow:none">
+    <div id="shh" class="shh"><span>ŞŞŞT!</span></div>
+    <div id="roleCard" hidden>
+      <p class="muted" style="font-family:var(--font-display)">BU OYUNDA SEN...</p>
+      <h2 id="revealTitle">MASUMSUN</h2>
+      <p id="revealText"></p>
+    </div>
+  </div>
+</div>
+
+<div id="meetHud" hidden>
+  <div id="meetTop">
+    <h2 id="meetTitle">TOPLANTI!</h2>
+    <p id="meetText"></p>
+    <p id="meetHint"></p>
+    <div id="meetTimer"></div>
+  </div>
+  <div id="chat"></div>
+  <button class="big" id="skipBtn" type="button">OY VERME</button>
+</div>
+
+<div id="ejectHud" hidden>
+  <div id="ejText"></div>
+  <div id="ejSub"></div>
+  <div id="ejCount"></div>
+</div>
+
+<div id="elev" hidden>
+  <div class="door l"></div><div class="door r"></div>
+  <div class="elev-text"><div id="elevArrow">⬆</div><div id="elevFloor">2. KAT</div><div class="muted" style="font-size:13px">Bu asansör sadece 1 kat çıkar</div></div>
+</div>
+
+<div class="screen" id="vip" hidden>
+  <div class="card">
+    <h2 class="vip-title">👑 VIP DOLABI</h2>
+    <p class="muted" style="font-size:14px">Giymek ya da çıkarmak için dokun. Kapatmak için <b>Ü</b> ya da <b>Ç</b>.</p>
+    <div class="vipgrid" id="vipGrid"></div>
+    <button class="big" id="vipClose" type="button">TAMAM</button>
+  </div>
+</div>
+
+<div class="screen" id="dead" hidden>
+  <div class="card">
+    <h2 class="dead-title">ÖLDÜN</h2>
+    <p id="deadText"></p>
+    <p class="press">Ama oyun bitmedi! Artık bir HAYALETSİN 👻</p>
+    <button class="big" id="deadBtn" type="button">DEVAM</button>
+  </div>
+</div>
+
+<div class="screen" id="end" hidden>
+  <div class="card">
+    <h2 id="endTitle" class="win-title">KAZANDIN!</h2>
+    <p id="endText"></p>
+    <p class="press">Yeni oyun için Ç harfine bas</p>
+    <button class="big" id="endBtn" type="button">Ç</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* saklanamadı */ } },
+};
+const rnd = a => a[Math.floor(Math.random() * a.length)];
+
+// ---------- Katlar ve odalar ----------
+// 1. kat eski fabrikanın 4 katı büyüklüğünde; 2. kat sahnede uzakta durur, asansörle ışınlanılır.
+const FLOORS = [
+  { name: '1. Kat · Fabrika', x0: -60, x1: 60, z0: -40, z1: 40, cab: 60, exit: { x: 53.5, z: 0 } },
+  { name: '2. Kat · Ofisler', x0: 170, x1: 230, z0: -20, z1: 20, cab: 230, exit: { x: 223.5, z: 0 } },
+];
+const floorOf = x => (x > 120 ? 1 : 0);
+const ZONES = [
+  { f: 0, name: 'Montaj Hattı', x0: -60, x1: -20, z0: -40, z1: -13, offs: [6, 13, 32], tasks: ['Konveyörü çalıştır', 'Robot kolunu ayarla', 'Vidaları sık'] },
+  { f: 0, name: 'Depo', x0: -20, x1: 20, z0: -40, z1: -13, offs: [6, 13, 32], tasks: ['Kutuları say', 'Paketleri etiketle', 'Forklifti şarj et'] },
+  { f: 0, name: 'Kazan Dairesi', x0: 20, x1: 60, z0: -40, z1: -13, offs: [6, 13, 32], tasks: ['Fırını ayarla', 'Basıncı düşür', 'Boruyu kontrol et'] },
+  { f: 0, name: 'Boya Atölyesi', x0: -60, x1: -20, z0: -13, z1: 13, offs: [6, 13, 32], tasks: ['Boyaları karıştır', 'Fırçaları temizle', 'Bandı yağla'] },
+  { f: 0, name: 'Kafeterya', x0: -20, x1: 20, z0: -13, z1: 13, offs: [7, 33], tasks: ['Çöpü boşalt', 'Su sebilini doldur'] },
+  { f: 0, name: 'Elektrik', x0: 20, x1: 60, z0: -13, z1: 13, offs: [6, 13, 32], tasks: ['Kabloları bağla', 'Sigortayı değiştir', 'Lambayı tak'] },
+  { f: 0, name: 'Kontrol Odası', x0: -60, x1: -20, z0: 13, z1: 40, offs: [6, 13, 32], tasks: ['Kameraları izle', 'Şifreyi gir', 'Makineyi tamir et'] },
+  { f: 0, name: 'Yükleme Rampası', x0: -20, x1: 20, z0: 13, z1: 40, offs: [6, 13, 32], tasks: ['Kamyonu yükle', 'Kasaları diz', 'Kapıyı aç'] },
+  { f: 0, name: 'Laboratuvar', x0: 20, x1: 60, z0: 13, z1: 40, offs: [6, 13, 32], tasks: ['Numuneyi incele', 'Tüpleri diz', 'Mikroskobu ayarla'] },
+  { f: 1, name: 'Ofis', x0: 170, x1: 200, z0: -20, z1: 0, offs: [5, 25], tasks: ['Dosyaları düzenle', 'Bilgisayarı güncelle'] },
+  { f: 1, name: 'Gözlem Terası', x0: 200, x1: 230, z0: -20, z1: 0, offs: [8], tasks: ['Teleskobu ayarla'] },
+  { f: 1, name: 'Arşiv', x0: 170, x1: 200, z0: 0, z1: 20, offs: [8], tasks: ['Belgeleri tara'] },
+  { f: 1, name: 'Dinlenme Odası', x0: 200, x1: 230, z0: 0, z1: 20, offs: [5, 22], tasks: ['Bitkileri sula', 'Kahve makinesini temizle'] },
+];
+function zoneAt(x, z) {
+  for (const zn of ZONES) if (x >= zn.x0 && x <= zn.x1 && z >= zn.z0 && z <= zn.z1) return zn.name;
+  return x > FLOORS[floorOf(x)].cab - 7 ? 'Asansör' : 'Koridor';
+}
+
+// ---------- Sahne ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+$('game').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0f13);
+scene.fog = new THREE.Fog(0x0c0f13, 45, 90);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200);
+
+// Uzaya atılma sahnesi (ayrı küçük sahne)
+const spaceScene = new THREE.Scene();
+spaceScene.background = new THREE.Color(0x02030a);
+const ejCam = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+ejCam.position.set(0, 1.4, 14); ejCam.lookAt(0, 1.2, 0);
+
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = ejCam.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix(); ejCam.updateProjectionMatrix();
+  sizeMap();
+}
+
+const hemi = new THREE.HemisphereLight(0xcfe3ff, 0x2a2018, 0.55);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2dd, 0.85);
+sun.position.set(-14, 30, 18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -36, right: 36, top: 30, bottom: -30, near: 1, far: 90 });
+scene.add(sun); scene.add(sun.target);
+const lamps = [[-35, -22, 0xffa040], [35, -22, 0xffa040], [0, 0, 0x80c0ff], [-35, 22, 0xffd080], [35, 22, 0xffd080], [200, 0, 0xffe0b0]].map(([x, z, c]) => {
+  const p = new THREE.PointLight(c, 0.7, 36, 2);
+  p.position.set(x, 7, z);
+  scene.add(p);
+  return p;
+});
+{
+  spaceScene.add(new THREE.AmbientLight(0xffffff, .55));
+  const d = new THREE.DirectionalLight(0xffffff, .9); d.position.set(4, 8, 10); spaceScene.add(d);
+}
+
+function canvasTex(size, draw, rx = 1, ry = 1, h = size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = h;
+  draw(c.getContext('2d'), size, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = 4;
+  return t;
+}
+const floorTex = canvasTex(256, (g, s) => {
+  g.fillStyle = '#c4c8ce'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 1400; i++) {
+    g.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '255,255,255'},${Math.random() * .06})`;
+    g.fillRect(Math.random() * s, Math.random() * s, 3, 3);
+  }
+  g.strokeStyle = '#8a9098'; g.lineWidth = 4; g.strokeRect(0, 0, s, s);
+}, 30, 20);
+const carpetTex = canvasTex(128, (g, s) => {
+  g.fillStyle = '#c9d2e6'; g.fillRect(0, 0, s, s);
+  g.strokeStyle = 'rgba(40,60,110,.25)'; g.lineWidth = 3;
+  for (let i = 0; i < s; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, s); g.stroke(); }
+}, 20, 14);
+const hazardTex = canvasTex(64, (g, s) => {
+  g.fillStyle = '#16181c'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#ffc928';
+  for (let i = -s; i < s * 2; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i + 16, 0); g.lineTo(i + 16 - s, s); g.lineTo(i - s, s); g.fill(); }
+});
+const beltTex = canvasTex(64, (g, s) => {
+  g.fillStyle = '#23262b'; g.fillRect(0, 0, s, s);
+  g.fillStyle = '#3a3f46'; for (let i = 0; i < s; i += 16) g.fillRect(i, 0, 6, s);
+}, 8, 1);
+
+// Makinelerin üstündeki çıkartmalar: dikkat üçgeni, kurukafa (dikkat tehlike), yasak işareti
+const STICKERS = [
+  canvasTex(128, g => {
+    g.lineJoin = 'round';
+    g.fillStyle = '#ffd400'; g.strokeStyle = '#111'; g.lineWidth = 10;
+    g.beginPath(); g.moveTo(64, 10); g.lineTo(120, 112); g.lineTo(8, 112); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = '#111'; g.fillRect(57, 42, 14, 42); g.beginPath(); g.arc(64, 98, 8, 0, Math.PI * 2); g.fill();
+  }),
+  canvasTex(128, g => {
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#d01818'; g.lineWidth = 8; g.stroke();
+    g.font = '900 15px sans-serif'; g.fillStyle = '#d01818'; g.textAlign = 'center';
+    const txt = 'DİKKAT TEHLİKE';
+    [...txt].forEach((ch, i) => {
+      g.save(); g.translate(64, 64); g.rotate(-1.75 + i * .25); g.fillText(ch, 0, -40); g.restore();
+    });
+    g.fillStyle = '#eee'; g.strokeStyle = '#222'; g.lineWidth = 3;
+    g.beginPath(); g.arc(64, 64, 22, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.fillRect(54, 80, 20, 14); g.strokeRect(54, 80, 20, 14);
+    g.fillStyle = '#111'; g.beginPath(); g.arc(55, 62, 7, 0, Math.PI * 2); g.arc(73, 62, 7, 0, Math.PI * 2); g.fill();
+    g.fillRect(60, 83, 3, 10); g.fillRect(66, 83, 3, 10);
+  }),
+  canvasTex(128, g => {
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#d01818'; g.lineWidth = 14; g.beginPath(); g.arc(64, 64, 50, 0, Math.PI * 2); g.stroke();
+    g.beginPath(); g.moveTo(30, 98); g.lineTo(98, 30); g.stroke();
+  }),
+].map(t => { t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return new THREE.MeshBasicMaterial({ map: t, transparent: true }); });
+
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .7, metalness: .15 }, o));
+
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(120, 80), new THREE.MeshStandardMaterial({ map: floorTex, roughness: .9 }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+const floor2 = new THREE.Mesh(new THREE.PlaneGeometry(60, 40), new THREE.MeshStandardMaterial({ map: carpetTex, color: 0x6f86c0, roughness: 1 }));
+floor2.rotation.x = -Math.PI / 2; floor2.position.x = 200;
+floor2.receiveShadow = true;
+scene.add(floor2);
+
+const obstacles = [];
+function box(w, h, d, x, y, z, material, solid = true) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+  m.position.set(x, y, z);
+  m.castShadow = m.receiveShadow = true;
+  scene.add(m);
+  if (solid) obstacles.push({ x1: x - w / 2, x2: x + w / 2, z1: z - d / 2, z2: z + d / 2 });
+  return m;
+}
+
+// Dış duvarlar: arkada yüksek, kameraya bakan önde alçak
+const wallMat = mat(0x6b4a3c, { roughness: .95 });
+const glassMat = new THREE.MeshBasicMaterial({ color: 0x9ec8e8 });
+box(121, 7, 1, 0, 3.5, -40.5, wallMat, false);
+box(1, 7, 80, -60.5, 3.5, 0, wallMat, false);
+box(1, 7, 80, 60.5, 3.5, 0, wallMat, false);
+box(121, 1, 1, 0, .5, 40.5, mat(0x3a3f46), false);
+for (let x = -56; x <= 56; x += 8) box(5, 2.2, .1, x, 4.6, -40 + .02, glassMat, false);
+const pipeMat = mat(0x9aa4ad, { metalness: .7, roughness: .35 });
+[1.6, 2.4].forEach((y, i) => {
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(.25, .25, 120, 12), i ? mat(0xc0392b, { metalness: .5 }) : pipeMat);
+  p.rotation.z = Math.PI / 2; p.position.set(0, y, -40 + .4); p.castShadow = true; scene.add(p);
+});
+// 2. kat dış duvarları
+const wall2Mat = mat(0x46506a, { roughness: .9 });
+box(61, 7, 1, 200, 3.5, -20.5, wall2Mat, false);
+box(1, 7, 40, 169.5, 3.5, 0, wall2Mat, false);
+box(1, 7, 40, 230.5, 3.5, 0, wall2Mat, false);
+box(61, 1, 1, 200, .5, 20.5, mat(0x3a3f46), false);
+box(26, 3.6, .1, 215, 4.2, -20 + .02, glassMat, false);
+box(10, 2.2, .1, 180, 4.6, -20 + .02, glassMat, false);
+
+// İç duvarlar: alçak, kapı boşluklu
+const innerMat = mat(0x8c96a3, { roughness: .85 });
+const capMat = mat(0xffc928, { roughness: .6 });
+function wallRun(alongX, c, a, b, gaps, h = 2.2) {
+  const cuts = gaps.map(g => [g - 4, g + 4]).sort((p, q) => p[0] - q[0]);
+  const seg = (u, v) => {
+    if (v - u < .2) return;
+    const L = v - u, m = (u + v) / 2;
+    if (alongX) { box(L, h, .6, m, h / 2, c, innerMat); box(L, .12, .64, m, h + .06, c, capMat, false); }
+    else { box(.6, h, L, c, h / 2, m, innerMat); box(.64, .12, L, c, h + .06, m, capMat, false); }
+  };
+  let s = a;
+  cuts.forEach(([u, v]) => { seg(s, u); s = v; });
+  seg(s, b);
+}
+wallRun(true, -13, -60, 60, [-40, 0, 40]);
+wallRun(true, 13, -60, 60, [-40, 0, 40]);
+wallRun(false, -20, -40, 40, [-26.5, 0, 26.5]);
+wallRun(false, 20, -40, 40, [-26.5, 0, 26.5]);
+wallRun(true, 0, 170, 222, [185, 211]);
+wallRun(false, 200, -20, 20, [-10, 10]);
+
+// Oda adları yerde yazar
+function floorLabel(text, x, z, w = 13) {
+  const t = canvasTex(512, (g, s, h) => {
+    g.font = "900 64px Nunito, 'Arial Black', sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = 'rgba(255,255,255,.9)'; g.fillText(text.toLocaleUpperCase('tr-TR'), s / 2, h / 2);
+  }, 1, 1, 128);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: t, transparent: true, opacity: .35, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, .03, z);
+  scene.add(m);
+}
+ZONES.forEach(zn => floorLabel(zn.name, (zn.x0 + zn.x1) / 2, zn.z1 - 3.2, zn.f ? 10 : 13));
+
+// Makineler (her görevin bir makinesi var)
+const pistons = [], beacons = [], blinkers = [];
+const machineMat = mat(0x7d8691, { metalness: .5, roughness: .45 });
+function machine(x, z, w, d, color, sticker) {
+  box(w, 3.2, d, x, 1.6, z, machineMat);
+  box(w - .6, .5, d - .6, x, 3.45, z, mat(0x4a525c, { metalness: .5 }), false);
+  [-1, 1].forEach(s => {
+    box(w * .5, 1.2, .1, x, 1.9, z + s * (d / 2 + .05), mat(0x111418, { emissive: color, emissiveIntensity: .35 }), false);
+    const lamp = box(.3, .3, .1, x + w * .32, 2.5, z + s * (d / 2 + .06), new THREE.MeshBasicMaterial({ color: 0x22ff66 }), false);
+    blinkers.push(lamp);
+    box(w, .25, .1, x, .12, z + s * (d / 2 + .05), new THREE.MeshStandardMaterial({ map: hazardTex }), false);
+  });
+  if (sticker < 3) {
+    const st = new THREE.Mesh(new THREE.PlaneGeometry(.85, .85), STICKERS[sticker]);
+    st.position.set(x - w * .25, .78, z + d / 2 + .08); scene.add(st);
+  }
+  const pis = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, 1.6, 16), pipeMat);
+  pis.position.set(x - w * .25, 4, z); pis.castShadow = true; scene.add(pis);
+  pistons.push({ m: pis, phase: Math.random() * 6 });
+  const bc = new THREE.Mesh(new THREE.CylinderGeometry(.22, .27, .4, 12), new THREE.MeshBasicMaterial({ color: 0xff7a1a }));
+  bc.position.set(x + w * .3, 3.9, z); scene.add(bc);
+  beacons.push(bc);
+}
+
+// ---------- Görevler: 1. katta 26, 2. katta 6 ----------
+const MCOLORS = [0x22ccff, 0xff4fa0, 0x22ff88, 0xffaa22, 0x9a66ff];
+const TASKS = [];
+ZONES.forEach(zn => zn.tasks.forEach((base, i) => {
+  const mx = zn.x0 + zn.offs[i], mz = zn.z0 + 2.4, k = TASKS.length;
+  machine(mx, mz, 3.4, 2, MCOLORS[k % 5], k % 4);
+  TASKS.push({ base, name: base, x: mx, z: mz + 2.4, floor: zn.f, zone: zn.name });
+}));
+TASKS.forEach(t => {
+  t.ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.2, 32), new THREE.MeshBasicMaterial({ color: 0xffc928, transparent: true, opacity: .85 }));
+  t.ring.rotation.x = -Math.PI / 2; t.ring.position.set(t.x, .03, t.z); scene.add(t.ring);
+  t.gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35), new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0xffaa00, emissiveIntensity: .8 }));
+  t.gem.position.set(t.x, 4.6, t.z - 2.4); scene.add(t.gem);
+});
+
+// Konveyör bandı (Montaj Hattı)
+box(16, .9, 2, -40, .45, -24, mat(0x3a3f46, { metalness: .4 }));
+const belt = new THREE.Mesh(new THREE.BoxGeometry(16, .06, 1.7), new THREE.MeshStandardMaterial({ map: beltTex, roughness: .8 }));
+belt.position.set(-40, .93, -24); belt.receiveShadow = true; scene.add(belt);
+const beltCrates = [];
+for (let i = 0; i < 6; i++) beltCrates.push(box(.9, .7, .9, -48 + i * 2.7, 1.32, -24, mat(0xb07a3e), false));
+
+// Tank (Kazan Dairesi), kasalar, variller
+const tank = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 5, 28), mat(0xd4dade, { metalness: .6, roughness: .3 }));
+tank.position.set(44, 2.5, -25); tank.castShadow = true; scene.add(tank);
+obstacles.push({ x1: 42, x2: 46, z1: -27, z2: -23 });
+const tankPipe = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, 5, 12), mat(0xc0392b, { metalness: .5 }));
+tankPipe.rotation.x = Math.PI / 2; tankPipe.position.set(44, 4.2, -20.5); scene.add(tankPipe);
+
+const crateMat = mat(0xa8743c, { roughness: .9 });
+box(2, 2, 2, -8, 1, -27, crateMat); box(1.4, 1.4, 1.4, -8, 2.7, -27, crateMat, false);
+box(3, 1.6, 3, 10, .8, -28, crateMat); box(1.6, 1.6, 1.6, 10.4, 2.4, -28.3, crateMat, false);
+box(2, 2.4, 4, -52, 1.2, 4, crateMat); box(2, 2.4, 4, 46, 1.2, 8, crateMat);
+box(3, 1.8, 2, 8, .9, 30, crateMat); box(3, 1.8, 2, -8, .9, 33, crateMat); box(2, 2, 2, 12, 1, 35, crateMat);
+const barrelMat = mat(0x2f7d4a, { metalness: .3 });
+[[-56, -36], [-54.8, -36.6], [56, 36], [54.6, 36.4], [14, -20], [-30, 20], [30, -6], [-34, -4]].forEach(([x, z]) => {
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(.55, .55, 1.3, 16), barrelMat);
+  b.position.set(x, .65, z); b.castShadow = true; scene.add(b);
+  obstacles.push({ x1: x - .55, x2: x + .55, z1: z - .55, z2: z + .55 });
+});
+// Boya kovaları
+[0xff4f8b, 0x4fd2ff, 0xffd23a, 0x7aff6a].forEach((c, i) => {
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(.4, .35, .6, 14), mat(c)); b.position.set(-44 + i * 1.1, .3, 2); scene.add(b);
+});
+obstacles.push({ x1: -44.4, x2: -40.3, z1: 1.6, z2: 2.4 });
+
+// 2. kat eşyaları
+const deskMat = mat(0x8a6a4a), screenMat = new THREE.MeshBasicMaterial({ color: 0x4fd2ff });
+[[180, -9], [190, -9], [180, -4], [190, -4]].forEach(([x, z]) => {
+  box(3, 1, 1.6, x, .5, z, deskMat); box(1.2, .8, .1, x, 1.4, z - .4, screenMat, false);
+});
+box(6, 2.6, .8, 185, 1.3, 11, mat(0x5a4a3a)); box(6, 2.6, .8, 185, 1.3, 16, mat(0x5a4a3a));
+box(4.5, 1, 1.6, 214, .5, 15, mat(0xc04a6a)); box(4.5, 1.2, .5, 214, 1.1, 15.9, mat(0xc04a6a), false);
+{
+  const scope = new THREE.Mesh(new THREE.CylinderGeometry(.25, .35, 3, 16), mat(0xe0e4ea, { metalness: .6 }));
+  scope.position.set(222, 2.2, -14); scope.rotation.x = -.7; scope.castShadow = true; scene.add(scope);
+  obstacles.push({ x1: 221.4, x2: 222.6, z1: -14.6, z2: -13.4 });
+  const plant = new THREE.Mesh(new THREE.SphereGeometry(.8, 12, 10), mat(0x3a9a4a)); plant.position.set(226, 1.2, 17); scene.add(plant);
+  box(.9, .8, .9, 226, .4, 17, mat(0xa86a3a));
+}
+
+// ---------- Asansör: sadece 1 kat çıkar ----------
+const cabMat = mat(0xb8c0c8, { metalness: .7, roughness: .3 });
+function signTex(text, color) {
+  const t = canvasTex(256, (g, s, h) => {
+    g.fillStyle = '#111'; g.fillRect(0, 0, s, h);
+    g.strokeStyle = '#ffc928'; g.lineWidth = 8; g.strokeRect(4, 4, s - 8, h - 8);
+    g.font = "900 46px Nunito, 'Arial Black', sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = color; g.fillText(text, s / 2, h / 2 + 2);
+  }, 1, 1, 96);
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return new THREE.MeshBasicMaterial({ map: t });
+}
+function buildCab(xe, text, color) {
+  const cx = xe - 1.6;
+  box(3.2, 4, .3, cx, 2, -3.15, cabMat); box(3.2, 4, .3, cx, 2, 3.15, cabMat);
+  box(3.2, .3, 6.6, cx, 4.15, 0, cabMat, false);
+  box(.15, 3.8, 1, xe - 3.25, 1.9, -2.5, mat(0x8d969f, { metalness: .6 }), false);
+  box(.15, 3.8, 1, xe - 3.25, 1.9, 2.5, mat(0x8d969f, { metalness: .6 }), false);
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 6), new THREE.MeshStandardMaterial({ map: hazardTex }));
+  fl.rotation.x = -Math.PI / 2; fl.position.set(cx, .03, 0); scene.add(fl);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 1.27), signTex(text, color));
+  sign.position.set(cx - .3, 5, 3.4); scene.add(sign);
+  const light = new THREE.Mesh(new THREE.BoxGeometry(1.2, .1, 1.2), new THREE.MeshBasicMaterial({ color: 0xfff4c0 }));
+  light.position.set(cx, 4, 0); scene.add(light);
+}
+buildCab(60, 'ASANSÖR ⬆ 2', '#4ade80');
+buildCab(230, 'ASANSÖR ⬇ 1', '#ffb020');
+
+// ---------- Dünyalar (D tuşuyla sıradakine geçilir) ----------
+const WORLDS = [
+  { name: 'Fabrika', bg: 0x0c0f13, floor: 0x74787f, wall: 0x6b4a3c, crate: 0xa8743c, machine: 0x7d8691, barrel: 0x2f7d4a,
+    sky: 0xcfe3ff, ground: 0x2a2018, hemiI: .55, sun: 0xfff2dd, sunI: .85, lamp: 0xffa040, tasks: null },
+  { name: 'Buz Dünyası', bg: 0x1b2a3d, floor: 0xc6dcee, wall: 0x8fc6e8, crate: 0xbfe6ff, machine: 0xa9c4d8, barrel: 0x6fb6e0,
+    sky: 0xe6f4ff, ground: 0x6a8cab, hemiI: .7, sun: 0xffffff, sunI: .75, lamp: 0x9fe0ff, decor: 'ice',
+    particles: { color: 0xffffff, size: .25, vy: -2.5 },
+    tasks: ['Buzu kır', 'Kardan adam yap', 'Isıtıcıyı yak', 'Kızağı onar', 'Penguenleri say', 'Buz kristali topla', 'Kar topu yap', 'Atkı ör', 'Buz pistini sil', 'Sıcak çikolata yap', 'İglo inşa et', 'Balık tut'] },
+  { name: 'Lav Dünyası', bg: 0x1a0604, floor: 0x6a4842, wall: 0x3b1612, crate: 0x5a3a30, machine: 0x5b4a4a, barrel: 0xb33a12,
+    sky: 0xff9a6a, ground: 0x3a0a00, hemiI: .55, sun: 0xffb080, sunI: .7, lamp: 0xff4a10, decor: 'lava',
+    particles: { color: 0xff7a20, size: .22, vy: 2 },
+    tasks: ['Lavı soğut', 'Ateş taşını taşı', 'Volkanı ölç', 'Köprüyü onar', 'Dumanı temizle', 'Kor topla', 'Kaya kır', 'Ejderha yumurtası bul', 'Isı ölçeri oku', 'Kükürt topla', 'Kalkanı onar', 'Su tankını doldur'] },
+  { name: 'Uzay Üssü', bg: 0x02030a, floor: 0x5c6290, wall: 0x2c2f55, crate: 0x9aa0c8, machine: 0x8088b0, barrel: 0x6a4ad6,
+    sky: 0xb8b8ff, ground: 0x10102a, hemiI: .55, sun: 0xd8dcff, sunI: .75, lamp: 0x7a6aff, decor: 'space',
+    particles: { color: 0xffffff, size: .35, vy: 0, sky: true },
+    tasks: ['Motoru çalıştır', 'Oksijeni doldur', 'Radarı ayarla', 'Roketi yakıtla', 'Uyduyu bağla', 'Yıldızları say', 'Göktaşını vur', 'Kaskı temizle', 'Uzaylıya mesaj at', 'Güneş panelini aç', 'Haritayı indir', 'Kapıyı kilitle'] },
+  { name: 'Orman', bg: 0x16331f, floor: 0x5f9a50, wall: 0x6b4a2a, crate: 0x8a5a2a, machine: 0x7a8a6a, barrel: 0x4a7a2a,
+    sky: 0xe8ffd8, ground: 0x2a4a1a, hemiI: .7, sun: 0xfff0c0, sunI: .9, lamp: 0xffe080, decor: 'forest',
+    particles: { color: 0xd8ff60, size: .25, vy: .3, firefly: true },
+    tasks: ['Ağaç dik', 'Mantar topla', 'Kulübeyi onar', 'Dereyi temizle', 'Kuşları besle', 'Çiçek sula', 'Odun kes', 'Kamp ateşi yak', 'Çilek topla', 'Kuş evi yap', 'Çadırı kur', 'Sincabı besle'] },
+  { name: 'Doğum Günü Dünyası', bg: 0x2a1438, floor: 0xf2b8d8, wall: 0x8a4ac8, crate: 0xff6aa8, machine: 0x6ac8ff, barrel: 0xffd23a,
+    sky: 0xfff0fa, ground: 0x6a3a7a, hemiI: .75, sun: 0xfff4e0, sunI: .8, lamp: 0xff8ad8, decor: 'party',
+    particles: { color: 0xffffff, size: .3, vy: -1.6, confetti: true },
+    tasks: ['Pastayı kes', 'Balon şişir', 'Hediyeleri paketle', 'Mumları yak', 'Konfeti at', 'Doğum günü şarkısı söyle', 'Şapkaları dağıt', 'Masayı kur', 'Davetiye yaz', 'Müziği aç', 'Limonata yap', 'Pinyatayı kır'] },
+];
+let worldIndex = 0;
+const worldDecor = new THREE.Group();
+scene.add(worldDecor);
+
+const PCOUNT = 1200;
+const pGeo = new THREE.BufferGeometry();
+const pPos = new Float32Array(PCOUNT * 3);
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+const pCol = new Float32Array(PCOUNT * 3).fill(1);
+pGeo.setAttribute('color', new THREE.BufferAttribute(pCol, 3));
+const pMat = new THREE.PointsMaterial({ color: 0xffffff, size: .25, transparent: true, opacity: .9, depthWrite: false, vertexColors: true });
+const PARTY = [0xff4f8b, 0xffd23a, 0x4fd2ff, 0x7aff6a, 0xb36aff, 0xff8a2a];
+const particles = new THREE.Points(pGeo, pMat);
+particles.frustumCulled = false;
+scene.add(particles);
+const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+function decorMesh(geo, material, x, y, z) {
+  const m = new THREE.Mesh(geo, material);
+  m.position.set(x, y, z); m.castShadow = true;
+  worldDecor.add(m);
+  return m;
+}
+// Duvarların dışındaki süslemeler: oyuncunun yolunu kapatmaz
+const OUTSIDE = [];
+for (let x = -64; x <= 64; x += 6) OUTSIDE.push([x, -44 - Math.random() * 4]);
+for (let z = -38; z <= 38; z += 6) { OUTSIDE.push([-64 - Math.random() * 3, z]); OUTSIDE.push([64 + Math.random() * 3, z]); }
+
+function buildDecor(kind) {
+  while (worldDecor.children.length) worldDecor.remove(worldDecor.children[0]);
+  if (kind === 'ice') {
+    const ice = new THREE.MeshStandardMaterial({ color: 0xaee6ff, emissive: 0x2a6a9a, emissiveIntensity: .4, transparent: true, opacity: .85, roughness: .1 });
+    OUTSIDE.forEach(([x, z]) => { decorMesh(new THREE.ConeGeometry(1 + Math.random(), 6 + Math.random() * 6, 6), ice, x, 4, z).rotation.z = (Math.random() - .5) * .4; });
+    const snow = mat(0xffffff, { roughness: 1 });
+    [[-56, -36], [56, -36], [-56, 36], [56, 36], [-30, -36], [30, 36]].forEach(([x, z]) => decorMesh(new THREE.SphereGeometry(1.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), snow, x, 0, z));
+  } else if (kind === 'lava') {
+    const lava = new THREE.MeshBasicMaterial({ color: 0xff5a10 });
+    [[-50, -20], [50, -6], [-28, 30], [50, -36], [-50, 20], [28, 36]].forEach(([x, z]) => {
+      const pool = decorMesh(new THREE.CircleGeometry(1.4 + Math.random(), 20), lava, x, .03, z);
+      pool.rotation.x = -Math.PI / 2;
+    });
+    const rock = mat(0x2a1210, { roughness: 1 });
+    OUTSIDE.forEach(([x, z]) => decorMesh(new THREE.ConeGeometry(2 + Math.random() * 1.5, 8 + Math.random() * 7, 7), rock, x, 5, z));
+    decorMesh(new THREE.SphereGeometry(1.2, 12, 8), lava, 0, 13, -50);
+  } else if (kind === 'space') {
+    decorMesh(new THREE.SphereGeometry(9, 32, 20), mat(0xd06a3a, { emissive: 0x5a2010, roughness: 1 }), 22, 20, -62);
+    const ring = decorMesh(new THREE.RingGeometry(11, 15, 48), new THREE.MeshBasicMaterial({ color: 0xe8c890, side: THREE.DoubleSide, transparent: true, opacity: .6 }), 22, 20, -62);
+    ring.rotation.x = 1.2;
+    decorMesh(new THREE.SphereGeometry(3, 24, 16), mat(0xb8bcc8, { emissive: 0x30323a, roughness: 1 }), -26, 24, -58);
+    const antenna = mat(0x9aa4ad, { metalness: .7, roughness: .3 });
+    OUTSIDE.filter((_, i) => i % 3 === 0).forEach(([x, z]) => {
+      decorMesh(new THREE.CylinderGeometry(.15, .15, 9, 8), antenna, x, 4.5, z);
+      decorMesh(new THREE.SphereGeometry(.4, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff3355 }), x, 9.2, z);
+    });
+  } else if (kind === 'party') {
+    OUTSIDE.forEach(([x, z], i) => {
+      const y = 7 + Math.random() * 6;
+      const balloon = decorMesh(new THREE.SphereGeometry(1, 18, 14), mat(PARTY[i % PARTY.length], { roughness: .25, metalness: .1 }), x, y, z);
+      balloon.scale.y = 1.2;
+      decorMesh(new THREE.CylinderGeometry(.03, .03, y - 1, 4), shineMat, x, (y - 1) / 2, z);
+    });
+    const cake1 = mat(0xfff0e0, { roughness: .8 }), cake2 = mat(0xff8ac0, { roughness: .8 }), cake3 = mat(0x8a4a2a, { roughness: .9 });
+    decorMesh(new THREE.CylinderGeometry(9, 9, 4, 40), cake3, 0, 2, -52);
+    decorMesh(new THREE.CylinderGeometry(9.2, 9.2, .8, 40), cake2, 0, 4.2, -52);
+    decorMesh(new THREE.CylinderGeometry(6, 6, 4, 40), cake1, 0, 6.5, -52);
+    decorMesh(new THREE.CylinderGeometry(6.2, 6.2, .8, 40), cake2, 0, 8.7, -52);
+    [-3, -1, 1, 3].forEach((x, i) => {
+      decorMesh(new THREE.CylinderGeometry(.25, .25, 2, 10), mat(PARTY[i]), x, 10, -50);
+      decorMesh(new THREE.SphereGeometry(.35, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffb020 }), x, 11.3, -50).scale.y = 1.5;
+    });
+    [[-56, -36], [56, -36], [-56, 36], [56, 36], [-30, 37], [30, -37]].forEach(([x, z], i) => {
+      decorMesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), mat(PARTY[i]), x, .6, z);
+      decorMesh(new THREE.BoxGeometry(1.5, .3, .3), mat(0xffffff), x, 1.22, z);
+      decorMesh(new THREE.BoxGeometry(.3, .3, 1.5), mat(0xffffff), x, 1.22, z);
+    });
+  } else if (kind === 'forest') {
+    const trunk = mat(0x6a4422, { roughness: 1 }), leaves = mat(0x2f8a3a, { roughness: .9 }), leaves2 = mat(0x4aa83a, { roughness: .9 });
+    OUTSIDE.forEach(([x, z], i) => {
+      const h = 7 + Math.random() * 5;
+      decorMesh(new THREE.CylinderGeometry(.5, .7, h * .4, 8), trunk, x, h * .2, z);
+      decorMesh(new THREE.ConeGeometry(2.6, h * .7, 9), i % 2 ? leaves : leaves2, x, h * .4 + h * .3, z);
+    });
+    const shroom = mat(0xe03a3a), stem = mat(0xf2ead8);
+    [[-56, -38], [56, -24], [-40, 38], [44, 38], [-56, 12]].forEach(([x, z]) => {
+      decorMesh(new THREE.CylinderGeometry(.12, .15, .5, 8), stem, x, .25, z);
+      decorMesh(new THREE.SphereGeometry(.4, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), shroom, x, .5, z);
+    });
+  }
+}
+
+function resetParticles(cfg) {
+  for (let i = 0; i < PCOUNT; i++) {
+    const c = new THREE.Color(cfg && cfg.confetti ? PARTY[i % PARTY.length] : 0xffffff);
+    pCol[i * 3] = c.r; pCol[i * 3 + 1] = c.g; pCol[i * 3 + 2] = c.b;
+    if (cfg && cfg.sky) {
+      const a = Math.random() * Math.PI * 2, r = 70 + Math.random() * 40;
+      pPos[i * 3] = Math.cos(a) * r; pPos[i * 3 + 1] = 5 + Math.random() * 50; pPos[i * 3 + 2] = Math.sin(a) * r - 10;
+    } else {
+      pPos[i * 3] = (Math.random() - .5) * 124; pPos[i * 3 + 1] = Math.random() * 14; pPos[i * 3 + 2] = (Math.random() - .5) * 84;
+    }
+  }
+  pGeo.attributes.position.needsUpdate = true;
+  pGeo.attributes.color.needsUpdate = true;
+}
+function updateParticles(dt, time) {
+  const cfg = WORLDS[worldIndex].particles;
+  if (!cfg || !cfg.vy && !cfg.firefly) return;
+  for (let i = 0; i < PCOUNT; i++) {
+    let y = pPos[i * 3 + 1] + cfg.vy * dt;
+    if (y < 0) y = 14; else if (y > 14) y = 0;
+    pPos[i * 3 + 1] = y;
+    if (cfg.firefly) { pPos[i * 3] += Math.sin(time * 2 + i) * dt * .6; pPos[i * 3 + 2] += Math.cos(time * 1.7 + i) * dt * .6; }
+    else pPos[i * 3] += Math.sin(time + i) * dt * .3;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+}
+
+function setWorld(i) {
+  worldIndex = i;
+  const w = WORLDS[i];
+  floor.material.color.setHex(w.floor);
+  wallMat.color.setHex(w.wall); crateMat.color.setHex(w.crate);
+  machineMat.color.setHex(w.machine); barrelMat.color.setHex(w.barrel);
+  hemi.color.setHex(w.sky); hemi.groundColor.setHex(w.ground);
+  sun.color.setHex(w.sun);
+  applyLights();
+  lamps.forEach(l => l.color.setHex(w.lamp));
+  particles.visible = !!w.particles;
+  if (w.particles) { pMat.color.setHex(w.particles.color); pMat.size = w.particles.size; resetParticles(w.particles); }
+  buildDecor(w.decor);
+  TASKS.forEach((t, k) => { t.name = w.tasks ? w.tasks[k % w.tasks.length] : t.base; });
+}
+
+// ---------- Karakterler ----------
+const visorMat = new THREE.MeshStandardMaterial({ color: 0x7cc8ff, metalness: .6, roughness: .15, emissive: 0x0d2a4a });
+const mouthMat = new THREE.MeshBasicMaterial({ color: 0x3a0508 });
+const tongueMat = new THREE.MeshStandardMaterial({ color: 0xff6f9c, roughness: .4 });
+const tongueGeo = new THREE.CylinderGeometry(.09, .12, 1, 10);
+tongueGeo.translate(0, .5, 0); tongueGeo.rotateX(Math.PI / 2);   // ağızdan ileri (+z) uzanır
+
+// "M" modu: 3 boyutlu satranç piyonu
+const PAWN_PROFILE = [[0, 0], [.8, 0], [.82, .1], [.74, .2], [.6, .27], [.6, .35], [.45, .43], [.34, .62], [.27, .95], [.24, 1.25], [.44, 1.3], [.47, 1.38], [.3, 1.46], [.2, 1.5], [0, 1.5]]
+  .map(([x, y]) => new THREE.Vector2(x, y));
+const pawnGeo = new THREE.LatheGeometry(PAWN_PROFILE, 36);
+const pawnHeadGeo = new THREE.SphereGeometry(.46, 32, 20);
+function makePawnMesh(color) {
+  const grp = new THREE.Group();
+  const pm = new THREE.MeshStandardMaterial({ color, roughness: .25, metalness: .35 });
+  const b = new THREE.Mesh(pawnGeo, pm); b.castShadow = true; grp.add(b);
+  const h = new THREE.Mesh(pawnHeadGeo, pm); h.position.y = 1.86; h.castShadow = true; grp.add(h);
+  return grp;
+}
+
+function makeCrew(color, pawnColor, parent = scene) {
+  const g = new THREE.Group();
+  const body = new THREE.Group(); g.add(body);
+  const m = new THREE.MeshStandardMaterial({ color, roughness: .45, metalness: .05 });
+  const add = (geo, x, y, z, material = m, par = body) => {
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.position.set(x, y, z); mesh.castShadow = true; par.add(mesh); return mesh;
+  };
+  add(new THREE.CylinderGeometry(.62, .6, 1.05, 28), 0, 1.2, 0);
+  add(new THREE.SphereGeometry(.62, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2), 0, 1.72, 0);
+  add(new THREE.SphereGeometry(.6, 28, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), 0, .68, 0).scale.y = .3;
+  add(new THREE.SphereGeometry(.5, 24, 16), 0, 1.55, .42, visorMat).scale.set(1, .55, .6);
+  add(new THREE.SphereGeometry(.09, 10, 8), .2, 1.64, .7, shineMat).scale.set(1.6, .7, .5);
+  add(new THREE.BoxGeometry(.75, .82, .4), 0, 1.22, -.66);
+  const legs = [-.3, .3].map(x => {
+    const pivot = new THREE.Group();
+    pivot.position.set(x, .72, 0); body.add(pivot);
+    add(new THREE.CylinderGeometry(.24, .24, .66, 16), 0, -.33, 0, m, pivot);
+    return pivot;
+  });
+  const pawn = makePawnMesh(pawnColor); pawn.visible = pawnMode; body.visible = !pawnMode;
+  g.add(pawn);
+  // Bıçak: sadece öldürürken görünür (eskisinden biraz küçük)
+  const knife = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(.08, .75, .2), new THREE.MeshStandardMaterial({ color: 0xe8edf2, metalness: .9, roughness: .15 }));
+  blade.position.y = .5;
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(.1, .25, 4), blade.material);
+  tip.position.y = 1; tip.scale.z = .5;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(.08, .08, .4, 8), mat(0x4a2a14));
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(.12, .06, .4), mat(0x222222, { metalness: .6 }));
+  guard.position.y = .2;
+  knife.add(blade, tip, handle, guard);
+  knife.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  knife.position.set(.75, 1.15, .3);
+  knife.scale.setScalar(1.1);
+  knife.visible = false;
+  g.add(knife);
+  // Ağız ve dil: bazen bıçak yerine dille yakalar
+  const mouth = new THREE.Mesh(new THREE.SphereGeometry(.2, 16, 12), mouthMat);
+  mouth.scale.set(1, .75, .45); mouth.visible = false; g.add(mouth);
+  const tongue = new THREE.Mesh(tongueGeo, tongueMat); tongue.visible = false; g.add(tongue);
+  const tongueTip = new THREE.Mesh(new THREE.SphereGeometry(.17, 12, 10), tongueMat); tongueTip.visible = false; g.add(tongueTip);
+  parent.add(g);
+  return { g, body, pawn, bodyMat: m, legL: legs[0], legR: legs[1], walk: 0, knife, knifeT: 0, mouth, tongue, tongueTip, tongueT: 0, tongueLen: 2 };
+}
+
+function makeLabel(text, color = '#ffffff') {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128;
+  const tex = new THREE.CanvasTexture(c);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  s.scale.set(3.4, .85, 1); s.renderOrder = 5;
+  s.userData = { c, tex };
+  setLabel(s, text, color);
+  return s;
+}
+function setLabel(s, text, color = '#ffffff', bg = null) {
+  const { c, tex } = s.userData, g = c.getContext('2d');
+  g.clearRect(0, 0, 512, 128);
+  g.font = "900 50px Nunito, 'Arial Black', sans-serif"; g.textAlign = 'center'; g.textBaseline = 'middle';
+  if (bg) {
+    const w = Math.min(500, g.measureText(text).width + 50);
+    g.fillStyle = bg; g.beginPath();
+    if (g.roundRect) g.roundRect(256 - w / 2, 18, w, 92, 40); else g.rect(256 - w / 2, 18, w, 92);
+    g.fill();
+  }
+  g.lineWidth = 10; g.strokeStyle = 'rgba(0,0,0,.85)'; g.lineJoin = 'round';
+  g.strokeText(text, 256, 66);
+  g.fillStyle = color; g.fillText(text, 256, 66);
+  tex.needsUpdate = true;
+}
+
+function makeCorpse(color, pawnColor, x, z, rot) {
+  const g = new THREE.Group();
+  const crewPart = new THREE.Group(), pawnPart = new THREE.Group();
+  g.add(crewPart, pawnPart);
+  const m = new THREE.MeshStandardMaterial({ color, roughness: .45 });
+  const puddle = new THREE.Mesh(new THREE.CircleGeometry(1.1, 24), new THREE.MeshBasicMaterial({ color: 0x7a0000 }));
+  puddle.rotation.x = -Math.PI / 2; puddle.position.y = .02; g.add(puddle);
+  const low = new THREE.Mesh(new THREE.CylinderGeometry(.62, .6, .5, 28), m); low.position.y = .45; crewPart.add(low);
+  const cut = new THREE.Mesh(new THREE.CylinderGeometry(.58, .58, .02, 28), new THREE.MeshBasicMaterial({ color: 0x8a1010 }));
+  cut.position.y = .71; crewPart.add(cut);
+  const bone = new THREE.Mesh(new THREE.CylinderGeometry(.1, .1, .4, 10), shineMat); bone.position.y = .9; crewPart.add(bone);
+  [-.09, .09].forEach(dx => { const k = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), shineMat); k.position.set(dx, 1.1, 0); crewPart.add(k); });
+  [-.3, .3].forEach(dx => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.24, .24, .3, 14), m); l.position.set(dx, .15, 0); crewPart.add(l); });
+  const pw = makePawnMesh(pawnColor); pw.rotation.z = Math.PI / 2; pw.position.set(1.1, .62, 0); pawnPart.add(pw);
+  crewPart.visible = !pawnMode; pawnPart.visible = pawnMode;
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  g.position.set(x, 0, z); g.rotation.y = rot;
+  g.userData.crewPart = crewPart; g.userData.pawnPart = pawnPart;
+  scene.add(g);
+  return g;
+}
+
+// Hayalet: yarı saydam, bacaksız, süzülür. Başkaları göremez; biz kendimizi görürüz.
+function makeGhost(e) {
+  e.ghost = true;
+  const swap = new Map();
+  e.g.traverse(o => {
+    if (!o.isMesh || o.material.userData.ghost) return;
+    let c = swap.get(o.material);
+    if (!c) {
+      c = o.material.clone(); c.transparent = true; c.opacity = .38; c.depthWrite = false; c.userData.ghost = true;
+      swap.set(o.material, c);
+    }
+    o.material = c; o.castShadow = false;
+  });
+  if (swap.has(e.bodyMat)) e.bodyMat = swap.get(e.bodyMat);
+  e.legL.visible = e.legR.visible = false;
+}
+
+// ---------- Görevler ve acil durum düğmesi ----------
+const BUTTON = { x: 0, z: 0 };
+{
+  const table = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.4, .9, 32), mat(0x5a6470, { metalness: .4 }));
+  table.position.set(BUTTON.x, .45, BUTTON.z); table.castShadow = table.receiveShadow = true; scene.add(table);
+  const btn = new THREE.Mesh(new THREE.CylinderGeometry(.38, .42, .18, 24), new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0x880000 }));
+  btn.position.set(BUTTON.x, 1, BUTTON.z); scene.add(btn);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(.55, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0xcfefff, transparent: true, opacity: .3, roughness: .05 }));
+  dome.position.set(BUTTON.x, .9, BUTTON.z); scene.add(dome);
+  obstacles.push({ x1: BUTTON.x - 1.3, x2: BUTTON.x + 1.3, z1: BUTTON.z - 1.3, z2: BUTTON.z + 1.3 });
+}
+let meetingsLeft = 1;
+const nearButton = () => player && player.alive && floorOf(player.g.position.x) === 0 &&
+  Math.hypot(player.g.position.x - BUTTON.x, player.g.position.z - BUTTON.z) < 3.4;
+
+// ---------- Elektrik panosu ve ışık sabotajı ----------
+const PANEL = { x: 45, z: -11.6 };
+const panelLamp = new THREE.MeshBasicMaterial({ color: 0x22ff66 });
+box(1.6, 2, .3, PANEL.x, 1.3, -12.55, mat(0xd8b020, { metalness: .4 }), false);
+box(.5, .5, .1, PANEL.x, 1.8, -12.36, panelLamp, false);
+let lightsOut = false, lightsT = 0, fixProgress = 0, sabCd = 15, npcSabT = 40;
+const seeR = () => lightsOut ? 3 : 7;
+
+function applyLights() {
+  const w = WORLDS[worldIndex];
+  const dark = lightsOut && !isKiller;   // katil karanlıkta da görür
+  hemi.intensity = w.hemiI * (dark ? .3 : 1);
+  sun.intensity = w.sunI * (dark ? .15 : 1);
+  scene.background.setHex(dark ? 0x000000 : w.bg);
+  scene.fog.color.setHex(dark ? 0x000000 : w.bg);
+  scene.fog.near = dark ? 14 : 45; scene.fog.far = dark ? 24 : 90;
+  panelLamp.color.setHex(lightsOut ? 0xff2222 : 0x22ff66);
+}
+function sabotageLights() {
+  if (lightsOut || state !== 'play') return;
+  lightsOut = true; lightsT = 30; fixProgress = 0;
+  applyLights();
+  sfx.lightsOff();
+  toast(isKiller ? 'Işıkları söndürdün! Artık kimse uzağı göremez.' : 'Işıklar söndü! Elektrik odasındaki panoyu tamir et!');
+}
+function restoreLights(fixed) {
+  if (!lightsOut) return;
+  lightsOut = false;
+  applyLights();
+  sfx.lightsOn();
+  if (fixed) toast('Işıkları tamir ettin!');
+  else if (state === 'play') toast('Işıklar geri geldi.');
+}
+function updateSabotage(dt) {
+  if (isKiller) sabCd = Math.max(0, sabCd - dt);
+  else if (!lightsOut) {
+    npcSabT -= dt;
+    if (npcSabT <= 0) { npcSabT = 45 + Math.random() * 25; if (npcs.some(n => n.impostor && n.alive)) sabotageLights(); }
+  }
+  if (lightsOut) {
+    lightsT -= dt;
+    if (lightsT <= 0) restoreLights(false);
+  }
+}
+function playerSabotage() {
+  if (state !== 'play' || !isKiller || lightsOut) return;
+  if (sabCd > 0) { toast(`Sabotaj için bekle: ${Math.ceil(sabCd)} sn`); return; }
+  sabCd = 45;
+  sabotageLights();
+}
+
+// ---------- Havalandırmalar (sadece katil kullanır) ----------
+const VENTS = [[-48, -18], [0, -20], [50, -18], [-48, 7], [10, 9], [40, 26], [-40, 26], [0, 24]].map(([x, z]) => {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(1.7, .08, 1.3), mat(0x3a4048, { metalness: .6, roughness: .4 }));
+  base.position.y = .04; base.receiveShadow = true; g.add(base);
+  for (let i = -2; i <= 2; i++) {
+    const slat = new THREE.Mesh(new THREE.BoxGeometry(1.4, .1, .12), mat(0x14171b));
+    slat.position.set(0, .07, i * .22); g.add(slat);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  return { x, z };
+});
+function nearestVent() {
+  if (!player) return -1;
+  let best = -1, bd = 1.7;
+  VENTS.forEach((v, i) => { const d = Math.hypot(v.x - player.g.position.x, v.z - player.g.position.z); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+function useVent() {
+  if (state !== 'play' || !isKiller) return;
+  const i = nearestVent();
+  if (i < 0) return;
+  const seen = aliveNpcs().filter(n => dist(n, player) < seeR());
+  const next = VENTS[(i + 1) % VENTS.length];
+  player.g.position.set(next.x, 0, next.z);
+  sfx.vent();
+  toast('Havalandırmadan geçtin!');
+  if (seen.length && caughtT <= 0) { caughtT = 1; witnessName = seen[0].name; }
+}
+
+setWorld(0);
+
+function nextWorld() {
+  setWorld((worldIndex + 1) % WORLDS.length);
+  sfx.world();
+  if (state !== 'menu') { toast(`${WORLDS[worldIndex].name}'na gittin!`); drawHud(); }
+  else $('menuWorld').textContent = WORLDS[worldIndex].name;
+}
+
+// ---------- Çarpışma ----------
+const R = .55;
+function inFloor(x, z, r) {
+  for (const F of FLOORS) if (x > F.x0 + r && x < F.x1 - r && z > F.z0 + r && z < F.z1 - r) return true;
+  return false;
+}
+function blocked(x, z, r = R) {
+  if (!inFloor(x, z, r)) return true;
+  for (const o of obstacles) if (x > o.x1 - r && x < o.x2 + r && z > o.z1 - r && z < o.z2 + r) return true;
+  return false;
+}
+function moveBy(e, dx, dz) {
+  const p = e.g.position;
+  if (e.ghost) {   // hayaletler duvarlardan geçer
+    if (inFloor(p.x + dx, p.z, R)) p.x += dx;
+    if (inFloor(p.x, p.z + dz, R)) p.z += dz;
+    return;
+  }
+  if (!blocked(p.x + dx, p.z)) p.x += dx;
+  if (!blocked(p.x, p.z + dz)) p.z += dz;
+}
+const dist = (a, b) => Math.hypot(a.g.position.x - b.g.position.x, a.g.position.z - b.g.position.z);
+const fl = e => floorOf(e.g.position.x);
+
+// ---------- Yol bulma: diğer amonguslar duvarlara değmemeye çalışır ----------
+// Izgara 1 birimlik kareler. Duvara yakın kareler pahalı, bu yüzden hep koridorların ortasından yürürler.
+const NAV = FLOORS.map(F => {
+  const nx = F.x1 - F.x0, nz = F.z1 - F.z0;
+  const blk = new Uint8Array(nx * nz), cost = new Float32Array(nx * nz);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) blk[j * nx + i] = blocked(F.x0 + i + .5, F.z0 + j + .5, R + .1) ? 1 : 0;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    if (blk[j * nx + i]) continue;
+    let near = 99;
+    for (let b = -2; b <= 2; b++) for (let a = -2; a <= 2; a++) {
+      const ii = i + a, jj = j + b;
+      if (ii < 0 || jj < 0 || ii >= nx || jj >= nz || blk[jj * nx + ii]) near = Math.min(near, Math.max(Math.abs(a), Math.abs(b)));
+    }
+    cost[j * nx + i] = near <= 1 ? 6 : near === 2 ? 1.5 : 0;
+  }
+  return { F, nx, nz, blk, cost };
+});
+function navIdx(N, x, z) {
+  const i = Math.floor(x - N.F.x0), j = Math.floor(z - N.F.z0);
+  if (i < 0 || j < 0 || i >= N.nx || j >= N.nz) return -1;
+  return j * N.nx + i;
+}
+function nearestFree(N, x, z) {
+  const c = navIdx(N, x, z);
+  if (c >= 0 && !N.blk[c]) return c;
+  for (let r = 1; r <= 4; r++) for (let b = -r; b <= r; b++) for (let a = -r; a <= r; a++) {
+    const k = navIdx(N, x + a, z + b);
+    if (k >= 0 && !N.blk[k]) return k;
+  }
+  return -1;
+}
+function clearLine(N, a, b) {
+  const d = Math.hypot(b.x - a.x, b.z - a.z), steps = Math.ceil(d / .4);
+  for (let s = 1; s < steps; s++) {
+    const k = navIdx(N, a.x + (b.x - a.x) * s / steps, a.z + (b.z - a.z) * s / steps);
+    if (k < 0 || N.blk[k] || N.cost[k] >= 6) return false;
+  }
+  return true;
+}
+const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
+function findPath(fi, from, to) {
+  const N = NAV[fi], s = nearestFree(N, from.x, from.z), goal = nearestFree(N, to.x, to.z);
+  if (s < 0 || goal < 0) return [];
+  if (s === goal) return [{ x: to.x, z: to.z }];
+  const total = N.nx * N.nz, gS = new Float32Array(total).fill(1e9), par = new Int32Array(total).fill(-1), closed = new Uint8Array(total);
+  const gx = goal % N.nx, gz = (goal / N.nx) | 0;
+  const h = k => { const dx = Math.abs(k % N.nx - gx), dz = Math.abs(((k / N.nx) | 0) - gz); return Math.max(dx, dz) + .414 * Math.min(dx, dz); };
+  const heap = [];
+  const push = (f, k) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => {
+    const top = heap[0], last = heap.pop();
+    if (heap.length) {
+      heap[0] = last; let i = 0;
+      for (;;) { const l = i * 2 + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; }
+    }
+    return top;
+  };
+  gS[s] = 0; push(h(s), s);
+  while (heap.length) {
+    const [, cur] = pop();
+    if (closed[cur]) continue;
+    if (cur === goal) break;
+    closed[cur] = 1;
+    const cx = cur % N.nx, cz = (cur / N.nx) | 0;
+    for (const [ox, oz, base] of DIRS) {
+      const nx = cx + ox, nz = cz + oz;
+      if (nx < 0 || nz < 0 || nx >= N.nx || nz >= N.nz) continue;
+      const ni = nz * N.nx + nx;
+      if (N.blk[ni] || closed[ni]) continue;
+      if (ox && oz && (N.blk[cz * N.nx + nx] || N.blk[nz * N.nx + cx])) continue;
+      const ng = gS[cur] + base * (1 + N.cost[ni]);
+      if (ng < gS[ni]) { gS[ni] = ng; par[ni] = cur; push(ng + h(ni), ni); }
+    }
+  }
+  if (par[goal] < 0) return [];
+  const cells = [];
+  for (let c = goal; c !== s && c >= 0; c = par[c]) cells.push({ x: N.F.x0 + c % N.nx + .5, z: N.F.z0 + ((c / N.nx) | 0) + .5 });
+  cells.reverse();
+  const last = cells[cells.length - 1];
+  if (!blocked(to.x, to.z)) { last.x = to.x; last.z = to.z; }
+  // Düz gidilebilen yerlerde köşeleri atla
+  const out = [];
+  let a = { x: from.x, z: from.z }, i = -1;
+  while (i < cells.length - 1) {
+    let j = i + 1;
+    while (j + 1 < cells.length && clearLine(N, a, cells[j + 1])) j++;
+    out.push(cells[j]); a = cells[j]; i = j;
+  }
+  return out;
+}
+
+// ---------- Ses ----------
+let actx = null, master = null, muted = false;
+function unlockAudio() {
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain(); master.gain.value = .9; master.connect(actx.destination);
+    } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume().catch(() => {});
+}
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+
+function beep(f, d, type = 'square', v = .12, slide = 0, delay = 0) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  o.connect(g).connect(master); o.start(t); o.stop(t + d + .02);
+}
+let noiseBuf = null;
+function noise(d, v = .2, from = 3000, to = 300, delay = 0) {
+  if (!actx || muted) return;
+  if (!noiseBuf) {
+    noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+    const ch = noiseBuf.getChannelData(0);
+    for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  }
+  const t = actx.currentTime + delay, src = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  src.buffer = noiseBuf; f.type = 'bandpass'; f.Q.value = 1.2;
+  f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + d);
+  g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+  src.connect(f).connect(g).connect(master); src.start(t); src.stop(t + d);
+}
+const sfx = {
+  click() { beep(700, .06, 'square', .08); },
+  scream(v = 1, delay = .08) {
+    if (!actx || muted) return;
+    const t = actx.currentTime + delay;
+    const o = actx.createOscillator(), lfo = actx.createOscillator(), lg = actx.createGain();
+    const f = actx.createBiquadFilter(), g = actx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(650, t);
+    o.frequency.exponentialRampToValueAtTime(950, t + .15);
+    o.frequency.exponentialRampToValueAtTime(220, t + 1.1);
+    lfo.frequency.value = 8; lg.gain.value = 30;
+    lfo.connect(lg).connect(o.frequency);
+    f.type = 'bandpass'; f.frequency.value = 1200; f.Q.value = 1.5;
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.4 * v, t + .05);
+    g.gain.setValueAtTime(.4 * v, t + .6); g.gain.exponentialRampToValueAtTime(.0001, t + 1.2);
+    o.connect(f).connect(g).connect(master);
+    o.start(t); lfo.start(t); o.stop(t + 1.25); lfo.stop(t + 1.25);
+  },
+  kill(v = 1, tongue = false) {
+    this.scream(v);
+    if (tongue) { noise(.35, .3 * v, 400, 2500); beep(180, .3, 'sine', .2 * v, 900); beep(900, .2, 'sine', .15 * v, 150, .3); }
+    else noise(.18, .35 * v, 6000, 1500);
+    beep(520, .35, 'sawtooth', .12 * v, 140, .05);
+    beep(70, .4, 'sine', .3 * v, 40, .12);
+  },
+  died(tongue) {
+    this.kill(1, tongue);
+    [[196, 'sawtooth'], [233, 'sawtooth'], [98, 'square']].forEach(([f, ty]) => beep(f, 1.6, ty, .08, f * .6, .35));
+  },
+  taskTick() { beep(1200 + Math.random() * 300, .04, 'square', .05); },
+  task() { [784, 988, 1175, 1568].forEach((f, i) => beep(f, .16, 'triangle', .14, 0, i * .08)); },
+  alarm() { for (let i = 0; i < 4; i++) beep(600, .32, 'sawtooth', .1, 1100, i * .34); },
+  vote() { beep(500, .08, 'square', .1, 800); },
+  eject() { noise(1.2, .25, 400, 3000); beep(300, 1.2, 'sine', .15, 60, .1); },
+  world() { noise(.5, .12, 800, 6000); [523, 784, 1046, 1568].forEach((f, i) => beep(f, .2, 'sine', .12, 0, i * .06)); },
+  killReady() { beep(300, .15, 'square', .08, 180); beep(180, .25, 'square', .06, 120, .12); },
+  revealKiller() { beep(110, 1.4, 'sawtooth', .1, 55); beep(165, 1.4, 'sawtooth', .06, 82, .1); },
+  revealCrew() { [523, 659, 784].forEach((f, i) => beep(f, .5, 'triangle', .1, 0, i * .12)); },
+  step() { noise(.05, .04, 900, 500); },
+  shh() { noise(1.1, .18, 5000, 3500, .1); beep(80, .6, 'sine', .3, 40); },
+  lightsOff() { beep(400, 1, 'sawtooth', .12, 40); noise(.3, .2, 1200, 200); },
+  lightsOn() { beep(60, .6, 'sawtooth', .1, 300); [523, 784].forEach((f, i) => beep(f, .15, 'triangle', .1, 0, .5 + i * .1)); },
+  vent() { noise(.25, .3, 300, 120); noise(.4, .15, 2000, 400, .2); beep(140, .3, 'square', .08, 60, .05); },
+  win() { [523, 659, 784, 1046, 784, 1046, 1318].forEach((f, i) => beep(f, i === 6 ? .6 : .18, 'triangle', .15, 0, i * .13)); },
+  lose() { [392, 370, 349, 294].forEach((f, i) => beep(f, i === 3 ? .9 : .35, 'sawtooth', .1, i === 3 ? 220 : 0, i * .38)); },
+  ding() { beep(1318, .5, 'sine', .14); beep(1046, .7, 'sine', .14, 0, .25); },
+  elevator() { beep(90, 1.6, 'sawtooth', .05, 140, .5); this.ding(); },
+  pawn() { [392, 523, 659, 784, 1046].forEach((f, i) => beep(f, .14, 'square', .07, 0, i * .05)); },
+};
+function toggleMute() { muted = !muted; toast(muted ? 'Ses kapalı (N)' : 'Ses açık (N)'); }
+
+// ---------- Oyun durumu ----------
+// Her rengin kendi adı var ve bu adlar hiçbir dünyada / oyunda değişmez.
+const ROSTER = [
+  { name: 'Mahunched', color: 0xe53935, pawn: 0xd4af37 },
+  { name: 'Dulutsoy İpek', color: 0x14308f, pawn: 0xf3ead2, home: 0 },
+  { name: 'Gece', color: 0x1c1c22, pawn: 0xff6f61, home: 0 },
+  { name: 'Pamuk', color: 0xff8ccf, pawn: 0x00a86b, home: 0 },
+  { name: 'Fıstık', color: 0x1fa64a, pawn: 0xb57edc, home: 0 },
+  { name: 'Limon', color: 0xf2d40c, pawn: 0x2b59c3, home: 0 },
+  { name: 'Havuç', color: 0xff8a1c, pawn: 0x40e0d0, home: 0 },
+  { name: 'Patlıcan', color: 0x8b45d6, pawn: 0x9acd32, home: 0 },
+  { name: 'Kar', color: 0xe9eef2, pawn: 0x8b0000, home: 1 },
+  { name: 'Buz', color: 0x2fe0d8, pawn: 0xff8c00, home: 1 },
+  { name: 'Kakao', color: 0x7a4a26, pawn: 0xff1493, home: 1 },
+];
+const TEAM = 'TİT';
+let state = 'menu', roleShown = false;
+let player = null, ipek = null, pet = null, npcs = [], corpses = [], isKiller = false, killCd = 0, revealT = 0, caughtT = -1, witnessName = '';
+let actionHeld = false, actionPressed = false, vipOpen = false, mapBig = false, pawnMode = store.get('amangasPawn', false);
+let npcButtonT = 90, npcMeetsLeft = 1, ipekFollowT = 0, deadT = 0;
+let outfit = Object.assign({ pet: false, white: false, head: null }, store.get('amangasOutfit', {}));
+const keys = new Set();
+const joy = { x: 0, z: 0 };
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+const who = e => (e === player ? 'Sen' : e.name);
+
+function makeNpc(r, i) {
+  const c = makeCrew(r.color, r.pawn);
+  const n = Object.assign(c, {
+    name: r.name, color: r.color, pawnColor: r.pawn, home: r.home || 0, alive: true, ghost: false,
+    path: [], wait: Math.random() * 2, travel: null, stuck: 0, impostor: false, killTimer: 0, prey: null, huntT: 0, repathT: 0,
+    sus: new Map(), reportT: 0, reportCorpse: null, goButton: false, followT: 0, idx: i,
+  });
+  n.label = makeLabel(r.name + (i === 1 ? ` [${TEAM}]` : ''), i === 1 ? '#9fb4ff' : '#ffffff');
+  n.label.position.y = 2.95; n.g.add(n.label);
+  return n;
+}
+
+function clearRound() {
+  if (lightsOut) { lightsOut = false; applyLights(); }
+  [player, pet, ...npcs].forEach(e => e && scene.remove(e.g));
+  corpses.forEach(c => scene.remove(c));
+  npcs = []; corpses = []; player = null; ipek = null; pet = null;
+  closeVip(); setMapBig(false); endMeetingVisuals();
+  $('ejectHud').hidden = true; $('elev').hidden = true; $('meetHud').hidden = true;
+}
+
+function ringAround(list, cx, cz, r) {
+  list.forEach((e, i) => {
+    const a = (i / list.length) * Math.PI * 2 + Math.PI / 2;
+    e.g.position.set(cx + Math.cos(a) * r, 0, cz + Math.sin(a) * r);
+    e.g.rotation.y = Math.atan2(cx - e.g.position.x, cz - e.g.position.z);
+  });
+}
+
+function newRound() {
+  clearRound();
+  isKiller = Math.random() < 1 / 3;
+  player = Object.assign(makeCrew(ROSTER[0].color, ROSTER[0].pawn), { name: ROSTER[0].name, isPlayer: true, alive: true, ghost: false, color: ROSTER[0].color, pawnColor: ROSTER[0].pawn });
+  player.label = makeLabel(`Mahunched [${TEAM}]`, '#ffd23a'); player.g.add(player.label);
+  player.g.position.set(0, 0, 3);
+  npcs = ROSTER.slice(1).map((r, i) => makeNpc(r, i + 1));
+  ipek = npcs[0];
+  ringAround(npcs.filter(n => n.home === 0), BUTTON.x, BUTTON.z, 3.4);
+  ringAround(npcs.filter(n => n.home === 1), 185, -14, 2.2);
+  ipek.g.position.set(1.4, 0, 3.4);
+  if (!isKiller) {
+    const imp = rnd(npcs.filter(n => n !== ipek && n.home === 0));
+    imp.impostor = true; imp.killTimer = 20 + Math.random() * 6;
+  }
+  applyOutfit();
+  killCd = 10;
+  caughtT = -1;
+  meetingsLeft = 1; sabCd = 15; npcSabT = 40 + Math.random() * 20;
+  npcButtonT = 80 + Math.random() * 40; npcMeetsLeft = 1; ipekFollowT = 0;
+  lightsOut = false; applyLights();
+  TASKS.forEach(t => {
+    t.done = false; t.progress = 0;
+    t.ring.visible = t.gem.visible = !isKiller;
+    t.ring.material.color.set(0xffc928); t.gem.material.color.set(0xffc928); t.gem.material.emissive.set(0xffaa00);
+  });
+  $('revealTitle').textContent = isKiller ? 'KATİLSİN!' : 'MASUMSUN';
+  $('revealTitle').className = isKiller ? 'role-killer' : 'role-crew';
+  $('revealText').textContent = isKiller
+    ? 'Herkesi tek tek yakala: bazen bıçakla, bazen dilinle! Ama dikkat et, yakında başka biri varsa seni görür. 2. kattakileri unutma, asansör doğuda.'
+    : 'Sarı yerlerdeki görevleri yap. Aranızda gizli bir katil var. Ceset bulursan R, şüphelenirsen kafeteryadaki kırmızı düğme!';
+  $('shh').hidden = false; $('roleCard').hidden = true;
+  show('reveal');
+  state = 'reveal'; revealT = 4.3; roleShown = false;
+  sfx.shh();
+}
+
+function show(id) {
+  ['menu', 'reveal', 'dead', 'end'].forEach(s => { $(s).hidden = s !== id; });
+  $('hud').hidden = !(id === null || id === 'reveal');
+  $('touch').hidden = id !== null;
+}
+
+// ---------- VIP dolabı (Ü) ----------
+const OUTFITS = [
+  { k: 'pet', icon: '👶', name: 'Bizi takip eden bebek amongus' },
+  { k: 'arrow', icon: '🏹', name: 'Kafadan geçmiş ok' },
+  { k: 'white', icon: '🥼', name: 'Beyaz üniforma' },
+  { k: 'alien', icon: '👽', name: 'Kafaya yapışmış uzaylı' },
+  { k: 'cone', icon: '🚧', name: 'Kafada duba' },
+];
+const isOn = k => k === 'pet' ? outfit.pet : k === 'white' ? outfit.white : outfit.head === k;
+function renderVip() {
+  const grid = $('vipGrid');
+  grid.innerHTML = '';
+  OUTFITS.forEach(o => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'outfit' + (isOn(o.k) ? ' on' : '');
+    b.innerHTML = `<b>${o.icon}</b>${o.name}`;
+    b.addEventListener('click', () => toggleOutfit(o.k));
+    grid.appendChild(b);
+  });
+}
+function toggleOutfit(k) {
+  if (k === 'pet') outfit.pet = !outfit.pet;
+  else if (k === 'white') outfit.white = !outfit.white;
+  else outfit.head = outfit.head === k ? null : k;
+  store.set('amangasOutfit', outfit);
+  sfx.click();
+  applyOutfit(); renderVip();
+}
+function toggleVip() {
+  if (vipOpen) { closeVip(); return; }
+  if (state !== 'play') return;
+  vipOpen = true; keys.clear(); actionHeld = false;
+  renderVip(); $('vip').hidden = false;
+}
+function closeVip() { vipOpen = false; $('vip').hidden = true; }
+
+function outfitMesh(kind) {
+  const g = new THREE.Group();
+  const M = (geo, material, x, y, z) => { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+  if (kind === 'cone') {
+    const orange = mat(0xff6a00, { roughness: .5 }), white = mat(0xffffff, { roughness: .4 });
+    M(new THREE.BoxGeometry(1, .1, 1), mat(0xe05500), 0, 2.33, 0);
+    M(new THREE.ConeGeometry(.42, 1.05, 28), orange, 0, 2.88, 0);
+    M(new THREE.CylinderGeometry(.22, .28, .16, 28), white, 0, 2.78, 0);
+    M(new THREE.CylinderGeometry(.11, .16, .13, 28), white, 0, 3.1, 0);
+  } else if (kind === 'arrow') {
+    const wood = mat(0x8a5a2a);
+    const a = new THREE.Group(); a.position.y = 1.9; a.rotation.z = .18; g.add(a);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, 2.1, 8), wood); shaft.rotation.z = Math.PI / 2; a.add(shaft);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(.12, .32, 8), mat(0xb8c0c8, { metalness: .8, roughness: .2 }));
+    tip.rotation.z = -Math.PI / 2; tip.position.x = 1.2; a.add(tip);
+    [-1, 1].forEach(s => {
+      const f = new THREE.Mesh(new THREE.BoxGeometry(.32, .02, .2), mat(0xe53935)); f.position.set(-.95, 0, s * .08); f.rotation.x = s * .6; a.add(f);
+    });
+    a.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  } else if (kind === 'alien') {
+    const green = mat(0x6fe36a, { roughness: .35 }), eyeW = shineMat, eyeB = new THREE.MeshBasicMaterial({ color: 0x111111 });
+    M(new THREE.SphereGeometry(.5, 24, 16), green, 0, 2.3, 0).scale.set(1.05, .55, 1.05);
+    [[-.2, 2.48, .32], [.2, 2.48, .32], [0, 2.58, .28]].forEach(([x, y, z]) => {
+      M(new THREE.SphereGeometry(.11, 12, 10), eyeW, x, y, z);
+      M(new THREE.SphereGeometry(.05, 8, 8), eyeB, x, y, z + .09);
+    });
+    [[.55, 0, -.6], [-.55, 0, .6], [0, .55, .6], [0, -.55, -.6]].forEach(([x, z, r]) => {
+      const t = M(new THREE.CylinderGeometry(.08, .04, .8, 8), green, x, 1.95, z);
+      if (x) t.rotation.z = r; else t.rotation.x = r;
+    });
+  } else if (kind === 'belt') {
+    const b = M(new THREE.TorusGeometry(.63, .07, 8, 32), mat(player.color), 0, 1.0, 0); b.rotation.x = Math.PI / 2;
+    M(new THREE.BoxGeometry(.22, .18, .06), mat(0xffd23a, { metalness: .7 }), .25, 1.0, .62);
+  }
+  return g;
+}
+function applyOutfit() {
+  if (!player) return;
+  if (player.outfitG) player.g.remove(player.outfitG);
+  const og = new THREE.Group(); player.g.add(og); player.outfitG = og;
+  if (outfit.head) og.add(outfitMesh(outfit.head));
+  if (outfit.white) og.add(outfitMesh('belt'));
+  player.bodyMat.color.setHex(outfit.white ? 0xf4f6f8 : player.color);
+  if (outfit.pet && !pet) {
+    pet = makeCrew(player.color, player.pawnColor);
+    pet.g.scale.setScalar(.45);
+    pet.g.position.set(player.g.position.x - 1.3, 0, player.g.position.z + .8);
+    if (player.ghost) makeGhost(pet);
+  } else if (!outfit.pet && pet) { scene.remove(pet.g); pet = null; }
+  const vip = outfit.pet || outfit.white || outfit.head;
+  setLabel(player.label, `${vip ? '👑 ' : ''}Mahunched [${TEAM}]`, '#ffd23a');
+  player.label.position.y = outfit.head === 'cone' ? 3.75 : outfit.head === 'alien' ? 3.2 : 2.95;
+  if (player.ghost) makeGhost(player);
+}
+
+// ---------- M: piyon modu ----------
+function applyPawn(e) { if (e) { e.body.visible = !pawnMode; e.pawn.visible = pawnMode; } }
+function togglePawn() {
+  pawnMode = !pawnMode;
+  store.set('amangasPawn', pawnMode);
+  [player, pet, ...npcs, ejFig].forEach(applyPawn);
+  corpses.forEach(c => { c.userData.crewPart.visible = !pawnMode; c.userData.pawnPart.visible = pawnMode; });
+  sfx.pawn();
+  toast(pawnMode ? '♟ PİYON MODU AÇIK! Herkes 3 boyutlu piyon oldu (M ile kapat)' : 'Piyon modu kapandı, herkes amongus!');
+}
+
+// ---------- H: büyük harita ----------
+const mm = $('minimap'), mctx = mm.getContext('2d');
+function sizeMap() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  let w;
+  if (mapBig) w = Math.min(window.innerWidth * .94, window.innerHeight * .86 * 1.5);
+  else w = matchMedia('(pointer: coarse)').matches ? 132 : 180;
+  const h = w / 1.5;
+  mm.style.width = w + 'px'; mm.style.height = h + 'px';
+  mm.width = Math.round(w * dpr); mm.height = Math.round(h * dpr);
+}
+function setMapBig(v) {
+  if (mapBig === v) return;
+  mapBig = v;
+  mm.classList.toggle('big', v);
+  sizeMap(); drawMinimap();
+}
+
+// ---------- Rapor ve toplantı ----------
+function nearestCorpse() {
+  if (!player || !player.alive) return null;
+  let best = null, bd = 2.5;
+  corpses.forEach(c => {
+    const d = Math.hypot(c.position.x - player.g.position.x, c.position.z - player.g.position.z);
+    if (d < bd) { bd = d; best = c; }
+  });
+  return best;
+}
+
+function report() {
+  if (state !== 'play' || !player.alive) return;
+  const c = nearestCorpse();
+  const emergency = !c && nearButton() && meetingsLeft > 0;
+  if (!c && !emergency) return;
+  if (emergency) meetingsLeft--;
+  callMeeting(player, c);
+}
+
+// Toplantı: herkes etrafını sarar, birine dokunursan ona oy atmış olursun, altında kaç oy aldığı yazar.
+const MC = { x: 0, z: 7 };
+let meeting = null;
+const CHATTER = ['Ben görevlerimi yapıyordum!', 'Kim yaptı bunu?!', 'Ben kesinlikle masumum.', 'Bence geçelim.', 'Ben 2. kattaydım.',
+  'Asansörün oradaydım.', 'Depoda kutu sayıyordum.', 'Biri çok şüpheli...'];
+function callMeeting(caller, corpse) {
+  if (state !== 'play') return;
+  restoreLights(false);
+  closeVip(); setMapBig(false);
+  state = 'meeting';
+  keys.clear(); actionHeld = false; joy.x = joy.z = 0;
+  sfx.alarm();
+  toastTimer = 0; $('toast').style.opacity = 0;
+  const corpseName = corpse ? corpse.userData.name : null;
+  corpses.forEach(o => scene.remove(o));
+  corpses = [];
+  const ring = aliveNpcs();
+  player.g.position.set(MC.x, 0, MC.z); player.g.rotation.y = 0;
+  if (pet) pet.g.position.set(MC.x - 1, 0, MC.z + .9);
+  ring.forEach((n, i) => {
+    const a = -Math.PI / 2 + (i / ring.length) * Math.PI * 2;
+    n.g.position.set(MC.x + Math.cos(a) * 4.8, 0, MC.z + Math.sin(a) * 4.2);
+    n.g.rotation.y = Math.atan2(MC.x - n.g.position.x, MC.z - n.g.position.z);
+    n.path = []; n.travel = null; n.prey = null; n.reportT = 0; n.goButton = false;
+    animateWalk(n, false, 0);
+  });
+  const parts = [...(player.alive ? [player] : []), ...ring];
+  meeting = { parts, votes: new Map(), voted: new Map(), skips: 0, t: 25, done: false, endT: 0, labels: new Map(), queue: [], elapsed: 0, pick: null };
+  parts.forEach(p => {
+    const s = makeLabel('0 oy', '#ffc928', 'rgba(0,0,0,.55)'); s.scale.set(2.4, .6, 1);
+    scene.add(s); meeting.labels.set(p, s);
+    p.voteAt = 3 + Math.random() * 10;
+  });
+  if (ipek.alive) ipek.voteAt = 9 + Math.random() * 3;
+  // Sohbet
+  const q = meeting.queue;
+  q.push({ at: .3, text: corpse ? `📢 ${who(caller)} ${corpseName} karakterinin cesedini buldu!` : `🚨 ${who(caller)} kırmızı düğmeye bastı!` });
+  let at = 1.4;
+  ring.forEach(n => {
+    if (n.impostor) {
+      if (Math.random() < .5) { const opts = parts.filter(o => o !== n); n.accuse = rnd(opts); q.push({ at: at += 1.1, text: `${n.name}: Bence ${who(n.accuse) === 'Sen' ? 'Mahunched' : n.accuse.name} çok şüpheli!` }); }
+      else n.accuse = null;
+      return;
+    }
+    const s = topSus(n, parts);
+    if (s) q.push({ at: at += 1.1, text: `${n.name}: ${s === player ? 'Mahunched' : s.name}'i ceset yakınlarında gördüm! 👀` });
+    else if (n === ipek && player.alive) q.push({ at: at += 1.1, text: `${n.name}: Ben Mahunched'e güveniyorum! 💙` });
+    else if (Math.random() < .35) q.push({ at: at += 1.1, text: `${n.name}: ${rnd(CHATTER)}` });
+  });
+  $('meetTitle').textContent = corpse ? 'CESET BULUNDU!' : 'ACİL TOPLANTI!';
+  $('meetText').textContent = corpse ? `${corpseName} öldürüldü. Katil kim?` : 'Herkes masanın başına toplandı.';
+  $('chat').innerHTML = '';
+  $('skipBtn').hidden = !player.alive;
+  show('none');
+  $('meetHud').hidden = false;
+  updateMeetHint();
+}
+function topSus(n, parts) {
+  let best = null, bv = 0;
+  n.sus.forEach((v, e) => { if (v > bv && parts.includes(e) && e !== n) { bv = v; best = e; } });
+  return best;
+}
+function updateMeetHint() {
+  const m = meeting;
+  $('meetHint').textContent = !player.alive ? 'Hayaletler oy veremez 👻 İzle bakalım!'
+    : m.voted.has(player) ? (m.pick === 'skip' ? 'Oy vermedin.' : `Oyunu ${m.pick.name} için verdin ✔`)
+    : 'Oy vermek için bir amongusa dokun!';
+}
+function castVote(voter, target) {
+  const m = meeting;
+  if (!m || m.done || m.voted.has(voter)) return;
+  m.voted.set(voter, target);
+  if (target === 'skip') m.skips++;
+  else {
+    m.votes.set(target, (m.votes.get(target) || 0) + 1);
+    const s = m.labels.get(target);
+    if (s) setLabel(s, `${m.votes.get(target)} oy`, '#ffc928', 'rgba(0,0,0,.55)');
+  }
+  sfx.vote();
+  if (voter === player) {
+    m.pick = target; $('skipBtn').hidden = true;
+    if (target !== 'skip') {
+      const ring = new THREE.Mesh(new THREE.RingGeometry(.85, 1.1, 32), new THREE.MeshBasicMaterial({ color: 0xffc928 }));
+      ring.rotation.x = -Math.PI / 2; ring.position.set(target.g.position.x, .04, target.g.position.z);
+      scene.add(ring); m.pickRing = ring;
+    }
+    updateMeetHint();
+    if (ipek.alive && !m.voted.has(ipek)) ipek.voteAt = Math.min(ipek.voteAt, m.elapsed + 1.2);
+  }
+}
+function botVote(n) {
+  const m = meeting, opts = m.parts.filter(o => o !== n);
+  if (!opts.length) return 'skip';
+  if (n === ipek) {   // İpek takım arkadaşı: senin oyunu takip eder, sana asla oy vermez
+    if (m.pick && m.pick !== 'skip' && m.pick !== n) return m.pick;
+    const s = topSus(n, m.parts);
+    if (s && s !== player) return s;
+    return Math.random() < .6 ? 'skip' : rnd(opts.filter(o => o !== player)) || 'skip';
+  }
+  if (n.impostor) return n.accuse && m.parts.includes(n.accuse) ? n.accuse : Math.random() < .5 ? 'skip' : rnd(opts);
+  const s = topSus(n, m.parts);
+  if (s && Math.random() < .8) return s;
+  let top = null, tv = 0;
+  m.votes.forEach((v, e) => { if (v > tv && e !== n) { tv = v; top = e; } });
+  if (top && tv >= 2 && Math.random() < .45) return top;
+  if (isKiller && player.alive && Math.random() < .12) return player;
+  return Math.random() < .55 ? 'skip' : rnd(opts);
+}
+function updateMeeting(dt) {
+  const m = meeting;
+  m.elapsed += dt; m.t -= dt;
+  while (m.queue.length && m.queue[0].at <= m.elapsed) {
+    const line = m.queue.shift(), chat = $('chat');
+    const d = document.createElement('div'); d.textContent = line.text; chat.appendChild(d);
+    while (chat.children.length > 4) chat.removeChild(chat.firstChild);
+  }
+  if (!m.done) {
+    m.parts.forEach(p => { if (p !== player && !m.voted.has(p) && m.elapsed >= p.voteAt) castVote(p, botVote(p)); });
+    if (m.t <= 0 || m.voted.size === m.parts.length) {
+      if (player.alive && !m.voted.has(player)) castVote(player, 'skip');
+      m.done = true; m.endT = 1.8;
+      $('meetHint').textContent = 'Oylar sayılıyor...';
+      $('skipBtn').hidden = true;
+    }
+  } else {
+    m.endT -= dt;
+    if (m.endT <= 0) resolveMeeting();
+  }
+  m.labels.forEach((s, p) => s.position.set(p.g.position.x, .35, p.g.position.z + 1.15));
+  $('meetTimer').textContent = m.done ? '' : `⏱ ${Math.max(0, Math.ceil(m.t))} sn · Oy verenler: ${m.voted.size}/${m.parts.length}`;
+}
+function meetingPick(clientX, clientY) {
+  const m = meeting;
+  if (!m || m.done || !player.alive || m.voted.has(player)) return;
+  let best = null, bd = 70;
+  const v = new THREE.Vector3();
+  m.parts.forEach(p => {
+    if (p === player) return;
+    v.set(p.g.position.x, 1.2, p.g.position.z).project(camera);
+    const sx = (v.x + 1) / 2 * window.innerWidth, sy = (1 - v.y) / 2 * window.innerHeight;
+    const d = Math.hypot(sx - clientX, sy - clientY);
+    if (d < bd) { bd = d; best = p; }
+  });
+  if (best) castVote(player, best);
+}
+function endMeetingVisuals() {
+  if (!meeting) return;
+  meeting.labels.forEach(s => { scene.remove(s); s.material.map.dispose(); s.material.dispose(); });
+  if (meeting.pickRing) scene.remove(meeting.pickRing);
+  meeting = null;
+}
+function resolveMeeting() {
+  const m = meeting;
+  let top = null, tv = 0, tie = false;
+  m.votes.forEach((v, e) => { if (v > tv) { top = e; tv = v; tie = false; } else if (v === tv) tie = true; });
+  const out = top && !tie && tv > m.skips ? top : null;
+  endMeetingVisuals();
+  $('meetHud').hidden = true;
+  startEject(out);
+}
+
+// ---------- Uzaya atılma: 10 saniye uzayda uçarken görürüz ----------
+let ejT = 0, ejDur = 10, ejEnt = null, ejFig = null;
+{
+  const n = 1800, pos = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - .5) * 160; pos[i * 3 + 1] = (Math.random() - .5) * 90; pos[i * 3 + 2] = -10 - Math.random() * 100; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  var ejStars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: .35 }));
+  spaceScene.add(ejStars);
+  const planet = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 20), mat(0xd06a3a, { emissive: 0x3a1408, roughness: 1 }));
+  planet.position.set(18, -9, -30); spaceScene.add(planet);
+}
+function startEject(ent) {
+  state = 'eject'; ejT = 0; ejEnt = ent; ejDur = ent ? 10 : 3.5;
+  if (ejFig) { spaceScene.remove(ejFig.g); ejFig = null; }
+  if (ent) {
+    ejFig = makeCrew(ent.color, ent.pawnColor, spaceScene);
+    if (ent === player && outfit.white) ejFig.bodyMat.color.setHex(0xf4f6f8);
+    applyPawn(ejFig);
+    sfx.eject();
+  }
+  $('ejText').textContent = ''; $('ejText').className = ''; $('ejSub').textContent = ''; $('ejCount').textContent = '';
+  $('ejectHud').hidden = false;
+}
+function ejectMessage() {
+  if (!ejEnt) return 'Kimse atılmadı.';
+  const nm = ejEnt === player ? 'Mahunched (sen)' : ejEnt.name;
+  return (ejEnt === player ? isKiller : ejEnt.impostor) ? `${nm} KATİLDİ!` : `${nm} katil değildi.`;
+}
+function updateEject(dt) {
+  ejT += dt;
+  const k = ejT / ejDur;
+  if (ejFig) {
+    ejFig.g.position.set(-15 + 30 * k, 1 + Math.sin(ejT * 1.3) * .8, 0);
+    ejFig.g.rotation.z += dt * 1.6; ejFig.g.rotation.y += dt * .9;
+    ejFig.g.position.y -= 1.2;
+  }
+  ejStars.position.x = -ejT * 2;
+  const msg = ejectMessage();
+  const shown = msg.slice(0, Math.floor(ejT * 12));
+  const el = $('ejText');
+  if (el.textContent !== shown) el.textContent = shown;
+  el.className = ejEnt && (ejEnt === player ? isKiller : ejEnt.impostor) ? 'imp' : '';
+  if (shown.length === msg.length && ejEnt) {
+    const left = (ejEnt === player ? 0 : (isKiller ? 1 : 0)) + npcs.filter(n => n.impostor && n.alive && n !== ejEnt).length;
+    $('ejSub').textContent = `Kalan katil: ${left}`;
+  } else if (!ejEnt && ejT > 1.2) $('ejSub').textContent = 'Oylar eşit çıktı ya da herkes geçti.';
+  $('ejCount').textContent = `${Math.max(0, Math.ceil(ejDur - ejT))}`;
+  if (ejT >= ejDur) finishEject();
+}
+function finishEject() {
+  $('ejectHud').hidden = true;
+  if (ejFig) { spaceScene.remove(ejFig.g); ejFig = null; }
+  const e = ejEnt; ejEnt = null;
+  if (e === player) {
+    if (isKiller) { state = 'play'; show(null); endGame(false, 'YAKALANDIN!', 'Toplantıda en çok oyu sen aldın ve uzaya atıldın. Katil olduğun anlaşıldı!'); return; }
+    player.alive = false; makeGhost(player); if (pet) makeGhost(pet);
+    toast('Uzaya atıldın! Artık bir hayaletsin 👻');
+  } else if (e) {
+    e.alive = false; makeGhost(e);
+    npcs.forEach(n => n.sus.delete(e));
+  }
+  state = 'play';
+  show(null);
+  if (checkWin()) return;
+  // Herkes toplantı masasına döner
+  const group = [player, ...aliveNpcs()];
+  ringAround(group, BUTTON.x, BUTTON.z, 3.2);
+  if (pet) pet.g.position.set(player.g.position.x - 1, 0, player.g.position.z + 1);
+  npcs.forEach(n => { n.path = []; n.wait = Math.random() * 1.5; if (n.impostor) { n.killTimer = 15 + Math.random() * 6; n.prey = null; } });
+  killCd = 10;
+  drawHud();
+}
+
+function toMenu() { clearRound(); state = 'menu'; show('menu'); menuCrew(); exitFull(); }
+
+// Oyun sırasında ekranda sadece oyun görünsün: tam ekran
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function enterFull() {
+  if (fsEl()) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) { /* tam ekran desteklenmiyor */ }
+}
+function exitFull() {
+  if (!fsEl()) return;
+  const ex = document.exitFullscreen || document.webkitExitFullscreen;
+  try { const r = ex.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) { /* yok say */ }
+}
+function toggleFull() { fsEl() ? exitFull() : enterFull(); }
+
+function startGame() {
+  enterFull();
+  unlockAudio();
+  newRound();
+}
+
+let toastTimer = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; toastTimer = 2.8; }
+function flash() { const f = $('flash'); f.style.transition = 'none'; f.style.opacity = .45; requestAnimationFrame(() => { f.style.transition = ''; f.style.opacity = 0; }); }
+
+function doKill(killer, victim) {
+  const tongue = Math.random() < .35;   // bazen bıçak yerine ağzını açıp diliyle
+  victim.alive = false;
+  const p = victim.g.position, kp = killer.g.position;
+  const body = makeCorpse(victim === player && outfit.white ? 0xf4f6f8 : victim.color, victim.pawnColor, p.x, p.z, victim.g.rotation.y);
+  body.userData.name = victim === player ? 'Mahunched' : victim.name;
+  corpses.push(body);
+  if (tongue) {
+    let dx = kp.x - p.x, dz = kp.z - p.z;
+    const d = Math.hypot(dx, dz) || 1; dx /= d; dz /= d;
+    if (!blocked(p.x + dx * 2.2, p.z + dz * 2.2)) kp.set(p.x + dx * 2.2, kp.y, p.z + dz * 2.2);
+    killer.g.rotation.y = Math.atan2(p.x - kp.x, p.z - kp.z);
+    killer.tongueLen = Math.max(.6, Math.hypot(p.x - kp.x, p.z - kp.z) - .4);
+    killer.tongueT = 1;
+  } else {
+    if (!blocked(p.x + .9, p.z)) kp.set(p.x + .9, kp.y, p.z);
+    killer.g.rotation.y = -Math.PI / 2;  // kurbana dön
+    killer.knifeT = 1.2;
+  }
+  if (!killer.isPlayer) killer.wait = 1.2;
+  // Yakındakiler katili ceset civarında görmüş olabilir (toplantıda söylerler)
+  aliveNpcs().forEach(n => {
+    if (n === killer || fl(n) !== floorOf(p.x)) return;
+    if (Math.hypot(n.g.position.x - p.x, n.g.position.z - p.z) < 15) n.sus.set(killer, (n.sus.get(killer) || 0) + 1);
+  });
+  if (victim.isPlayer) {
+    flash();
+    sfx.died(tongue);
+    if (checkWin()) return;
+    state = 'dead'; deadT = 0;
+    $('deadText').textContent = `Seni ${killer.name} ${tongue ? 'ağzını açıp diliyle' : 'bıçakla'} yakaladı! Artık kimse seni göremez ama sen kendini görebilirsin. Görevlerini yapmaya devam et, belki takımın katili bulur!`;
+    makeGhost(player); if (pet) makeGhost(pet);
+    setTimeout(() => { if (state === 'dead') show('dead'); }, 1400);
+    return;
+  }
+  makeGhost(victim);
+  if (!isKiller) {
+    sfx.kill(Math.max(.25, 1 - dist(player, killer) / 40), tongue);
+    if (fl(player) === floorOf(p.x)) toast(`${victim.name} öldürüldü!`);
+  } else {
+    sfx.kill(1, tongue);
+  }
+  checkWin();
+}
+function continueAsGhost() {
+  if (state !== 'dead') return;
+  state = 'play'; show(null); drawHud();
+  toast('Hayaletsin 👻 Duvarlardan geçebilirsin!');
+}
+
+function aliveNpcs() { return npcs.filter(n => n.alive); }
+
+function witnesses(victim, killer) {
+  const f = fl(victim);
+  return aliveNpcs().filter(n => n !== victim && n !== killer && fl(n) === f && dist(n, victim) < seeR());
+}
+
+function checkWin() {
+  if (state === 'over' || !player) return state === 'over';
+  if (isKiller) {
+    if (!aliveNpcs().length) { endGame(true, 'KAZANDIN!', 'Kimse seni yakalayamadan herkesi yakaladın. Fabrikanın tek sahibi sensin!'); return true; }
+    return false;
+  }
+  const imp = npcs.find(n => n.impostor);
+  if (imp && !imp.alive) { endGame(true, 'KAZANDIN!', `${imp.name} katildi ve uzaya atıldı. Fabrika kurtuldu! Takım ${TEAM} kazandı!`); return true; }
+  const crewAlive = npcs.filter(n => n.alive && !n.impostor).length + (player.alive ? 1 : 0);
+  if (crewAlive <= 1) { endGame(false, 'KATİL KAZANDI!', `${imp.name} neredeyse herkesi yakaladı. Katil oydu!`); return true; }
+  if (TASKS.every(t => t.done)) { endGame(true, 'KAZANDIN!', `Bütün 32 görevi bitirdin! Katil ${imp.name} idi. Fabrika kurtuldu!`); return true; }
+  return false;
+}
+
+function endGame(win, title, text) {
+  state = 'over';
+  closeVip(); setMapBig(false);
+  $('endTitle').textContent = title;
+  $('endTitle').className = win ? 'win-title' : 'dead-title';
+  $('endText').textContent = text;
+  win ? sfx.win() : sfx.lose();
+  setTimeout(() => show('end'), 600);
+}
+
+// ---------- Hareket / yapay zekâ ----------
+function animateWalk(e, moving, dt) {
+  e.walk = moving ? e.walk + dt * 11 : 0;
+  const s = Math.sin(e.walk) * .7;
+  e.legL.rotation.x = s; e.legR.rotation.x = -s;
+  e.pawn.rotation.z = moving ? Math.sin(e.walk) * .08 : 0;
+  e.g.position.y = moving ? Math.abs(Math.sin(e.walk)) * (pawnMode ? .18 : .08) : 0;
+}
+function face(e, dx, dz, dt) {
+  const target = Math.atan2(dx, dz);
+  let diff = target - e.g.rotation.y;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  e.g.rotation.y += diff * Math.min(1, dt * 12);
+}
+
+function updatePlayer(dt) {
+  let dx = 0, dz = 0;
+  if (!vipOpen) {
+    if (keys.has('ArrowUp')) dz -= 1;
+    if (keys.has('ArrowDown')) dz += 1;
+    if (keys.has('ArrowLeft')) dx -= 1;
+    if (keys.has('ArrowRight')) dx += 1;
+    dx += joy.x; dz += joy.z;
+  }
+  const len = Math.hypot(dx, dz);
+  if (len > .1) {
+    const s = (player.ghost ? 7 : 6) * dt / Math.max(1, len);
+    moveBy(player, dx * s, dz * s);
+    face(player, dx, dz, dt);
+  }
+  const stepBefore = Math.floor(player.walk / Math.PI);
+  animateWalk(player, len > .1, dt);
+  if (len > .1 && !player.ghost && Math.floor(player.walk / Math.PI) !== stepBefore) sfx.step();
+  // Asansöre doğru yürüyünce biner
+  const F = FLOORS[fl(player)], p = player.g.position;
+  if (p.x > F.cab - 2.8 && Math.abs(p.z) < 2.6) startElevator();
+}
+
+let elevT = 0, elevTo = 0, elevMoved = false;
+function startElevator() {
+  state = 'elevator'; elevT = 0; elevMoved = false; elevTo = 1 - fl(player);
+  keys.clear(); actionHeld = false; joy.x = joy.z = 0;
+  setMapBig(false); closeVip();
+  $('elevArrow').textContent = elevTo ? '⬆' : '⬇';
+  $('elevArrow').style.color = elevTo ? 'var(--ok)' : '#ffb020';
+  $('elevFloor').textContent = elevTo ? '2. KAT · OFİSLER' : '1. KAT · FABRİKA';
+  const el = $('elev'); el.hidden = true; void el.offsetWidth; el.hidden = false;
+  sfx.elevator();
+}
+function updateElevator(dt) {
+  elevT += dt;
+  if (!elevMoved && elevT > 1.1) {
+    elevMoved = true;
+    const ex = FLOORS[elevTo].exit;
+    player.g.position.set(ex.x, 0, ex.z); player.g.rotation.y = -Math.PI / 2;
+    camPos.set(ex.x, 13, ex.z + 11);
+    if (pet) pet.g.position.set(ex.x + 1, 0, ex.z + 1);
+    if (ipek.alive && fl(ipek) !== elevTo) ipekFollowT = 2.5;
+  }
+  if (elevT >= 2.4) { state = 'play'; $('elev').hidden = true; toast(FLOORS[elevTo].name); drawHud(); }
+}
+
+function goTravel(n, to) {
+  const f = fl(n), ex = FLOORS[f].exit, p = n.g.position;
+  n.travel = to;
+  if (Math.hypot(p.x - ex.x, p.z - ex.z) < 1.2) { arrive(n); return; }
+  n.path = findPath(f, p, ex);
+  if (!n.path.length) { n.travel = null; n.wait = 1; }
+}
+function pickTarget(n) {
+  const f = fl(n), p = n.g.position;
+  if (n.goButton && f === 0) { n.path = findPath(0, p, { x: BUTTON.x, z: BUTTON.z + 2.2 }); return; }
+  if (n.travel !== null) { goTravel(n, n.travel); return; }
+  if (n === ipek && player && Math.random() < .6) {   // İpek hep bizimle oynar
+    const pp = player.g.position;
+    if (fl(player) === f) {
+      const tx = pp.x + (Math.random() - .5) * 4, tz = pp.z + (Math.random() - .5) * 4;
+      n.path = findPath(f, p, { x: tx, z: tz });
+      if (n.path.length) return;
+    }
+  }
+  const want = Math.random() < (n.home === f ? .92 : .2) ? f : 1 - f;
+  if (want !== f && n !== ipek) { goTravel(n, want); return; }
+  const t = rnd(TASKS.filter(t => t.floor === f));
+  n.path = findPath(f, p, { x: t.x + (Math.random() - .5), z: t.z + .2 });
+  if (!n.path.length) n.wait = 1;
+}
+function arrive(n) {
+  if (n.travel !== null) {   // asansörle diğer kata
+    const to = n.travel, ex = FLOORS[to].exit;
+    n.travel = null;
+    n.g.position.set(ex.x - Math.random(), 0, ex.z + (Math.random() - .5) * 2);
+    n.wait = .4; n.path = [];
+    return;
+  }
+  n.wait = 1.5 + Math.random() * 3.5;
+}
+function followPath(n, dt, speed) {
+  const p = n.g.position, t = n.path[0];
+  const dx = t.x - p.x, dz = t.z - p.z, d = Math.hypot(dx, dz);
+  if (d < .3) { n.path.shift(); if (!n.path.length) arrive(n); return; }
+  const s = Math.min(d, speed * dt), bx = p.x, bz = p.z;
+  if (n.alive) moveBy(n, dx / d * s, dz / d * s); else { p.x += dx / d * s; p.z += dz / d * s; }
+  if (Math.hypot(p.x - bx, p.z - bz) < s * .3) {
+    n.stuck += dt;
+    if (n.stuck > .6) { n.stuck = 0; n.path = []; n.wait = .2; }
+  } else n.stuck = 0;
+  face(n, dx, dz, dt);
+  animateWalk(n, true, dt);
+}
+
+function updateNpc(n, dt) {
+  const p = n.g.position;
+  if (!n.alive) {   // hayaletler dolaşır
+    if (n.path.length) { followPath(n, dt, 1.8); return; }
+    animateWalk(n, false, dt);
+    if (n.wait > 0) { n.wait -= dt; return; }
+    const t = rnd(TASKS.filter(t => t.floor === fl(n)));
+    n.path = findPath(fl(n), p, t); n.wait = 2 + Math.random() * 4;
+    return;
+  }
+  const f = fl(n);
+  if (state === 'play' && player) {
+    // Ceset görürse rapor eder
+    if (!n.impostor && n.reportT <= 0) {
+      for (const c of corpses) {
+        if (floorOf(c.position.x) === f && Math.hypot(c.position.x - p.x, c.position.z - p.z) < seeR()) { n.reportT = 1; n.reportCorpse = c; break; }
+      }
+    }
+    if (n.reportT > 0) {
+      n.reportT -= dt; animateWalk(n, false, dt);
+      if (n.reportT <= 0 && corpses.includes(n.reportCorpse)) callMeeting(n, n.reportCorpse);
+      return;
+    }
+    if (n.goButton && f === 0 && Math.hypot(p.x - BUTTON.x, p.z - BUTTON.z) < 3) {
+      n.goButton = false; callMeeting(n, null); return;
+    }
+  }
+  let speed = 2.6, hunting = false;
+  if (n.impostor && state === 'play' && player) {
+    n.killTimer -= dt;
+    if (n.killTimer <= 0) {
+      if (!n.prey || !n.prey.alive || fl(n.prey) !== f) {
+        const opts = aliveNpcs().filter(o => o !== n && fl(o) === f);
+        const canPlayer = player.alive && fl(player) === f;
+        n.prey = canPlayer && (Math.random() < .5 || !opts.length) ? player : opts.length ? rnd(opts) : null;
+        n.huntT = 0; n.repathT = 0;
+        if (!n.prey && n.travel === null) {
+          const other = 1 - f;
+          if (aliveNpcs().some(o => o !== n && fl(o) === other) || (player.alive && fl(player) === other)) goTravel(n, other);
+        }
+      }
+      if (n.prey) {
+        hunting = true; speed = 4.2; n.huntT += dt; n.repathT -= dt;
+        if (n.repathT <= 0) { n.repathT = .5; n.path = findPath(f, p, n.prey.g.position); }
+        if (dist(n, n.prey) < 1.3 && witnesses(n.prey, n).length === 0) {
+          doKill(n, n.prey);
+          n.prey = null; n.killTimer = 15 + Math.random() * 8; n.path = [];
+          return;
+        }
+        if (n.huntT > 14) { n.prey = null; n.killTimer = 4; }
+      }
+    }
+  }
+  if (!hunting && n.wait > 0) { n.wait -= dt; animateWalk(n, false, dt); return; }
+  if (!n.path.length) { pickTarget(n); animateWalk(n, false, dt); return; }
+  followPath(n, dt, speed);
+}
+
+// Diğer amonguslar da arada bir kırmızı düğmeye basar
+function npcButtonTick(dt) {
+  if (npcMeetsLeft <= 0) return;
+  npcButtonT -= dt;
+  if (npcButtonT > 0) return;
+  npcButtonT = 9999;
+  const opts = aliveNpcs().filter(n => !n.impostor && fl(n) === 0 && n.sus.size);
+  const n = opts.length ? rnd(opts) : rnd(aliveNpcs().filter(n => !n.impostor && fl(n) === 0).concat([null]));
+  if (!n) { npcButtonT = 40; return; }
+  npcMeetsLeft--;
+  n.goButton = true; n.path = []; n.wait = 0; n.travel = null;
+}
+
+// ---------- Etkileşim ve HUD ----------
+let hudTimer = 0;
+function interact(dt) {
+  const prompt = $('prompt');
+  let html = '';
+  if (!isKiller) {
+    let best = null, bd = 2.2;
+    TASKS.forEach(t => {
+      if (t.done) return;
+      const d = Math.hypot(player.g.position.x - t.x, player.g.position.z - t.z);
+      if (d < bd) { bd = d; best = t; }
+    });
+    if (best) {
+      if (actionHeld) {
+        const before = best.progress;
+        best.progress = Math.min(1, best.progress + dt / 2.5);
+        if (Math.floor(before * 12) !== Math.floor(best.progress * 12)) sfx.taskTick();
+        if (best.progress >= 1) {
+          best.done = true; sfx.task(); toast(`Görev bitti: ${best.name}`);
+          best.ring.material.color.set(0x4ade80); best.gem.material.color.set(0x4ade80); best.gem.material.emissive.set(0x1a7a40);
+          if (checkWin()) return;
+        }
+      }
+      html = `<div>E tuşuna basılı tut: ${best.name}</div><div class="bar"><i style="width:${best.progress * 100}%"></i></div>`;
+    }
+  } else {
+    const wasWaiting = killCd > 0;
+    killCd = Math.max(0, killCd - dt);
+    if (wasWaiting && killCd === 0) { sfx.killReady(); toast('Öldürmeye hazırsın!'); }
+    let best = null, bd = 2;
+    aliveNpcs().forEach(n => { const d = dist(player, n); if (d < bd) { bd = d; best = n; } });
+    if (best) {
+      const seen = witnesses(best, player);
+      if (killCd > 0) html = `<div>Bekle: ${Math.ceil(killCd)} saniye</div>`;
+      else html = `<div>E: ${best.name} karakterini yakala</div>`;
+      if (seen.length) html += `<div class="warn">Dikkat! ${seen.map(s => s.name).join(', ')} seni görür!</div>`;
+      if (actionPressed && killCd <= 0) {
+        doKill(player, best);
+        flash();
+        killCd = 10;
+        if (seen.length && state === 'play') { caughtT = 1; witnessName = seen[0].name; }
+      }
+    } else if (killCd > 0) {
+      html = `<div>Öldürmek için bekle: ${Math.ceil(killCd)} sn</div>`;
+    }
+  }
+  if (player.alive) {
+    if (nearestCorpse()) html += `<div class="report">R: Ölüyü raporla</div>`;
+    else if (nearButton()) html += meetingsLeft > 0
+      ? `<div class="report">R: Kırmızı acil durum düğmesine bas</div>`
+      : `<div>Acil durum düğmesini zaten kullandın</div>`;
+  }
+  if (lightsOut && !isKiller) {
+    const dp = Math.hypot(player.g.position.x - PANEL.x, player.g.position.z - PANEL.z);
+    if (dp < 2.4) {
+      if (actionHeld) { fixProgress = Math.min(1, fixProgress + dt / 1.5); if (Math.random() < .2) sfx.taskTick(); }
+      if (fixProgress >= 1) restoreLights(true);
+      else html = `<div>E tuşuna basılı tut: Işıkları tamir et</div><div class="bar"><i style="width:${fixProgress * 100}%"></i></div>` + html;
+    } else {
+      html += `<div class="warn">Işıklar sönük! Elektrik panosu Elektrik odasında.</div>`;
+    }
+  }
+  if (isKiller && !lightsOut && sabCd <= 0) html += `<div class="report">S: Işıkları söndür</div>`;
+  if (isKiller && nearestVent() >= 0) {
+    html += `<div class="report">V: Havalandırmaya gir</div>`;
+    const seen = aliveNpcs().filter(n => dist(n, player) < seeR());
+    if (seen.length) html += `<div class="warn">Dikkat! ${seen[0].name} girdiğini görür!</div>`;
+  }
+  actionPressed = false;
+  prompt.hidden = !html;
+  if (html && prompt.innerHTML !== html) prompt.innerHTML = html;
+}
+
+// ---------- Harita ----------
+function drawMinimap() {
+  if (!player) return;
+  const F = FLOORS[fl(player)], fi = fl(player);
+  const w = mm.width, h = mm.height, pad = w * .04, big = mapBig, u = w / 360;
+  const sx = x => pad + (x - F.x0) / (F.x1 - F.x0) * (w - pad * 2);
+  const sz = z => pad + (big ? 26 * u : 0) + (z - F.z0) / (F.z1 - F.z0) * (h - pad * 2 - (big ? 26 * u : 0));
+  mctx.clearRect(0, 0, w, h);
+  mctx.fillStyle = 'rgba(255,255,255,.08)';
+  mctx.fillRect(sx(F.x0), sz(F.z0), sx(F.x1) - sx(F.x0), sz(F.z1) - sz(F.z0));
+  if (big) {
+    ZONES.filter(zn => zn.f === fi).forEach(zn => {
+      mctx.fillStyle = 'rgba(143,211,255,.07)';
+      mctx.fillRect(sx(zn.x0) + 2, sz(zn.z0) + 2, sx(zn.x1) - sx(zn.x0) - 4, sz(zn.z1) - sz(zn.z0) - 4);
+      mctx.fillStyle = 'rgba(255,255,255,.75)'; mctx.font = `800 ${Math.round(11 * u)}px Nunito, sans-serif`; mctx.textAlign = 'center';
+      mctx.fillText(zn.name, sx((zn.x0 + zn.x1) / 2), sz(zn.z1) - 8 * u);
+    });
+  }
+  mctx.fillStyle = 'rgba(255,255,255,.35)';
+  obstacles.forEach(o => { if (floorOf(o.x1) === fi) mctx.fillRect(sx(o.x1), sz(o.z1), Math.max(1, sx(o.x2) - sx(o.x1)), Math.max(1, sz(o.z2) - sz(o.z1))); });
+  const r = big ? .9 : 1;   // u zaten haritanın boyuyla büyüyor
+  if (!isKiller) {
+    TASKS.forEach(t => {
+      if (t.floor !== fi) return;
+      mctx.fillStyle = t.done ? '#4ade80' : '#ffc928';
+      mctx.beginPath(); mctx.arc(sx(t.x), sz(t.z), (t.done ? 4 : 6) * r * u, 0, Math.PI * 2); mctx.fill();
+    });
+  } else if (fi === 0) {
+    mctx.fillStyle = '#9aa4ad';
+    VENTS.forEach(v => mctx.fillRect(sx(v.x) - 6 * r * u, sz(v.z) - 4 * r * u, 12 * r * u, 8 * r * u));
+  }
+  if (fi === 0) { mctx.fillStyle = '#ff2a2a'; mctx.beginPath(); mctx.arc(sx(BUTTON.x), sz(BUTTON.z), 5 * r * u, 0, Math.PI * 2); mctx.fill(); }
+  // Asansör
+  mctx.fillStyle = '#8fd3ff';
+  mctx.fillRect(sx(F.cab - 3.2), sz(-3), sx(F.cab) - sx(F.cab - 3.2), sz(3) - sz(-3));
+  if (big) { mctx.fillStyle = '#0b2233'; mctx.font = `900 ${Math.round(10 * u)}px Nunito, sans-serif`; mctx.textAlign = 'center'; mctx.fillText(fi ? '⬇' : '⬆', sx(F.cab - 1.6), sz(.8)); }
+  if (lightsOut && !isKiller && fi === 0 && Math.floor(performance.now() / 300) % 2) {
+    mctx.fillStyle = '#ffe14a';
+    mctx.fillRect(sx(PANEL.x) - 6 * r * u, sz(PANEL.z) - 6 * r * u, 12 * r * u, 12 * r * u);
+  }
+  mctx.strokeStyle = '#ff3d3d'; mctx.lineWidth = 3 * u * r;
+  corpses.forEach(c => {
+    if (floorOf(c.position.x) !== fi) return;
+    const x = sx(c.position.x), y = sz(c.position.z), k = 5 * r * u;
+    mctx.beginPath(); mctx.moveTo(x - k, y - k); mctx.lineTo(x + k, y + k); mctx.moveTo(x + k, y - k); mctx.lineTo(x - k, y + k); mctx.stroke();
+  });
+  const px = sx(player.g.position.x), py = sz(player.g.position.z);
+  mctx.fillStyle = player.alive ? '#e53935' : 'rgba(229,57,53,.5)'; mctx.strokeStyle = '#fff'; mctx.lineWidth = 2.5 * u;
+  mctx.beginPath(); mctx.arc(px, py, (big ? 9 : 7) * u * (1 + (big ? Math.sin(performance.now() / 200) * .15 : 0)), 0, Math.PI * 2); mctx.fill(); mctx.stroke();
+  if (big) {
+    mctx.fillStyle = '#ffc928'; mctx.font = `900 ${Math.round(15 * u)}px Bungee, Nunito, sans-serif`; mctx.textAlign = 'left';
+    mctx.fillText(`🗺 ${F.name}`, pad, pad + 14 * u);
+    mctx.textAlign = 'right'; mctx.fillStyle = '#a3acb6'; mctx.font = `800 ${Math.round(11 * u)}px Nunito, sans-serif`;
+    mctx.fillText('Kapatmak için Ç (ya da H)', w - pad, pad + 13 * u);
+  }
+}
+
+function drawHud() {
+  const info = $('info');
+  if (!player) return;
+  const fi = fl(player);
+  const where = `<div class="where">${FLOORS[fi].name} · ${zoneAt(player.g.position.x, player.g.position.z)}</div>`;
+  const world = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div>`;
+  if (isKiller) {
+    const left = aliveNpcs().length;
+    info.innerHTML = `${world}${where}<div class="role role-killer">KATİL</div>${lightsOut ? '<div class="warn-line">Işıklar sönük, kimse uzağı göremez</div>' : sabCd > 0 ? `<div class="muted">Sabotaj: ${Math.ceil(sabCd)} sn</div>` : '<div class="warn-line">S: Işıkları söndür</div>'}
+      <div>Kalan kişi: <b>${left}</b> / ${npcs.length}</div>
+      <div class="muted">2. katta: ${aliveNpcs().filter(n => fl(n) === 1).length} kişi</div>
+      <div class="muted" style="margin-top:4px">Yalnız birini bul, yanına git, E'ye bas.</div>`;
+  } else {
+    const done = TASKS.filter(t => t.done).length;
+    const here = TASKS.filter(t => t.floor === fi), other = TASKS.filter(t => t.floor !== fi);
+    info.innerHTML = `${world}${where}<div class="role ${player.alive ? 'role-crew">MASUM' : 'role-ghost">HAYALET 👻'}</div>${lightsOut ? '<div class="warn-line">IŞIKLAR SÖNDÜ!</div>' : ''}
+      <div class="count">Görevler: ${done} / ${TASKS.length}</div>
+      <ul>${here.map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('')}</ul>
+      <div class="muted other" style="margin-top:6px">${fi ? '1. kat' : '2. kat (asansör doğuda)'}: ${other.filter(t => t.done).length} / ${other.length} görev</div>
+      <div class="bar"><i style="width:${done / TASKS.length * 100}%"></i></div>
+      <div class="more">${$('info').classList.contains('open') ? '▲ Listeyi kapat' : '▼ Görev listesi için dokun'}</div>`;
+  }
+}
+
+// ---------- Döngü ----------
+const camTarget = new THREE.Vector3(), camPos = new THREE.Vector3(0, 30, 30), want = new THREE.Vector3();
+let last = performance.now(), time = 0;
+function animateKillers(dt) {
+  [player, ...npcs].forEach(e => {
+    if (!e || !e.knife) return;
+    e.knife.visible = e.knifeT > 0;
+    if (e.knifeT > 0) {
+      e.knifeT -= dt;
+      const k = 1.2 - e.knifeT;
+      e.knife.rotation.x = k < .25 ? -k * 6 : -1.5 + Math.abs(Math.sin((k - .25) * 10)) * 2.2;
+    }
+    const on = e.tongueT > 0;
+    e.mouth.visible = e.tongue.visible = e.tongueTip.visible = on;
+    if (on) {
+      e.tongueT -= dt;
+      const k = 1 - e.tongueT, ext = k < .3 ? k / .3 : k < .55 ? 1 : Math.max(0, 1 - (k - .55) / .45);
+      const my = pawnMode ? 1.82 : 1.18, mz = pawnMode ? .42 : .56;
+      e.mouth.position.set(0, my, mz);
+      e.tongue.position.set(0, my - .03, mz);
+      e.tongue.scale.set(1, 1, Math.max(.02, ext * e.tongueLen));
+      e.tongueTip.position.set(0, my - .03, mz + ext * e.tongueLen);
+    }
+  });
+}
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000);
+  last = now; time += dt;
+
+  beltTex.offset.x -= dt * .5;
+  animateKillers(dt);
+  updateParticles(dt, time);
+  beltCrates.forEach(c => { c.position.x += dt * 2; if (c.position.x > -32.4) c.position.x = -47.6; });
+  pistons.forEach(p => { p.m.position.y = 4 + Math.sin(time * 2.4 + p.phase) * .5; });
+  beacons.forEach((b, i) => { b.material.color.setHex(Math.sin(time * 6 + i) > 0 ? 0xff7a1a : 0x552200); });
+  blinkers.forEach((b, i) => { b.material.color.setHex(Math.sin(time * 3 + i * 1.7) > 0 ? 0x22ff66 : 0x0a3318); });
+  TASKS.forEach(t => {
+    if (!t.done) { t.gem.rotation.y += dt * 2; t.gem.position.y = 4.6 + Math.sin(time * 3) * .25; t.ring.material.opacity = .55 + Math.sin(time * 4) * .3; }
+  });
+
+  if (state === 'reveal') {
+    revealT -= dt;
+    if (!roleShown && revealT <= 2.8) {
+      roleShown = true;
+      $('shh').hidden = true; $('roleCard').hidden = false;
+      isKiller ? sfx.revealKiller() : sfx.revealCrew();
+    }
+    if (revealT <= 0) { state = 'play'; show(null); drawHud(); }
+  }
+  if (state === 'play' || state === 'reveal' || state === 'elevator') {
+    if (state === 'play') updatePlayer(dt);
+    if (state === 'elevator') updateElevator(dt);
+    npcs.forEach(n => updateNpc(n, dt));
+    if (state === 'play') { interact(dt); updateSabotage(dt); npcButtonTick(dt); }
+    if (ipekFollowT > 0 && state === 'play') {
+      ipekFollowT -= dt;
+      if (ipekFollowT <= 0 && ipek.alive && fl(ipek) !== fl(player)) {
+        const ex = FLOORS[fl(player)].exit;
+        ipek.g.position.set(ex.x - .5, 0, ex.z + 1.4); ipek.path = []; ipek.travel = null; ipek.wait = .3;
+        toast('Dulutsoy İpek de asansörle geldi! 💙');
+      }
+    }
+    if (caughtT > 0 && state === 'play') {
+      caughtT -= dt;
+      if (caughtT <= 0) endGame(false, 'YAKALANDIN!', `${witnessName} seni gördü ve herkese söyledi. Bir dahakine kimse yokken yap!`);
+    }
+    hudTimer -= dt;
+    if (hudTimer <= 0) { drawHud(); hudTimer = .2; }
+    drawMinimap();
+  } else if (state === 'dead' || state === 'over' || state === 'menu') {
+    npcs.forEach(n => updateNpc(n, dt));
+    if (state === 'dead') { deadT += dt; if (deadT > 9) continueAsGhost(); }
+  }
+  if (state === 'meeting') updateMeeting(dt);
+  if (state === 'eject') updateEject(dt);
+  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').style.opacity = 0; }
+
+  // Kim kimi görür: ölüler ve uzaya atılanlar sadece hayaletken görünür
+  const pf = player ? fl(player) : 0, seeGhosts = !player || !player.alive;
+  npcs.forEach(n => {
+    n.g.visible = fl(n) === pf && (n.alive || seeGhosts);
+    if (n.ghost) n.g.position.y = .3 + Math.sin(time * 2 + n.idx) * .12;
+  });
+  if (player && player.ghost) player.g.position.y = .3 + Math.sin(time * 2) * .12;
+  if (pet && player) {
+    const pp = player.g.position, bp = pet.g.position;
+    const tx = pp.x - Math.sin(player.g.rotation.y) * 1.4, tz = pp.z - Math.cos(player.g.rotation.y) * 1.4;
+    const dx = tx - bp.x, dz = tz - bp.z, d = Math.hypot(dx, dz);
+    if (d > 8) bp.set(tx, 0, tz);
+    else if (d > .25 && state !== 'meeting') { const k = Math.min(1, dt * 4); bp.x += dx * k; bp.z += dz * k; face(pet, dx, dz, dt); animateWalk(pet, true, dt * 1.4); }
+    else animateWalk(pet, false, dt);
+    if (pet.ghost) bp.y = .3 + Math.sin(time * 2 + 1) * .12;
+  }
+  particles.position.x = pf === 1 ? 200 : 0;
+
+  if (state === 'meeting') {
+    const f = Math.max(1, 6.5 / (.466 * camera.aspect) / 16.4);
+    camTarget.set(MC.x, .8, MC.z - .5);
+    want.set(MC.x, 12 * f, MC.z + 9.5 * f);
+    camPos.lerp(want, Math.min(1, dt * 4));
+  } else if (player && state !== 'menu') {
+    const p = player.g.position;
+    camTarget.set(p.x, 1, p.z);
+    want.set(p.x, 13, p.z + 11);
+    camPos.lerp(want, Math.min(1, dt * 5));
+  } else {
+    camTarget.set(0, 0, 0);
+    camPos.set(Math.sin(time * .12) * 34, 24, Math.cos(time * .12) * 34);
+  }
+  camera.position.copy(camPos);
+  camera.lookAt(camTarget);
+  sun.position.set(camTarget.x - 14, 30, camTarget.z + 18);
+  sun.target.position.set(camTarget.x, 0, camTarget.z);
+  if (state === 'eject') renderer.render(spaceScene, ejCam);
+  else renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// Menü arkasında dolaşan örnek ekip (hepsi kendi adıyla)
+function menuCrew() {
+  npcs = ROSTER.map((r, i) => makeNpc(r, i));
+  ringAround(npcs, BUTTON.x, BUTTON.z, 4);
+  npcs.forEach(n => { n.home = 0; });
+}
+function renderRoster() {
+  $('roster').innerHTML = ROSTER.map((r, i) =>
+    `<span class="chip${i < 2 ? ' team' : ''}"><i style="background:${hex(r.color)}"></i>${r.name}${i === 0 ? ' (sen)' : ''}${i < 2 ? ` · ${TEAM}` : ''}</span>`).join('');
+}
+renderRoster();
+menuCrew();
+window.addEventListener('resize', resize);
+resize();
+requestAnimationFrame(frame);
+
+// ---------- Girdi ----------
+const isC = e => e.key === 'ç' || e.key === 'Ç' || e.key === 'Escape';
+const isU = e => e.key === 'ü' || e.key === 'Ü' || e.code === 'BracketRight';
+window.addEventListener('keydown', e => {
+  if (isC(e)) {
+    e.preventDefault();
+    if (vipOpen) { closeVip(); return; }
+    if (mapBig) { setMapBig(false); return; }
+    if (state === 'over') newRound();
+    else if (state !== 'menu') toMenu();
+    return;
+  }
+  if (isU(e) && !e.repeat) { e.preventDefault(); toggleVip(); return; }
+  if (e.code === 'KeyM' && !e.repeat) { togglePawn(); return; }
+  if (e.code === 'KeyN' && !e.repeat) { toggleMute(); return; }
+  if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
+  if (state === 'menu' && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); startGame(); return; }
+  if (state === 'dead' && (e.key === 'Enter' || e.code === 'Space' || e.code === 'KeyE')) { e.preventDefault(); continueAsGhost(); return; }
+  if (state === 'meeting') { if (e.code === 'Space' && player.alive) { e.preventDefault(); castVote(player, 'skip'); } return; }
+  if (e.code === 'KeyH' && !e.repeat) { if (state === 'play') setMapBig(!mapBig); return; }
+  if (e.code === 'KeyR' && !e.repeat && state === 'play') { report(); return; }
+  if (e.code === 'KeyS' && !e.repeat && state === 'play') { playerSabotage(); return; }
+  if (e.code === 'KeyV' && !e.repeat) { useVent(); return; }
+  if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
+  if (e.code === 'KeyE' || e.code === 'Space') {
+    e.preventDefault();
+    if (!e.repeat) actionPressed = true;
+    actionHeld = true;
+  }
+  if (e.code.startsWith('Arrow')) e.preventDefault();
+  keys.add(e.code);
+});
+window.addEventListener('keyup', e => {
+  keys.delete(e.code);
+  if (e.code === 'KeyE' || e.code === 'Space') actionHeld = false;
+});
+window.addEventListener('blur', () => { keys.clear(); actionHeld = false; });
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (state === 'meeting') meetingPick(e.clientX, e.clientY);
+  else if (mapBig) setMapBig(false);
+});
+mm.addEventListener('pointerdown', () => { if (mapBig) setMapBig(false); });
+mm.style.pointerEvents = 'auto';
+
+$('info').addEventListener('click', () => { $('info').classList.toggle('open'); drawHud(); });
+$('startBtn').addEventListener('click', startGame);
+$('worldBtn').addEventListener('click', nextWorld);
+$('reportBtn').addEventListener('click', report);
+$('ventBtn').addEventListener('click', useVent);
+$('sabBtn').addEventListener('click', playerSabotage);
+$('vipBtn').addEventListener('click', toggleVip);
+$('mapBtn').addEventListener('click', () => { if (state === 'play') setMapBig(!mapBig); });
+$('modBtn').addEventListener('click', togglePawn);
+$('vipClose').addEventListener('click', closeVip);
+$('skipBtn').addEventListener('click', () => castVote(player, 'skip'));
+$('quit').addEventListener('click', toMenu);
+$('deadBtn').addEventListener('click', continueAsGhost);
+$('endBtn').addEventListener('click', newRound);
+
+const act = $('actBtn');
+act.addEventListener('pointerdown', e => { e.preventDefault(); actionPressed = true; actionHeld = true; });
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => act.addEventListener(ev, () => { actionHeld = false; }));
+
+const stick = $('stick'), knob = $('knob');
+let stickId = null;
+function stickMove(e) {
+  const r = stick.getBoundingClientRect();
+  let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+  const m = Math.hypot(x, y), max = r.width / 2;
+  if (m > max) { x *= max / m; y *= max / m; }
+  knob.style.transform = `translate(${x}px, ${y}px)`;
+  joy.x = x / max; joy.z = y / max;
+}
+stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stickMove(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+['pointerup', 'pointercancel'].forEach(ev => stick.addEventListener(ev, () => {
+  stickId = null; joy.x = joy.z = 0; knob.style.transform = '';
+}));
+})();
+</script>
