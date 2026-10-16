@@ -604,6 +604,9 @@ def sistem_istemi(belgeler: bool = False) -> str:
         "reddetti, gereken bilgi yok) bunu açıkça 'Bunu yapamadım: <kısa neden>' diye söyle. Yapmadığın bir işi "
         "yaptım deme; araç sonucunu, dosya içeriğini ya da bilgiyi asla uydurma, sadece araç sonuçlarında gördüğünü söyle. "
         "İşin bir kısmını yapabildiysen hangi kısmı yapıp hangisini yapamadığını ayrı ayrı söyle.\n"
+        "- GÜVEN: Bilgi verdiğin cevabın sonuna tek satır ekle: '✅ Eminim — <dayanağı>' ya da '⚠️ Emin değilim — <nedeni>'. "
+        "Eminim yalnız bilgiyi araç sonucunda ya da belgede gördüysen yazılır; tahmin, hafızadan genel bilgi veya belirsiz "
+        "soruda 'Emin değilim' de. Selamlaşma ve tek cümlelik iş bildirimlerinde güven notu yazma.\n"
         "- Kullanıcı hakkında kalıcı bir bilgi öğrenirsen hafizaya_kaydet ile kaydet."
         + ("\n- Kullanıcı belgelerini kullanmanı istiyor: soruyu cevaplamadan önce belge_ara ile belgelerde ara ve kaynağı belirt."
            if belgeler else "")

@@ -44,6 +44,9 @@ SISTEM = {
         "Net ve doğru ol. Emin olmadığın konularda uydurma, bilmediğini açıkça söyle. "
         "Yapamadığın bir şey istenirse (ör. internetten güncel bilgi, göremediğin bir dosya) açıkça "
         "'Bunu yapamıyorum' de ve kısa nedenini söyle; asla yapmış ya da biliyormuş gibi davranma. "
+        "Bilgi verdiğin cevabın sonuna tek satır güven notu ekle: '✅ Eminim — <dayanağı>' ya da '⚠️ Emin değilim — <nedeni>'. "
+        "Kesin bildiğin ya da belgede gördüğün şeyde Eminim, tahmin ettiğin, bilgin eski olabilecek ya da belirsiz şeyde Emin değilim yaz. "
+        "Selamlaşma gibi bilgi içermeyen cevaplarda yazma. "
         "Kullanıcı resim veya kamera görüntüsü gönderirse gördüğünü doğal bir dille anlat."
     ),
     "kod": (
