@@ -234,7 +234,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
     <div class="hazard"></div>
     <h1>AMANGAS</h1>
     <p>Sen <b style="color:var(--red)">Mahunched</b>'sin (kırmızı). Takımın <b style="color:var(--hazard)">TİT</b>:
-      <b style="color:var(--navy)">Dulutsoy İpek</b> (koyu mavi) her oyunda seninle oynar.
+      <b style="color:var(--navy)">Bulut Soyipek</b> (koyu mavi) her oyunda seninle oynar.
       Dev fabrikada <b>26 görev</b>, asansörle çıkılan 2. katta <b>6 görev</b> daha var.
       Her oyunda <b>3'te 1</b> ihtimalle <b style="color:var(--danger)">KATİL</b> sen olursun!</p>
     <div class="roster" id="roster"></div>
@@ -253,7 +253,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>N</kbd><span>Sesi aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
-    <div class="lock">🔒 <b>Özel oda: TİT</b> · Bu oyunda sadece Mahunched ve Dulutsoy İpek'in takımı var</div>
+    <div class="lock">🔒 <b>Özel oda: TİT</b> · Bu oyunda sadece Mahunched ve Bulut Soyipek'in takımı var</div>
     <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
     <button class="big" id="startBtn" type="button">OYNA</button>
     <p class="muted" style="font-size:13px">Enter tuşuna da basabilirsin</p>
@@ -1260,7 +1260,7 @@ function toggleMute() { muted = !muted; toast(muted ? 'Ses kapalı (N)' : 'Ses a
 // Her rengin kendi adı var ve bu adlar hiçbir dünyada / oyunda değişmez.
 const ROSTER = [
   { name: 'Mahunched', color: 0xe53935, pawn: 0xd4af37 },
-  { name: 'Dulutsoy İpek', color: 0x14308f, pawn: 0xf3ead2, home: 0 },
+  { name: 'Bulut Soyipek', color: 0x14308f, pawn: 0xf3ead2, home: 0 },
   { name: 'Gece', color: 0x1c1c22, pawn: 0xff6f61, home: 0 },
   { name: 'Pamuk', color: 0xff8ccf, pawn: 0x00a86b, home: 0 },
   { name: 'Fıstık', color: 0x1fa64a, pawn: 0xb57edc, home: 0 },
@@ -1587,7 +1587,7 @@ function castVote(voter, target) {
 function botVote(n) {
   const m = meeting, opts = m.parts.filter(o => o !== n);
   if (!opts.length) return 'skip';
-  if (n === ipek) {   // İpek takım arkadaşı: senin oyunu takip eder, sana asla oy vermez
+  if (n === ipek) {   // Bulut Soyipek takım arkadaşı: senin oyunu takip eder, sana asla oy vermez
     if (m.pick && m.pick !== 'skip' && m.pick !== n) return m.pick;
     const s = topSus(n, m.parts);
     if (s && s !== player) return s;
@@ -1911,7 +1911,7 @@ function pickTarget(n) {
   const f = fl(n), p = n.g.position;
   if (n.goButton && f === 0) { n.path = findPath(0, p, { x: BUTTON.x, z: BUTTON.z + 2.2 }); return; }
   if (n.travel !== null) { goTravel(n, n.travel); return; }
-  if (n === ipek && player && Math.random() < .6) {   // İpek hep bizimle oynar
+  if (n === ipek && player && Math.random() < .6) {   // Bulut Soyipek hep bizimle oynar
     const pp = player.g.position;
     if (fl(player) === f) {
       const tx = pp.x + (Math.random() - .5) * 4, tz = pp.z + (Math.random() - .5) * 4;
@@ -2233,7 +2233,7 @@ function frame(now) {
       if (ipekFollowT <= 0 && ipek.alive && fl(ipek) !== fl(player)) {
         const ex = FLOORS[fl(player)].exit;
         ipek.g.position.set(ex.x - .5, 0, ex.z + 1.4); ipek.path = []; ipek.travel = null; ipek.wait = .3;
-        toast('Dulutsoy İpek de asansörle geldi! 💙');
+        toast('Bulut Soyipek de asansörle geldi! 💙');
       }
     }
     if (caughtT > 0 && state === 'play') {
