@@ -1,5 +1,5 @@
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM.bat icine gomulur)
-$SURUM = '1.0'
+$SURUM = '1.1'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -10,7 +10,7 @@ function Bilgi($t)  { Write-Host "  $t" }
 function Uyari($t)  { Write-Host "  UYARI: $t" -ForegroundColor Yellow }
 function Tamam($t)  { Write-Host "  OK: $t" -ForegroundColor Green }
 
-function Cli {
+function Arduino {
     & $script:cli --config-file $script:cfg @args
     if ($LASTEXITCODE -ne 0) { throw "arduino-cli hata verdi: $($args -join ' ')" }
 }
@@ -127,14 +127,14 @@ Tamam 'Arduino CLI hazir'
 
 # ---------------------------------------------------------------------------
 Baslik "5/7 ESP32 kart paketi ($ESP32_SURUM) ve kutuphaneler (ilk seferde uzun surer)"
-Cli core update-index
+Arduino core update-index
 $kurulu = & $script:cli --config-file $script:cfg core list 2>$null | Out-String
 if ($kurulu -notmatch "esp32:esp32\s+$([regex]::Escape($ESP32_SURUM))") {
     Bilgi 'ESP32 paketi indiriliyor (~600 MB)...'
-    Cli core install "esp32:esp32@$ESP32_SURUM"
+    Arduino core install "esp32:esp32@$ESP32_SURUM"
 }
 Tamam 'ESP32 kart paketi'
-Cli lib install 'Adafruit PWM Servo Driver Library'
+Arduino lib install 'Adafruit PWM Servo Driver Library'
 $ps4Dir = Join-Path $libDir 'PS4Controller'
 if (-not (Test-Path (Join-Path $ps4Dir 'library.properties'))) {
     Bilgi 'PS4Controller kutuphanesi indiriliyor...'
@@ -151,7 +151,7 @@ Tamam 'Kutuphaneler: Adafruit PWM Servo Driver, PS4Controller'
 
 # ---------------------------------------------------------------------------
 Baslik '6/7 Kod derleniyor'
-Cli compile --fqbn $FQBN --build-path $build $sketch
+Arduino compile --fqbn $FQBN --build-path $build $sketch
 Tamam 'Derleme basarili'
 
 # ---------------------------------------------------------------------------
