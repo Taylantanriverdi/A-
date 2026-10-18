@@ -3,13 +3,13 @@ setlocal
 chcp 65001 >nul
 title ROBOT KOL - Otomatik Kurulum
 set "ROBOTKOL_BAT=%~f0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText($env:ROBOTKOL_BAT,[Text.Encoding]::UTF8); $a=$s.IndexOf('#'+'#PS_BASLA'); $b=$s.IndexOf('#'+'#PS_BITIS'); try { Invoke-Expression $s.Substring($a,$b-$a) } catch { Write-Host ''; Write-Host ('HATA: '+$_) -ForegroundColor Red; Write-Host 'Internet baglantinizi kontrol edip bu dosyaya tekrar cift tiklayin.' -ForegroundColor Yellow }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText($env:ROBOTKOL_BAT,[Text.Encoding]::UTF8); $a=$s.IndexOf('#'+'#PS_BASLA'); $b=$s.IndexOf('#'+'#PS_BITIS'); try { Invoke-Expression $s.Substring($a,$b-$a) } catch { Write-Host ''; Write-Host ('HATA: '+$_) -ForegroundColor Red; Write-Host 'Bu ekranin goruntusunu gonderin veya dosyaya tekrar cift tiklayin.' -ForegroundColor Yellow }"
 echo.
 pause
 exit /b
 ##PS_BASLA
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM.bat icine gomulur)
-$SURUM = '1.1'
+$SURUM = '1.2'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -40,31 +40,36 @@ $ana = Join-Path $masaustu 'ROBOT KOL'
 New-Item -ItemType Directory -Force -Path $ana | Out-Null
 Tamam $ana
 
-# ESP32 derleyicisi bosluk / Turkce karakter iceren yollarda sorun cikarabildigi icin,
-# gerekirse C:\RobotKol adinda bir kisayol (junction) acilir. Dosyalar yine ROBOT KOL icindedir.
-$calis = $ana
-if ($ana -match '[^\x21-\x7E]') {
-    $calis = 'C:\RobotKol'
-    if (Test-Path $calis) {
-        $oge = Get-Item $calis -Force
-        if ($oge.Attributes -band [IO.FileAttributes]::ReparsePoint) { cmd /c rmdir "$calis" | Out-Null }
-        else { $calis = 'C:\RobotKol_Baglanti'; if (Test-Path $calis) { cmd /c rmdir "$calis" | Out-Null } }
-    }
-    cmd /c mklink /J "$calis" "$ana" | Out-Null
-    if (-not (Test-Path $calis)) { Uyari 'Kisayol olusturulamadi, dogrudan klasor kullanilacak.'; $calis = $ana }
-    else { Bilgi "Derleme icin kisa yol: $calis  ->  $ana" }
+# Arduino araclari (Go tabanli) bosluk, Turkce karakter ve kisayol (junction) iceren
+# yollarda hata verebildigi icin araclar gercek bir klasorde (C:\RobotKol) tutulur.
+# ROBOT KOL\araclar bu klasore acilan bir kisayoldur; icerigi masaustunden gorulebilir.
+function Kisayol-mi($yol) {
+    (Test-Path $yol) -and ((Get-Item $yol -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)
 }
+$arac = 'C:\RobotKol'
+# Surum 1.0 C:\RobotKol'u masaustune kisayol olarak acmisti: once onu kaldir (sadece kisayol silinir).
+if (Kisayol-mi $arac) { [IO.Directory]::Delete($arac, $false) }
+try { New-Item -ItemType Directory -Force -Path $arac | Out-Null }
+catch { $arac = 'C:\Users\Public\RobotKol'; New-Item -ItemType Directory -Force -Path $arac | Out-Null }
+foreach ($eski in 'araclar', 'kutuphaneler') {   # surum 1.0'dan kalan yarim kurulum klasorleri
+    $y = Join-Path $ana $eski
+    if ((Test-Path $y) -and -not (Kisayol-mi $y)) { Remove-Item $y -Recurse -Force }
+}
+$link = Join-Path $ana 'araclar'
+if (-not (Test-Path $link)) {
+    try { New-Item -ItemType Junction -Path $link -Target $arac | Out-Null } catch { Uyari "Kisayol acilamadi: $link" }
+}
+Bilgi "Arduino araclari: $arac  (masaustunde: ROBOT KOL\araclar)"
 
-$arac    = Join-Path $calis 'araclar'
 $cliDir  = Join-Path $arac 'arduino-cli'
 $script:cli = Join-Path $cliDir 'arduino-cli.exe'
 $script:cfg = Join-Path $arac 'arduino-cli.yaml'
-$kutuph  = Join-Path $calis 'kutuphaneler'
+$kutuph  = Join-Path $arac 'kutuphaneler'
 $libDir  = Join-Path $kutuph 'libraries'
-$sketch  = Join-Path $calis 'RobotKol_PS4'
+$sketch  = Join-Path $arac 'proje\RobotKol_PS4'
 $build   = Join-Path $arac 'derleme'
 $ayar    = Join-Path $ana 'ayarlar.txt'
-New-Item -ItemType Directory -Force -Path $arac, $cliDir, $libDir | Out-Null
+New-Item -ItemType Directory -Force -Path $cliDir, $libDir, $sketch | Out-Null
 
 # ---------------------------------------------------------------------------
 Baslik '2/7 PS4 kolu MAC adresi'
@@ -161,6 +166,7 @@ Tamam 'Kutuphaneler: Adafruit PWM Servo Driver, PS4Controller'
 
 # ---------------------------------------------------------------------------
 Baslik '6/7 Kod derleniyor'
+Copy-Item (Join-Path $ana 'RobotKol_PS4\RobotKol_PS4.ino') $sketch -Force   # derleme kopyasi
 Arduino compile --fqbn $FQBN --build-path $build $sketch
 Tamam 'Derleme basarili'
 

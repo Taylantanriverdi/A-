@@ -10,7 +10,7 @@ setlocal
 chcp 65001 >nul
 title ROBOT KOL - Otomatik Kurulum
 set "ROBOTKOL_BAT=%~f0"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText($env:ROBOTKOL_BAT,[Text.Encoding]::UTF8); $a=$s.IndexOf('#'+'#PS_BASLA'); $b=$s.IndexOf('#'+'#PS_BITIS'); try { Invoke-Expression $s.Substring($a,$b-$a) } catch { Write-Host ''; Write-Host ('HATA: '+$_) -ForegroundColor Red; Write-Host 'Internet baglantinizi kontrol edip bu dosyaya tekrar cift tiklayin.' -ForegroundColor Yellow }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText($env:ROBOTKOL_BAT,[Text.Encoding]::UTF8); $a=$s.IndexOf('#'+'#PS_BASLA'); $b=$s.IndexOf('#'+'#PS_BITIS'); try { Invoke-Expression $s.Substring($a,$b-$a) } catch { Write-Host ''; Write-Host ('HATA: '+$_) -ForegroundColor Red; Write-Host 'Bu ekranin goruntusunu gonderin veya dosyaya tekrar cift tiklayin.' -ForegroundColor Yellow }"
 echo.
 pause
 exit /b
