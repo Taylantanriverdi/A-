@@ -20,7 +20,7 @@ exit /b
 HDR
 cat kurulum/kurulum.ps1
 echo '##PS_BITIS'
-for f in RobotKol_PS4.ino README.md SURUMLER.md; do
+for f in RobotKol_PS4.ino README.md SURUMLER.md KONTROL_PANELI.html; do
   case $f in *.ino) dest="RobotKol_PS4/$f" ;; *) dest="$f" ;; esac
   echo "##DOSYA $dest"
   cat "$f"

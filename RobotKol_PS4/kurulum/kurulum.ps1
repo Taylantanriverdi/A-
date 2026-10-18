@@ -1,6 +1,6 @@
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
 # Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
-$SURUM = 'V5'
+$SURUM = 'V6'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -255,12 +255,7 @@ if ($port) {
         }
     }
     if ($basarili) {
-        Tamam 'Kod ESP32''ye yuklendi! PS4 kolunun PS tusuna basin.'
-        $c = Read-Host '  Seri monitor acilsin mi? (E/H)'
-        if ($c -match '^[Ee]') {
-            Bilgi 'Kapatmak icin Ctrl+C'
-            & $script:cli --config-file $script:cfg monitor -p $port -c baudrate=115200
-        }
+        Tamam 'Kod ESP32''ye yuklendi! PS4 kolunun PS tusuna basin veya USB kontrol panelini kullanin.'
     } else { Uyari 'Yukleme yapilamadi. Derlenmis kod hazir, bu dosyaya tekrar cift tiklayarak deneyebilirsiniz.' }
 } else {
     Uyari 'Yukleme atlandi. ESP32''yi takip bu dosyayi tekrar calistirin.'
@@ -269,3 +264,16 @@ if ($port) {
 Write-Host ''
 Write-Host "Tum dosyalar: $ana" -ForegroundColor Green
 Start-Process explorer.exe $ana
+
+# USB kontrol paneli: Web Serial icin Chrome veya Edge gerekir (Firefox desteklemez)
+$panel = Join-Path $ana 'KONTROL_PANELI.html'
+$c = Read-Host 'USB kontrol paneli acilsin mi? (E/H, Enter = E)'
+if ($c -notmatch '^[Hh]') {
+    $tarayici = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+                  "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+                  "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") |
+                Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $tarayici) { $tarayici = 'msedge.exe' }
+    Start-Process $tarayici "`"$panel`""
+    Bilgi 'Panelde "USB ile baglan"a basip ESP32''nin COM portunu secin.'
+}

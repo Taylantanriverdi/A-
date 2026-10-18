@@ -10,7 +10,7 @@ exit /b
 ##PS_BASLA
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
 # Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
-$SURUM = 'V5'
+$SURUM = 'V6'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -265,12 +265,7 @@ if ($port) {
         }
     }
     if ($basarili) {
-        Tamam 'Kod ESP32''ye yuklendi! PS4 kolunun PS tusuna basin.'
-        $c = Read-Host '  Seri monitor acilsin mi? (E/H)'
-        if ($c -match '^[Ee]') {
-            Bilgi 'Kapatmak icin Ctrl+C'
-            & $script:cli --config-file $script:cfg monitor -p $port -c baudrate=115200
-        }
+        Tamam 'Kod ESP32''ye yuklendi! PS4 kolunun PS tusuna basin veya USB kontrol panelini kullanin.'
     } else { Uyari 'Yukleme yapilamadi. Derlenmis kod hazir, bu dosyaya tekrar cift tiklayarak deneyebilirsiniz.' }
 } else {
     Uyari 'Yukleme atlandi. ESP32''yi takip bu dosyayi tekrar calistirin.'
@@ -279,10 +274,24 @@ if ($port) {
 Write-Host ''
 Write-Host "Tum dosyalar: $ana" -ForegroundColor Green
 Start-Process explorer.exe $ana
+
+# USB kontrol paneli: Web Serial icin Chrome veya Edge gerekir (Firefox desteklemez)
+$panel = Join-Path $ana 'KONTROL_PANELI.html'
+$c = Read-Host 'USB kontrol paneli acilsin mi? (E/H, Enter = E)'
+if ($c -notmatch '^[Hh]') {
+    $tarayici = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+                  "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+                  "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") |
+                Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $tarayici) { $tarayici = 'msedge.exe' }
+    Start-Process $tarayici "`"$panel`""
+    Bilgi 'Panelde "USB ile baglan"a basip ESP32''nin COM portunu secin.'
+}
 ##PS_BITIS
 ##DOSYA RobotKol_PS4/RobotKol_PS4.ino
 /*
  * 6 Eksenli Robot Kol - ESP32 + PCA9685 + PS4 (DualShock 4) Bluetooth kontrolü
+ *                        + bilgisayardan USB kablo ile kontrol (KONTROL_PANELI.html)
  *
  * Kütüphaneler (Arduino IDE > Kütüphane Yöneticisi / GitHub):
  *   - PS4Controller          (aed3/PS4-esp32)
@@ -299,6 +308,16 @@ Start-Process explorer.exe $ana
  *   R2 / L2       -> Eksen 6: Kıskaç kapat / aç (basınç kadar hızlı)
  *   Yön ← / →     -> Hız kademesi düşür / artır (%25 - %50 - %100, LED rengi değişir)
  *   OPTIONS       -> Tüm eksenleri yavaşça başlangıç (home) pozisyonuna getir
+ *
+ * USB SERİ KOMUTLARI (115200 baud, her komut bir satır)
+ *   A i derece          -> i. eksenin hedef açısını ayarla (panel kaydırıcıları)
+ *   V v0 v1 .. v5       -> 6 eksen için hız komutu (-1..1). 300 ms yeni komut
+ *                          gelmezse sıfırlanır (kablo çekilirse kol durur)
+ *   H                   -> home pozisyonu
+ *   X                   -> acil durdurma (kol olduğu yerde kalır)
+ *   S n                 -> hız kademesi (0, 1, 2)
+ *   ?                   -> eksen sınırlarını gönder ("L i min max home isim")
+ *   ESP32 10 Hz ile "P a0 .. a5" (anlık açılar) satırı gönderir.
  *
  * YUMUŞAKLIK (SMOOTH) NASIL SAĞLANIYOR?
  *   1) Ölü bölge (deadzone): çubuk merkezdeki küçük titreşimler yok sayılır.
@@ -365,6 +384,13 @@ bool     homing     = false;
 bool     prevLeft = false, prevRight = false;
 uint32_t lastLoop = 0, lastPrint = 0;
 
+// ---- USB seri kontrol (bilgisayar paneli) ----
+const uint32_t SERIAL_TIMEOUT_MS = 300;
+float    serialVel[6] = {0, 0, 0, 0, 0, 0};
+uint32_t lastSerialVel = 0;
+char     lineBuf[96];
+uint8_t  lineLen = 0;
+
 // -------------------------------------------------------------------------
 // Çubuk değerini (-128..127) ölü bölge + expo uygulanmış -1..1 aralığına çevirir
 float stickToNorm(int v) {
@@ -387,6 +413,7 @@ void writeServo(const Joint& j) {
 }
 
 void updateLed() {
+  Serial.printf("S %d\n", speedLevel);   // paneli de bilgilendir
   if (!PS4.isConnected()) return;
   if (speedLevel == 0)      PS4.setLed(0, 255, 0);    // yavaş: yeşil
   else if (speedLevel == 1) PS4.setLed(0, 0, 255);    // orta: mavi
@@ -404,6 +431,53 @@ void onDisconnect() {
   Serial.println("PS4 baglantisi koptu! Kol donduruldu.");
   homing = false;
   for (auto& j : joints) j.target = j.current;
+}
+
+void sendLimits() {
+  for (int i = 0; i < 6; i++)
+    Serial.printf("L %d %.0f %.0f %.0f %s\n", i, joints[i].minDeg, joints[i].maxDeg, joints[i].homeDeg, joints[i].name);
+  Serial.printf("S %d\n", speedLevel);
+}
+
+void stopAll() {
+  homing = false;
+  for (int i = 0; i < 6; i++) { joints[i].target = joints[i].current; serialVel[i] = 0; }
+}
+
+void handleLine(const char* s) {
+  float v[6];
+  int n = sscanf(s + 1, "%f %f %f %f %f %f", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+  switch (s[0]) {
+    case 'A':
+      if (n >= 2 && v[0] >= 0 && v[0] < 6) {
+        Joint& j = joints[(int)v[0]];
+        homing = false;
+        j.target = constrain(v[1], j.minDeg, j.maxDeg);
+      }
+      break;
+    case 'V':
+      if (n == 6) {
+        for (int i = 0; i < 6; i++) serialVel[i] = constrain(v[i], -1.0f, 1.0f);
+        lastSerialVel = millis();
+      }
+      break;
+    case 'H': homing = true; break;
+    case 'X': stopAll(); break;
+    case 'S': if (n >= 1 && v[0] >= 0 && v[0] <= 2) { speedLevel = (uint8_t)v[0]; updateLed(); } break;
+    case '?': sendLimits(); break;
+  }
+}
+
+// USB'den gelen karakterleri satır satır topla (bloklamaz)
+void readSerial() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (lineLen) { lineBuf[lineLen] = 0; handleLine(lineBuf); lineLen = 0; }
+    } else if (lineLen < sizeof(lineBuf) - 1) {
+      lineBuf[lineLen++] = c;
+    }
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -428,9 +502,12 @@ void setup() {
   PS4.attachOnDisconnect(onDisconnect);
   PS4.begin(PS4_MAC);
   Serial.println("PS4 kolu bekleniyor... (PS tusuna basin)");
+  Serial.println("HAZIR");
+  sendLimits();
 }
 
 void loop() {
+  readSerial();
   uint32_t now = millis();
   if (now - lastLoop < LOOP_MS) return;
   float dt = (now - lastLoop) / 1000.0f;
@@ -462,6 +539,10 @@ void loop() {
     if (PS4.Options()) homing = true;
   }
 
+  // --- USB'den gelen hız komutları (PS4 ile toplanır) ---
+  if (now - lastSerialVel < SERIAL_TIMEOUT_MS)
+    for (int i = 0; i < 6; i++) vel[i] = constrain(vel[i] + serialVel[i], -1.0f, 1.0f);
+
   // Herhangi bir manuel komut gelirse home hareketini iptal et
   for (float v : vel) if (v != 0.0f) { homing = false; break; }
 
@@ -486,11 +567,11 @@ void loop() {
     }
   }
 
-  // Seri port üzerinden durum bilgisi (2 Hz)
-  if (now - lastPrint > 500) {
+  // Panel için anlık açılar (10 Hz)
+  if (now - lastPrint >= 100) {
     lastPrint = now;
-    for (auto& j : joints) { Serial.print(j.name); Serial.print(':'); Serial.print(j.current, 1); Serial.print("  "); }
-    Serial.println();
+    Serial.printf("P %.1f %.1f %.1f %.1f %.1f %.1f\n", joints[0].current, joints[1].current,
+                  joints[2].current, joints[3].current, joints[4].current, joints[5].current);
   }
 }
 ##DOSYA_SON
@@ -554,9 +635,27 @@ En yüksek numaralı `ROBOT_KOL_KURULUM_V<n>.bat` dosyasına çift tıklayın. D
 5. Kodu derler, ESP32'nin bağlı olduğu COM portunu bulur ve kodu karta yükler.
 
 Yeni bir sürüm geldiğinde güncel `.bat` dosyasına çift tıklamanız yeterli. Not: `kurulum/bat_olustur.sh` betiği, `.bat` dosyasını bu klasördeki dosyalardan yeniden üretir.
+
+## Bilgisayardan USB ile Kontrol
+
+ESP32 bilgisayara USB ile bağlıyken `KONTROL_PANELI.html` dosyasını **Chrome** veya **Edge** ile açın. **USB ile bağlan** düğmesine basıp ESP32'nin COM portunu seçin.
+
+- **Kaydırıcılar:** Her eksen kaydırıcıdaki açıya yumuşakça gider.
+- **Klavye:** Q/A taban, W/S omuz, E/D dirsek, R/F bilek eğim, T/G bilek dönüş, Y/H kıskaç kapat/aç. 1/2/3 hız, 0 başlangıç pozisyonu, Boşluk durdur.
+- **PS4 kolu (USB ile bilgisayara takılı):** Bluetooth'taki düzenin aynısıyla çalışır.
+
+Panel ve Arduino seri monitörü aynı anda açık olamaz, çünkü ikisi aynı COM portunu kullanır. Servolar USB'den değil, yine harici güç kaynağından beslenmelidir.
 ##DOSYA_SON
 ##DOSYA SURUMLER.md
 # ROBOT KOL – Sürüm Geçmişi
+
+## V6
+- Yeni: Bilgisayardan USB kablo ile kontrol. `KONTROL_PANELI.html` (Chrome veya Edge ile açılır):
+  - Her eksen için kaydırıcı (açılar ESP32'den canlı okunur)
+  - Klavye ile kontrol: Q/A, W/S, E/D, R/F, T/G, Y/H; 1-2-3 hız; 0 başlangıç pozisyonu; Boşluk durdur
+  - PS4 kolu bilgisayara USB ile takılınca ESP32'deki ile aynı düzende çalışır
+- ESP32 kodu USB seri komutlarını kabul ediyor. Kablo çekilir ya da panel kapanırsa kol 0,3 saniye içinde duruyor. PS4 Bluetooth kontrolü aynen çalışmaya devam ediyor.
+- Kurulum sonunda seri monitör yerine kontrol paneli açılıyor.
 
 ## V5
 - Düzeltme: "There is not enough space on the disk" (C: dolu) hatası.
@@ -580,4 +679,308 @@ Yeni bir sürüm geldiğinde güncel `.bat` dosyasına çift tıklamanız yeterl
 
 ## V1
 - İlk sürüm: ROBOT KOL klasörü, PS4 MAC adresi, kod yazma, Arduino CLI, ESP32 2.0.17, kütüphaneler, derleme ve yükleme.
+##DOSYA_SON
+##DOSYA KONTROL_PANELI.html
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Robot Kol Paneli</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --panel: #ffffff; --text: #1d2330; --muted: #677085; --line: #dde1e8;
+    --accent: #2563eb; --accent-text: #ffffff; --ok: #15803d; --warn: #b45309; --danger: #dc2626;
+    --track: #e3e7ee; --key: #eef1f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --panel: #1b2029; --text: #e6e9ef; --muted: #98a1b3; --line: #2c3340;
+      --accent: #4f8cff; --accent-text: #0b1020; --ok: #4ade80; --warn: #fbbf24; --danger: #f87171;
+      --track: #2a313d; --key: #252c38;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0; flex: 1 1 auto; }
+  h2 { font-size: 15px; margin: 0 0 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .status { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.on { background: var(--ok); }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+           padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.danger { background: var(--danger); color: #fff; border-color: var(--danger); font-weight: 600; }
+  button.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button:disabled { opacity: .5; cursor: default; }
+  .grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+  @media (max-width: 820px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .joint { display: grid; grid-template-columns: 110px minmax(0, 1fr) 64px; align-items: center; gap: 10px; padding: 6px 0; }
+  .joint label { font-weight: 600; }
+  .joint output { text-align: right; font-variant-numeric: tabular-nums; }
+  .joint small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  td { padding: 4px 6px; border-bottom: 1px solid var(--line); }
+  td:last-child { color: var(--muted); }
+  kbd { background: var(--key); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px; font: 13px ui-monospace, Consolas, monospace; }
+  .note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+  .warnbox { background: var(--panel); border: 1px solid var(--warn); color: var(--text); border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; display: none; }
+  #log { height: 140px; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px;
+         font: 12px/1.4 ui-monospace, Consolas, monospace; white-space: pre-wrap; margin: 0; }
+  .gp { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  .gp.on { color: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Robot Kol Paneli</h1>
+    <span class="status"><span class="dot" id="dot"></span><span id="durum">Bağlı değil</span></span>
+    <button class="primary" id="baglan">USB ile bağlan</button>
+  </header>
+
+  <div class="warnbox" id="destekYok">
+    Bu tarayıcı USB seri bağlantıyı desteklemiyor. Bu dosyayı <b>Google Chrome</b> veya <b>Microsoft Edge</b> ile açın.
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Eksenler</h2>
+      <div id="eksenler"></div>
+      <div class="row">
+        <button id="home">Başlangıç pozisyonu</button>
+        <button class="danger" id="dur">DURDUR (Boşluk)</button>
+      </div>
+      <div class="row" id="hizlar">
+        <span class="status">Hız:</span>
+        <button data-s="0">%25</button><button data-s="1">%50</button><button data-s="2">%100</button>
+      </div>
+      <p class="note">Kaydırıcıyı sürükleyince eksen o açıya yumuşakça gider. Değerler ESP32'den canlı okunur.</p>
+    </section>
+
+    <section class="card">
+      <h2>Klavye ve oyun kolu</h2>
+      <table>
+        <tr><td><kbd>Q</kbd> <kbd>A</kbd></td><td>Taban</td></tr>
+        <tr><td><kbd>W</kbd> <kbd>S</kbd></td><td>Omuz</td></tr>
+        <tr><td><kbd>E</kbd> <kbd>D</kbd></td><td>Dirsek</td></tr>
+        <tr><td><kbd>R</kbd> <kbd>F</kbd></td><td>Bilek eğim</td></tr>
+        <tr><td><kbd>T</kbd> <kbd>G</kbd></td><td>Bilek dönüş</td></tr>
+        <tr><td><kbd>Y</kbd> <kbd>H</kbd></td><td>Kıskaç kapat / aç</td></tr>
+        <tr><td><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd></td><td>Hız %25 / %50 / %100</td></tr>
+        <tr><td><kbd>0</kbd></td><td>Başlangıç pozisyonu</td></tr>
+        <tr><td><kbd>Boşluk</kbd></td><td>Durdur</td></tr>
+      </table>
+      <p class="note">PS4 kolunu bilgisayara USB ile takarsanız ESP32'deki ile aynı düzende çalışır:
+        sol çubuk taban/omuz, sağ çubuk dirsek/bilek dönüş, yön ↑↓ bilek eğim, R2/L2 kıskaç,
+        yön ←→ hız, OPTIONS başlangıç.</p>
+      <div class="gp" id="gp">Oyun kolu bulunamadı (takıp bir tuşuna basın)</div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>ESP32 mesajları</h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+
+<script>
+const EKSENLER = [
+  { ad: 'Taban',       min: 0,  max: 180, home: 90 },
+  { ad: 'Omuz',        min: 15, max: 165, home: 90 },
+  { ad: 'Dirsek',      min: 10, max: 170, home: 90 },
+  { ad: 'Bilek Eğim',  min: 0,  max: 180, home: 90 },
+  { ad: 'Bilek Dönüş', min: 0,  max: 180, home: 90 },
+  { ad: 'Kıskaç',      min: 30, max: 120, home: 60 },
+];
+const TUSLAR = { q: [0, 1], a: [0, -1], w: [1, 1], s: [1, -1], e: [2, 1], d: [2, -1],
+                 r: [3, 1], f: [3, -1], t: [4, 1], g: [4, -1], y: [5, 1], h: [5, -1] };
+const OLU_BOLGE = 0.1, EXPO = 0.6;
+
+const $ = id => document.getElementById(id);
+let port = null, yazici = null, okuyucu = null, bagli = false;
+const basili = new Set();
+let sonHizBos = true, gpOnceki = {};
+const sonDokunma = new Array(6).fill(0);
+
+// ---------------- Arayüz ----------------
+const kaydiricilar = EKSENLER.map((e, i) => {
+  const satir = document.createElement('div');
+  satir.className = 'joint';
+  satir.innerHTML = `<label for="k${i}">${e.ad}<small>${e.min}°–${e.max}°</small></label>
+    <input type="range" id="k${i}" min="${e.min}" max="${e.max}" step="1" value="${e.home}">
+    <output id="o${i}">${e.home}°</output>`;
+  $('eksenler').appendChild(satir);
+  const k = satir.querySelector('input');
+  let son = 0;
+  k.addEventListener('input', () => {
+    sonDokunma[i] = Date.now();
+    $('o' + i).textContent = k.value + '°';
+    if (Date.now() - son > 50) { son = Date.now(); gonder(`A ${i} ${k.value}`); }
+  });
+  k.addEventListener('change', () => { sonDokunma[i] = Date.now(); gonder(`A ${i} ${k.value}`); });
+  return k;
+});
+
+function hizSec(n) {
+  document.querySelectorAll('#hizlar button').forEach(b => b.classList.toggle('sel', b.dataset.s == n));
+}
+document.querySelectorAll('#hizlar button').forEach(b => b.addEventListener('click', () => gonder('S ' + b.dataset.s)));
+$('home').addEventListener('click', () => gonder('H'));
+$('dur').addEventListener('click', () => gonder('X'));
+
+function logla(t) {
+  const l = $('log');
+  l.textContent += t + '\n';
+  if (l.textContent.length > 20000) l.textContent = l.textContent.slice(-10000);
+  l.scrollTop = l.scrollHeight;
+}
+function durumYaz(on, t) { $('dot').classList.toggle('on', on); $('durum').textContent = t; }
+
+// ---------------- Seri bağlantı ----------------
+if (!('serial' in navigator)) { $('destekYok').style.display = 'block'; $('baglan').disabled = true; }
+
+$('baglan').addEventListener('click', async () => {
+  if (bagli) { await kes(); return; }
+  try {
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+  } catch (e) { logla('Bağlanılamadı: ' + e.message); return; }
+  yazici = port.writable.getWriter();
+  bagli = true;
+  durumYaz(true, 'Bağlı');
+  $('baglan').textContent = 'Bağlantıyı kes';
+  logla('Bağlandı. ESP32 yeniden başlarsa servolar başlangıç pozisyonuna gider.');
+  setTimeout(() => gonder('?'), 1500);
+  okuDongusu();
+});
+
+async function kes() {
+  try { await gonder('X'); } catch {}   // kol dursun, sonra bağlantıyı kapat
+  bagli = false;
+  try { await okuyucu?.cancel(); } catch {}
+  try { yazici?.releaseLock(); } catch {}
+  try { await port?.close(); } catch {}
+  durumYaz(false, 'Bağlı değil');
+  $('baglan').textContent = 'USB ile bağlan';
+}
+
+async function okuDongusu() {
+  const cozucu = new TextDecoder();
+  let tampon = '';
+  try {
+    okuyucu = port.readable.getReader();
+    while (bagli) {
+      const { value, done } = await okuyucu.read();
+      if (done) break;
+      tampon += cozucu.decode(value, { stream: true });
+      let n;
+      while ((n = tampon.indexOf('\n')) >= 0) {
+        satirIsle(tampon.slice(0, n).trim());
+        tampon = tampon.slice(n + 1);
+      }
+    }
+  } catch (e) {
+    if (bagli) logla('Bağlantı koptu: ' + e.message);
+  } finally {
+    try { okuyucu.releaseLock(); } catch {}
+    if (bagli) { bagli = false; durumYaz(false, 'Bağlantı koptu'); $('baglan').textContent = 'USB ile bağlan'; }
+  }
+}
+
+function satirIsle(s) {
+  if (!s) return;
+  const p = s.split(' ');
+  if (p[0] === 'P' && p.length === 7) {
+    for (let i = 0; i < 6; i++) {
+      if (Date.now() - sonDokunma[i] < 800) continue;   // kullanıcı sürüklerken dokunma
+      const v = parseFloat(p[i + 1]);
+      kaydiricilar[i].value = Math.round(v);
+      $('o' + i).textContent = v.toFixed(0) + '°';
+    }
+  } else if (p[0] === 'L' && p.length >= 5) {
+    const i = +p[1], k = kaydiricilar[i];
+    if (!k) return;
+    k.min = p[2]; k.max = p[3];
+    k.parentElement.querySelector('small').textContent = `${p[2]}°–${p[3]}°`;
+  } else if (p[0] === 'S') {
+    hizSec(p[1]);
+  } else {
+    logla(s);
+    if (s === 'HAZIR') gonder('?');
+  }
+}
+
+let yazmaZinciri = Promise.resolve();
+function gonder(komut) {
+  if (!bagli || !yazici) return Promise.resolve();
+  const veri = new TextEncoder().encode(komut + '\n');
+  yazmaZinciri = yazmaZinciri.then(() => yazici.write(veri)).catch(e => logla('Gönderilemedi: ' + e.message));
+  return yazmaZinciri;
+}
+
+// ---------------- Klavye ----------------
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.target.type !== 'range') return;
+  const k = e.key.toLowerCase();
+  if (TUSLAR[k]) { basili.add(k); e.preventDefault(); }
+  else if (k === ' ') { gonder('X'); e.preventDefault(); }
+  else if (k === '0') gonder('H');
+  else if (k >= '1' && k <= '3') gonder('S ' + (k - 1));
+});
+addEventListener('keyup', e => basili.delete(e.key.toLowerCase()));
+addEventListener('blur', () => basili.clear());
+
+// ---------------- Oyun kolu (Gamepad API) ----------------
+function sekillendir(v) {
+  const a = Math.abs(v);
+  if (a < OLU_BOLGE) return 0;
+  let n = Math.min(1, (a - OLU_BOLGE) / (1 - OLU_BOLGE));
+  n = EXPO * n * n * n + (1 - EXPO) * n;
+  return Math.sign(v) * n;
+}
+function oyunKolu() {
+  for (const g of navigator.getGamepads ? navigator.getGamepads() : []) if (g && g.connected) return g;
+  return null;
+}
+function kenar(ad, basildi) { const ilk = basildi && !gpOnceki[ad]; gpOnceki[ad] = basildi; return ilk; }
+
+// ---------------- Hız komutu döngüsü (20 Hz) ----------------
+setInterval(() => {
+  const v = [0, 0, 0, 0, 0, 0];
+  for (const k of basili) { const [i, yon] = TUSLAR[k]; v[i] += yon; }
+
+  const g = oyunKolu();
+  $('gp').textContent = g ? 'Oyun kolu bağlı: ' + g.id : 'Oyun kolu bulunamadı (takıp bir tuşuna basın)';
+  $('gp').classList.toggle('on', !!g);
+  if (g) {
+    const b = i => g.buttons[i] || { pressed: false, value: 0 };
+    v[0] += sekillendir(g.axes[0] || 0);
+    v[1] += sekillendir(-(g.axes[1] || 0));          // çubuk yukarı = pozitif (ESP32 ile aynı)
+    v[2] += sekillendir(-(g.axes[3] || 0));
+    v[4] += sekillendir(g.axes[2] || 0);
+    if (b(12).pressed) v[3] += 1;
+    if (b(13).pressed) v[3] -= 1;
+    v[5] += b(7).value - b(6).value;                 // R2 kapat, L2 aç
+    const secili = document.querySelector('#hizlar button.sel');
+    const hiz = secili ? +secili.dataset.s : 1;
+    if (kenar('sol', b(14).pressed) && hiz > 0) gonder('S ' + (hiz - 1));
+    if (kenar('sag', b(15).pressed) && hiz < 2) gonder('S ' + (hiz + 1));
+    if (kenar('opt', b(9).pressed)) gonder('H');
+  }
+
+  const vs = v.map(x => Math.max(-1, Math.min(1, x)));
+  const bos = vs.every(x => x === 0);
+  if (!bos || !sonHizBos) gonder('V ' + vs.map(x => x.toFixed(2)).join(' '));
+  sonHizBos = bos;
+}, 50);
+</script>
+</body>
+</html>
 ##DOSYA_SON

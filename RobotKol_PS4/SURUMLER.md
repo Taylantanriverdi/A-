@@ -1,5 +1,13 @@
 # ROBOT KOL – Sürüm Geçmişi
 
+## V6
+- Yeni: Bilgisayardan USB kablo ile kontrol. `KONTROL_PANELI.html` (Chrome veya Edge ile açılır):
+  - Her eksen için kaydırıcı (açılar ESP32'den canlı okunur)
+  - Klavye ile kontrol: Q/A, W/S, E/D, R/F, T/G, Y/H; 1-2-3 hız; 0 başlangıç pozisyonu; Boşluk durdur
+  - PS4 kolu bilgisayara USB ile takılınca ESP32'deki ile aynı düzende çalışır
+- ESP32 kodu USB seri komutlarını kabul ediyor. Kablo çekilir ya da panel kapanırsa kol 0,3 saniye içinde duruyor. PS4 Bluetooth kontrolü aynen çalışmaya devam ediyor.
+- Kurulum sonunda seri monitör yerine kontrol paneli açılıyor.
+
 ## V5
 - Düzeltme: "There is not enough space on the disk" (C: dolu) hatası.
 - Kurulumdan önce disklerdeki boş alan gösteriliyor. Araçlar, en az 4 GB boş alanı olan ilk sürücüye kuruluyor (önce C:, yetmezse D:, E: ...).

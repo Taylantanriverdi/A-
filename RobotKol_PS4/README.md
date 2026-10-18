@@ -57,3 +57,13 @@ En yüksek numaralı `ROBOT_KOL_KURULUM_V<n>.bat` dosyasına çift tıklayın. D
 5. Kodu derler, ESP32'nin bağlı olduğu COM portunu bulur ve kodu karta yükler.
 
 Yeni bir sürüm geldiğinde güncel `.bat` dosyasına çift tıklamanız yeterli. Not: `kurulum/bat_olustur.sh` betiği, `.bat` dosyasını bu klasördeki dosyalardan yeniden üretir.
+
+## Bilgisayardan USB ile Kontrol
+
+ESP32 bilgisayara USB ile bağlıyken `KONTROL_PANELI.html` dosyasını **Chrome** veya **Edge** ile açın. **USB ile bağlan** düğmesine basıp ESP32'nin COM portunu seçin.
+
+- **Kaydırıcılar:** Her eksen kaydırıcıdaki açıya yumuşakça gider.
+- **Klavye:** Q/A taban, W/S omuz, E/D dirsek, R/F bilek eğim, T/G bilek dönüş, Y/H kıskaç kapat/aç. 1/2/3 hız, 0 başlangıç pozisyonu, Boşluk durdur.
+- **PS4 kolu (USB ile bilgisayara takılı):** Bluetooth'taki düzenin aynısıyla çalışır.
+
+Panel ve Arduino seri monitörü aynı anda açık olamaz, çünkü ikisi aynı COM portunu kullanır. Servolar USB'den değil, yine harici güç kaynağından beslenmelidir.

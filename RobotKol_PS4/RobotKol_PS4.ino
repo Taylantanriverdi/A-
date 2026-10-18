@@ -1,5 +1,6 @@
 /*
  * 6 Eksenli Robot Kol - ESP32 + PCA9685 + PS4 (DualShock 4) Bluetooth kontrolü
+ *                        + bilgisayardan USB kablo ile kontrol (KONTROL_PANELI.html)
  *
  * Kütüphaneler (Arduino IDE > Kütüphane Yöneticisi / GitHub):
  *   - PS4Controller          (aed3/PS4-esp32)
@@ -16,6 +17,16 @@
  *   R2 / L2       -> Eksen 6: Kıskaç kapat / aç (basınç kadar hızlı)
  *   Yön ← / →     -> Hız kademesi düşür / artır (%25 - %50 - %100, LED rengi değişir)
  *   OPTIONS       -> Tüm eksenleri yavaşça başlangıç (home) pozisyonuna getir
+ *
+ * USB SERİ KOMUTLARI (115200 baud, her komut bir satır)
+ *   A i derece          -> i. eksenin hedef açısını ayarla (panel kaydırıcıları)
+ *   V v0 v1 .. v5       -> 6 eksen için hız komutu (-1..1). 300 ms yeni komut
+ *                          gelmezse sıfırlanır (kablo çekilirse kol durur)
+ *   H                   -> home pozisyonu
+ *   X                   -> acil durdurma (kol olduğu yerde kalır)
+ *   S n                 -> hız kademesi (0, 1, 2)
+ *   ?                   -> eksen sınırlarını gönder ("L i min max home isim")
+ *   ESP32 10 Hz ile "P a0 .. a5" (anlık açılar) satırı gönderir.
  *
  * YUMUŞAKLIK (SMOOTH) NASIL SAĞLANIYOR?
  *   1) Ölü bölge (deadzone): çubuk merkezdeki küçük titreşimler yok sayılır.
@@ -82,6 +93,13 @@ bool     homing     = false;
 bool     prevLeft = false, prevRight = false;
 uint32_t lastLoop = 0, lastPrint = 0;
 
+// ---- USB seri kontrol (bilgisayar paneli) ----
+const uint32_t SERIAL_TIMEOUT_MS = 300;
+float    serialVel[6] = {0, 0, 0, 0, 0, 0};
+uint32_t lastSerialVel = 0;
+char     lineBuf[96];
+uint8_t  lineLen = 0;
+
 // -------------------------------------------------------------------------
 // Çubuk değerini (-128..127) ölü bölge + expo uygulanmış -1..1 aralığına çevirir
 float stickToNorm(int v) {
@@ -104,6 +122,7 @@ void writeServo(const Joint& j) {
 }
 
 void updateLed() {
+  Serial.printf("S %d\n", speedLevel);   // paneli de bilgilendir
   if (!PS4.isConnected()) return;
   if (speedLevel == 0)      PS4.setLed(0, 255, 0);    // yavaş: yeşil
   else if (speedLevel == 1) PS4.setLed(0, 0, 255);    // orta: mavi
@@ -121,6 +140,53 @@ void onDisconnect() {
   Serial.println("PS4 baglantisi koptu! Kol donduruldu.");
   homing = false;
   for (auto& j : joints) j.target = j.current;
+}
+
+void sendLimits() {
+  for (int i = 0; i < 6; i++)
+    Serial.printf("L %d %.0f %.0f %.0f %s\n", i, joints[i].minDeg, joints[i].maxDeg, joints[i].homeDeg, joints[i].name);
+  Serial.printf("S %d\n", speedLevel);
+}
+
+void stopAll() {
+  homing = false;
+  for (int i = 0; i < 6; i++) { joints[i].target = joints[i].current; serialVel[i] = 0; }
+}
+
+void handleLine(const char* s) {
+  float v[6];
+  int n = sscanf(s + 1, "%f %f %f %f %f %f", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5]);
+  switch (s[0]) {
+    case 'A':
+      if (n >= 2 && v[0] >= 0 && v[0] < 6) {
+        Joint& j = joints[(int)v[0]];
+        homing = false;
+        j.target = constrain(v[1], j.minDeg, j.maxDeg);
+      }
+      break;
+    case 'V':
+      if (n == 6) {
+        for (int i = 0; i < 6; i++) serialVel[i] = constrain(v[i], -1.0f, 1.0f);
+        lastSerialVel = millis();
+      }
+      break;
+    case 'H': homing = true; break;
+    case 'X': stopAll(); break;
+    case 'S': if (n >= 1 && v[0] >= 0 && v[0] <= 2) { speedLevel = (uint8_t)v[0]; updateLed(); } break;
+    case '?': sendLimits(); break;
+  }
+}
+
+// USB'den gelen karakterleri satır satır topla (bloklamaz)
+void readSerial() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      if (lineLen) { lineBuf[lineLen] = 0; handleLine(lineBuf); lineLen = 0; }
+    } else if (lineLen < sizeof(lineBuf) - 1) {
+      lineBuf[lineLen++] = c;
+    }
+  }
 }
 
 // -------------------------------------------------------------------------
@@ -145,9 +211,12 @@ void setup() {
   PS4.attachOnDisconnect(onDisconnect);
   PS4.begin(PS4_MAC);
   Serial.println("PS4 kolu bekleniyor... (PS tusuna basin)");
+  Serial.println("HAZIR");
+  sendLimits();
 }
 
 void loop() {
+  readSerial();
   uint32_t now = millis();
   if (now - lastLoop < LOOP_MS) return;
   float dt = (now - lastLoop) / 1000.0f;
@@ -179,6 +248,10 @@ void loop() {
     if (PS4.Options()) homing = true;
   }
 
+  // --- USB'den gelen hız komutları (PS4 ile toplanır) ---
+  if (now - lastSerialVel < SERIAL_TIMEOUT_MS)
+    for (int i = 0; i < 6; i++) vel[i] = constrain(vel[i] + serialVel[i], -1.0f, 1.0f);
+
   // Herhangi bir manuel komut gelirse home hareketini iptal et
   for (float v : vel) if (v != 0.0f) { homing = false; break; }
 
@@ -203,10 +276,10 @@ void loop() {
     }
   }
 
-  // Seri port üzerinden durum bilgisi (2 Hz)
-  if (now - lastPrint > 500) {
+  // Panel için anlık açılar (10 Hz)
+  if (now - lastPrint >= 100) {
     lastPrint = now;
-    for (auto& j : joints) { Serial.print(j.name); Serial.print(':'); Serial.print(j.current, 1); Serial.print("  "); }
-    Serial.println();
+    Serial.printf("P %.1f %.1f %.1f %.1f %.1f %.1f\n", joints[0].current, joints[1].current,
+                  joints[2].current, joints[3].current, joints[4].current, joints[5].current);
   }
 }
