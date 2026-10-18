@@ -1,5 +1,6 @@
-# ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM.bat icine gomulur)
-$SURUM = '1.2'
+# ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
+# Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
+$SURUM = 'V3'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -103,7 +104,15 @@ foreach ($m in $re.Matches($veri)) {
     [IO.File]::WriteAllText($hedef, $icerik, $utf8)
     Tamam "yazildi: $rel"
 }
-$batKopya = Join-Path $ana 'ROBOT_KOL_KURULUM.bat'
+# Klasorde sadece guncel surumun bat dosyasi durur, eskiler yedekler\eski_surumler'e tasinir
+$batKopya = Join-Path $ana "ROBOT_KOL_KURULUM_$SURUM.bat"
+$eskiDir = Join-Path $ana 'yedekler\eski_surumler'
+foreach ($b in Get-ChildItem $ana -Filter 'ROBOT_KOL_KURULUM*.bat') {
+    if ($b.FullName -eq $batKopya -or $b.FullName -eq (Resolve-Path $env:ROBOTKOL_BAT).Path) { continue }
+    New-Item -ItemType Directory -Force -Path $eskiDir | Out-Null
+    Move-Item $b.FullName (Join-Path $eskiDir $b.Name) -Force
+    Bilgi "eski surum tasindi: yedekler\eski_surumler\$($b.Name)"
+}
 if ((Resolve-Path $env:ROBOTKOL_BAT).Path -ne $batKopya) { Copy-Item $env:ROBOTKOL_BAT $batKopya -Force }
 [IO.File]::WriteAllText((Join-Path $ana 'SURUM.txt'), "Kurulum surumu: $SURUM`r`nSon calisma: $(Get-Date)`r`n", $utf8)
 

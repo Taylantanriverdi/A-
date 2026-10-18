@@ -48,7 +48,7 @@ Kod: [`RobotKol_PS4.ino`](RobotKol_PS4.ino)
 
 ## Tek Tıkla Kurulum (Windows)
 
-`ROBOT_KOL_KURULUM.bat` dosyasına çift tıklayın. Dosya şunları kendisi yapar:
+En yüksek numaralı `ROBOT_KOL_KURULUM_V<n>.bat` dosyasına çift tıklayın. Değişiklikler `SURUMLER.md` dosyasında. Dosya şunları kendisi yapar:
 
 1. Masaüstünde **ROBOT KOL** klasörünü oluşturur. Bütün dosyalar ve araçlar bu klasöre konur.
 2. PS4 kolunun MAC adresini bir kez sorar ve `ayarlar.txt` dosyasına kaydeder.

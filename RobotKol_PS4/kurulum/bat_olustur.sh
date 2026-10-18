@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# ROBOT_KOL_KURULUM.bat dosyasini kurulum.ps1 + proje dosyalarindan (CRLF) uretir.
+# ROBOT_KOL_KURULUM_V<n>.bat dosyasini (surum kurulum.ps1 icindeki $SURUM) kurulum.ps1 + proje dosyalarindan (CRLF) uretir.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-OUT=ROBOT_KOL_KURULUM.bat
+SURUM=$(sed -n "s/^\$SURUM = '\(.*\)'.*/\1/p" kurulum/kurulum.ps1 | tr -d '\r')
+OUT=ROBOT_KOL_KURULUM_${SURUM}.bat
+rm -f ROBOT_KOL_KURULUM*.bat
 {
 cat <<'HDR'
 @echo off
@@ -18,7 +20,7 @@ exit /b
 HDR
 cat kurulum/kurulum.ps1
 echo '##PS_BITIS'
-for f in RobotKol_PS4.ino README.md; do
+for f in RobotKol_PS4.ino README.md SURUMLER.md; do
   case $f in *.ino) dest="RobotKol_PS4/$f" ;; *) dest="$f" ;; esac
   echo "##DOSYA $dest"
   cat "$f"
