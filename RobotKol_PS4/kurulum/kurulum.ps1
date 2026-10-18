@@ -1,6 +1,6 @@
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
 # Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
-$SURUM = 'V4'
+$SURUM = 'V5'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -32,25 +32,62 @@ New-Item -ItemType Directory -Force -Path $ana | Out-Null
 Tamam $ana
 
 # Arduino araclari (Go tabanli) bosluk, Turkce karakter ve kisayol (junction) iceren
-# yollarda hata verebildigi icin araclar gercek bir klasorde (C:\RobotKol) tutulur.
+# yollarda hata verebildigi icin araclar gercek bir X:\RobotKol klasorunde tutulur.
 # ROBOT KOL\araclar bu klasore acilan bir kisayoldur; icerigi masaustunden gorulebilir.
+# Disk, yeterli bos alani olan ilk sabit surucu olarak secilir (once C:).
+$GEREKLI_GB = 4
 function Kisayol-mi($yol) {
     (Test-Path $yol) -and ((Get-Item $yol -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)
 }
-$arac = 'C:\RobotKol'
-# Surum 1.0 C:\RobotKol'u masaustune kisayol olarak acmisti: once onu kaldir (sadece kisayol silinir).
-if (Kisayol-mi $arac) { [IO.Directory]::Delete($arac, $false) }
-try { New-Item -ItemType Directory -Force -Path $arac | Out-Null }
-catch { $arac = 'C:\Users\Public\RobotKol'; New-Item -ItemType Directory -Force -Path $arac | Out-Null }
-foreach ($eski in 'araclar', 'kutuphaneler') {   # surum 1.0'dan kalan yarim kurulum klasorleri
+function Klasor-Boyutu($yol) {
+    if (-not (Test-Path $yol)) { return [double]0 }
+    $t = (Get-ChildItem $yol -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
+    if ($t) { [double]$t } else { [double]0 }
+}
+function GB($b) { [math]::Round($b / 1GB, 1) }
+
+# Surum V1 C:\RobotKol'u masaustune kisayol olarak acmisti: once onu kaldir (sadece kisayol silinir).
+if (Kisayol-mi 'C:\RobotKol') { [IO.Directory]::Delete('C:\RobotKol', $false) }
+
+$adaylar = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | Sort-Object { $_.DeviceID -ne 'C:' }, DeviceID | ForEach-Object {
+    $yol = "$($_.DeviceID)\RobotKol"
+    [pscustomobject]@{
+        Yol   = $yol
+        Bos   = [double]$_.FreeSpace + (Klasor-Boyutu $yol)   # eski yarim kurulum silinirse acilacak alan dahil
+        Hazir = Test-Path "$yol\arduino15\packages\esp32\hardware\esp32\$ESP32_SURUM"
+    }
+})
+foreach ($a in $adaylar) { Bilgi "$($a.Yol.Substring(0, 2)) surucusu kullanilabilir alan: $(GB $a.Bos) GB" }
+$secim = $adaylar | Where-Object { $_.Hazir } | Select-Object -First 1
+if (-not $secim) { $secim = $adaylar | Where-Object { $_.Bos -ge $GEREKLI_GB * 1GB } | Select-Object -First 1 }
+if (-not $secim) {
+    Start-Process cleanmgr.exe
+    throw "Diskte yeterli bos alan yok. ESP32 paketi icin en az $GEREKLI_GB GB gerekli. Disk Temizleme acildi; yer acip bu dosyaya tekrar cift tiklayin."
+}
+$arac = $secim.Yol
+
+# Baska suruculerde kalmis yarim kurulumlari tasi/sil (indirilmis dosyalar korunur).
+foreach ($a in $adaylar) {
+    if ($a.Yol -eq $arac -or -not (Test-Path $a.Yol) -or (Kisayol-mi $a.Yol)) { continue }
+    $eskiInd = Join-Path $a.Yol 'indirilenler'
+    if (Test-Path $eskiInd) { robocopy $eskiInd (Join-Path $arac 'indirilenler') /E /MOVE /NFL /NDL /NJH /NJS /NP | Out-Null }
+    Remove-Item $a.Yol -Recurse -Force -ErrorAction SilentlyContinue
+    Bilgi "Yer acmak icin eski yarim kurulum silindi: $($a.Yol)"
+}
+New-Item -ItemType Directory -Force -Path $arac | Out-Null
+
+foreach ($eski in 'araclar', 'kutuphaneler') {   # surum V1'den kalan yarim kurulum klasorleri
     $y = Join-Path $ana $eski
     if ((Test-Path $y) -and -not (Kisayol-mi $y)) { Remove-Item $y -Recurse -Force }
 }
 $link = Join-Path $ana 'araclar'
-if (-not (Test-Path $link)) {
-    try { New-Item -ItemType Junction -Path $link -Target $arac | Out-Null } catch { Uyari "Kisayol acilamadi: $link" }
-}
+if (Kisayol-mi $link) { [IO.Directory]::Delete($link, $false) }   # sadece kisayolu yeniler
+try { New-Item -ItemType Junction -Path $link -Target $arac | Out-Null } catch { Uyari "Kisayol acilamadi: $link" }
 Bilgi "Arduino araclari: $arac  (masaustunde: ROBOT KOL\araclar)"
+
+# Gecici dosyalar da secilen surucuye yazilsin (C: dolu olabilir)
+$env:TEMP = $env:TMP = Join-Path $arac 'gecici'
+New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
 
 $cliDir  = Join-Path $arac 'arduino-cli'
 $script:cli = Join-Path $cliDir 'arduino-cli.exe'
@@ -169,6 +206,8 @@ if (-not (Test-Path (Join-Path $ps4Dir 'library.properties'))) {
     Remove-Item $zip, $gecici -Recurse -Force
 }
 Tamam 'Kutuphaneler: Adafruit PWM Servo Driver, PS4Controller'
+# Kurulumdan sonra indirme onbellegi ve gecici dosyalar gereksiz: yer kazanmak icin silinir
+Remove-Item (Join-Path $arac 'indirilenler'), (Join-Path $env:TEMP '*') -Recurse -Force -ErrorAction SilentlyContinue
 
 # ---------------------------------------------------------------------------
 Baslik '6/7 Kod derleniyor'
