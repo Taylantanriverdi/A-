@@ -45,3 +45,15 @@ Kod: [`RobotKol_PS4.ino`](RobotKol_PS4.ino)
 2. Aynı MAC'i koddaki `PS4_MAC` değişkenine yazın.
 3. ESP32 Arduino Core **2.0.x** (ör. 2.0.17) kullanın.
 4. Kodu yükledikten sonra kolun **PS** tuşuna basın; ışık çubuğu mavi yanınca bağlantı kurulmuştur.
+
+## Tek Tıkla Kurulum (Windows)
+
+`ROBOT_KOL_KURULUM.bat` dosyasına çift tıklayın. Dosya şunları kendisi yapar:
+
+1. Masaüstünde **ROBOT KOL** klasörünü oluşturur. Bütün dosyalar ve araçlar bu klasöre konur.
+2. PS4 kolunun MAC adresini bir kez sorar ve `ayarlar.txt` dosyasına kaydeder.
+3. Kodu ve bu belgeyi yazar. Bir dosya değiştiyse eski sürümünü `yedekler\` klasörüne alır.
+4. Arduino CLI'yi, ESP32 kart paketini (2.0.17) ve kütüphaneleri indirip kurar.
+5. Kodu derler, ESP32'nin bağlı olduğu COM portunu bulur ve kodu karta yükler.
+
+Yeni bir sürüm geldiğinde güncel `.bat` dosyasına çift tıklamanız yeterli. Not: `kurulum/bat_olustur.sh` betiği, `.bat` dosyasını bu klasördeki dosyalardan yeniden üretir.
