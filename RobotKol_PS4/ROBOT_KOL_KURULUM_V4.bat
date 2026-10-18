@@ -10,7 +10,7 @@ exit /b
 ##PS_BASLA
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
 # Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
-$SURUM = 'V3'
+$SURUM = 'V4'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -151,8 +151,15 @@ Tamam 'Arduino CLI hazir'
 
 # ---------------------------------------------------------------------------
 Baslik "5/7 ESP32 kart paketi ($ESP32_SURUM) ve kutuphaneler (ilk seferde uzun surer)"
-Arduino core update-index
-$kurulu = & $script:cli --config-file $script:cfg core list 2>$null | Out-String
+# Paket ve kutuphane listelerini guncelle. Bir liste guncellenemese bile (or. "Some indexes
+# could not be updated") ESP32 listesi diskte varsa kuruluma devam edilir.
+& $script:cli --config-file $script:cfg update
+if ($LASTEXITCODE -ne 0) {
+    $espIndex = Join-Path $arac 'arduino15\package_esp32_index.json'
+    if (-not (Test-Path $espIndex)) { throw 'ESP32 paket listesi indirilemedi. Internet baglantisini kontrol edin.' }
+    Uyari 'Bazi listeler guncellenemedi, diskteki listelerle devam ediliyor.'
+}
+$kurulu = & $script:cli --config-file $script:cfg core list | Out-String
 if ($kurulu -notmatch "esp32:esp32\s+$([regex]::Escape($ESP32_SURUM))") {
     Bilgi 'ESP32 paketi indiriliyor (~600 MB)...'
     Arduino core install "esp32:esp32@$ESP32_SURUM"
@@ -511,6 +518,10 @@ Yeni bir sürüm geldiğinde güncel `.bat` dosyasına çift tıklamanız yeterl
 ##DOSYA_SON
 ##DOSYA SURUMLER.md
 # ROBOT KOL – Sürüm Geçmişi
+
+## V4
+- Düzeltme: "arduino-cli hata verdi: core update-index" hatası. Liste güncellemesinde "Some indexes could not be updated" uyarısı çıksa bile ESP32 listesi indirilmişse kurulum devam ediyor.
+- Paket listesiyle birlikte kütüphane listesi de güncelleniyor (`arduino-cli update`).
 
 ## V3
 - Arduino araçları gerçek `C:\RobotKol` klasörüne kuruluyor. Masaüstündeki `ROBOT KOL\araclar` bu klasöre giden bir kısayol.

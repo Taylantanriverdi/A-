@@ -1,5 +1,9 @@
 # ROBOT KOL – Sürüm Geçmişi
 
+## V4
+- Düzeltme: "arduino-cli hata verdi: core update-index" hatası. Liste güncellemesinde "Some indexes could not be updated" uyarısı çıksa bile ESP32 listesi indirilmişse kurulum devam ediyor.
+- Paket listesiyle birlikte kütüphane listesi de güncelleniyor (`arduino-cli update`).
+
 ## V3
 - Arduino araçları gerçek `C:\RobotKol` klasörüne kuruluyor. Masaüstündeki `ROBOT KOL\araclar` bu klasöre giden bir kısayol.
 - Düzeltme: "following symlink ... packages" hatası giderildi.
