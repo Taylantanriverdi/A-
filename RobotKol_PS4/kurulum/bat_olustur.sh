@@ -26,5 +26,8 @@ for f in RobotKol_PS4.ino README.md SURUMLER.md KONTROL_PANELI.html; do
   cat "$f"
   echo '##DOSYA_SON'
 done
+echo '##DOSYA64 ROBOT_KOL_KILAVUZ.pdf'
+base64 -w 76 ROBOT_KOL_KILAVUZ.pdf
+echo '##DOSYA_SON'
 } | sed 's/\r$//; s/$/\r/' > "$OUT"
 echo "olusturuldu: $OUT"

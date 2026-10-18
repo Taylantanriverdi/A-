@@ -1,5 +1,9 @@
 # ROBOT KOL – Sürüm Geçmişi
 
+## V7
+- Yeni: `ROBOT_KOL_KILAVUZ.pdf` (14 sayfa, resimli). İçinde malzeme listesi, 3D baskı parçaları ve ayarları, bağlantı şeması, yazılım kurulumu, PS4 eşleştirme, servo ortalama, 7 adımda montaj, kalibrasyon, kullanım, sorun giderme ve kontrol listesi var.
+- Kurulum dosyası kılavuzu da ROBOT KOL klasörüne koyuyor.
+
 ## V6
 - Yeni: Bilgisayardan USB kablo ile kontrol. `KONTROL_PANELI.html` (Chrome veya Edge ile açılır):
   - Her eksen için kaydırıcı (açılar ESP32'den canlı okunur)

@@ -1,6 +1,6 @@
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
 # Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
-$SURUM = 'V6'
+$SURUM = 'V7'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -120,12 +120,24 @@ Tamam "MAC = $mac  (degistirmek icin: $ayar)"
 Baslik '3/7 Proje dosyalari yaziliyor / guncelleniyor'
 $bat = [IO.File]::ReadAllText($env:ROBOTKOL_BAT, [Text.Encoding]::UTF8)
 $veri = $bat.Substring($bat.IndexOf('#' + '#PS_BITIS'))
-$re = [regex]'(?ms)^##DOSYA (.+?)\r?\n(.*?)\r?\n##DOSYA_SON'
+# ##DOSYA = metin dosyasi, ##DOSYA64 = base64 ile gomulu ikili dosya (or. PDF kilavuz)
+$re = [regex]'(?ms)^##DOSYA(64)? (.+?)\r?\n(.*?)\r?\n##DOSYA_SON'
 $damga = Get-Date -Format 'yyyyMMdd_HHmmss'
 foreach ($m in $re.Matches($veri)) {
-    $rel = $m.Groups[1].Value.Trim()
+    $ikili = $m.Groups[1].Success
+    $rel = $m.Groups[2].Value.Trim()
     $hedef = Join-Path $ana $rel
-    $icerik = ($m.Groups[2].Value -replace "`r?`n", "`r`n") + "`r`n"
+    if ($ikili) {
+        $bayt = [Convert]::FromBase64String(($m.Groups[3].Value -replace '\s', ''))
+        New-Item -ItemType Directory -Force -Path (Split-Path $hedef) | Out-Null
+        if ((Test-Path $hedef) -and ([Convert]::ToBase64String([IO.File]::ReadAllBytes($hedef)) -eq [Convert]::ToBase64String($bayt))) {
+            Bilgi "degisiklik yok: $rel"; continue
+        }
+        [IO.File]::WriteAllBytes($hedef, $bayt)   # kilavuz her surumde yenisiyle degisir, yedeklenmez
+        Tamam "yazildi: $rel"
+        continue
+    }
+    $icerik = ($m.Groups[3].Value -replace "`r?`n", "`r`n") + "`r`n"
     if ($rel -like '*.ino') {
         $icerik = $icerik -replace 'const char\* PS4_MAC = "[^"]*";', "const char* PS4_MAC = `"$mac`";"
     }
