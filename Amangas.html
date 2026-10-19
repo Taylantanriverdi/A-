@@ -204,6 +204,17 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
 .outfit.on { border-color: #ffd23a; background: #3a3010; }
 .outfit.on::after { content: 'GİYİLİ ✔'; font-family: var(--font-display); font-size: 11px; color: #ffd23a; }
 @media (max-width: 520px) { #vip { justify-content: center; } #vip .card { margin: auto; } }
+.math-title { color: #8fd3ff; text-shadow: 0 4px 0 #173c5c; font-size: clamp(24px, 7vw, 34px); }
+#mathQ { font-family: var(--font-display); font-size: clamp(44px, 14vw, 72px); color: #fff; line-height: 1.1; }
+#mathA { font-family: var(--font-display); font-size: 44px; min-height: 58px; color: var(--hazard); background: #0d1117; border: 2px solid #3a434f; border-radius: 12px; padding: 4px 0; }
+#mathA.ok { color: var(--ok); border-color: var(--ok); }
+#mathA.bad { color: var(--danger); border-color: var(--danger); animation: shake .35s; }
+@keyframes shake { 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pad button { font-family: var(--font-display); font-size: 28px; padding: 10px 0; border: 0; border-radius: 12px; background: #2a3b66; color: #fff; cursor: pointer; box-shadow: 0 4px 0 #15203a; }
+.pad button:active { transform: translateY(3px); box-shadow: 0 1px 0 #15203a; }
+.pad .del { background: #5a2330; box-shadow: 0 4px 0 #2a0e15; }
+.pad .go { background: var(--ok); color: #08311a; box-shadow: 0 4px 0 #14532d; }
 @media (prefers-reduced-motion: reduce) { .shh span, #chat div { animation: none; } #flash, #toast, #info .bar > i { transition: none; } }
 </style>
 
@@ -243,7 +254,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
     <p class="muted" style="font-size:13px">Herkesin rengi ve adı hep aynıdır; dünya değişse de isimler değişmez.</p>
     <div class="keys">
       <kbd>← ↑ → ↓</kbd><span>Yürü (ok tuşları)</span>
-      <kbd>E</kbd><span>Görev yap (basılı tut) / Katilsen öldür (bazen bıçakla, bazen dille!)</span>
+      <kbd>E</kbd><span>Görev yap (basılı tut ya da 🔢 matematik sorusunu rakamlarla çöz) / Katilsen öldür (bazen bıçakla, bazen dille!)</span>
       <kbd>R</kbd><span>Ölüyü raporla ya da kafeteryadaki kırmızı düğmeye bas</span>
       <kbd>H</kbd><span>Haritayı tam ekran yap · <b>Ç</b> ile kapat</span>
       <kbd>Ü</kbd><span>VIP dolabı: kıyafetler</span>
@@ -304,6 +315,17 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
     <p class="muted" style="font-size:14px">Giymek ya da çıkarmak için dokun. Kapatmak için <b>Ü</b> ya da <b>Ç</b>.</p>
     <div class="vipgrid" id="vipGrid"></div>
     <button class="big" id="vipClose" type="button">TAMAM</button>
+  </div>
+</div>
+
+<div class="screen" id="math" hidden>
+  <div class="card" style="max-width:380px">
+    <h2 class="math-title" id="mathTitle">GÖREV</h2>
+    <p class="muted" style="font-size:14px">Görevi bitirmek için soruyu çöz! Rakamlarla yaz, sonra <b>Enter</b>'a bas.</p>
+    <div id="mathQ">3 + 4 = ?</div>
+    <div id="mathA"></div>
+    <div class="pad" id="mathPad"></div>
+    <p class="muted" style="font-size:13px">Kapatmak için <b>Ç</b></p>
   </div>
 </div>
 
@@ -577,7 +599,7 @@ const TASKS = [];
 ZONES.forEach(zn => zn.tasks.forEach((base, i) => {
   const mx = zn.x0 + zn.offs[i], mz = zn.z0 + 2.4, k = TASKS.length;
   machine(mx, mz, 3.4, 2, MCOLORS[k % 5], k % 4);
-  TASKS.push({ base, name: base, x: mx, z: mz + 2.4, floor: zn.f, zone: zn.name });
+  TASKS.push({ base, name: base, x: mx, z: mz + 2.4, floor: zn.f, zone: zn.name, math: k % 2 === 0 });
 }));
 TASKS.forEach(t => {
   t.ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.2, 32), new THREE.MeshBasicMaterial({ color: 0xffc928, transparent: true, opacity: .85 }));
@@ -1312,7 +1334,7 @@ function clearRound() {
   [player, pet, ...npcs].forEach(e => e && scene.remove(e.g));
   corpses.forEach(c => scene.remove(c));
   npcs = []; corpses = []; player = null; ipek = null; pet = null;
-  closeVip(); setMapBig(false); endMeetingVisuals();
+  closeVip(); closeMath(); setMapBig(false); endMeetingVisuals();
   $('ejectHud').hidden = true; $('elev').hidden = true; $('meetHud').hidden = true;
 }
 
@@ -1402,6 +1424,57 @@ function toggleVip() {
   renderVip(); $('vip').hidden = false;
 }
 function closeVip() { vipOpen = false; $('vip').hidden = true; }
+
+// ---------- Görev ekranında çok kolay matematik soruları ----------
+let mathOpen = false, mathTask = null, mathAns = 0, mathIn = '', mathLock = false;
+function completeTask(t) {
+  t.done = true; t.progress = 1; sfx.task(); toast(`Görev bitti: ${t.name}`);
+  t.ring.material.color.set(0x4ade80); t.gem.material.color.set(0x4ade80); t.gem.material.emissive.set(0x1a7a40);
+  checkWin();
+}
+function newQuestion() {
+  let q;
+  if (Math.random() < .55) { const a = 1 + Math.floor(Math.random() * 9), b = Math.floor(Math.random() * (11 - a)); q = `${a} + ${b}`; mathAns = a + b; }
+  else { const a = 2 + Math.floor(Math.random() * 9), b = Math.floor(Math.random() * (a + 1)); q = `${a} − ${b}`; mathAns = a - b; }
+  $('mathQ').textContent = `${q} = ?`;
+  mathIn = ''; renderMath('');
+}
+function renderMath(cls) { const a = $('mathA'); a.textContent = mathIn || ' '; a.className = cls; }
+function openMath(t) {
+  if (state !== 'play' || t.done) return;
+  mathOpen = true; mathTask = t; mathLock = false;
+  keys.clear(); actionHeld = false; joy.x = joy.z = 0;
+  $('mathTitle').textContent = t.name;
+  newQuestion();
+  $('math').hidden = false;
+}
+function closeMath() { mathOpen = false; mathTask = null; $('math').hidden = true; }
+function mathKey(k) {
+  if (!mathOpen || mathLock) return;
+  if (k === 'del') { mathIn = mathIn.slice(0, -1); renderMath(''); sfx.click(); return; }
+  if (k === 'go') {
+    if (!mathIn) return;
+    if (+mathIn === mathAns) {
+      renderMath('ok'); $('mathA').textContent = `${mathIn} ✔ Aferin!`; mathLock = true;
+      const t = mathTask;
+      setTimeout(() => { if (mathOpen && mathTask === t) { closeMath(); if (state === 'play') completeTask(t); } }, 700);
+    } else {
+      renderMath('bad'); sfx.vote(); beep(160, .3, 'sawtooth', .08);
+      $('mathA').textContent = `${mathIn} ✘ Tekrar dene!`;
+      mathLock = true;
+      setTimeout(() => { mathLock = false; mathIn = ''; renderMath(''); }, 800);
+    }
+    return;
+  }
+  if (mathIn.length < 2) { mathIn += k; renderMath(''); sfx.click(); }
+}
+['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'go'].forEach(k => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = k === 'del' ? '⌫' : k === 'go' ? '✔' : k;
+  if (k === 'del') b.className = 'del'; if (k === 'go') b.className = 'go';
+  b.addEventListener('click', () => mathKey(k));
+  $('mathPad').appendChild(b);
+});
 
 function outfitMesh(kind) {
   const g = new THREE.Group();
@@ -1515,7 +1588,7 @@ const CHATTER = ['Ben görevlerimi yapıyordum!', 'Kim yaptı bunu?!', 'Ben kesi
 function callMeeting(caller, corpse) {
   if (state !== 'play') return;
   restoreLights(false);
-  closeVip(); setMapBig(false);
+  closeVip(); closeMath(); setMapBig(false);
   state = 'meeting';
   keys.clear(); actionHeld = false; joy.x = joy.z = 0;
   sfx.alarm();
@@ -1795,6 +1868,7 @@ function doKill(killer, victim) {
     if (Math.hypot(n.g.position.x - p.x, n.g.position.z - p.z) < 15) n.sus.set(killer, (n.sus.get(killer) || 0) + 1);
   });
   if (victim.isPlayer) {
+    closeMath();
     flash();
     sfx.died(tongue);
     if (checkWin()) return;
@@ -1842,7 +1916,7 @@ function checkWin() {
 
 function endGame(win, title, text) {
   state = 'over';
-  closeVip(); setMapBig(false);
+  closeVip(); closeMath(); setMapBig(false);
   $('endTitle').textContent = title;
   $('endTitle').className = win ? 'win-title' : 'dead-title';
   $('endText').textContent = text;
@@ -1868,7 +1942,7 @@ function face(e, dx, dz, dt) {
 
 function updatePlayer(dt) {
   let dx = 0, dz = 0;
-  if (!vipOpen) {
+  if (!vipOpen && !mathOpen) {
     if (keys.has('ArrowUp')) dz -= 1;
     if (keys.has('ArrowDown')) dz += 1;
     if (keys.has('ArrowLeft')) dx -= 1;
@@ -2061,16 +2135,15 @@ function interact(dt) {
       const d = Math.hypot(player.g.position.x - t.x, player.g.position.z - t.z);
       if (d < bd) { bd = d; best = t; }
     });
-    if (best) {
+    if (best && best.math) {
+      if (actionPressed) { actionPressed = false; openMath(best); return; }
+      html = `<div>E: ${best.name} 🔢 <span style="color:#8fd3ff">(matematik sorusu)</span></div>`;
+    } else if (best) {
       if (actionHeld) {
         const before = best.progress;
         best.progress = Math.min(1, best.progress + dt / 2.5);
         if (Math.floor(before * 12) !== Math.floor(best.progress * 12)) sfx.taskTick();
-        if (best.progress >= 1) {
-          best.done = true; sfx.task(); toast(`Görev bitti: ${best.name}`);
-          best.ring.material.color.set(0x4ade80); best.gem.material.color.set(0x4ade80); best.gem.material.emissive.set(0x1a7a40);
-          if (checkWin()) return;
-        }
+        if (best.progress >= 1) { completeTask(best); if (state !== 'play') return; }
       }
       html = `<div>E tuşuna basılı tut: ${best.name}</div><div class="bar"><i style="width:${best.progress * 100}%"></i></div>`;
     }
@@ -2358,10 +2431,20 @@ const isU = e => e.key === 'ü' || e.key === 'Ü' || e.code === 'BracketRight';
 window.addEventListener('keydown', e => {
   if (isC(e)) {
     e.preventDefault();
+    if (mathOpen) { closeMath(); return; }
     if (vipOpen) { closeVip(); return; }
     if (mapBig) { setMapBig(false); return; }
     if (state === 'over') newRound();
     else if (state !== 'menu') toMenu();
+    return;
+  }
+  if (mathOpen) {
+    if (isC(e)) { e.preventDefault(); closeMath(); return; }
+    const d = /^(Digit|Numpad)(\d)$/.exec(e.code);
+    if (d) mathKey(d[2]);
+    else if (e.code === 'Backspace') mathKey('del');
+    else if (e.key === 'Enter' || e.code === 'NumpadEnter' || e.code === 'Space') mathKey('go');
+    e.preventDefault();
     return;
   }
   if (isU(e) && !e.repeat) { e.preventDefault(); toggleVip(); return; }
