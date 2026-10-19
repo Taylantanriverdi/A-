@@ -67,3 +67,15 @@ ESP32 bilgisayara USB ile bağlıyken `KONTROL_PANELI.html` dosyasını **Chrome
 - **PS4 kolu (USB ile bilgisayara takılı):** Bluetooth'taki düzenin aynısıyla çalışır.
 
 Panel ve Arduino seri monitörü aynı anda açık olamaz, çünkü ikisi aynı COM portunu kullanır. Servolar USB'den değil, yine harici güç kaynağından beslenmelidir.
+
+## 3D Simülasyon ve Dijital İkiz
+
+`SIMULASYON.html` dosyasını **Chrome** veya **Edge** ile açın; internet gerekmez. Kolu kurmadan önce deneyebilirsiniz.
+
+- **Aynı hareket:** ESP32 kodundaki kontrol döngüsünün aynısı çalışır. Eksen sınırları ve hızlar derleme sırasında `RobotKol_PS4.ino` dosyasından okunur.
+- **Poz kaydedici:** Pozları kaydedip sırayla oynatabilirsiniz.
+- **Dijital ikiz:** **Gerçek kola bağlan (USB)** ile ESP32'ye bağlanınca 3D model gerçek kolun açılarını gösterir ve komutlar gerçek kola gider.
+
+## Geliştirici: Her Şeyi Yeniden Üretmek
+
+`./hepsini_derle.sh` sırasıyla şunları üretir: simülasyon (`simulasyon/`, three.js + esbuild), kılavuz görselleri (`belge/gorsel_uret.mjs`), PDF kılavuz (`belge/kilavuz_olustur.py`) ve kurulum dosyası (`kurulum/bat_olustur.sh`). Node.js, Python ve Playwright (Chromium) gerekir.

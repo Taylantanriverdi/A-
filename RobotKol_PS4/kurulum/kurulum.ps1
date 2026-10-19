@@ -1,6 +1,6 @@
 # ROBOT KOL - otomatik kurulum betigi (ROBOT_KOL_KURULUM_V<n>.bat icine gomulur)
 # Her guncellemede bir artirilir; bat dosyasinin adi da buna gore olusur (V1, V2, V3 ...).
-$SURUM = 'V7'
+$SURUM = 'V8'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
@@ -277,15 +277,20 @@ Write-Host ''
 Write-Host "Tum dosyalar: $ana" -ForegroundColor Green
 Start-Process explorer.exe $ana
 
-# USB kontrol paneli: Web Serial icin Chrome veya Edge gerekir (Firefox desteklemez)
-$panel = Join-Path $ana 'KONTROL_PANELI.html'
-$c = Read-Host 'USB kontrol paneli acilsin mi? (E/H, Enter = E)'
-if ($c -notmatch '^[Hh]') {
+# Simulasyon ve USB paneli Web Serial kullanir: Chrome veya Edge gerekir (Firefox desteklemez)
+Write-Host ''
+Write-Host 'Hangisi acilsin?' -ForegroundColor Cyan
+Bilgi '[S] 3D simulasyon ve dijital ikiz (onerilen)'
+Bilgi '[P] Basit USB kontrol paneli'
+Bilgi '[H] Hicbiri'
+$c = Read-Host '  Seciminiz (Enter = S)'
+$dosya = switch -regex ($c) { '^[Pp]' { 'KONTROL_PANELI.html' } '^[Hh]' { $null } default { 'SIMULASYON.html' } }
+if ($dosya) {
     $tarayici = @("$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
                   "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
                   "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe") |
                 Where-Object { Test-Path $_ } | Select-Object -First 1
     if (-not $tarayici) { $tarayici = 'msedge.exe' }
-    Start-Process $tarayici "`"$panel`""
-    Bilgi 'Panelde "USB ile baglan"a basip ESP32''nin COM portunu secin.'
+    Start-Process $tarayici "`"$(Join-Path $ana $dosya)`""
+    Bilgi 'Gercek kolu kullanmak icin acilan sayfada USB ile baglan dugmesine basip ESP32''nin COM portunu secin.'
 }

@@ -1,6 +1,6 @@
 # ROBOT_KOL_KILAVUZ.pdf dosyasını üretir: önce HTML yazılır, sonra Chromium ile PDF'e çevrilir.
 #   python3 belge/kilavuz_olustur.py   (Playwright + Chromium gerekir)
-import os, subprocess, sys
+import base64, os, subprocess, sys
 sys.path.insert(0, os.path.dirname(__file__))
 import svgler as S
 
@@ -28,7 +28,7 @@ tr { break-inside: avoid; }
 .ipucu { border-left: 5px solid #16a34a; background: #f0fdf4; border-radius: 6px; padding: 8px 12px; margin: 10px 0; break-inside: avoid; }
 .sekil { text-align: center; margin: 8px 0; break-inside: avoid; }
 .sekil figcaption { color: #64748b; font-size: 9pt; margin-top: 4px; }
-.adim { display: grid; grid-template-columns: 230px 1fr; gap: 14px; align-items: start; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin: 0 0 10px; break-inside: avoid; }
+.adim { display: grid; grid-template-columns: 200px 1fr; gap: 14px; align-items: start; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; margin: 0 0 10px; break-inside: avoid; }
 .adim h3 { margin: 0 0 4px; }
 .adim ol, .adim ul { margin: 4px 0; padding-left: 18px; }
 .no { display: inline-block; background: #2563eb; color: #fff; border-radius: 50%; width: 22px; height: 22px; text-align: center; line-height: 22px; font-weight: 700; margin-right: 6px; font-size: 10pt; }
@@ -55,6 +55,13 @@ def sekil(svg, yazi):
     return f'<figure class="sekil">{svg}<figcaption>{yazi}</figcaption></figure>'
 
 
+def resim(ad, stil='width:100%'):
+    # belge/gorseller/<ad>.jpg (gorsel_uret.mjs ile 3D modelden üretilir) PDF'e gömülür
+    yol = os.path.join(BURADA, 'gorseller', ad + '.jpg')
+    veri = base64.b64encode(open(yol, 'rb').read()).decode()
+    return f'<img src="data:image/jpeg;base64,{veri}" style="{stil};border-radius:10px;display:block;margin:0 auto">'
+
+
 def adim(n, baslik, svg, govde):
     return f'<div class="adim"><div>{svg}</div><div><h3><span class="no">{n}</span>{baslik}</h3>{govde}</div></div>'
 
@@ -62,7 +69,8 @@ def adim(n, baslik, svg, govde):
 BOLUMLER = ['Yol haritası', 'Robot kolu tanıyalım', 'Malzeme listesi', '3D yazıcıdan basılacak parçalar',
             'Baskı ayarları', 'Elektrik bağlantıları', 'Yazılım kurulumu', 'PS4 kolunu eşleştirme',
             'Servoları ortalama', 'Mekanik montaj (7 adım)', 'İlk çalıştırma ve kalibrasyon',
-            'Kullanım: PS4 ve bilgisayar', 'Sorun giderme', 'Güvenlik', 'Son kontrol listesi']
+            'Kullanım: PS4 ve bilgisayar', '3D simülasyon ve dijital ikiz', 'Sorun giderme', 'Güvenlik',
+            'Son kontrol listesi']
 
 parcalar = []
 
@@ -70,11 +78,11 @@ parcalar = []
 parcalar.append(f"""
 <section class="kapak">
   <div class="ust">
-    <span class="etiket">Kılavuz V7</span><span class="etiket">ESP32 + PCA9685</span>
+    <span class="etiket">Kılavuz V8</span><span class="etiket">ESP32 + PCA9685</span>
     <h1>6 Eksenli Robot Kol</h1>
     <p>Malzeme listesi, 3D baskı parçaları, bağlantı şeması, montaj ve kullanım. Sıfırdan çalışan kola kadar her adım.</p>
   </div>
-  <div class="sekil" style="margin-top:18px">{S.kol(7, None, True, 470)}
+  <div class="sekil" style="margin-top:14px">{resim('kapak', 'width:100%;max-height:118mm;object-fit:cover')}
     <figcaption>Turuncu numaralar eksenleri gösterir: 1 taban, 2 omuz, 3 dirsek, 4 bilek eğimi, 5 bilek dönüşü, 6 kıskaç.</figcaption></div>
   <h3>İçindekiler</h3>
   <div class="icindekiler">{''.join(f'<div>{i + 1}. {b}</div>' for i, b in enumerate(BOLUMLER))}</div>
@@ -220,7 +228,7 @@ parcalar.append(f"""
 parcalar.append(f"""
 <section class="sayfa">
 <h2>7. Yazılım kurulumu (tek tık)</h2>
-<p>Tüm yazılım işini <code>ROBOT_KOL_KURULUM_V7.bat</code> dosyası yapar. Bu dosyaya Windows'ta çift tıklayın:</p>
+<p>Tüm yazılım işini <code>ROBOT_KOL_KURULUM_V8.bat</code> dosyası yapar. Bu dosyaya Windows'ta çift tıklayın:</p>
 {tablo(['Adım', 'Ne olur', 'Sizin yapmanız gereken'], [
     ['1', 'Masaüstünde <b>ROBOT KOL</b> klasörü açılır', '—'],
     ['2', 'PS4 kolunun MAC adresi sorulur (sadece ilk seferde)', 'Bölüm 8\'deki adresi yazın veya Enter'],
@@ -264,6 +272,7 @@ parcalar.append(f"""
 </div>
 </div>
 <h3>Başlangıç duruşu (tüm servolar 90°)</h3>
+{sekil(resim('baslangic', 'width:44%'), 'Şekil 3 – Başlangıç duruşu, yandan (3D simülasyondan)')}
 {tablo(['Eksen', 'Başlangıçta parça nasıl durmalı'], [
     ['1 Taban', 'Kol tam karşıya (öne) bakıyor'],
     ['2 Omuz', 'Üst kol dik (yukarı) duruyor'],
@@ -313,13 +322,17 @@ ADIMLAR = [
       <li>Tüm kabloları spiral toplayıcıyla toplayıp, kol her yöne dönerken gergin olmayacak kadar boşluk bırakın.</li>
     </ol>"""),
 ]
-govde = ''.join(adim(i + 1, b, S.kol(i + 1, i + 1, True, 230), g) for i, (b, g) in enumerate(ADIMLAR))
+govde = ''.join(adim(i + 1, b, resim(f'adim{i + 1}'), g) for i, (b, g) in enumerate(ADIMLAR))
 parcalar.append(f"""
 <section class="sayfa">
 <h2>10. Mekanik montaj</h2>
-<p>Her çizimde <b style="color:#2563eb">mavi</b> parça o adımda eklenen parçadır; gri parçalar önceki adımlarda takılmıştır. Vidaları önce gevşek takın, hepsi yerine oturunca sıkın. Plastikte vidaları fazla sıkmayın; diş yalanır.</p>
+<p>Görseller 3D simülasyondaki modelden alınmıştır. <b style="color:#2563eb">Mavi parlayan</b> parçalar o adımda eklenen parçalardır; diğerleri önceki adımlarda takılmıştır. 1. adımda taban gövdesi, içindeki servoyu göstermek için şeffaf çizilmiştir. Vidaları önce gevşek takın, hepsi yerine oturunca sıkın. Plastikte vidaları fazla sıkmayın; diş yalanır.</p>
 {govde}
-<div class="ipucu"><b>Elektronik kutusu:</b> ESP32 ve PCA9685'i elektronik kutusuna yerleştirip tabanın arkasına sabitleyin. USB girişine erişebildiğinizden emin olun.</div>
+<div class="adim"><div>{resim('elektronik')}</div><div><h3><span class="no">+</span>Elektronik kutusu</h3>
+<ol><li>PCA9685 ve ESP32'yi kutuya vidalayın veya çift taraflı bantla yapıştırın.</li>
+<li>Kutuyu tabanın arkasına, zemin plakasına sabitleyin.</li>
+<li>Servo kablolarını spiral kablo toplayıcıyla kol boyunca kutuya getirin.</li>
+<li>USB ve güç kablolarının rahatça takılıp çıkarılabildiğinden emin olun.</li></ol></div></div>
 </section>
 """)
 
@@ -380,7 +393,35 @@ parcalar.append(f"""
 # ---------------- 13 Sorun giderme + 14 Güvenlik + 15 Kontrol listesi ----------------
 parcalar.append(f"""
 <section class="sayfa">
-<h2>13. Sorun giderme</h2>
+<h2>13. 3D simülasyon ve dijital ikiz</h2>
+<p><code>ROBOT KOL\\SIMULASYON.html</code> dosyasını Chrome veya Edge ile açın. İnternet gerekmez. Kolu daha monte etmeden, hatta parçaları basmadan önce deneyebilirsiniz.</p>
+{sekil(resim('simulasyon'), 'Şekil 5 – Simülasyon ekranı')}
+<div class="iki">
+<div>
+<h3>Simülasyonda neler yapılır?</h3>
+<ul>
+  <li><b>Aynı kontrol:</b> ESP32 kodundaki hız, yumuşatma ve açı sınırları birebir kullanılır. Değerler doğrudan <code>RobotKol_PS4.ino</code> dosyasından okunur.</li>
+  <li><b>Kontrol yolları:</b> Kaydırıcılar, klavye ve USB ile takılı PS4 kolu.</li>
+  <li><b>Uç konumu:</b> Kıskaç ucunun X, Y, Z konumu milimetre olarak gösterilir. Uç masaya değerse uyarı çıkar.</li>
+  <li><b>Poz kaydedici:</b> Kolu birkaç konuma getirip kaydedin. <b>Oynat</b> kolu sırayla bu konumlara götürür; <b>Döngü</b> ile tekrar eder.</li>
+  <li><b>Görünüm:</b> Fareyle döndürün, Ön / Yan / Üst kamera, eksen etiketleri ve uç izi.</li>
+</ul>
+</div>
+<div>
+<h3>Dijital ikiz (gerçek kolla)</h3>
+<ol>
+  <li>ESP32'yi USB ile bilgisayara bağlayın.</li>
+  <li><b>Gerçek kola bağlan (USB)</b> düğmesine basıp COM portunu seçin.</li>
+  <li>Artık her komut gerçek kola gider. 3D model, ESP32'den gelen <b>gerçek açıları</b> gösterir.</li>
+  <li>Kaydettiğiniz pozları <b>Oynat</b> ile gerçek kola da yaptırabilirsiniz.</li>
+</ol>
+<div class="uyari">Pozları önce bağlantısız simülasyonda deneyin. Kol masaya veya kendine çarpmıyorsa gerçek kolda oynatın.</div>
+</div>
+</div>
+</section>
+
+<section class="sayfa">
+<h2>14. Sorun giderme</h2>
 {tablo(['Belirti', 'Olası neden', 'Çözüm'], [
     ['Hiçbir servo hareket etmiyor', 'Servo gücü yok veya SDA/SCL ters', 'V+ – GND arası 5–6 V mi ölçün; GPIO21 = SDA, GPIO22 = SCL'],
     ['Servolar hareket edince ESP32 yeniden başlıyor', 'Servolar ESP32\'den besleniyor / adaptör zayıf', 'Servoları sadece adaptörden besleyin; 10 A adaptör ve 1000 µF kondansatör'],
@@ -393,7 +434,7 @@ parcalar.append(f"""
     ['Kol bir yönde kendi kendine kayıyor', 'Çubuk merkezi kaymış', 'Kodda <code>STICK_DEAD</code> 12 → 18'],
     ['Omuz kolu kaldıramıyor', 'Servo torku yetmiyor', 'Omuza DS3218 (20 kg) takın, kolun ucunu hafifletin'],
 ])}
-<h2 style="margin-top:18px">14. Güvenlik</h2>
+<h2 style="margin-top:18px">15. Güvenlik</h2>
 <ul>
   <li>Kol çalışırken parmaklarınızı eklemlerin ve kıskacın arasına sokmayın.</li>
   <li>Kolu zemine sabitleyin; uzandığında devrilebilir.</li>
@@ -404,7 +445,7 @@ parcalar.append(f"""
 </section>
 
 <section class="sayfa">
-<h2>15. Son kontrol listesi</h2>
+<h2>16. Son kontrol listesi</h2>
 <div class="iki">
 <div>
 <h3>Hazırlık</h3>
@@ -437,15 +478,17 @@ parcalar.append(f"""
   <li>Ters giden eksenlerin <code>yön</code> değeri düzeltildi</li>
   <li>Dayanan eksenlerin <code>min/max</code> sınırları daraltıldı</li>
   <li>USB kontrol paneli denendi</li>
+  <li>3D simülasyonda pozlar denendi</li>
 </ul>
 </div>
 </div>
 <div class="kutu" style="margin-top:20px">
 <b>Klasör düzeni (Masaüstü\\ROBOT KOL)</b>
 <table>
-<tr><td><code>ROBOT_KOL_KURULUM_V7.bat</code></td><td>Kurulum ve güncelleme (çift tık)</td></tr>
+<tr><td><code>ROBOT_KOL_KURULUM_V8.bat</code></td><td>Kurulum ve güncelleme (çift tık)</td></tr>
 <tr><td><code>ROBOT_KOL_KILAVUZ.pdf</code></td><td>Bu kılavuz</td></tr>
-<tr><td><code>KONTROL_PANELI.html</code></td><td>Bilgisayardan USB kontrol</td></tr>
+<tr><td><code>SIMULASYON.html</code></td><td>3D simülasyon ve dijital ikiz</td></tr>
+<tr><td><code>KONTROL_PANELI.html</code></td><td>Basit USB kontrol paneli</td></tr>
 <tr><td><code>RobotKol_PS4\\RobotKol_PS4.ino</code></td><td>ESP32 kodu</td></tr>
 <tr><td><code>ayarlar.txt</code></td><td>PS4 MAC adresi</td></tr>
 <tr><td><code>SURUMLER.md</code></td><td>Sürüm geçmişi</td></tr>
@@ -469,7 +512,7 @@ const {{ chromium }} = r('playwright');
   await p.goto('file://{HTML}');
   await p.pdf({{ path: {PDF!r}, format: 'A4', printBackground: true, displayHeaderFooter: true,
     headerTemplate: '<span></span>',
-    footerTemplate: '<div style="font-size:8px;color:#94a3b8;width:100%;text-align:center;font-family:Inter,sans-serif">6 Eksenli Robot Kol – Kılavuz V7 · Sayfa <span class=pageNumber></span> / <span class=totalPages></span></div>',
+    footerTemplate: '<div style="font-size:8px;color:#94a3b8;width:100%;text-align:center;font-family:Inter,sans-serif">6 Eksenli Robot Kol – Kılavuz V8 · Sayfa <span class=pageNumber></span> / <span class=totalPages></span></div>',
     margin: {{ top: '14mm', bottom: '16mm', left: '14mm', right: '14mm' }} }});
   await b.close();
 }})();

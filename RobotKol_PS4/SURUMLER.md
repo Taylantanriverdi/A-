@@ -1,5 +1,19 @@
 # ROBOT KOL – Sürüm Geçmişi
 
+## V8
+- Yeni: `SIMULASYON.html`, gerçekçi 3D simülasyon. İnternet gerekmez.
+  - ESP32 kodundaki kontrol döngüsünün aynısı çalışıyor. Hız, yumuşatma ve açı sınırları doğrudan `RobotKol_PS4.ino` dosyasından okunuyor.
+  - Kontrol: kaydırıcılar, klavye ve USB ile takılı PS4 kolu.
+  - Kıskaç ucunun konumu (mm), masaya çarpma ve eksen sınırı uyarısı, uç izi.
+  - Poz kaydedici: kaydet, oynat, döngü.
+  - Dijital ikiz: ESP32'ye USB ile bağlanınca 3D model gerçek kolun açılarını gösteriyor, komutlar gerçek kola gidiyor.
+- Kılavuz (15 sayfa) gerçekçi 3D görsellerle yenilendi: kapak, başlangıç duruşu, 7 montaj adımı ve elektronik kutusu. Yeni bölüm: 3D simülasyon.
+- ESP32 kodu düzeltmeleri:
+  - PS4 bağlanma/kopma olayları artık Bluetooth görevinde değil, ana döngüde işleniyor. Önceden eklem verisine iki görev aynı anda yazabiliyordu.
+  - Açılışta eski Bluetooth eşleşmeleri siliniyor. PS4 kolunun yeniden bağlanamama sorununu önler.
+  - İlk döngüdeki zaman adımı sınırlandı.
+- Kurulum sonunda simülasyon, basit panel veya hiçbiri seçilebiliyor.
+
 ## V7
 - Yeni: `ROBOT_KOL_KILAVUZ.pdf` (14 sayfa, resimli). İçinde malzeme listesi, 3D baskı parçaları ve ayarları, bağlantı şeması, yazılım kurulumu, PS4 eşleştirme, servo ortalama, 7 adımda montaj, kalibrasyon, kullanım, sorun giderme ve kontrol listesi var.
 - Kurulum dosyası kılavuzu da ROBOT KOL klasörüne koyuyor.

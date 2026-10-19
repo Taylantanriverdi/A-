@@ -42,6 +42,7 @@
 #include <Wire.h>
 #include <PS4Controller.h>
 #include <Adafruit_PWMServoDriver.h>
+#include "esp_gap_bt_api.h"
 
 // ---- PS4 kolunun eşleştirildiği MAC adresi (SixaxisPairTool ile yazılan) ----
 const char* PS4_MAC = "a0:b1:c2:d3:e4:f5";
@@ -130,16 +131,21 @@ void updateLed() {
   PS4.sendToController();
 }
 
-void onConnect() {
-  Serial.println("PS4 kolu baglandi.");
-  updateLed();
-}
+// PS4 olayları Bluetooth görevinde (ayrı çekirdekte) çalışır. Eklem verisine ve seri
+// porta loop() ile aynı anda dokunmamak için burada sadece bayrak kaldırılır.
+volatile bool ps4Baglandi = false, ps4Koptu = false;
 
-void onDisconnect() {
-  // Güvenlik: bağlantı koparsa kol olduğu yerde durur
-  Serial.println("PS4 baglantisi koptu! Kol donduruldu.");
-  homing = false;
-  for (auto& j : joints) j.target = j.current;
+void onConnect() { ps4Baglandi = true; }
+
+void onDisconnect() { ps4Koptu = true; }
+
+// Eski Bluetooth eşleşmelerini sil: PS4 kolunun yeniden bağlanamama sorununu önler
+void removePairedDevices() {
+  uint8_t adresler[20][6];
+  int adet = esp_bt_gap_get_bond_device_num();
+  if (adet > 20) adet = 20;
+  esp_bt_gap_get_bond_device_list(&adet, adresler);
+  for (int i = 0; i < adet; i++) esp_bt_gap_remove_bond_device(adresler[i]);
 }
 
 void sendLimits() {
@@ -210,6 +216,7 @@ void setup() {
   PS4.attachOnConnect(onConnect);
   PS4.attachOnDisconnect(onDisconnect);
   PS4.begin(PS4_MAC);
+  removePairedDevices();
   Serial.println("PS4 kolu bekleniyor... (PS tusuna basin)");
   Serial.println("HAZIR");
   sendLimits();
@@ -220,7 +227,20 @@ void loop() {
   uint32_t now = millis();
   if (now - lastLoop < LOOP_MS) return;
   float dt = (now - lastLoop) / 1000.0f;
+  if (dt > 0.05f) dt = 0.05f;   // ilk döngüde / gecikmede ani sıçrama olmasın
   lastLoop = now;
+
+  // PS4 olaylarını burada işle (güvenli)
+  if (ps4Koptu) {
+    ps4Koptu = false;
+    Serial.println("PS4 baglantisi koptu! Kol donduruldu.");
+    stopAll();   // güvenlik: kol olduğu yerde durur
+  }
+  if (ps4Baglandi) {
+    ps4Baglandi = false;
+    Serial.println("PS4 kolu baglandi.");
+    updateLed();
+  }
 
   float vel[6] = {0, 0, 0, 0, 0, 0};   // -1..1 normalize hız komutları
 
