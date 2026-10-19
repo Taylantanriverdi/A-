@@ -136,6 +136,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
 #vipBtn { bottom: calc(158px + env(safe-area-inset-bottom, 0px)); background: #ffd23a; color: #3a2a00; }
 #mapBtn { bottom: calc(218px + env(safe-area-inset-bottom, 0px)); background: #4ade80; color: #08311a; }
 #modBtn { bottom: calc(278px + env(safe-area-inset-bottom, 0px)); background: #b67cff; color: #1e0a3a; }
+#viewBtn { left: calc(30px + env(safe-area-inset-left, 0px)); bottom: calc(338px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; font-size: 19px; background: #ff9a3c; color: #3a1a00; }
 /* Küçük ekranda görev listesi kapalı başlar, dokununca açılır */
 #info .more { display: none; color: var(--muted); font-size: 12px; margin-top: 4px; }
 @media (max-width: 640px) {
@@ -227,6 +228,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <button id="vipBtn" type="button" aria-label="VIP dolabı">Ü</button>
   <button id="mapBtn" type="button" aria-label="Büyük harita">H</button>
   <button id="modBtn" type="button" aria-label="Piyon modu">M</button>
+  <button id="viewBtn" type="button" aria-label="Görüş modu">G</button>
 </div>
 
 <div class="screen" id="menu">
@@ -246,6 +248,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>H</kbd><span>Haritayı tam ekran yap · <b>Ç</b> ile kapat</span>
       <kbd>Ü</kbd><span>VIP dolabı: kıyafetler</span>
       <kbd>M</kbd><span>Mod: herkes 3 boyutlu piyona dönüşür</span>
+      <kbd>G</kbd><span>Görüş modu: yukarıdan, arkadan, kendi gözünden, kuş bakışı</span>
       <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
       <kbd>S</kbd><span>Katilsen ışıkları söndür (sabotaj)</span>
       <kbd>V</kbd><span>Katilsen havalandırmadan başka yere ışınlan</span>
@@ -1275,6 +1278,16 @@ const TEAM = 'TİT';
 let state = 'menu', roleShown = false;
 let player = null, ipek = null, pet = null, npcs = [], corpses = [], isKiller = false, killCd = 0, revealT = 0, caughtT = -1, witnessName = '';
 let actionHeld = false, actionPressed = false, vipOpen = false, mapBig = false, pawnMode = store.get('amangasPawn', false);
+// G: görüş modu. 0 yukarıdan (normal), 1 arkadan, 2 kendi gözünden, 3 kuş bakışı
+const VIEWS = ['👀 Normal görüş (yukarıdan)', '🎥 Arkadan görüş', '👁 Kendi gözünden görüş', '🦅 Kuş bakışı görüş'];
+let viewMode = store.get('amangasView', 0) % VIEWS.length;
+function toggleView() {
+  viewMode = (viewMode + 1) % VIEWS.length;
+  store.set('amangasView', viewMode);
+  sfx.click();
+  toast(VIEWS[viewMode] + (viewMode === 1 || viewMode === 2 ? ' · ← → dön, ↑ ↓ yürü' : '') + ' (G ile değiştir)');
+}
+const turnView = () => viewMode === 1 || viewMode === 2;
 let npcButtonT = 90, npcMeetsLeft = 1, ipekFollowT = 0, deadT = 0;
 let outfit = Object.assign({ pet: false, white: false, head: null }, store.get('amangasOutfit', {}));
 const keys = new Set();
@@ -1862,6 +1875,22 @@ function updatePlayer(dt) {
     if (keys.has('ArrowRight')) dx += 1;
     dx += joy.x; dz += joy.z;
   }
+  if (turnView()) {
+    // Arkadan ve gözünden görüşte: sağ/sol döner, ileri/geri yürür
+    player.g.rotation.y -= dx * 2.6 * dt;
+    const fwd = -dz, r = player.g.rotation.y;
+    const moving = Math.abs(fwd) > .1;
+    if (moving) {
+      const s = (player.ghost ? 7 : 6) * dt * Math.max(-1, Math.min(1, fwd)) * (fwd < 0 ? .6 : 1);
+      moveBy(player, Math.sin(r) * s, Math.cos(r) * s);
+    }
+    const sb = Math.floor(player.walk / Math.PI);
+    animateWalk(player, moving, dt);
+    if (moving && !player.ghost && Math.floor(player.walk / Math.PI) !== sb) sfx.step();
+    const F = FLOORS[fl(player)], p = player.g.position;
+    if (p.x > F.cab - 2.8 && Math.abs(p.z) < 2.6) startElevator();
+    return;
+  }
   const len = Math.hypot(dx, dz);
   if (len > .1) {
     const s = (player.ghost ? 7 : 6) * dt / Math.max(1, len);
@@ -2257,6 +2286,8 @@ function frame(now) {
     n.g.visible = fl(n) === pf && (n.alive || seeGhosts);
     if (n.ghost) n.g.position.y = .3 + Math.sin(time * 2 + n.idx) * .12;
   });
+  if (player) player.g.visible = !(viewMode === 2 && (state === 'play' || state === 'elevator' || state === 'dead'));
+  if (player) player.label.visible = !(turnView() && state !== 'meeting');
   if (player && player.ghost) player.g.position.y = .3 + Math.sin(time * 2) * .12;
   if (pet && player) {
     const pp = player.g.position, bp = pet.g.position;
@@ -2275,10 +2306,23 @@ function frame(now) {
     want.set(MC.x, 12 * f, MC.z + 9.5 * f);
     camPos.lerp(want, Math.min(1, dt * 4));
   } else if (player && state !== 'menu') {
-    const p = player.g.position;
-    camTarget.set(p.x, 1, p.z);
-    want.set(p.x, 13, p.z + 11);
-    camPos.lerp(want, Math.min(1, dt * 5));
+    const p = player.g.position, r = player.g.rotation.y, fx = Math.sin(r), fz = Math.cos(r);
+    if (viewMode === 1) {          // arkadan
+      camTarget.set(p.x + fx * 4, 1.4, p.z + fz * 4);
+      want.set(p.x - fx * 6.5, 4.2, p.z - fz * 6.5);
+      camPos.lerp(want, Math.min(1, dt * 6));
+    } else if (viewMode === 2) {   // kendi gözünden
+      camTarget.set(p.x + fx * 10, 1.5, p.z + fz * 10);
+      camPos.set(p.x + fx * .45, 1.75, p.z + fz * .45);
+    } else if (viewMode === 3) {   // kuş bakışı
+      camTarget.set(p.x, 0, p.z);
+      want.set(p.x, 34, p.z + .5);
+      camPos.lerp(want, Math.min(1, dt * 5));
+    } else {
+      camTarget.set(p.x, 1, p.z);
+      want.set(p.x, 13, p.z + 11);
+      camPos.lerp(want, Math.min(1, dt * 5));
+    }
   } else {
     camTarget.set(0, 0, 0);
     camPos.set(Math.sin(time * .12) * 34, 24, Math.cos(time * .12) * 34);
@@ -2322,6 +2366,7 @@ window.addEventListener('keydown', e => {
   }
   if (isU(e) && !e.repeat) { e.preventDefault(); toggleVip(); return; }
   if (e.code === 'KeyM' && !e.repeat) { togglePawn(); return; }
+  if (e.code === 'KeyG' && !e.repeat) { toggleView(); return; }
   if (e.code === 'KeyN' && !e.repeat) { toggleMute(); return; }
   if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
   if (state === 'menu' && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); startGame(); return; }
@@ -2362,6 +2407,7 @@ $('sabBtn').addEventListener('click', playerSabotage);
 $('vipBtn').addEventListener('click', toggleVip);
 $('mapBtn').addEventListener('click', () => { if (state === 'play') setMapBig(!mapBig); });
 $('modBtn').addEventListener('click', togglePawn);
+$('viewBtn').addEventListener('click', toggleView);
 $('vipClose').addEventListener('click', closeVip);
 $('skipBtn').addEventListener('click', () => castVote(player, 'skip'));
 $('quit').addEventListener('click', toMenu);
