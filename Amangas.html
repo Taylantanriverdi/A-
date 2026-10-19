@@ -238,7 +238,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <button id="sabBtn" type="button" aria-label="Işıkları söndür">S</button>
   <button id="vipBtn" type="button" aria-label="VIP dolabı">Ü</button>
   <button id="mapBtn" type="button" aria-label="Büyük harita">H</button>
-  <button id="modBtn" type="button" aria-label="Piyon modu">M</button>
+  <button id="modBtn" type="button" aria-label="Piyon ve domuz modu">M</button>
   <button id="viewBtn" type="button" aria-label="Görüş modu">G</button>
 </div>
 
@@ -258,7 +258,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>R</kbd><span>Ölüyü raporla ya da kafeteryadaki kırmızı düğmeye bas</span>
       <kbd>H</kbd><span>Haritayı tam ekran yap · <b>Ç</b> ile kapat</span>
       <kbd>Ü</kbd><span>VIP dolabı: kıyafetler</span>
-      <kbd>M</kbd><span>Mod: herkes 3 boyutlu piyona dönüşür</span>
+      <kbd>M</kbd><span>Mod: 1. basış herkes 3 boyutlu piyon, 2. basış amongus, 3. basış herkes renk renk domuz! 🐷</span>
       <kbd>G</kbd><span>Görüş modu: yukarıdan, arkadan, kendi gözünden, kuş bakışı</span>
       <kbd>D</kbd><span>Başka dünyaya git: Fabrika, Buz, Lav, Uzay, Orman, Doğum Günü</span>
       <kbd>S</kbd><span>Katilsen ışıkları söndür (sabotaj)</span>
@@ -859,6 +859,34 @@ function makePawnMesh(color) {
   const h = new THREE.Mesh(pawnHeadGeo, pm); h.position.y = 1.86; h.castShadow = true; grp.add(h);
   return grp;
 }
+// M'ye üçüncü basış: herkes domuz olur, her domuzun rengi farklı
+const PIG_OF = new Map();   // piyon rengi -> domuz rengi (ROSTER'dan doldurulur)
+function makePigMesh(color) {
+  const grp = new THREE.Group(), legs = [];
+  const pm = new THREE.MeshStandardMaterial({ color, roughness: .55 });
+  const dark = new THREE.MeshStandardMaterial({ color: new THREE.Color(color).multiplyScalar(.75), roughness: .6 });
+  const black = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const M = (geo, material, x, y, z, par = grp) => { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); m.castShadow = true; par.add(m); return m; };
+  M(new THREE.SphereGeometry(.7, 28, 20), pm, 0, 1.0, -.1).scale.set(1, .85, 1.3);
+  M(new THREE.SphereGeometry(.5, 24, 18), pm, 0, 1.3, .85);
+  const snout = M(new THREE.CylinderGeometry(.24, .26, .2, 20), dark, 0, 1.22, 1.33); snout.rotation.x = Math.PI / 2;
+  [-.08, .08].forEach(x => { const n = M(new THREE.CylinderGeometry(.045, .045, .03, 10), black, x, 1.22, 1.44); n.rotation.x = Math.PI / 2; });
+  [-.19, .19].forEach(x => M(new THREE.SphereGeometry(.07, 10, 8), black, x, 1.46, 1.25));
+  [-1, 1].forEach(sx => { const ear = M(new THREE.ConeGeometry(.17, .32, 12), dark, sx * .3, 1.72, .78); ear.rotation.set(-.4, 0, -sx * .45); });
+  [[-.35, .45], [.35, .45], [-.35, -.6], [.35, -.6]].forEach(([x, z]) => {
+    const piv = new THREE.Group(); piv.position.set(x, .55, z); grp.add(piv);
+    M(new THREE.CylinderGeometry(.14, .13, .55, 12), pm, 0, -.27, 0, piv);
+    M(new THREE.CylinderGeometry(.14, .14, .06, 12), dark, 0, -.53, 0, piv);
+    legs.push(piv);
+  });
+  const tail = M(new THREE.TorusGeometry(.12, .035, 8, 20, Math.PI * 1.6), dark, 0, 1.15, -1.0); tail.rotation.y = Math.PI / 2;
+  grp.userData.legs = legs;
+  return grp;
+}
+// Biçim: 0 amongus, 1 piyon, 2 amongus, 3 domuz (M her basışta sıradakine geçer)
+const SHAPES = ['crew', 'pawn', 'crew', 'pig'];
+let shapeStep = store.get('amangasShape', 0) % SHAPES.length;
+const shapeNow = () => SHAPES[shapeStep];
 
 function makeCrew(color, pawnColor, parent = scene) {
   const g = new THREE.Group();
@@ -880,8 +908,9 @@ function makeCrew(color, pawnColor, parent = scene) {
     add(new THREE.CylinderGeometry(.24, .24, .66, 16), 0, -.33, 0, m, pivot);
     return pivot;
   });
-  const pawn = makePawnMesh(pawnColor); pawn.visible = pawnMode; body.visible = !pawnMode;
-  g.add(pawn);
+  const pawn = makePawnMesh(pawnColor); g.add(pawn);
+  const pig = makePigMesh(PIG_OF.get(pawnColor) || 0xffa6c9); g.add(pig);
+  body.visible = shapeNow() === 'crew'; pawn.visible = shapeNow() === 'pawn'; pig.visible = shapeNow() === 'pig';
   // Bıçak: sadece öldürürken görünür (eskisinden biraz küçük)
   const knife = new THREE.Group();
   const blade = new THREE.Mesh(new THREE.BoxGeometry(.08, .75, .2), new THREE.MeshStandardMaterial({ color: 0xe8edf2, metalness: .9, roughness: .15 }));
@@ -903,7 +932,7 @@ function makeCrew(color, pawnColor, parent = scene) {
   const tongue = new THREE.Mesh(tongueGeo, tongueMat); tongue.visible = false; g.add(tongue);
   const tongueTip = new THREE.Mesh(new THREE.SphereGeometry(.17, 12, 10), tongueMat); tongueTip.visible = false; g.add(tongueTip);
   parent.add(g);
-  return { g, body, pawn, bodyMat: m, legL: legs[0], legR: legs[1], walk: 0, knife, knifeT: 0, mouth, tongue, tongueTip, tongueT: 0, tongueLen: 2 };
+  return { g, body, pawn, pig, bodyMat: m, legL: legs[0], legR: legs[1], walk: 0, knife, knifeT: 0, mouth, tongue, tongueTip, tongueT: 0, tongueLen: 2 };
 }
 
 function makeLabel(text, color = '#ffffff') {
@@ -945,7 +974,9 @@ function makeCorpse(color, pawnColor, x, z, rot) {
   [-.09, .09].forEach(dx => { const k = new THREE.Mesh(new THREE.SphereGeometry(.12, 10, 8), shineMat); k.position.set(dx, 1.1, 0); crewPart.add(k); });
   [-.3, .3].forEach(dx => { const l = new THREE.Mesh(new THREE.CylinderGeometry(.24, .24, .3, 14), m); l.position.set(dx, .15, 0); crewPart.add(l); });
   const pw = makePawnMesh(pawnColor); pw.rotation.z = Math.PI / 2; pw.position.set(1.1, .62, 0); pawnPart.add(pw);
-  crewPart.visible = !pawnMode; pawnPart.visible = pawnMode;
+  const pigPart = makePigMesh(PIG_OF.get(pawnColor) || 0xffa6c9); pigPart.rotation.z = Math.PI / 2; pigPart.position.set(.7, .7, 0); g.add(pigPart);
+  crewPart.visible = shapeNow() === 'crew'; pawnPart.visible = shapeNow() === 'pawn'; pigPart.visible = shapeNow() === 'pig';
+  g.userData.pigPart = pigPart;
   g.traverse(o => { if (o.isMesh) o.castShadow = true; });
   g.position.set(x, 0, z); g.rotation.y = rot;
   g.userData.crewPart = crewPart; g.userData.pawnPart = pawnPart;
@@ -1277,6 +1308,7 @@ const sfx = {
   lose() { [392, 370, 349, 294].forEach((f, i) => beep(f, i === 3 ? .9 : .35, 'sawtooth', .1, i === 3 ? 220 : 0, i * .38)); },
   ding() { beep(1318, .5, 'sine', .14); beep(1046, .7, 'sine', .14, 0, .25); },
   elevator() { beep(90, 1.6, 'sawtooth', .05, 140, .5); this.ding(); },
+  oink() { [0, .28].forEach(d => { beep(320, .18, 'sawtooth', .12, 180, d); noise(.16, .15, 900, 300, d); }); },
   pawn() { [392, 523, 659, 784, 1046].forEach((f, i) => beep(f, .14, 'square', .07, 0, i * .05)); },
 };
 function toggleMute() { muted = !muted; toast(muted ? 'Ses kapalı (N)' : 'Ses açık (N)'); }
@@ -1284,22 +1316,23 @@ function toggleMute() { muted = !muted; toast(muted ? 'Ses kapalı (N)' : 'Ses a
 // ---------- Oyun durumu ----------
 // Her rengin kendi adı var ve bu adlar hiçbir dünyada / oyunda değişmez.
 const ROSTER = [
-  { name: 'Mahunched', color: 0xe53935, pawn: 0xd4af37 },
-  { name: 'Bulut Soyipek', color: 0x14308f, pawn: 0xf3ead2, home: 0 },
-  { name: 'Gece', color: 0x1c1c22, pawn: 0xff6f61, home: 0 },
-  { name: 'Pamuk', color: 0xff8ccf, pawn: 0x00a86b, home: 0 },
-  { name: 'Fıstık', color: 0x1fa64a, pawn: 0xb57edc, home: 0 },
-  { name: 'Limon', color: 0xf2d40c, pawn: 0x2b59c3, home: 0 },
-  { name: 'Havuç', color: 0xff8a1c, pawn: 0x40e0d0, home: 0 },
-  { name: 'Patlıcan', color: 0x8b45d6, pawn: 0x9acd32, home: 0 },
-  { name: 'Kar', color: 0xe9eef2, pawn: 0x8b0000, home: 1 },
-  { name: 'Buz', color: 0x2fe0d8, pawn: 0xff8c00, home: 1 },
-  { name: 'Kakao', color: 0x7a4a26, pawn: 0xff1493, home: 1 },
+  { name: 'Mahunched', color: 0xe53935, pawn: 0xd4af37, pig: 0xffa6c9 },
+  { name: 'Bulut Soyipek', color: 0x14308f, pawn: 0xf3ead2, pig: 0x9ad7ff, home: 0 },
+  { name: 'Gece', color: 0x1c1c22, pawn: 0xff6f61, pig: 0x6b5b53, home: 0 },
+  { name: 'Pamuk', color: 0xff8ccf, pawn: 0x00a86b, pig: 0xf6e27a, home: 0 },
+  { name: 'Fıstık', color: 0x1fa64a, pawn: 0xb57edc, pig: 0xb8f28a, home: 0 },
+  { name: 'Limon', color: 0xf2d40c, pawn: 0x2b59c3, pig: 0xff7f6e, home: 0 },
+  { name: 'Havuç', color: 0xff8a1c, pawn: 0x40e0d0, pig: 0xd9b3ff, home: 0 },
+  { name: 'Patlıcan', color: 0x8b45d6, pawn: 0x9acd32, pig: 0xffd1a1, home: 0 },
+  { name: 'Kar', color: 0xe9eef2, pawn: 0x8b0000, pig: 0x7ee0c3, home: 1 },
+  { name: 'Buz', color: 0x2fe0d8, pawn: 0xff8c00, pig: 0xc0c4cc, home: 1 },
+  { name: 'Kakao', color: 0x7a4a26, pawn: 0xff1493, pig: 0xf4f1ea, home: 1 },
 ];
+ROSTER.forEach(r => PIG_OF.set(r.pawn, r.pig));
 const TEAM = 'TİT';
 let state = 'menu', roleShown = false;
 let player = null, ipek = null, pet = null, npcs = [], corpses = [], isKiller = false, killCd = 0, revealT = 0, caughtT = -1, witnessName = '';
-let actionHeld = false, actionPressed = false, vipOpen = false, mapBig = false, pawnMode = store.get('amangasPawn', false);
+let actionHeld = false, actionPressed = false, vipOpen = false, mapBig = false, pawnMode = shapeNow() === 'pawn';
 // G: görüş modu. 0 yukarıdan (normal), 1 arkadan, 2 kendi gözünden, 3 kuş bakışı
 const VIEWS = ['👀 Normal görüş (yukarıdan)', '🎥 Arkadan görüş', '👁 Kendi gözünden görüş', '🦅 Kuş bakışı görüş'];
 let viewMode = store.get('amangasView', 0) % VIEWS.length;
@@ -1515,7 +1548,7 @@ function outfitMesh(kind) {
 function applyOutfit() {
   if (!player) return;
   if (player.outfitG) player.g.remove(player.outfitG);
-  const og = new THREE.Group(); player.g.add(og); player.outfitG = og;
+  const og = new THREE.Group(); player.g.add(og); player.outfitG = og; applyPawn(player);
   if (outfit.head) og.add(outfitMesh(outfit.head));
   if (outfit.white) og.add(outfitMesh('belt'));
   player.bodyMat.color.setHex(outfit.white ? 0xf4f6f8 : player.color);
@@ -1532,14 +1565,21 @@ function applyOutfit() {
 }
 
 // ---------- M: piyon modu ----------
-function applyPawn(e) { if (e) { e.body.visible = !pawnMode; e.pawn.visible = pawnMode; } }
+function applyPawn(e) {
+  if (!e) return;
+  const sh = shapeNow();
+  e.body.visible = sh === 'crew'; e.pawn.visible = sh === 'pawn'; e.pig.visible = sh === 'pig';
+  if (e.outfitG) e.outfitG.position.set(0, sh === 'pig' ? -.6 : 0, sh === 'pig' ? .9 : 0);
+}
 function togglePawn() {
-  pawnMode = !pawnMode;
-  store.set('amangasPawn', pawnMode);
+  shapeStep = (shapeStep + 1) % SHAPES.length;
+  store.set('amangasShape', shapeStep);
+  const sh = shapeNow();
+  pawnMode = sh === 'pawn';
   [player, pet, ...npcs, ejFig].forEach(applyPawn);
-  corpses.forEach(c => { c.userData.crewPart.visible = !pawnMode; c.userData.pawnPart.visible = pawnMode; });
-  sfx.pawn();
-  toast(pawnMode ? '♟ PİYON MODU AÇIK! Herkes 3 boyutlu piyon oldu (M ile kapat)' : 'Piyon modu kapandı, herkes amongus!');
+  corpses.forEach(c => { c.userData.crewPart.visible = sh === 'crew'; c.userData.pawnPart.visible = sh === 'pawn'; c.userData.pigPart.visible = sh === 'pig'; });
+  if (sh === 'pig') { sfx.oink(); toast('🐷 DOMUZ MODU! Bütün taşlar domuz oldu, hepsinin rengi farklı! (M ile çık)'); }
+  else { sfx.pawn(); toast(sh === 'pawn' ? '♟ PİYON MODU AÇIK! Herkes 3 boyutlu piyon oldu (M)' : shapeStep === 2 ? 'Herkes amongus! Bir daha M\'ye basarsan... 🐷' : 'Herkes yine amongus!'); }
 }
 
 // ---------- H: büyük harita ----------
@@ -1930,7 +1970,8 @@ function animateWalk(e, moving, dt) {
   const s = Math.sin(e.walk) * .7;
   e.legL.rotation.x = s; e.legR.rotation.x = -s;
   e.pawn.rotation.z = moving ? Math.sin(e.walk) * .08 : 0;
-  e.g.position.y = moving ? Math.abs(Math.sin(e.walk)) * (pawnMode ? .18 : .08) : 0;
+  e.pig.userData.legs.forEach((l, i) => { l.rotation.x = (i === 0 || i === 3 ? s : -s) * .9; });
+  e.g.position.y = moving ? Math.abs(Math.sin(e.walk)) * (pawnMode ? .18 : shapeNow() === 'pig' ? .1 : .08) : 0;
 }
 function face(e, dx, dz, dt) {
   const target = Math.atan2(dx, dz);
@@ -2293,7 +2334,8 @@ function animateKillers(dt) {
     if (on) {
       e.tongueT -= dt;
       const k = 1 - e.tongueT, ext = k < .3 ? k / .3 : k < .55 ? 1 : Math.max(0, 1 - (k - .55) / .45);
-      const my = pawnMode ? 1.82 : 1.18, mz = pawnMode ? .42 : .56;
+      const pig = shapeNow() === 'pig';
+      const my = pawnMode ? 1.82 : pig ? 1.1 : 1.18, mz = pawnMode ? .42 : pig ? 1.3 : .56;
       e.mouth.position.set(0, my, mz);
       e.tongue.position.set(0, my - .03, mz);
       e.tongue.scale.set(1, 1, Math.max(.02, ext * e.tongueLen));
