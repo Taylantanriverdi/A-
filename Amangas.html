@@ -1788,9 +1788,7 @@ let ejT = 0, ejDur = 10, ejEnt = null, ejFig = null;
   for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - .5) * 160; pos[i * 3 + 1] = (Math.random() - .5) * 90; pos[i * 3 + 2] = -10 - Math.random() * 100; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   var ejStars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: .35 }));
-  spaceScene.add(ejStars);
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(6, 32, 20), mat(0xd06a3a, { emissive: 0x3a1408, roughness: 1 }));
-  planet.position.set(18, -9, -30); spaceScene.add(planet);
+  // Uzayda atılan amongustan başka hiçbir şey görünmez: yıldız ve gezegen yok
 }
 function startEject(ent) {
   state = 'eject'; ejT = 0; ejEnt = ent; ejDur = ent ? 10 : 3.5;
