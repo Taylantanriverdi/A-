@@ -1,0 +1,9 @@
+{
+  "name": "dental-nc-simulator",
+  "private": true,
+  "description": "hyperDENT NC dosyaları için çevrimdışı kazıma simülatörü",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}
