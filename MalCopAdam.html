@@ -1,4 +1,4 @@
-<title>Mal Çöp Adam</title>
+<title>Çöp Adam</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -170,7 +170,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
 
 <div class="screen" id="startScreen">
   <div class="page">
-    <h1>Mal Çöp Adam</h1>
+    <h1>Çöp Adam</h1>
     <p>Birisi seni kareli bir defterin sayfasına çizdi ve sonra unuttu. Sayfada başka çöp adamlar, tuhaf yaratıklar ve üç karanlık mağara var.</p>
     <p>Her mağarada bir boss yaşıyor. Üçünü de yen, üç altın yıldızı topla.</p>
     <div class="keys desk-only">
@@ -189,7 +189,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
 <div class="screen" id="deadScreen" hidden>
   <div class="page">
     <h2>Bayıldın!</h2>
-    <p>10 darbe yedin. Gözlerin çarpı çarpı oldu ama mal çöp adam pes etmez.</p>
+    <p>10 darbe yedin. Gözlerin çarpı çarpı oldu ama çöp adam pes etmez.</p>
     <p class="note">Yendiğin bosslar yenik kalır.</p>
     <button class="btn" id="reviveBtn" type="button">Yeniden çizil</button>
   </div>
@@ -198,7 +198,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
 <div class="screen" id="winScreen" hidden>
   <div class="page">
     <h1>Kazandın!</h1>
-    <p>Üç bossu da yendin ve üç altın yıldızı topladın. Belki biraz malsın ama kahraman bir malsın.</p>
+    <p>Üç bossu da yendin ve üç altın yıldızı topladın. Artık defterin en ünlü çöp adamı sensin.</p>
     <button class="btn" id="againBtn" type="button">Baştan oyna</button>
   </div>
 </div>
@@ -841,7 +841,7 @@ function fallDown(e, line) {
 
 /* ---------------- Diğer çöp adamlar ---------------- */
 const NPC_DEFS = [
-  ['Bıdık', 'Merhaba mal çöp adam! Ay pardon, merhaba çöp adam.', 0xef4b4b],
+  ['Bıdık', 'Merhaba çöp adam! Çizgi Köyü\'ne hoş geldin.', 0xef4b4b],
   ['Zıpır', 'Yaratıklara vurma, yoksa peşine düşerler!', 0x5cc85a],
   ['Şaşkın', 'Mağaralarda bosslar var. Girdiğin an saldırırlar!', 0xffd23f],
   ['Pofuduk', 'D tuşuna basınca rengin değişiyor. Çok havalı!', 0xff8fc7],
@@ -1350,7 +1350,7 @@ function updatePlayer(dt, time) {
     }
     if (P.wantJump && P.onGround) { P.vel.y = 12.5; P.onGround = false; SFX.jump(); }
     if (P.wantPunch && P.punchCd <= 0) doPunch();
-    // mal olduğu için arada kendi ayağına takılır (yakında kızgın yaratık yokken)
+    // sakar olduğu için arada kendi ayağına takılır (yakında kızgın yaratık yokken)
     if (P.zone < 0 && P.onGround && P.runT > 3 && P.tripCd <= 0 && Math.random() < dt / 30 && !creatures.some(c => c.aggro && !c.dead && distXZ(c.pos, P.pos) < 25)) {
       P.tripCd = 40; P.vel.x *= 1.4; P.vel.z *= 1.4; P.vel.y = 5; P.onGround = false; fallDown(P, pick(TRIP_LINES));
     }
@@ -1659,7 +1659,7 @@ function buildWorld() {
   CAVES.forEach((_, i) => buildCaveOutside(i));
   tower(); pencil(); eraserBlock();
   house(-13, -8, '#fff3b0', 0xe5484d); house(13, -10, '#cfe8ff', 0x4f8fe0); house(0, -22, '#ffd6e7', 0x2e9e4f);
-  sign(5, -4, 'Çöp Köy', 'Nüfus: 10 çöp adam', 0);
+  sign(5, -4, 'Çizgi Köyü', 'Nüfus: 10 çöp adam', 0);
   decorate();
   CAVES.forEach((_, i) => { buildArena(i); makeBoss(i); });
   NPC_DEFS.forEach((d, i) => makeNpc(d, i));
