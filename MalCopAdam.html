@@ -138,6 +138,16 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
 #tHit { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(30px + env(safe-area-inset-bottom, 0px)); width: 88px; height: 88px; font-size: 24px; background: var(--heart); color: #fff; }
 #tJump { right: calc(120px + env(safe-area-inset-right, 0px)); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); width: 70px; height: 70px; font-size: 18px; background: var(--gold); }
 #tColor { right: calc(40px + env(safe-area-inset-right, 0px)); bottom: calc(132px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; font-size: 24px; background: #fff; }
+#tEat { right: calc(110px + env(safe-area-inset-right, 0px)); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); width: 58px; height: 58px; font-size: 24px; background: #ffd6e7; }
+.hunger { flex-direction: column; align-items: stretch; gap: 2px; padding: 2px 10px 6px; min-width: 150px; }
+.hunger .row { display: flex; justify-content: space-between; gap: 8px; }
+.hunger .row b { color: #2e9e4f; font-weight: 400; }
+.hunger .row b.warn { color: #e07a10; }
+.hunger .row b.bad { color: var(--margin); }
+#hungerBar { height: 12px; border: 2px solid var(--ink); border-radius: 3px 7px 4px 6px; background: #fff; overflow: hidden; }
+#hungerFill {
+  height: 100%; width: 0; background: repeating-linear-gradient(-45deg, #ff9234 0 6px, #ffb25e 6px 12px); transition: width .3s;
+}
 @media (pointer: fine) { #touch { display: none; } }
 @media (pointer: coarse) { #help { display: none; } #minimap { width: 82px; height: 112px; } }
 @media (prefers-reduced-motion: reduce) { #flash, #toast, #fade, .btn { transition: none; } #hearts svg.pop { animation: none; } }
@@ -151,12 +161,16 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
   <div id="hearts" aria-label="Can"></div>
   <div id="topright">
     <div class="tag"><span>Yıldız</span><b id="starCount">0 / 3</b></div>
+    <div class="tag hunger" role="meter" aria-label="Açlık" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="hungerTag">
+      <div class="row"><span>Açlık</span><b id="hungerText">Tok</b></div>
+      <div id="hungerBar"><div id="hungerFill"></div></div>
+    </div>
     <div class="tag"><span id="swatch"></span><span id="colorName">Mavi</span><span class="desk-only">· D</span></div>
     <canvas id="minimap" width="220" height="300" aria-label="Defter sayfasının haritası"></canvas>
   </div>
   <div id="bossbar" hidden><div class="name" id="bossName"></div><div class="pips" id="bossPips"></div></div>
   <div id="toast"></div>
-  <div id="help">Oklar: yürü · Boşluk: zıpla · X / tık: vur · D: renk · Q/E veya sürükle: kamera · F: tam ekran</div>
+  <div id="help">Oklar: yürü · Boşluk: zıpla · X / tık: vur · D: renk · Y: kek ye · Q/E veya sürükle: kamera · F: tam ekran</div>
 </div>
 <div id="flash"></div>
 <div id="fade"></div>
@@ -166,6 +180,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
   <button class="tbtn" id="tHit" type="button">VUR</button>
   <button class="tbtn" id="tJump" type="button">ZIPLA</button>
   <button class="tbtn" id="tColor" type="button">D</button>
+  <button class="tbtn" id="tEat" type="button" aria-label="Kek ye">Y</button>
 </div>
 
 <div class="screen" id="startScreen">
@@ -179,6 +194,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
       <kbd>Boşluk</kbd><span>zıpla</span>
       <kbd>X · tık</kbd><span>vur</span>
       <kbd>D</kbd><span>rengini değiştir</span>
+      <kbd>Y</kbd><span>kek ye</span>
       <kbd>Q · E · sürükle</kbd><span>kamerayı çevir</span>
     </div>
     <p class="touch-only">Soldaki daireyle yürü, sağdaki düğmelerle vur, zıpla ve renk değiştir. Ekranı sürükleyerek kamerayı çevir.</p>
@@ -366,6 +382,14 @@ function drawFace(g, kind) {
       eye(88, 102, 27, 9, 7, 10); eye(166, 98, 18, -6, 5, 7);
       curve(62, 66, 86, 50, 110, 64, 5); curve(150, 72, 168, 60, 184, 74, 5);
       grin(); break;
+    case 'nom0': case 'nom1': {
+      curve(66, 104, 88, 86, 110, 104); curve(146, 100, 166, 82, 186, 100);
+      g.fillStyle = 'rgba(255,111,145,.5)'; g.beginPath(); g.ellipse(66, 138, 20, 14, 0, 0, 7); g.ellipse(190, 134, 20, 14, 0, 0, 7); g.fill();
+      if (kind === 'nom0') { g.beginPath(); g.ellipse(128, 160, 26, 16, 0, 0, 7); g.fillStyle = INKC; g.fill(); }
+      else curve(102, 158, 128, 172, 154, 158, 6);
+      g.fillStyle = '#f2c79a'; [[100, 186], [150, 190], [128, 200]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); });
+      break;
+    }
     case 'blink':
       curve(64, 104, 88, 116, 112, 104); curve(152, 100, 166, 110, 180, 100);
       curve(62, 66, 86, 50, 110, 64, 5); curve(150, 72, 168, 60, 184, 74, 5);
@@ -995,6 +1019,7 @@ function poseStick(s, dt, p, time) {
     if (p.dance) { x = -2.8; z = a.side * (.6 + Math.sin(time * 8 + a.side) * .5); e = -.8; }
     if (f > .3) { x = -.2; z = a.side * 1.45; e = -.15; }
     if (p.punch > 0 && a.side === p.punchSide) { x = -1.6; z = -a.side * .1; e = -.05; }
+    if (p.eat && a.side === -1) { x = -1.7 + Math.sin(time * 14) * .15; z = .55; e = -1.75; }
     a.sh.rotation.x += (x - a.sh.rotation.x) * k; a.sh.rotation.z += (z - a.sh.rotation.z) * k; a.el.rotation.x += (e - a.el.rotation.x) * k;
   }
   for (const l of s.legs) {
@@ -1012,7 +1037,7 @@ function poseStick(s, dt, p, time) {
 /* ---------------- Oyuncu ---------------- */
 const P = {
   r: .55, vel: new V3(), zone: -1, onGround: false, yaw: 0, hp: 10, inv: 0, hurtT: 0, state: 'ok', fallT: 0, deadT: 0,
-  punchT: 0, punchCd: 0, punchSide: 1, idleT: 0, runT: 0, tripCd: 30, blinkT: 2, colorIdx: 0, caveCd: 0, enterT: 0, wantJump: false, wantPunch: false, bubT: 0,
+  punchT: 0, punchCd: 0, punchSide: 1, idleT: 0, runT: 0, tripCd: 30, blinkT: 2, colorIdx: 0, caveCd: 0, enterT: 0, wantJump: false, wantPunch: false, bubT: 0, hunger: 0, eatT: 0, hungerShown: -1,
 };
 const IDLE_LINES = ['Burnum kaşınıyor ama kolum çok ince...', 'Ben neden çöp adamım?', 'Sağ hangisiydi? Hah, bu.', 'Bugün günlerden pazartesi mi?', 'Bir kelebek gördüm sanki...', 'Karnım acıktı. Silgi yenir mi?', 'Ne bakıyorsun? Ha, sen beni oynatıyorsun.', 'Ayakkabılarım nerede? Ha, ayaklarım.'];
 const TRIP_LINES = ['Ayağım takıldı!', 'Kim koydu bunu buraya?!', 'Yer çok yakındı...', 'Bilerek yaptım. Evet.'];
@@ -1442,6 +1467,7 @@ addEventListener('keydown', e => {
   if (k === ' ') P.wantJump = true;
   if (k === 'x' || k === 'X' || k === 'j' || k === 'J') P.wantPunch = true;
   if (k === 'd' || k === 'D') changeColor();
+  if (k === 'y' || k === 'Y') eatCake();
   if (k === 'f' || k === 'F') toggleFull();
 });
 addEventListener('keyup', e => { keys[e.key] = false; });
@@ -1481,7 +1507,7 @@ stickEl.addEventListener('pointermove', e => { if (e.pointerId === joy.id) joyMo
 const joyEnd = e => { if (e.pointerId !== joy.id) return; joy.id = null; joy.x = joy.y = 0; knob.style.transform = ''; };
 stickEl.addEventListener('pointerup', joyEnd); stickEl.addEventListener('pointercancel', joyEnd);
 const tap = (id, fn) => $(id).addEventListener('pointerdown', e => { e.preventDefault(); audio(); if (running) fn(); });
-tap('tHit', () => { P.wantPunch = true; }); tap('tJump', () => { P.wantJump = true; }); tap('tColor', () => changeColor());
+tap('tHit', () => { P.wantPunch = true; }); tap('tJump', () => { P.wantJump = true; }); tap('tColor', () => changeColor()); tap('tEat', () => eatCake());
 
 const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
 function enterFull() {
@@ -1497,6 +1523,45 @@ function exitFull() {
 }
 function toggleFull() { fsEl() ? exitFull() : enterFull(); }
 
+/* ---------------- Açlık ve kek ---------------- */
+const HUNGER_TIME = 180; // açlık 3 dakikada sonuna gelir; sonuna gelince hiçbir şey olmaz
+let cake = null;
+function buildCake() {
+  const g = new THREE.Group();
+  const base = ink(new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .2, 14), toon(0xc98a4b)), 1.1); g.add(base);
+  const cream = ink(new THREE.Mesh(new THREE.CylinderGeometry(.31, .31, .1, 14), toon(0xfff6ea)), 1.1); cream.position.y = .14; g.add(cream);
+  const top = ink(new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .14, 14), toon(0xff8fc7)), 1.1); top.position.y = .26; g.add(top);
+  const cherry = ink(new THREE.Mesh(G.sphere, toon(0xe5484d)), 1.15); cherry.scale.setScalar(.09); cherry.position.y = .42; g.add(cherry);
+  g.visible = false; g.position.set(-.08, -.42, .62); g.rotation.x = .5; // ağzın hemen önünde
+  P.s.head.add(g);
+  return g;
+}
+function eatCake() {
+  if (!running || P.state !== 'ok' || P.eatT > 0) return;
+  if (!cake) cake = buildCake();
+  P.eatT = 1.5; P.eatFrom = P.hunger; cake.visible = true; cake.scale.setScalar(1.3);
+  say(P, P.hunger < 15 ? 'Aç değilim ama kek kek\'tir!' : pick(['Mmm, kek!', 'Hamm hamm!', 'Dünyanın en güzel keki!']), 1.6);
+}
+function updateHunger(dt) {
+  if (P.state !== 'dead') P.hunger = Math.min(100, P.hunger + dt * 100 / HUNGER_TIME);
+  if (P.eatT > 0) {
+    P.eatT -= dt;
+    const k = 1 - Math.max(0, P.eatT) / 1.5;
+    P.hunger = P.eatFrom * (1 - k);
+    cake.scale.setScalar(1.3 * Math.max(.08, 1 - k * .9));
+    if (Math.floor(P.eatT * 6) !== Math.floor((P.eatT + dt) * 6)) { tone(rand(180, 260), .07, 'square', .05, 120); if (Math.random() < .5) splash(new V3(P.pos.x, P.pos.y + .9, P.pos.z), 0xf2c79a, 2); }
+    if (P.eatT <= 0) { cake.visible = false; P.hunger = 0; SFX.pick(); }
+    if (P.state !== 'ok') { P.eatT = 0; cake.visible = false; }
+  }
+  const h = Math.round(P.hunger);
+  if (h !== P.hungerShown) {
+    P.hungerShown = h;
+    $('hungerFill').style.width = h + '%';
+    $('hungerText').textContent = h < 25 ? 'Tok' : h < 55 ? 'Biraz aç' : h < 90 ? 'Aç' : 'Çok aç!';
+    $('hungerText').className = h < 55 ? '' : h < 90 ? 'warn' : 'bad';
+    $('hungerTag').setAttribute('aria-valuenow', h);
+  }
+}
 function changeColor() {
   if (P.state === 'dead') return;
   P.colorIdx = (P.colorIdx + 1) % PALETTE.length;
@@ -1650,12 +1715,13 @@ function updatePlayer(dt, time) {
   else if (P.state === 'fallen' && P.onGround) face = 'dizzy' + (Math.floor(time * 8) % 4);
   else if (!P.onGround && P.vel.y < -11) face = 'scared';
   else if (P.hurtT > 0) face = 'ouch';
+  else if (P.eatT > 0) face = 'nom' + (Math.floor(time * 7) % 2);
   else if (P.blinkT < 0) face = 'blink';
   setFace(s, face);
   s.root.rotation.y = P.yaw;
   const hs = Math.hypot(P.vel.x, P.vel.z) / speed;
   const won = stars >= 3 && !$('winScreen').hidden;
-  poseStick(s, dt, { move: P.onGround && P.state === 'ok' ? clamp(hs, 0, 1) : 0, air: !P.onGround && P.state === 'ok', fall: P.state !== 'ok', punch: P.punchT > 0 ? 1 : 0, punchSide: P.punchSide, dance: won }, time);
+  poseStick(s, dt, { move: P.onGround && P.state === 'ok' ? clamp(hs, 0, 1) : 0, air: !P.onGround && P.state === 'ok', fall: P.state !== 'ok', punch: P.punchT > 0 ? 1 : 0, punchSide: P.punchSide, dance: won, eat: P.eatT > 0 }, time);
   s.root.visible = P.inv <= 0 || P.state === 'dead' || Math.floor(time * 16) % 2 === 0;
   s.shadow.position.y = (P.gh > -100 ? P.gh - P.pos.y : -999) + .05;
 }
@@ -1891,7 +1957,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(.05, (now - last) / 1000); last = now; time += dt;
   if (running) {
-    updatePlayer(dt, time);
+    updatePlayer(dt, time); updateHunger(dt);
     for (const n of npcs) if (n.zone === P.zone) { updateNpc(n, dt, time); separate(P, n); }
     for (const c of creatures) if (c.zone === P.zone) { updateCreature(c, dt, time); if (!c.dead) separate(P, c); }
     for (const b of bosses) updateBoss(b, dt, time);
@@ -1988,7 +2054,7 @@ function resetAll() {
   caveMouths.forEach((m, i) => m.sign.mark(null));
   deskBars.visible = true;
   for (const c of creatures) { Object.assign(c, { dead: false, hp: 5, aggro: false, deadT: 0 }); c.root.visible = true; c.root.scale.setScalar(1); c.body.rotation.z = 0; setCFace(c, 'calm'); }
-  stars = 0; updateStars(); revive();
+  stars = 0; P.hunger = 0; updateStars(); revive();
 }
 $('startBtn').addEventListener('click', startGame);
 $('reviveBtn').addEventListener('click', revive);
