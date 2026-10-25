@@ -99,6 +99,8 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
 #bossbar .pips { display: flex; justify-content: center; gap: 6px; margin-top: 2px; }
 #bossbar .pips i { width: 26px; height: 12px; border: 2px solid var(--ink); border-radius: 3px 6px 2px 5px; background: var(--margin); }
 #bossbar .pips i.off { background: transparent; }
+#bossbar .pips.many { gap: 4px; }
+#bossbar .pips.many i { width: 18px; }
 #toast {
   position: absolute; top: calc(118px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%) rotate(-1.5deg);
   font-family: var(--font-display); font-size: clamp(22px, 6vw, 34px); color: var(--pencil); text-align: center; line-height: 1.05;
@@ -234,10 +236,10 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const INK = 0x1d2140, INKC = '#1d2140';
 const PAPER_W = 220, PAPER_D = 300, HALF_W = PAPER_W / 2, HALF_D = PAPER_D / 2;
 const ARENA_R = 22;
-const DESK = 3, VILLAGE = 4; // masa (kedi) ve Kalem Köyü bölgeleri
-const ZR = [ARENA_R, ARENA_R, ARENA_R, 30, 58]; // her bölgenin yarıçapı
-const ZOBST = { 0: [], 1: [], 2: [], 3: [], 4: [] };
-const TRIG = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+const DESK = 3, VILLAGE = 4, SHARP = 5, GIANT = 6; // masa (kedi), Kalem Köyü, kalemtıraş mağarası, devin ini
+const ZR = [ARENA_R, ARENA_R, ARENA_R, 30, 58, ARENA_R, 34]; // her bölgenin yarıçapı
+const ZOBST = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+const TRIG = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
 const openZone = z => z === -1 || z === VILLAGE; // serbest dolaşılan bölgeler
 const GRAV = 32;
 let seed = 7;
@@ -435,6 +437,16 @@ function drawFace(g, kind) {
       [[20, 136, 92, 146], [16, 160, 92, 154], [236, 136, 164, 146], [240, 160, 164, 154]].forEach(([a, b, c2, d]) => line(a, b, c2, d, 3));
       break;
     }
+    case 'giant':
+      g.fillStyle = '#4a2c1a'; g.beginPath(); g.moveTo(52, 70); g.quadraticCurveTo(84, 40, 120, 74); g.lineTo(112, 84); g.quadraticCurveTo(84, 62, 58, 84); g.fill();
+      g.beginPath(); g.moveTo(204, 70); g.quadraticCurveTo(172, 40, 136, 74); g.lineTo(144, 84); g.quadraticCurveTo(172, 62, 198, 84); g.fill();
+      eye(88, 104, 19, 3, 3, 9, '#fff', '#2f6fd6'); eye(168, 104, 19, -3, 3, 9, '#fff', '#2f6fd6');
+      g.fillStyle = INKC; g.beginPath(); g.arc(91, 107, 4, 0, 7); g.arc(165, 107, 4, 0, 7); g.fill();
+      g.beginPath(); g.moveTo(128, 170); g.lineTo(88, 182); g.lineTo(98, 202); g.lineTo(158, 202); g.lineTo(168, 182); g.closePath(); g.fillStyle = INKC; g.fill();
+      g.fillStyle = '#fff'; for (let k = 0; k < 4; k++) g.fillRect(104 + k * 13, 183, 10, 9);
+      g.fillStyle = '#4a2c1a'; g.beginPath(); g.moveTo(128, 158); g.bezierCurveTo(100, 142, 64, 160, 58, 184); g.bezierCurveTo(84, 166, 108, 176, 128, 168); g.bezierCurveTo(148, 176, 172, 166, 198, 184); g.bezierCurveTo(192, 160, 156, 142, 128, 158); g.fill();
+      curve(60, 130, 66, 146, 74, 150, 3); curve(196, 130, 190, 146, 182, 150, 3);
+      break;
     case 'boss':
       eye(90, 104, 26, 4, 4, 10, '#ffe14d', '#b3001b'); eye(166, 104, 26, -4, 4, 10, '#ffe14d', '#b3001b');
       line(52, 64, 118, 92, 11); line(204, 64, 138, 92, 11); teeth(146, 54, '#5a0011'); break;
@@ -716,6 +728,15 @@ const caveMouths = [];
 function buildCaveOutside(i) {
   const cv = CAVES[i], y = terrain(cv.x, cv.z) - .6;
   const dir = new V3(-cv.x, 0, -cv.z).normalize();
+  caveMound(worldGroup, cv.x, y, cv.z, dir, 0x9b94ab);
+  OBST.push({ x: cv.x, z: cv.z, r: 7.1, top: 999 });
+  const mp = new V3(cv.x + dir.x * 8.4, 0, cv.z + dir.z * 8.4);
+  const perp = new V3(dir.z, 0, -dir.x);
+  const sg = sign(cv.x + dir.x * 11 + perp.x * 5, cv.z + dir.z * 11 + perp.z * 5, 'Mağara ' + (i + 1), cv.name, Math.atan2(dir.x, dir.z));
+  caveMouths[i] = { pos: mp, dir, sign: sg, zone: -1 };
+}
+// kaya tepesi ve karanlık ağzı; ağız dir yönüne bakar
+function caveMound(group, x0, y, z0, dir, color) {
   const geo = new THREE.SphereGeometry(8, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2);
   const p = geo.attributes.position;
   for (let k = 0; k < p.count; k++) {
@@ -725,8 +746,8 @@ function buildCaveOutside(i) {
     p.setXYZ(k, x * f, yy * f * .72, z * f);
   }
   const rockGeo = geo.toNonIndexed(); rockGeo.computeVertexNormals(); // düz yüzlü kaya
-  const g = new THREE.Group(); g.position.set(cv.x, y, cv.z); g.rotation.y = Math.atan2(dir.x, dir.z);
-  const mound = ink(new THREE.Mesh(rockGeo, toon(0x9b94ab)), 1.03); g.add(mound);
+  const g = new THREE.Group(); g.position.set(x0, y, z0); g.rotation.y = Math.atan2(dir.x, dir.z);
+  const mound = ink(new THREE.Mesh(rockGeo, toon(color)), 1.03); g.add(mound);
   const mouth = new THREE.Mesh(new THREE.CircleGeometry(2.9, 20, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x0d0b12 }));
   mouth.position.set(0, .4, 7.35); g.add(mouth);
   const arch = new THREE.Mesh(new THREE.TorusGeometry(2.9, .2, 6, 20, Math.PI), inkMat.clone()); arch.material.side = THREE.FrontSide; arch.position.copy(mouth.position); g.add(arch);
@@ -739,12 +760,7 @@ function buildCaveOutside(i) {
   cg.fillStyle = INKC; cg.beginPath(); cg.arc(50, 52, 10, 0, 7); cg.arc(78, 52, 10, 0, 7); cg.fill();
   [54, 64, 74].forEach(x => { cg.beginPath(); cg.moveTo(x, 80); cg.lineTo(x, 104); cg.stroke(); });
   const skull = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(c), transparent: true })); skull.scale.set(2.2, 2.2, 1); skull.position.set(0, 4.6, 7); g.add(skull);
-  worldGroup.add(g);
-  OBST.push({ x: cv.x, z: cv.z, r: 7.1, top: 999 });
-  const mp = new V3(cv.x + dir.x * 8.4, 0, cv.z + dir.z * 8.4);
-  const perp = new V3(dir.z, 0, -dir.x);
-  const sg = sign(cv.x + dir.x * 11 + perp.x * 5, cv.z + dir.z * 11 + perp.z * 5, 'Mağara ' + (i + 1), cv.name, Math.atan2(dir.x, dir.z));
-  caveMouths.push({ pos: mp, dir, sign: sg });
+  group.add(g);
 }
 
 /* --- Mağaraların içi (arenalar) --- */
@@ -758,7 +774,14 @@ function buildArena(i) {
   const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g);
   const ac = new V3(600 + i * 160, 0, 0); AC.push(ac); g.position.copy(ac);
   TRIG[i].push({ x: ac.x, z: ac.z + ARENA_R - 2.6, r: 1.8, go: exitCave });
-  const tints = [[0x3b3a52, '#2e2d40', 'rgba(150,150,200,.5)'], [0x4d3346, '#3c2636', 'rgba(240,150,190,.45)'], [0x4a2e2e, '#3a2222', 'rgba(240,110,90,.45)']][i];
+  if (i === SHARP) {
+    sharpHole = new THREE.Group(); sharpHole.visible = false; sharpHole.position.set(0, 0, -10); g.add(sharpHole);
+    const hole = new THREE.Mesh(new THREE.CircleGeometry(2.6, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x050407 })); hole.position.y = .05; sharpHole.add(hole);
+    const rim = new THREE.Mesh(new THREE.RingGeometry(2.6, 3, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd23f, side: THREE.DoubleSide })); rim.position.y = .06; sharpHole.add(rim);
+    floorText(sharpHole, 0, 4.4, 'AŞAĞI İN', Math.PI, 4.4);
+    TRIG[i].push({ x: ac.x, z: ac.z - 10, r: 2.3, ok: () => bosses[SHARP].dead, go: enterGiant });
+  }
+  const tints = [[0x3b3a52, '#2e2d40', 'rgba(150,150,200,.5)'], [0x4d3346, '#3c2636', 'rgba(240,150,190,.45)'], [0x4a2e2e, '#3a2222', 'rgba(240,110,90,.45)'], null, null, [0x3a4450, '#2b333d', 'rgba(220,180,120,.45)']][i];
   const floor = new THREE.Mesh(new THREE.CircleGeometry(ARENA_R + 5, 48).rotateX(-Math.PI / 2), toon(0xffffff, { map: tex(graphiteTex(tints[1], tints[2]), [3, 3]) }));
   g.add(floor);
   const wall = new THREE.Mesh(new THREE.CylinderGeometry(ARENA_R + 2, ARENA_R + 5, 18, 40, 1, true), toon(tints[0], { side: THREE.BackSide, map: tex(graphiteTex('#8c88a0', 'rgba(20,20,30,.55)'), [6, 1]) }));
@@ -821,7 +844,7 @@ function bookArch(group, x, z, rotY) {
   const arch = new THREE.Mesh(new THREE.TorusGeometry(2.8, .2, 6, 20, Math.PI), new THREE.MeshBasicMaterial({ color: INK })); arch.position.copy(mouth.position); g.add(arch);
   return g;
 }
-let deskBars = null;
+let deskBars = null, sharpHole = null;
 function buildDesk() {
   const i = DESK, R = ZR[i];
   const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g);
@@ -856,6 +879,29 @@ function buildDesk() {
   TRIG[i].push({ x: ac.x, z: ac.z - (R - 2), r: 2.6, ok: () => bosses[DESK].dead, locked: 'Önce kediyi yen!', go: enterVillage });
 }
 
+/* --- Devin ini: kalemtıraş mağarasındaki deliğin altı --- */
+function buildGiantLair() {
+  const i = GIANT, R = ZR[i];
+  const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g);
+  const ac = new V3(600 + i * 160, 0, 0); AC.push(ac); g.position.copy(ac);
+  g.add(new THREE.Mesh(new THREE.CircleGeometry(R + 60, 48).rotateX(-Math.PI / 2), toon(0x8a7060, { map: tex(woodTex(), [8, 8]) })));
+  const [c, cg] = canvas(1024, 1024); cg.fillStyle = '#f4efe2'; cg.fillRect(0, 0, 1024, 1024);
+  cg.strokeStyle = 'rgba(40,40,60,.35)'; cg.lineCap = 'round';
+  for (let k = 0; k < 40; k++) { cg.lineWidth = rand(3, 9); cg.beginPath(); let x = rand(0, 1024), y = rand(0, 1024); cg.moveTo(x, y); for (let j = 0; j < 8; j++) { x += rand(-90, 90); y += rand(-90, 90); cg.lineTo(x, y); } cg.stroke(); }
+  for (let k = 0; k < 6; k++) { cg.save(); cg.translate(rand(150, 870), rand(150, 870)); cg.rotate(rand(0, 6)); cg.strokeStyle = 'rgba(29,33,64,.5)'; cg.lineWidth = 8; cg.beginPath(); cg.arc(0, -60, 22, 0, 7); cg.moveTo(0, -38); cg.lineTo(0, 10); cg.moveTo(-26, -20); cg.lineTo(26, -20); cg.moveTo(0, 10); cg.lineTo(-20, 50); cg.moveTo(0, 10); cg.lineTo(20, 50); cg.stroke(); cg.restore(); }
+  const sheet = new THREE.Mesh(new THREE.CircleGeometry(R + 1, 48).rotateX(-Math.PI / 2), toon(0xffffff, { map: tex(c) })); sheet.position.y = .02; g.add(sheet);
+  // kenarda dev boya kutuları ve yatık mum boyalar
+  for (let k = 0; k < 16; k++) {
+    const a = k / 16 * Math.PI * 2 + .1, x = Math.cos(a) * (R + 5), z = Math.sin(a) * (R + 5);
+    if (z > R - 4 && Math.abs(x) < 10) continue;
+    if (k % 2) { const pot = ink(new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 5, 16), toon(0xf4f4f4)), 1.03); pot.position.set(x, 2.5, z); g.add(pot); const paint = new THREE.Mesh(new THREE.CircleGeometry(2.8, 16).rotateX(-Math.PI / 2), toon(PENCIL_COLORS[k % 8])); paint.position.set(x, 5.02, z); g.add(paint); }
+    else { const cr = ink(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 12, 10), toon(PENCIL_COLORS[k % 8])), 1.03); cr.rotation.z = Math.PI / 2; cr.rotation.y = a; cr.position.set(x, 1.4, z); g.add(cr); }
+  }
+  exitRing(g, 0, R - 3);
+  floorText(g, 0, R - 6.4, 'KÖYE DÖN', Math.PI, 5);
+  TRIG[i].push({ x: ac.x, z: ac.z + R - 3, r: 1.8, go: exitCave });
+}
+
 /* --- Kalem Köyü --- */
 function makePencil(group, x, z, h, r, color, obst) {
   const p = new THREE.Group(); p.position.set(x, 0, z); p.rotation.y = rand(0, 1);
@@ -881,19 +927,27 @@ function linedPaperTex() {
 function buildVillage() {
   const i = VILLAGE, R = ZR[i];
   const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g); // nesneler dünya koordinatında
-  const ac = new V3(1400, 0, 0); AC.push(ac);
+  const ac = new V3(2300, 0, 0); AC.push(ac);
   const X = x => ac.x + x, Z = z => ac.z + z, ob = ZOBST[i];
   const floor = new THREE.Mesh(new THREE.CircleGeometry(R + 45, 64).rotateX(-Math.PI / 2), toon(0xffffff, { map: tex(linedPaperTex(), [14, 14]) }));
   floor.position.set(ac.x, 0, ac.z); g.add(floor);
   // kalemlerden çit
   const n = Math.round(Math.PI * 2 * (R + 1.5) / 3.2);
   for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; makePencil(g, X(Math.cos(a) * (R + 1.5)), Z(Math.sin(a) * (R + 1.5)), rand(5, 7.5), .75, PENCIL_COLORS[k % 8]); }
+  // kalemtıraş mağarası
+  const CA = .93; // evlerin arasındaki boşluk
+  { const cdir = new V3(-Math.cos(CA), 0, -Math.sin(CA)), cx = X(Math.cos(CA) * 40), cz = Z(Math.sin(CA) * 40), perp = new V3(cdir.z, 0, -cdir.x);
+    caveMound(g, cx, -.6, cz, cdir, 0x8a8aa0); ob.push({ x: cx, z: cz, r: 7.1, top: 999 });
+    const mp = new V3(cx + cdir.x * 8.4, 0, cz + cdir.z * 8.4);
+    const sg = sign(cx + cdir.x * 11.5 + perp.x * 6, cz + cdir.z * 11.5 + perp.z * 6, 'Mağara', 'Kalemtıraş Canavarı', Math.atan2(cdir.x, cdir.z), i);
+    caveMouths[SHARP] = caveMouths[GIANT] = { pos: mp, dir: cdir, sign: sg, zone: i };
+    TRIG[i].push({ x: mp.x, z: mp.z, r: 2.6, go: () => enterCave(SHARP) }); }
   // dev kalemler (ağaç gibi)
   let placed = 0, guard = 0;
   while (placed < 24 && guard++ < 1000) {
     const a = rand(0, 6.283), d = rand(12, R - 5), x = Math.cos(a) * d, z = Math.sin(a) * d;
     if (Math.abs(x) < 8 && z < -R + 22) continue;
-    if (Math.abs(d - 24) < 6) continue; // kalemlik evlerin halkası
+    if (Math.abs(d - 24) < 6 || Math.hypot(x - Math.cos(CA) * 40, z - Math.sin(CA) * 40) < 12) continue; // kalemlik evler ve mağara
     if (ob.some(o => (o.x - X(x)) ** 2 + (o.z - Z(z)) ** 2 < 64)) continue;
     makePencil(g, X(x), Z(z), rand(7, 15), rand(.9, 1.4), pick(PENCIL_COLORS), ob); placed++;
   }
@@ -1072,7 +1126,7 @@ const PENCIL_NPCS = [
   ['Mavi Uç', 'Kediyi sen mi yendin? Vay be, biz hep korkardık.', 0x2f6fd6],
   ['Kütük', 'Ucum kırıldı, kimse bakmasın lütfen.', 0x2e9e4f],
   ['2B', 'Deftere dönmek istersen girişteki sarı halkaya gir.', 0x3a3d52],
-  ['Mor Kalem', 'Kalemtıraşın üstüne çıkma, orası korkunç bir yer...', 0x9b6cf0],
+  ['Mor Kalem', 'Köyün öbür ucundaki mağarada Kalemtıraş Canavarı yaşar. Onun altında da daha kötüsü...', 0x9b6cf0],
 ];
 const npcs = [];
 const OUCH_LINES = ['Ayy! Neden vurdun?!', 'Hey! Ben iyi çöp adamım!', 'Annemlere söylicem!', 'Bunu hak etmedim...'];
@@ -1174,13 +1228,15 @@ function hitCreature(c) {
 }
 
 /* ---------------- Bosslar ---------------- */
-const bosses = [];
+const bosses = [], BOSS_LIST = []; // bosses: bölge numarasına göre
 const BOSS_DEFS = [
   { name: 'Mürekkep Lekesi', r: 3.2, speed: 4.6, attacks: ['volley', 'leap', 'volley', 'leap'], proj: 0x23264f, taunt: ['Seni lekeleyeceğim!', 'BLOB!', 'Mürekkebim bitmez!'] },
   { name: 'Silgi Kral', r: 3.1, speed: 5, attacks: ['dash', 'crumbs', 'dash', 'crumbs'], proj: 0xf49ab8, taunt: ['Seni sileceğim!', 'Kral benim!', 'Hiç çizilmemiş gibi olacaksın!'] },
   { name: 'Karalama Canavarı', r: 3.0, speed: 5.4, attacks: ['ring', 'spiral', 'leap', 'ring'], proj: 0xe5484d, taunt: ['KRRRT KRRT!', 'Seni karalayacağım!', 'Zıpla bakalım!'] },
   { name: 'Dev Tekir', r: 3.4, speed: 6.4, attacks: ['swipe', 'leap', 'volley', 'swipe', 'dash'], proj: 0xff6f91, taunt: ['Miyavvv!', 'Sen fare misin?', 'Seni yumak yapacağım!', 'Pıııs!'] },
 ];
+BOSS_DEFS[SHARP] = { name: 'Kalemtıraş Canavarı', r: 3.0, speed: 5.2, attacks: ['dash', 'crumbs', 'spiral', 'ring'], proj: 0xf2c79a, taunt: ['Seni de yontacağım!', 'Vırrr vırrr!', 'Ucunu sivrilteyim mi?'] };
+BOSS_DEFS[GIANT] = { name: 'Dev Ressam', r: 3.6, speed: 4.4, hp: 10, h: 19, attacks: ['slam', 'volley', 'ring', 'slam', 'spiral'], proj: 0x23264f, taunt: ['Seni ben çizdim, ben de silerim!', 'HOHOHO!', 'Kalemim senden büyük!', 'Küçük çöp adam!'] };
 const tabbyTex = () => {
   const [c, g] = canvas(256, 256); g.fillStyle = '#f29a3c'; g.fillRect(0, 0, 256, 256);
   g.strokeStyle = '#c4621a'; g.lineCap = 'round';
@@ -1205,6 +1261,51 @@ function buildBoss(i) {
     const crown = ink(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, .8, 10, 1, true), toon(0xf5b82e, { side: THREE.DoubleSide })), 1.04); crown.position.set(.9, 4.6, 0); body.add(crown);
     for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2, c = ink(new THREE.Mesh(G.cone, toon(0xf5b82e)), 1.08); c.scale.set(.35, .9, .35); c.position.set(.9 + Math.cos(a) * 1.25, 5.4, Math.sin(a) * 1.25); body.add(c); }
     for (const side of [1, -1]) { const l = ink(new THREE.Mesh(G.box, toon(0xd9789a)), 1.06); l.scale.set(.9, .8, 1.2); l.position.set(side * 2, .4, 0); body.add(l); }
+  } else if (i === SHARP) {
+    mat = toon(0xb8c0cc);
+    const box = ink(new THREE.Mesh(G.box, mat), 1.03); box.scale.set(5.4, 4.4, 4.2); box.position.y = 2.6; body.add(box);
+    const f = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), faceMat); f.position.set(-1, 3.1, 2.12); body.add(f);
+    const holeMat = new THREE.MeshBasicMaterial({ color: 0x0d0b12 });
+    const cone = new THREE.Mesh(new THREE.CircleGeometry(1.1, 20), holeMat); cone.position.set(1.6, 2.6, 2.13); body.add(cone);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.15, .16, 6, 20), toon(0x8a8aa0)); ring.position.copy(cone.position); body.add(ring);
+    spin = new THREE.Group(); spin.position.set(0, 4.95, 0); body.add(spin); // tepedeki bıçak döner
+    const blade = ink(new THREE.Mesh(G.box, toon(0xe8ecf2)), 1.06); blade.scale.set(4.6, .25, 1.2); spin.add(blade);
+    const screw = ink(new THREE.Mesh(new THREE.CylinderGeometry(.45, .45, .5, 10), toon(0x8a8aa0)), 1.08); screw.position.y = .2; spin.add(screw);
+    for (const side of [1, -1]) { const l = ink(new THREE.Mesh(G.box, toon(0x8a8aa0)), 1.06); l.scale.set(1, .8, 1.3); l.position.set(side * 1.9, .4, 0); body.add(l); }
+  } else if (i === GIANT) {
+    mat = toon(0xe5484d);
+    const skin = toon(0xf5c9a0), pants = toon(0x2f4f8f), dark = toon(0x3a2a22), hair = toon(0x4a2c1a);
+    const rig = { arms: [], legs: [] };
+    for (const side of [1, -1]) {
+      const hip = new THREE.Group(); hip.position.set(side * 1.35, 6, 0); body.add(hip);
+      const leg = ink(new THREE.Mesh(new THREE.CylinderGeometry(.95, .85, 5.4, 12), pants), 1.04); leg.position.y = -2.7; hip.add(leg);
+      const shoe = ink(new THREE.Mesh(G.sphere, dark), 1.05); shoe.scale.set(1, .6, 1.6); shoe.position.set(0, -5.5, .45); hip.add(shoe);
+      rig.legs.push({ hip, side });
+      const sh = new THREE.Group(); sh.position.set(side * 3.1, 11.4, 0); body.add(sh);
+      const up = ink(new THREE.Mesh(new THREE.CylinderGeometry(.85, .75, 3.6, 12), mat), 1.04); up.position.y = -1.8; sh.add(up);
+      const el = new THREE.Group(); el.position.y = -3.6; sh.add(el);
+      const fore = ink(new THREE.Mesh(new THREE.CylinderGeometry(.62, .56, 3.2, 12), skin), 1.04); fore.position.y = -1.6; el.add(fore);
+      const hand = ink(new THREE.Mesh(G.sphere, skin), 1.05); hand.scale.setScalar(.85); hand.position.y = -3.4; el.add(hand);
+      if (side > 0) { // elindeki dev kalem
+        const pen = new THREE.Group(); pen.position.set(0, -3.4, .2); el.add(pen);
+        const pb = ink(new THREE.Mesh(new THREE.CylinderGeometry(.5, .5, 9, 6), toon(0xffc928)), 1.04); pb.position.y = -2.2; pen.add(pb);
+        const pw = ink(new THREE.Mesh(new THREE.ConeGeometry(.5, 1.6, 6), toon(0xf2c79a)), 1.05); pw.rotation.x = Math.PI; pw.position.y = -7.5; pen.add(pw);
+        const pl = new THREE.Mesh(new THREE.ConeGeometry(.18, .58, 6), toon(0x3a3a48)); pl.rotation.x = Math.PI; pl.position.y = -8.3; pen.add(pl);
+        const pe = ink(new THREE.Mesh(new THREE.CylinderGeometry(.5, .5, .9, 10), toon(0xf49ab8)), 1.05); pe.position.y = 2.7; pen.add(pe);
+      }
+      rig.arms.push({ sh, el, side });
+      const ear = ink(new THREE.Mesh(G.sphere, skin), 1.08); ear.scale.set(.35, .55, .3); ear.position.set(side * 2, 14.4, 0); body.add(ear);
+    }
+    const torso = ink(new THREE.Mesh(G.sphere, mat), 1.03); torso.scale.set(2.9, 3.4, 2.1); torso.position.y = 9.2; body.add(torso);
+    const belt = ink(new THREE.Mesh(new THREE.CylinderGeometry(2.55, 2.55, .6, 20), dark), 1.03); belt.position.y = 6.6; body.add(belt);
+    for (let k = 0; k < 3; k++) { const bt = ink(new THREE.Mesh(G.sphere, toon(0xfff6ea)), 1.1); bt.scale.setScalar(.22); bt.position.set(0, 8 + k * 1.2, 2.05 - Math.abs(k - 1) * .05); body.add(bt); }
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(.8, .9, 1.2, 12), skin); neck.position.y = 12.6; body.add(neck);
+    const head = ink(new THREE.Mesh(G.sphere, skin), 1.04); head.scale.setScalar(2); head.position.y = 14.4; body.add(head);
+    const f = new THREE.Mesh(G.face, faceMat); f.scale.setScalar(2); f.position.y = 14.4; body.add(f);
+    const nose = ink(new THREE.Mesh(G.sphere, skin), 1.08); nose.scale.set(.42, .55, .5); nose.position.set(0, 14.15, 2); body.add(nose);
+    const cap = ink(new THREE.Mesh(G.sphere, hair), 1.04); cap.scale.set(2.12, 1.25, 2.12); cap.position.set(0, 15.35, -.3); body.add(cap);
+    for (let k = 0; k < 6; k++) { const tuft = ink(new THREE.Mesh(G.sphere, hair), 1.06); tuft.scale.setScalar(rand(.5, .8)); const a = k / 6 * Math.PI * 2; tuft.position.set(Math.cos(a) * 1.4, 16.3 + rand(0, .4), Math.sin(a) * 1.2 - .4); body.add(tuft); }
+    var giantRig = rig;
   } else if (i === DESK) {
     mat = toon(0xffffff, { map: tabbyTex() });
     const white = toon(0xfff6ea);
@@ -1234,19 +1335,20 @@ function buildBoss(i) {
     for (const side of [1, -1]) { const l = new THREE.Mesh(limbGeo(1.1), toon(INK)); l.position.set(side * 1.2, 1, 0); body.add(l); const ft = ink(new THREE.Mesh(G.sphere, mat), 1.1); ft.scale.set(.45, .25, .6); ft.position.set(side * 1.2, -.05, .2); body.add(ft); }
   }
   const shadow = addShadow(root, BOSS_DEFS[i].r * 2.4); shadow.position.y = .04;
-  return { root, body, mat, faceMat, spin, shadow };
+  return { root, body, mat, faceMat, spin, shadow, rig: typeof giantRig !== 'undefined' ? giantRig : null };
 }
 function makeBoss(i) {
-  const b = Object.assign(buildBoss(i), { cat: i === DESK, i, def: BOSS_DEFS[i], r: BOSS_DEFS[i].r, hp: 5, dead: false, deadT: 0, state: 'wait', t: 0, actT: 0, atk: '', atkIdx: 0,
+  const b = Object.assign(buildBoss(i), { cat: i === DESK, giant: i === GIANT, i, def: BOSS_DEFS[i], r: BOSS_DEFS[i].r, hp: 5, maxHp: BOSS_DEFS[i].hp || 5, dead: false, deadT: 0, state: 'wait', t: 0, actT: 0, atk: '', atkIdx: 0,
     inv: 0, flash: 0, yaw: 0, fired: 0, bubT: 0, collected: false });
   b.pos = b.root.position; caveGroups[i].add(b.root); resetBoss(b);
-  bosses.push(b);
+  bosses[i] = b; BOSS_LIST.push(b);
 }
 function resetBoss(b) {
   b.root.visible = !b.dead; if (b.dead) return;
   if (b.cat) deskBars.visible = true;
-  b.hp = 5; b.state = 'wait'; b.t = 0; b.root.position.set(0, 0, -6); b.root.rotation.set(0, 0, 0); b.body.rotation.set(0, 0, 0); b.body.position.set(0, 0, 0); b.body.scale.set(1, 1, 1);
-  b.faceMat.map = faceTex(b.cat ? 'cat' : 'boss');
+  if (b.i === SHARP) sharpHole.visible = false;
+  b.hp = b.maxHp; b.state = 'wait'; b.t = 0; b.root.position.set(0, 0, -6); b.root.rotation.set(0, 0, 0); b.body.rotation.set(0, 0, 0); b.body.position.set(0, 0, 0); b.body.scale.set(1, 1, 1);
+  b.faceMat.map = faceTex(b.cat ? 'cat' : b.giant ? 'giant' : 'boss');
 }
 function hitBoss(b) {
   if (b.inv > 0 || b.dead) return;
@@ -1259,6 +1361,8 @@ function hitBoss(b) {
     b.dead = true; b.deadT = 0; b.faceMat.map = faceTex('dead'); SFX.die(); SFX.boom();
     say(b, 'Hayıııır!', 2); clearHazards();
     if (b.cat) { toast('Dev Tekir yenildi! Fare deliği açıldı.', 3.5); deskBars.visible = false; splash(new V3(AC[DESK].x, 0, AC[DESK].z - ZR[DESK] + 1.5), 0xffc928, 14); P.hp = 10; updateHearts(); }
+    else if (b.i === SHARP) { toast('Kalemtıraş Canavarı yenildi! Yerde bir delik açıldı.', 3.5); sharpHole.visible = true; caveMouths[SHARP].sign.mark('YENİLDİ'); P.hp = 10; updateHearts(); }
+    else if (b.giant) { toast('Dev Ressam yenildi! Kalem Köyü kurtuldu!', 4.5); P.hp = 10; updateHearts(); say(P, 'Ben mi yendim? Ben mi?! Yaşasııın!', 3); for (let k = 0; k < 4; k++) splash(P.pos, PENCIL_COLORS[k * 2], 12); caveMouths[SHARP].sign.mark('KAHRAMAN'); }
     else { toast(b.def.name + ' yenildi!'); caveMouths[b.i].sign.mark('YENİLDİ'); }
   } else if (Math.random() < .5) say(b, pick(b.def.taunt), 1.6);
 }
@@ -1424,7 +1528,8 @@ function updateBossBar() {
   $('bossbar').hidden = !b || b.dead;
   if (!b) return;
   $('bossName').textContent = b.def.name;
-  $('bossPips').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < b.hp ? '' : 'off'}"></i>`).join('');
+  $('bossPips').classList.toggle('many', b.maxHp > 5);
+  $('bossPips').innerHTML = Array.from({ length: b.maxHp }, (_, i) => `<i class="${i < b.hp ? '' : 'off'}"></i>`).join('');
 }
 let toastT = 0;
 function toast(text, dur = 2.6) { const t = $('toast'); t.textContent = text; t.style.opacity = 1; toastT = dur; }
@@ -1582,6 +1687,8 @@ function setZoneLook(zone) {
     scene.fog = new THREE.Fog(0xf6f3ea, 90, 260); scene.background = null; hemi.intensity = .62; hemi.groundColor.setHex(0xcfc3a8); sun.intensity = .72;
   } else if (zone === DESK) {
     scene.fog = new THREE.Fog(0xdcc39c, 50, 170); scene.background = new THREE.Color(0xdcc39c); hemi.intensity = .7; hemi.groundColor.setHex(0xb08a5a); sun.intensity = .6;
+  } else if (zone === GIANT) {
+    scene.fog = new THREE.Fog(0x2e2430, 45, 130); scene.background = new THREE.Color(0x2e2430); hemi.intensity = .6; hemi.groundColor.setHex(0x8a7060); sun.intensity = .5;
   } else if (zone === VILLAGE) {
     scene.fog = new THREE.Fog(0xf7efd6, 70, 190); scene.background = new THREE.Color(0xf7efd6); hemi.intensity = .65; hemi.groundColor.setHex(0xcfc3a8); sun.intensity = .7;
   } else {
@@ -1605,7 +1712,8 @@ function enterCave(i) {
   goZone(i, () => {
     const ac = AC[i]; P.pos.set(ac.x, 0, ac.z + ARENA_R - 8); P.yaw = Math.PI; cam.yaw = 0;
     const b = bosses[i];
-    if (b.dead) toast(b.collected ? 'Burası artık boş. Sadece yankı var.' : 'Yıldızını almayı unutma!');
+    if (b.dead && i === SHARP) toast('Yerdeki delikten aşağı in!');
+    else if (b.dead) toast(b.collected ? 'Burası artık boş. Sadece yankı var.' : 'Yıldızını almayı unutma!');
     else toast(b.def.name + '!');
   });
 }
@@ -1627,11 +1735,17 @@ function backToDesk() {
 function toNotebook() {
   goZone(-1, () => { P.pos.set(SPAWN.x, terrain(SPAWN.x, SPAWN.z), SPAWN.z); P.yaw = 0; cam.yaw = 0; toast('Deftere geri döndün!'); });
 }
+function enterGiant() {
+  goZone(GIANT, () => {
+    const ac = AC[GIANT]; P.pos.set(ac.x, 22, ac.z + ZR[GIANT] - 9); P.inv = 3; P.yaw = Math.PI; cam.yaw = 0;
+    toast(bosses[GIANT].dead ? 'Devin ini artık sessiz.' : 'Dev Ressam! Elinde kocaman bir kalem var!', 3);
+  });
+}
 function exitCave() {
   const i = P.zone, m = caveMouths[i];
   P.caveCd = 1.2;
-  goZone(-1, () => {
-    P.pos.set(m.pos.x + m.dir.x * 3, 0, m.pos.z + m.dir.z * 3); P.pos.y = groundAt(-1, P.pos.x, P.pos.z, 50);
+  goZone(m.zone, () => {
+    P.pos.set(m.pos.x + m.dir.x * 3, 0, m.pos.z + m.dir.z * 3); P.pos.y = groundAt(m.zone, P.pos.x, P.pos.z, 50);
     P.yaw = Math.atan2(m.dir.x, m.dir.z); cam.yaw = P.yaw + Math.PI;
   });
 }
@@ -1699,11 +1813,11 @@ function updatePlayer(dt, time) {
   if (P.zone < 0 && P.pos.y < -45) dropToDesk(); // defterden masaya
   // mağara girişleri / çıkış
   if (P.zone < 0 && P.caveCd <= 0 && P.state !== 'dead') {
-    caveMouths.forEach((m, i) => { if (distXZ(P.pos, m.pos) < 2.6) enterCave(i); });
+    caveMouths.forEach((m, i) => { if (m.zone === -1 && distXZ(P.pos, m.pos) < 2.6) enterCave(i); });
   } else if (P.zone >= 0 && P.enterT > 1.2 && P.state === 'ok' && P.inv <= 0) { // geri itilip yanlışlıkla çıkmasın
     for (const t of TRIG[P.zone]) {
       if (Math.hypot(P.pos.x - t.x, P.pos.z - t.z) >= t.r) continue;
-      if (t.ok && !t.ok()) { if (toastT <= 0) toast(t.locked); continue; }
+      if (t.ok && !t.ok()) { if (t.locked && toastT <= 0) toast(t.locked); continue; }
       t.go(); break;
     }
   }
@@ -1822,6 +1936,19 @@ const BOSS_ATTACKS = {
     }
     return t > 1.25;
   },
+  slam(b, t) {
+    if (b.fired === 0) {
+      b.fired = 1; b.slamAt = { x: P.pos.x, z: P.pos.z };
+      spawnWave(b.i, P.pos.x, P.pos.z, { disc: true, r: 3.6, speed: 0, max: 99, life: .75, noDmg: true, color: 0xe5484d });
+      say(b, pick(['KALEM DARBESİ!', 'Al sana!', 'HOP!']), 1);
+    }
+    if (b.fired === 1 && t > .75) {
+      b.fired = 2; SFX.boom(); cam.shake = .7; splash(new V3(b.slamAt.x, 0, b.slamAt.z), INK, 10);
+      if (Math.hypot(P.pos.x - b.slamAt.x, P.pos.z - b.slamAt.z) < 3.6 && P.pos.y < 1.5) hurtPlayer(1, { x: b.slamAt.x, z: b.slamAt.z });
+      spawnWave(b.i, b.slamAt.x, b.slamAt.z, { speed: 13, max: 10, width: .9 });
+    }
+    return t > 1.3;
+  },
   swipe(b, t) {
     b.body.position.z = Math.sin(Math.min(1, t / .45) * Math.PI) * 1.6;
     if (b.fired === 0 && t > .15) {
@@ -1849,16 +1976,34 @@ const BOSS_ATTACKS = {
   },
 };
 let TICK = 0;
+function animGiant(b, time, dt) {
+  const k = Math.min(1, dt * 10), walking = b.state === 'chase';
+  for (const l of b.rig.legs) l.hip.rotation.x += ((walking ? Math.sin(time * 5 + (l.side > 0 ? 0 : Math.PI)) * .45 : 0) - l.hip.rotation.x) * k;
+  for (const a of b.rig.arms) {
+    let x = walking ? Math.sin(time * 5 + (a.side > 0 ? Math.PI : 0)) * .4 : 0, z = a.side * .18, e = -.35;
+    if (a.side > 0) {
+      const slam = b.atk === 'slam';
+      if (slam && b.state === 'tele') { x = -2.9; e = -.6; }
+      else if (slam && b.state === 'act') { if (b.actT < .7) { x = -3; e = -.7; } else { x = -1.25; e = -.1; } }
+      else if (b.state === 'act') { x = -1.6; e = -.4; } // kalemle işaret eder
+    }
+    if (b.dead) { x = -.3; z = a.side * 1.2; }
+    a.sh.rotation.x += (x - a.sh.rotation.x) * k; a.sh.rotation.z += (z - a.sh.rotation.z) * k; a.el.rotation.x += (e - a.el.rotation.x) * k;
+  }
+}
 function updateBoss(b, dt, time) {
+  if (b.giant) animGiant(b, time, dt);
   b.inv -= dt; b.flash = Math.max(0, b.flash - dt * 4); b.mat.emissive.setScalar(b.flash * .9);
   if (b.spin && b.cat) { b.spin.rotation.z = Math.sin(time * 3) * .45; b.spin.rotation.x = Math.sin(time * 2.1) * .15; }
+  else if (b.spin && b.i === SHARP) b.spin.rotation.y += dt * 5;
   else if (b.spin) { b.spin.rotation.y += dt * 2; b.spin.rotation.x += dt * 1.3; }
   const wp = worldPos(b);
-  updateBubble(b, dt, wp.x, wp.y + b.r * 2 + 1.5, wp.z, P.zone === b.i);
+  updateBubble(b, dt, wp.x, wp.y + (b.def.h || b.r * 2 + 1.5), wp.z, P.zone === b.i);
   if (b.dead) {
     b.deadT += dt;
     b.body.rotation.z = Math.min(1.45, b.deadT * 2.5); b.pos.y = Math.max(0, b.pos.y - dt * 10);
-    if (b.deadT > .7 && !b.starSpawned && !b.cat) { b.starSpawned = true; spawnStar(b); SFX.star(); }
+    if (b.giant && b.deadT > .55 && !b.thud) { b.thud = true; SFX.boom(); cam.shake = 1; }
+    if (b.deadT > .7 && !b.starSpawned && b.i < 3) { b.starSpawned = true; spawnStar(b); SFX.star(); }
     if (b.deadT > 1.8) b.body.scale.setScalar(Math.max(.001, 1 - (b.deadT - 1.8)));
     if (b.deadT > 2.8) b.root.visible = false;
     return;
@@ -1867,7 +2012,7 @@ function updateBoss(b, dt, time) {
     b.body.position.y = Math.sin(time * 1.5) * .15; b.body.position.x = 0; return;
   }
   const dx = P.pos.x - wp.x, dz = P.pos.z - wp.z, d = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
-  const rage = 1 + (5 - b.hp) * .14;
+  const rage = 1 + (b.maxHp - b.hp) / b.maxHp * .7;
   b.t -= dt * rage;
   b.body.position.x = 0;
   if (b.state !== 'act') b.body.position.z = 0;
@@ -1910,8 +2055,9 @@ function updateHazards(dt) {
   }
   for (let i = waves.length - 1; i >= 0; i--) {
     const w = waves[i];
-    w.r += w.speed * dt; w.mesh.scale.set(w.r, 1, w.r); w.mesh.material.opacity = .75 * (1 - w.r / w.max) + .15;
-    if (!w.hit && P.zone === w.zone && P.pos.y < .7) {
+    w.r += w.speed * dt; w.mesh.scale.set(w.r, 1, w.r); w.mesh.material.opacity = w.life !== undefined ? .35 + Math.abs(Math.sin(w.life * 18)) * .3 : .75 * (1 - w.r / w.max) + .15;
+    if (w.life !== undefined) { w.life -= dt; if (w.life <= 0) { scene.remove(w.mesh); waves.splice(i, 1); continue; } }
+    if (!w.hit && !w.noDmg && P.zone === w.zone && P.pos.y < .7) {
       const d = Math.hypot(P.pos.x - w.x, P.pos.z - w.z);
       if (w.disc ? d < w.r : Math.abs(d - w.r) < w.width) { w.hit = true; hurtPlayer(1, { x: w.x, z: w.z }); }
     }
@@ -1942,9 +2088,10 @@ const camTarget = new V3(), camWant = new V3();
 function updateCamera(dt) {
   if (keys.q || keys.Q) cam.yaw += dt * 2.2;
   if (keys.e || keys.E) cam.yaw -= dt * 2.2;
-  const d = cam.dist * (P.zone >= 0 && P.zone !== VILLAGE ? 1.25 : 1), cp = Math.cos(cam.pitch);
-  camTarget.set(P.pos.x, P.pos.y + 1.8, P.pos.z);
-  camWant.set(P.pos.x + Math.sin(cam.yaw) * cp * d, P.pos.y + 1.8 + Math.sin(cam.pitch) * d, P.pos.z + Math.cos(cam.yaw) * cp * d);
+  const big = P.zone === GIANT; // dev sığsın diye kamera geri çekilip yukarı bakar
+  const d = cam.dist * (big ? 1.9 : P.zone >= 0 && P.zone !== VILLAGE ? 1.25 : 1), pitch = big ? Math.min(cam.pitch, .2) : cam.pitch, cp = Math.cos(pitch), ty = big ? 6 : 1.8;
+  camTarget.set(P.pos.x, P.pos.y + ty, P.pos.z);
+  camWant.set(P.pos.x + Math.sin(cam.yaw) * cp * d, P.pos.y + ty + Math.sin(pitch) * d, P.pos.z + Math.cos(cam.yaw) * cp * d);
   if (P.zone < 0 && Math.abs(camWant.x) < HALF_W && Math.abs(camWant.z) < HALF_D) camWant.y = Math.max(camWant.y, terrain(camWant.x, camWant.z) + 1.2);
   if (P.zone >= 0) { const ac = AC[P.zone], dx = camWant.x - ac.x, dz = camWant.z - ac.z, l = Math.hypot(dx, dz); const lim = ZR[P.zone] + 1; if (l > lim) { camWant.x = ac.x + dx / l * lim; camWant.z = ac.z + dz / l * lim; } }
   if (cam.snap) { camera.position.copy(camWant); cam.snap = false; } else camera.position.lerp(camWant, 1 - Math.exp(-dt * 9));
@@ -1960,7 +2107,7 @@ function frame(now) {
     updatePlayer(dt, time); updateHunger(dt);
     for (const n of npcs) if (n.zone === P.zone) { updateNpc(n, dt, time); separate(P, n); }
     for (const c of creatures) if (c.zone === P.zone) { updateCreature(c, dt, time); if (!c.dead) separate(P, c); }
-    for (const b of bosses) updateBoss(b, dt, time);
+    for (const b of BOSS_LIST) updateBoss(b, dt, time);
     updateHazards(dt);
   } else {
     // başlangıç ekranının arkasında karakter el sallasın
@@ -2006,7 +2153,7 @@ function buildWorld() {
   decorate();
   CAVES.forEach((_, i) => { buildArena(i); makeBoss(i); });
   buildDesk(); makeBoss(DESK);
-  buildVillage();
+  buildVillage(); buildArena(SHARP); makeBoss(SHARP); buildGiantLair(); makeBoss(GIANT);
   NPC_DEFS.forEach((d, i) => makeNpc(d, i));
   PENCIL_NPCS.forEach((d, i) => makeNpc(d, i, VILLAGE));
   const erasers = ['erPink', 'erWhite', 'erTwin'], vc = AC[VILLAGE];
@@ -2048,7 +2195,7 @@ function revive() {
 }
 function resetAll() {
   $('winScreen').hidden = true;
-  for (const b of bosses) { b.dead = false; b.collected = false; b.starSpawned = false; b.deadT = 0; resetBoss(b); }
+  for (const b of BOSS_LIST) { b.dead = false; b.thud = false; b.collected = false; b.starSpawned = false; b.deadT = 0; resetBoss(b); }
   for (const k of pickups) k.m.parent && k.m.parent.remove(k.m); pickups.length = 0;
   SIGNS.forEach(s => { if (s.reset) s.reset(); });
   caveMouths.forEach((m, i) => m.sign.mark(null));
@@ -2072,7 +2219,10 @@ async function boot(data) {
     (data.dead || []).forEach((d, i) => {
       const b = bosses[i]; if (!d || !b) return;
       b.dead = true; b.deadT = 99; b.starSpawned = true; b.collected = !!(data.collected || [])[i]; b.root.visible = false;
-      if (b.cat) deskBars.visible = false; else { caveMouths[i].sign.mark('YENİLDİ'); if (!b.collected) spawnStar(b); }
+      if (b.cat) deskBars.visible = false;
+      else if (i === SHARP) { sharpHole.visible = true; caveMouths[i].sign.mark('YENİLDİ'); }
+      else if (b.giant) caveMouths[SHARP].sign.mark('KAHRAMAN');
+      else { caveMouths[i].sign.mark('YENİLDİ'); if (!b.collected) spawnStar(b); }
     });
     stars = data.stars || 0; P.hp = data.hp || 10; P.colorIdx = data.colorIdx || 0; P.s.bodyMat.color.setHex(PALETTE[P.colorIdx].c);
     updateHearts(); updateStars(); updateSwatch(); setZoneLook(-1);
@@ -2081,7 +2231,7 @@ async function boot(data) {
   requestAnimationFrame(t => { last = t; frame(t); });
 }
 const hot = window.claude && window.claude.hot;
-if (hot && hot.snapshot) hot.snapshot(() => ({ started: running, hp: P.hp, stars, colorIdx: P.colorIdx, dead: bosses.map(b => b.dead), collected: bosses.map(b => b.collected) }));
+if (hot && hot.snapshot) hot.snapshot(() => ({ started: running, hp: P.hp, stars, colorIdx: P.colorIdx, dead: bosses.map(b => b && b.dead), collected: bosses.map(b => b && b.collected) }));
 const start = data => boot(data || {});
 hot && hot.ready ? hot.ready(start) : start((hot && hot.data) || {});
 </script>
