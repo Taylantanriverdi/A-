@@ -173,6 +173,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
     <h1>Çöp Adam</h1>
     <p>Birisi seni kareli bir defterin sayfasına çizdi ve sonra unuttu. Sayfada başka çöp adamlar, tuhaf yaratıklar ve üç karanlık mağara var.</p>
     <p>Her mağarada bir boss yaşıyor. Üçünü de yen, üç altın yıldızı topla.</p>
+    <p>Defterin kenarından düşersen masaya inersin. Orada dev bir kedi var. Onu yenersen fare deliğinden Kalem Köyü'ne geçersin.</p>
     <div class="keys desk-only">
       <kbd>Oklar</kbd><span>yürü</span>
       <kbd>Boşluk</kbd><span>zıpla</span>
@@ -217,6 +218,11 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const INK = 0x1d2140, INKC = '#1d2140';
 const PAPER_W = 220, PAPER_D = 300, HALF_W = PAPER_W / 2, HALF_D = PAPER_D / 2;
 const ARENA_R = 22;
+const DESK = 3, VILLAGE = 4; // masa (kedi) ve Kalem Köyü bölgeleri
+const ZR = [ARENA_R, ARENA_R, ARENA_R, 30, 58]; // her bölgenin yarıçapı
+const ZOBST = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+const TRIG = { 0: [], 1: [], 2: [], 3: [], 4: [] };
+const openZone = z => z === -1 || z === VILLAGE; // serbest dolaşılan bölgeler
 const GRAV = 32;
 let seed = 7;
 const srand = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
@@ -395,6 +401,16 @@ function drawFace(g, kind) {
     case 'angry':
       eye(94, 108, 22, 2, 4, 9, '#fff', '#d7263d'); eye(162, 108, 22, -2, 4, 9, '#fff', '#d7263d');
       line(62, 74, 116, 94, 9); line(194, 74, 140, 94, 9); teeth(150, 40); break;
+    case 'cat': {
+      const catEye = (x, y) => { g.beginPath(); g.ellipse(x, y, 24, 28, 0, 0, 7); g.fillStyle = '#c6f05a'; g.fill(); g.lineWidth = 5; g.stroke(); g.beginPath(); g.ellipse(x, y + 2, 5, 20, 0, 0, 7); g.fillStyle = INKC; g.fill(); circ(x - 7, y - 10, 4, '#fff', false); };
+      catEye(88, 96); catEye(168, 96);
+      line(56, 58, 110, 76, 9); line(200, 58, 146, 76, 9);
+      g.beginPath(); g.moveTo(116, 134); g.lineTo(140, 134); g.lineTo(128, 148); g.closePath(); g.fillStyle = '#ff8fb0'; g.fill(); g.lineWidth = 4; g.stroke();
+      curve(128, 148, 116, 168, 100, 158, 5); curve(128, 148, 140, 168, 156, 158, 5);
+      g.fillStyle = '#fff'; g.beginPath(); g.moveTo(108, 162); g.lineTo(113, 176); g.lineTo(118, 164); g.moveTo(138, 164); g.lineTo(143, 176); g.lineTo(148, 162); g.fill(); g.lineWidth = 3; g.stroke();
+      [[20, 136, 92, 146], [16, 160, 92, 154], [236, 136, 164, 146], [240, 160, 164, 154]].forEach(([a, b, c2, d]) => line(a, b, c2, d, 3));
+      break;
+    }
     case 'boss':
       eye(90, 104, 26, 4, 4, 10, '#ffe14d', '#b3001b'); eye(166, 104, 26, -4, 4, 10, '#ffe14d', '#b3001b');
       line(52, 64, 118, 92, 11); line(204, 64, 138, 92, 11); teeth(146, 54, '#5a0011'); break;
@@ -632,8 +648,8 @@ function tower() {
   sign(TOWER.x + 8, TOWER.z + 7, 'Atlama Kulesi', 'Tepeden atlarsan başın döner!', -0.6);
 }
 const SIGNS = [];
-function sign(x, z, title, sub, rot = 0) {
-  const y = terrain(x, z), g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
+function sign(x, z, title, sub, rot = 0, zone = -1) {
+  const y = zone < 0 ? terrain(x, z) : 0, g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot;
   const post = ink(new THREE.Mesh(new THREE.CylinderGeometry(.14, .16, 3, 6), toon(0x8a5a32))); post.position.y = 1.5; g.add(post);
   const [c, cg] = canvas(512, 256);
   const draw = (extra) => {
@@ -648,7 +664,7 @@ function sign(x, z, title, sub, rot = 0) {
   const t = tex(c);
   const board = ink(new THREE.Mesh(G.box, [toon(0xc99258), toon(0xc99258), toon(0xc99258), toon(0xc99258), toon(0xffffff, { map: t }), toon(0xc99258)]), 1.03);
   board.scale.set(3.6, 1.8, .18); board.position.y = 3; g.add(board);
-  worldGroup.add(g); OBST.push({ x, z, r: .3, top: 999 });
+  (zone < 0 ? worldGroup : caveGroups[zone]).add(g); (zone < 0 ? OBST : ZOBST[zone]).push({ x, z, r: .3, top: 999 });
   const sg = { mark(extra) { draw(extra); t.needsUpdate = true; } }; SIGNS.push(sg); return sg;
 }
 function decorate() {
@@ -717,6 +733,7 @@ function graphiteTex(base, line) {
 function buildArena(i) {
   const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g);
   const ac = new V3(600 + i * 160, 0, 0); AC.push(ac); g.position.copy(ac);
+  TRIG[i].push({ x: ac.x, z: ac.z + ARENA_R - 2.6, r: 1.8, go: exitCave });
   const tints = [[0x3b3a52, '#2e2d40', 'rgba(150,150,200,.5)'], [0x4d3346, '#3c2636', 'rgba(240,150,190,.45)'], [0x4a2e2e, '#3a2222', 'rgba(240,110,90,.45)']][i];
   const floor = new THREE.Mesh(new THREE.CircleGeometry(ARENA_R + 5, 48).rotateX(-Math.PI / 2), toon(0xffffff, { map: tex(graphiteTex(tints[1], tints[2]), [3, 3]) }));
   g.add(floor);
@@ -745,6 +762,149 @@ function buildArena(i) {
   lab.rotation.set(-Math.PI / 2, 0, Math.PI); lab.position.set(0, .05, ARENA_R - 5.4); g.add(lab); // yere yazılmış, çıkışa yürürken okunur
   return g;
 }
+
+/* --- Masa: defterden düşenlerin indiği yer, dev kedinin evi --- */
+function woodTex() {
+  const [c, g] = canvas(512, 512); g.fillStyle = '#c99258'; g.fillRect(0, 0, 512, 512);
+  g.strokeStyle = 'rgba(110,60,20,.35)';
+  for (let y = 0; y < 512; y += 12) { g.lineWidth = 1 + Math.random() * 3; g.beginPath(); for (let x = 0; x <= 512; x += 16) { const yy = y + Math.sin(x * .02 + y) * 4; x ? g.lineTo(x, yy) : g.moveTo(x, yy); } g.stroke(); }
+  return c;
+}
+function floorText(group, x, z, text, rotZ = Math.PI, w = 4, color = '#fbfaf3') {
+  const [c, cg] = canvas(512, 128); cg.fillStyle = color; cg.fillRect(6, 6, 500, 116); cg.strokeStyle = INKC; cg.lineWidth = 8; cg.strokeRect(6, 6, 500, 116);
+  cg.fillStyle = INKC; cg.font = '70px "Patrick Hand", "Comic Sans MS", cursive'; cg.textAlign = 'center'; cg.fillText(text, 256, 88);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 4), new THREE.MeshBasicMaterial({ map: tex(c), polygonOffset: true, polygonOffsetFactor: -2 }));
+  m.rotation.set(-Math.PI / 2, 0, rotZ); m.position.set(x, .05, z); group.add(m); return m;
+}
+function exitRing(group, x, z) {
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.5, 2.1, 36).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffd23f, side: THREE.DoubleSide }));
+  ring.position.set(x, .06, z); group.add(ring);
+  const glow = new THREE.Mesh(new THREE.CircleGeometry(1.5, 30).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfbfaf3, transparent: true, opacity: .6 })); glow.position.set(x, .05, z); group.add(glow);
+  const rim = new THREE.Mesh(new THREE.RingGeometry(2.1, 2.3, 36).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: INK, side: THREE.DoubleSide })); rim.position.set(x, .07, z); group.add(rim);
+  PORTALS.push(glow);
+}
+// kitap yığınının altında karanlık bir delik (mağara ağzı); yerel koordinat, ağız +z'ye bakar
+function bookArch(group, x, z, rotY) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; group.add(g);
+  const cols = [0x2f6fd6, 0xe5484d, 0x2e9e4f, 0xf5b82e];
+  let y = 0;
+  cols.forEach((col, k) => {
+    const h = 2.2 + (k % 2) * .6, w = 15 - k * 1.3;
+    const b = ink(new THREE.Mesh(G.box, [toon(0xfbfaf3), toon(0xfbfaf3), toon(col), toon(col), toon(0xfbfaf3), toon(col)]), 1.02);
+    b.scale.set(w, h, 8); b.position.set(Math.sin(k * 2) * .6, y + h / 2, 0); b.rotation.y = Math.sin(k * 3) * .05; g.add(b); y += h;
+  });
+  const mouth = new THREE.Mesh(new THREE.CircleGeometry(2.8, 20, 0, Math.PI), new THREE.MeshBasicMaterial({ color: 0x0d0b12 })); mouth.position.set(0, 0, 4.06); g.add(mouth);
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(2.8, .2, 6, 20, Math.PI), new THREE.MeshBasicMaterial({ color: INK })); arch.position.copy(mouth.position); g.add(arch);
+  return g;
+}
+let deskBars = null;
+function buildDesk() {
+  const i = DESK, R = ZR[i];
+  const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g);
+  const ac = new V3(600 + i * 160, 0, 0); AC.push(ac); g.position.copy(ac);
+  g.add(new THREE.Mesh(new THREE.CircleGeometry(R + 60, 48).rotateX(-Math.PI / 2), toon(0xffffff, { map: tex(woodTex(), [8, 8]) })));
+  // tepede, düştüğün defter
+  const [pc, pg] = canvas(512, 256); pg.fillStyle = '#f3efe2'; pg.fillRect(0, 0, 512, 256); pg.strokeStyle = 'rgba(120,110,90,.45)';
+  for (let y = 4; y < 256; y += 5) { pg.lineWidth = 1 + Math.random(); pg.beginPath(); pg.moveTo(0, y); pg.lineTo(512, y + Math.random() * 2); pg.stroke(); }
+  const pt = tex(pc); const side = toon(0xffffff, { map: pt });
+  const nb = ink(new THREE.Mesh(G.box, [side, side, toon(0xfbfaf3), side, side, side]), 1.01); nb.scale.set(110, 26, 30); nb.position.set(0, 13, R + 22); g.add(nb);
+  // kenarlarda dağınık kitaplar, kupa, ataş
+  for (let k = 0; k < 14; k++) {
+    const a = Math.PI * .15 + k / 14 * Math.PI * 1.7 - Math.PI / 2 + Math.PI;
+    if (Math.abs(Math.sin(a)) > .93 && Math.cos(a) > -.2) continue;
+    const bx = Math.cos(a) * (R + 5), bz = Math.sin(a) * (R + 5);
+    if (bz > R - 2 || (Math.abs(bx) < 10 && bz < -R + 4)) continue;
+    let y = 0;
+    for (let j = 0; j < 1 + (k % 3); j++) { const h = rand(1.4, 2.6); const b = ink(new THREE.Mesh(G.box, toon(pick([0x2f6fd6, 0xe5484d, 0x2e9e4f, 0x9b6cf0, 0xff9234]))), 1.02); b.scale.set(rand(5, 8), h, rand(4, 6)); b.position.set(bx, y + h / 2, bz); b.rotation.y = a + rand(-.3, .3); g.add(b); y += h; }
+  }
+  const mug = ink(new THREE.Mesh(new THREE.CylinderGeometry(4, 3.6, 9, 20), toon(0xf4f4f4)), 1.03); mug.position.set(R + 9, 4.5, 8); g.add(mug);
+  const handle = ink(new THREE.Mesh(new THREE.TorusGeometry(2.2, .5, 8, 20), toon(0xf4f4f4)), 1.05); handle.position.set(R + 13, 5, 8); g.add(handle);
+  const coffee = new THREE.Mesh(new THREE.CircleGeometry(3.7, 20).rotateX(-Math.PI / 2), toon(0x6b3d1e)); coffee.position.set(R + 9, 8.6, 8); g.add(coffee);
+  const clip = new THREE.Mesh(new THREE.TorusGeometry(2.4, .18, 6, 30), toon(0xc0c6d2)); clip.rotation.x = Math.PI / 2; clip.scale.set(1, 2.2, 1); clip.position.set(-R + 6, .2, 10); outline(clip, 1.1); g.add(clip);
+  // fare deliği (kitap yığınının altında), kedi yenilene kadar kalemlerle kapalı
+  bookArch(g, 0, -(R + 3), 0);
+  deskBars = new THREE.Group(); g.add(deskBars);
+  for (let k = -2; k <= 2; k++) {
+    const bar = ink(new THREE.Mesh(new THREE.CylinderGeometry(.22, .22, 6, 6), toon(pick([0xffc928, 0xe5484d, 0x2f6fd6]))), 1.08);
+    bar.position.set(k * 1.1, 3, -(R - 1.4)); deskBars.add(bar);
+  }
+  floorText(g, 0, -(R - 5), 'FARE DELİĞİ', 0, 5);
+  TRIG[i].push({ x: ac.x, z: ac.z - (R - 2), r: 2.6, ok: () => bosses[DESK].dead, locked: 'Önce kediyi yen!', go: enterVillage });
+}
+
+/* --- Kalem Köyü --- */
+function makePencil(group, x, z, h, r, color, obst) {
+  const p = new THREE.Group(); p.position.set(x, 0, z); p.rotation.y = rand(0, 1);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 6), toon(color)); body.position.y = h / 2; outline(body, 1.04); p.add(body);
+  const wood = new THREE.Mesh(new THREE.ConeGeometry(r, r * 3, 6), toon(0xf2c79a)); wood.position.y = h + r * 1.5; outline(wood, 1.05); p.add(wood);
+  const lead = new THREE.Mesh(new THREE.ConeGeometry(r * .36, r * 1.08, 6), toon(color === 0xffc928 ? 0x3a3a48 : color)); lead.position.y = h + r * 3 - r * .54 + .02; p.add(lead);
+  group.add(p);
+  if (obst) obst.push({ x, z, r: r + .05, top: 999 });
+  return p;
+}
+const PENCIL_COLORS = [0xffc928, 0xe5484d, 0x2f6fd6, 0x2e9e4f, 0x9b6cf0, 0xff9234, 0xff8fc7, 0x3a3d52];
+function linedPaperTex() {
+  const [c, g] = canvas(512, 512); g.fillStyle = '#fff7d1'; g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(140,120,70,${Math.random() * .07})`; g.fillRect(Math.random() * 512, Math.random() * 512, 2, 1); }
+  g.strokeStyle = 'rgba(80,140,210,.55)'; g.lineWidth = 2;
+  for (let y = 24; y < 512; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); }
+  g.strokeStyle = 'rgba(60,60,80,.35)'; g.lineWidth = 3; g.lineCap = 'round';
+  // kurşun kalem karalamaları: spiral, yıldız, kalp
+  g.beginPath(); for (let a = 0; a < 18; a += .2) { const r = a * 2.2; g.lineTo(120 + Math.cos(a) * r, 140 + Math.sin(a) * r); } g.stroke();
+  starPath(g, 380, 120, 34, 15); g.stroke(); heartPath(g, 300, 380, 30); g.stroke();
+  return c;
+}
+function buildVillage() {
+  const i = VILLAGE, R = ZR[i];
+  const g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g); // nesneler dünya koordinatında
+  const ac = new V3(1400, 0, 0); AC.push(ac);
+  const X = x => ac.x + x, Z = z => ac.z + z, ob = ZOBST[i];
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(R + 45, 64).rotateX(-Math.PI / 2), toon(0xffffff, { map: tex(linedPaperTex(), [14, 14]) }));
+  floor.position.set(ac.x, 0, ac.z); g.add(floor);
+  // kalemlerden çit
+  const n = Math.round(Math.PI * 2 * (R + 1.5) / 3.2);
+  for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2; makePencil(g, X(Math.cos(a) * (R + 1.5)), Z(Math.sin(a) * (R + 1.5)), rand(5, 7.5), .75, PENCIL_COLORS[k % 8]); }
+  // dev kalemler (ağaç gibi)
+  let placed = 0, guard = 0;
+  while (placed < 24 && guard++ < 1000) {
+    const a = rand(0, 6.283), d = rand(12, R - 5), x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (Math.abs(x) < 8 && z < -R + 22) continue;
+    if (Math.abs(d - 24) < 6) continue; // kalemlik evlerin halkası
+    if (ob.some(o => (o.x - X(x)) ** 2 + (o.z - Z(z)) ** 2 < 64)) continue;
+    makePencil(g, X(x), Z(z), rand(7, 15), rand(.9, 1.4), pick(PENCIL_COLORS), ob); placed++;
+  }
+  // kalemlik evler
+  for (let k = 0; k < 5; k++) {
+    const a = k / 5 * Math.PI * 2 + .3, x = X(Math.cos(a) * 24), z = Z(Math.sin(a) * 24);
+    const [c, cg] = canvas(512, 192); const wall = ['#cfe8ff', '#ffd6e7', '#fff3b0', '#d9f5c9', '#e9dcff'][k];
+    cg.fillStyle = wall; cg.fillRect(0, 0, 512, 192); crayonBlob(cg, 256, 96, 300, 140, 'rgba(255,255,255,.5)', null, -.6, 6, .4);
+    cg.strokeStyle = INKC; cg.lineWidth = 6; cg.fillStyle = '#8a5a32'; cg.fillRect(226, 84, 60, 108); cg.strokeRect(226, 84, 60, 108);
+    [[110, 50], [360, 50]].forEach(([wx, wy]) => { cg.fillStyle = '#9fd2f5'; cg.fillRect(wx, wy, 46, 46); cg.strokeRect(wx, wy, 46, 46); });
+    const cup = ink(new THREE.Mesh(new THREE.CylinderGeometry(3.2, 3.2, 4.6, 20, 1), [toon(0xffffff, { map: tex(c) }), toon(0x8a8aa0), toon(0x8a8aa0)]), 1.03);
+    cup.position.set(x, 2.3, z); cup.rotation.y = -a + Math.PI / 2 + Math.PI; g.add(cup);
+    for (let j = 0; j < 7; j++) { const aa = j / 7 * 6.283, rr = j ? 1.9 : 0; const pp = makePencil(g, x + Math.cos(aa) * rr, z + Math.sin(aa) * rr, rand(5.5, 8.5), .5, pick(PENCIL_COLORS)); pp.rotation.z = Math.cos(aa) * .12 * (j ? 1 : 0); pp.rotation.x = Math.sin(aa) * .12 * (j ? 1 : 0); }
+    ob.push({ x, z, r: 3.3, top: 999 });
+  }
+  // dev kalemtıraş: üstüne çıkılabilir
+  const sh = new THREE.Group(); sh.position.set(X(-14), 0, Z(4)); g.add(sh);
+  const sb = ink(new THREE.Mesh(G.box, toon(0xc0c6d2)), 1.03); sb.scale.set(5, 3.4, 3.6); sb.position.y = 1.7; sh.add(sb);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(1, 16), new THREE.MeshBasicMaterial({ color: 0x0d0b12 })); hole.position.set(2.52, 1.8, 0); hole.rotation.y = Math.PI / 2; sh.add(hole);
+  const blade = ink(new THREE.Mesh(G.box, toon(0x8a8aa0)), 1.05); blade.scale.set(2.6, .2, 2.2); blade.position.set(.6, 3.5, 0); sh.add(blade);
+  ob.push({ box: true, x: X(-14), z: Z(4), hw: 2.5, hd: 1.8, top: 3.4 });
+  // yatık bir kalem: köprü gibi üstünde yürünür
+  const lp = new THREE.Group(); lp.position.set(X(14), 1.1, Z(-8)); g.add(lp);
+  const lb = ink(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 16, 6), toon(0x2e9e4f)), 1.02); lb.rotation.z = Math.PI / 2; lp.add(lb);
+  const lw = ink(new THREE.Mesh(new THREE.ConeGeometry(1.1, 3.2, 6), toon(0xf2c79a)), 1.03); lw.rotation.z = -Math.PI / 2; lw.position.x = 9.6; lp.add(lw);
+  ob.push({ box: true, x: X(14), z: Z(-8), hw: 9.5, hd: 1.05, top: 2.2 });
+  // giriş: masadaki fare deliğinin öbür ucu, ve deftere dönüş halkası
+  bookArch(g, X(0), Z(-(R + 3)), 0);
+  TRIG[i].push({ x: X(0), z: Z(-(R - 2)), r: 2.6, go: backToDesk });
+  exitRing(g, X(8), Z(-(R - 12)));
+  floorText(g, X(8), Z(-(R - 15.4)), 'DEFTERE DÖN', Math.PI, 5);
+  TRIG[i].push({ x: X(8), z: Z(-(R - 12)), r: 1.8, go: toNotebook });
+  sign(X(-6), Z(-(R - 12)), 'Kalem Köyü', 'Nüfus: kalemler, silgiler', Math.PI, i);
+}
+
 const FLAMES = [], PORTALS = [];
 const FLAME_MAT = (() => {
   const [c, g] = canvas(64, 96);
@@ -786,6 +946,36 @@ function buildStick(color, limbColor, faceKind) {
   for (let i = 0; i < 3; i++) { const s = new THREE.Sprite(starSpriteMat); s.scale.setScalar(.5); const a = i * Math.PI * 2 / 3; s.position.set(Math.cos(a) * .7, 0, Math.sin(a) * .7); stars.add(s); }
   const shadow = addShadow(root, 1.6); shadow.position.y = .04;
   return { root, tilt, head, torso, bodyMat, limbMat, faceMat, arms, legs, stars, shadow, faceKind, phase: Math.random() * 6, fallK: 0, squash: 0 };
+}
+function buildPencilPerson(color, faceKind) {
+  const root = new THREE.Group(), tilt = new THREE.Group(); root.add(tilt);
+  const bodyMat = toon(color), limbMat = toon(INK);
+  const body = ink(new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, 2, 6), bodyMat), 1.05); body.rotation.y = Math.PI / 6; body.position.y = 2; tilt.add(body);
+  const wood = ink(new THREE.Mesh(new THREE.ConeGeometry(.42, .9, 6), toon(0xf2c79a)), 1.06); wood.rotation.y = Math.PI / 6; wood.position.y = 3.45; tilt.add(wood);
+  const lead = new THREE.Mesh(new THREE.ConeGeometry(.15, .32, 6), toon(color === 0xffc928 ? 0x3a3a48 : color)); lead.position.y = 3.76; tilt.add(lead);
+  const band = ink(new THREE.Mesh(new THREE.CylinderGeometry(.44, .44, .22, 10), toon(0xc0c6d2)), 1.05); band.position.y = 1.0; tilt.add(band);
+  const er = ink(new THREE.Mesh(new THREE.CylinderGeometry(.42, .42, .3, 10), toon(0xf49ab8)), 1.05); er.position.y = .78; tilt.add(er);
+  const faceMat = new THREE.MeshBasicMaterial({ map: faceTex(faceKind), transparent: true, depthWrite: false });
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(.72, .72), faceMat); face.position.set(0, 2.35, .37); tilt.add(face);
+  const arms = [], legs = [];
+  for (const side of [1, -1]) {
+    const sh = new THREE.Group(); sh.position.set(side * .44, 2.2, 0); tilt.add(sh);
+    sh.add(new THREE.Mesh(limbGeo(.5), limbMat));
+    const el = new THREE.Group(); el.position.y = -.5; sh.add(el);
+    el.add(new THREE.Mesh(limbGeo(.45), limbMat));
+    const hand = ink(new THREE.Mesh(G.sphere, bodyMat), 1.14); hand.scale.setScalar(.13); hand.position.y = -.47; el.add(hand);
+    arms.push({ sh, el, side });
+    const hip = new THREE.Group(); hip.position.set(side * .2, .7, 0); tilt.add(hip);
+    hip.add(new THREE.Mesh(limbGeo(.35), limbMat));
+    const kn = new THREE.Group(); kn.position.y = -.35; hip.add(kn);
+    kn.add(new THREE.Mesh(limbGeo(.3), limbMat));
+    const foot = ink(new THREE.Mesh(G.sphere, toon(0x3a3a48)), 1.12); foot.scale.set(.15, .09, .25); foot.position.set(0, -.3, .08); kn.add(foot);
+    legs.push({ hip, kn, side });
+  }
+  const stars = new THREE.Group(); stars.visible = false; root.add(stars);
+  for (let i = 0; i < 3; i++) { const st = new THREE.Sprite(starSpriteMat); st.scale.setScalar(.5); const a = i * Math.PI * 2 / 3; st.position.set(Math.cos(a) * .7, 0, Math.sin(a) * .7); stars.add(st); }
+  const shadow = addShadow(root, 1.5); shadow.position.y = .04;
+  return { root, tilt, bodyMat, limbMat, faceMat, arms, legs, stars, shadow, faceKind, phase: Math.random() * 6, fallK: 0, squash: 0 };
 }
 function setFace(s, kind) { if (s.faceKind !== kind) { s.faceKind = kind; s.faceMat.map = faceTex(kind); } }
 // p: {move 0..1, air, fall 0/1, punch 0..1, punchSide, flail}
@@ -847,19 +1037,28 @@ const NPC_DEFS = [
   ['Pofuduk', 'D tuşuna basınca rengin değişiyor. Çok havalı!', 0xff8fc7],
   ['Uykucu', 'Zzz... ha? Uyumuyordum. Gözlerimi dinlendiriyordum.', 0x9b6cf0],
   ['Fıstık', 'Kuleye tırmanıp atlarsan başın döner, gözlerin fırıl fırıl olur!', 0xff9234],
-  ['Leylek', 'Defterin kenarından düşersen masaya kadar gidersin.', 0x3a3d52],
+  ['Leylek', 'Defterin kenarından düşersen masaya düşersin. Orada dev bir kedi var!', 0x3a3d52],
   ['Tombik', 'Bosslar 5 vuruşta ölür. Sen 10 darbeye dayanırsın.', 0xf4f4f4],
   ['Kıvırcık', 'Haritada kafatası olan yerler mağara. Dikkat et!', 0x4f8fe0],
 ];
+const PENCIL_NPCS = [
+  ['Sivri', 'Hoş geldin! Burası Kalem Köyü. Herkes biraz sivridir.', 0xffc928],
+  ['Kırmızı Kalem', 'Silgilere vurma! Vurursan peşini bırakmazlar.', 0xe5484d],
+  ['Mavi Uç', 'Kediyi sen mi yendin? Vay be, biz hep korkardık.', 0x2f6fd6],
+  ['Kütük', 'Ucum kırıldı, kimse bakmasın lütfen.', 0x2e9e4f],
+  ['2B', 'Deftere dönmek istersen girişteki sarı halkaya gir.', 0x3a3d52],
+  ['Mor Kalem', 'Kalemtıraşın üstüne çıkma, orası korkunç bir yer...', 0x9b6cf0],
+];
 const npcs = [];
 const OUCH_LINES = ['Ayy! Neden vurdun?!', 'Hey! Ben iyi çöp adamım!', 'Annemlere söylicem!', 'Bunu hak etmedim...'];
-function makeNpc(def, i) {
+function makeNpc(def, i, zone = -1) {
   const [name, line, color] = def;
-  const s = buildStick(color, darker(color), 'happy' + (i % 5));
-  const a = i / NPC_DEFS.length * Math.PI * 2, d = rand(9, 26);
-  const x = Math.cos(a) * d, z = Math.sin(a) * d;
-  s.root.position.set(x, terrain(x, z), z); worldGroup.add(s.root);
-  const n = { s, root: s.root, pos: s.root.position, vel: new V3(), r: .55, zone: -1, onGround: true, yaw: rand(0, 6), state: 'ok', fallT: 0, name, line,
+  const s = zone < 0 ? buildStick(color, darker(color), 'happy' + (i % 5)) : buildPencilPerson(color, 'happy' + (i % 5));
+  const list = zone < 0 ? NPC_DEFS : PENCIL_NPCS, c = zone < 0 ? new V3() : AC[zone];
+  const a = i / list.length * Math.PI * 2 + .4, d = rand(9, 20);
+  const x = c.x + Math.cos(a) * d, z = c.z + Math.sin(a) * d;
+  s.root.position.set(x, zone < 0 ? terrain(x, z) : 0, z); (zone < 0 ? worldGroup : caveGroups[zone]).add(s.root);
+  const n = { s, root: s.root, pos: s.root.position, vel: new V3(), r: .55, zone, onGround: true, yaw: rand(0, 6), state: 'ok', fallT: 0, name, line,
     baseFace: 'happy' + (i % 5), home: new V3(x, 0, z), target: null, wt: rand(0, 3), talkCd: 0, tripCd: rand(15, 50), bubT: 0 };
   n.onLand = imp => { if (imp > 19) fallDown(n, 'Ayyy!'); };
   npcs.push(n);
@@ -877,6 +1076,9 @@ const CREATURE_TYPES = {
   slime: { name: 'Pıtpıt', color: 0x74d24f, r: 1.15, walk: 3, run: 6.2 },
   spiky: { name: 'Dikenbaş', color: 0xff9b3d, r: 1.05, walk: 2.6, run: 6.8 },
   cloud: { name: 'Bulutçuk', color: 0xb49cf7, r: 1.1, walk: 2.4, run: 6 },
+  erPink: { name: 'Silgicik', color: 0xf49ab8, band: 0x4f8fe0, r: 1.1, walk: 2.6, run: 6.4, eraser: true },
+  erWhite: { name: 'Beyaz Silgi', color: 0xf4f1ea, band: 0x2f6fd6, bandX: -.2, bandW: .8, r: 1.1, walk: 2.4, run: 6.8, eraser: true },
+  erTwin: { name: 'İkiz Silgi', color: 0xe5484d, band: 0x4f8fe0, r: 1.1, walk: 2.8, run: 6.2, eraser: true },
 };
 function buildCreature(type) {
   const T = CREATURE_TYPES[type];
@@ -906,6 +1108,16 @@ function buildCreature(type) {
       const ft = ink(new THREE.Mesh(G.sphere, mat), 1.12); ft.scale.set(.2, .12, .3); ft.position.set(0, -.52, .1); hip.add(ft);
       legs.push({ hip, side });
     }
+  } else if (T.eraser) {
+    const m = ink(new THREE.Mesh(G.box, mat), 1.05); m.scale.set(1.9, 1.15, 1.2); m.position.y = 1.05; body.add(m);
+    const bd = ink(new THREE.Mesh(G.box, toon(T.band)), 1.04); bd.scale.set(T.bandW || .95, 1.18, 1.23); bd.position.set(T.bandX || -.48, 1.05, 0); body.add(bd);
+    faceMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.05, 1.05), faceMat); faceMesh.position.set(T.bandX ? .5 : .45, 1.08, .62); body.add(faceMesh);
+    for (const side of [1, -1]) {
+      const hip = new THREE.Group(); hip.position.set(side * .5, .5, 0); body.add(hip);
+      hip.add(new THREE.Mesh(limbGeo(.45), toon(INK)));
+      const ft = ink(new THREE.Mesh(G.sphere, toon(0x3a3a48)), 1.12); ft.scale.set(.18, .1, .28); ft.position.set(0, -.47, .1); hip.add(ft);
+      legs.push({ hip, side });
+    }
   } else {
     const parts = [[0, 1.9, 0, 1.0], [-.85, 1.65, -.1, .7], [.85, 1.7, -.1, .72], [0, 2.55, -.25, .66]];
     parts.forEach(([x, y, z, s], i) => { const m = ink(new THREE.Mesh(G.sphere, mat), 1.06); m.scale.setScalar(s); m.position.set(x, y, z); body.add(m); if (i === 0) { faceMesh = new THREE.Mesh(G.face, faceMat); faceMesh.scale.setScalar(s); faceMesh.position.set(x, y, z); body.add(faceMesh); } });
@@ -914,10 +1126,10 @@ function buildCreature(type) {
   const shadow = addShadow(root, T.r * 2.2); shadow.position.y = .04;
   return { root, body, mat, faceMat, legs, faceKind: 'calm' };
 }
-function makeCreature(type, x, z) {
+function makeCreature(type, x, z, zone = -1) {
   const T = CREATURE_TYPES[type], b = buildCreature(type);
-  b.root.position.set(x, terrain(x, z), z); worldGroup.add(b.root);
-  const c = Object.assign(b, { type, T, pos: b.root.position, vel: new V3(), r: T.r, zone: -1, onGround: true, yaw: rand(0, 6), hp: 5, aggro: false, dead: false, deadT: 0,
+  b.root.position.set(x, zone < 0 ? terrain(x, z) : 0, z); (zone < 0 ? worldGroup : caveGroups[zone]).add(b.root);
+  const c = Object.assign(b, { type, T, pos: b.root.position, vel: new V3(), r: T.r, zone, onGround: true, yaw: rand(0, 6), hp: 5, aggro: false, dead: false, deadT: 0,
     home: new V3(x, 0, z), target: null, wt: rand(0, 2), atkCd: 0, lunge: 0, inv: 0, flash: 0, hurtT: 0, phase: rand(0, 6), bubT: 0 });
   c.pipsEl = document.createElement('div'); c.pipsEl.className = 'pipsTag'; c.pipsEl.hidden = true; $('labels').appendChild(c.pipsEl);
   creatures.push(c);
@@ -942,7 +1154,14 @@ const BOSS_DEFS = [
   { name: 'Mürekkep Lekesi', r: 3.2, speed: 4.6, attacks: ['volley', 'leap', 'volley', 'leap'], proj: 0x23264f, taunt: ['Seni lekeleyeceğim!', 'BLOB!', 'Mürekkebim bitmez!'] },
   { name: 'Silgi Kral', r: 3.1, speed: 5, attacks: ['dash', 'crumbs', 'dash', 'crumbs'], proj: 0xf49ab8, taunt: ['Seni sileceğim!', 'Kral benim!', 'Hiç çizilmemiş gibi olacaksın!'] },
   { name: 'Karalama Canavarı', r: 3.0, speed: 5.4, attacks: ['ring', 'spiral', 'leap', 'ring'], proj: 0xe5484d, taunt: ['KRRRT KRRT!', 'Seni karalayacağım!', 'Zıpla bakalım!'] },
+  { name: 'Dev Tekir', r: 3.4, speed: 6.4, attacks: ['swipe', 'leap', 'volley', 'swipe', 'dash'], proj: 0xff6f91, taunt: ['Miyavvv!', 'Sen fare misin?', 'Seni yumak yapacağım!', 'Pıııs!'] },
 ];
+const tabbyTex = () => {
+  const [c, g] = canvas(256, 256); g.fillStyle = '#f29a3c'; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = '#c4621a'; g.lineCap = 'round';
+  for (let y = 10; y < 256; y += 26) { g.lineWidth = 7 + Math.random() * 5; g.beginPath(); for (let x = 0; x <= 256; x += 16) { const yy = y + Math.sin(x * .05 + y) * 6; x ? g.lineTo(x, yy) : g.moveTo(x, yy); } g.stroke(); }
+  return tex(c);
+};
 function buildBoss(i) {
   const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
   const faceMat = new THREE.MeshBasicMaterial({ map: faceTex('boss'), transparent: true, depthWrite: false });
@@ -961,6 +1180,24 @@ function buildBoss(i) {
     const crown = ink(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, .8, 10, 1, true), toon(0xf5b82e, { side: THREE.DoubleSide })), 1.04); crown.position.set(.9, 4.6, 0); body.add(crown);
     for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2, c = ink(new THREE.Mesh(G.cone, toon(0xf5b82e)), 1.08); c.scale.set(.35, .9, .35); c.position.set(.9 + Math.cos(a) * 1.25, 5.4, Math.sin(a) * 1.25); body.add(c); }
     for (const side of [1, -1]) { const l = ink(new THREE.Mesh(G.box, toon(0xd9789a)), 1.06); l.scale.set(.9, .8, 1.2); l.position.set(side * 2, .4, 0); body.add(l); }
+  } else if (i === DESK) {
+    mat = toon(0xffffff, { map: tabbyTex() });
+    const white = toon(0xfff6ea);
+    const torso = ink(new THREE.Mesh(G.sphere, mat), 1.04); torso.scale.set(2.3, 2, 3.6); torso.position.y = 3.2; body.add(torso);
+    const head = new THREE.Group(); head.position.set(0, 5.4, 3.5); body.add(head);
+    const skull = ink(new THREE.Mesh(G.sphere, mat), 1.04); skull.scale.set(2.2, 2, 2); head.add(skull);
+    const f = new THREE.Mesh(G.face, faceMat); f.scale.set(2.2, 2, 2); head.add(f);
+    for (const side of [1, -1]) {
+      const ear = ink(new THREE.Mesh(G.cone, mat), 1.06); ear.scale.set(.8, 1.4, .5); ear.position.set(side * 1.25, 1.95, -.2); ear.rotation.z = -side * .3; head.add(ear);
+      const inner = new THREE.Mesh(G.cone, toon(0xff8fb0)); inner.scale.set(.45, .9, .2); inner.position.set(side * 1.22, 1.85, .12); inner.rotation.z = -side * .3; head.add(inner);
+      for (const fz of [2.2, -2.2]) {
+        const leg = ink(new THREE.Mesh(new THREE.CylinderGeometry(.55, .5, 2.4, 10), mat), 1.05); leg.position.set(side * 1.35, 1.2, fz); body.add(leg);
+        const paw = ink(new THREE.Mesh(G.sphere, white), 1.08); paw.scale.set(.75, .42, .9); paw.position.set(side * 1.35, .2, fz + .2); body.add(paw);
+      }
+    }
+    spin = new THREE.Group(); spin.position.set(0, 3.8, -3.3); body.add(spin); // kuyruk
+    let ty = 0, tz = 0;
+    for (let k = 0; k < 7; k++) { const t = ink(new THREE.Mesh(G.sphere, k === 6 ? white : mat), 1.08); t.scale.setScalar(.62 - k * .05); ty += .55; tz -= .45 - k * .07; t.position.set(0, ty, tz); spin.add(t); }
   } else {
     mat = toon(0xe5484d);
     const m = ink(new THREE.Mesh(G.sphere, mat), 1.04); m.scale.setScalar(2.6); m.position.y = 3; body.add(m);
@@ -975,15 +1212,16 @@ function buildBoss(i) {
   return { root, body, mat, faceMat, spin, shadow };
 }
 function makeBoss(i) {
-  const b = Object.assign(buildBoss(i), { i, def: BOSS_DEFS[i], r: BOSS_DEFS[i].r, hp: 5, dead: false, deadT: 0, state: 'wait', t: 0, actT: 0, atk: '', atkIdx: 0,
+  const b = Object.assign(buildBoss(i), { cat: i === DESK, i, def: BOSS_DEFS[i], r: BOSS_DEFS[i].r, hp: 5, dead: false, deadT: 0, state: 'wait', t: 0, actT: 0, atk: '', atkIdx: 0,
     inv: 0, flash: 0, yaw: 0, fired: 0, bubT: 0, collected: false });
   b.pos = b.root.position; caveGroups[i].add(b.root); resetBoss(b);
   bosses.push(b);
 }
 function resetBoss(b) {
   b.root.visible = !b.dead; if (b.dead) return;
+  if (b.cat) deskBars.visible = true;
   b.hp = 5; b.state = 'wait'; b.t = 0; b.root.position.set(0, 0, -6); b.root.rotation.set(0, 0, 0); b.body.rotation.set(0, 0, 0); b.body.position.set(0, 0, 0); b.body.scale.set(1, 1, 1);
-  b.faceMat.map = faceTex('boss');
+  b.faceMat.map = faceTex(b.cat ? 'cat' : 'boss');
 }
 function hitBoss(b) {
   if (b.inv > 0 || b.dead) return;
@@ -995,8 +1233,8 @@ function hitBoss(b) {
   if (b.hp <= 0) {
     b.dead = true; b.deadT = 0; b.faceMat.map = faceTex('dead'); SFX.die(); SFX.boom();
     say(b, 'Hayıııır!', 2); clearHazards();
-    toast(b.def.name + ' yenildi!');
-    caveMouths[b.i].sign.mark('YENİLDİ');
+    if (b.cat) { toast('Dev Tekir yenildi! Fare deliği açıldı.', 3.5); deskBars.visible = false; splash(new V3(AC[DESK].x, 0, AC[DESK].z - ZR[DESK] + 1.5), 0xffc928, 14); P.hp = 10; updateHearts(); }
+    else { toast(b.def.name + ' yenildi!'); caveMouths[b.i].sign.mark('YENİLDİ'); }
   } else if (Math.random() < .5) say(b, pick(b.def.taunt), 1.6);
 }
 const worldPos = b => new V3(b.pos.x + AC[b.i].x, b.pos.y, b.pos.z + AC[b.i].z);
@@ -1034,7 +1272,7 @@ function splash(pos, color, n) {
 function spawnHeart(x, z, zone) {
   const s = new THREE.Sprite(heartSpriteMat); s.scale.setScalar(1.3);
   const gy = zone < 0 ? terrain(x, z) : 0;
-  s.position.set(x, gy + 1, z); (zone < 0 ? worldGroup : scene).add(s);
+  s.position.set(x, gy + 1, z); (zone < 0 ? worldGroup : zone === VILLAGE ? caveGroups[zone] : scene).add(s);
   pickups.push({ m: s, kind: 'heart', zone, x, z, base: gy + 1, t: 0 });
 }
 let starGeo = null;
@@ -1052,10 +1290,12 @@ function spawnStar(b) {
 /* ---------------- Fizik ---------------- */
 const distXZ = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 function groundAt(zone, x, z, y) {
-  if (zone >= 0) return 0;
-  if (Math.abs(x) > HALF_W || Math.abs(z) > HALF_D) return -1e4;
-  let h = terrain(x, z);
-  for (const o of OBST) {
+  let h = 0, list = ZOBST[zone];
+  if (zone < 0) {
+    if (Math.abs(x) > HALF_W || Math.abs(z) > HALF_D) return -1e4;
+    h = terrain(x, z); list = OBST;
+  }
+  for (const o of list) {
     if (o.top > 500 || y < o.top - .7) continue;
     const inside = o.box ? (Math.abs(x - o.x) < o.hw && Math.abs(z - o.z) < o.hd) : ((x - o.x) ** 2 + (z - o.z) ** 2 < o.r * o.r);
     if (inside && o.top > h) h = o.top;
@@ -1065,11 +1305,10 @@ function groundAt(zone, x, z, y) {
 function collide(e) {
   const p = e.pos;
   if (e.zone >= 0) {
-    const ac = AC[e.zone], dx = p.x - ac.x, dz = p.z - ac.z, d = Math.hypot(dx, dz), lim = ARENA_R - e.r;
+    const ac = AC[e.zone], dx = p.x - ac.x, dz = p.z - ac.z, d = Math.hypot(dx, dz), lim = ZR[e.zone] - e.r;
     if (d > lim) { p.x = ac.x + dx / d * lim; p.z = ac.z + dz / d * lim; }
-    return;
   }
-  for (const o of OBST) {
+  for (const o of (e.zone < 0 ? OBST : ZOBST[e.zone])) {
     if (p.y >= o.top - .7) continue;
     if (o.box) {
       const dx = p.x - o.x, dz = p.z - o.z, ex = o.hw + e.r, ez = o.hd + e.r;
@@ -1106,7 +1345,13 @@ function wander(e, dt, radius, speed) {
   e.wt -= dt;
   if (e.wt <= 0) {
     if (Math.random() < .35) { e.target = null; e.wt = rand(1, 3); }
-    else { const a = rand(0, 6.283), d = rand(0, radius); e.target = { x: clamp(e.home.x + Math.cos(a) * d, -100, 100), z: clamp(e.home.z + Math.sin(a) * d, -140, 140) }; e.wt = rand(3, 7); }
+    else {
+      const a = rand(0, 6.283), d = rand(0, radius);
+      let x = e.home.x + Math.cos(a) * d, z = e.home.z + Math.sin(a) * d;
+      if (e.zone < 0) { x = clamp(x, -100, 100); z = clamp(z, -140, 140); }
+      else { const c = AC[e.zone], dx = x - c.x, dz = z - c.z, l = Math.hypot(dx, dz), m = ZR[e.zone] - 4; if (l > m) { x = c.x + dx / l * m; z = c.z + dz / l * m; } }
+      e.target = { x, z }; e.wt = rand(3, 7);
+    }
   }
   if (!e.target) return [0, 0];
   const dx = e.target.x - e.pos.x, dz = e.target.z - e.pos.z, d = Math.hypot(dx, dz);
@@ -1150,7 +1395,7 @@ let stars = 0;
 function updateStars() { $('starCount').textContent = `${stars} / 3`; }
 function updateSwatch() { const c = PALETTE[P.colorIdx]; $('swatch').style.background = '#' + c.c.toString(16).padStart(6, '0'); $('colorName').textContent = c.n; }
 function updateBossBar() {
-  const b = P.zone >= 0 ? bosses[P.zone] : null;
+  const b = P.zone >= 0 ? bosses[P.zone] || null : null;
   $('bossbar').hidden = !b || b.dead;
   if (!b) return;
   $('bossName').textContent = b.def.name;
@@ -1176,7 +1421,7 @@ function drawMinimap() {
     mm.fillStyle = '#fff'; mm.font = 'bold 14px "Patrick Hand", sans-serif'; mm.textAlign = 'center'; mm.fillText(i + 1, x, y + 3);
   });
   mm.fillStyle = '#ff6f91';
-  for (const c of creatures) if (!c.dead && c.aggro) { mm.beginPath(); mm.arc((c.pos.x + HALF_W) * sx, (c.pos.z + HALF_D) * sz, 4, 0, 7); mm.fill(); }
+  for (const c of creatures) if (!c.dead && c.aggro && c.zone < 0) { mm.beginPath(); mm.arc((c.pos.x + HALF_W) * sx, (c.pos.z + HALF_D) * sz, 4, 0, 7); mm.fill(); }
   if (P.zone < 0) {
     const x = (P.pos.x + HALF_W) * sx, y = (P.pos.z + HALF_D) * sz;
     mm.save(); mm.translate(x, y); mm.rotate(-P.yaw + Math.PI);
@@ -1267,8 +1512,13 @@ function setZoneLook(zone) {
   worldGroup.visible = zone < 0;
   caveGroups.forEach((g, i) => { g.visible = i === zone; });
   for (const p of pickups) p.m.visible = p.zone === zone;
+  $('minimap').hidden = zone !== -1;
   if (zone < 0) {
     scene.fog = new THREE.Fog(0xf6f3ea, 90, 260); scene.background = null; hemi.intensity = .62; hemi.groundColor.setHex(0xcfc3a8); sun.intensity = .72;
+  } else if (zone === DESK) {
+    scene.fog = new THREE.Fog(0xdcc39c, 50, 170); scene.background = new THREE.Color(0xdcc39c); hemi.intensity = .7; hemi.groundColor.setHex(0xb08a5a); sun.intensity = .6;
+  } else if (zone === VILLAGE) {
+    scene.fog = new THREE.Fog(0xf7efd6, 70, 190); scene.background = new THREE.Color(0xf7efd6); hemi.intensity = .65; hemi.groundColor.setHex(0xcfc3a8); sun.intensity = .7;
   } else {
     scene.fog = new THREE.Fog(0x15121c, 24, 75); scene.background = new THREE.Color(0x15121c); hemi.intensity = .45; hemi.groundColor.setHex(0x6a6a8a); sun.intensity = .25;
   }
@@ -1278,9 +1528,9 @@ function goZone(zone, place) {
   transitioning = true; $('fade').classList.add('on'); SFX.enter();
   setTimeout(() => {
     clearHazards();
-    P.zone = zone; place(); P.vel.set(0, 0, 0); P.onGround = false;
+    P.zone = zone; P.enterT = 0; P.vel.set(0, 0, 0); place(); P.onGround = false;
     setZoneLook(zone); cam.snap = true;
-    if (zone >= 0) { const b = bosses[zone]; if (!b.dead) { b.state = 'wait'; b.t = 0; } }
+    const b = bosses[zone]; if (b && !b.dead) { b.state = 'wait'; b.t = 0; }
     updateBossBar();
     $('fade').classList.remove('on'); transitioning = false;
   }, 300);
@@ -1293,6 +1543,24 @@ function enterCave(i) {
     if (b.dead) toast(b.collected ? 'Burası artık boş. Sadece yankı var.' : 'Yıldızını almayı unutma!');
     else toast(b.def.name + '!');
   });
+}
+function dropToDesk() {
+  goZone(DESK, () => {
+    const ac = AC[DESK]; P.pos.set(ac.x, 24, ac.z + 8); P.inv = 3; P.yaw = Math.PI; cam.yaw = 0;
+    toast(bosses[DESK].dead ? 'Yine masaya düştün. Fare deliği açık.' : 'Defterden masaya düştün! Dev bir kedi var!', 3);
+  });
+}
+function enterVillage() {
+  goZone(VILLAGE, () => {
+    const ac = AC[VILLAGE]; P.pos.set(ac.x, 0, ac.z - (ZR[VILLAGE] - 18)); P.yaw = 0; cam.yaw = Math.PI;
+    toast('Kalem Köyü\'ne hoş geldin!', 3);
+  });
+}
+function backToDesk() {
+  goZone(DESK, () => { const ac = AC[DESK]; P.pos.set(ac.x, 0, ac.z - (ZR[DESK] - 8)); P.yaw = 0; cam.yaw = 0; });
+}
+function toNotebook() {
+  goZone(-1, () => { P.pos.set(SPAWN.x, terrain(SPAWN.x, SPAWN.z), SPAWN.z); P.yaw = 0; cam.yaw = 0; toast('Deftere geri döndün!'); });
 }
 function exitCave() {
   const i = P.zone, m = caveMouths[i];
@@ -1318,13 +1586,10 @@ function hurtPlayer(n, from) {
 function doPunch() {
   P.punchT = .26; P.punchCd = .38; P.punchSide = -P.punchSide; SFX.punch();
   const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), cx = P.pos.x + fx * 1.3, cz = P.pos.z + fz * 1.3;
-  if (P.zone < 0) {
-    for (const c of creatures) if (!c.dead && Math.hypot(c.pos.x - cx, c.pos.z - cz) < c.r + 1.2 && Math.abs(c.pos.y - P.pos.y) < 2.6) hitCreature(c);
-    for (const n of npcs) if (n.state === 'ok' && Math.hypot(n.pos.x - cx, n.pos.z - cz) < 1.7 && Math.abs(n.pos.y - P.pos.y) < 2.4) hitNpc(n);
-  } else {
-    const b = bosses[P.zone], wp = worldPos(b);
-    if (!b.dead && Math.hypot(wp.x - cx, wp.z - cz) < b.r + 1.5 && P.pos.y < 4.5) hitBoss(b);
-  }
+  for (const c of creatures) if (c.zone === P.zone && !c.dead && Math.hypot(c.pos.x - cx, c.pos.z - cz) < c.r + 1.2 && Math.abs(c.pos.y - P.pos.y) < 2.6) hitCreature(c);
+  for (const n of npcs) if (n.zone === P.zone && n.state === 'ok' && Math.hypot(n.pos.x - cx, n.pos.z - cz) < 1.7 && Math.abs(n.pos.y - P.pos.y) < 2.4) hitNpc(n);
+  const b = bosses[P.zone];
+  if (b && !b.dead) { const wp = worldPos(b); if (Math.hypot(wp.x - cx, wp.z - cz) < b.r + 1.5 && P.pos.y < 4.5) hitBoss(b); }
 }
 function moveInput() {
   let ix = 0, iy = 0;
@@ -1345,13 +1610,13 @@ function updatePlayer(dt, time) {
     if (ml > .1) { P.yaw = angLerp(P.yaw, Math.atan2(mx, mz), Math.min(1, dt * 14)); P.idleT = 0; P.runT += dt; }
     else {
       P.idleT += dt; P.runT = 0;
-      if (P.idleT > 1.6 && P.zone < 0) P.yaw = angLerp(P.yaw, cam.yaw, Math.min(1, dt * 3)); // boş durunca kameraya bakıp sırıtır
+      if (P.idleT > 1.6 && openZone(P.zone)) P.yaw = angLerp(P.yaw, cam.yaw, Math.min(1, dt * 3)); // boş durunca kameraya bakıp sırıtır
       if (P.idleT > 7) { P.idleT = 0; say(P, pick(IDLE_LINES), 3); }
     }
     if (P.wantJump && P.onGround) { P.vel.y = 12.5; P.onGround = false; SFX.jump(); }
     if (P.wantPunch && P.punchCd <= 0) doPunch();
     // sakar olduğu için arada kendi ayağına takılır (yakında kızgın yaratık yokken)
-    if (P.zone < 0 && P.onGround && P.runT > 3 && P.tripCd <= 0 && Math.random() < dt / 30 && !creatures.some(c => c.aggro && !c.dead && distXZ(c.pos, P.pos) < 25)) {
+    if (openZone(P.zone) && P.onGround && P.runT > 3 && P.tripCd <= 0 && Math.random() < dt / 30 && !creatures.some(c => c.aggro && !c.dead && distXZ(c.pos, P.pos) < 25)) {
       P.tripCd = 40; P.vel.x *= 1.4; P.vel.z *= 1.4; P.vel.y = 5; P.onGround = false; fallDown(P, pick(TRIP_LINES));
     }
   } else if (P.state === 'fallen') {
@@ -1366,16 +1631,16 @@ function updatePlayer(dt, time) {
   P.wantJump = P.wantPunch = false;
   physics(P, dt);
   // defterden düştü
-  if (P.pos.y < -45) {
-    P.pos.set(SPAWN.x + rand(-3, 3), 24, SPAWN.z + rand(-3, 3)); P.vel.set(0, 0, 0); P.onGround = false; cam.snap = true;
-    toast('Defterden düştün! Biri seni geri çizdi.');
-  }
+  if (P.zone < 0 && P.pos.y < -45) dropToDesk(); // defterden masaya
   // mağara girişleri / çıkış
   if (P.zone < 0 && P.caveCd <= 0 && P.state !== 'dead') {
     caveMouths.forEach((m, i) => { if (distXZ(P.pos, m.pos) < 2.6) enterCave(i); });
   } else if (P.zone >= 0 && P.enterT > 1.2 && P.state === 'ok' && P.inv <= 0) { // geri itilip yanlışlıkla çıkmasın
-    const ac = AC[P.zone];
-    if (Math.hypot(P.pos.x - ac.x, P.pos.z - (ac.z + ARENA_R - 2.6)) < 1.8) exitCave();
+    for (const t of TRIG[P.zone]) {
+      if (Math.hypot(P.pos.x - t.x, P.pos.z - t.z) >= t.r) continue;
+      if (t.ok && !t.ok()) { if (toastT <= 0) toast(t.locked); continue; }
+      t.go(); break;
+    }
   }
   // yüz ifadesi
   const s = P.s;
@@ -1405,7 +1670,7 @@ function updateNpc(n, dt, time) {
     if (n.onGround) n.fallT -= dt;
     if (n.fallT <= 0) n.state = 'ok';
   } else {
-    if (dP < 4.5 && P.zone < 0 && P.state !== 'dead') {
+    if (dP < 4.5 && P.zone === n.zone && P.state !== 'dead') {
       n.yaw = angLerp(n.yaw, Math.atan2(P.pos.x - n.pos.x, P.pos.z - n.pos.z), Math.min(1, dt * 6));
       if (n.talkCd <= 0) { say(n, n.name + ': ' + n.line, 4); n.talkCd = 14; }
     } else {
@@ -1415,7 +1680,7 @@ function updateNpc(n, dt, time) {
     }
     const k = Math.min(1, dt * 6); n.vel.x += (want[0] - n.vel.x) * k; n.vel.z += (want[1] - n.vel.z) * k;
   }
-  physics(n, dt); keepOnPaper(n);
+  physics(n, dt); if (n.zone < 0) keepOnPaper(n);
   const s = n.s;
   let face = n.baseFace;
   if (n.state === 'fallen' && n.onGround) face = 'dizzy' + (Math.floor(time * 8 + 1) % 4);
@@ -1435,13 +1700,13 @@ function updateCreature(c, dt, time) {
     if (c.deadT > 2.3) c.root.visible = false;
     if (c.deadT > 45 && distXZ(c.home, P.pos) > 30) {
       Object.assign(c, { dead: false, hp: 5, aggro: false, deadT: 0 }); c.root.visible = true; c.root.scale.setScalar(1); c.body.rotation.z = 0;
-      c.pos.set(c.home.x, terrain(c.home.x, c.home.z) + 4, c.home.z); setCFace(c, 'calm');
+      c.pos.set(c.home.x, (c.zone < 0 ? terrain(c.home.x, c.home.z) : 0) + 4, c.home.z); setCFace(c, 'calm');
     }
     physics(c, dt);
     return;
   }
   const dP = distXZ(c.pos, P.pos);
-  if (c.aggro && (P.zone >= 0 || dP > 40 || P.state === 'dead')) { c.aggro = false; c.hp = Math.min(5, c.hp + 1); }
+  if (c.aggro && (P.zone !== c.zone || dP > 40 || P.state === 'dead')) { c.aggro = false; c.hp = Math.min(5, c.hp + 1); }
   let want;
   if (c.aggro) {
     const dx = P.pos.x - c.pos.x, dz = P.pos.z - c.pos.z, d = dP || 1, reach = c.r + P.r + .5;
@@ -1453,12 +1718,13 @@ function updateCreature(c, dt, time) {
     if (want[0] || want[1]) c.yaw = angLerp(c.yaw, Math.atan2(want[0], want[1]), Math.min(1, dt * 5));
   }
   const k = Math.min(1, dt * (c.onGround ? 6 : 1.5)); c.vel.x += (want[0] - c.vel.x) * k; c.vel.z += (want[1] - c.vel.z) * k;
-  physics(c, dt); keepOnPaper(c);
+  physics(c, dt); if (c.zone < 0) keepOnPaper(c);
   c.root.rotation.y = c.yaw;
   const sp = Math.hypot(c.vel.x, c.vel.z); c.phase += dt * (2 + sp * 1.6);
   const lungeK = c.lunge > 0 ? Math.sin(c.lunge / .3 * Math.PI) : 0;
   c.body.position.z = lungeK * .9;
   if (c.type === 'slime') { const b = Math.abs(Math.sin(c.phase)); c.body.position.y = b * .5 * Math.min(1, sp / 2 + .2); c.body.scale.set(1 + (1 - b) * .12, 1 - (1 - b) * .15 + lungeK * .2, 1 + (1 - b) * .12); }
+  else if (c.T.eraser) { c.legs.forEach(l => { l.hip.rotation.x = Math.sin(c.phase * 1.6 + (l.side > 0 ? 0 : Math.PI)) * .8 * Math.min(1, sp / 2); }); c.body.position.y = Math.abs(Math.sin(c.phase * 1.6)) * .18 * Math.min(1, sp / 2); c.body.rotation.x = lungeK * .4; }
   else if (c.type === 'spiky') { c.legs.forEach(l => { l.hip.rotation.x = Math.sin(c.phase * 1.4 + (l.side > 0 ? 0 : Math.PI)) * .7 * Math.min(1, sp / 2); }); c.body.rotation.x = lungeK * .5; }
   else { c.body.position.y = Math.sin(time * 2.2 + c.phase) * .3 + .3; c.legs.forEach(l => { l.hip.rotation.z = l.side * .3 + Math.sin(time * 4 + l.side) * .25; }); }
   setCFace(c, c.hurtT > 0 ? 'ouch' : c.aggro ? 'angry' : 'calm');
@@ -1490,6 +1756,17 @@ const BOSS_ATTACKS = {
     }
     return t > 1.25;
   },
+  swipe(b, t) {
+    b.body.position.z = Math.sin(Math.min(1, t / .45) * Math.PI) * 1.6;
+    if (b.fired === 0 && t > .15) {
+      b.fired = 1; SFX.punch(); noise(.2, .3, 2500);
+      const wp = worldPos(b), dx = P.pos.x - wp.x, dz = P.pos.z - wp.z;
+      let da = Math.atan2(dx, dz) - b.yaw; da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.hypot(dx, dz) < b.r + 4 && Math.abs(da) < 1.1 && P.pos.y < 3) hurtPlayer(1, wp);
+      say(b, 'PENÇE!', .8);
+    }
+    return t > .6;
+  },
   dash(b, t, ang) {
     if (b.fired === 0) { b.dashAng = ang; b.fired = 1; say(b, 'SİLİYORUUUM!', 1); }
     if (t < .9) { b.yaw = b.dashAng; b.pos.x += Math.sin(b.dashAng) * 25 * (1 + (5 - b.hp) * .08) * TICK; b.pos.z += Math.cos(b.dashAng) * 25 * (1 + (5 - b.hp) * .08) * TICK; }
@@ -1499,8 +1776,8 @@ const BOSS_ATTACKS = {
     if (t < .35) b.pos.y = Math.sin(t / .35 * Math.PI) * 2.5;
     else if (b.fired === 0) {
       b.pos.y = 0; b.fired = 1; SFX.boom(); cam.shake = .5;
-      spawnWave(b.i, AC[b.i].x + b.pos.x, AC[b.i].z + b.pos.z, { speed: 12, max: ARENA_R + 3, width: .9 });
-      if (b.hp <= 2) setTimeout(() => { if (!b.dead && P.zone === b.i) spawnWave(b.i, AC[b.i].x + b.pos.x, AC[b.i].z + b.pos.z, { speed: 12, max: ARENA_R + 3, width: .9 }); }, 600);
+      spawnWave(b.i, AC[b.i].x + b.pos.x, AC[b.i].z + b.pos.z, { speed: 12, max: ZR[b.i] + 3, width: .9 });
+      if (b.hp <= 2) setTimeout(() => { if (!b.dead && P.zone === b.i) spawnWave(b.i, AC[b.i].x + b.pos.x, AC[b.i].z + b.pos.z, { speed: 12, max: ZR[b.i] + 3, width: .9 }); }, 600);
     }
     return t > .9;
   },
@@ -1508,13 +1785,14 @@ const BOSS_ATTACKS = {
 let TICK = 0;
 function updateBoss(b, dt, time) {
   b.inv -= dt; b.flash = Math.max(0, b.flash - dt * 4); b.mat.emissive.setScalar(b.flash * .9);
-  if (b.spin) { b.spin.rotation.y += dt * 2; b.spin.rotation.x += dt * 1.3; }
+  if (b.spin && b.cat) { b.spin.rotation.z = Math.sin(time * 3) * .45; b.spin.rotation.x = Math.sin(time * 2.1) * .15; }
+  else if (b.spin) { b.spin.rotation.y += dt * 2; b.spin.rotation.x += dt * 1.3; }
   const wp = worldPos(b);
   updateBubble(b, dt, wp.x, wp.y + b.r * 2 + 1.5, wp.z, P.zone === b.i);
   if (b.dead) {
     b.deadT += dt;
     b.body.rotation.z = Math.min(1.45, b.deadT * 2.5); b.pos.y = Math.max(0, b.pos.y - dt * 10);
-    if (b.deadT > .7 && !b.starSpawned) { b.starSpawned = true; spawnStar(b); SFX.star(); }
+    if (b.deadT > .7 && !b.starSpawned && !b.cat) { b.starSpawned = true; spawnStar(b); SFX.star(); }
     if (b.deadT > 1.8) b.body.scale.setScalar(Math.max(.001, 1 - (b.deadT - 1.8)));
     if (b.deadT > 2.8) b.root.visible = false;
     return;
@@ -1526,6 +1804,7 @@ function updateBoss(b, dt, time) {
   const rage = 1 + (5 - b.hp) * .14;
   b.t -= dt * rage;
   b.body.position.x = 0;
+  if (b.state !== 'act') b.body.position.z = 0;
   if (b.state !== 'act' || b.atk !== 'dash') b.yaw = angLerp(b.yaw, ang, Math.min(1, dt * 5));
   switch (b.state) {
     case 'wait': b.state = 'roar'; b.t = .9; say(b, 'GRAAAA!', 1.4); SFX.roar(); cam.shake = .4; break;
@@ -1542,7 +1821,7 @@ function updateBoss(b, dt, time) {
     case 'rest': b.body.position.y = 0; if (b.t <= 0) { b.state = 'chase'; b.t = rand(.9, 1.7); } break;
   }
   // arena içinde kalsın
-  const bl = Math.hypot(b.pos.x, b.pos.z), lim = ARENA_R - b.r;
+  const bl = Math.hypot(b.pos.x, b.pos.z), lim = ZR[b.i] - b.r;
   if (bl > lim) { b.pos.x *= lim / bl; b.pos.z *= lim / bl; }
   b.root.rotation.y = b.yaw;
   b.shadow.position.y = -b.pos.y + .05;
@@ -1558,7 +1837,7 @@ function updateHazards(dt) {
   for (let i = projectiles.length - 1; i >= 0; i--) {
     const p = projectiles[i];
     p.m.position.addScaledVector(p.vel, dt); p.m.rotation.x += p.spin * dt; p.m.rotation.y += p.spin * dt * .7; p.life -= dt;
-    const ac = AC[p.zone], far = Math.hypot(p.m.position.x - ac.x, p.m.position.z - ac.z) > ARENA_R + .5;
+    const ac = AC[p.zone], far = Math.hypot(p.m.position.x - ac.x, p.m.position.z - ac.z) > ZR[p.zone] + .5;
     const hit = P.zone === p.zone && Math.hypot(p.m.position.x - P.pos.x, p.m.position.z - P.pos.z) < 1.05 && Math.abs(p.m.position.y - (P.pos.y + 1.5)) < 1.5;
     if (hit) hurtPlayer(1, p.m.position);
     if (hit || far || p.life <= 0) { if (far) splash(p.m.position, BOSS_DEFS[p.zone].proj, 3); scene.remove(p.m); projectiles.splice(i, 1); }
@@ -1597,11 +1876,11 @@ const camTarget = new V3(), camWant = new V3();
 function updateCamera(dt) {
   if (keys.q || keys.Q) cam.yaw += dt * 2.2;
   if (keys.e || keys.E) cam.yaw -= dt * 2.2;
-  const d = cam.dist * (P.zone >= 0 ? 1.25 : 1), cp = Math.cos(cam.pitch);
+  const d = cam.dist * (P.zone >= 0 && P.zone !== VILLAGE ? 1.25 : 1), cp = Math.cos(cam.pitch);
   camTarget.set(P.pos.x, P.pos.y + 1.8, P.pos.z);
   camWant.set(P.pos.x + Math.sin(cam.yaw) * cp * d, P.pos.y + 1.8 + Math.sin(cam.pitch) * d, P.pos.z + Math.cos(cam.yaw) * cp * d);
   if (P.zone < 0 && Math.abs(camWant.x) < HALF_W && Math.abs(camWant.z) < HALF_D) camWant.y = Math.max(camWant.y, terrain(camWant.x, camWant.z) + 1.2);
-  if (P.zone >= 0) { const ac = AC[P.zone], dx = camWant.x - ac.x, dz = camWant.z - ac.z, l = Math.hypot(dx, dz); if (l > ARENA_R + 1) { camWant.x = ac.x + dx / l * (ARENA_R + 1); camWant.z = ac.z + dz / l * (ARENA_R + 1); } }
+  if (P.zone >= 0) { const ac = AC[P.zone], dx = camWant.x - ac.x, dz = camWant.z - ac.z, l = Math.hypot(dx, dz); const lim = ZR[P.zone] + 1; if (l > lim) { camWant.x = ac.x + dx / l * lim; camWant.z = ac.z + dz / l * lim; } }
   if (cam.snap) { camera.position.copy(camWant); cam.snap = false; } else camera.position.lerp(camWant, 1 - Math.exp(-dt * 9));
   camera.lookAt(camTarget);
   if (cam.shake > 0 && !REDUCED) { cam.shake -= dt; camera.position.x += (Math.random() - .5) * cam.shake; camera.position.y += (Math.random() - .5) * cam.shake; }
@@ -1613,10 +1892,8 @@ function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now; time += dt;
   if (running) {
     updatePlayer(dt, time);
-    if (P.zone < 0) {
-      for (const n of npcs) { updateNpc(n, dt, time); separate(P, n); }
-      for (const c of creatures) { updateCreature(c, dt, time); if (!c.dead) separate(P, c); }
-    }
+    for (const n of npcs) if (n.zone === P.zone) { updateNpc(n, dt, time); separate(P, n); }
+    for (const c of creatures) if (c.zone === P.zone) { updateCreature(c, dt, time); if (!c.dead) separate(P, c); }
     for (const b of bosses) updateBoss(b, dt, time);
     updateHazards(dt);
   } else {
@@ -1627,9 +1904,9 @@ function frame(now) {
   updateCamera(dt);
   // etiketler
   updateBubble(P, dt, P.pos.x, P.pos.y + 4, P.pos.z, true);
-  for (const n of npcs) updateBubble(n, dt, n.pos.x, n.pos.y + 4, n.pos.z, P.zone < 0 && distXZ(n.pos, P.pos) < 40);
+  for (const n of npcs) updateBubble(n, dt, n.pos.x, n.pos.y + 4.2, n.pos.z, P.zone === n.zone && distXZ(n.pos, P.pos) < 40);
   for (const c of creatures) {
-    const vis = P.zone < 0 && !c.dead && distXZ(c.pos, P.pos) < 40;
+    const vis = P.zone === c.zone && !c.dead && distXZ(c.pos, P.pos) < 40;
     updateBubble(c, dt, c.pos.x, c.pos.y + 3.4, c.pos.z, vis);
     if (vis && (c.aggro || c.hp < 5)) {
       if (c.pipsHp !== c.hp) { c.pipsHp = c.hp; c.pipsEl.innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < c.hp ? '' : 'off'}"></i>`).join(''); }
@@ -1662,7 +1939,17 @@ function buildWorld() {
   sign(5, -4, 'Çizgi Köyü', 'Nüfus: 10 çöp adam', 0);
   decorate();
   CAVES.forEach((_, i) => { buildArena(i); makeBoss(i); });
+  buildDesk(); makeBoss(DESK);
+  buildVillage();
   NPC_DEFS.forEach((d, i) => makeNpc(d, i));
+  PENCIL_NPCS.forEach((d, i) => makeNpc(d, i, VILLAGE));
+  const erasers = ['erPink', 'erWhite', 'erTwin'], vc = AC[VILLAGE];
+  let ne = 0, ge = 0;
+  while (ne < 11 && ge++ < 2000) {
+    const a = rand(0, 6.283), d = rand(14, ZR[VILLAGE] - 6), x = vc.x + Math.cos(a) * d, z = vc.z + Math.sin(a) * d;
+    if (ZOBST[VILLAGE].some(o => !o.box && (o.x - x) ** 2 + (o.z - z) ** 2 < (o.r + 2.5) ** 2)) continue;
+    makeCreature(erasers[ne % 3], x, z, VILLAGE); ne++;
+  }
   const types = ['slime', 'spiky', 'cloud'];
   let n = 0, guard = 0;
   while (n < 15 && guard++ < 3000) {
@@ -1688,7 +1975,7 @@ function startGame() {
 }
 function revive() {
   $('deadScreen').hidden = true;
-  if (P.zone >= 0) { const b = bosses[P.zone]; if (!b.dead) resetBoss(b); }
+  { const b = bosses[P.zone]; if (b && !b.dead) resetBoss(b); }
   clearHazards();
   P.hp = 10; P.state = 'ok'; P.inv = 1.5; P.s.fallK = 1; updateHearts();
   placePlayerAtSpawn(); say(P, 'Yeniden çizildim! Biraz yamuk ama olsun.', 3);
@@ -1699,6 +1986,7 @@ function resetAll() {
   for (const k of pickups) k.m.parent && k.m.parent.remove(k.m); pickups.length = 0;
   SIGNS.forEach(s => { if (s.reset) s.reset(); });
   caveMouths.forEach((m, i) => m.sign.mark(null));
+  deskBars.visible = true;
   for (const c of creatures) { Object.assign(c, { dead: false, hp: 5, aggro: false, deadT: 0 }); c.root.visible = true; c.root.scale.setScalar(1); c.body.rotation.z = 0; setCFace(c, 'calm'); }
   stars = 0; updateStars(); revive();
 }
@@ -1715,7 +2003,11 @@ async function boot(data) {
   await fontsReady();
   buildWorld(); placePlayerAtSpawn(); updateHearts(); updateStars(); updateSwatch(); drawMinimap();
   if (data && data.started) {
-    (data.dead || []).forEach((d, i) => { if (d) { const b = bosses[i]; b.dead = true; b.deadT = 99; b.starSpawned = true; b.collected = !!(data.collected || [])[i]; b.root.visible = false; caveMouths[i].sign.mark('YENİLDİ'); if (!b.collected) spawnStar(b); } });
+    (data.dead || []).forEach((d, i) => {
+      const b = bosses[i]; if (!d || !b) return;
+      b.dead = true; b.deadT = 99; b.starSpawned = true; b.collected = !!(data.collected || [])[i]; b.root.visible = false;
+      if (b.cat) deskBars.visible = false; else { caveMouths[i].sign.mark('YENİLDİ'); if (!b.collected) spawnStar(b); }
+    });
     stars = data.stars || 0; P.hp = data.hp || 10; P.colorIdx = data.colorIdx || 0; P.s.bodyMat.color.setHex(PALETTE[P.colorIdx].c);
     updateHearts(); updateStars(); updateSwatch(); setZoneLook(-1);
     $('startScreen').hidden = true; $('hud').hidden = false; $('touch').hidden = false; running = true;
