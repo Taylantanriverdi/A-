@@ -1,0 +1,7 @@
+{
+  "status_url": "https://raw.githubusercontent.com/KULLANICI/REPO/main/durum.txt",
+  "poll_interval_seconds": 15,
+  "on_network_error": "keep",
+  "emergency_password_sha256": "",
+  "lock_message": "Bu cihaz gecici olarak kullanima kapatilmistir."
+}
