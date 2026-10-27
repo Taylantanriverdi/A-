@@ -26,7 +26,46 @@ araç. Açılışta çalışır, sizin kontrol ettiğiniz bir "durum bayrağı"n
 2. Cihazdaki ajan her birkaç saniyede bir bu dosyayı okur.
 3. `LOCK` görürse tam ekran kilit açılır; `UNLOCK` görürse kilit kalkar.
 
-## Kurulum
+## İki parça: Panel (ana PC) + Ajan (client PC'ler)
+
+```
+ANA BİLGİSAYAR                 İNTERNET                    CLIENT PC'LER
+control_panel.html  --API-->  GitHub Gist  <--RAW oku--  device_guard.py (ajan)
+   (KİLİTLE/AÇ)               durum.txt                   LOCK -> kilit ekranı
+```
+
+- **`control_panel.html`** → ana bilgisayarında aç, tek tıkla tüm client'ları
+  kilitle/aç. Gist'i senin GitHub token'ınla günceller.
+- **`install_client.bat`** → her client PC'de bir kez çalıştır; ajanı kurar,
+  açılışa ekler.
+
+### Önce ortak Gist'i hazırla
+1. <https://gist.github.com> → yeni gist, dosya adı `durum.txt`, içerik `UNLOCK`.
+   "Create **public** gist" (ajanın token'sız okuması için en kolayı public'tir).
+2. Tarayıcıdaki adresten **Gist ID**'yi al: `gist.github.com/<kullanıcı>/<GIST_ID>`.
+3. GitHub → Settings → Developer settings → **Personal access token** oluştur.
+   Yalnızca **`gist`** izni yeterli. Token'ı güvende tut.
+
+### Ana bilgisayar (panel)
+1. `control_panel.html` dosyasını çift tıkla (tarayıcıda açılır).
+2. Ayarlar bölümüne **Gist ID**, **dosya adı** (`durum.txt`) ve **token**'ı gir,
+   "Ayarları Kaydet" → "Yenile".
+3. Panel sana **"Client PC'lerin kullanacağı RAW link"**i gösterir — bunu kopyala,
+   client kurulumunda kullanacaksın.
+4. Artık **KİLİTLE / AÇ** tuşları tüm cihazları kontrol eder.
+
+> Token yalnızca senin tarayıcının `localStorage`'ında durur, repoya/başka yere
+> gitmez. Token girmeden de durumu görebilir, değişimi "manuel yöntem"den yapabilirsin.
+
+### Her client PC (ajan)
+1. `device-guard` klasörünü client PC'ye kopyala.
+2. `install_client.bat` → **sağ tık → Yönetici olarak çalıştır**.
+3. Sorduğunda panelden aldığın **RAW link**i yapıştır, istersen acil-açma şifresi
+   belirle. Gerisini (dosya kopyalama, `config.json`, açılış görevi) otomatik yapar.
+
+---
+
+## Elle kurulum (tek makine, panelsiz)
 
 ### 1) Python
 Windows'ta Python 3 kurulu olmalı (kurulumda "Add to PATH" işaretli). Ekstra

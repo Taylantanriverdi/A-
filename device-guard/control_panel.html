@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Device Guard — Kontrol Paneli</title>
+<style>
+  :root{
+    --bg:#0b0f1a; --panel:#141a2b; --panel2:#1b2336; --line:#263149;
+    --txt:#e8ecf4; --muted:#8b93a7; --accent:#4f8cff;
+    --lock:#ff5c5c; --unlock:#35c08a; --warn:#f0b429;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"Segoe UI",system-ui,Arial,sans-serif;line-height:1.5}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 16px}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:18px;margin-bottom:16px}
+  .status{display:flex;align-items:center;gap:14px}
+  .dot{width:16px;height:16px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+  .dot.lock{background:var(--lock);box-shadow:0 0 12px var(--lock)}
+  .dot.unlock{background:var(--unlock);box-shadow:0 0 12px var(--unlock)}
+  .status .big{font-size:20px;font-weight:700}
+  .status .small{color:var(--muted);font-size:12px}
+  .btns{display:flex;gap:12px;margin-top:16px}
+  button{flex:1;border:0;border-radius:12px;padding:16px;font-size:16px;
+    font-weight:700;cursor:pointer;color:#fff;transition:.15s transform}
+  button:active{transform:scale(.98)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .b-lock{background:var(--lock)} .b-unlock{background:var(--unlock)}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px}
+  input{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--txt);border-radius:9px;padding:10px;font-size:14px}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  details summary{cursor:pointer;color:var(--accent);font-size:14px;font-weight:600}
+  .mini{font-size:12px;color:var(--muted);margin-top:8px;word-break:break-all}
+  .copy{background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    border-radius:8px;padding:8px 10px;font-size:13px;flex:0 0 auto;font-weight:600}
+  .log{font-size:12px;color:var(--muted);margin-top:10px;min-height:18px}
+  .log.err{color:var(--lock)} .log.ok{color:var(--unlock)}
+  .note{background:rgba(240,180,41,.1);border:1px solid rgba(240,180,41,.4);
+    border-radius:10px;padding:12px;font-size:12px;color:#f3d089;margin-top:12px}
+  a{color:var(--accent)}
+  code{background:var(--panel2);padding:2px 6px;border-radius:6px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔒 Device Guard — Kontrol Paneli</h1>
+  <div class="sub">Cihazlarını uzaktan kullanıma aç / kapat. Bu panel yalnızca
+    senin tarayıcında çalışır; ayarların bu bilgisayarda saklanır.</div>
+
+  <div class="card">
+    <div class="status">
+      <div id="dot" class="dot"></div>
+      <div>
+        <div class="big" id="statusText">Durum bilinmiyor</div>
+        <div class="small" id="statusSub">Ayarları girip "Yenile"ye bas</div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="b-lock"  id="btnLock"   onclick="setFlag('LOCK')">KİLİTLE</button>
+      <button class="b-unlock" id="btnUnlock" onclick="setFlag('UNLOCK')">AÇ</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <div class="card">
+    <details open>
+      <summary>⚙️ Ayarlar (GitHub Gist)</summary>
+      <label>Gist ID (gist.github.com/&lt;kullanıcı&gt;/<b>&lt;bu kısım&gt;</b>)</label>
+      <input id="gistId" placeholder="örn. 1a2b3c4d5e6f...">
+      <div class="row">
+        <div>
+          <label>Dosya adı</label>
+          <input id="fileName" value="durum.txt">
+        </div>
+        <div>
+          <label>Kontrol aralığı yenileme (sn)</label>
+          <input id="refresh" type="number" value="10" min="3">
+        </div>
+      </div>
+      <label>GitHub Token (yalnızca <code>gist</code> izni yeterli)</label>
+      <input id="token" type="password" placeholder="ghp_... (yalnızca bu tarayıcıda saklanır)">
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="copy" onclick="saveCfg()">Ayarları Kaydet</button>
+        <button class="copy" onclick="refreshNow()">Yenile</button>
+      </div>
+
+      <label style="margin-top:16px">Client PC'lerin kullanacağı RAW link
+        (bunu <code>install_client.bat</code>'a ver):</label>
+      <div style="display:flex;gap:10px">
+        <input id="rawUrl" readonly placeholder="Gist ID girince otomatik oluşur">
+        <button class="copy" onclick="copyRaw()">Kopyala</button>
+      </div>
+
+      <div class="note">
+        <b>Token hakkında:</b> Token yalnızca <b>kendi Gist'ini</b> güncellemek için
+        kullanılır ve sadece bu tarayıcının <code>localStorage</code>'ında tutulur —
+        hiçbir yere gönderilmez, repoya yazılmaz. Token girmezsen panel yine durumu
+        <i>okuyabilir</i> (public gist), ama değiştirmek için aşağıdaki manuel yolu
+        kullanırsın.
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <details>
+      <summary>📝 Token'sız manuel yöntem</summary>
+      <div class="mini">
+        1. <a id="editLink" href="#" target="_blank">Gist'i tarayıcıda aç</a><br>
+        2. Dosya içeriğini <code>LOCK</code> ya da <code>UNLOCK</code> yapıp kaydet.<br>
+        3. Client'lar birkaç saniye içinde yeni durumu alır.
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const LS = "deviceGuardCfg";
+
+function loadCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem(LS) || "{}");
+    $("gistId").value  = c.gistId  || "";
+    $("fileName").value= c.fileName|| "durum.txt";
+    $("token").value   = c.token   || "";
+    $("refresh").value = c.refresh || 10;
+  }catch(e){}
+  updateRaw();
+}
+function saveCfg(){
+  const c = {
+    gistId:$("gistId").value.trim(),
+    fileName:$("fileName").value.trim() || "durum.txt",
+    token:$("token").value.trim(),
+    refresh:Math.max(3, parseInt($("refresh").value)||10)
+  };
+  localStorage.setItem(LS, JSON.stringify(c));
+  updateRaw(); log("Ayarlar kaydedildi.","ok");
+  startPolling();
+}
+function cfg(){ try{return JSON.parse(localStorage.getItem(LS)||"{}")}catch(e){return {}} }
+
+function log(m,cls){ const l=$("log"); l.textContent=m; l.className="log "+(cls||""); }
+
+let ownerLogin = null;
+function updateRaw(){
+  const id = $("gistId").value.trim(), fn = $("fileName").value.trim()||"durum.txt";
+  if(id && ownerLogin){
+    $("rawUrl").value = `https://gist.githubusercontent.com/${ownerLogin}/${id}/raw/${fn}`;
+  }else if(id){
+    $("rawUrl").value = "Durumu bir kez yenile → kullanıcı adı otomatik dolacak";
+  }else{
+    $("rawUrl").value = "";
+  }
+  $("editLink").href = id ? `https://gist.github.com/${id}` : "#";
+}
+function copyRaw(){
+  const v=$("rawUrl").value;
+  if(v && v.startsWith("http")){ navigator.clipboard.writeText(v); log("RAW link kopyalandı.","ok"); }
+  else log("Önce Gist ID girip Yenile'ye bas.","err");
+}
+
+async function api(method, body){
+  const c = cfg();
+  if(!c.gistId) throw new Error("Gist ID girilmedi.");
+  const headers = {"Accept":"application/vnd.github+json"};
+  if(c.token) headers["Authorization"] = "Bearer "+c.token;
+  const res = await fetch(`https://api.github.com/gists/${c.gistId}`,{
+    method, headers, body: body?JSON.stringify(body):undefined
+  });
+  if(!res.ok){
+    const t = await res.text();
+    throw new Error(`GitHub ${res.status}: ${t.slice(0,120)}`);
+  }
+  return res.json();
+}
+
+function parse(content){
+  const t=(content||"").trim().toUpperCase();
+  if(t.includes("LOCK") && !t.includes("UNLOCK")) return "LOCK";
+  if(t.includes("UNLOCK")) return "UNLOCK";
+  return null;
+}
+
+function render(state){
+  const dot=$("dot"), st=$("statusText"), sub=$("statusSub");
+  dot.className="dot";
+  if(state==="LOCK"){ dot.classList.add("lock"); st.textContent="KİLİTLİ"; sub.textContent="Cihaz kullanıma kapalı"; }
+  else if(state==="UNLOCK"){ dot.classList.add("unlock"); st.textContent="AÇIK"; sub.textContent="Cihaz kullanılabilir"; }
+  else{ st.textContent="Durum bilinmiyor"; sub.textContent="Gist okunamadı"; }
+}
+
+async function refreshNow(){
+  try{
+    const c = cfg();
+    if(!c.gistId){ log("Önce ayarları kaydet.","err"); return; }
+    const data = await api("GET");
+    ownerLogin = data.owner && data.owner.login;
+    updateRaw();
+    const fn = c.fileName || "durum.txt";
+    const file = data.files[fn];
+    if(!file){ log(`"${fn}" adlı dosya bu Gist'te yok.`,"err"); render(null); return; }
+    render(parse(file.content));
+    log("Güncellendi: "+new Date().toLocaleTimeString(),"");
+  }catch(e){ log(e.message,"err"); render(null); }
+}
+
+async function setFlag(value){
+  const c = cfg();
+  if(!c.gistId){ log("Önce ayarları kaydet.","err"); return; }
+  if(!c.token){
+    log("Token yok. Manuel yöntemi kullan (aşağıdaki bölüm).","err"); return;
+  }
+  $("btnLock").disabled=$("btnUnlock").disabled=true;
+  try{
+    const fn = c.fileName || "durum.txt";
+    await api("PATCH", {files:{[fn]:{content:value}}});
+    log(value==="LOCK"?"Cihaz KİLİTLENDİ.":"Cihaz AÇILDI.","ok");
+    render(value);
+  }catch(e){ log(e.message,"err"); }
+  finally{ $("btnLock").disabled=$("btnUnlock").disabled=false; }
+}
+
+let timer=null;
+function startPolling(){
+  if(timer) clearInterval(timer);
+  const sec = Math.max(3, (cfg().refresh)||10);
+  refreshNow();
+  timer=setInterval(refreshNow, sec*1000);
+}
+
+["gistId","fileName"].forEach(id=>$(id).addEventListener("input",updateRaw));
+loadCfg();
+if(cfg().gistId) startPolling();
+</script>
+</body>
+</html>
