@@ -80,6 +80,22 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 }
 #msg.on { opacity: 1; }
 
+/* Giriş sahnesi: sinema şeritleri ve altyazı */
+.bars::before, .bars::after { content: ''; position: fixed; left: 0; right: 0; height: 11vh; background: #000; z-index: 7; }
+.bars::before { top: 0; }
+.bars::after { bottom: 0; }
+#subtitle {
+  position: fixed; left: 50%; bottom: 13vh; transform: translateX(-50%); z-index: 8; pointer-events: none;
+  font-family: var(--font-body); font-weight: 900; font-size: clamp(18px, 4.5vw, 30px); color: #ffd1d1;
+  text-shadow: 0 2px 0 #000, 0 0 18px rgba(255, 40, 40, 0.7); text-align: center; width: max-content; max-width: calc(100vw - 32px);
+  transition: opacity 0.3s;
+}
+#skip {
+  position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(11vh + 12px); z-index: 8;
+  font-family: var(--font-body); font-weight: 800; font-size: 14px; color: var(--fg);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; cursor: pointer;
+}
+
 /* Dokunmatik kontroller: yalnızca dokunmatik ekranlarda */
 #touch { display: none; }
 @media (pointer: coarse) {
@@ -103,6 +119,10 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 <div id="game"></div>
 <div id="flash"></div>
 <div id="msg"></div>
+<div id="intro" class="bars" hidden>
+  <div id="subtitle"></div>
+  <button id="skip">Geç (Enter)</button>
+</div>
 
 <div id="hud" hidden>
   <div class="pill" aria-label="Can"><span id="hearts"></span></div>
@@ -463,6 +483,11 @@ const sfx = {
   kill: () => { tone(500, 60, 0.5, 'square', 0.1); },
   hurt: () => { tone(220, 90, 0.3, 'square', 0.14); },
   bolt: () => { tone(300, 600, 0.18, 'triangle', 0.05); },
+  rumble: () => { tone(70, 40, 2.4, 'sawtooth', 0.12); tone(110, 55, 2.4, 'triangle', 0.1); },
+  slam: () => { tone(160, 30, 1.2, 'square', 0.25); tone(60, 25, 1.5, 'sawtooth', 0.25); },
+  pop: () => { tone(200, 500, 0.15, 'triangle', 0.05); },
+  laugh: () => { for (let i = 0; i < 4; i++) setTimeout(() => tone(260 - i * 25, 140 - i * 15, 0.22, 'square', 0.09), i * 260); },
+  vanish: () => { tone(900, 60, 0.9, 'sawtooth', 0.1); },
   mount: () => { tone(300, 900, 0.35, 'sine', 0.12); },
   land: () => { tone(800, 250, 0.35, 'sine', 0.12); },
 };
@@ -621,10 +646,171 @@ function endGame(won) {
 function startGame() {
   ac();
   newGame();
-  state = 'play';
   $('startScreen').hidden = $('endScreen').hidden = true;
+  startIntro();
+}
+
+// ---------- Giriş sahnesi: Kötülerin Kralı ----------
+// Kral gökten meydana iner, asasını yere vurur, kötüler her yerden çıkar, kral kaybolur.
+const KING_POS = new THREE.Vector3(0, 0, 16);
+const INTRO = { land: 2.6, raise: 3.4, slam: 3.75, spawnEnd: 6.6, vanish: 7.6, end: 8.8 };
+let king = null, intro = null;
+
+function makeKing() {
+  const p = makePerson(0x2a0a18, 0xb9b0a6, 0, true);
+  const g = p.g;
+  const gold = new THREE.MeshLambertMaterial({ color: 0xe0b030, emissive: 0x3a2400 });
+  const crown = cyl(0.3, 0.3, 0.16, gold, 10); crown.position.y = 2.55; g.add(crown);
+  for (let k = 0; k < 6; k++) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.22, 4), gold);
+    const a = (k / 6) * Math.PI * 2;
+    spike.position.set(Math.cos(a) * 0.27, 2.72, Math.sin(a) * 0.27); g.add(spike);
+  }
+  const cape = new THREE.Mesh(new THREE.ConeGeometry(0.75, 1.9, 14, 1, true, Math.PI * 0.5, Math.PI), new THREE.MeshLambertMaterial({ color: 0x6e0a12, side: THREE.DoubleSide }));
+  cape.position.set(0, 1.15, -0.05); cape.castShadow = true; g.add(cape);
+  const staff = new THREE.Group();
+  const pole = cyl(0.05, 0.06, 2.8, mat(0x1a1a1a), 8); pole.position.y = 1.4; staff.add(pole);
+  const orb = ball(0.2, new THREE.MeshBasicMaterial({ color: 0xff2a2a })); orb.position.y = 2.9; staff.add(orb);
+  const glow = new THREE.PointLight(0xff2020, 2, 12); glow.position.y = 2.9; staff.add(glow);
+  staff.position.set(0.6, 0, 0.25);
+  g.add(staff);
+  g.scale.setScalar(1.6);
+  const aura = new THREE.PointLight(0xff3030, 0, 40); aura.position.y = 3; g.add(aura);
+  return { g, legs: p.legs, staff, aura };
+}
+
+function shockwave() {
+  const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.6, 48), new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(KING_POS.x, 0.3, KING_POS.z);
+  scene.add(m);
+  return m;
+}
+
+// Kötünün çıktığı yerde göğe yükselen kırmızı ışık sütunu
+function pillar(pos) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.4, 40, 12, 1, true), new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.7, fog: false, side: THREE.DoubleSide, depthWrite: false }));
+  m.position.set(pos.x, 20, pos.z);
+  scene.add(m);
+  bursts.push({ mesh: m, t: 0, pillar: true });
+}
+
+function startIntro() {
+  state = 'intro';
+  player.yaw = 0;
+  hero.g.position.copy(player.pos);
+  hero.g.rotation.set(0, 0, 0);
+  hero.g.visible = true;
+  hero.legs[0].rotation.x = hero.legs[1].rotation.x = 0;
+  king = makeKing();
+  king.g.position.set(KING_POS.x, 30, KING_POS.z);
+  king.g.rotation.y = Math.PI;
+  scene.add(king.g);
+  villains.forEach((v, i) => { v.g.visible = false; v.spawnAt = INTRO.slam + 0.25 + i * (2.4 / villains.length); v.shown = false; });
+  intro = { t: 0, said: {}, wave: null, shake: 0 };
+  $('intro').hidden = false;
+  $('subtitle').textContent = '';
+  camPos.set(3, 2.6, 2.5);
+  sfx.rumble();
+}
+
+function say(key, text) {
+  if (intro.said[key]) return;
+  intro.said[key] = true;
+  $('subtitle').textContent = text;
+}
+
+function finishIntro() {
+  if (state !== 'intro') return;
+  for (const v of villains) { v.g.visible = true; v.g.position.copy(v.pos); }
+  if (king) { scene.remove(king.g); king = null; }
+  if (intro.wave) scene.remove(intro.wave);
+  intro = null;
+  $('intro').hidden = true;
+  state = 'play';
   $('hud').hidden = $('hint').hidden = $('touch').hidden = false;
   showMsg('Kötü adamları bul ve S ile vur!');
+}
+
+function updateIntro(dt) {
+  const t = (intro.t += dt);
+  const I = INTRO;
+  const kingHead = king.g.position.clone().setY(king.g.position.y + 3.2);
+
+  // 1) Kral kızıl ışık içinde gökten iner
+  if (t < I.land) {
+    say('a', 'Kasabaya karanlık çöktü…');
+    const k = t / I.land;
+    king.g.position.y = 30 * Math.pow(1 - k, 2);
+    king.g.rotation.y = Math.PI + (1 - k) * 6;
+    king.aura.intensity = 3 * k;
+  } else {
+    king.g.position.y = 0;
+    king.g.rotation.y = Math.PI;
+    if (t > I.land + 0.3) say('b', 'KÖTÜLERİN KRALI: “Bu şehir artık benim!”');
+  }
+
+  // 2) Asayı kaldırır, 3) yere vurur
+  if (t >= I.land && t < I.raise) king.staff.position.y = 0;
+  else if (t >= I.raise && t < I.slam) king.staff.position.y = Math.min(1, (t - I.raise) / (I.slam - I.raise - 0.1)) * 1.4;
+  else if (t >= I.slam) {
+    king.staff.position.y = Math.max(0, 1.4 - (t - I.slam) * 30);
+    if (!intro.wave) {
+      intro.wave = shockwave();
+      intro.shake = 0.9;
+      burst(KING_POS.clone().setY(0.5), 0xff3030);
+      sfx.slam();
+      say('c', 'GÜM!');
+    }
+  }
+  if (intro.wave) {
+    const k = (t - I.slam) / 2.2;
+    intro.wave.scale.setScalar(1 + k * 90);
+    intro.wave.material.opacity = Math.max(0, 0.85 * (1 - k));
+  }
+
+  // 4) Kötüler şehrin her yerinden yerden çıkar
+  if (t > I.slam + 0.4) say('d', 'Kötü adamlar her yerden çıkıyor!');
+  for (const v of villains) {
+    if (t < v.spawnAt) continue;
+    if (!v.shown) { v.shown = true; v.g.visible = true; burst(v.pos.clone().setY(1), 0xff3030); pillar(v.pos); sfx.pop(); }
+    const k = Math.min(1, (t - v.spawnAt) / 0.6);
+    v.g.position.set(v.pos.x, -2.6 * (1 - k), v.pos.z);
+    v.g.rotation.y = Math.atan2(player.pos.x - v.pos.x, player.pos.z - v.pos.z);
+  }
+
+  // 5) Kral güler ve kaybolur
+  if (t >= I.spawnEnd && !intro.said.laugh) { intro.said.laugh = true; sfx.laugh(); say('e', 'KÖTÜLERİN KRALI: “Ha ha ha! Onları yenemezsin, büyücü!”'); }
+  if (t >= I.vanish) {
+    const k = Math.min(1, (t - I.vanish) / 0.6);
+    if (!intro.said.gone) { intro.said.gone = true; sfx.vanish(); burst(kingHead.clone().setY(2.5), 0x8a1020); }
+    king.g.scale.setScalar(1.6 * (1 - k) + 0.001);
+    king.g.rotation.y = Math.PI + k * 12;
+    if (k >= 1) { king.g.visible = false; say('f', 'Kral kayboldu… Şehri sen kurtarmalısın!'); }
+  }
+
+  // Kamera: önce omuz üstünden krala, sonra yukarıdan şehre, sonra yine krala
+  let want, look;
+  const shoulder = new THREE.Vector3(3, 2.6, 2.5);
+  if (t < I.slam + 0.5 || t >= I.spawnEnd) {
+    want = shoulder;
+    look = t < I.land ? king.g.position.clone().setY(king.g.position.y + 2.5) : kingHead;
+  } else {
+    want = new THREE.Vector3(0, 90, -60);
+    look = new THREE.Vector3(0, 0, 15);
+  }
+  camPos.lerp(want, 1 - Math.pow(0.15, dt));
+  camera.position.copy(camPos);
+  if (intro.shake > 0) {
+    intro.shake = Math.max(0, intro.shake - dt);
+    camera.position.x += rand(-1, 1) * intro.shake * 0.5;
+    camera.position.y += rand(-1, 1) * intro.shake * 0.5;
+  }
+  camera.lookAt(look);
+
+  updateVillagers(dt);
+  updateBursts(dt);
+  if (t >= I.end) finishIntro();
 }
 
 // ---------- Güncelleme ----------
@@ -776,9 +962,19 @@ function updateProjectiles(dt) {
     if (!gone && p.distanceTo(chest(player)) < 0.8) { hurt(); burst(p, 0xff4040); gone = true; }
     if (gone) { scene.remove(b.mesh); bolts.splice(i, 1); }
   }
+  updateBursts(dt);
+}
+
+function updateBursts(dt) {
   for (let i = bursts.length - 1; i >= 0; i--) {
     const b = bursts[i];
     b.t += dt;
+    if (b.pillar) {
+      b.mesh.scale.set(1 - b.t / 2.5, 1, 1 - b.t / 2.5);
+      b.mesh.material.opacity = Math.max(0, 0.7 * (1 - b.t / 2.5));
+      if (b.t > 2.5) { scene.remove(b.mesh); bursts.splice(i, 1); }
+      continue;
+    }
     b.mesh.scale.setScalar(1 + b.t * 8);
     b.mesh.material.opacity = Math.max(0, 0.9 - b.t * 2.5);
     if (b.t > 0.4) { scene.remove(b.mesh); bursts.splice(i, 1); }
@@ -811,6 +1007,8 @@ function frame(now) {
     $('alt').textContent = player.flying ? `${Math.round(player.pos.y)} m` : '';
     if (msgTimer > 0 && (msgTimer -= dt) <= 0) $('msg').classList.remove('on');
     updateCamera(dt, false);
+  } else if (state === 'intro') {
+    updateIntro(dt);
   } else {
     // menüde şehrin üstünde yavaşça dön
     const t = now / 9000;
@@ -830,6 +1028,10 @@ requestAnimationFrame(frame);
 const lower = k => (k || '').toLocaleLowerCase('tr');
 addEventListener('keydown', e => {
   const k = lower(e.key);
+  if (state === 'intro') {
+    if (e.key === 'Enter' || e.code === 'Space' || e.key === 'Escape') { e.preventDefault(); finishIntro(); }
+    return;
+  }
   if (state !== 'play') {
     if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); startGame(); }
     return;
@@ -852,6 +1054,7 @@ addEventListener('blur', () => keys.clear());
 
 $('startBtn').addEventListener('click', startGame);
 $('againBtn').addEventListener('click', startGame);
+$('skip').addEventListener('click', finishIntro);
 
 for (const b of document.querySelectorAll('#touch button')) {
   b.addEventListener('pointerdown', e => {
