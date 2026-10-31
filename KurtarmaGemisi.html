@@ -67,6 +67,8 @@ button:focus-visible { outline: 3px solid var(--sand); outline-offset: 3px; }
   display: grid; grid-template-columns: auto auto; gap: 6px 12px; align-items: center; font-size: 15px;
 }
 #info .lbl { font-size: 11px; font-weight: 900; letter-spacing: .1em; color: var(--muted); }
+#dmg { width: 96px; height: 12px; border-radius: 6px; background: rgba(255,255,255,.15); overflow: hidden; }
+#dmg i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 6px; transition: width .3s, background .3s; }
 #info b { font-family: var(--font-display); font-weight: 400; font-size: 20px; font-variant-numeric: tabular-nums; }
 #seats { display: flex; gap: 4px; }
 #seats i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--buoy); box-sizing: border-box; }
@@ -99,12 +101,16 @@ button:focus-visible { outline: 3px solid var(--sand); outline-offset: 3px; }
   pointer-events: auto; touch-action: none;
 }
 #knob { position: absolute; left: 39px; top: 39px; width: 52px; height: 52px; border-radius: 50%; background: rgba(255,106,43,.8); }
-#actBtn, #hornBtn {
+#actBtn, #hornBtn, #viewBtn {
   position: absolute; border-radius: 50%; border: 0; font-family: var(--font-display); pointer-events: auto; touch-action: none;
 }
 #actBtn {
   right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(30px + env(safe-area-inset-bottom, 0px));
   width: 88px; height: 88px; background: var(--buoy); color: #fff; font-size: 30px; box-shadow: 0 5px 0 var(--buoy-dark);
+}
+#viewBtn {
+  right: calc(34px + env(safe-area-inset-right, 0px)); bottom: calc(136px + env(safe-area-inset-bottom, 0px));
+  width: 62px; height: 62px; background: #3cc6e4; color: #06303d; font-size: 22px;
 }
 #hornBtn {
   right: calc(124px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px));
@@ -126,6 +132,7 @@ button:focus-visible { outline: 3px solid var(--sand); outline-offset: 3px; }
     <span class="lbl">KURTARILAN</span><b id="saved">0 / 0</b>
     <span class="lbl">HIZ</span><b id="spd">0 knot</b>
     <span class="lbl">SÜRE</span><b id="time">0:00</b>
+    <span class="lbl">HASAR</span><span id="dmg"><i></i></span>
   </div>
   <button id="quit" type="button" aria-label="Oyundan çık">Ç · ÇIK</button>
   <div id="toast"></div>
@@ -137,6 +144,7 @@ button:focus-visible { outline: 3px solid var(--sand); outline-offset: 3px; }
   <div id="stick"><div id="knob"></div></div>
   <button id="actBtn" type="button" aria-label="İnsanları gemiye al">E</button>
   <button id="hornBtn" type="button" aria-label="Korna çal">H</button>
+  <button id="viewBtn" type="button" aria-label="Görüş modunu değiştir">D</button>
 </div>
 
 <div class="screen" id="menu">
@@ -146,16 +154,17 @@ button:focus-visible { outline: 3px solid var(--sand); outline-offset: 3px; }
     <p>Denizdeki adalarda mahsur kalan insanlar var! Kaptan sensin. Gemine bin, adalara git, herkesi gemiye al ve
       <b style="color:var(--sand)">deniz fenerinin yanındaki limana</b> geri getir.</p>
     <div class="keys">
-      <kbd>← ↑ → ↓</kbd><span>Gemiyi sür (W A S D de olur)</span>
+      <kbd>← ↑ → ↓</kbd><span>Gemiyi sür</span>
       <kbd>E</kbd><span>Adanın yanındayken insanları gemiye al</span>
       <kbd>H</kbd><span>Korna çal</span>
-      <kbd>C</kbd><span>Kamerayı değiştir</span>
+      <kbd>D</kbd><span>Görüş modunu değiştir: arkadan, yakından, uzaktan, kaptan köşkü, kuş bakışı, yandan, önden</span>
       <kbd>F</kbd><span>Tam ekran aç / kapat</span>
       <kbd>M</kbd><span>Sesi aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
     <p class="muted" style="font-size:14px">Gemine en fazla <b style="color:var(--fg)">6 kişi</b> sığar. Gemi dolunca limana dön.
-      Turuncu ok seni hep doğru yere götürür.</p>
+      Turuncu ok seni hep doğru yere götürür.
+      Bir yere çarparsan gemin yamulur ve yavaşlar; limanda tamir edilir.</p>
     <button class="big" id="startBtn" type="button">DENİZE AÇIL</button>
     <p class="muted" style="font-size:13px" id="bestLine">Enter tuşuna da basabilirsin</p>
     <div class="buoy"></div>
@@ -266,15 +275,25 @@ for (let i = 0; i < 22; i++) {
 }
 
 // ---------- Gemi ----------
+// Gövde kenarları küçük parçalara bölünür ki çarpınca yamulabilsin
 function hullShape(s) {
+  const pts = [[-2.6, 5], [2.6, 5], [2.8, -1.5], [0, -7.2], [-2.8, -1.5]];
   const sh = new THREE.Shape();
-  sh.moveTo(-2.6 * s, 5 * s); sh.lineTo(2.6 * s, 5 * s); sh.lineTo(2.8 * s, -1.5 * s);
-  sh.lineTo(0, -7.2 * s); sh.lineTo(-2.8 * s, -1.5 * s); sh.closePath();
+  pts.forEach(([x, y], i) => {
+    const [nx, ny] = pts[(i + 1) % pts.length];
+    for (let k = 0; k < 8; k++) {
+      const px = (x + (nx - x) * k / 8) * s, py = (y + (ny - y) * k / 8) * s;
+      if (i === 0 && k === 0) sh.moveTo(px, py); else sh.lineTo(px, py);
+    }
+  });
+  sh.closePath();
   return sh;
 }
+const dentables = [];
 function slab(s, depth, y, m) {
-  const g = new THREE.ExtrudeGeometry(hullShape(s), { depth, bevelEnabled: false });
+  const g = new THREE.ExtrudeGeometry(hullShape(s), { depth, bevelEnabled: false, steps: 3 });
   g.rotateX(-Math.PI / 2); g.translate(0, y, 0);
+  dentables.push({ geo: g, orig: g.attributes.position.array.slice() });
   return new THREE.Mesh(g, m);
 }
 const ship = new THREE.Group();
@@ -285,19 +304,119 @@ ship.add(slab(0.93, 0.25, 1.0, M.wood));
 const cabin = box(3.6, 2.6, 3.4, M.white); cabin.position.set(0, 2.55, -2.7); ship.add(cabin);
 const windows = box(3.64, 0.7, 3.44, M.navy); windows.position.set(0, 3.05, -2.7); ship.add(windows);
 const roof = box(4.0, 0.3, 3.8, M.blue); roof.position.set(0, 4.0, -2.7); ship.add(roof);
-const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.6, 10), M.orange); chimney.position.set(0, 4.9, -3.7); ship.add(chimney);
-const chimTop = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.3, 10), M.black); chimTop.position.set(0, 5.75, -3.7); ship.add(chimTop);
-const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4, 6), M.black); mast.position.set(0, 6.1, -1.6); ship.add(mast);
+const chimPivot = new THREE.Group(); chimPivot.position.set(0, 4.1, -3.7); ship.add(chimPivot);
+const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.6, 10), M.orange); chimney.position.y = 0.8; chimPivot.add(chimney);
+const chimTop = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.3, 10), M.black); chimTop.position.y = 1.65; chimPivot.add(chimTop);
+const mastPivot = new THREE.Group(); mastPivot.position.set(0, 4.1, -1.6); ship.add(mastPivot);
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4, 6), M.black); mast.position.y = 2; mastPivot.add(mast);
 const flagGeo = new THREE.PlaneGeometry(1.6, 1); flagGeo.translate(-0.8, 0, 0);
 const flag = new THREE.Mesh(flagGeo, new THREE.MeshLambertMaterial({ color: 0xd8342c, side: THREE.DoubleSide }));
-flag.position.set(0, 7.5, -1.6); flag.rotation.y = -Math.PI / 2; ship.add(flag);
+flag.position.y = 3.4; flag.rotation.y = -Math.PI / 2; mastPivot.add(flag);
 const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 8, 16), M.orange); ring.position.set(0, 2.3, -0.98); ship.add(ring);
 const ringStripe = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.19, 8, 4, 0.5), M.white);
 ringStripe.position.copy(ring.position); ship.add(ringStripe);
 scene.add(ship);
 const SLOTS = [[-1.3, 0], [1.3, 0], [-1.2, 2], [1.2, 2], [-0.6, 4], [0.6, 4]].map(([x, z]) => new THREE.Vector3(x, 1.25, z));
 
-const boat = { x: 16, z: 30, h: 0, speed: 0, roll: 0 };
+const boat = { x: 16, z: 30, h: 0, speed: 0, roll: 0, damage: 0, list: 0, dentCd: 0 };
+
+// ---------- Hasar: yamulma, kıymıklar, duman, tamir ----------
+const hash3 = (x, y, z) => { const v = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return v - Math.floor(v) - 0.5; };
+function dent(lx, lz, power) {
+  // lx, lz: geminin içinden çarpılan yere doğru yön (gemiye göre)
+  const P = dentables[0].geo.attributes.position;
+  let bx = 0, bz = 0, bd = -1e9;
+  for (let i = 0; i < P.count; i++) {
+    const d = P.getX(i) * lx + P.getZ(i) * lz;
+    if (d > bd) { bd = d; bx = P.getX(i); bz = P.getZ(i); }
+  }
+  const RAD = 2.2 + power * 1.2, seed = Math.random() * 100;
+  for (const { geo, orig } of dentables) {
+    const a = geo.attributes.position.array;
+    for (let i = 0; i < a.length; i += 3) {
+      const dist = Math.hypot(a[i] - bx, a[i + 2] - bz);
+      if (dist >= RAD) continue;
+      const k = Math.pow(1 - dist / RAD, 1.5) * power;
+      const j = hash3(orig[i] + seed, orig[i + 1], orig[i + 2]);
+      a[i] -= lx * k * (1 + j * 0.6); a[i + 2] -= lz * k * (1 + j * 0.6);
+      a[i + 1] += j * k * 0.5;
+      // çok fazla içe göçmesin
+      const ox = a[i] - orig[i], oz = a[i + 2] - orig[i + 2], m = Math.hypot(ox, oz);
+      if (m > 1.5) { a[i] = orig[i] + ox / m * 1.5; a[i + 2] = orig[i + 2] + oz / m * 1.5; }
+    }
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+  }
+  const bend = (piv, amt) => {
+    piv.rotation.z = Math.max(-0.7, Math.min(0.7, piv.rotation.z + (Math.random() - 0.5) * amt));
+    piv.rotation.x = Math.max(-0.5, Math.min(0.5, piv.rotation.x + (Math.random() - 0.5) * amt * 0.6));
+  };
+  bend(mastPivot, power * 0.7); bend(chimPivot, power * 0.5);
+  boat.list = Math.max(-0.12, Math.min(0.12, boat.list + (lx > 0 ? -1 : 1) * power * 0.04));
+  boat.damage = Math.min(1, boat.damage + power * 0.2);
+  // kıymıklar
+  const wx = lx * Math.cos(boat.h) + lz * Math.sin(boat.h), wz = -lx * Math.sin(boat.h) + lz * Math.cos(boat.h);
+  for (let i = 0; i < 10; i++) {
+    const sp = splinters[splI++ % splinters.length];
+    sp.life = 1.4; sp.m.visible = true;
+    sp.m.position.set(boat.x + wx * 3, ship.position.y + 1.5, boat.z + wz * 3);
+    sp.v.set(wx * rand(-2, 6) + rand(-4, 4), rand(5, 11), wz * rand(-2, 6) + rand(-4, 4));
+  }
+  drawDamage();
+}
+function repair(silent) {
+  for (const { geo, orig } of dentables) {
+    geo.attributes.position.array.set(orig);
+    geo.attributes.position.needsUpdate = true;
+    geo.computeVertexNormals();
+  }
+  mastPivot.rotation.set(0, 0, 0); chimPivot.rotation.set(0, 0, 0);
+  boat.damage = 0; boat.list = 0;
+  drawDamage();
+  if (!silent) { toast('Gemi tamir edildi, yepyeni oldu!'); sfx.repair(); }
+}
+function drawDamage() {
+  const el = $('dmg').firstElementChild, d = boat.damage;
+  el.style.width = `${Math.round(d * 100)}%`;
+  el.style.background = d > 0.66 ? '#ff4d4d' : d > 0.33 ? '#ffc23d' : 'var(--ok)';
+}
+const splinters = [], smoke = [];
+let splI = 0, smokeI = 0, smokeT = 0;
+for (let i = 0; i < 40; i++) {
+  const m = box(rand(0.2, 0.5), 0.15, rand(0.4, 0.9), i % 3 ? M.wood : M.white);
+  m.visible = false; scene.add(m);
+  splinters.push({ m, v: new THREE.Vector3(), life: 0 });
+}
+const smokeGeo = new THREE.IcosahedronGeometry(0.6, 0);
+for (let i = 0; i < 30; i++) {
+  const m = new THREE.Mesh(smokeGeo, new THREE.MeshBasicMaterial({ color: 0x3a3f45, transparent: true, opacity: 0.6, depthWrite: false }));
+  m.visible = false; scene.add(m);
+  smoke.push({ m, life: 0 });
+}
+function updateDamageFx(dt) {
+  for (const sp of splinters) {
+    if (sp.life <= 0) continue;
+    sp.life -= dt; sp.v.y -= 22 * dt;
+    sp.m.position.addScaledVector(sp.v, dt);
+    sp.m.rotation.x += dt * 9; sp.m.rotation.y += dt * 7;
+    if (sp.life <= 0 || sp.m.position.y < -1) { sp.life = 0; sp.m.visible = false; }
+  }
+  smokeT -= dt;
+  if (boat.damage > 0.3 && smokeT <= 0) {
+    smokeT = 0.25 - boat.damage * 0.15;
+    const s = smoke[smokeI++ % smoke.length], top = chimTop.getWorldPosition(new THREE.Vector3());
+    s.life = 2.2; s.m.visible = true; s.m.position.copy(top);
+  }
+  for (const s of smoke) {
+    if (s.life <= 0) continue;
+    s.life -= dt;
+    if (s.life <= 0) { s.m.visible = false; continue; }
+    const k = 1 - s.life / 2.2;
+    s.m.position.y += dt * 3; s.m.position.x += dt * 1.5;
+    s.m.scale.setScalar(1 + k * 3);
+    s.m.material.opacity = 0.6 * (1 - k);
+  }
+}
 const fwd = () => new THREE.Vector3(Math.sin(boat.h), 0, Math.cos(boat.h));
 
 // Yol gösteren ok
@@ -526,6 +645,8 @@ const sfx = {
   deliver() { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'triangle', 0.14, i * 0.09)); },
   win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.4, 'triangle', 0.16, i * 0.14)); },
   bump() { tone(70, 0.4, 'sine', 0.35); hiss(0.3, 0.2, 500); },
+  crash(p) { tone(60, 0.5, 'sine', 0.4); hiss(0.5, 0.35 * p + 0.1, 900); tone(140, 0.12, 'square', 0.1, 0.05); tone(95, 0.15, 'square', 0.1, 0.15); },
+  repair() { [440, 554, 659, 880].forEach((f, i) => tone(f, 0.2, 'square', 0.06, i * 0.08)); },
   nope() { tone(220, 0.15, 'square', 0.08); tone(180, 0.2, 'square', 0.08, 0.12); }
 };
 function toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.8; toast(muted ? 'Ses kapalı' : 'Ses açık'); }
@@ -545,8 +666,18 @@ function exitFull() {
 }
 
 // ---------- Oyun durumu ----------
-let state = 'menu', passengers = [], jumps = [], delivered = 0, total = 0, elapsed = 0, camMode = 0, outWarn = 0;
-const CAMS = [[22, 10], [38, 22], [13, 5]];
+let state = 'menu', passengers = [], jumps = [], delivered = 0, total = 0, elapsed = 0, view = 0, outWarn = 0;
+// D tuşuyla değişen görüş modları
+const VIEWS = [
+  { name: 'Arkadan', d: 22, h: 10 },
+  { name: 'Yakından', d: 13, h: 5 },
+  { name: 'Uzaktan', d: 38, h: 22 },
+  { name: 'Kaptan Köşkü', pos: [0, 4.9, -1.2], look: [0, 3.2, 20] },
+  { name: 'Kuş Bakışı', d: 6, h: 75 },
+  { name: 'Yandan', pos: [16, 5, 2], look: [0, 2, 1] },
+  { name: 'Önden', pos: [0, 6, 20], look: [0, 2.5, 0] }
+];
+function nextView() { view = (view + 1) % VIEWS.length; toast(`Görüş: ${VIEWS[view].name}`); }
 const loadBest = () => { try { return parseFloat(localStorage.getItem('kurtarmaGemisiRekor')) || 0; } catch (e) { return 0; } };
 const saveBest = v => { try { localStorage.setItem('kurtarmaGemisiRekor', String(v)); } catch (e) { /* yok say */ } };
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
@@ -561,7 +692,8 @@ function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity
 
 function newGame() {
   buildWorld();
-  Object.assign(boat, { x: 16, z: 30, h: 0, speed: 0, roll: 0 });
+  Object.assign(boat, { x: 16, z: 30, h: 0, speed: 0, roll: 0, dentCd: 0 });
+  repair(true);
   for (const p of passengers) ship.remove(p.mesh);
   passengers = []; jumps = []; delivered = 0; elapsed = 0;
   total = islands.reduce((n, i) => n + i.total, 0);
@@ -673,7 +805,7 @@ window.addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.code === 'KeyE' || e.code === 'Space') rescue();
   if (e.code === 'KeyH') sfx.horn();
-  if (e.code === 'KeyC') { camMode = (camMode + 1) % CAMS.length; }
+  if (e.code === 'KeyD' || e.code === 'KeyC') nextView();
 });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -683,6 +815,7 @@ $('againBtn').addEventListener('click', newGame);
 $('quit').addEventListener('click', toMenu);
 $('actBtn').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); rescue(); });
 $('hornBtn').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); sfx.horn(); });
+$('viewBtn').addEventListener('pointerdown', e => { e.preventDefault(); if (state === 'play') nextView(); });
 const stick = $('stick'), knob = $('knob');
 let stickId = null;
 function stickMove(e) {
@@ -700,20 +833,32 @@ stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickM
 // ---------- Gemi fiziği ----------
 const MAXF = 26, MAXR = -8;
 function collide() {
-  let hit = false;
+  let hit = false, hx = 0, hz = 0;
   const solids = islands.map(i => [i.x, i.z, i.r + 3.8]).concat([[0, 0, HARBOR_R + 3.8]]);
   for (const [x, z, r] of solids) {
     const dx = boat.x - x, dz = boat.z - z, d = Math.hypot(dx, dz);
-    if (d < r) { boat.x = x + dx / d * r; boat.z = z + dz / d * r; hit = true; }
+    if (d < r) { boat.x = x + dx / d * r; boat.z = z + dz / d * r; hit = true; hx = -dx / d; hz = -dz / d; }
   }
   // iskele
   const cx = Math.max(PIER.x0, Math.min(PIER.x1, boat.x)), cz = Math.max(PIER.z0, Math.min(PIER.z1, boat.z));
   const dx = boat.x - cx, dz = boat.z - cz, d = Math.hypot(dx, dz), R = 3.2;
   if (d < R) {
-    if (d > 0.001) { boat.x = cx + dx / d * R; boat.z = cz + dz / d * R; } else { boat.x = boat.x < 0 ? PIER.x0 - R : PIER.x1 + R; }
+    if (d > 0.001) { hx = -dx / d; hz = -dz / d; boat.x = cx + dx / d * R; boat.z = cz + dz / d * R; }
+    else { hx = boat.x < 0 ? 1 : -1; hz = 0; boat.x = boat.x < 0 ? PIER.x0 - R : PIER.x1 + R; }
     hit = true;
   }
-  if (hit) { if (Math.abs(boat.speed) > 6) { sfx.bump(); toast('Dikkat! Kayalara çarptın'); } boat.speed *= 0.3; }
+  if (hit) {
+    const sp = Math.abs(boat.speed);
+    if (sp > 6 && boat.dentCd <= 0) {
+      const power = Math.min(1.3, sp / MAXF * 1.5);
+      const c = Math.cos(boat.h), s = Math.sin(boat.h);
+      dent(hx * c - hz * s, hx * s + hz * c, power);
+      boat.dentCd = 0.6;
+      sfx.crash(power);
+      toast(boat.damage >= 1 ? 'Gemi çok hasarlı! Limana git, tamir et' : 'Çat! Gemi yamuldu');
+    } else if (sp > 3) sfx.bump();
+    boat.speed *= 0.3;
+  }
   const dist = Math.hypot(boat.x, boat.z);
   if (dist > WORLD_R) {
     boat.x *= WORLD_R / dist; boat.z *= WORLD_R / dist; boat.speed *= 0.5;
@@ -723,10 +868,10 @@ function collide() {
 function updateBoat(dt, t) {
   let thr = 0, steer = 0;
   if (state === 'play') {
-    if (keys.ArrowUp || keys.KeyW) thr += 1;
-    if (keys.ArrowDown || keys.KeyS) thr -= 1;
-    if (keys.ArrowLeft || keys.KeyA) steer -= 1;
-    if (keys.ArrowRight || keys.KeyD) steer += 1;
+    if (keys.ArrowUp) thr += 1;
+    if (keys.ArrowDown) thr -= 1;
+    if (keys.ArrowLeft) steer -= 1;
+    if (keys.ArrowRight) steer += 1;
     if (Math.abs(joy.y) > 0.15) thr += -joy.y;
     if (Math.abs(joy.x) > 0.15) steer += joy.x;
     thr = Math.max(-1, Math.min(1, thr)); steer = Math.max(-1, Math.min(1, steer));
@@ -734,7 +879,8 @@ function updateBoat(dt, t) {
   if (thr > 0) boat.speed += thr * 13 * dt;
   else if (thr < 0) boat.speed += thr * (boat.speed > 0 ? 22 : 8) * dt;
   boat.speed -= boat.speed * 0.45 * dt;
-  boat.speed = Math.max(MAXR, Math.min(MAXF, boat.speed));
+  boat.dentCd -= dt;
+  boat.speed = Math.max(MAXR, Math.min(MAXF * (1 - boat.damage * 0.45), boat.speed));
   const turnF = Math.max(0.3, Math.min(1, Math.abs(boat.speed) / 8)) * (boat.speed < -0.5 ? -1 : 1);
   boat.h -= steer * 1.35 * turnF * dt;
   boat.x += Math.sin(boat.h) * boat.speed * dt;
@@ -746,8 +892,9 @@ function updateBoat(dt, t) {
   const hr = waveH(boat.x + sx * 2.5, boat.z + sz * 2.5, t), hl = waveH(boat.x - sx * 2.5, boat.z - sz * 2.5, t);
   boat.roll += (steer * (boat.speed / MAXF) * 0.14 - boat.roll) * Math.min(1, dt * 3);
   ship.position.set(boat.x, (hb + hs + hr + hl) / 4 - 0.1, boat.z);
-  ship.rotation.set((hs - hb) / 11, boat.h, (hr - hl) / 5 + boat.roll);
+  ship.rotation.set((hs - hb) / 11, boat.h, (hr - hl) / 5 + boat.roll + boat.list);
   flag.rotation.y = -Math.PI / 2 + Math.sin(t * 6) * 0.25;
+  updateDamageFx(dt);
   // köpük
   foamT -= dt;
   if (Math.abs(boat.speed) > 3 && foamT <= 0) {
@@ -836,7 +983,7 @@ function loop(now) {
   if (state === 'play') {
     elapsed += dt; outWarn -= dt;
     const isl = zoneIsland(), inDrop = Math.hypot(boat.x - DROP.x, boat.z - DROP.z) < DROP.r;
-    if (inDrop) unload();
+    if (inDrop) { unload(); if (boat.damage > 0) repair(false); }
     const pr = $('prompt');
     if (isl && isl.people.length) {
       const full = passengers.length >= CAP;
@@ -864,16 +1011,22 @@ function loop(now) {
   // kamera
   const f = fwd();
   if (state === 'play') {
-    const [dist, hgt] = CAMS[camMode];
-    const want = new THREE.Vector3(boat.x - f.x * dist, hgt + ship.position.y, boat.z - f.z * dist);
-    camPos.lerp(want, 1 - Math.exp(-dt * 3.5));
-    camLook.lerp(new THREE.Vector3(boat.x + f.x * 8, 2.5, boat.z + f.z * 8), 1 - Math.exp(-dt * 6));
+    const v = VIEWS[view];
+    if (v.pos) {
+      ship.updateMatrixWorld();
+      camPos.lerp(ship.localToWorld(new THREE.Vector3(...v.pos)), 1 - Math.exp(-dt * 12));
+      camLook.lerp(ship.localToWorld(new THREE.Vector3(...v.look)), 1 - Math.exp(-dt * 12));
+    } else {
+      const want = new THREE.Vector3(boat.x - f.x * v.d, v.h + ship.position.y, boat.z - f.z * v.d);
+      camPos.lerp(want, 1 - Math.exp(-dt * 3.5));
+      camLook.lerp(new THREE.Vector3(boat.x + f.x * 8, 2.5, boat.z + f.z * 8), 1 - Math.exp(-dt * 6));
+    }
   } else {
     const a = t * 0.12;
     camPos.set(boat.x + Math.cos(a) * 34, 14, boat.z + Math.sin(a) * 34);
     camLook.set(boat.x, 3, boat.z);
   }
-  for (const isl of islands) {   // kamera adanın içine girmesin
+  if (!(state === 'play' && VIEWS[view].pos)) for (const isl of islands) {   // kamera adanın içine girmesin
     if (Math.hypot(camPos.x - isl.x, camPos.z - isl.z) < isl.r + 3) camPos.y = Math.max(camPos.y, 14);
   }
   camera.position.copy(camPos);
