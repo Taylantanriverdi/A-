@@ -1,0 +1,889 @@
+<title>Kurtarma Gemisi</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Tam ekran 3B deniz; üstünde can simidi renklerinde HUD ve ekran kartları */
+:root {
+  --bg: #0a2234;
+  --panel: rgba(8, 30, 46, 0.88);
+  --fg: #eefbff;
+  --muted: #9cc4d4;
+  --buoy: #ff6a2b;
+  --buoy-dark: #a8360c;
+  --sea: #3cc6e4;
+  --sand: #ffd98a;
+  --ok: #6be38f;
+  --line: rgba(255, 255, 255, 0.16);
+  --font-display: 'Lilita One', 'Arial Black', Impact, system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+#game { position: fixed; inset: 0; }
+#game canvas { display: block; width: 100%; height: 100%; }
+
+.screen {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(4, 18, 30, 0.35); z-index: 10; box-sizing: border-box; overflow-y: auto;
+}
+.card {
+  background: var(--panel); border: 2px solid var(--line); border-radius: 16px;
+  padding: 22px 22px; max-width: 520px; width: 100%; box-sizing: border-box; margin: auto;
+  display: flex; flex-direction: column; gap: 14px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+}
+.buoy { height: 10px; border-radius: 5px; background: repeating-linear-gradient(90deg, var(--buoy) 0 26px, #fff 26px 52px); }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0; line-height: 1.05; text-wrap: balance; letter-spacing: 0.01em; }
+h1 { font-size: clamp(36px, 10vw, 60px); color: var(--buoy); text-shadow: 0 4px 0 var(--buoy-dark); }
+h2 { font-size: clamp(34px, 10vw, 64px); color: var(--ok); text-shadow: 0 5px 0 #1d6b3a; }
+p { margin: 0; line-height: 1.5; font-size: 16px; }
+.muted { color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; font-size: 15px; align-items: center; }
+kbd {
+  font-family: var(--font-display); font-size: 14px; background: #133a52; border: 1px solid #2d5f7c;
+  border-bottom-width: 3px; border-radius: 6px; padding: 2px 8px; color: var(--fg); white-space: nowrap; justify-self: start;
+}
+button.big {
+  font-family: var(--font-display); font-size: 26px; padding: 12px 20px; border: 0; border-radius: 12px;
+  background: var(--buoy); color: #fff; cursor: pointer; box-shadow: 0 5px 0 var(--buoy-dark); letter-spacing: 0.04em;
+}
+button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--buoy-dark); }
+button:focus-visible { outline: 3px solid var(--sand); outline-offset: 3px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat { background: rgba(255,255,255,.06); border-radius: 10px; padding: 10px; }
+.stat b { display: block; font-family: var(--font-display); font-size: 30px; font-weight: 400; color: var(--sand); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; letter-spacing: .08em; color: var(--muted); font-weight: 800; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#info {
+  position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  display: grid; grid-template-columns: auto auto; gap: 6px 12px; align-items: center; font-size: 15px;
+}
+#info .lbl { font-size: 11px; font-weight: 900; letter-spacing: .1em; color: var(--muted); }
+#info b { font-family: var(--font-display); font-weight: 400; font-size: 20px; font-variant-numeric: tabular-nums; }
+#seats { display: flex; gap: 4px; }
+#seats i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--buoy); box-sizing: border-box; }
+#seats i.on { background: var(--buoy); }
+#quit {
+  position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px));
+  pointer-events: auto; font-family: var(--font-display); font-size: 16px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer;
+}
+#toast {
+  position: absolute; top: calc(90px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%);
+  font-family: var(--font-display); font-size: clamp(20px, 5vw, 28px); color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.45);
+  text-align: center; max-width: calc(100vw - 32px); opacity: 0; transition: opacity .4s;
+}
+#prompt {
+  position: absolute; bottom: calc(28px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  background: var(--buoy); color: #fff; font-family: var(--font-display); font-size: 20px; padding: 10px 18px;
+  border-radius: 12px; box-shadow: 0 4px 0 var(--buoy-dark); white-space: nowrap; max-width: calc(100vw - 32px);
+}
+#prompt.full { background: #2d5f7c; box-shadow: 0 4px 0 #173a50; }
+#minimap {
+  position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  width: 170px; height: 170px; border-radius: 50%; border: 3px solid rgba(255,255,255,.5); background: rgba(8,40,62,.8);
+}
+
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#stick {
+  position: absolute; left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,.1); border: 2px solid var(--line);
+  pointer-events: auto; touch-action: none;
+}
+#knob { position: absolute; left: 39px; top: 39px; width: 52px; height: 52px; border-radius: 50%; background: rgba(255,106,43,.8); }
+#actBtn, #hornBtn {
+  position: absolute; border-radius: 50%; border: 0; font-family: var(--font-display); pointer-events: auto; touch-action: none;
+}
+#actBtn {
+  right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+  width: 88px; height: 88px; background: var(--buoy); color: #fff; font-size: 30px; box-shadow: 0 5px 0 var(--buoy-dark);
+}
+#hornBtn {
+  right: calc(124px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+  width: 62px; height: 62px; background: var(--sand); color: #4a3200; font-size: 22px;
+}
+@media (pointer: fine) { #touch { display: none; } }
+@media (pointer: coarse) {
+  #minimap { bottom: auto; top: calc(62px + env(safe-area-inset-top, 0px)); width: 116px; height: 116px; }
+  #prompt { bottom: calc(170px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+
+<div id="game"></div>
+
+<div id="hud" hidden>
+  <div id="info">
+    <span class="lbl">GEMİDE</span><span id="seats"></span>
+    <span class="lbl">KURTARILAN</span><b id="saved">0 / 0</b>
+    <span class="lbl">HIZ</span><b id="spd">0 knot</b>
+    <span class="lbl">SÜRE</span><b id="time">0:00</b>
+  </div>
+  <button id="quit" type="button" aria-label="Oyundan çık">Ç · ÇIK</button>
+  <div id="toast"></div>
+  <div id="prompt" hidden></div>
+  <canvas id="minimap" width="340" height="340" aria-label="Harita"></canvas>
+</div>
+
+<div id="touch" hidden>
+  <div id="stick"><div id="knob"></div></div>
+  <button id="actBtn" type="button" aria-label="İnsanları gemiye al">E</button>
+  <button id="hornBtn" type="button" aria-label="Korna çal">H</button>
+</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <div class="buoy"></div>
+    <h1>KURTARMA GEMİSİ</h1>
+    <p>Denizdeki adalarda mahsur kalan insanlar var! Kaptan sensin. Gemine bin, adalara git, herkesi gemiye al ve
+      <b style="color:var(--sand)">deniz fenerinin yanındaki limana</b> geri getir.</p>
+    <div class="keys">
+      <kbd>← ↑ → ↓</kbd><span>Gemiyi sür (W A S D de olur)</span>
+      <kbd>E</kbd><span>Adanın yanındayken insanları gemiye al</span>
+      <kbd>H</kbd><span>Korna çal</span>
+      <kbd>C</kbd><span>Kamerayı değiştir</span>
+      <kbd>F</kbd><span>Tam ekran aç / kapat</span>
+      <kbd>M</kbd><span>Sesi aç / kapat</span>
+      <kbd>Ç</kbd><span>Oyundan çık</span>
+    </div>
+    <p class="muted" style="font-size:14px">Gemine en fazla <b style="color:var(--fg)">6 kişi</b> sığar. Gemi dolunca limana dön.
+      Turuncu ok seni hep doğru yere götürür.</p>
+    <button class="big" id="startBtn" type="button">DENİZE AÇIL</button>
+    <p class="muted" style="font-size:13px" id="bestLine">Enter tuşuna da basabilirsin</p>
+    <div class="buoy"></div>
+  </div>
+</div>
+
+<div class="screen" id="end" hidden>
+  <div class="card">
+    <div class="buoy"></div>
+    <h2>HERKES KURTARILDI!</h2>
+    <p id="endText"></p>
+    <div class="stats">
+      <div class="stat"><span>SÜREN</span><b id="endTime">0:00</b></div>
+      <div class="stat"><span>EN İYİ SÜRE</span><b id="endBest">0:00</b></div>
+    </div>
+    <button class="big" id="againBtn" type="button">YENİ ADALAR</button>
+    <p class="muted" style="font-size:13px">Enter: yeni oyun · Ç: menü</p>
+    <div class="buoy"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const TAU = Math.PI * 2;
+
+// ---------- Ayarlar ----------
+const CAP = 6;              // gemi kapasitesi
+const ISLANDS = 8;          // ada sayısı
+const WORLD_R = 420;        // denizin sınırı
+const HARBOR_R = 14;        // liman adasının yarıçapı
+const PIER = { x0: -3, x1: 3, z0: 10, z1: 36 };   // iskele (dikdörtgen)
+const DROP = { x: 0, z: 24, r: 22 };              // indirme alanı
+
+// ---------- Sahne ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+$('game').appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const SKY = 0x9fd8f2;
+scene.background = new THREE.Color(SKY);
+scene.fog = new THREE.Fog(SKY, 110, 330);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.5, 1400);
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+scene.add(new THREE.HemisphereLight(0xeef9ff, 0x2a6f8f, 0.95));
+const sunLight = new THREE.DirectionalLight(0xfff1d6, 1.0);
+sunLight.position.set(120, 160, 60); scene.add(sunLight);
+const sunDir = sunLight.position.clone().normalize();
+const sunDisc = new THREE.Mesh(new THREE.SphereGeometry(26, 16, 12), new THREE.MeshBasicMaterial({ color: 0xfff6c8, fog: false }));
+scene.add(sunDisc);
+
+const mat = (color, extra) => new THREE.MeshPhongMaterial(Object.assign({ color, flatShading: true, shininess: 6, specular: 0x222222 }, extra || {}));
+const M = {
+  sand: mat(0xf2d38a), sand2: mat(0xe4bd6e), grass: mat(0x5cbf4a), grass2: mat(0x3f9a3a),
+  trunk: mat(0x8a5a32), leaf: mat(0x2f9e44), rock: mat(0x8d969c), coco: mat(0x5a3a1c),
+  white: mat(0xf6f8fa), red: mat(0xd8342c), blue: mat(0x1f5f9e), navy: mat(0x16324a), wood: mat(0xc28a52),
+  orange: mat(0xff6a2b), black: mat(0x222831), yellow: new THREE.MeshBasicMaterial({ color: 0xfff1a0 }),
+  skin: [mat(0xf1c7a0), mat(0xd9a074), mat(0xa66d45), mat(0x7a4a2b)],
+  shirts: [0xe63946, 0xffb703, 0x8338ec, 0x2a9d8f, 0xfb5607, 0x3a86ff, 0xff006e, 0x06d6a0].map(c => mat(c)),
+  pants: mat(0x1d3557), hair: mat(0x2b1d14),
+  cloud: new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x9aa7b4, fog: false, flatShading: true, shininess: 0, specular: 0 }),
+  foam: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }),
+  arrow: new THREE.MeshLambertMaterial({ color: 0xff6a2b, emissive: 0x7a2200 })
+};
+const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
+
+// ---------- Dalgalı deniz ----------
+function waveH(x, z, t) {
+  return Math.sin(x * 0.08 + t * 1.2) * 0.45 + Math.sin(z * 0.06 - t * 0.9) * 0.45 + Math.sin((x + z) * 0.13 + t * 1.7) * 0.22;
+}
+const OCEAN = 760, SEG = 95, CELL = OCEAN / SEG;
+const oceanGeo = new THREE.PlaneGeometry(OCEAN, OCEAN, SEG, SEG);
+oceanGeo.rotateX(-Math.PI / 2);
+const oPos = oceanGeo.attributes.position;
+const baseX = new Float32Array(oPos.count), baseZ = new Float32Array(oPos.count);
+for (let i = 0; i < oPos.count; i++) { baseX[i] = oPos.getX(i); baseZ[i] = oPos.getZ(i); }
+const ocean = new THREE.Mesh(oceanGeo, new THREE.MeshPhongMaterial({ color: 0x167aae, specular: 0x4f97b8, shininess: 35, flatShading: true }));
+scene.add(ocean);
+function updateOcean(cx, cz, t) {
+  const ox = Math.round(cx / CELL) * CELL, oz = Math.round(cz / CELL) * CELL;
+  ocean.position.set(ox, 0, oz);
+  for (let i = 0; i < oPos.count; i++) oPos.setY(i, waveH(baseX[i] + ox, baseZ[i] + oz, t));
+  oPos.needsUpdate = true;
+}
+
+// ---------- Bulutlar ----------
+for (let i = 0; i < 22; i++) {
+  const c = new THREE.Group();
+  const n = 3 + Math.floor(Math.random() * 3);
+  for (let k = 0; k < n; k++) {
+    const s = new THREE.Mesh(new THREE.IcosahedronGeometry(rand(6, 11), 0), M.cloud);
+    s.position.set(k * 8 - n * 4 + rand(-2, 2), rand(-2, 3), rand(-4, 4));
+    c.add(s);
+  }
+  const a = rand(0, TAU), d = rand(60, 480);
+  c.position.set(Math.cos(a) * d, rand(70, 110), Math.sin(a) * d);
+  c.rotation.y = rand(0, TAU);
+  scene.add(c);
+}
+
+// ---------- Gemi ----------
+function hullShape(s) {
+  const sh = new THREE.Shape();
+  sh.moveTo(-2.6 * s, 5 * s); sh.lineTo(2.6 * s, 5 * s); sh.lineTo(2.8 * s, -1.5 * s);
+  sh.lineTo(0, -7.2 * s); sh.lineTo(-2.8 * s, -1.5 * s); sh.closePath();
+  return sh;
+}
+function slab(s, depth, y, m) {
+  const g = new THREE.ExtrudeGeometry(hullShape(s), { depth, bevelEnabled: false });
+  g.rotateX(-Math.PI / 2); g.translate(0, y, 0);
+  return new THREE.Mesh(g, m);
+}
+const ship = new THREE.Group();
+ship.rotation.order = 'YXZ';
+ship.add(slab(1, 2.4, -1.4, M.white));
+ship.add(slab(1.02, 0.55, -0.6, M.red));
+ship.add(slab(0.93, 0.25, 1.0, M.wood));
+const cabin = box(3.6, 2.6, 3.4, M.white); cabin.position.set(0, 2.55, -2.7); ship.add(cabin);
+const windows = box(3.64, 0.7, 3.44, M.navy); windows.position.set(0, 3.05, -2.7); ship.add(windows);
+const roof = box(4.0, 0.3, 3.8, M.blue); roof.position.set(0, 4.0, -2.7); ship.add(roof);
+const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.6, 10), M.orange); chimney.position.set(0, 4.9, -3.7); ship.add(chimney);
+const chimTop = new THREE.Mesh(new THREE.CylinderGeometry(0.47, 0.47, 0.3, 10), M.black); chimTop.position.set(0, 5.75, -3.7); ship.add(chimTop);
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4, 6), M.black); mast.position.set(0, 6.1, -1.6); ship.add(mast);
+const flagGeo = new THREE.PlaneGeometry(1.6, 1); flagGeo.translate(-0.8, 0, 0);
+const flag = new THREE.Mesh(flagGeo, new THREE.MeshLambertMaterial({ color: 0xd8342c, side: THREE.DoubleSide }));
+flag.position.set(0, 7.5, -1.6); flag.rotation.y = -Math.PI / 2; ship.add(flag);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.18, 8, 16), M.orange); ring.position.set(0, 2.3, -0.98); ship.add(ring);
+const ringStripe = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.19, 8, 4, 0.5), M.white);
+ringStripe.position.copy(ring.position); ship.add(ringStripe);
+scene.add(ship);
+const SLOTS = [[-1.3, 0], [1.3, 0], [-1.2, 2], [1.2, 2], [-0.6, 4], [0.6, 4]].map(([x, z]) => new THREE.Vector3(x, 1.25, z));
+
+const boat = { x: 16, z: 30, h: 0, speed: 0, roll: 0 };
+const fwd = () => new THREE.Vector3(Math.sin(boat.h), 0, Math.cos(boat.h));
+
+// Yol gösteren ok
+const arrowGeo = new THREE.ConeGeometry(1.1, 3, 8); arrowGeo.rotateX(Math.PI / 2);
+const arrow = new THREE.Mesh(arrowGeo, M.arrow); scene.add(arrow);
+
+// Köpük izi
+const foamGeo = new THREE.CircleGeometry(0.6, 8); foamGeo.rotateX(-Math.PI / 2);
+const foam = [];
+for (let i = 0; i < 70; i++) {
+  const f = new THREE.Mesh(foamGeo, M.foam.clone()); f.visible = false; scene.add(f);
+  foam.push({ m: f, life: 0 });
+}
+let foamI = 0, foamT = 0;
+
+// ---------- İnsan ----------
+function makePerson() {
+  const p = new THREE.Group();
+  const legs = box(0.55, 0.9, 0.35, M.pants); legs.position.y = 0.45; p.add(legs);
+  const body = box(0.85, 1.0, 0.5, M.shirts[Math.floor(Math.random() * M.shirts.length)]); body.position.y = 1.4; p.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 10, 8), M.skin[Math.floor(Math.random() * M.skin.length)]);
+  head.position.y = 2.2; p.add(head);
+  const hair = box(0.66, 0.22, 0.66, M.hair); hair.position.y = 2.5; p.add(hair);
+  const arm = side => {
+    const piv = new THREE.Group(); piv.position.set(side * 0.55, 1.85, 0);
+    const a = box(0.22, 0.9, 0.22, body.material); a.position.y = -0.45; piv.add(a); p.add(piv);
+    return piv;
+  };
+  p.userData = { armL: arm(-1), armR: arm(1), phase: rand(0, TAU), baseY: 0, mode: 'help' };
+  return p;
+}
+function animatePerson(p, t, excited) {
+  const u = p.userData;
+  if (u.mode === 'help' || u.mode === 'cheer') {
+    const w = Math.sin(t * (excited ? 12 : 7) + u.phase) * 0.45;
+    u.armL.rotation.z = -(2.55 + w); u.armR.rotation.z = 2.55 - w;
+    p.position.y = u.baseY + (excited ? Math.abs(Math.sin(t * 7 + u.phase)) * 0.7 : 0);
+  } else {
+    u.armL.rotation.z = -0.15; u.armR.rotation.z = 0.15;
+  }
+}
+
+// ---------- Yazılı tabelalar ----------
+function signTexture(text, bg) {
+  const c = document.createElement('canvas'); c.width = 320; c.height = 120;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.beginPath();
+  if (g.roundRect) g.roundRect(6, 6, 308, 100, 24); else g.rect(6, 6, 308, 100);
+  g.fill();
+  g.beginPath(); g.moveTo(145, 104); g.lineTo(175, 104); g.lineTo(160, 118); g.fill();
+  g.fillStyle = '#fff'; g.font = "56px 'Lilita One', 'Arial Black', sans-serif";
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 160, 58);
+  return new THREE.CanvasTexture(c);
+}
+function makeSign(text, bg) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: signTexture(text, bg), depthTest: false, fog: false }));
+  s.scale.set(13, 4.9, 1); s.renderOrder = 10;
+  return s;
+}
+function setSign(s, text, bg) { s.material.map.dispose(); s.material.map = signTexture(text, bg); s.material.needsUpdate = true; }
+
+// ---------- Dünya: adalar ve liman ----------
+let world = null, islands = [], pierSpots = [], pierPeople = [];
+function palm() {
+  const p = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.38, 6, 6), M.trunk);
+  trunk.position.y = 3; p.add(trunk);
+  const top = new THREE.Group(); top.position.y = 6; p.add(top);
+  for (let k = 0; k < 6; k++) {
+    const piv = new THREE.Group(); piv.rotation.order = 'YXZ';
+    piv.rotation.set(0.5, k * TAU / 6, 0);
+    const leaf = box(0.9, 0.12, 3.6, M.leaf); leaf.position.z = 1.8; piv.add(leaf); top.add(piv);
+  }
+  for (let k = 0; k < 3; k++) {
+    const c = new THREE.Mesh(new THREE.SphereGeometry(0.28, 6, 5), M.coco);
+    c.position.set(Math.cos(k * 2.1) * 0.4, -0.3, Math.sin(k * 2.1) * 0.4); top.add(c);
+  }
+  p.rotation.z = rand(-0.18, 0.18); p.rotation.y = rand(0, TAU);
+  return p;
+}
+function wobbly(geo, seed) {
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), a = Math.atan2(z, x);
+    const f = 1 + 0.07 * Math.sin(3 * a + seed) + 0.05 * Math.sin(5 * a + seed * 2);
+    pos.setX(i, x * f); pos.setZ(i, z * f);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+function makeIsland(x, z, r, count) {
+  const g = new THREE.Group(); g.position.set(x, 0, z);
+  const seed = rand(0, TAU);
+  const sand = new THREE.Mesh(wobbly(new THREE.CylinderGeometry(r, r * 1.3, 6, 16), seed), M.sand); sand.position.y = -1; g.add(sand);
+  const grass = new THREE.Mesh(wobbly(new THREE.CylinderGeometry(r * 0.62, r * 0.7, 1.2, 12), seed), M.grass); grass.position.y = 2.5; g.add(grass);
+  if (r > 12) {
+    const hill = new THREE.Mesh(new THREE.ConeGeometry(r * 0.42, r * 0.55, 8), M.grass2);
+    hill.position.set(rand(-2, 2), 3.1 + r * 0.27, rand(-2, 2)); g.add(hill);
+  }
+  const palms = 1 + Math.floor(r / 6);
+  for (let i = 0; i < palms; i++) {
+    const p = palm(); const a = rand(0, TAU), d = rand(0.15, 0.5) * r;
+    p.position.set(Math.cos(a) * d, 3.1, Math.sin(a) * d); g.add(p);
+  }
+  for (let i = 0; i < 3; i++) {
+    const rk = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.8, 1.8), 0), M.rock);
+    const a = rand(0, TAU); rk.position.set(Math.cos(a) * r * 0.97, 1.6, Math.sin(a) * r * 0.97);
+    rk.rotation.set(rand(0, 3), rand(0, 3), 0); g.add(rk);
+  }
+  // Yardım bekleyen insanlar
+  const people = [];
+  const a0 = rand(0, TAU);
+  for (let i = 0; i < count; i++) {
+    const p = makePerson();
+    const a = a0 + (i - (count - 1) / 2) * 0.35;
+    p.position.set(Math.cos(a) * r * 0.82, 2, Math.sin(a) * r * 0.82);
+    p.userData.baseY = 2;
+    p.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+    p.scale.setScalar(1.25);
+    g.add(p); people.push(p);
+  }
+  const sign = makeSign(`İMDAT! ${count}`, '#e63946'); sign.position.y = 15; g.add(sign);
+  world.add(g);
+  return { x, z, r, g, people, sign, total: count };
+}
+function makeHarbor() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(wobbly(new THREE.CylinderGeometry(HARBOR_R, HARBOR_R * 1.3, 6, 16), 1.3), M.sand2); base.position.y = -1; g.add(base);
+  const top = new THREE.Mesh(wobbly(new THREE.CylinderGeometry(HARBOR_R * 0.7, HARBOR_R * 0.78, 1.2, 12), 1.3), M.grass); top.position.y = 2.5; g.add(top);
+  // Deniz feneri
+  const lh = new THREE.Group(); lh.position.set(-4, 3.1, -3); g.add(lh);
+  for (let i = 0; i < 5; i++) {
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(1.9 - i * 0.22, 2.1 - i * 0.22, 2.6, 12), i % 2 ? M.white : M.red);
+    s.position.y = 1.3 + i * 2.6; lh.add(s);
+  }
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 1.6, 10), M.yellow); lamp.position.y = 14.2; lh.add(lamp);
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.8, 10), M.red); cap.position.y = 15.9; lh.add(cap);
+  const beam = new THREE.Group(); beam.position.y = 14.2; lh.add(beam);
+  const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff6b0, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide });
+  const bg = new THREE.ConeGeometry(2.2, 26, 12, 1, true); bg.rotateZ(Math.PI / 2); bg.translate(14, 0, 0);
+  beam.add(new THREE.Mesh(bg, beamMat));
+  g.userData.beam = beam;
+  // Ev
+  const house = box(5, 3.2, 4, M.white); house.position.set(5, 4.7, -4); g.add(house);
+  const hr = new THREE.Mesh(new THREE.ConeGeometry(4, 2.4, 4), M.red); hr.position.set(5, 7.5, -4); hr.rotation.y = Math.PI / 4; g.add(hr);
+  // İskele
+  const deck = box(PIER.x1 - PIER.x0, 0.5, PIER.z1 - PIER.z0, M.wood);
+  deck.position.set(0, 1.6, (PIER.z0 + PIER.z1) / 2); g.add(deck);
+  for (let z = PIER.z0 + 2; z <= PIER.z1; z += 4) for (const x of [PIER.x0 + 0.3, PIER.x1 - 0.3]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 5, 6), M.trunk); post.position.set(x, -0.5, z); g.add(post);
+  }
+  const sign = makeSign('LİMAN', '#1f5f9e'); sign.position.set(0, 21, 0); g.add(sign);
+  world.add(g);
+  pierSpots = [];
+  for (let i = 0; i < 12; i++) for (const x of [-1.5, 1.5]) pierSpots.push(new THREE.Vector3(x, 1.85, PIER.z0 + 3 + i * 1.9));
+  return g;
+}
+let harbor = null;
+function buildWorld() {
+  if (world) scene.remove(world);
+  world = new THREE.Group(); scene.add(world);
+  harbor = makeHarbor();
+  islands = []; pierPeople = [];
+  let tries = 0;
+  while (islands.length < ISLANDS && tries < 3000) {
+    tries++;
+    const a = rand(0, TAU), d = rand(85, 340), r = rand(9, 18);
+    const x = Math.cos(a) * d, z = Math.sin(a) * d;
+    if (islands.every(o => Math.hypot(o.x - x, o.z - z) > o.r + r + 40)) islands.push({ x, z, r });
+  }
+  islands = islands.map(o => makeIsland(o.x, o.z, o.r, 1 + Math.floor(Math.random() * 3)));
+}
+
+// ---------- Ses ----------
+let actx = null, master = null, muted = false, engine = null;
+function unlockAudio() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
+  master = actx.createGain(); master.gain.value = muted ? 0 : 0.8; master.connect(actx.destination);
+  const buf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+  const ch = buf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+  actx.noise = buf;
+  // dalga sesi
+  const n = actx.createBufferSource(); n.buffer = buf; n.loop = true;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+  const wg = actx.createGain(); wg.gain.value = 0.07;
+  const lfo = actx.createOscillator(); lfo.frequency.value = 0.15;
+  const lg = actx.createGain(); lg.gain.value = 0.05; lfo.connect(lg); lg.connect(wg.gain);
+  n.connect(lp); lp.connect(wg); wg.connect(master); n.start(); lfo.start();
+  // motor sesi
+  const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 40;
+  const ef = actx.createBiquadFilter(); ef.type = 'lowpass'; ef.frequency.value = 240;
+  const eg = actx.createGain(); eg.gain.value = 0;
+  o.connect(ef); ef.connect(eg); eg.connect(master); o.start();
+  engine = { o, eg };
+}
+window.addEventListener('pointerdown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+function tone(f, d, type, v, delay) {
+  if (!actx) return;
+  const t = actx.currentTime + (delay || 0), o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'triangle'; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v || 0.15, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.05);
+}
+function hiss(d, v, freq, delay) {
+  if (!actx) return;
+  const t = actx.currentTime + (delay || 0), s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = actx.noise; f.type = 'lowpass'; f.frequency.value = freq || 1200;
+  g.gain.setValueAtTime(v || 0.25, t); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + d);
+}
+const sfx = {
+  horn() {
+    if (!actx) return;
+    const t = actx.currentTime, g = actx.createGain(), f = actx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 750;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.2, t + 0.08);
+    g.gain.setValueAtTime(0.2, t + 0.9); g.gain.linearRampToValueAtTime(0.0001, t + 1.25);
+    f.connect(g); g.connect(master);
+    for (const fr of [98, 147, 196]) { const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = fr; o.connect(f); o.start(t); o.stop(t + 1.3); }
+  },
+  jump(i) { tone(520 + i * 90, 0.18, 'square', 0.06, 0); hiss(0.3, 0.12, 1500, 0.5); },
+  board() { [523, 659, 784].forEach((f, i) => tone(f, 0.25, 'triangle', 0.14, i * 0.1)); },
+  deliver() { [392, 523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'triangle', 0.14, i * 0.09)); },
+  win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, 0.4, 'triangle', 0.16, i * 0.14)); },
+  bump() { tone(70, 0.4, 'sine', 0.35); hiss(0.3, 0.2, 500); },
+  nope() { tone(220, 0.15, 'square', 0.08); tone(180, 0.2, 'square', 0.08, 0.12); }
+};
+function toggleMute() { muted = !muted; if (master) master.gain.value = muted ? 0 : 0.8; toast(muted ? 'Ses kapalı' : 'Ses açık'); }
+
+// ---------- Tam ekran ----------
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function enterFull() {
+  if (fsEl()) return;
+  const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return;
+  try { const r = req.call(el, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); } catch (e) { /* desteklenmiyor */ }
+}
+function exitFull() {
+  if (!fsEl()) return;
+  const ex = document.exitFullscreen || document.webkitExitFullscreen;
+  try { const r = ex.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) { /* yok say */ }
+}
+
+// ---------- Oyun durumu ----------
+let state = 'menu', passengers = [], jumps = [], delivered = 0, total = 0, elapsed = 0, camMode = 0, outWarn = 0;
+const CAMS = [[22, 10], [38, 22], [13, 5]];
+const loadBest = () => { try { return parseFloat(localStorage.getItem('kurtarmaGemisiRekor')) || 0; } catch (e) { return 0; } };
+const saveBest = v => { try { localStorage.setItem('kurtarmaGemisiRekor', String(v)); } catch (e) { /* yok say */ } };
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+function show(id) {
+  for (const s of ['menu', 'end']) $(s).hidden = s !== id;
+  $('hud').hidden = id !== null;
+  $('touch').hidden = id !== null;
+}
+let toastTimer = 0;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; toastTimer = 2.6; }
+
+function newGame() {
+  buildWorld();
+  Object.assign(boat, { x: 16, z: 30, h: 0, speed: 0, roll: 0 });
+  for (const p of passengers) ship.remove(p.mesh);
+  passengers = []; jumps = []; delivered = 0; elapsed = 0;
+  total = islands.reduce((n, i) => n + i.total, 0);
+  state = 'play'; show(null);
+  enterFull(); unlockAudio();
+  toast(`${islands.length} adada ${total} kişi yardım bekliyor!`);
+  drawHud();
+}
+function toMenu() {
+  state = 'menu'; show('menu'); exitFull();
+  const b = loadBest(); $('bestLine').textContent = b ? `En iyi süren: ${fmt(b)} · Enter tuşuna da basabilirsin` : 'Enter tuşuna da basabilirsin';
+}
+function winGame() {
+  state = 'end';
+  const best = loadBest(), isBest = !best || elapsed < best;
+  if (isBest) saveBest(elapsed);
+  $('endTime').textContent = fmt(elapsed);
+  $('endBest').textContent = fmt(isBest ? elapsed : best);
+  $('endText').textContent = isBest
+    ? `${total} kişinin hepsi limana ulaştı. Bu senin en hızlı kurtarman, harika kaptanlık!`
+    : `${total} kişinin hepsi limana ulaştı. Rekorunu kırmak için yeni adalarda tekrar dene!`;
+  show('end'); sfx.win();
+}
+
+function drawHud() {
+  const seats = $('seats');
+  if (seats.children.length !== CAP) seats.innerHTML = '<i></i>'.repeat(CAP);
+  [...seats.children].forEach((el, i) => el.classList.toggle('on', i < passengers.length));
+  $('saved').textContent = `${delivered} / ${total}`;
+}
+
+// ---------- Kurtarma ----------
+function zoneIsland() {
+  for (const isl of islands) if (Math.hypot(boat.x - isl.x, boat.z - isl.z) < isl.r + 15) return isl;
+  return null;
+}
+function rescue() {
+  if (state !== 'play') return;
+  const isl = zoneIsland();
+  if (!isl) { toast('Önce bir adanın yanına git'); sfx.nope(); return; }
+  if (!isl.people.length) { toast('Bu adada kimse kalmadı'); sfx.nope(); return; }
+  const room = CAP - passengers.length;
+  if (room <= 0) { toast('Gemi dolu! Limana dön'); sfx.nope(); return; }
+  const n = Math.min(room, isl.people.length);
+  for (let k = 0; k < n; k++) {
+    const mesh = isl.people.pop();
+    const slot = SLOTS[passengers.length];
+    const pas = { mesh, slot };
+    passengers.push(pas);
+    world.attach(mesh);
+    mesh.userData.mode = 'jump';
+    jumps.push({
+      mesh, delay: k * 0.3, t: 0, dur: 0.8, from: mesh.position.clone(), s0: mesh.scale.x, s1: 0.8, idx: k,
+      to: () => ship.localToWorld(slot.clone()),
+      done() { ship.add(mesh); mesh.position.copy(slot); mesh.rotation.set(0, 0, 0); mesh.scale.setScalar(0.8); mesh.userData.mode = 'ride'; }
+    });
+  }
+  const left = isl.people.length;
+  if (left) setSign(isl.sign, `İMDAT! ${left}`, '#e63946');
+  else setSign(isl.sign, 'KURTARILDI', '#2a9d58');
+  sfx.board();
+  toast(passengers.length >= CAP ? 'Gemi doldu! Limana götür' : `${n} kişi gemiye bindi!`);
+  drawHud();
+}
+function unload() {
+  if (!passengers.length || jumps.length) return;
+  const list = passengers; passengers = [];
+  list.forEach((pas, k) => {
+    const mesh = pas.mesh, spot = pierSpots[pierPeople.length % pierSpots.length];
+    pierPeople.push(mesh);
+    world.attach(mesh); mesh.userData.mode = 'jump';
+    jumps.push({
+      mesh, delay: k * 0.25, t: 0, dur: 0.9, from: mesh.position.clone(), s0: mesh.scale.x, s1: 1.1, idx: k,
+      to: () => spot.clone(),
+      done() { mesh.position.copy(spot); mesh.rotation.set(0, Math.PI, 0); mesh.userData.baseY = spot.y; mesh.userData.mode = 'cheer'; }
+    });
+  });
+  delivered += list.length;
+  sfx.deliver();
+  toast(delivered >= total ? 'Son yolcular da limanda!' : `${list.length} kişi limana ulaştı!`);
+  drawHud();
+}
+function updateJumps(dt) {
+  for (let i = jumps.length - 1; i >= 0; i--) {
+    const j = jumps[i];
+    if (j.delay > 0) { j.delay -= dt; if (j.delay <= 0) sfx.jump(j.idx); continue; }
+    j.t += dt;
+    const p = Math.min(1, j.t / j.dur), to = j.to();
+    j.mesh.position.lerpVectors(j.from, to, p);
+    j.mesh.position.y += Math.sin(p * Math.PI) * 7;
+    j.mesh.scale.setScalar(j.s0 + (j.s1 - j.s0) * p);
+    j.mesh.rotation.x = p * TAU;
+    if (p >= 1) { j.mesh.rotation.x = 0; j.done(); jumps.splice(i, 1); }
+  }
+}
+
+// ---------- Kontroller ----------
+const keys = {};
+const joy = { x: 0, y: 0 };
+const isC = e => e.key === 'ç' || e.key === 'Ç' || e.key === 'Escape';
+window.addEventListener('keydown', e => {
+  if (isC(e)) { e.preventDefault(); if (state !== 'menu') toMenu(); return; }
+  if ((state === 'menu' || state === 'end') && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); newGame(); return; }
+  if (e.code === 'KeyF' && !e.repeat) { fsEl() ? exitFull() : enterFull(); return; }
+  if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
+  if (state !== 'play') return;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if (e.repeat) return;
+  if (e.code === 'KeyE' || e.code === 'Space') rescue();
+  if (e.code === 'KeyH') sfx.horn();
+  if (e.code === 'KeyC') { camMode = (camMode + 1) % CAMS.length; }
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+$('startBtn').addEventListener('click', newGame);
+$('againBtn').addEventListener('click', newGame);
+$('quit').addEventListener('click', toMenu);
+$('actBtn').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); rescue(); });
+$('hornBtn').addEventListener('pointerdown', e => { e.preventDefault(); unlockAudio(); sfx.horn(); });
+const stick = $('stick'), knob = $('knob');
+let stickId = null;
+function stickMove(e) {
+  const r = stick.getBoundingClientRect();
+  let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+  const m = Math.hypot(x, y), max = r.width / 2;
+  if (m > max) { x *= max / m; y *= max / m; }
+  knob.style.transform = `translate(${x}px, ${y}px)`;
+  joy.x = x / max; joy.y = y / max;
+}
+stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stickMove(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+['pointerup', 'pointercancel'].forEach(ev => stick.addEventListener(ev, () => { stickId = null; joy.x = joy.y = 0; knob.style.transform = ''; }));
+
+// ---------- Gemi fiziği ----------
+const MAXF = 26, MAXR = -8;
+function collide() {
+  let hit = false;
+  const solids = islands.map(i => [i.x, i.z, i.r + 3.8]).concat([[0, 0, HARBOR_R + 3.8]]);
+  for (const [x, z, r] of solids) {
+    const dx = boat.x - x, dz = boat.z - z, d = Math.hypot(dx, dz);
+    if (d < r) { boat.x = x + dx / d * r; boat.z = z + dz / d * r; hit = true; }
+  }
+  // iskele
+  const cx = Math.max(PIER.x0, Math.min(PIER.x1, boat.x)), cz = Math.max(PIER.z0, Math.min(PIER.z1, boat.z));
+  const dx = boat.x - cx, dz = boat.z - cz, d = Math.hypot(dx, dz), R = 3.2;
+  if (d < R) {
+    if (d > 0.001) { boat.x = cx + dx / d * R; boat.z = cz + dz / d * R; } else { boat.x = boat.x < 0 ? PIER.x0 - R : PIER.x1 + R; }
+    hit = true;
+  }
+  if (hit) { if (Math.abs(boat.speed) > 6) { sfx.bump(); toast('Dikkat! Kayalara çarptın'); } boat.speed *= 0.3; }
+  const dist = Math.hypot(boat.x, boat.z);
+  if (dist > WORLD_R) {
+    boat.x *= WORLD_R / dist; boat.z *= WORLD_R / dist; boat.speed *= 0.5;
+    if (outWarn <= 0) { toast('Çok uzaklaştın, adalara geri dön!'); outWarn = 3; }
+  }
+}
+function updateBoat(dt, t) {
+  let thr = 0, steer = 0;
+  if (state === 'play') {
+    if (keys.ArrowUp || keys.KeyW) thr += 1;
+    if (keys.ArrowDown || keys.KeyS) thr -= 1;
+    if (keys.ArrowLeft || keys.KeyA) steer -= 1;
+    if (keys.ArrowRight || keys.KeyD) steer += 1;
+    if (Math.abs(joy.y) > 0.15) thr += -joy.y;
+    if (Math.abs(joy.x) > 0.15) steer += joy.x;
+    thr = Math.max(-1, Math.min(1, thr)); steer = Math.max(-1, Math.min(1, steer));
+  }
+  if (thr > 0) boat.speed += thr * 13 * dt;
+  else if (thr < 0) boat.speed += thr * (boat.speed > 0 ? 22 : 8) * dt;
+  boat.speed -= boat.speed * 0.45 * dt;
+  boat.speed = Math.max(MAXR, Math.min(MAXF, boat.speed));
+  const turnF = Math.max(0.3, Math.min(1, Math.abs(boat.speed) / 8)) * (boat.speed < -0.5 ? -1 : 1);
+  boat.h -= steer * 1.35 * turnF * dt;
+  boat.x += Math.sin(boat.h) * boat.speed * dt;
+  boat.z += Math.cos(boat.h) * boat.speed * dt;
+  collide();
+  // dalgalara göre sallanma
+  const f = fwd(), sx = Math.cos(boat.h), sz = -Math.sin(boat.h);
+  const hb = waveH(boat.x + f.x * 6, boat.z + f.z * 6, t), hs = waveH(boat.x - f.x * 5, boat.z - f.z * 5, t);
+  const hr = waveH(boat.x + sx * 2.5, boat.z + sz * 2.5, t), hl = waveH(boat.x - sx * 2.5, boat.z - sz * 2.5, t);
+  boat.roll += (steer * (boat.speed / MAXF) * 0.14 - boat.roll) * Math.min(1, dt * 3);
+  ship.position.set(boat.x, (hb + hs + hr + hl) / 4 - 0.1, boat.z);
+  ship.rotation.set((hs - hb) / 11, boat.h, (hr - hl) / 5 + boat.roll);
+  flag.rotation.y = -Math.PI / 2 + Math.sin(t * 6) * 0.25;
+  // köpük
+  foamT -= dt;
+  if (Math.abs(boat.speed) > 3 && foamT <= 0) {
+    foamT = 0.045;
+    for (const side of [-1.4, 1.4]) {
+      const fo = foam[foamI++ % foam.length];
+      fo.life = 1.6; fo.m.visible = true;
+      fo.m.position.set(boat.x - f.x * 5.3 + sx * side, 0, boat.z - f.z * 5.3 + sz * side);
+    }
+  }
+  for (const fo of foam) {
+    if (fo.life <= 0) continue;
+    fo.life -= dt;
+    if (fo.life <= 0) { fo.m.visible = false; continue; }
+    const k = 1 - fo.life / 1.6;
+    fo.m.scale.setScalar(1 + k * 3.5);
+    fo.m.material.opacity = 0.7 * (1 - k);
+    fo.m.position.y = waveH(fo.m.position.x, fo.m.position.z, t) + 0.12;
+  }
+  if (engine) {
+    const s = Math.abs(boat.speed) / MAXF;
+    engine.o.frequency.value = 38 + s * 40;
+    engine.eg.gain.value = state === 'play' ? 0.02 + s * 0.07 : 0;
+  }
+}
+
+// ---------- Harita ----------
+const mm = $('minimap'), mg = mm.getContext('2d');
+function drawMap() {
+  const W = mm.width, c = W / 2, sc = (W / 2 - 8) / WORLD_R;
+  mg.clearRect(0, 0, W, W);
+  mg.save(); mg.beginPath(); mg.arc(c, c, W / 2, 0, TAU); mg.clip();
+  mg.strokeStyle = 'rgba(255,255,255,.12)'; mg.lineWidth = 2;
+  for (const r of [140, 280, 420]) { mg.beginPath(); mg.arc(c, c, r * sc, 0, TAU); mg.stroke(); }
+  const px = x => c - x * sc, pz = z => c - z * sc;
+  for (const isl of islands) {
+    mg.fillStyle = '#f2d38a'; mg.beginPath(); mg.arc(px(isl.x), pz(isl.z), Math.max(6, isl.r * sc * 1.4), 0, TAU); mg.fill();
+    if (isl.people.length) {
+      mg.fillStyle = '#e63946'; mg.beginPath(); mg.arc(px(isl.x), pz(isl.z), 7, 0, TAU); mg.fill();
+      mg.fillStyle = '#fff'; mg.font = "bold 13px 'Nunito', sans-serif"; mg.textAlign = 'center'; mg.textBaseline = 'middle';
+      mg.fillText(isl.people.length, px(isl.x), pz(isl.z) + 1);
+    }
+  }
+  mg.fillStyle = '#ffd98a'; mg.fillRect(px(0) - 8, pz(0) - 8, 16, 16);
+  mg.fillStyle = '#1f5f9e'; mg.fillRect(px(0) - 4, pz(0) - 4, 8, 8);
+  mg.save(); mg.translate(px(boat.x), pz(boat.z)); mg.rotate(boat.h + Math.PI);
+  mg.fillStyle = '#ff6a2b'; mg.strokeStyle = '#fff'; mg.lineWidth = 2;
+  mg.beginPath(); mg.moveTo(0, -12); mg.lineTo(8, 9); mg.lineTo(-8, 9); mg.closePath(); mg.fill(); mg.stroke();
+  mg.restore(); mg.restore();
+}
+
+// ---------- Ana döngü ----------
+const camPos = new THREE.Vector3(0, 30, -30), camLook = new THREE.Vector3();
+let last = performance.now(), clock = 0, hudT = 0;
+function target() {
+  const busy = jumps.length > 0;
+  if (passengers.length < CAP) {
+    let best = null, bd = Infinity;
+    for (const isl of islands) if (isl.people.length) {
+      const d = Math.hypot(isl.x - boat.x, isl.z - boat.z);
+      if (d < bd) { bd = d; best = isl; }
+    }
+    if (best && (!passengers.length || bd < Math.hypot(DROP.x - boat.x, DROP.z - boat.z) * 1.6)) return { x: best.x, z: best.z, isl: best };
+  }
+  if (passengers.length || busy) return { x: DROP.x, z: DROP.z, harbor: true };
+  return null;
+}
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+  const t = clock;
+  updateBoat(dt, t);
+  updateOcean(boat.x, boat.z, t);
+  updateJumps(dt);
+
+  // insan animasyonları
+  for (const isl of islands) {
+    const near = Math.hypot(isl.x - boat.x, isl.z - boat.z) < isl.r + 45;
+    for (const p of isl.people) animatePerson(p, t, near);
+    isl.sign.position.y = 15 + Math.sin(t * 2 + isl.x) * 0.6;
+  }
+  for (const pas of passengers) if (pas.mesh.userData.mode === 'ride') animatePerson(pas.mesh, t, false);
+  for (const p of pierPeople) if (p.userData.mode === 'cheer') animatePerson(p, t, true);
+  if (harbor) harbor.userData.beam.rotation.y = t * 0.9;
+
+  if (state === 'play') {
+    elapsed += dt; outWarn -= dt;
+    const isl = zoneIsland(), inDrop = Math.hypot(boat.x - DROP.x, boat.z - DROP.z) < DROP.r;
+    if (inDrop) unload();
+    const pr = $('prompt');
+    if (isl && isl.people.length) {
+      const full = passengers.length >= CAP;
+      pr.hidden = false; pr.classList.toggle('full', full);
+      pr.textContent = full ? 'Gemi dolu! Önce limana götür' : `E · ${isl.people.length} kişiyi gemiye al`;
+    } else pr.hidden = true;
+    const tg = target();
+    if (tg && !(tg.isl && isl === tg.isl) && !(tg.harbor && inDrop)) {
+      arrow.visible = true;
+      arrow.position.set(boat.x, ship.position.y + 10 + Math.sin(t * 4) * 0.4, boat.z);
+      arrow.rotation.y = Math.atan2(tg.x - boat.x, tg.z - boat.z);
+    } else arrow.visible = false;
+    if (delivered >= total && total > 0 && !jumps.length && !passengers.length) winGame();
+    hudT -= dt;
+    if (hudT <= 0) {
+      hudT = 0.2;
+      $('spd').textContent = `${Math.round(Math.abs(boat.speed) * 0.9)} knot`;
+      $('time').textContent = fmt(elapsed);
+      drawMap();
+    }
+  } else arrow.visible = false;
+
+  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').style.opacity = 0; }
+
+  // kamera
+  const f = fwd();
+  if (state === 'play') {
+    const [dist, hgt] = CAMS[camMode];
+    const want = new THREE.Vector3(boat.x - f.x * dist, hgt + ship.position.y, boat.z - f.z * dist);
+    camPos.lerp(want, 1 - Math.exp(-dt * 3.5));
+    camLook.lerp(new THREE.Vector3(boat.x + f.x * 8, 2.5, boat.z + f.z * 8), 1 - Math.exp(-dt * 6));
+  } else {
+    const a = t * 0.12;
+    camPos.set(boat.x + Math.cos(a) * 34, 14, boat.z + Math.sin(a) * 34);
+    camLook.set(boat.x, 3, boat.z);
+  }
+  for (const isl of islands) {   // kamera adanın içine girmesin
+    if (Math.hypot(camPos.x - isl.x, camPos.z - isl.z) < isl.r + 3) camPos.y = Math.max(camPos.y, 14);
+  }
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+  sunDisc.position.copy(camera.position).addScaledVector(sunDir, 700);
+  renderer.render(scene, camera);
+}
+
+buildWorld();
+toMenu();
+requestAnimationFrame(loop);
+})();
+</script>
