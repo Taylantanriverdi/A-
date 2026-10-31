@@ -1,0 +1,1717 @@
+<title>Karınca Kaçışı</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Tam ekran 3B sahne; üstünde HUD, animasyon altyazıları ve ekran kartları */
+:root {
+  --bg: #0d1016;
+  --panel: rgba(22, 18, 14, 0.86);
+  --fg: #fbf3e4;
+  --muted: #c2b6a3;
+  --honey: #ffc23d;
+  --ant: #e2452f;
+  --leaf: #6ad06a;
+  --danger: #ff4b3e;
+  --sky: #8fd3ff;
+  --line: rgba(255, 255, 255, 0.16);
+  --font-display: 'Bungee', Impact, 'Arial Black', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); font-family: var(--font-body); }
+#game { position: fixed; inset: 0; }
+#game canvas { display: block; width: 100%; height: 100%; }
+
+.screen {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding-block: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: rgba(10, 8, 6, 0.45); z-index: 10; box-sizing: border-box; overflow-y: auto;
+}
+.card {
+  background: var(--panel); border: 2px solid var(--line); border-radius: 16px;
+  padding: 24px 22px; max-width: 540px; width: 100%; box-sizing: border-box; margin: auto;
+  display: flex; flex-direction: column; gap: 14px; text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.honeycomb { height: 12px; border-radius: 6px; background:
+  radial-gradient(circle at 6px 6px, var(--honey) 4px, transparent 5px) 0 0 / 14px 12px, #3a2a10; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; margin: 0; line-height: 1.05; text-wrap: balance; }
+h1 { font-size: clamp(32px, 9vw, 58px); color: var(--honey); text-shadow: 0 4px 0 #7a4a00; }
+h2 { font-size: clamp(32px, 10vw, 64px); }
+p { margin: 0; line-height: 1.5; font-size: 16px; text-wrap: pretty; }
+.muted { color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; font-size: 15px; align-items: center; }
+kbd {
+  font-family: var(--font-display); font-size: 13px; background: #2a231b; border: 1px solid #4d4234;
+  border-bottom-width: 3px; border-radius: 6px; padding: 2px 8px; color: var(--fg); white-space: nowrap; justify-self: start;
+}
+button.big {
+  font-family: var(--font-display); font-size: 22px; padding: 14px 20px; border: 0; border-radius: 12px;
+  background: var(--honey); color: #2b1a00; cursor: pointer; box-shadow: 0 5px 0 #a06a00;
+}
+button.big:active { transform: translateY(3px); box-shadow: 0 2px 0 #a06a00; }
+button.link { background: none; border: 0; color: var(--muted); font: 800 14px var(--font-body); text-decoration: underline; cursor: pointer; padding: 6px; }
+button:focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; }
+.win-title { color: var(--leaf); text-shadow: 0 5px 0 #1f5a1f; }
+.lose-title { color: var(--danger); text-shadow: 0 5px 0 #5a0b0b; }
+
+/* --- Animasyon (sinematik) --- */
+#cine { position: fixed; inset: 0; pointer-events: none; z-index: 5; }
+#cine .bar { position: absolute; left: 0; right: 0; height: 11vh; background: #000; }
+#cine .bar.top { top: 0; } #cine .bar.bot { bottom: 0; }
+#caption {
+  position: absolute; left: 50%; bottom: calc(11vh + 18px); transform: translateX(-50%);
+  width: min(92vw, 760px); text-align: center; font: 900 clamp(18px, 3.6vw, 28px) var(--font-body);
+  color: #fff; text-shadow: 0 2px 6px #000, 0 0 2px #000; transition: opacity .35s; text-wrap: balance;
+}
+#caption.loud { font-family: var(--font-display); font-weight: 400; color: var(--honey); font-size: clamp(30px, 7vw, 56px); }
+#skipBtn {
+  position: fixed; z-index: 7; top: calc(11vh + 12px); right: max(16px, env(safe-area-inset-right, 0px));
+  font: 800 15px var(--font-body); background: rgba(0,0,0,.55); color: #fff; border: 1px solid var(--line);
+  border-radius: 999px; padding: 8px 14px; cursor: pointer;
+}
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 9; }
+
+/* --- HUD --- */
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 4; }
+#mission {
+  position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: max(12px, env(safe-area-inset-top, 0px));
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; max-width: min(360px, calc(100vw - 150px));
+}
+#mission .num { font-family: var(--font-display); font-size: 12px; color: var(--honey); letter-spacing: .04em; }
+#mission .title { font-family: var(--font-display); font-size: 18px; margin: 2px 0 4px; }
+#mission .desc { font-size: 14px; color: var(--muted); }
+#mission .prog { font-weight: 900; font-size: 15px; margin-top: 4px; color: var(--leaf); }
+#lives {
+  position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); top: max(12px, env(safe-area-inset-top, 0px));
+  display: flex; gap: 4px; font-size: 30px; line-height: 1; filter: drop-shadow(0 2px 0 #000);
+}
+#lives .h { color: var(--danger); } #lives .h.off { color: #3a3330; }
+#dashWrap {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px));
+  display: flex; align-items: center; gap: 8px; font: 900 13px var(--font-body); color: var(--muted);
+  background: var(--panel); padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line);
+}
+#dashBar { width: 120px; height: 8px; border-radius: 4px; background: #3a3128; overflow: hidden; }
+#dashBar i { display: block; height: 100%; width: 100%; background: var(--sky); }
+#toast {
+  position: absolute; left: 50%; top: 28%; transform: translateX(-50%); text-align: center;
+  width: min(90vw, 620px); transition: opacity .4s; opacity: 0;
+}
+#toast .t { font-family: var(--font-display); font-size: clamp(26px, 6vw, 44px); color: var(--honey); text-shadow: 0 4px 0 #6a3e00, 0 0 10px #000; }
+#toast .s { font: 900 clamp(16px, 3vw, 22px) var(--font-body); text-shadow: 0 2px 4px #000; margin-top: 6px; }
+#flash { position: fixed; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 8; transition: opacity .45s; }
+
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
+#stick {
+  position: absolute; left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 124px; height: 124px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid var(--line);
+  pointer-events: auto; touch-action: none;
+}
+#knob { position: absolute; left: 36px; top: 36px; width: 52px; height: 52px; border-radius: 50%; background: rgba(255,194,61,.75); }
+.tbtn {
+  position: absolute; border-radius: 50%; border: 0; font-family: var(--font-display); pointer-events: auto; touch-action: none;
+}
+#jumpBtn { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(34px + env(safe-area-inset-bottom, 0px)); width: 88px; height: 88px; background: var(--honey); color: #2b1a00; font-size: 16px; }
+#dashBtn { right: calc(126px + env(safe-area-inset-right, 0px)); bottom: calc(40px + env(safe-area-inset-bottom, 0px)); width: 68px; height: 68px; background: var(--sky); color: #082233; font-size: 14px; }
+#pauseBtn { right: calc(34px + env(safe-area-inset-right, 0px)); bottom: calc(140px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; background: #3a3128; color: #fff; font-size: 16px; }
+@media (pointer: fine) { #touch { display: none; } }
+@media (pointer: coarse) { #dashWrap { bottom: calc(180px + env(safe-area-inset-bottom, 0px)); left: auto; right: max(12px, env(safe-area-inset-right, 0px)); transform: none; } }
+@media (prefers-reduced-motion: reduce) { #flash, #toast, #caption { transition: none; } }
+</style>
+
+<div id="game"></div>
+
+<div id="cine" hidden>
+  <div class="bar top"></div><div class="bar bot"></div>
+  <div id="caption"></div>
+</div>
+<button id="skipBtn" type="button" hidden>Geç ⏭</button>
+
+<div id="hud" hidden>
+  <div id="mission">
+    <div class="num" id="mNum">GÖREV 1 / 4</div>
+    <div class="title" id="mTitle"></div>
+    <div class="desc" id="mDesc"></div>
+    <div class="prog" id="mProg"></div>
+  </div>
+  <div id="lives" aria-label="Can"></div>
+  <div id="dashWrap"><span>KOŞ</span><div id="dashBar"><i id="dashFill"></i></div></div>
+  <div id="toast"><div class="t" id="toastT"></div><div class="s" id="toastS"></div></div>
+</div>
+<div id="flash"></div>
+<div id="fade"></div>
+
+<div id="touch" hidden>
+  <div id="stick"><div id="knob"></div></div>
+  <button class="tbtn" id="jumpBtn" type="button">ZIPLA</button>
+  <button class="tbtn" id="dashBtn" type="button">KOŞ</button>
+  <button class="tbtn" id="pauseBtn" type="button" aria-label="Durdur">II</button>
+</div>
+
+<div class="screen" id="menu">
+  <div class="card">
+    <div class="honeycomb"></div>
+    <h1>KARINCA KAÇIŞI</h1>
+    <p>Sen küçük ama cesur bir karıncasın! Kasaban <b style="color:var(--honey)">arıların</b> saldırısına uğrayınca bir rokete atlayıp kaçıyorsun…
+      ve kendini <b style="color:var(--sky)">Paris</b>'te buluyorsun. Bir karınca için Paris koca bir gezegen!</p>
+    <div class="keys">
+      <kbd>← ↑ → ↓</kbd><span>Yürü ve dön (W A S D de olur)</span>
+      <kbd>BOŞLUK</kbd><span>Zıpla — arıların üstünden atla!</span>
+      <kbd>SHIFT</kbd><span>Hızlı koş</span>
+      <kbd>P</kbd><span>Oyunu durdur</span>
+      <kbd>M</kbd><span>Sesi aç / kapat</span>
+      <kbd>F</kbd><span>Tam ekran</span>
+    </div>
+    <p class="muted" style="font-size:14px">Yeşil halkanın içindeki yuvan güvenli bölgedir, arılar oraya giremez.</p>
+    <button class="big" id="startBtn" type="button">BAŞLA</button>
+    <button class="link" id="skipStartBtn" type="button">Animasyonu geç, direkt oyna</button>
+    <div class="honeycomb"></div>
+  </div>
+</div>
+
+<div class="screen" id="pause" hidden>
+  <div class="card">
+    <h2>DURDU</h2>
+    <p class="muted">Devam etmek için P'ye bas.</p>
+    <button class="big" id="resumeBtn" type="button">DEVAM</button>
+  </div>
+</div>
+
+<div class="screen" id="caught" hidden>
+  <div class="card">
+    <h2 class="lose-title">YAKALANDIN!</h2>
+    <p id="caughtText">Arılar seni yakaladı… Ama bir karınca asla pes etmez!</p>
+    <button class="big" id="retryBtn" type="button">TEKRAR DENE</button>
+  </div>
+</div>
+
+<div class="screen" id="win" hidden>
+  <div class="card">
+    <div class="honeycomb"></div>
+    <h2 class="win-title">KAZANDIN!</h2>
+    <p>Arıların kovanını kapattın ve onları Paris'ten kovdun! Kasabandan tek kurtulan sendin… ama artık Paris senin yeni yuvan.</p>
+    <button class="big" id="againBtn" type="button">TEKRAR OYNA</button>
+    <button class="link" id="replayIntroBtn" type="button">Animasyonu tekrar izle</button>
+    <div class="honeycomb"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, u) => a + (b - a) * u;
+const smooth = u => { u = clamp(u, 0, 1); return u * u * (3 - 2 * u); };
+const UP = new THREE.Vector3(0, 1, 0);
+
+// ================= Sahne =================
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+$('game').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
+function resize() {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+const hemi = new THREE.HemisphereLight(0xdff2ff, 0x5a7a3a, 0.75);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff1d6, 1.0);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -45, right: 45, top: 45, bottom: -45, near: 1, far: 170 });
+sun.shadow.bias = -0.0008;
+scene.add(sun, sun.target);
+function aimSun(x, z) {
+  sun.position.set(x + 30, 55, z + 22);
+  sun.target.position.set(x, 0, z);
+}
+
+function canvasTex(size, draw, rx = 1, ry = 1, h = size) {
+  const c = document.createElement('canvas');
+  c.width = size; c.height = h;
+  draw(c.getContext('2d'), size, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.anisotropy = 4;
+  return t;
+}
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .7, metalness: .05 }, o));
+const SPH = new THREE.SphereGeometry(1, 18, 14);
+function mesh(geo, material, x = 0, y = 0, z = 0, parent) {
+  const m = new THREE.Mesh(geo, material);
+  m.position.set(x, y, z);
+  m.castShadow = m.receiveShadow = true;
+  if (parent) parent.add(m);
+  return m;
+}
+function blob(material, sx, sy, sz, x, y, z, parent) {
+  const m = mesh(SPH, material, x, y, z, parent);
+  m.scale.set(sx, sy, sz);
+  return m;
+}
+function limb(a, b, r, material, parent) {
+  const d = new THREE.Vector3().subVectors(b, a);
+  const len = d.length();
+  const m = mesh(new THREE.CylinderGeometry(r, r, len, 6), material, 0, 0, 0, parent);
+  m.position.copy(a).addScaledVector(d, 0.5);
+  m.quaternion.setFromUnitVectors(UP, d.normalize());
+  return m;
+}
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+// ================= Karakterler =================
+const PLAYER_COLOR = 0xe2452f;
+function makeAnt(color, isPlayer) {
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  g.add(body);
+  const m = mat(color, { roughness: .35 });
+  const dk = mat(0x1a1210, { roughness: .6 });
+  const white = mat(0xffffff, { roughness: .3 });
+  blob(m, .42, .38, .55, 0, .66, -.72, body);
+  blob(m, .24, .22, .3, 0, .62, -.06, body);
+  blob(m, .32, .3, .32, 0, .8, .44, body);
+  for (const s of [-1, 1]) {
+    blob(white, .11, .12, .1, s * .15, .88, .68, body);
+    blob(dk, .055, .065, .05, s * .16, .89, .77, body);
+    const a1 = V(s * .1, 1.04, .55), a2 = V(s * .26, 1.42, .78), a3 = V(s * .36, 1.48, 1.08);
+    limb(a1, a2, .025, dk, body); limb(a2, a3, .025, dk, body);
+    blob(dk, .05, .05, .05, a3.x, a3.y, a3.z, body);
+  }
+  const legs = [];
+  for (const s of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const hip = new THREE.Group();
+    hip.position.set(s * .12, .56, .16 - i * .2);
+    const dz = (1 - i) * .16;
+    const knee = V(s * .42, .22, dz);
+    limb(V(0, 0, 0), knee, .035, dk, hip);
+    limb(knee, V(s * .72, -.54, dz * 2.2), .03, dk, hip);
+    body.add(hip);
+    legs.push({ hip, s, i });
+  }
+  if (isPlayer) {
+    const cap = mat(0x2f6cf0, { roughness: .5 });
+    const top = mesh(new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), cap, 0, .9, .42, body);
+    top.scale.set(.34, .26, .34);
+    const brim = mesh(new THREE.CylinderGeometry(.3, .3, .03, 16), cap, 0, .92, .66, body);
+    brim.scale.set(1, 1, .7);
+    const scarf = mesh(new THREE.TorusGeometry(.2, .06, 8, 16), mat(0xffc23d), 0, .66, .22, body);
+    scarf.rotation.x = Math.PI / 2 - .3;
+  }
+  g.userData = { legs, body, phase: Math.random() * 6 };
+  return g;
+}
+function animateAnt(a, speed, dt) {
+  const u = a.userData;
+  const k = Math.min(1, speed / 2.5);
+  u.phase += dt * (4 + speed * 2.6);
+  for (const L of u.legs) {
+    const off = ((L.i + (L.s > 0 ? 1 : 0)) % 2) * Math.PI;
+    L.hip.rotation.y = Math.sin(u.phase + off) * .5 * k;
+    L.hip.rotation.z = Math.max(0, Math.cos(u.phase + off)) * .3 * L.s * k;
+  }
+  u.body.position.y = Math.abs(Math.sin(u.phase)) * .05 * k;
+}
+
+const stripeTex = canvasTex(64, (g, s) => {
+  for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? '#1b1308' : '#ffc21f'; g.fillRect(0, i * s / 8, s, s / 8); }
+});
+const beeBodyGeo = new THREE.SphereGeometry(1, 22, 16).rotateX(Math.PI / 2);
+const wingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: .55, side: THREE.DoubleSide, depthWrite: false, roughness: .2 });
+function wingGeo(side) { return new THREE.CircleGeometry(.8, 18).scale(1, .5, 1).translate(side * .8, 0, 0).rotateX(-Math.PI / 2); }
+const WING_L = wingGeo(-1), WING_R = wingGeo(1);
+function makeBee() {
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  g.add(body);
+  const dk = mat(0x15100a, { roughness: .4 });
+  const white = mat(0xffffff, { roughness: .3 });
+  const b = mesh(beeBodyGeo, mat(0xffffff, { map: stripeTex, roughness: .5 }), 0, 0, 0, body);
+  b.scale.set(.62, .6, .95);
+  blob(dk, .42, .42, .4, 0, .08, .98, body);
+  for (const s of [-1, 1]) {
+    blob(white, .14, .15, .1, s * .19, .2, 1.27, body);
+    blob(dk, .07, .08, .05, s * .2, .19, 1.36, body);
+    const brow = mesh(new THREE.BoxGeometry(.24, .05, .05), dk, s * .2, .38, 1.3, body);
+    brow.rotation.z = s * -.45;
+    limb(V(s * .12, .4, 1.1), V(s * .32, .85, 1.35), .025, dk, body);
+    blob(dk, .05, .05, .05, s * .32, .85, 1.35, body);
+    for (let i = 0; i < 3; i++) limb(V(s * .2, -.45, .25 - i * .25), V(s * .3, -.8, .2 - i * .3), .025, dk, body);
+  }
+  const st = mesh(new THREE.ConeGeometry(.12, .5, 8).rotateX(-Math.PI / 2), dk, 0, 0, -1.1, body);
+  st.castShadow = false;
+  const wl = new THREE.Group(), wr = new THREE.Group();
+  wl.position.set(-.18, .55, .1); wr.position.set(.18, .55, .1);
+  wl.add(new THREE.Mesh(WING_L, wingMat)); wr.add(new THREE.Mesh(WING_R, wingMat));
+  body.add(wl, wr);
+  g.userData = { wl, wr, body, phase: Math.random() * 6 };
+  return g;
+}
+function animateBee(b, dt) {
+  const u = b.userData;
+  u.phase += dt;
+  const f = Math.sin(u.phase * 42) * .7;
+  u.wl.rotation.z = f; u.wr.rotation.z = -f;
+  u.body.position.y = Math.sin(u.phase * 3) * .12;
+}
+
+function makeRocket() {
+  const g = new THREE.Group();
+  const white = mat(0xf3f1ea, { roughness: .35, metalness: .3 });
+  const red = mat(0xd83a2a, { roughness: .4, metalness: .2 });
+  const dark = mat(0x2b2e35, { roughness: .5, metalness: .5 });
+  mesh(new THREE.CylinderGeometry(1.25, 1.4, 5.5, 28), white, 0, 3.65, 0, g);
+  mesh(new THREE.ConeGeometry(1.25, 2.4, 28), red, 0, 7.6, 0, g);
+  mesh(new THREE.CylinderGeometry(1.29, 1.31, .4, 28), red, 0, 4.4, 0, g);
+  mesh(new THREE.CylinderGeometry(.7, .95, .7, 18), dark, 0, .55, 0, g);
+  for (let k = 0; k < 4; k++) {
+    const a = k * Math.PI / 2 + Math.PI / 4;
+    const fin = mesh(new THREE.BoxGeometry(.14, 2.4, 1.3), red, Math.sin(a) * 1.55, 1.2, Math.cos(a) * 1.55, g);
+    fin.rotation.y = a;
+  }
+  // lombar
+  const ring = mesh(new THREE.TorusGeometry(.42, .08, 8, 20), dark, 0, 5.6, 1.3, g);
+  ring.rotation.x = -.05;
+  mesh(new THREE.CircleGeometry(.42, 20), mat(0x6ec8ff, { roughness: .1, metalness: .3, emissive: 0x123a55 }), 0, 5.6, 1.31, g);
+  // kapı
+  mesh(new THREE.PlaneGeometry(.95, 1.7), new THREE.MeshBasicMaterial({ color: 0x0c0c10 }), 0, 2.3, 1.36, g).castShadow = false;
+  const hinge = new THREE.Group();
+  hinge.position.set(-.5, 2.3, 1.38);
+  const door = mesh(new THREE.BoxGeometry(1.0, 1.76, .08), dark, .5, 0, 0, hinge);
+  mesh(new THREE.BoxGeometry(1.0, .12, .09), mat(0xffc23d), 0, .4, .01, door);
+  g.add(hinge);
+  // alev
+  const flame = new THREE.Group();
+  const f1 = new THREE.Mesh(new THREE.ConeGeometry(.75, 3.2, 18, 1, true).rotateX(Math.PI),
+    new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false }));
+  f1.position.y = -1.4;
+  const f2 = new THREE.Mesh(new THREE.ConeGeometry(.45, 2, 14, 1, true).rotateX(Math.PI),
+    new THREE.MeshBasicMaterial({ color: 0xfff08a, transparent: true, opacity: .95, blending: THREE.AdditiveBlending, depthWrite: false }));
+  f2.position.y = -.8;
+  flame.add(f1, f2);
+  flame.visible = false;
+  g.add(flame);
+  g.userData = { hinge, flame };
+  return g;
+}
+
+// ================= Parçacıklar (duman) =================
+const particles = [];
+const smokeGeo = new THREE.SphereGeometry(1, 8, 6);
+for (let i = 0; i < 90; i++) {
+  const m = new THREE.Mesh(smokeGeo, new THREE.MeshStandardMaterial({ color: 0xd8d4cc, transparent: true, opacity: 0, depthWrite: false, roughness: 1 }));
+  m.visible = false;
+  scene.add(m);
+  particles.push({ m, life: 0, max: 1, v: new THREE.Vector3(), s: 1 });
+}
+let pIdx = 0;
+function emitSmoke(x, y, z, vx, vy, vz, size, life, color = 0xd8d4cc) {
+  const p = particles[pIdx++ % particles.length];
+  p.m.position.set(x, y, z); p.v.set(vx, vy, vz);
+  p.life = p.max = life; p.s = size;
+  p.m.material.color.setHex(color);
+  p.m.visible = true;
+}
+function updateParticles(dt) {
+  for (const p of particles) {
+    if (p.life <= 0) continue;
+    p.life -= dt;
+    if (p.life <= 0) { p.m.visible = false; continue; }
+    const u = 1 - p.life / p.max;
+    p.m.position.addScaledVector(p.v, dt);
+    p.v.multiplyScalar(1 - dt * 1.5);
+    p.m.scale.setScalar(p.s * (0.4 + u * 1.6));
+    p.m.material.opacity = (1 - u) * .7;
+  }
+}
+function clearParticles() { for (const p of particles) { p.life = 0; p.m.visible = false; } }
+
+// ================= DÜNYA 1: Karınca Kasabası =================
+const town = new THREE.Group();
+scene.add(town);
+const RPOS = V(0, 0, -24);
+(() => {
+  const grassTex = canvasTex(256, (g, s) => {
+    g.fillStyle = '#5fae46'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 2500; i++) {
+      g.fillStyle = Math.random() < .5 ? 'rgba(40,110,30,.35)' : 'rgba(150,210,90,.3)';
+      g.fillRect(Math.random() * s, Math.random() * s, 2, 5);
+    }
+  }, 40, 40);
+  const ground = mesh(new THREE.PlaneGeometry(400, 400), mat(0xffffff, { map: grassTex, roughness: 1 }), 0, 0, 0, town);
+  ground.rotation.x = -Math.PI / 2;
+  const path = mesh(new THREE.RingGeometry(12.3, 15.7, 72), mat(0xb98a55, { roughness: 1 }), 0, .03, 0, town);
+  path.rotation.x = -Math.PI / 2;
+  const toPad = mesh(new THREE.PlaneGeometry(3.2, 9), mat(0xb98a55, { roughness: 1 }), 0, .03, -19.5, town);
+  toPad.rotation.x = -Math.PI / 2;
+
+  // meydandaki çiy damlası çeşmesi
+  const leaf = mesh(new THREE.CircleGeometry(3, 24), mat(0x3f8f35, { side: THREE.DoubleSide }), 0, .08, 0, town);
+  leaf.rotation.x = -Math.PI / 2; leaf.scale.set(1, .7, 1);
+  blob(mat(0x9fe3ff, { transparent: true, opacity: .75, roughness: .05, metalness: .2 }), 1.3, 1.1, 1.3, 0, 1.1, 0, town);
+
+  // evler
+  const sand = mat(0xb87d46, { roughness: 1 });
+  const holeM = new THREE.MeshBasicMaterial({ color: 0x1a0f08 });
+  const capM = mat(0xd8382c, { roughness: .6 });
+  const stemM = mat(0xf2e6cc, { roughness: .9 });
+  const spotM = mat(0xffffff, { roughness: .8 });
+  const winM = mat(0xffe27a, { emissive: 0x6a5000 });
+  for (let k = 0; k < 10; k++) {
+    const a = -Math.PI / 2 + (k + .5) * (Math.PI * 2 / 10);
+    const x = Math.cos(a) * 23, z = Math.sin(a) * 23;
+    const toC = V(-x, 0, -z).normalize();
+    if (k % 2 === 0) {
+      const hill = mesh(new THREE.ConeGeometry(4.5, 5, 26), sand, x, 2.5, z, town);
+      hill.scale.set(1, 1, 1);
+      const door = mesh(new THREE.CircleGeometry(.95, 18), holeM, x + toC.x * 3.62, 1.0, z + toC.z * 3.62, town);
+      door.lookAt(0, 1.0, 0); door.rotateX(-.2); door.castShadow = false;
+    } else {
+      mesh(new THREE.CylinderGeometry(1.7, 2.1, 4.6, 20), stemM, x, 2.3, z, town);
+      const cap = mesh(new THREE.SphereGeometry(4, 26, 12, 0, Math.PI * 2, 0, Math.PI / 2), capM, x, 4.2, z, town);
+      cap.scale.set(1, .7, 1);
+      for (let j = 0; j < 9; j++) {
+        const pa = rand(0, Math.PI * 2), pe = rand(.25, 1.25);
+        const sp = blob(spotM, .5, .2, .5, x + Math.cos(pa) * Math.sin(pe) * 4, 4.2 + Math.cos(pe) * 2.8, z + Math.sin(pa) * Math.sin(pe) * 4, town);
+        sp.lookAt(x, 0, z);
+      }
+      const door = mesh(new THREE.PlaneGeometry(1.1, 1.9), mat(0x7a4a24), x + toC.x * 1.95, .95, z + toC.z * 1.95, town);
+      door.lookAt(0, .95, 0);
+      const win = mesh(new THREE.CircleGeometry(.38, 14), winM, x + toC.x * 1.82, 3.1, z + toC.z * 1.82, town);
+      win.lookAt(0, 3.1, 0);
+    }
+  }
+
+  // dev otlar
+  const grassGeo = new THREE.ConeGeometry(.4, 1, 4).translate(0, .5, 0);
+  const grass = new THREE.InstancedMesh(grassGeo, mat(0xffffff, { roughness: .9 }), 420);
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+  for (let i = 0; i < 420; i++) {
+    const a = rand(0, Math.PI * 2), r = rand(31, 110);
+    dummy.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
+    dummy.rotation.set(rand(-.15, .15), rand(0, 3), rand(-.15, .15));
+    dummy.scale.set(rand(.8, 1.6), rand(6, 18), rand(.8, 1.6));
+    dummy.updateMatrix();
+    grass.setMatrixAt(i, dummy.matrix);
+    grass.setColorAt(i, col.setHSL(rand(.24, .33), rand(.45, .65), rand(.28, .45)));
+  }
+  grass.castShadow = true;
+  town.add(grass);
+
+  // dev çiçekler
+  const petalCols = [0xff7eb6, 0xfff16a, 0xffffff, 0xb48cff, 0xff9a3c];
+  for (let i = 0; i < 9; i++) {
+    const a = rand(0, Math.PI * 2), r = rand(33, 55), h = rand(10, 16);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    mesh(new THREE.CylinderGeometry(.35, .45, h, 8), mat(0x3d8c2f), x, h / 2, z, town);
+    const head = new THREE.Group();
+    head.position.set(x, h, z);
+    head.rotation.set(rand(-.4, .4), rand(0, 3), rand(-.4, .4));
+    const pm = mat(petalCols[i % petalCols.length], { roughness: .6 });
+    for (let j = 0; j < 7; j++) {
+      const pa = j / 7 * Math.PI * 2;
+      blob(pm, 1.6, .25, .8, Math.cos(pa) * 1.9, 0, Math.sin(pa) * 1.9, head).rotation.y = -pa;
+    }
+    blob(mat(0xffb020), 1.1, .5, 1.1, 0, .2, 0, head);
+    town.add(head);
+  }
+  // çakıllar
+  const rockM = mat(0x8d8a84, { roughness: .9, flatShading: true });
+  for (let i = 0; i < 30; i++) {
+    const a = rand(0, Math.PI * 2), r = rand(17, 60);
+    const s = rand(.6, 2.6);
+    const rk = mesh(new THREE.DodecahedronGeometry(s), rockM, Math.cos(a) * r, s * .4, Math.sin(a) * r, town);
+    if (Math.abs(Math.cos(a) * r) < 5 && Math.sin(a) * r < -16 && Math.sin(a) * r > -30) rk.visible = false;
+  }
+  // bulutlar
+  const cloudM = mat(0xffffff, { roughness: 1 });
+  for (let i = 0; i < 10; i++) {
+    const cx = rand(-140, 140), cy = rand(45, 70), cz = rand(-160, 80);
+    for (let j = 0; j < 5; j++) { const s = rand(5, 10); blob(cloudM, s * 1.4, s * .8, s, cx + rand(-10, 10), cy + rand(-2, 3), cz + rand(-5, 5), town).castShadow = false; }
+  }
+  // gazoz kapağından fırlatma rampası
+  const pad = mesh(new THREE.CylinderGeometry(3.2, 3.2, .6, 22), mat(0xc72b2b, { metalness: .6, roughness: .35 }), RPOS.x, .3, RPOS.z, town);
+  pad.receiveShadow = true;
+})();
+
+// ================= DÜNYA 2: Uzay =================
+const space = new THREE.Group();
+scene.add(space);
+let planet;
+(() => {
+  const N = 2500, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const v = V(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(rand(300, 600));
+    pos.set([v.x, v.y, v.z], i * 3);
+  }
+  const sg = new THREE.BufferGeometry();
+  sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  space.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: true })));
+  const ptex = canvasTex(256, (g, s, h) => {
+    g.fillStyle = '#2f78d6'; g.fillRect(0, 0, s, h);
+    for (let i = 0; i < 26; i++) {
+      g.fillStyle = Math.random() < .7 ? '#4fa452' : '#d8c27a';
+      g.beginPath(); g.ellipse(rand(0, s), rand(h * .15, h * .85), rand(8, 34), rand(5, 20), rand(0, 3), 0, 7); g.fill();
+    }
+    g.fillStyle = 'rgba(255,255,255,.55)';
+    for (let i = 0; i < 30; i++) { g.beginPath(); g.ellipse(rand(0, s), rand(0, h), rand(10, 40), rand(2, 6), 0, 0, 7); g.fill(); }
+    g.fillStyle = '#f4f8ff'; g.fillRect(0, 0, s, 10); g.fillRect(0, h - 10, s, 10);
+  }, 1, 1, 128);
+  planet = mesh(new THREE.SphereGeometry(28, 48, 32), mat(0xffffff, { map: ptex, roughness: .8 }), 58, -6, -60, space);
+  const atmo = new THREE.Mesh(new THREE.SphereGeometry(29.5, 40, 28), new THREE.MeshBasicMaterial({ color: 0x8fd3ff, transparent: true, opacity: .18, blending: THREE.AdditiveBlending, depthWrite: false }));
+  planet.add(atmo);
+  mesh(new THREE.SphereGeometry(5, 24, 16), mat(0xbdb8ae, { roughness: 1 }), -60, 30, -90, space);
+})();
+
+// ================= DÜNYA 3: Paris (karınca boyutunda) =================
+const paris = new THREE.Group();
+scene.add(paris);
+const obstacles = [];
+const BOUNDS = { x1: -75, x2: 75, z1: -125, z2: 75 };
+const YUVA = V(-6, 0, 15), YUVA_R = 5;
+const HIVE = V(-50, 0, 30);
+const HIVE_DIR = V(50, 0, -30).normalize();
+const EIFFEL = V(0, 0, -110);
+const EIFFEL_LEG = V(22, 0, -88);
+function obs(x, z, r) { obstacles.push({ x, z, r }); }
+function obsLocal(obj, pts, r) {
+  obj.updateMatrixWorld(true);
+  for (const p of pts) { const w = obj.localToWorld(p.clone()); obs(w.x, w.z, r); }
+}
+(() => {
+  const cobble = canvasTex(256, (g, s) => {
+    g.fillStyle = '#5b5a58'; g.fillRect(0, 0, s, s);
+    const n = 4, w = s / n;
+    for (let r = 0; r < n; r++) for (let c = -1; c < n; c++) {
+      const x = c * w + (r % 2) * w / 2, y = r * w;
+      const v = 120 + Math.random() * 50 | 0;
+      g.fillStyle = `rgb(${v},${v - 4},${v - 10})`;
+      g.beginPath(); g.roundRect ? g.roundRect(x + 4, y + 4, w - 8, w - 8, 14) : g.rect(x + 4, y + 4, w - 8, w - 8); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.07)'; g.fillRect(x + 10, y + 8, w - 26, 8);
+    }
+  }, 28, 28);
+  const ground = mesh(new THREE.PlaneGeometry(460, 460), mat(0xffffff, { map: cobble, roughness: .95 }), 0, 0, -30, paris);
+  ground.rotation.x = -Math.PI / 2;
+
+  // kruvasan
+  const croTex = canvasTex(128, (g, s) => {
+    g.fillStyle = '#d99a45'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < s; i += 16) { g.fillStyle = '#b8742a'; g.fillRect(i, 0, 4, s); g.fillStyle = '#f0c070'; g.fillRect(i + 6, 0, 3, s); }
+  }, 6, 1);
+  const cro = new THREE.Group();
+  cro.position.set(-22, 0, 12); cro.rotation.y = .6;
+  const croM = mesh(new THREE.TorusGeometry(5, 2.3, 16, 30, Math.PI * 1.3), mat(0xffffff, { map: croTex, roughness: .6 }), 0, 1.6, 0, cro);
+  croM.rotation.x = Math.PI / 2; croM.scale.set(1, 1, .7);
+  for (const a of [0, Math.PI * 1.3]) blob(mat(0xd99a45, { roughness: .6 }), 1.6, 1.1, 1.6, Math.cos(a) * 5, 1.2, Math.sin(a) * 5, cro);
+  paris.add(cro);
+  const croPts = [];
+  for (let a = 0; a <= Math.PI * 1.3 + .01; a += .35) croPts.push(V(Math.cos(a) * 5, 0, Math.sin(a) * 5));
+  obsLocal(cro, croPts, 2.4);
+
+  // baget ekmek
+  const bag = new THREE.Group();
+  bag.position.set(22, 0, 16); bag.rotation.y = -.35;
+  const bagM = mat(0xd9a05b, { roughness: .7 });
+  const bb = mesh(new THREE.CylinderGeometry(1.6, 1.6, 22, 22).rotateZ(Math.PI / 2), bagM, 0, 1.6, 0, bag);
+  bb.scale.set(1, .85, 1);
+  for (const s of [-1, 1]) blob(bagM, 1.8, 1.36, 1.6, s * 11, 1.6, 0, bag);
+  for (let i = -4; i <= 4; i++) {
+    const cut = mesh(new THREE.BoxGeometry(1.6, .12, .5), mat(0xf3d9a4), i * 2.3, 2.95, 0, bag);
+    cut.rotation.y = .6;
+  }
+  paris.add(bag);
+  const bagPts = [];
+  for (let x = -12; x <= 12; x += 2.4) bagPts.push(V(x, 0, 0));
+  obsLocal(bag, bagPts, 1.9);
+
+  // kahve fincanı
+  const cw = mat(0xf7f5f0, { roughness: .25 });
+  mesh(new THREE.CylinderGeometry(9, 7, .8, 36), cw, 28, .4, -22, paris);
+  mesh(new THREE.CylinderGeometry(5.6, 4.3, 7, 36), cw, 28, 4.3, -22, paris);
+  const coffee = mesh(new THREE.CircleGeometry(5.3, 32), mat(0x4a2a14, { roughness: .2 }), 28, 7.6, -22, paris);
+  coffee.rotation.x = -Math.PI / 2;
+  const handle = mesh(new THREE.TorusGeometry(2, .5, 10, 20), cw, 33.8, 4.6, -22, paris);
+  handle.rotation.y = Math.PI / 2;
+  obs(28, -22, 9);
+
+  // makaronlar
+  const macCols = [0xff9cc7, 0xa8e6a1, 0xc9a7ff, 0xffd27a, 0x9fd8ff];
+  const macs = [[8, -26, 1], [15, -31, 2], [4, -34, 1], [-6, -22, 1], [44, 2, 3]];
+  macs.forEach(([x, z, stack], idx) => {
+    for (let s = 0; s < stack; s++) {
+      const m = mat(macCols[(idx + s) % macCols.length], { roughness: .7 });
+      const y = s * 2.6;
+      mesh(new THREE.CylinderGeometry(3, 3.1, 1.1, 28), m, x, y + .55, z, paris);
+      mesh(new THREE.CylinderGeometry(2.7, 2.7, .5, 28), mat(0xfff6e6), x, y + 1.35, z, paris);
+      const top = mesh(new THREE.SphereGeometry(3, 28, 10, 0, Math.PI * 2, 0, Math.PI / 2), m, x, y + 1.6, z, paris);
+      top.scale.set(1, .32, 1);
+    }
+    obs(x, z, 3.3);
+  });
+
+  // peynir dilimi
+  const cheese = mesh(new THREE.CylinderGeometry(7, 7, 4.5, 24, 1, false, 0, Math.PI / 3), mat(0xffd34d, { roughness: .6 }), -10, 2.25, 32, paris);
+  cheese.rotation.y = 2.2;
+  obsLocal(cheese, [V(1.5, 0, 2.5), V(3, 0, 5), V(4.5, 0, 3)], 2.6);
+
+  // kafe masası (çok yüksek!)
+  const metal = mat(0x2d4a3a, { roughness: .4, metalness: .6 });
+  for (const [dx, dz] of [[-7, -7], [7, -7], [-7, 7], [7, 7]]) {
+    mesh(new THREE.CylinderGeometry(.6, .9, 40, 12), metal, -32 + dx, 20, -34 + dz, paris);
+    obs(-32 + dx, -34 + dz, 1.1);
+  }
+  mesh(new THREE.CylinderGeometry(15, 15, 1, 40), mat(0xe8e0d0, { roughness: .5, metalness: .2 }), -32, 40.5, -34, paris);
+
+  // sokak lambası
+  mesh(new THREE.CylinderGeometry(2.6, 3, 4, 16), metal, 46, 2, 36, paris);
+  mesh(new THREE.CylinderGeometry(1.1, 1.4, 70, 12), metal, 46, 37, 36, paris);
+  mesh(new THREE.BoxGeometry(5, 7, 5), mat(0xfff0b0, { emissive: 0x806020 }), 46, 74, 36, paris);
+  obs(46, 36, 3.2);
+
+  // saksı ve sardunyalar
+  mesh(new THREE.CylinderGeometry(6, 4.6, 8, 28), mat(0xc4673e, { roughness: .9 }), -28, 4, 48, paris);
+  const soil = mesh(new THREE.CircleGeometry(5.7, 24), mat(0x3a2414), -28, 7.9, 48, paris); soil.rotation.x = -Math.PI / 2;
+  const gm = mat(0x3d8c2f), rm = mat(0xff3048, { roughness: .6 });
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2, x = -28 + Math.cos(a) * 3, z = 48 + Math.sin(a) * 3, h = rand(6, 11);
+    mesh(new THREE.CylinderGeometry(.25, .3, h, 6), gm, x, 8 + h / 2, z, paris);
+    for (let j = 0; j < 4; j++) blob(rm, 1.1, 1.1, 1.1, x + rand(-1, 1), 8 + h + rand(-.5, .8), z + rand(-1, 1), paris);
+  }
+  obs(-28, 48, 6.3);
+
+  // bere
+  const beret = mesh(new THREE.CylinderGeometry(5, 5.6, 1.2, 32), mat(0x7a1020, { roughness: .9 }), 42, .6, -52, paris);
+  beret.rotation.z = .05;
+  blob(mat(0x7a1020), .5, .7, .5, 42, 1.5, -52, paris);
+  obs(42, -52, 5.6);
+
+  // arı kovanı
+  const hiveM = mat(0xd9a03a, { roughness: .7 });
+  for (let i = 0; i < 6; i++) {
+    const r = 4.4 - Math.abs(i - 2.2) * .55;
+    const t = mesh(new THREE.TorusGeometry(r, 1.15, 10, 26), hiveM, HIVE.x, 1.1 + i * 1.5, HIVE.z, paris);
+    t.rotation.x = Math.PI / 2;
+    mesh(new THREE.CylinderGeometry(r, r, 1.6, 26), hiveM, HIVE.x, 1.1 + i * 1.5, HIVE.z, paris);
+  }
+  blob(hiveM, 2.2, 1.4, 2.2, HIVE.x, 9.6, HIVE.z, paris);
+  const ent = mesh(new THREE.CircleGeometry(1.3, 20), new THREE.MeshBasicMaterial({ color: 0x140a02 }), HIVE.x + HIVE_DIR.x * 4.45, 1.6, HIVE.z + HIVE_DIR.z * 4.45, paris);
+  ent.lookAt(HIVE.x + HIVE_DIR.x * 10, 1.6, HIVE.z + HIVE_DIR.z * 10);
+  obs(HIVE.x, HIVE.z, 5);
+
+  // yeni yuvamız
+  mesh(new THREE.ConeGeometry(3, 3, 22), mat(0xb87d46, { roughness: 1 }), YUVA.x, 1.5, YUVA.z, paris);
+  const yd = mesh(new THREE.CircleGeometry(.7, 16), new THREE.MeshBasicMaterial({ color: 0x1a0f08 }), YUVA.x - 1.6, .7, YUVA.z + 1.6, paris);
+  yd.lookAt(YUVA.x - 5, .7, YUVA.z + 5);
+  obs(YUVA.x, YUVA.z, 2.6);
+  const safe = new THREE.Mesh(new THREE.RingGeometry(YUVA_R - .35, YUVA_R, 56), new THREE.MeshBasicMaterial({ color: 0x6ad06a, transparent: true, opacity: .8, side: THREE.DoubleSide }));
+  safe.rotation.x = -Math.PI / 2; safe.position.set(YUVA.x, .06, YUVA.z);
+  const safeFill = new THREE.Mesh(new THREE.CircleGeometry(YUVA_R, 48), new THREE.MeshBasicMaterial({ color: 0x6ad06a, transparent: true, opacity: .12 }));
+  safeFill.rotation.x = -Math.PI / 2; safeFill.position.set(YUVA.x, .05, YUVA.z);
+  paris.add(safe, safeFill);
+
+  // Eyfel Kulesi
+  const lattice = canvasTex(128, (g, s) => {
+    g.clearRect(0, 0, s, s);
+    g.strokeStyle = '#fff'; g.lineWidth = 9; g.strokeRect(0, 0, s, s);
+    g.lineWidth = 5;
+    g.beginPath(); g.moveTo(0, 0); g.lineTo(s, s); g.moveTo(s, 0); g.lineTo(0, s); g.stroke();
+    g.lineWidth = 4; g.beginPath(); g.moveTo(0, s / 2); g.lineTo(s, s / 2); g.stroke();
+  }, 2, 5);
+  const ironM = new THREE.MeshStandardMaterial({ color: 0x7a5f45, map: lattice, alphaTest: .5, side: THREE.DoubleSide, roughness: .8, metalness: .3 });
+  const solidIron = mat(0x6b523b, { roughness: .8, metalness: .3 });
+  const ef = new THREE.Group();
+  ef.position.copy(EIFFEL);
+  function frustumBetween(a, b, rb, rt) {
+    const d = new THREE.Vector3().subVectors(b, a);
+    const geo = new THREE.CylinderGeometry(rt, rb, d.length(), 4, 1, true).rotateY(Math.PI / 4);
+    const m = new THREE.Mesh(geo, ironM);
+    m.castShadow = true;
+    m.position.copy(a).addScaledVector(d, .5);
+    m.quaternion.setFromUnitVectors(UP, d.normalize());
+    ef.add(m);
+  }
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    frustumBetween(V(sx * 22, 0, sz * 22), V(sx * 11, 50, sz * 11), 7, 4);
+    obs(EIFFEL.x + sx * 22, EIFFEL.z + sz * 22, 7);
+  }
+  for (let k = 0; k < 4; k++) {
+    const arch = new THREE.Mesh(new THREE.TorusGeometry(15, 1, 8, 28, Math.PI), solidIron);
+    arch.position.set(k < 2 ? 0 : (k === 2 ? -19 : 19), 20, k < 2 ? (k === 0 ? 19 : -19) : 0);
+    if (k >= 2) arch.rotation.y = Math.PI / 2;
+    ef.add(arch);
+  }
+  mesh(new THREE.BoxGeometry(36, 3, 36), solidIron, 0, 51, 0, ef);
+  frustumBetween(V(0, 52, 0), V(0, 116, 0), 14, 5);
+  mesh(new THREE.BoxGeometry(15, 2, 15), solidIron, 0, 117, 0, ef);
+  frustumBetween(V(0, 118, 0), V(0, 176, 0), 5, 1.4);
+  mesh(new THREE.BoxGeometry(3.4, 4, 3.4), solidIron, 0, 178, 0, ef);
+  mesh(new THREE.CylinderGeometry(.3, .3, 12, 6), solidIron, 0, 186, 0, ef);
+  paris.add(ef);
+
+  // uzaktaki Paris binaları
+  const facade = canvasTex(128, (g, s) => {
+    g.fillStyle = '#e9dcc3'; g.fillRect(0, 0, s, s);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+      g.fillStyle = '#5a6a7c'; g.fillRect(c * 32 + 9, r * 32 + 6, 14, 20);
+      g.fillStyle = '#2b2b2b'; g.fillRect(c * 32 + 6, r * 32 + 26, 20, 3);
+    }
+  }, 3, 4);
+  const facM = mat(0xffffff, { map: facade, roughness: .9 });
+  const roofM = mat(0x6d7a88, { roughness: .7, metalness: .2 });
+  for (let i = 0; i < 26; i++) {
+    const a = i / 26 * Math.PI * 2;
+    const r = rand(165, 190);
+    const x = Math.cos(a) * r, z = -25 + Math.sin(a) * r;
+    const h = rand(55, 95), w = rand(30, 44);
+    const b = mesh(new THREE.BoxGeometry(w, h, 26), facM, x, h / 2, z, paris);
+    b.lookAt(0, h / 2, -25);
+    b.castShadow = false;
+    const roof = mesh(new THREE.CylinderGeometry(.1, 1, 1, 4, 1).rotateY(Math.PI / 4), roofM, x, h + 7, z, paris);
+    roof.scale.set(w * .72, 14, 18.4);
+    roof.lookAt(0, h + 7, -25);
+    roof.castShadow = false;
+  }
+})();
+
+// ================= Ortak nesneler =================
+const rocket = makeRocket();
+scene.add(rocket);
+const player = makeAnt(PLAYER_COLOR, true);
+scene.add(player);
+
+// ================= Ses =================
+let actx = null, master = null, buzzGain = null, muted = false;
+function audio() {
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      master = actx.createGain(); master.gain.value = .5; master.connect(actx.destination);
+      buzzGain = actx.createGain(); buzzGain.gain.value = 0;
+      const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1400;
+      lp.connect(buzzGain); buzzGain.connect(master);
+      const lfo = actx.createOscillator(); lfo.frequency.value = 19;
+      const lfoG = actx.createGain(); lfoG.gain.value = 12; lfo.connect(lfoG);
+      for (const f of [218, 231]) {
+        const o = actx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f;
+        lfoG.connect(o.frequency); o.connect(lp); o.start();
+      }
+      lfo.start();
+    } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume();
+}
+function setBuzz(v) { if (buzzGain) buzzGain.gain.setTargetAtTime(muted ? 0 : v, actx.currentTime, .1); }
+function tone(freq, dur, type = 'sine', vol = .15, when = 0, slideTo) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + when;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + .015);
+  g.gain.exponentialRampToValueAtTime(.0008, t0 + dur);
+  o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + .05);
+}
+function noise(dur, vol, freq, when = 0) {
+  if (!actx || muted) return;
+  const t0 = actx.currentTime + when;
+  const buf = actx.createBuffer(1, actx.sampleRate * dur | 0, actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = actx.createBufferSource(); src.buffer = buf;
+  const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.001, t0 + dur);
+  src.connect(f); f.connect(g); g.connect(master); src.start(t0);
+}
+const sfx = {
+  pick() { tone(880, .1, 'triangle', .14); tone(1320, .14, 'triangle', .12, .07); },
+  deliver() { [523, 659, 784].forEach((f, i) => tone(f, .18, 'triangle', .14, i * .08)); },
+  hurt() { tone(320, .3, 'sawtooth', .13, 0, 110); noise(.25, .15, 900); },
+  jump() { tone(380, .14, 'sine', .12, 0, 760); },
+  dash() { noise(.3, .12, 2400); },
+  mission() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .25, 'triangle', .15, i * .12)); },
+  win() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, .3, 'triangle', .15, i * .14)); },
+  lose() { [440, 392, 349, 262].forEach((f, i) => tone(f, .35, 'square', .07, i * .2)); },
+  launch() { noise(4.5, .4, 380); tone(60, 4, 'sawtooth', .12, 0, 40); },
+  land() { noise(.9, .35, 300); },
+  door() { tone(240, .1, 'square', .07); tone(170, .14, 'square', .07, .1); },
+  bonk() { tone(190, .2, 'square', .12, 0, 80); },
+  squeak() { tone(rand(900, 1300), .12, 'sine', .07, 0, 600); },
+  sad() { [392, 349, 311, 262].forEach((f, i) => tone(f, .7, 'sine', .08, i * .55)); },
+};
+// küçük arka plan melodisi
+let musicMode = null, musicStep = 0;
+const MELODY = {
+  calm: [523, 659, 784, 659, 587, 698, 880, 698, 523, 659, 784, 1047, 988, 784, 659, 587],
+  game: [392, 0, 523, 0, 466, 0, 392, 349, 392, 0, 587, 0, 523, 466, 392, 0],
+};
+setInterval(() => {
+  if (!musicMode || !actx || muted || document.hidden) return;
+  const seq = MELODY[musicMode];
+  const f = seq[musicStep++ % seq.length];
+  if (f) tone(f, .28, 'triangle', musicMode === 'calm' ? .05 : .035);
+  if (musicStep % 4 === 0) tone(seq[0] / 2, .4, 'sine', .04);
+}, 230);
+
+// ================= Dünya değiştirme =================
+let world = '';
+function setWorld(name) {
+  if (world === name) return;
+  world = name;
+  town.visible = name === 'town';
+  space.visible = name === 'space';
+  paris.visible = name === 'paris';
+  clearParticles();
+  if (name === 'town') {
+    scene.background = new THREE.Color(0x9fd8ff);
+    scene.fog = new THREE.Fog(0x9fd8ff, 70, 200);
+    hemi.color.setHex(0xdff2ff); hemi.groundColor.setHex(0x5a7a3a); hemi.intensity = .75;
+    sun.color.setHex(0xfff1d6); sun.intensity = 1.0;
+  } else if (name === 'space') {
+    scene.background = new THREE.Color(0x03040a);
+    scene.fog = null;
+    hemi.color.setHex(0x8899cc); hemi.groundColor.setHex(0x111122); hemi.intensity = .35;
+    sun.color.setHex(0xffffff); sun.intensity = 1.3;
+  } else {
+    scene.background = new THREE.Color(0xd9e6f2);
+    scene.fog = new THREE.Fog(0xd9e6f2, 110, 380);
+    hemi.color.setHex(0xeaf2ff); hemi.groundColor.setHex(0x6a6258); hemi.intensity = .75;
+    sun.color.setHex(0xffe6c8); sun.intensity = 1.05;
+  }
+}
+
+// ================= Kasaba karıncaları (menü + animasyon) =================
+const townAnts = [];
+const ANT_COLORS = [0x3a2418, 0x2a1a12, 0x5a3420, 0x46281a, 0x2e2018, 0x6a3a1e, 0x3a2418, 0x50301c, 0x2a1a12];
+for (let i = 0; i < 9; i++) {
+  const a = makeAnt(ANT_COLORS[i]);
+  town.add(a);
+  townAnts.push({ mesh: a, angle: 0, mode: 'walk', target: V(0, 0, 0), carrier: null, speed: 0 });
+}
+let playerAngle = 0;
+function placeOnRing(obj, angle) {
+  obj.position.set(Math.cos(angle) * 14, 0, Math.sin(angle) * 14);
+  obj.rotation.set(0, Math.atan2(-Math.sin(angle), Math.cos(angle)), 0);
+}
+function resetTown() {
+  playerAngle = -Math.PI / 2 - .27;
+  townAnts.forEach((a, i) => {
+    a.angle = playerAngle - (i + 1) * (Math.PI * 2 / 10);
+    a.mode = 'walk'; a.carrier = null;
+    a.mesh.visible = true;
+    placeOnRing(a.mesh, a.angle);
+  });
+  player.visible = true;
+  placeOnRing(player, playerAngle);
+  rocket.position.copy(RPOS); rocket.position.y = .6;
+  rocket.rotation.set(0, 0, 0);
+  rocket.userData.hinge.rotation.y = 0;
+  rocket.userData.flame.visible = false;
+}
+function walkRing(dt) {
+  for (const a of townAnts) if (a.mode === 'walk') { a.angle += dt * .14; placeOnRing(a.mesh, a.angle); animateAnt(a.mesh, 2, dt); }
+}
+
+// ================= Animasyon (sinematik) =================
+const CAPTIONS = [
+  [0, "Karınca Kasabası'nda güzel bir sabahtı…"],
+  [3.6, 'Ben ve arkadaşlarım her zamanki gibi yürüyüşe çıkmıştık.'],
+  [7.2, 'Ama birden gökyüzünden bir vızıltı geldi…'],
+  [9.6, 'ARILAR SALDIRIYOR!', true],
+  [12.6, 'Herkes kaçışıyor! Hemen rokete koşmalıyım!'],
+  [16.9, 'ROKETE ATLA!', true],
+  [18.9, 'Kapı kapandı… Motorlar çalışıyor!'],
+  [21.6, 'Kasabadan benden başka kimse kurtulamadı…'],
+  [25.3, 'Uzun bir yolculuk… ve uzakta yeni bir gezegen!'],
+  [30.3, 'İniş başlıyor…'],
+  [35.3, 'Burası… PARİS! Bir karınca için Paris koca bir gezegen demek!'],
+  [38.4, 'Ama dikkat… Arılar peşimi bırakmadı!'],
+];
+const INTRO_END = 41.2;
+let introT = 0, introFlags = new Set(), capIdx = -1;
+let cineBees = [], runFrom = V(0, 0, 0), b9 = null, b9From = V(0, 0, 0);
+const camLook = V(0, 0, 0);
+const DOOR_FRONT = V(RPOS.x, 0, RPOS.z + 3.4);
+const DOOR_IN = V(RPOS.x, 1.6, RPOS.z + 1.1);
+function once(k, at, fn) { if (introT >= at && !introFlags.has(k)) { introFlags.add(k); fn(); } }
+function removeCineBees() { for (const b of cineBees) b.mesh.parent && b.mesh.parent.remove(b.mesh); cineBees = []; b9 = null; }
+function faceDir(obj, dx, dz, k = 1) {
+  if (Math.abs(dx) + Math.abs(dz) < 1e-5) return;
+  const target = Math.atan2(dx, dz);
+  let d = target - obj.rotation.y;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  obj.rotation.y += d * k;
+}
+function moveToward(obj, target, speed, dt) {
+  const d = new THREE.Vector3().subVectors(target, obj.position);
+  const len = d.length();
+  if (len < 1e-4) return 0;
+  const step = Math.min(len, speed * dt);
+  obj.position.addScaledVector(d, step / len);
+  faceDir(obj, d.x, d.z, Math.min(1, dt * 8));
+  return len - step;
+}
+
+function startIntro() {
+  audio();
+  state = 'intro';
+  introT = 0; introFlags = new Set(); capIdx = -1;
+  removeCineBees();
+  setWorld('town');
+  resetTown();
+  hideScreens();
+  $('hud').hidden = true; $('touch').hidden = true;
+  $('cine').hidden = false; $('skipBtn').hidden = false;
+  musicMode = 'calm';
+  setBuzz(0);
+}
+
+function showCaption(t) {
+  let idx = -1;
+  for (let i = 0; i < CAPTIONS.length; i++) if (t >= CAPTIONS[i][0]) idx = i;
+  if (idx !== capIdx) {
+    capIdx = idx;
+    const c = $('caption');
+    c.textContent = idx >= 0 ? CAPTIONS[idx][1] : '';
+    c.classList.toggle('loud', !!(idx >= 0 && CAPTIONS[idx][2]));
+  }
+}
+
+function updateIntro(dt) {
+  introT += dt;
+  const t = introT;
+  showCaption(t);
+  const tri = c => Math.max(0, 1 - Math.abs(t - c) / .5);
+  $('fade').style.opacity = Math.max(tri(25), tri(30), clamp((t - 40.5) / .6, 0, 1));
+  if (t < 25) setWorld('town'); else if (t < 30) setWorld('space'); else setWorld('paris');
+  const R = rocket.userData;
+  let shake = 0;
+
+  if (world === 'town') {
+    aimSun(0, -8);
+    // --- karıncalar ---
+    once('bees', 7, () => {
+      musicMode = null;
+      for (let i = 0; i < 10; i++) {
+        const m = makeBee();
+        m.position.set(rand(-35, 35), rand(26, 36), rand(-80, -62));
+        town.add(m);
+        cineBees.push({ mesh: m, mode: i < 9 ? 'hunt' : 'wait', victim: townAnts[i] || null, hover: null });
+      }
+      b9 = cineBees[9];
+    });
+    once('panic', 10, () => {
+      for (const a of townAnts) { a.mode = 'panic'; a.target.set(rand(-18, 18), 0, rand(-18, 18)); }
+    });
+    for (const a of townAnts) {
+      if (a.mode === 'walk') { a.angle += dt * .14; placeOnRing(a.mesh, a.angle); animateAnt(a.mesh, 2, dt); }
+      else if (a.mode === 'panic') {
+        if (moveToward(a.mesh, a.target, 3.4, dt) < .5) a.target.set(rand(-18, 18), 0, rand(-18, 18));
+        animateAnt(a.mesh, 5, dt);
+      } else if (a.mode === 'carried') {
+        a.mesh.position.copy(a.carrier.mesh.position).add(V(0, -1.25, 0));
+        a.mesh.rotation.y = a.carrier.mesh.rotation.y;
+        a.mesh.rotation.z = Math.sin(t * 9 + a.angle) * .25;
+        animateAnt(a.mesh, 8, dt);
+      }
+    }
+    // --- arılar ---
+    for (const b of cineBees) {
+      animateBee(b.mesh, dt);
+      if (b.mode === 'hunt') {
+        const tp = b.victim.mesh.position.clone().add(V(0, 1.3, 0));
+        const d = b.mesh.position.distanceTo(tp);
+        moveToward(b.mesh, tp, d > 12 ? 17 : 9.5, dt);
+        if (b.mesh.position.distanceTo(tp) < .6 || t > 18.5) {
+          b.mode = 'carry'; b.victim.mode = 'carried'; b.victim.carrier = b;
+          b.hover = { cx: rand(-6, 6), cz: rand(-14, 4), r: rand(5, 11), a: rand(0, 6), h: rand(11, 17) };
+          sfx.squeak();
+        }
+      } else if (b.mode === 'carry' || b.mode === 'circle') {
+        const H = b.hover;
+        H.a += dt * .55;
+        moveToward(b.mesh, V(H.cx + Math.cos(H.a) * H.r, H.h, H.cz + Math.sin(H.a) * H.r), 5, dt);
+      }
+    }
+    // --- bizim karınca ---
+    if (t < 10.5) { playerAngle += dt * .14; placeOnRing(player, playerAngle); animateAnt(player, 2, dt); }
+    else if (t < 17) {
+      once('run', 10.5, () => runFrom.copy(player.position));
+      const u = (t - 10.5) / 6.5;
+      player.position.lerpVectors(runFrom, DOOR_FRONT, u * u * .35 + u * .65);
+      faceDir(player, DOOR_FRONT.x - runFrom.x, DOOR_FRONT.z - runFrom.z, Math.min(1, dt * 10));
+      animateAnt(player, 6, dt);
+    } else if (t < 18.2) {
+      once('jump', 17, () => sfx.jump());
+      const u = (t - 17) / 1.2;
+      player.position.lerpVectors(DOOR_FRONT, DOOR_IN, u);
+      player.position.y += Math.sin(Math.PI * u) * 2.2;
+      faceDir(player, 0, -1, Math.min(1, dt * 10));
+      animateAnt(player, 3, dt);
+    } else player.visible = false;
+    // peşimizdeki arı
+    once('b9', 12, () => {
+      b9.mode = 'chase';
+      const dir = V(DOOR_FRONT.x - runFrom.x, 0, DOOR_FRONT.z - runFrom.z).normalize();
+      b9.mesh.position.copy(player.position).addScaledVector(dir, -14).add(V(0, 4, 0));
+      b9From.copy(b9.mesh.position);
+    });
+    if (b9 && b9.mode === 'chase') {
+      const u = clamp((t - 12) / 6.6, 0, 1);
+      const p = new THREE.Vector3().lerpVectors(b9From, DOOR_FRONT.clone().add(V(0, 2.2, .2)), Math.pow(u, 1.25));
+      faceDir(b9.mesh, p.x - b9.mesh.position.x, p.z - b9.mesh.position.z, Math.min(1, dt * 8));
+      b9.mesh.position.copy(p);
+      if (u >= 1) {
+        b9.mode = 'circle'; sfx.bonk();
+        b9.hover = { cx: 0, cz: -20, r: 6, a: 1.5, h: 9 };
+      }
+    }
+    // kapı
+    const h = R.hinge;
+    if (t >= 15 && t < 18.3) { once('dopen', 15, () => sfx.door()); h.rotation.y = -1.9 * smooth((t - 15) / .6); }
+    if (t >= 18.3) { once('dclose', 18.3, () => sfx.door()); h.rotation.y = -1.9 * (1 - smooth((t - 18.3) / .5)); }
+    // fırlatma
+    if (t >= 19.4) {
+      once('ign', 19.4, () => { R.flame.visible = true; sfx.launch(); setTimeout(() => state === 'intro' && sfx.sad(), 2200); });
+      shake = t < 21 ? .12 : .06;
+      const lift = Math.max(0, t - 20.5);
+      rocket.position.set(RPOS.x + (t < 20.5 ? rand(-.05, .05) : 0), .6 + 2.6 * lift * lift, RPOS.z);
+      R.flame.scale.set(1, 1 + Math.sin(t * 50) * .15 + (lift > 0 ? .4 : 0), 1);
+      for (let i = 0; i < 3; i++) {
+        const a = rand(0, Math.PI * 2), s = lift > 0 ? 1 : 5;
+        emitSmoke(rocket.position.x, Math.max(.6, rocket.position.y - 1.2), rocket.position.z, Math.cos(a) * s * rand(1, 3), rand(.3, 1.5), Math.sin(a) * s * rand(1, 3), rand(.8, 1.6), rand(1.2, 2.2));
+      }
+    }
+    // --- kamera ---
+    if (t < 7) {
+      const a = .35 + t * .07;
+      camera.position.set(Math.cos(a) * 30, 10 - t * .45, Math.sin(a) * 30);
+      camLook.set(0, 1, 0);
+    } else if (t < 10.5) {
+      camera.position.set(2, 1.6, 4);
+      const c = V(0, 0, 0);
+      cineBees.forEach(b => c.add(b.mesh.position)); c.multiplyScalar(1 / Math.max(1, cineBees.length));
+      camLook.lerp(c, t < 7.1 ? 1 : Math.min(1, dt * 3));
+    } else if (t < 13.5) {
+      camera.position.set(19, 15, 9);
+      camLook.set(0, 1, -6);
+    } else if (t < 17) {
+      const dir = V(DOOR_FRONT.x - runFrom.x, 0, DOOR_FRONT.z - runFrom.z).normalize();
+      camera.position.copy(player.position).addScaledVector(dir, -6.5).add(V(1.5, 3, 0));
+      camLook.copy(player.position).addScaledVector(dir, 3).add(V(0, 1, 0));
+    } else if (t < 19.2) {
+      camera.position.set(6.5, 2.6, -15.5);
+      camLook.set(0, 2, -22.5);
+    } else {
+      camera.position.set(9, 1.4, -11);
+      camLook.lerp(V(rocket.position.x, rocket.position.y + 4, rocket.position.z), t < 19.3 ? 1 : Math.min(1, dt * 4));
+    }
+  } else if (world === 'space') {
+    once('space', 25, () => {
+      removeCineBees();
+      player.visible = false;
+      rocket.rotation.set(0, 0, -Math.PI / 2);
+      R.flame.visible = true; R.flame.scale.set(1, 1.3, 1);
+      sun.position.set(-80, 40, 60); sun.target.position.set(0, 0, 0);
+    });
+    const u = t - 25;
+    rocket.position.set(-42 + u * 15, Math.sin(u * 1.4) * .6 + u * -.4, 0);
+    rocket.rotation.x = Math.sin(u * 2) * .05;
+    R.flame.scale.set(1, 1.3 + Math.sin(t * 40) * .15, 1);
+    if (Math.random() < .7) emitSmoke(rocket.position.x - 2.5, rocket.position.y, rocket.position.z, rand(-6, -3), rand(-.4, .4), rand(-.4, .4), rand(.4, .8), 1.2, 0xffb070);
+    planet.rotation.y += dt * .05;
+    camera.position.set(-6 + u * 1.5, 5, 30);
+    camLook.set(rocket.position.x * .6 + 10, 0, -10);
+  } else {
+    // --- Paris'e iniş ---
+    once('paris', 30, () => {
+      removeCineBees();
+      rocket.rotation.set(0, 0, 0);
+      rocket.position.set(0, 70, 0);
+      R.flame.visible = true;
+      R.hinge.rotation.y = 0;
+      player.visible = false;
+      aimSun(0, 0);
+    });
+    if (t < 34.5) {
+      const u = (t - 30) / 4.5;
+      rocket.position.set(0, .0 + 70 * (1 - u) * (1 - u), 0);
+      R.flame.scale.set(1, 1 + Math.sin(t * 50) * .2, 1);
+      if (rocket.position.y < 12) for (let i = 0; i < 3; i++) {
+        const a = rand(0, Math.PI * 2);
+        emitSmoke(Math.cos(a) * 1.5, .5, Math.sin(a) * 1.5, Math.cos(a) * rand(4, 9), rand(.2, 1), Math.sin(a) * rand(4, 9), rand(.8, 1.5), rand(1, 2));
+      }
+      camera.position.set(13, 2, 17);
+      camLook.set(0, rocket.position.y * .8 + 4, 0);
+      shake = .04;
+    } else {
+      once('land', 34.5, () => {
+        rocket.position.y = 0; R.flame.visible = false; sfx.land();
+        for (let i = 0; i < 30; i++) { const a = rand(0, Math.PI * 2); emitSmoke(Math.cos(a) * 2, .4, Math.sin(a) * 2, Math.cos(a) * rand(5, 11), rand(.2, 1.2), Math.sin(a) * rand(5, 11), rand(1, 1.8), rand(1.2, 2.2)); }
+      });
+      if (t < 34.9) shake = .25 * (34.9 - t);
+      const h = R.hinge;
+      if (t >= 35 && t < 35.6) { once('pdoor', 35, () => sfx.door()); h.rotation.y = -1.9 * smooth((t - 35) / .6); }
+      const IN = V(0, 1.6, 1.1), OUT = V(0, 0, 3.6), WALK = V(5, 0, 8);
+      if (t >= 35.3) {
+        player.visible = true;
+        if (t < 36.1) {
+          const u = (t - 35.3) / .8;
+          player.position.lerpVectors(IN, OUT, u); player.position.y += Math.sin(Math.PI * u) * 1.2;
+          player.rotation.y = 0;
+          once('pjump', 35.3, () => sfx.jump());
+          animateAnt(player, 3, dt);
+        } else if (t < 37.6) {
+          const u = (t - 36.1) / 1.5;
+          player.position.lerpVectors(OUT, WALK, smooth(u));
+          faceDir(player, WALK.x - OUT.x, WALK.z - OUT.z, Math.min(1, dt * 8));
+          animateAnt(player, 2.5, dt);
+        } else {
+          faceDir(player, EIFFEL.x - player.position.x, EIFFEL.z - player.position.z, Math.min(1, dt * 3));
+          animateAnt(player, .6, dt);
+        }
+      }
+      once('flyby', 37.8, () => {
+        for (let i = 0; i < 3; i++) {
+          const m = makeBee();
+          m.position.set(-70 - i * 6, 14 + i * 2, -40 + i * 4);
+          scene.add(m);
+          cineBees.push({ mesh: m, mode: 'flyby' });
+        }
+        musicMode = null;
+      });
+      for (const b of cineBees) { animateBee(b.mesh, dt); b.mesh.position.x += dt * 22; b.mesh.rotation.y = Math.PI / 2; }
+      if (t < 37.6) {
+        camera.position.set(10, 1.6, 14);
+        camLook.set(player.visible ? player.position.x * .5 : 0, 2.2, player.visible ? player.position.z * .5 : 1);
+      } else {
+        const u = smooth((t - 37.6) / 2.4);
+        camera.position.set(lerp(10, 7.5, u), lerp(1.6, .9, u), lerp(14, 13, u));
+        camLook.lerpVectors(V(5, 1.5, 8), V(0, 95, -110), u);
+      }
+    }
+  }
+  if (t >= 38.2) setBuzz(.07); else if (world === 'town' && t > 7) {
+    let near = 99;
+    for (const b of cineBees) near = Math.min(near, b.mesh.position.distanceTo(camera.position));
+    setBuzz(clamp(1 - near / 40, 0, 1) * .14);
+  } else setBuzz(0);
+  if (shake) camera.position.add(V(rand(-shake, shake), rand(-shake, shake), rand(-shake, shake)));
+  camera.lookAt(camLook);
+  if (t >= INTRO_END) startGame();
+}
+
+// ================= Oyun =================
+const MISSIONS = [
+  { title: 'Karnın zil çalıyor!', desc: 'Bu kadar yolculuktan sonra çok acıktın. 6 ekmek kırıntısı topla.', type: 'collect', kind: 'crumb', bees: 2, speed: 4.6,
+    spots: [[-12, 4], [-30, 20], [-16, 25], [14, 6], [30, 9], [26, 27]] },
+  { title: 'Yeni yuva', desc: 'Kahve fincanının yanındaki 3 şeker küpünü tek tek yuvana taşı.', type: 'carry', kind: 'sugar', bees: 3, speed: 4.9,
+    spots: [[19, -11], [39, -12], [30, -36]], dest: YUVA, destR: 5.6, label: 'şeker küpü' },
+  { title: 'Kasabamızın bayrağı', desc: "Eyfel Kulesi'nin ayağına git ve Karınca Kasabası'nın bayrağını dik.", type: 'reach', bees: 4, speed: 5.2,
+    dest: EIFFEL_LEG, destR: 13 },
+  { title: 'Arı kovanı', desc: 'Arılar burada da kovan kurmuş! 3 çakıl taşı taşıyıp kovanın kapısını kapat.', type: 'carry', kind: 'pebble', bees: 5, speed: 5.5,
+    spots: [[-30, -14], [-52, -4], [-18, -46]], dest: HIVE, destR: 8.5, label: 'çakıl taşı', hive: true },
+];
+const P = { vel: V(0, 0, 0), vy: 0, onGround: true, dash: 0, dashCd: 0, invuln: 0, knock: V(0, 0, 0) };
+let state = 'menu', missionIdx = 0, progress = 0, lives = 3, carrying = null, missionDone = 0;
+let items = [], bees = [], delivered = [];
+const keys = {};
+const joy = { x: 0, y: 0 };
+
+const ITEM_GEO = {
+  crumb: new THREE.DodecahedronGeometry(.5),
+  sugar: new THREE.BoxGeometry(.95, .95, .95),
+  pebble: new THREE.IcosahedronGeometry(.6),
+};
+const ITEM_MAT = {
+  crumb: mat(0xc98a3d, { roughness: .9, flatShading: true }),
+  sugar: mat(0xffffff, { roughness: .3, emissive: 0x222222 }),
+  pebble: mat(0x8f8b85, { roughness: .9, flatShading: true }),
+};
+const ringGeo = new THREE.RingGeometry(.8, 1.0, 24);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xffc23d, transparent: true, opacity: .85, side: THREE.DoubleSide });
+const beamGeo = new THREE.CylinderGeometry(.18, .18, 12, 6, 1, true).translate(0, 6, 0);
+const beamMat = new THREE.MeshBasicMaterial({ color: 0xffd25a, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false });
+const destBeam = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 70, 20, 1, true).translate(0, 35, 0),
+  new THREE.MeshBasicMaterial({ color: 0x8fff8f, transparent: true, opacity: .2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+destBeam.visible = false;
+scene.add(destBeam);
+const arrow = new THREE.Mesh(new THREE.ConeGeometry(.28, .8, 10).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffc23d }));
+arrow.visible = false;
+scene.add(arrow);
+
+const flagTex = canvasTex(128, (g, s, h) => {
+  g.fillStyle = '#ff8a1f'; g.fillRect(0, 0, s, h);
+  g.fillStyle = '#ffd25a'; g.fillRect(0, h - 14, s, 14);
+  g.fillStyle = '#2a1408';
+  for (const [x, r] of [[40, 12], [62, 9], [82, 11]]) { g.beginPath(); g.ellipse(x, h / 2 - 4, r, r * .8, 0, 0, 7); g.fill(); }
+  g.lineWidth = 3; g.strokeStyle = '#2a1408';
+  for (let i = 0; i < 3; i++) for (const s2 of [-1, 1]) { g.beginPath(); g.moveTo(52 + i * 10, h / 2); g.lineTo(46 + i * 14, h / 2 + s2 * 22); g.stroke(); }
+}, 1, 1, 80);
+function makeFlag(scale = 1) {
+  const f = new THREE.Group();
+  mesh(new THREE.CylinderGeometry(.05, .05, 2.6, 6), mat(0x8a6a4a), 0, 1.3, 0, f);
+  const cloth = mesh(new THREE.PlaneGeometry(1.4, .9), new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: .8 }), .72, 2.1, 0, f);
+  f.userData.cloth = cloth;
+  f.scale.setScalar(scale);
+  return f;
+}
+const backFlag = makeFlag(.75);
+backFlag.position.set(0, .7, -.5);
+backFlag.visible = false;
+player.userData.body.add(backFlag);
+let plantedFlag = null;
+
+function collide(p, r) {
+  for (const o of obstacles) {
+    const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz), m = o.r + r;
+    if (d < m && d > 1e-5) { p.x = o.x + dx / d * m; p.z = o.z + dz / d * m; }
+  }
+  p.x = clamp(p.x, BOUNDS.x1, BOUNDS.x2);
+  p.z = clamp(p.z, BOUNDS.z1, BOUNDS.z2);
+}
+
+function clearMissionObjects() {
+  for (const it of items) { scene.remove(it.g); }
+  items = [];
+  for (const b of bees) scene.remove(b.mesh);
+  bees = [];
+  carrying = null;
+  backFlag.visible = false;
+  destBeam.visible = false;
+}
+function spawnItem(kind, x, z) {
+  const g = new THREE.Group();
+  const p = { x, z }; collide(p, 1.2);
+  g.position.set(p.x, 0, p.z);
+  const m = mesh(ITEM_GEO[kind], ITEM_MAT[kind], 0, .7, 0, g);
+  const ring = new THREE.Mesh(ringGeo, ringMat); ring.rotation.x = -Math.PI / 2; ring.position.y = .05;
+  const beam = new THREE.Mesh(beamGeo, beamMat);
+  g.add(ring, beam);
+  scene.add(g);
+  const it = { g, m, ring, beam, kind, taken: false, done: false };
+  items.push(it);
+  return it;
+}
+function spawnBee(i, M) {
+  const m = makeBee();
+  let x, z;
+  if (M.hive && i < 3) { x = HIVE.x + HIVE_DIR.x * 7 + rand(-3, 3); z = HIVE.z + HIVE_DIR.z * 7 + rand(-3, 3); }
+  else {
+    for (let tries = 0; tries < 30; tries++) {
+      const a = rand(0, Math.PI * 2), r = rand(26, 50);
+      x = clamp(player.position.x + Math.cos(a) * r, BOUNDS.x1 + 5, BOUNDS.x2 - 5);
+      z = clamp(player.position.z + Math.sin(a) * r, BOUNDS.z1 + 5, BOUNDS.z2 - 5);
+      if (Math.hypot(x - player.position.x, z - player.position.z) > 22) break;
+    }
+  }
+  m.position.set(x, 3, z);
+  scene.add(m);
+  bees.push({ mesh: m, home: V(x, 0, z), wander: V(x, 3, z), state: 'patrol', timer: 0, chaseT: 0, speed: M.speed + rand(-.2, .2) });
+}
+
+function startGame() {
+  state = 'play';
+  removeCineBees();
+  setWorld('paris');
+  clearParticles();
+  $('cine').hidden = true; $('skipBtn').hidden = true;
+  $('fade').style.opacity = 0;
+  hideScreens();
+  $('hud').hidden = false;
+  $('touch').hidden = false;
+  rocket.position.set(0, 0, 0); rocket.rotation.set(0, 0, 0);
+  rocket.userData.flame.visible = false; rocket.userData.hinge.rotation.y = -1.9;
+  player.visible = true;
+  player.position.set(5, 0, 8); player.rotation.set(0, Math.PI, 0);
+  for (const d of delivered) scene.remove(d);
+  delivered = [];
+  if (plantedFlag) { scene.remove(plantedFlag); plantedFlag = null; }
+  camera.position.set(5, 5, 16);
+  musicMode = 'game';
+  startMission(0);
+}
+function startMission(i) {
+  clearMissionObjects();
+  missionIdx = i;
+  const M = MISSIONS[i];
+  progress = 0; lives = 3; missionDone = 0;
+  P.invuln = 1.5; P.dash = 0; P.dashCd = 0; P.vy = 0; P.knock.set(0, 0, 0);
+  if (M.spots) for (const [x, z] of M.spots) spawnItem(M.kind, x, z);
+  for (let b = 0; b < M.bees; b++) spawnBee(b, M);
+  if (M.type === 'reach') backFlag.visible = true;
+  $('mNum').textContent = `GÖREV ${i + 1} / ${MISSIONS.length}`;
+  $('mTitle').textContent = M.title;
+  $('mDesc').textContent = M.desc;
+  updateHud();
+  toast(`GÖREV ${i + 1}`, M.title, 2600);
+}
+function updateHud() {
+  const M = MISSIONS[missionIdx];
+  let s;
+  if (M.type === 'collect') s = `${progress} / ${M.spots.length} kırıntı`;
+  else if (M.type === 'carry') s = `${progress} / ${M.spots.length} ${M.label} taşındı` + (carrying ? ' · Sırtındakini hedefe götür!' : '');
+  else s = progress ? 'Bayrak dikildi!' : 'Sarı ok seni kuleye götürür';
+  $('mProg').textContent = s;
+  $('lives').innerHTML = [0, 1, 2].map(i => `<span class="h${i < lives ? '' : ' off'}">♥</span>`).join('');
+}
+let toastTimer = 0;
+function toast(t, s, ms = 2000) {
+  $('toastT').textContent = t; $('toastS').textContent = s || '';
+  $('toast').style.opacity = 1;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('toast').style.opacity = 0; }, ms);
+}
+function flash() {
+  const f = $('flash');
+  f.style.transition = 'none'; f.style.opacity = .45;
+  requestAnimationFrame(() => { f.style.transition = ''; f.style.opacity = 0; });
+}
+
+function hurt(from) {
+  if (P.invuln > 0 || missionDone) return;
+  lives--;
+  sfx.hurt(); flash();
+  P.invuln = 2;
+  const d = V(player.position.x - from.x, 0, player.position.z - from.z).normalize();
+  P.knock.copy(d).multiplyScalar(14);
+  P.vy = 5; P.onGround = false;
+  if (carrying) {
+    carrying.taken = false;
+    carrying.g.position.set(player.position.x, 0, player.position.z);
+    carrying.m.position.set(0, .7, 0);
+    carrying.g.add(carrying.m);
+    carrying.ring.visible = carrying.beam.visible = true;
+    scene.add(carrying.g);
+    carrying = null;
+    toast('Düşürdün!', 'Arı çarptı, yükünü geri al.', 1600);
+  }
+  updateHud();
+  if (lives <= 0) {
+    state = 'caught';
+    setBuzz(0);
+    sfx.lose();
+    $('caughtText').textContent = `Arılar seni yakaladı… Ama bir karınca asla pes etmez! "${MISSIONS[missionIdx].title}" görevi baştan başlıyor.`;
+    show('caught');
+  }
+}
+
+function completeMission() {
+  missionDone = 2.8;
+  sfx.mission();
+  toast('GÖREV TAMAM!', missionIdx + 1 < MISSIONS.length ? 'Sıradaki göreve hazırlan…' : 'Arılar kaçıyor!', 2600);
+  for (const b of bees) { b.state = 'retreat'; b.timer = 99; }
+  destBeam.visible = false;
+}
+
+function currentTarget() {
+  const M = MISSIONS[missionIdx];
+  if (missionDone) return null;
+  if (M.type === 'reach') return M.dest;
+  if (M.type === 'carry' && carrying) return M.dest;
+  let best = null, bd = 1e9;
+  for (const it of items) {
+    if (it.taken || it.done) continue;
+    const d = it.g.position.distanceTo(player.position);
+    if (d < bd) { bd = d; best = it.g.position; }
+  }
+  return best;
+}
+
+function deliver(it) {
+  const M = MISSIONS[missionIdx];
+  it.done = true; carrying = null;
+  const g = it.g;
+  g.remove(it.ring); g.remove(it.beam);
+  g.add(it.m);
+  let pos;
+  if (M.hive) {
+    const side = V(-HIVE_DIR.z, 0, HIVE_DIR.x);
+    pos = HIVE.clone().addScaledVector(HIVE_DIR, 5.1).addScaledVector(side, (progress - 1) * .9);
+    it.m.position.set(0, .55 + (progress === 1 ? .9 : 0), 0);
+    it.m.scale.setScalar(1.6);
+  } else {
+    const a = 2.2 + progress * .7;
+    pos = V(YUVA.x + Math.cos(a) * 3.4, 0, YUVA.z + Math.sin(a) * 3.4);
+    it.m.position.set(0, .48, 0);
+  }
+  g.position.copy(pos);
+  scene.add(g);
+  delivered.push(g);
+  items = items.filter(x => x !== it);
+  progress++;
+  sfx.deliver();
+  updateHud();
+  if (progress >= M.spots.length) completeMission();
+  else toast(`${progress} / ${M.spots.length}`, `Harika! Sıradaki ${M.label}…`, 1400);
+}
+
+function updatePlay(dt) {
+  const M = MISSIONS[missionIdx];
+  const t = performance.now() / 1000;
+  // --- girdi ---
+  let fwd = 0, turn = 0;
+  if (keys.ArrowUp || keys.KeyW) fwd += 1;
+  if (keys.ArrowDown || keys.KeyS) fwd -= 1;
+  if (keys.ArrowLeft || keys.KeyA) turn += 1;
+  if (keys.ArrowRight || keys.KeyD) turn -= 1;
+  fwd = clamp(fwd - joy.y, -1, 1); turn = clamp(turn - joy.x, -1, 1);
+  P.dashCd = Math.max(0, P.dashCd - dt);
+  P.dash = Math.max(0, P.dash - dt);
+  P.invuln = Math.max(0, P.invuln - dt);
+  const base = carrying ? 5.1 : 6.2;
+  const speed = P.dash > 0 ? 13 : base;
+  player.rotation.y += turn * dt * 2.9;
+  const h = player.rotation.y;
+  const fx = Math.sin(h), fz = Math.cos(h);
+  const mv = P.dash > 0 ? Math.max(fwd, .9) : fwd * (fwd < 0 ? .55 : 1);
+  player.position.x += fx * mv * speed * dt + P.knock.x * dt;
+  player.position.z += fz * mv * speed * dt + P.knock.z * dt;
+  P.knock.multiplyScalar(Math.max(0, 1 - dt * 5));
+  P.vy -= 22 * dt;
+  player.position.y += P.vy * dt;
+  if (player.position.y <= 0) { player.position.y = 0; P.vy = 0; P.onGround = true; }
+  collide(player.position, .9);
+  animateAnt(player, Math.abs(mv) * speed * (P.onGround ? 1 : .2) + Math.abs(turn) * 1.5, dt);
+  player.visible = P.invuln > 0 ? Math.floor(t * 12) % 2 === 0 : true;
+  if (P.dash > 0) emitSmoke(player.position.x - fx * 1.2, .3, player.position.z - fz * 1.2, rand(-.5, .5), .5, rand(-.5, .5), .35, .5, 0xcfc6b5);
+  $('dashFill').style.width = `${(1 - P.dashCd / 2.2) * 100}%`;
+
+  const inSafe = Math.hypot(player.position.x - YUVA.x, player.position.z - YUVA.z) < YUVA_R;
+  const pc = V(player.position.x, player.position.y + .7, player.position.z);
+
+  // --- eşyalar ---
+  for (const it of items) {
+    if (it.taken) continue;
+    it.m.rotation.y += dt * 1.5;
+    it.m.position.y = .7 + Math.sin(t * 3 + it.g.position.x) * .15;
+    const d = Math.hypot(it.g.position.x - player.position.x, it.g.position.z - player.position.z);
+    if (d < 1.7 && player.position.y < 1.5 && !missionDone) {
+      if (M.type === 'collect') {
+        it.done = true; scene.remove(it.g);
+        progress++; sfx.pick(); updateHud();
+        for (let i = 0; i < 6; i++) emitSmoke(it.g.position.x, .8, it.g.position.z, rand(-2, 2), rand(1, 3), rand(-2, 2), .25, .6, 0xffd25a);
+        if (progress >= M.spots.length) completeMission();
+      } else if (M.type === 'carry' && !carrying) {
+        it.taken = true; carrying = it;
+        it.ring.visible = it.beam.visible = false;
+        scene.remove(it.g);
+        player.userData.body.add(it.m);
+        it.m.position.set(0, 1.25, -.55);
+        it.m.rotation.set(0, 0, 0);
+        sfx.pick(); updateHud();
+        toast('Aldın!', 'Şimdi yeşil ışığa götür.', 1400);
+      }
+    }
+  }
+  items = items.filter(it => !it.done);
+  if (carrying) carrying.m.position.y = 1.25 + Math.abs(Math.sin(player.userData.phase)) * .05;
+
+  // --- hedef ---
+  if ((M.type === 'carry' && carrying) || M.type === 'reach') {
+    if (!missionDone) { destBeam.visible = true; destBeam.position.set(M.dest.x, 0, M.dest.z); }
+    const d = Math.hypot(player.position.x - M.dest.x, player.position.z - M.dest.z);
+    if (d < M.destR && !missionDone) {
+      if (M.type === 'carry') deliver(carrying);
+      else {
+        progress = 1;
+        backFlag.visible = false;
+        plantedFlag = makeFlag(3);
+        const dir = V(-M.dest.x, 0, 60 - M.dest.z).normalize();
+        plantedFlag.position.set(M.dest.x + dir.x * 8, 0, M.dest.z + dir.z * 8);
+        scene.add(plantedFlag);
+        updateHud();
+        completeMission();
+      }
+    }
+  } else destBeam.visible = false;
+  if (plantedFlag) plantedFlag.userData.cloth.rotation.y = Math.sin(t * 3) * .25;
+
+  const target = currentTarget();
+  arrow.visible = !!target;
+  if (target) {
+    arrow.position.set(player.position.x, player.position.y + 2.4 + Math.sin(t * 4) * .1, player.position.z);
+    arrow.rotation.y = Math.atan2(target.x - player.position.x, target.z - player.position.z);
+  }
+
+  // --- arılar ---
+  let near = 99;
+  for (const b of bees) {
+    const m = b.mesh;
+    animateBee(m, dt);
+    const dxp = player.position.x - m.position.x, dzp = player.position.z - m.position.z;
+    const dp = Math.hypot(dxp, dzp);
+    near = Math.min(near, dp);
+    if (b.state === 'patrol') {
+      if (m.position.distanceTo(b.wander) < 1.5) b.wander.set(b.home.x + rand(-15, 15), rand(2.5, 5), b.home.z + rand(-15, 15));
+      moveToward(m, b.wander, 3, dt);
+      if (dp < 17 && !inSafe && !missionDone) { b.state = 'chase'; b.chaseT = 0; sfx.squeak(); }
+    } else if (b.state === 'chase') {
+      b.chaseT += dt;
+      const tp = V(player.position.x, 1.0, player.position.z);
+      moveToward(m, tp, b.speed, dt);
+      if (pc.distanceTo(m.position) < 1.3) { hurt(m.position); b.state = 'retreat'; b.timer = 2.2; }
+      else if (dp > 26 || inSafe || b.chaseT > 9) { b.state = 'retreat'; b.timer = 2.5; }
+    } else if (b.state === 'retreat') {
+      b.timer -= dt;
+      const away = V(m.position.x - player.position.x, 0, m.position.z - player.position.z).normalize();
+      if (missionDone) moveToward(m, V(m.position.x + away.x * 10, 30, m.position.z + away.z * 10), 9, dt);
+      else moveToward(m, V(m.position.x + away.x * 5, 6, m.position.z + away.z * 5), 4.5, dt);
+      if (b.timer <= 0) { b.state = 'patrol'; b.home.set(m.position.x, 0, m.position.z); b.wander.copy(m.position); }
+    }
+    // güvenli bölgeye giremezler
+    const ys = Math.hypot(m.position.x - YUVA.x, m.position.z - YUVA.z);
+    if (ys < YUVA_R + 1.5) {
+      m.position.x = YUVA.x + (m.position.x - YUVA.x) / ys * (YUVA_R + 1.5);
+      m.position.z = YUVA.z + (m.position.z - YUVA.z) / ys * (YUVA_R + 1.5);
+    }
+    m.position.x = clamp(m.position.x, BOUNDS.x1, BOUNDS.x2);
+    m.position.z = clamp(m.position.z, BOUNDS.z1, BOUNDS.z2);
+  }
+  setBuzz(state === 'play' ? clamp(1 - near / 28, 0, 1) * .13 : 0);
+
+  // --- görev geçişi ---
+  if (missionDone) {
+    missionDone -= dt;
+    if (missionDone <= 0) {
+      missionDone = 0;
+      if (missionIdx + 1 < MISSIONS.length) startMission(missionIdx + 1);
+      else { state = 'win'; setBuzz(0); musicMode = null; sfx.win(); $('hud').hidden = true; $('touch').hidden = true; show('win'); }
+    }
+  }
+
+  // --- kamera ---
+  aimSun(player.position.x, player.position.z);
+  const want = V(player.position.x - fx * 8, player.position.y + 4.4, player.position.z - fz * 8);
+  camera.position.lerp(want, 1 - Math.exp(-dt * 4.5));
+  camera.position.y = Math.max(camera.position.y, 1);
+  camera.lookAt(player.position.x + fx * 2, player.position.y + 1.2, player.position.z + fz * 2);
+}
+
+function jump() {
+  if (state !== 'play' || !P.onGround) return;
+  P.vy = 9; P.onGround = false; sfx.jump();
+}
+function dash() {
+  if (state !== 'play' || P.dashCd > 0) return;
+  P.dash = .45; P.dashCd = 2.2; sfx.dash();
+}
+
+// ================= Ekranlar =================
+const SCREENS = ['menu', 'pause', 'caught', 'win'];
+function hideScreens() { SCREENS.forEach(s => $(s).hidden = true); }
+function show(id) { hideScreens(); $(id).hidden = false; const b = $(id).querySelector('button'); b && b.focus(); }
+function goMenuIdle() {
+  state = 'menu';
+  setWorld('town'); resetTown(); removeCineBees();
+  show('menu');
+}
+function togglePause() {
+  if (state === 'play') { state = 'pause'; setBuzz(0); show('pause'); }
+  else if (state === 'pause') { state = 'play'; hideScreens(); }
+}
+function retry() {
+  hideScreens();
+  state = 'play';
+  player.position.set(YUVA.x + 3, 0, YUVA.z + 3);
+  startMission(missionIdx);
+}
+$('startBtn').onclick = () => startIntro();
+$('skipStartBtn').onclick = () => { audio(); startGame(); };
+$('skipBtn').onclick = () => startGame();
+$('resumeBtn').onclick = () => togglePause();
+$('retryBtn').onclick = () => retry();
+$('againBtn').onclick = () => { audio(); startGame(); };
+$('replayIntroBtn').onclick = () => startIntro();
+
+// ================= Tam ekran =================
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function toggleFull() {
+  try {
+    if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen).call(el); }
+  } catch (e) { /* desteklenmiyor */ }
+}
+
+// ================= Klavye =================
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  if (e.repeat) return;
+  if (e.code === 'KeyM') { muted = !muted; setBuzz(0); toast(muted ? 'Ses kapalı' : 'Ses açık', '', 900); return; }
+  if (e.code === 'KeyF') { toggleFull(); return; }
+  if (state === 'menu' && e.code === 'Enter') { e.preventDefault(); startIntro(); return; }
+  if (state === 'intro' && (e.code === 'Enter' || e.code === 'Space' || e.code === 'Escape')) { e.preventDefault(); startGame(); return; }
+  if ((e.code === 'KeyP' || e.code === 'Escape') && (state === 'play' || state === 'pause')) { togglePause(); return; }
+  if (state === 'caught' && e.code === 'Enter') { e.preventDefault(); retry(); return; }
+  if (e.code === 'Space') jump();
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') dash();
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (state === 'play') togglePause(); });
+
+// ================= Dokunmatik =================
+const stick = $('stick'), knob = $('knob');
+let stickId = null;
+function stickMove(e) {
+  const r = stick.getBoundingClientRect();
+  let x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
+  const max = r.width / 2, len = Math.hypot(x, y);
+  if (len > max) { x = x / len * max; y = y / len * max; }
+  knob.style.transform = `translate(${x}px, ${y}px)`;
+  joy.x = x / max; joy.y = y / max;
+}
+stick.addEventListener('pointerdown', e => { stickId = e.pointerId; stick.setPointerCapture(e.pointerId); stickMove(e); });
+stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) stickMove(e); });
+const stickEnd = e => { if (e.pointerId !== stickId) return; stickId = null; joy.x = joy.y = 0; knob.style.transform = ''; };
+stick.addEventListener('pointerup', stickEnd);
+stick.addEventListener('pointercancel', stickEnd);
+$('jumpBtn').addEventListener('pointerdown', e => { e.preventDefault(); jump(); });
+$('dashBtn').addEventListener('pointerdown', e => { e.preventDefault(); dash(); });
+$('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); togglePause(); });
+
+// ================= Ana döngü =================
+let last = performance.now(), menuT = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000);
+  last = now;
+  if (state === 'menu') {
+    menuT += dt;
+    walkRing(dt);
+    playerAngle += dt * .14; placeOnRing(player, playerAngle); animateAnt(player, 2, dt);
+    const a = menuT * .06;
+    camera.position.set(Math.cos(a) * 34, 13, Math.sin(a) * 34);
+    camera.lookAt(0, 2, -4);
+    aimSun(0, -8);
+  } else if (state === 'intro') updateIntro(dt);
+  else if (state === 'play') updatePlay(dt);
+  else if (state === 'pause' || state === 'caught' || state === 'win') {
+    for (const b of bees) animateBee(b.mesh, dt);
+  }
+  updateParticles(dt);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+goMenuIdle();
+requestAnimationFrame(frame);
+})();
+</script>
