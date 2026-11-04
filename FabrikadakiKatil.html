@@ -109,6 +109,20 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   font-family: var(--font-display); font-size: 18px; color: var(--hazard); text-shadow: 0 2px 0 #000; text-align: center;
   max-width: calc(100vw - 32px); transition: opacity .4s;
 }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 9; transition: opacity .45s; }
+#elev {
+  position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+  background: var(--panel); border: 2px solid #4fa8ff; border-radius: 12px; padding: 10px; pointer-events: auto; text-align: center;
+}
+.elev-title { font-family: var(--font-display); color: #8fd3ff; font-size: 14px; margin-bottom: 6px; }
+.elev-grid { display: grid; grid-template-columns: repeat(3, 40px); gap: 6px; }
+.elev-grid button {
+  height: 40px; border-radius: 50%; border: 2px solid #5a6878; background: #1c232c; color: var(--fg);
+  font-family: var(--font-display); font-size: 16px; cursor: pointer;
+}
+.elev-grid button.here { background: #ff9b2a; color: #2a1400; border-color: #ff9b2a; }
+.elev-note { font-size: 11px; color: var(--muted); margin-top: 6px; }
+@media (pointer: coarse) { #elev { bottom: auto; top: calc(180px + env(safe-area-inset-top, 0px)); } }
 #flash { position: fixed; inset: 0; background: var(--danger); opacity: 0; pointer-events: none; z-index: 8; transition: opacity .5s; }
 
 #touch { position: fixed; inset: 0; pointer-events: none; z-index: 6; }
@@ -169,9 +183,19 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
   <button id="quit" type="button" aria-label="Oyundan çık">Ç · ÇIK</button>
   <div id="toast"></div>
   <div id="prompt" hidden></div>
+  <div id="elev" hidden>
+    <div class="elev-title">ASANSÖR</div>
+    <div class="elev-grid">
+      <button type="button" data-f="7">7</button><button type="button" data-f="8">8</button><button type="button" data-f="9">9</button>
+      <button type="button" data-f="4">4</button><button type="button" data-f="5">5</button><button type="button" data-f="6">6</button>
+      <button type="button" data-f="1">1</button><button type="button" data-f="2">2</button><button type="button" data-f="3">3</button>
+    </div>
+    <div class="elev-note">En fazla 9. kat</div>
+  </div>
   <canvas id="minimap" width="360" height="264" aria-label="Mini harita"></canvas>
 </div>
 <div id="flash"></div>
+<div id="fade"></div>
 
 <div id="touch" hidden>
   <div id="stick"><div id="knob"></div></div>
@@ -196,6 +220,7 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>S</kbd><span>Katilsen ışıkları söndür (sabotaj)</span>
       <kbd>F</kbd><span>Tam ekran aç / kapat</span>
       <kbd>V</kbd><span>Katilsen havalandırmadan başka yere ışınlan</span>
+      <kbd>1 - 9</kbd><span>Asansörde kat seç (en fazla 9. kat)</span>
       <kbd>M</kbd><span>Sesi aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
@@ -556,10 +581,11 @@ function setWorld(i) {
   sun.color.setHex(w.sun);
   applyLights();
   lamps.forEach(l => l.color.setHex(w.lamp));
+  if (typeof currentFloor !== 'undefined' && currentFloor > 1) lamps.forEach(l => l.color.setHSL((currentFloor - 1) / FLOORS, .85, .6));
   particles.visible = !!w.particles;
   if (w.particles) { pMat.color.setHex(w.particles.color); pMat.size = w.particles.size; resetParticles(w.particles); }
   buildDecor(w.decor);
-  TASKS.forEach((t, k) => { t.name = w.tasks[k]; });
+  TASKS.forEach(t => { t.name = w.tasks[t.nameIdx]; });
 }
 
 // ---------- Karakterler ----------
@@ -622,7 +648,9 @@ function makeCorpse(color, x, z, rot) {
 }
 
 // ---------- Görevler ----------
-const TASKS = [
+const FLOORS = 9;          // asansör sadece 9. kata kadar çıkar
+const TASK_COUNT = 23;
+const SPOTS = [
   { name: 'Makineyi tamir et', x: -18, z: -8.6 },
   { name: 'Kabloları bağla', x: 0, z: -10.6 },
   { name: 'Fırını ayarla', x: 18, z: -8.6 },
@@ -636,12 +664,92 @@ const TASKS = [
   { name: '', x: 26, z: 4.2 },
   { name: '', x: 10, z: -7 },
 ];
+// Her görevin bir katı ve yeri var; (i % 9, i % 12) çifti tekrar etmediği için aynı katta aynı yer iki kez çıkmaz
+const TASKS = Array.from({ length: TASK_COUNT }, (_, i) => ({
+  x: SPOTS[i % SPOTS.length].x, z: SPOTS[i % SPOTS.length].z, floor: (i % FLOORS) + 1, nameIdx: i % SPOTS.length, name: '',
+}));
 TASKS.forEach(t => {
   t.ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.2, 32), new THREE.MeshBasicMaterial({ color: 0xffc928, transparent: true, opacity: .85 }));
   t.ring.rotation.x = -Math.PI / 2; t.ring.position.set(t.x, .03, t.z); scene.add(t.ring);
   t.gem = new THREE.Mesh(new THREE.OctahedronGeometry(.35), new THREE.MeshStandardMaterial({ color: 0xffc928, emissive: 0xffaa00, emissiveIntensity: .8 }));
   t.gem.position.set(t.x, 3, t.z); scene.add(t.gem);
 });
+// ---------- Asansör (güney duvarın önünde, 1-9 tuşlarıyla kat seçilir) ----------
+const ELEV = { x: 0, z: 19.6, elevator: true };
+const floorSignCanvas = document.createElement('canvas');
+floorSignCanvas.width = 256; floorSignCanvas.height = 128;
+const floorSignTex = new THREE.CanvasTexture(floorSignCanvas);
+{
+  const steel = mat(0xaab4be, { metalness: .8, roughness: .3 });
+  box(.4, 4, .4, ELEV.x - 1.8, 2, ELEV.z + .6, steel, false);
+  box(.4, 4, .4, ELEV.x + 1.8, 2, ELEV.z + .6, steel, false);
+  box(4, .4, .4, ELEV.x, 4.1, ELEV.z + .6, steel, false);
+  const floorPlate = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.4), new THREE.MeshStandardMaterial({ color: 0x3a6aa8, metalness: .5, roughness: .4 }));
+  floorPlate.rotation.x = -Math.PI / 2; floorPlate.position.set(ELEV.x, .025, ELEV.z); scene.add(floorPlate);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ map: floorSignTex }));
+  sign.position.set(ELEV.x, 5, ELEV.z + .6); sign.rotation.y = Math.PI; scene.add(sign);
+  const sign2 = sign.clone(); sign2.rotation.y = 0; sign2.position.z = ELEV.z + .35; scene.add(sign2);
+}
+// Arka duvarda büyük kat numarası
+const wallSignCanvas = document.createElement('canvas');
+wallSignCanvas.width = 512; wallSignCanvas.height = 160;
+const wallSignTex = new THREE.CanvasTexture(wallSignCanvas);
+{
+  const ws = new THREE.Mesh(new THREE.PlaneGeometry(10, 3.1), new THREE.MeshBasicMaterial({ map: wallSignTex, transparent: true }));
+  ws.position.set(0, 6.6, -D + .05); scene.add(ws);
+}
+let currentFloor = 1;
+function drawFloorSigns(f) {
+  let g = floorSignCanvas.getContext('2d');
+  g.fillStyle = '#0d1a2a'; g.fillRect(0, 0, 256, 128);
+  g.fillStyle = '#ff9b2a'; g.font = 'bold 84px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(f + '▲', 128, 66);
+  floorSignTex.needsUpdate = true;
+  g = wallSignCanvas.getContext('2d');
+  g.clearRect(0, 0, 512, 160);
+  g.fillStyle = 'rgba(10,12,16,.75)'; g.fillRect(0, 0, 512, 160);
+  g.fillStyle = '#ffc928'; g.font = 'bold 110px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('KAT ' + f, 256, 84);
+  wallSignTex.needsUpdate = true;
+}
+drawFloorSigns(1);
+const nearElevator = () => player && Math.hypot(player.g.position.x - ELEV.x, player.g.position.z - ELEV.z) < 2.3;
+let riding = 0;
+function rideTo(f) {
+  if (state !== 'play' || !nearElevator() || riding > 0) return;
+  if (f < 1 || f > FLOORS) { toast('Bu asansör sadece 9. kata kadar çıkar!'); sfx.vote(); return; }
+  if (f === currentFloor) { toast(`Zaten ${f}. kattasın`); return; }
+  riding = .9;
+  const fade = $('fade');
+  fade.style.opacity = 1;
+  sfx.elevator(f > currentFloor);
+  setTimeout(() => {
+    if (!player) return;
+    player.floor = f;
+    setFloorLook(f);
+    toast(`${f}. kattasın`);
+    fade.style.opacity = 0;
+    sfx.ding();
+  }, 550);
+}
+function setFloorLook(f) {
+  currentFloor = f;
+  drawFloorSigns(f);
+  // Her katın lambaları farklı renkte
+  lamps.forEach(l => f === 1 ? l.color.setHex(WORLDS[worldIndex].lamp) : l.color.setHSL((f - 1) / FLOORS, .85, .6));
+  updateElevPanel();
+}
+function updateElevPanel() {
+  document.querySelectorAll('#elev button[data-f]').forEach(b => b.classList.toggle('here', +b.dataset.f === currentFloor));
+}
+// Kim hangi kattaysa sadece o kattakiler görünür
+function updateVisibility() {
+  const f = player ? player.floor : 1;
+  npcs.forEach(n => { n.g.visible = !player || (n.floor || 1) === f; });
+  corpses.forEach(c => { c.visible = (c.userData.floor || 1) === f; });
+  TASKS.forEach(t => { t.ring.visible = t.gem.visible = !!player && !isKiller && t.floor === f; });
+}
+
 // ---------- Acil durum masası (ortada, R ile toplantı) ----------
 const BUTTON = { x: 0, z: -4 };
 {
@@ -739,7 +847,7 @@ function useVent() {
   if (seen.length && caughtT <= 0) { caughtT = 1; witnessName = seen[0].name; }
 }
 
-const WAYPOINTS = TASKS.map(t => ({ x: t.x, z: t.z })).concat([
+const WAYPOINTS = SPOTS.map(t => ({ x: t.x, z: t.z })).concat([
   { x: 0, z: 0 }, { x: -15, z: 0 }, { x: 15, z: 0 }, { x: -22, z: -18 }, { x: 22, z: -18 },
   { x: -22, z: 18 }, { x: 22, z: 18 }, { x: 0, z: 19 }, { x: 0, z: -19 }, { x: -14, z: 7 }, { x: 14, z: 7 }, { x: 4, z: -7 },
 ]);
@@ -764,7 +872,9 @@ function moveBy(e, dx, dz) {
   if (!blocked(p.x + dx, p.z)) p.x += dx;
   if (!blocked(p.x, p.z + dz)) p.z += dz;
 }
-const dist = (a, b) => Math.hypot(a.g.position.x - b.g.position.x, a.g.position.z - b.g.position.z);
+// Farklı kattakiler birbirini göremez ve öldüremez: aralarındaki mesafe sonsuz
+const dist = (a, b) => (a.floor || 1) !== (b.floor || 1) ? Infinity
+  : Math.hypot(a.g.position.x - b.g.position.x, a.g.position.z - b.g.position.z);
 
 // ---------- Ses ----------
 // Tüm sesler Web Audio ile üretilir; ilk tıklama ya da tuşla açılır.
@@ -845,6 +955,8 @@ const sfx = {
   revealKiller() { beep(110, 1.4, 'sawtooth', .1, 55); beep(165, 1.4, 'sawtooth', .06, 82, .1); },
   revealCrew() { [523, 659, 784].forEach((f, i) => beep(f, .5, 'triangle', .1, 0, i * .12)); },
   step() { noise(.05, .04, 900, 500); },
+  elevator(up) { beep(up ? 120 : 220, .6, 'sine', .15, up ? 220 : 120); noise(.6, .08, 400, 300); },
+  ding() { beep(1318, .5, 'sine', .14); beep(1046, .7, 'sine', .12, 0, .18); },
   shh() { noise(1.1, .18, 5000, 3500, .1); beep(80, .6, 'sine', .3, 40); },
   lightsOff() { beep(400, 1, 'sawtooth', .12, 40); noise(.3, .2, 1200, 200); },
   lightsOn() { beep(60, .6, 'sawtooth', .1, 300); [523, 784].forEach((f, i) => beep(f, .15, 'triangle', .1, 0, .5 + i * .1)); },
@@ -878,12 +990,13 @@ function randomWaypoint() { return WAYPOINTS[Math.floor(Math.random() * WAYPOINT
 function newRound() {
   clearRound();
   isKiller = Math.random() < 1 / 3;
-  player = Object.assign(makeCrew(0xe53935), { name: 'Kırmızı', isPlayer: true, alive: true, color: 0xe53935 });
+  player = Object.assign(makeCrew(0xe53935), { name: 'Kırmızı', isPlayer: true, alive: true, color: 0xe53935, floor: 1 });
+  setFloorLook(1);
   player.g.position.set(0, 0, -1);
   const pool = COLORS.slice().sort(() => Math.random() - .5).slice(0, 7);
   pool.forEach(([name, color], i) => {
     const a = ((i + 1) / (pool.length + 1)) * Math.PI * 2 + Math.PI / 2;
-    const n = Object.assign(makeCrew(color), { name, color, alive: true, target: randomWaypoint(), wait: Math.random() * 2,
+    const n = Object.assign(makeCrew(color), { name, color, floor: 1, alive: true, target: randomWaypoint(), wait: Math.random() * 2,
       stuck: 0, detour: null, detourT: 0, impostor: false, killTimer: 0, prey: null, huntT: 0, lastPos: null });
     n.g.position.set(Math.cos(a) * 3, 0, -4 + Math.sin(a) * 3);
     n.g.rotation.y = a + Math.PI;
@@ -925,6 +1038,7 @@ function nearestCorpse() {
   if (!player) return null;
   let best = null, bd = 2.5;
   corpses.forEach(c => {
+    if ((c.userData.floor || 1) !== player.floor) return;
     const d = Math.hypot(c.position.x - player.g.position.x, c.position.z - player.g.position.z);
     if (d < bd) { bd = d; best = c; }
   });
@@ -1033,7 +1147,9 @@ function endMeeting() {
   group.forEach((e, i) => {
     const a = (i / group.length) * Math.PI * 2;
     e.g.position.set(BUTTON.x + Math.cos(a + Math.PI / 2) * 3, 0, BUTTON.z + Math.sin(a + Math.PI / 2) * 3);
+    e.floor = 1;
   });
+  setFloorLook(1);
   npcs.forEach(n => { if (n.impostor) { n.killTimer = 15 + Math.random() * 6; n.prey = null; } });
   killCd = 10;
   state = 'play';
@@ -1074,6 +1190,7 @@ function doKill(killer, victim) {
   const p = victim.g.position;
   const body = makeCorpse(victim.color, p.x, p.z, victim.g.rotation.y);
   body.userData.name = victim.name;
+  body.userData.floor = victim.floor || 1;
   corpses.push(body);
   scene.remove(victim.g);
   if (!blocked(p.x + .9, p.z)) killer.g.position.set(p.x + .9, 0, p.z);
@@ -1088,8 +1205,9 @@ function doKill(killer, victim) {
     setTimeout(() => { if (state === 'dead') show('dead'); }, 1600);
   } else if (!isKiller) {
     // Uzaktaki cinayet daha kısık duyulur
-    sfx.kill(Math.max(.25, 1 - dist(player, killer) / 40));
-    toast(`${victim.name} öldürüldü!`);
+    const sameFloor = victim.floor === player.floor;
+    sfx.kill(sameFloor ? Math.max(.25, 1 - dist(player, killer) / 40) : .2);
+    toast(sameFloor ? `${victim.name} öldürüldü!` : `${victim.floor}. katta ${victim.name} öldürüldü!`);
   } else {
     sfx.kill();
   }
@@ -1155,7 +1273,11 @@ function updateNpc(n, dt) {
         n.huntT = 0;
       }
       hunting = true; speed = 4.2; n.huntT += dt;
-      goal = { x: n.prey.g.position.x, z: n.prey.g.position.z };
+      if (n.prey.floor !== n.floor) {
+        // Kurban başka katta: asansöre koş ve o kata çık
+        goal = ELEV;
+        if (Math.hypot(n.g.position.x - ELEV.x, n.g.position.z - ELEV.z) < 1.2) { n.floor = n.prey.floor; n.huntT = Math.min(n.huntT, 6); }
+      } else goal = { x: n.prey.g.position.x, z: n.prey.g.position.z };
       if (dist(n, n.prey) < 1.3 && witnesses(n.prey, n).length === 0) {
         doKill(n, n.prey);
         n.prey = null; n.killTimer = 15 + Math.random() * 8;
@@ -1170,7 +1292,15 @@ function updateNpc(n, dt) {
   const dx = goal.x - p.x, dz = goal.z - p.z, d = Math.hypot(dx, dz);
   if (d < .6) {
     if (n.detourT > 0) { n.detourT = 0; }
-    else if (!hunting) { n.target = randomWaypoint(); n.wait = 1 + Math.random() * 3.5; }
+    else if (!hunting) {
+      if (n.target === ELEV) {
+        // Asansörle rastgele başka bir kata git
+        let f = n.floor;
+        while (f === n.floor) f = 1 + Math.floor(Math.random() * FLOORS);
+        n.floor = f; n.wait = .4;
+      } else n.wait = 1 + Math.random() * 3.5;
+      n.target = Math.random() < .22 ? ELEV : randomWaypoint();
+    }
     animateWalk(n, false, dt);
     return;
   }
@@ -1193,7 +1323,7 @@ function interact(dt) {
   if (!isKiller) {
     let best = null, bd = 2.2;
     TASKS.forEach(t => {
-      if (t.done) return;
+      if (t.done || t.floor !== player.floor) return;
       const d = Math.hypot(player.g.position.x - t.x, player.g.position.z - t.z);
       if (d < bd) { bd = d; best = t; }
     });
@@ -1232,6 +1362,7 @@ function interact(dt) {
       html = `<div>Öldürmek için bekle: ${Math.ceil(killCd)} sn</div>`;
     }
   }
+  if (nearElevator()) html += `<div class="report">Asansör: 1-9 tuşuna bas ya da kata tıkla</div>`;
   if (nearestCorpse()) html += `<div class="report">R: Ölüyü raporla</div>`;
   else if (nearButton()) html += meetingsLeft > 0
     ? `<div class="report">R: Acil durum düğmesine bas</div>`
@@ -1271,6 +1402,7 @@ function drawMinimap() {
   obstacles.forEach(o => mctx.fillRect(sx(o.x1), sz(o.z1), sx(o.x2) - sx(o.x1), sz(o.z2) - sz(o.z1)));
   if (!isKiller) {
     TASKS.forEach(t => {
+      if (t.floor !== player.floor) return;
       mctx.fillStyle = t.done ? '#4ade80' : '#ffc928';
       mctx.beginPath(); mctx.arc(sx(t.x), sz(t.z), t.done ? 5 : 7, 0, Math.PI * 2); mctx.fill();
     });
@@ -1284,8 +1416,13 @@ function drawMinimap() {
     mctx.fillStyle = '#ffe14a';
     mctx.fillRect(sx(PANEL.x) - 8, sz(PANEL.z) - 8, 16, 16);
   }
+  mctx.fillStyle = '#4fa8ff';
+  mctx.fillRect(sx(ELEV.x) - 9, sz(ELEV.z) - 7, 18, 14);
+  mctx.fillStyle = '#fff'; mctx.font = 'bold 20px sans-serif'; mctx.textAlign = 'left'; mctx.textBaseline = 'top';
+  mctx.fillText('KAT ' + player.floor, 14, 12);
   mctx.strokeStyle = '#ff3d3d'; mctx.lineWidth = 4;
   corpses.forEach(c => {
+    if ((c.userData.floor || 1) !== player.floor) return;
     const x = sx(c.position.x), y = sz(c.position.z);
     mctx.beginPath(); mctx.moveTo(x - 6, y - 6); mctx.lineTo(x + 6, y + 6); mctx.moveTo(x + 6, y - 6); mctx.lineTo(x - 6, y + 6); mctx.stroke();
   });
@@ -1294,19 +1431,28 @@ function drawMinimap() {
   mctx.beginPath(); mctx.arc(px, py, 9, 0, Math.PI * 2); mctx.fill(); mctx.stroke();
 }
 
+function otherFloors() {
+  const left = {};
+  TASKS.forEach(t => { if (!t.done && t.floor !== player.floor) left[t.floor] = (left[t.floor] || 0) + 1; });
+  const parts = Object.keys(left).sort((a, b) => a - b).map(f => `${f}. kat: ${left[f]}`);
+  return parts.length ? 'Diğer katlarda kalan: ' + parts.join(', ') : 'Diğer katlarda görev kalmadı';
+}
+
 function drawHud() {
   const info = $('info');
   if (!player) return;
   if (isKiller) {
     const left = aliveNpcs().length;
-    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>${lightsOut ? '<div class="warn-line">Işıklar sönük, kimse uzağı göremez</div>' : sabCd > 0 ? `<div class="muted">Sabotaj: ${Math.ceil(sabCd)} sn</div>` : '<div class="warn-line">S: Işıkları söndür</div>'}
+    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · ${player.floor}. kat · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>${lightsOut ? '<div class="warn-line">Işıklar sönük, kimse uzağı göremez</div>' : sabCd > 0 ? `<div class="muted">Sabotaj: ${Math.ceil(sabCd)} sn</div>` : '<div class="warn-line">S: Işıkları söndür</div>'}
       <div>Kalan kişi: <b>${left}</b> / ${npcs.length}</div>
       <div class="muted" style="margin-top:4px">Yalnız birini bul, yanına git, E'ye bas.</div>`;
   } else {
     const done = TASKS.filter(t => t.done).length;
-    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>${lightsOut ? '<div class="warn-line">IŞIKLAR SÖNDÜ!</div>' : ''}
+    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · ${player.floor}. kat · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>${lightsOut ? '<div class="warn-line">IŞIKLAR SÖNDÜ!</div>' : ''}
       <div class="count">Görevler: ${done} / ${TASKS.length}</div>
-      <ul>${TASKS.map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('')}</ul>
+      <div class="muted">Bu kat (${player.floor}. kat):</div>
+      <ul>${TASKS.filter(t => t.floor === player.floor).map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('') || '<li class="muted">Görev yok</li>'}</ul>
+      <div class="muted" style="margin-top:6px">${otherFloors()}</div>
       <div class="bar"><i style="width:${done / TASKS.length * 100}%"></i></div>`;
   }
 }
@@ -1330,6 +1476,7 @@ function frame(now) {
     }
   });
   updateParticles(dt, time);
+  updateVisibility();
   beltCrates.forEach(c => { c.position.x += dt * 2; if (c.position.x > 7.6) c.position.x = -7.6; });
   pistons.forEach(p => { p.m.position.y = 4 + Math.sin(time * 2.4 + p.phase) * .5; });
   beacons.forEach((b, i) => { b.material.color.setHex(Math.sin(time * 6 + i) > 0 ? 0xff7a1a : 0x552200); });
@@ -1351,6 +1498,8 @@ function frame(now) {
     if (state === 'play') updatePlayer(dt);
     npcs.forEach(n => updateNpc(n, dt));
     if (state === 'play') { interact(dt); updateSabotage(dt); }
+    if (riding > 0) riding -= dt;
+    $('elev').hidden = !(state === 'play' && nearElevator());
     if (caughtT > 0 && state === 'play') {
       caughtT -= dt;
       if (caughtT <= 0) endGame(false, 'YAKALANDIN!', `${witnessName} seni gördü ve herkese söyledi. Bir dahakine kimse yokken yap!`);
@@ -1409,6 +1558,8 @@ window.addEventListener('keydown', e => {
   if (e.code === 'KeyF' && !e.repeat) { toggleFull(); return; }
   if (e.code === 'KeyM' && !e.repeat) { toggleMute(); return; }
   if (e.code === 'KeyV' && !e.repeat) { useVent(); return; }
+  const dm = /^(Digit|Numpad)(\d)$/.exec(e.code);
+  if (dm && !e.repeat && state === 'play' && nearElevator()) { rideTo(+dm[2]); return; }
   if (e.code === 'KeyD' && !e.repeat && state !== 'dead' && state !== 'over') { nextWorld(); return; }
   if (e.code === 'KeyE' || e.code === 'Space') {
     e.preventDefault();
@@ -1428,6 +1579,7 @@ $('startBtn').addEventListener('click', startGame);
 $('worldBtn').addEventListener('click', nextWorld);
 $('reportBtn').addEventListener('click', report);
 $('ventBtn').addEventListener('click', useVent);
+document.querySelectorAll('#elev button[data-f]').forEach(b => b.addEventListener('click', () => rideTo(+b.dataset.f)));
 $('sabBtn').addEventListener('click', playerSabotage);
 $('meetBtn').addEventListener('click', endMeeting);
 $('quit').addEventListener('click', toMenu);
