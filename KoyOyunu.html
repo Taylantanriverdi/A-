@@ -27,11 +27,10 @@
   .konusma span { background: #fff8e0; border: 3px solid #8a5a20; border-radius: 14px; padding: 8px 16px; display: inline-block; }
   #konusma1 { left: 2%; }
   #konusma2 { right: 2%; }
-  #giris, #bitis {
+  #giris {
     position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column;
     align-items: center; justify-content: center; background: rgba(20,40,20,.85); color: #fff; text-align: center;
   }
-  #bitis { display: none; }
   h1 { font-size: 52px; margin: 0 0 10px; color: #ffe08a; text-shadow: 0 4px 0 #6a4010; }
   .kutular { display: flex; gap: 30px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
   .kutu { background: rgba(255,255,255,.12); border-radius: 16px; padding: 16px 26px; min-width: 220px; }
@@ -49,12 +48,14 @@
 
 <div id="hud1" class="hud">
   <div class="ad" style="color:#7fd0ff">🔵 Oyuncu 1</div>
-  <div>🍎 Elma: <span id="skor1">0</span> / <span class="hedef">15</span></div>
-  <div class="tus">W ileri · S geri · A sol · D sağ</div>
+  <div>🎒 Çantada: <span id="canta1">0</span> 🍎</div>
+  <div>💝 Köylülere verilen: <span id="verilen1">0</span></div>
+  <div class="tus">E/W ileri · Z/S geri · A sol · D sağ</div>
 </div>
 <div id="hud2" class="hud">
   <div class="ad" style="color:#ff8a8a">Oyuncu 2 🔴</div>
-  <div>🍎 Elma: <span id="skor2">0</span> / <span class="hedef">15</span></div>
+  <div>🎒 Çantada: <span id="canta2">0</span> 🍎</div>
+  <div>💝 Köylülere verilen: <span id="verilen2">0</span></div>
   <div class="tus">↑ ileri · ↓ geri · ← sol · → sağ</div>
 </div>
 
@@ -63,12 +64,12 @@
 
 <div id="giris">
   <h1>🏡 Köy Oyunu 🏡</h1>
-  <div style="font-size:20px">Köyde dolaş, köylülerle tanış, yere düşen elmaları topla!<br>15 elmayı ilk toplayan kazanır.</div>
+  <div style="font-size:20px">Köyde dolaş, yere düşen elmaları topla ve köylülere götür!<br>Bir köylünün yanına gidince çantandaki elmaları ona verirsin. Kazanan yok, birlikte köye yardım edin! 🍎</div>
   <div class="kutular">
     <div class="kutu">
       <h2 style="color:#7fd0ff">🔵 Oyuncu 1 (sol ekran)</h2>
-      <div><span class="tusk">W</span> ileri</div>
-      <div><span class="tusk">S</span> geri</div>
+      <div><span class="tusk">E</span> ya da <span class="tusk">W</span> ileri</div>
+      <div><span class="tusk">Z</span> ya da <span class="tusk">S</span> geri</div>
       <div><span class="tusk">A</span> sola dön</div>
       <div><span class="tusk">D</span> sağa dön</div>
     </div>
@@ -81,12 +82,6 @@
     </div>
   </div>
   <button id="basla">Oyna!</button>
-</div>
-
-<div id="bitis">
-  <h1 id="kazanan">Kazanan!</h1>
-  <div style="font-size:20px" id="sonuc"></div>
-  <button id="tekrar">Tekrar Oyna</button>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -353,12 +348,13 @@ function oyuncuYap(renk, x, z, aci) {
   g.position.set(x, 0, z);
   g.rotation.y = aci;
   scene.add(g);
-  return { g, aci, hiz: 0, skor: 0, kamPos: new THREE.Vector3(x, 6, z + 10) };
+  return { g, aci, hiz: 0, canta: 0, verilen: 0, kamPos: new THREE.Vector3(x, 6, z + 10) };
 }
 const oyuncu1 = oyuncuYap(0x2a8aff, -3, 8, Math.PI);
 const oyuncu2 = oyuncuYap(0xff3030, 3, 8, Math.PI);
-oyuncu1.tuslar = { ileri: 'KeyW', geri: 'KeyS', sol: 'KeyA', sag: 'KeyD' };
-oyuncu2.tuslar = { ileri: 'ArrowUp', geri: 'ArrowDown', sol: 'ArrowLeft', sag: 'ArrowRight' };
+oyuncu1.tuslar = { ileri: ['KeyE', 'KeyW'], geri: ['KeyZ', 'KeyS'], sol: ['KeyA'], sag: ['KeyD'] };
+oyuncu2.tuslar = { ileri: ['ArrowUp'], geri: ['ArrowDown'], sol: ['ArrowLeft'], sag: ['ArrowRight'] };
+const bas = liste => liste.some(k => basili[k]);
 
 // ================== KÖYLÜLER ==================
 const koyluBilgi = [
@@ -381,7 +377,11 @@ koyluBilgi.forEach((b, i) => {
   do { x = (Math.random() - 0.5) * 80; z = (Math.random() - 0.5) * 80; } while (!bosMu(x, z, 1.5) && !(Math.abs(x) < 3 || Math.abs(z) < 3));
   g.position.set(x, 0, z);
   scene.add(g);
-  koyluler.push({ g, bilgi: b, hedef: null, bekle: Math.random() * 3, hiz: 0, sozIndex: 0 });
+  // köylünün elinde tuttuğu elma (elma verilince görünür)
+  const eldeki = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshLambertMaterial({ color: 0xe01818, emissive: 0x400000 }));
+  eldeki.position.y = -1.05; eldeki.visible = false;
+  g.userData.sagKol.add(eldeki);
+  koyluler.push({ g, bilgi: b, hedef: null, bekle: Math.random() * 3, hiz: 0, sozIndex: 0, aldigi: 0, eldeki });
 });
 
 // ================== ELMALAR ==================
@@ -431,6 +431,16 @@ function parilti(x, z, renk) {
   }
 }
 
+function kalpler(x, z) {
+  for (let i = 0; i < 10; i++) {
+    const p = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), new THREE.MeshBasicMaterial({ color: i % 2 ? 0xff4d8a : 0xffcc33 }));
+    p.position.set(x, 3, z);
+    p.userData.v = new THREE.Vector3((Math.random() - 0.5) * 3, 4 + Math.random() * 3, (Math.random() - 0.5) * 3);
+    p.userData.omur = 1.2;
+    scene.add(p); parcaciklar.push(p);
+  }
+}
+
 // ================== ÇARPIŞMA ==================
 function carpismaCoz(pos, r) {
   for (const e of engeller) {
@@ -462,11 +472,12 @@ function bip(frek, sure, tip = 'sine', ses = 0.15) {
   o.start(); o.stop(actx.currentTime + sure);
 }
 function elmaSesi() { bip(660, 0.1, 'square', 0.08); setTimeout(() => bip(990, 0.15, 'square', 0.08), 80); }
+function verSesi() { [523, 659, 784].forEach((f, i) => setTimeout(() => bip(f, 0.2, 'triangle', 0.1), i * 100)); }
 function konusmaSesi() { for (let i = 0; i < 4; i++) setTimeout(() => bip(300 + Math.random() * 300, 0.06, 'triangle', 0.06), i * 70); }
 
 // ================== KLAVYE ==================
 const basili = {};
-const oyunTuslari = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const oyunTuslari = ['KeyE', 'KeyW', 'KeyZ', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 window.addEventListener('keydown', e => {
   basili[e.code] = true;
   if (oyunTuslari.includes(e.code)) e.preventDefault();
@@ -475,9 +486,9 @@ window.addEventListener('keyup', e => { basili[e.code] = false; });
 window.addEventListener('blur', () => { for (const k in basili) basili[k] = false; });
 
 // ================== OYUN DURUMU ==================
-const HEDEF = 15;
 let oyunda = false;
-const skorEl = [document.getElementById('skor1'), document.getElementById('skor2')];
+const cantaEl = [document.getElementById('canta1'), document.getElementById('canta2')];
+const verilenEl = [document.getElementById('verilen1'), document.getElementById('verilen2')];
 const konusmaEl = [document.getElementById('konusma1'), document.getElementById('konusma2')];
 const konusmaZaman = [0, 0];
 const sonKonusulan = [null, null];
@@ -492,11 +503,11 @@ function konus(i, metin) {
 function oyuncuGuncelle(o, idx, dt) {
   const t = o.tuslar;
   const donus = 2.8;
-  if (basili[t.sol]) o.aci += donus * dt;
-  if (basili[t.sag]) o.aci -= donus * dt;
+  if (bas(t.sol)) o.aci += donus * dt;
+  if (bas(t.sag)) o.aci -= donus * dt;
   let hedefHiz = 0;
-  if (basili[t.ileri]) hedefHiz = 9;
-  if (basili[t.geri]) hedefHiz = -5;
+  if (bas(t.ileri)) hedefHiz = 9;
+  if (bas(t.geri)) hedefHiz = -5;
   o.hiz += (hedefHiz - o.hiz) * Math.min(1, dt * 10);
   const p = o.g.position;
   p.x += Math.sin(o.aci) * o.hiz * dt;
@@ -512,10 +523,9 @@ function oyuncuGuncelle(o, idx, dt) {
     if (Math.hypot(e.position.x - p.x, e.position.z - p.z) < 1.2) {
       parilti(e.position.x, e.position.z, idx === 0 ? 0x2a8aff : 0xff3030);
       elmaKoy(e);
-      o.skor++;
-      skorEl[idx].textContent = o.skor;
+      o.canta++;
+      cantaEl[idx].textContent = o.canta;
       elmaSesi();
-      if (o.skor >= HEDEF) bitir(idx);
     }
   }
 
@@ -524,7 +534,22 @@ function oyuncuGuncelle(o, idx, dt) {
   for (const k of koyluler) {
     if (Math.hypot(k.g.position.x - p.x, k.g.position.z - p.z) < 3) { yakin = k; break; }
   }
-  if (yakin && sonKonusulan[idx] !== yakin) {
+  if (yakin && o.canta > 0) {
+    // çantadaki elmaları köylüye ver
+    const n = o.canta;
+    yakin.aldigi += n;
+    o.verilen += n; o.canta = 0;
+    cantaEl[idx].textContent = 0;
+    verilenEl[idx].textContent = o.verilen;
+    const tesekkur = ['Çok teşekkür ederim!', 'Ellerine sağlık!', 'Ne güzel elmalar bunlar!', 'Allah razı olsun evlat!', 'Bunlardan reçel yapacağım!'];
+    konus(idx, yakin.bilgi.ad + ': "' + n + ' elma! ' + tesekkur[Math.floor(Math.random() * tesekkur.length)] +
+      '" (Toplam ' + yakin.aldigi + ' elma aldı)');
+    kalpler(yakin.g.position.x, yakin.g.position.z);
+    verSesi();
+    yakin.bakilan = o;
+    yakin.bakmaZaman = 3;
+    yakin.eldeki.visible = true;
+  } else if (yakin && sonKonusulan[idx] !== yakin) {
     const s = yakin.bilgi.sozler[yakin.sozIndex % yakin.bilgi.sozler.length];
     yakin.sozIndex++;
     konus(idx, yakin.bilgi.ad + ': "' + s + '"');
@@ -558,6 +583,7 @@ function koyluGuncelle(k, dt) {
     return;
   }
   k.g.userData.sagKol.rotation.z = 0;
+  k.eldeki.visible = false;
   if (k.bekle > 0) {
     k.bekle -= dt; k.hiz = 0;
     yuruAnim(k.g, 0, dt);
@@ -608,31 +634,19 @@ function aciFark(a, b) {
   return d;
 }
 
-function bitir(idx) {
-  oyunda = false;
-  const ad = idx === 0 ? '🔵 Oyuncu 1' : '🔴 Oyuncu 2';
-  document.getElementById('kazanan').textContent = ad + ' kazandı! 🎉';
-  document.getElementById('sonuc').textContent = 'Skor: Oyuncu 1 → ' + oyuncu1.skor + ' elma, Oyuncu 2 → ' + oyuncu2.skor + ' elma';
-  document.getElementById('bitis').style.display = 'flex';
-  [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => bip(f, 0.3, 'square', 0.1), i * 150));
-}
-
 function baslat() {
   if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   [oyuncu1, oyuncu2].forEach((o, i) => {
-    o.skor = 0; skorEl[i].textContent = 0;
+    o.canta = 0; o.verilen = 0; cantaEl[i].textContent = 0; verilenEl[i].textContent = 0;
     o.aci = Math.PI; o.hiz = 0;
     o.g.position.set(i === 0 ? -3 : 3, 0, 8);
     o.kamPos.set(o.g.position.x, 6, 17);
   });
   elmalar.forEach(elmaKoy);
-  document.querySelectorAll('.hedef').forEach(el => el.textContent = HEDEF);
   document.getElementById('giris').style.display = 'none';
-  document.getElementById('bitis').style.display = 'none';
   oyunda = true;
 }
 document.getElementById('basla').onclick = baslat;
-document.getElementById('tekrar').onclick = baslat;
 
 // ================== ÇİZİM DÖNGÜSÜ ==================
 const saat = new THREE.Clock();
