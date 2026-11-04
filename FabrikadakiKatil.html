@@ -31,7 +31,9 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); c
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   background: rgba(8, 10, 14, 0.55); z-index: 10; box-sizing: border-box;
+  align-items: flex-start; overflow-y: auto;
 }
+.screen > .card { margin-block: auto; }
 .card {
   background: var(--panel); border: 2px solid var(--line); border-radius: 14px;
   padding: 24px 22px; max-width: 520px; width: 100%; box-sizing: border-box;
@@ -44,11 +46,20 @@ h1 { font-size: clamp(30px, 8vw, 54px); color: var(--pink); text-shadow: 0 4px 0
 h2 { font-size: clamp(40px, 12vw, 80px); }
 p { margin: 0; line-height: 1.5; font-size: 16px; }
 .muted { color: var(--muted); }
-.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; text-align: left; font-size: 15px; align-items: center; }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; text-align: left; font-size: 14px; align-items: center; }
 kbd {
   font-family: var(--font-display); font-size: 13px; background: #20262f; border: 1px solid #3a434f;
   border-bottom-width: 3px; border-radius: 6px; padding: 2px 8px; color: var(--fg); white-space: nowrap; justify-self: start;
 }
+.mods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mod {
+  font: 800 15px var(--font-body); padding: 10px 6px; border-radius: 10px; cursor: pointer;
+  background: #20262f; color: var(--fg); border: 2px solid #3a434f;
+}
+.mod b { font-family: var(--font-display); font-weight: 400; color: var(--muted); margin-right: 4px; }
+.mod.on { border-color: #b36aff; background: #2e1f45; }
+.mod.on b { color: #c99bff; }
+@media (min-width: 640px) { #menu .card { max-width: 760px; } #menu .keys { grid-template-columns: auto 1fr auto 1fr; } }
 button.big {
   font-family: var(--font-display); font-size: 22px; padding: 14px 20px; border: 0; border-radius: 10px;
   background: var(--pink); color: #2a0b1d; cursor: pointer; box-shadow: 0 5px 0 #a13d78;
@@ -196,6 +207,12 @@ button:focus-visible { outline: 3px solid var(--hazard); outline-offset: 3px; }
       <kbd>M</kbd><span>Sesi aç / kapat</span>
       <kbd>Ç</kbd><span>Oyundan çık</span>
     </div>
+    <div class="mods" role="group" aria-label="Mod seç">
+      <button type="button" class="mod" data-mod="0"><b>1</b> Normal</button>
+      <button type="button" class="mod" data-mod="1"><b>2</b> Mor Katil</button>
+      <button type="button" class="mod" data-mod="2"><b>3</b> Minikler</button>
+    </div>
+    <p class="muted" id="modInfo" style="font-size:14px"></p>
     <p class="muted" style="font-size:14px">Şu anki dünya: <b id="menuWorld" style="color:var(--hazard)">Fabrika</b></p>
     <button class="big" id="startBtn" type="button">OYNA</button>
     <p class="muted" style="font-size:13px">Enter tuşuna da basabilirsin</p>
@@ -598,6 +615,7 @@ function makeCrew(color) {
   knife.scale.setScalar(1.5);
   knife.visible = false;
   g.add(knife);
+  g.scale.setScalar(crewScale());
   return { g, legL: legs[0], legR: legs[1], walk: 0, knife, knifeT: 0 };
 }
 
@@ -857,6 +875,20 @@ const COLORS = [
   ['Turuncu', 0xff8a1c], ['Mor', 0x8b45d6], ['Camgöbeği', 0x2fe0d8], ['Beyaz', 0xe9eef2],
 ];
 let state = 'menu', roleShown = false;
+// Modlar: Mor Katil'de katil hep mor; Minikler'de herkes küçük ve katil yine mor
+const MODS = [
+  { name: 'Normal', info: 'Her oyunda 3\'te 1 ihtimalle katil sen olursun.' },
+  { name: 'Mor Katil', purple: true, info: 'Katil her zaman MOR! Sen masumsun, ondan kaç.' },
+  { name: 'Minikler', purple: true, tiny: true, info: 'Herkes küçüldü! Katil yine her zaman MOR.' },
+];
+let modIndex = 0;
+const crewScale = () => MODS[modIndex].tiny ? .5 : 1;
+function setMod(i) {
+  modIndex = i;
+  document.querySelectorAll('.mod').forEach(b => b.classList.toggle('on', +b.dataset.mod === i));
+  $('modInfo').textContent = MODS[i].info;
+  if (state === 'menu') { clearRound(); menuCrew(); }
+}
 let player = null, npcs = [], corpses = [], isKiller = false, killCd = 0, revealT = 0, caughtT = -1, witnessName = '';
 let actionHeld = false, actionPressed = false;
 const keys = new Set();
@@ -874,10 +906,12 @@ function randomWaypoint() { return WAYPOINTS[Math.floor(Math.random() * WAYPOINT
 
 function newRound() {
   clearRound();
-  isKiller = Math.random() < 1 / 3;
+  const mod = MODS[modIndex];
+  isKiller = !mod.purple && Math.random() < 1 / 3;
   player = Object.assign(makeCrew(0xe53935), { name: 'Kırmızı', isPlayer: true, alive: true, color: 0xe53935 });
   player.g.position.set(0, 0, -1);
-  const pool = COLORS.slice().sort(() => Math.random() - .5).slice(0, 7);
+  let pool = COLORS.slice().sort(() => Math.random() - .5).slice(0, 7);
+  if (mod.purple && !pool.some(([n]) => n === 'Mor')) pool[0] = COLORS.find(([n]) => n === 'Mor');
   pool.forEach(([name, color], i) => {
     const a = ((i + 1) / (pool.length + 1)) * Math.PI * 2 + Math.PI / 2;
     const n = Object.assign(makeCrew(color), { name, color, alive: true, target: randomWaypoint(), wait: Math.random() * 2,
@@ -887,7 +921,7 @@ function newRound() {
     npcs.push(n);
   });
   if (!isKiller) {
-    const imp = npcs[Math.floor(Math.random() * npcs.length)];
+    const imp = mod.purple ? npcs.find(n => n.name === 'Mor') : npcs[Math.floor(Math.random() * npcs.length)];
     imp.impostor = true; imp.killTimer = 20 + Math.random() * 6;
   }
   killCd = 10;
@@ -903,6 +937,7 @@ function newRound() {
   $('revealTitle').className = isKiller ? 'role-killer' : 'role-crew';
   $('revealText').textContent = isKiller
     ? 'Herkesi tek tek yakala. Ama dikkat et, yakında başka biri varsa seni görür!'
+    : mod.purple ? 'Bu modda katil hep MOR! Ondan uzak dur ve görevleri yap.'
     : 'Sarı yerlerdeki görevleri yap. Aranızda gizli bir katil var, ondan kaç!';
   // Önce "Şşşt!" ekranı, sonra rol
   $('shh').hidden = false; $('roleCard').hidden = true;
@@ -1071,6 +1106,7 @@ function doKill(killer, victim) {
   const p = victim.g.position;
   const body = makeCorpse(victim.color, p.x, p.z, victim.g.rotation.y);
   body.userData.name = victim.name;
+  body.scale.setScalar(crewScale());
   corpses.push(body);
   scene.remove(victim.g);
   if (!blocked(p.x + .9, p.z)) killer.g.position.set(p.x + .9, 0, p.z);
@@ -1296,12 +1332,12 @@ function drawHud() {
   if (!player) return;
   if (isKiller) {
     const left = aliveNpcs().length;
-    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>${lightsOut ? '<div class="warn-line">Işıklar sönük, kimse uzağı göremez</div>' : sabCd > 0 ? `<div class="muted">Sabotaj: ${Math.ceil(sabCd)} sn</div>` : '<div class="warn-line">S: Işıkları söndür</div>'}
+    info.innerHTML = `<div class="world">${MODS[modIndex].name} · ${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-killer">KATİL</div>${lightsOut ? '<div class="warn-line">Işıklar sönük, kimse uzağı göremez</div>' : sabCd > 0 ? `<div class="muted">Sabotaj: ${Math.ceil(sabCd)} sn</div>` : '<div class="warn-line">S: Işıkları söndür</div>'}
       <div>Kalan kişi: <b>${left}</b> / ${npcs.length}</div>
       <div class="muted" style="margin-top:4px">Yalnız birini bul, yanına git, E'ye bas.</div>`;
   } else {
     const done = TASKS.filter(t => t.done).length;
-    info.innerHTML = `<div class="world">${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>${lightsOut ? '<div class="warn-line">IŞIKLAR SÖNDÜ!</div>' : ''}
+    info.innerHTML = `<div class="world">${MODS[modIndex].name} · ${WORLDS[worldIndex].name} · <b>D</b> başka dünya</div><div class="role role-crew">MASUM</div>${lightsOut ? '<div class="warn-line">IŞIKLAR SÖNDÜ!</div>' : ''}
       <div class="count">Görevler: ${done} / ${TASKS.length}</div>
       <ul>${TASKS.map(t => `<li class="${t.done ? 'done' : ''}">${t.name}</li>`).join('')}</ul>
       <div class="bar"><i style="width:${done / TASKS.length * 100}%"></i></div>`;
@@ -1363,7 +1399,8 @@ function frame(now) {
   if (player && state !== 'menu') {
     const p = player.g.position;
     camTarget.set(p.x, 1, p.z);
-    const want = new THREE.Vector3(p.x, 13, p.z + 11);
+    const k = crewScale() < 1 ? .65 : 1;   // minik modda kamera yaklaşır
+    const want = new THREE.Vector3(p.x, 13 * k, p.z + 11 * k);
     camPos.lerp(want, Math.min(1, dt * 5));
   } else {
     camTarget.set(0, 0, 0);
@@ -1384,6 +1421,8 @@ function menuCrew() {
   });
 }
 menuCrew();
+setMod(0);
+document.querySelectorAll('.mod').forEach(b => b.addEventListener('click', () => setMod(+b.dataset.mod)));
 
 requestAnimationFrame(frame);
 
@@ -1397,6 +1436,7 @@ window.addEventListener('keydown', e => {
     return;
   }
   if (state === 'menu' && (e.key === 'Enter' || e.code === 'Space')) { e.preventDefault(); startGame(); return; }
+  if (state === 'menu' && ['Digit1', 'Digit2', 'Digit3'].includes(e.code)) { setMod(+e.code.slice(-1) - 1); return; }
   if (state === 'meeting') {
     if ((e.key === 'Enter' || e.code === 'Space') && meetOutcome) { e.preventDefault(); endMeeting(); }
     return;
