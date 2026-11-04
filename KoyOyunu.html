@@ -50,7 +50,7 @@
 <div id="hud1" class="hud">
   <div class="ad" style="color:#7fd0ff">🔵 Oyuncu 1</div>
   <div>🍎 Elma: <span id="skor1">0</span> / <span class="hedef">15</span></div>
-  <div class="tus">E ileri · Z geri · A sol · D sağ</div>
+  <div class="tus">W ileri · S geri · A sol · D sağ</div>
 </div>
 <div id="hud2" class="hud">
   <div class="ad" style="color:#ff8a8a">Oyuncu 2 🔴</div>
@@ -67,8 +67,8 @@
   <div class="kutular">
     <div class="kutu">
       <h2 style="color:#7fd0ff">🔵 Oyuncu 1 (sol ekran)</h2>
-      <div><span class="tusk">E</span> ileri</div>
-      <div><span class="tusk">Z</span> geri</div>
+      <div><span class="tusk">W</span> ileri</div>
+      <div><span class="tusk">S</span> geri</div>
       <div><span class="tusk">A</span> sola dön</div>
       <div><span class="tusk">D</span> sağa dön</div>
     </div>
@@ -357,7 +357,7 @@ function oyuncuYap(renk, x, z, aci) {
 }
 const oyuncu1 = oyuncuYap(0x2a8aff, -3, 8, Math.PI);
 const oyuncu2 = oyuncuYap(0xff3030, 3, 8, Math.PI);
-oyuncu1.tuslar = { ileri: 'KeyE', geri: 'KeyZ', sol: 'KeyA', sag: 'KeyD' };
+oyuncu1.tuslar = { ileri: 'KeyW', geri: 'KeyS', sol: 'KeyA', sag: 'KeyD' };
 oyuncu2.tuslar = { ileri: 'ArrowUp', geri: 'ArrowDown', sol: 'ArrowLeft', sag: 'ArrowRight' };
 
 // ================== KÖYLÜLER ==================
@@ -466,7 +466,7 @@ function konusmaSesi() { for (let i = 0; i < 4; i++) setTimeout(() => bip(300 + 
 
 // ================== KLAVYE ==================
 const basili = {};
-const oyunTuslari = ['KeyE', 'KeyZ', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const oyunTuslari = ['KeyW', 'KeyS', 'KeyA', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 window.addEventListener('keydown', e => {
   basili[e.code] = true;
   if (oyunTuslari.includes(e.code)) e.preventDefault();
