@@ -229,11 +229,11 @@ const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPa
 function statikSun(req, res, kapi) {
   let yol = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (yol === '/') yol = kapi === 'dis' ? '/dis-index.html' : '/index.html';
-  if (kapi === 'dis' && !DIS_SAYFALAR.test(yol)) { res.writeHead(404); res.end('Bulunamadı'); return; }
+  if (kapi === 'dis' && !DIS_SAYFALAR.test(yol)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
   const tam = path.normalize(path.join(GENEL, yol));
   if (!tam.startsWith(GENEL + path.sep)) { res.writeHead(400); res.end(); return; }
   fs.stat(tam, (hata, st) => {
-    if (hata || !st.isFile()) { res.writeHead(404); res.end('Bulunamadı'); return; }
+    if (hata || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
     res.writeHead(200, {
       'Content-Type': TURLER[path.extname(tam).toLowerCase()] || 'application/octet-stream',
       'Content-Length': st.size,
@@ -250,7 +250,7 @@ function dosyaSun(req, res, oturumVarMi) {
   if (!m) { res.writeHead(404); res.end(); return; }
   const klasor = path.join(DOSYALAR, m[1]);
   let ad;
-  try { ad = fs.readdirSync(klasor)[0]; } catch (e) { res.writeHead(404); res.end('Bulunamadı'); return; }
+  try { ad = fs.readdirSync(klasor)[0]; } catch (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
   if (!ad) { res.writeHead(404); res.end(); return; }
   const tam = path.join(klasor, ad);
   const st = fs.statSync(tam);
