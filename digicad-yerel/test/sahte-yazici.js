@@ -10,7 +10,9 @@ const deger = ad => { const i = a.indexOf(ad); return i >= 0 ? a[i + 1] : null; 
 const yazici = deger('-Yazici');
 if (yazici && !YAZICILAR.some(y => y.ad === yazici)) { process.stderr.write('Yazıcı bulunamadı: ' + yazici); process.exit(1); }
 const resim = deger('-Resim');
-const form = resim ? { hasta: deger('-Baslik'), resim: true } : JSON.parse(fs.readFileSync(deger('-Veri'), 'utf8'));
+const formDosyasi = deger('-Form');
+const form = resim ? { hasta: deger('-Baslik'), resim: true } : formDosyasi ? { siparisFormu: true, baslik: deger('-Baslik'), ...JSON.parse(fs.readFileSync(formDosyasi, 'utf8')) } : JSON.parse(fs.readFileSync(deger('-Veri'), 'utf8'));
+if (process.env.SAHTE_FORM_HATASI && formDosyasi) { process.stderr.write('Sipariş formu çizim hatası (deneme)'); process.exit(1); }
 const klasor = process.env.SAHTE_YAZICI_CIKTI;
 fs.mkdirSync(klasor, { recursive: true });
 fs.writeFileSync(path.join(klasor, Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.json'), JSON.stringify({ yazici: yazici || '(varsayılan)', kopya: deger('-Kopya'), kagit: deger('-Kagit'), form }, null, 1));

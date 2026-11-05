@@ -4,11 +4,12 @@
 #  yazıcıya iş formu basar. Ek program gerekmez (Windows'un kendi
 #  System.Drawing yazdırma altyapısı kullanılır).
 #    yazdir.ps1 -Liste                                  → yazıcı listesi (JSON)
-#    yazdir.ps1 -Resim form.png -Yazici "Ad" -Kagit A5  → hazır form resmini bas
-#                (Sipariş Takip Formu; sunucu Edge ile resme çevirir)
-#    yazdir.ps1 -Veri is.json -Yazici "Ad" -Kagit A5    → yedek: formu kendisi çizer
+#    yazdir.ps1 -Form form.json -Yazici "Ad" -Kagit A5  → SİPARİŞ TAKİP FORMU
+#                (yönetim panelindeki "Yazdır" çıktısının ölçüleriyle birebir çizilir)
+#    yazdir.ps1 -Resim form.png ...                     → hazır resmi bas
+#    yazdir.ps1 -Veri is.json ...                       → yedek: basit iş formu
 # ═══════════════════════════════════════════════════════════════════
-param([string]$Veri, [string]$Resim, [string]$Baslik = 'DIGICAD Sipariş Formu', [string]$Yazici, [int]$Kopya = 1, [string]$Kagit = 'A5', [switch]$Liste)
+param([string]$Veri, [string]$Form, [string]$Resim, [string]$Baslik = 'DIGICAD Sipariş Formu', [string]$Yazici, [int]$Kopya = 1, [string]$Kagit = 'A5', [switch]$Liste)
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 
@@ -22,13 +23,14 @@ if ($Liste) {
 
 Add-Type -AssemblyName System.Drawing
 if ($Resim) { $script:resim = [System.Drawing.Image]::FromFile($Resim) }
+elseif ($Form) { $script:f = Get-Content -LiteralPath $Form -Raw -Encoding UTF8 | ConvertFrom-Json }
 else { $script:d = Get-Content -LiteralPath $Veri -Raw -Encoding UTF8 | ConvertFrom-Json }
 
 $pd = New-Object System.Drawing.Printing.PrintDocument
 if ($Yazici) { $pd.PrinterSettings.PrinterName = $Yazici }
 if (-not $pd.PrinterSettings.IsValid) { throw ('Yazıcı bulunamadı: ' + $Yazici) }
 if ($Kopya -gt 1) { $pd.PrinterSettings.Copies = [int16]$Kopya }
-$pd.DocumentName = $(if ($Resim) { $Baslik } else { 'DIGICAD İş Talebi - ' + $script:d.hasta })
+$pd.DocumentName = $(if ($Resim -or $Form) { $Baslik } else { 'DIGICAD İş Talebi - ' + $script:d.hasta })
 # Durum penceresi ("Yazdırılıyor...") açılmasın
 $pd.PrintController = New-Object System.Drawing.Printing.StandardPrintController
 # Kağıt boyutu: A5 (148x210 mm) varsayılan, A4 isteğe bağlı. Ölçüler 1/100 inç.
@@ -41,9 +43,194 @@ if (-not $kagitBoyu) {
 }
 $pd.DefaultPageSettings.PaperSize = $kagitBoyu
 $pd.DefaultPageSettings.Landscape = $false
-$pd.DefaultPageSettings.Margins = $(if ($Resim) { New-Object System.Drawing.Printing.Margins(12, 12, 12, 12) } elseif ($script:A5) { New-Object System.Drawing.Printing.Margins(32, 32, 28, 28) } else { New-Object System.Drawing.Printing.Margins(55, 55, 45, 45) })
+$pd.DefaultPageSettings.Margins = $(if ($Resim -or $Form) { New-Object System.Drawing.Printing.Margins(12, 12, 12, 12) } elseif ($script:A5) { New-Object System.Drawing.Printing.Margins(32, 32, 28, 28) } else { New-Object System.Drawing.Printing.Margins(55, 55, 45, 45) })
 
-if ($Resim) {
+if ($Form) {
+  # ── SİPARİŞ TAKİP FORMU ──────────────────────────────────────────
+  # Koordinatlar, panelin yazdırdığı HTML formun tarayıcıdaki ölçüleridir
+  # (A4 = 794 piksel genişlik). Sayfaya orantılı ölçeklenir.
+  $pd.add_PrintPage({
+    param($gonderen, $e)
+    $f = $script:f
+    $g = $e.Graphics
+    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $mb = $e.MarginBounds
+    $olcek = [single]($mb.Width / 794)
+    $g.TranslateTransform([single]$mb.Left, [single]$mb.Top)
+    $g.ScaleTransform($olcek, $olcek)
+
+    $W = [System.Drawing.GraphicsUnit]::World
+    $B = [System.Drawing.FontStyle]::Bold
+    $N = [System.Drawing.FontStyle]::Regular
+    $lacivert = [System.Drawing.Color]::FromArgb(26, 39, 64)
+    $fLac = New-Object System.Drawing.SolidBrush($lacivert)
+    $fAdres = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(90, 107, 122))
+    $fGri = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(136, 136, 136))
+    $fBeyaz = [System.Drawing.Brushes]::White
+    $kCerceve = New-Object System.Drawing.Pen($lacivert, [single]1.5)
+    $kKalin = New-Object System.Drawing.Pen($lacivert, [single]2)
+    $kHucre = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(204, 204, 204), [single]1)
+    $kNokta = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(204, 204, 204), [single]1)
+    $kNokta.DashStyle = [System.Drawing.Drawing2D.DashStyle]::Dot
+    $script:tip = [System.Drawing.StringFormat]::GenericTypographic.Clone()
+    $script:tip.FormatFlags = $script:tip.FormatFlags -bor [System.Drawing.StringFormatFlags]::MeasureTrailingSpaces
+    $script:gg = $g
+
+    function Yazi($metin, $font, $firca, [single]$x, [single]$y) { $script:gg.DrawString([string]$metin, $font, $firca, $x, $y, $script:tip) }
+    function Gen($metin, $font) { return [single]$script:gg.MeasureString([string]$metin, $font, (New-Object System.Drawing.PointF(0, 0)), $script:tip).Width }
+    function Aralikli($metin, $font, $firca, [single]$x, [single]$y, [single]$aralik) {
+      foreach ($c in ([string]$metin).ToCharArray()) { Yazi ([string]$c) $font $firca $x $y; $x += (Gen ([string]$c) $font) + $aralik }
+    }
+    function AralikliGen($metin, $font, [single]$aralik) {
+      $t = [single]0; foreach ($c in ([string]$metin).ToCharArray()) { $t += (Gen ([string]$c) $font) + $aralik }; return $t
+    }
+    function Ortala($metin, $font, $firca, [single]$x, [single]$gen, [single]$y) { Yazi $metin $font $firca ($x + ($gen - (Gen $metin $font)) / 2) $y }
+    function Etiket($metin, [single]$x, [single]$y) { Aralikli $metin $script:fEtiket $fLac $x $y ([single]0.8) }
+    function NoktaliCizgi([single]$x1, [single]$x2, [single]$y) { $script:gg.DrawLine($kNokta, $x1, $y, $x2, $y) }
+    # Satır kaydırma (CSS gibi kelime kelime; çok uzun kelimeler harf harf bölünür)
+    function Satirlar($metin, $font, [single]$gen) {
+      $sonuc = New-Object System.Collections.Generic.List[string]
+      foreach ($paragraf in ([string]$metin -split "`n")) {
+        $satir = ''
+        foreach ($kelime in ($paragraf -split ' ')) {
+          $aday = $(if ($satir) { $satir + ' ' + $kelime } else { $kelime })
+          if ((Gen $aday $font) -le $gen) { $satir = $aday; continue }
+          if ($satir) { $sonuc.Add($satir); $satir = '' }
+          while ((Gen $kelime $font) -gt $gen -and $kelime.Length -gt 1) {
+            $n = $kelime.Length
+            while ($n -gt 1 -and (Gen ($kelime.Substring(0, $n)) $font) -gt $gen) { $n-- }
+            $sonuc.Add($kelime.Substring(0, $n)); $kelime = $kelime.Substring($n)
+          }
+          $satir = $kelime
+        }
+        $sonuc.Add($satir)
+      }
+      return , $sonuc
+    }
+
+    $script:fEtiket = New-Object System.Drawing.Font('Arial', [single]10, $B, $W)
+    $fLogo = New-Object System.Drawing.Font('Arial', [single]42, $B, $W)
+    $fAd = New-Object System.Drawing.Font('Arial', [single]12, $B, $W)
+    $fAdr = New-Object System.Drawing.Font('Arial', [single]9, $N, $W)
+    $fNo = New-Object System.Drawing.Font('Arial', [single]8, $N, $W)
+    $fDis = New-Object System.Drawing.Font('Arial', [single]11, $N, $W)
+    $fDisB = New-Object System.Drawing.Font('Arial', [single]11, $B, $W)
+    $fBaslik = New-Object System.Drawing.Font('Arial', [single]18, $B, $W)
+    $fDeger = New-Object System.Drawing.Font('Arial', [single]18, $B, $W)
+    $fBuyuk = New-Object System.Drawing.Font('Arial', [single]22, $N, $W)
+    $fTarih = New-Object System.Drawing.Font('Arial', [single]14, $B, $W)
+    $fMat = New-Object System.Drawing.Font('Arial', [single]13, $B, $W)
+    $fNot = New-Object System.Drawing.Font('Arial', [single]13, $N, $W)
+    $fTik = New-Object System.Drawing.Font('Segoe UI Symbol', [single]12, $N, $W)
+
+    # ── Üst bölüm: logo ve adres (sol sütun 20..260) ──
+    $lg = AralikliGen 'DC' $fLogo ([single]2)
+    Aralikli 'DC' $fLogo $fLac ([single](20 + (240 - $lg) / 2)) ([single]20) ([single]2)
+    Ortala 'DIGICAD DENTAL STUDIO' $fAd $fLac ([single]20) ([single]240) ([single]66)
+    $adres = @('Oğuzlar Mh. 1379 Sk. 13/12', 'Balgat / Çankaya / Ankara', '0(505) 648 18 93', '0(553) 002 76 76')
+    for ($i = 0; $i -lt 4; $i++) { Ortala $adres[$i] $fAdr $fAdres ([single]20) ([single]240) ([single](84 + $i * 12.6 + 1.6)) }
+
+    # ── Diş şeması (285..769) ──
+    $secili = @{}
+    foreach ($n in @($f.disler)) { if ($n) { $secili[[int]$n] = $true } }
+    $ust1 = @(18, 17, 16, 15, 14, 13, 12, 11); $ust2 = @(21, 22, 23, 24, 25, 26, 27, 28)
+    $alt1 = @(48, 47, 46, 45, 44, 43, 42, 41); $alt2 = @(31, 32, 33, 34, 35, 36, 37, 38)
+    function HucreX([int]$i) { if ($i -lt 8) { return [single](285 + 30 * $i) } else { return [single](529 + 30 * ($i - 8)) } }
+    function NumaraSatiri($dizi, [single]$y) {
+      for ($i = 0; $i -lt 16; $i++) { Ortala ([string]$dizi[$i]) $fNo $fGri (HucreX $i) ([single]30) ([single]($y + 1.5)) }
+    }
+    function DisSatiri($dizi, [single]$y) {
+      for ($i = 0; $i -lt 16; $i++) {
+        $x = HucreX $i; $no = [int]$dizi[$i]
+        if ($secili.ContainsKey($no)) {
+          $script:gg.FillRectangle($fLac, $x, $y, [single]30, [single]17)
+          Ortala ([string]$no) $fDisB $fBeyaz $x ([single]30) ([single]($y + 2.4))
+        } else {
+          Ortala ([string]$no) $fDis $fLac $x ([single]30) ([single]($y + 2.4))
+        }
+        $script:gg.DrawRectangle($kHucre, $x, $y, [single]30, [single]17)
+      }
+      $script:gg.DrawLine($kKalin, [single]526, $y, [single]526, [single]($y + 17))
+    }
+    NumaraSatiri ($ust1 + $ust2) ([single]32.9)
+    DisSatiri ($ust1 + $ust2) ([single]44.4)
+    $g.FillRectangle($fLac, [single]285, [single]61.9, [single]484, [single]1.5)
+    DisSatiri ($alt1 + $alt2) ([single]63.9)
+    NumaraSatiri ($alt1 + $alt2) ([single]80.9)
+    $bg = AralikliGen 'SİPARİŞ TAKİP FORMU' $fBaslik ([single]3)
+    Aralikli 'SİPARİŞ TAKİP FORMU' $fBaslik $fLac ([single](280 + (494 - $bg) / 2)) ([single]100.4) ([single]3)
+    $g.DrawLine($kKalin, [single]20, [single]149.4, [single]774, [single]149.4)
+
+    # ── 1. satır: Klinik / Hekim — Hasta (y 164.4, yükseklik 69) ──
+    $g.DrawRectangle($kCerceve, [single]20.75, [single]165.15, [single]752.5, [single]67.5)
+    $g.DrawLine($kCerceve, [single]396.75, [single]165.4, [single]396.75, [single]232.4)
+    Etiket 'KLİNİK / HEKİM' ([single]33) ([single]175.4)
+    Etiket 'HASTA ADI - SOYADI' ([single]409) ([single]175.4)
+    $hk = (Satirlar ([string]$f.hekim) $fDeger ([single]351))[0]
+    $hs = (Satirlar ([string]$f.hasta) $fDeger ([single]352))[0]
+    Yazi $hk $fDeger $fLac ([single]33) ([single]196.4)
+    Yazi $hs $fDeger $fLac ([single]409) ([single]196.4)
+    NoktaliCizgi ([single]33) ([single]384) ([single]221.9)
+    NoktaliCizgi ([single]409) ([single]761) ([single]221.9)
+
+    # ── 2. satır: Renk / Üye sayısı (ya da İş kalemleri) / Teslim — Materyal ──
+    $y2 = [single]243.4
+    $kalemler = @($f.kalemler | Where-Object { $_ })
+    $sy = $y2 + 11
+    # sol sütun yüksekliğini hesapla
+    $blok2 = $(if ($kalemler.Count -gt 1) { 11 + 6 + 4 + $kalemler.Count * 22 } else { 60 })
+    $solYuk = 10 + 60 + 14 + $blok2 + 14 + 45 + 10
+    $satirYuk = [single][Math]::Max(200, $solYuk + 2)
+    $g.DrawRectangle($kCerceve, [single]20.75, ($y2 + 0.75), [single]752.5, ($satirYuk - 1.5))
+    $g.DrawLine($kCerceve, [single]396.75, ($y2 + 1), [single]396.75, ($y2 + $satirYuk - 1))
+    # RENK
+    Etiket 'RENK' ([single]33) $sy
+    Ortala ([string]$f.renk) $fBuyuk $fLac ([single]33) ([single]351) ($sy + 17 + 8)
+    NoktaliCizgi ([single]33) ([single]384) ($sy + 17 + 42.5)
+    $sy += 60 + 14
+    if ($kalemler.Count -gt 1) {
+      Etiket 'İŞ KALEMLERİ' ([single]33) $sy
+      $ky = $sy + 21
+      foreach ($k in $kalemler) {
+        Yazi ([string]$k.tur) $fMat $fLac ([single]33) ($ky + 3)
+        $adet = [string]$k.adet + ' ad.'
+        Yazi $adet $fMat $fLac ([single](384 - (Gen $adet $fMat))) ($ky + 3)
+        NoktaliCizgi ([single]33) ([single]384) ($ky + 21.5)
+        $ky += 22
+      }
+    } else {
+      Etiket 'ÜYE SAYISI' ([single]33) $sy
+      Ortala ([string]$f.adet) $fBuyuk $fLac ([single]33) ([single]351) ($sy + 17 + 8)
+      NoktaliCizgi ([single]33) ([single]384) ($sy + 17 + 42.5)
+    }
+    $sy += $blok2 + 14
+    Etiket 'TESLİM TARİHİ' ([single]33) $sy
+    Ortala ([string]$f.teslim) $fTarih $fLac ([single]33) ([single]351) ($sy + 17 + 4 + 2)
+    NoktaliCizgi ([single]33) ([single]384) ($sy + 17 + 27.5)
+    # MATERYAL
+    Etiket 'MATERYAL' ([single]409) ($y2 + 11)
+    $malzemeler = @('ZIRCONIA', 'METAL DESTEKLİ PORSELEN', 'EMAX', 'LAMİNE', 'PMMA', 'TITANIUM')
+    for ($i = 0; $i -lt $malzemeler.Count; $i++) {
+      $my = $y2 + 30 + $i * 21
+      $g.DrawRectangle($kCerceve, [single]409.75, ($my + 1.25), [single]12.5, [single]12.5)
+      if ([string]$f.malzeme -eq $malzemeler[$i]) { Ortala '✓' $fTik $fLac ([single]409) ([single]14) ($my - 0.5) }
+      Yazi $malzemeler[$i] $fMat $fLac ([single]431) ($my + 0.5)
+    }
+
+    # ── NOTLAR ──
+    $ny = $y2 + $satirYuk + 10
+    $notSatirlari = Satirlar ([string]$f.notlar) $fNot ([single]728)
+    if (-not [string]$f.notlar) { $notSatirlari = @() }
+    $notYuk = [single][Math]::Max(130, 1.5 + 10 + 11 + 6 + $notSatirlari.Count * 20.8 + 10 + 1.5)
+    $g.DrawRectangle($kCerceve, [single]20.75, ($ny + 0.75), [single]752.5, ($notYuk - 1.5))
+    Etiket 'NOTLAR' ([single]33) ($ny + 11.5)
+    $ty = $ny + 28.5 + 2.9
+    foreach ($satir in $notSatirlari) { Yazi $satir $fNot $fLac ([single]33) $ty; $ty += 20.8 }
+
+    $e.HasMorePages = $false
+  })
+} elseif ($Resim) {
   # Hazır form resmini (A4 oranında) sayfaya orantılı sığdır — A5'te birebir küçültülmüş hâli çıkar
   $pd.add_PrintPage({
     param($gonderen, $e)

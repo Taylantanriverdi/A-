@@ -323,9 +323,10 @@ seçilebilir. Çıktı, yönetim panelindeki **Sipariş Takip Formu** ile birebi
 aynı görünür. Hekimin çene bilgisi, dosyaları ve bağlantıları, panelin
 "Forma Aktar" özelliğindeki gibi Notlar bölümüne yazılır.
 
-Form, bilgisayardaki Edge tarayıcısıyla ekran açılmadan resme çevrilip
-basılır. Edge bulunamazsa basit bir yedek form basılır; Ayarlar kartındaki
-geçmişte "basit form" yazar. Yazdırmayı sunucu yaptığı için yönetim paneli
+Form, Windows'un kendi çizim altyapısıyla, paneldeki "Yazdır" çıktısının
+ölçüleri birebir kopyalanarak çizilir. Tarayıcı ya da ek program gerekmez.
+Herhangi bir hata olursa iş yine de basit bir yedek formla basılır. Bu
+durumda Ayarlar kartındaki geçmişte "basit form" ve hatanın sebebi yazar. Yazdırmayı sunucu yaptığı için yönetim paneli
 kapalıyken de çalışır. Aynı iş iki kez basılmaz.
 
 Yazıcı listede görünmüyorsa, yazıcı muhtemelen yalnızca sizin Windows
