@@ -131,6 +131,7 @@
   <p>Sık ve rengârenk bir ormandasın. Ağaçları ve kayaları <b>yumruklarınla kır</b>, tahta ve taş topla, <b>yollar döşe ve kendi şehrini kur!</b></p>
   <p>Kapıya yürüyerek evlerin içine gir; içeride mobilyalar ve <b>A ile açılan sandıklar</b> var, içinden tahta ve taş çıkar!</p>
   <p>Evlerine köylüler yerleşir: yolları kullanır, birbirleriyle sohbet eder, kuyudan su içer ve sana el sallarlar.</p>
+  <p>Ormanda dev <b>yetiler</b> dolaşır, bastıkları ağaçları ezerler. Yetiye vurma, seni bayıltır ve en yakın kulübede uyanırsın!</p>
   <p><span class="keys">↑↓←→</span> hareket &nbsp;<span class="keys">A</span> zıpla &nbsp;<span class="keys">S</span> vur &nbsp;<span class="keys">1-7</span> yapı seç &nbsp;<span class="keys">E</span> inşa et &nbsp;<span class="keys">M</span> modlar</p>
   <p id="startMode" style="color:var(--accent);font-weight:bold"></p>
   <div>
@@ -728,6 +729,7 @@
   }
   function collide(p, radius, skipThings) {
     if (!skipThings) for (const t of nearThings(p.x, p.z)) {
+      if (t.crushed) continue;
       const ex = p.x - t.x, ez = p.z - t.z, d = Math.hypot(ex, ez), min = t.r + radius;
       if (d < min && d > 1e-4) { p.x = t.x + ex / d * min; p.z = t.z + ez / d * min; }
     }
@@ -1697,7 +1699,7 @@
   };
   const AN_KEYS = Object.keys(ANIMALS), AN_W = AN_KEYS.reduce((s, k) => s + ANIMALS[k].w, 0);
   const animals = [], birds = [];
-  const ALL_SPECIES = AN_KEYS.length + 1;
+  const ALL_SPECIES = AN_KEYS.length + 2; // + kuş + yeti
   function spawnAnimal(force) {
     let w = Math.random() * AN_W, type = AN_KEYS[0];
     for (const k of AN_KEYS) { w -= ANIMALS[k].w; if (w <= 0) { type = k; break; } }
@@ -1723,6 +1725,190 @@
     const a = Math.random() * 6.28;
     const b = { g, wings, cx: S.x + Math.sin(a) * 15, cz: S.z + Math.cos(a) * 15, rad: 6 + Math.random() * 10, ang: Math.random() * 6.28, alt: 9 + Math.random() * 6, sp: (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.5), t: Math.random() * 9 };
     scene.add(g); birds.push(b);
+  }
+
+  // ================= Yetiler =================
+  // Ormanda dolaşan dev kar adamları: bastıkları ağaçları ezer (yeti uzaklaşınca ağaç düzelir),
+  // evlere yaklaşmaz, vurulursa Kazım Usta'yı bayıltır ve oyuncu en yakın kulübede uyanır.
+  const yetis = [], crushed = [];
+  const MAX_YETI = 2;
+  function makeYeti(female) {
+    const FUR = female ? 0xf6ecef : 0xe6eef4, FUR2 = female ? 0xe8d6dc : 0xc8d4de, SKIN = female ? 0x8a9ac0 : 0x6f8aa8, DARKS = 0x2a3448;
+    const furP = (p, x, y, z, sx, sy, sz, c = FUR) => p.push(P(GEO.ico1, c, x, y, z, sx, sy, sz, Math.random() * 3, Math.random() * 3, 0, { disp: 0.22, jitter: 0.08 }));
+    const shag = (p, x, y, z, rx, ry, rz, n, s, c) => { // gövde yüzeyine dağılmış tüy öbekleri
+      for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, b = Math.random() * 3.14 - 1.57; furP(p, x + Math.cos(b) * Math.sin(a) * rx, y + Math.sin(b) * ry, z + Math.cos(b) * Math.cos(a) * rz, s, s * 1.2, s, c || (Math.random() < 0.3 ? FUR2 : FUR)); }
+    };
+    const fm = (parts) => { const o = new THREE.Mesh(merge(parts, { jitter: 0.05 }), animalMat); o.castShadow = true; o.receiveShadow = true; return o; };
+    const sm = (parts) => am(parts);
+    const g = new THREE.Group(), inner = new THREE.Group(); inner.scale.setScalar(female ? 0.86 : 1); g.add(inner);
+    const legs = [], arms = [];
+    for (const s of [-1, 1]) {
+      const hip = new THREE.Group(); hip.position.set(s * 0.32, 1.1, 0); inner.add(hip);
+      const tp = []; furP(tp, 0, -0.32, 0, 0.3, 0.45, 0.3); shag(tp, 0, -0.32, 0, 0.26, 0.38, 0.26, 7, 0.14); hip.add(fm(tp));
+      const knee = new THREE.Group(); knee.position.y = -0.68; hip.add(knee);
+      const kp = []; furP(kp, 0, -0.22, 0, 0.25, 0.34, 0.25); shag(kp, 0, -0.2, 0, 0.22, 0.28, 0.22, 6, 0.12); knee.add(fm(kp));
+      const fp = []; E(fp, SKIN, 0, -0.38, 0.12, 0.2, 0.09, 0.32);
+      for (const t of [-1, 0, 1]) E(fp, 0xeeeeee, t * 0.09, -0.4, 0.43, 0.03, 0.025, 0.05); // tırnaklar
+      knee.add(sm(fp));
+      legs.push({ hip, knee });
+    }
+    const body = new THREE.Group(); body.position.y = 1.1; inner.add(body);
+    const bp = [];
+    furP(bp, 0, 0.62, 0, 0.66, 0.78, 0.5); furP(bp, 0, 1.12, -0.05, 0.6, 0.38, 0.45); // gövde + kambur omuz
+    furP(bp, 0, 0.55, 0.28, 0.45, 0.52, 0.28, FUR2);                                   // göğüs/karın
+    shag(bp, 0, 0.7, 0, 0.62, 0.72, 0.48, 26, 0.2);
+    if (!female) shag(bp, 0, 1.2, 0, 0.6, 0.2, 0.4, 8, 0.22);
+    body.add(fm(bp));
+    for (const s of [-1, 1]) {
+      const sh = new THREE.Group(); sh.position.set(s * 0.72, 1.12, 0); sh.rotation.z = s * 0.18; body.add(sh);
+      const up = []; furP(up, 0, -0.38, 0, 0.24, 0.48, 0.24); shag(up, 0, -0.38, 0, 0.2, 0.4, 0.2, 8, 0.13); sh.add(fm(up));
+      const el = new THREE.Group(); el.position.y = -0.78; el.rotation.x = -0.25; sh.add(el);
+      const fp = []; furP(fp, 0, -0.32, 0, 0.22, 0.42, 0.22); shag(fp, 0, -0.3, 0, 0.19, 0.34, 0.19, 7, 0.12); el.add(fm(fp));
+      const hp = []; E(hp, SKIN, 0, -0.78, 0.02, 0.15, 0.19, 0.11);
+      for (let f = 0; f < 4; f++) { E(hp, SKIN, -0.09 + f * 0.06, -0.97, 0.05, 0.035, 0.08, 0.035); E(hp, 0xeeeeee, -0.09 + f * 0.06, -1.05, 0.07, 0.02, 0.03, 0.02); }
+      E(hp, SKIN, -s * 0.13, -0.8, 0.08, 0.04, 0.07, 0.04);
+      el.add(sm(hp));
+      arms.push({ sh, el });
+    }
+    const head = new THREE.Group(); head.position.set(0, 1.42, 0.1); body.add(head);
+    const hfur = [];
+    furP(hfur, 0, 0.28, -0.04, 0.42, 0.42, 0.4); shag(hfur, 0, 0.32, -0.06, 0.38, 0.36, 0.34, 14, 0.15);
+    if (female) { // dişi: uzun tüylü saçlar sırtına iner
+      for (let i = 0; i < 9; i++) { const a = -1.2 + i * 0.3; furP(hfur, Math.sin(a) * 0.35, 0.1 - Math.abs(Math.sin(a)) * 0.05, -0.2 - Math.cos(a) * 0.12, 0.12, 0.38, 0.1, 0xfaf4f6); }
+    } else { // erkek: sakal
+      furP(hfur, 0, -0.02, 0.2, 0.28, 0.2, 0.18, FUR2); shag(hfur, 0, -0.04, 0.22, 0.24, 0.12, 0.12, 6, 0.1, FUR2);
+    }
+    head.add(fm(hfur));
+    const face = [];
+    E(face, SKIN, 0, 0.22, 0.27, 0.27, 0.27, 0.15);                      // yüz
+    E(face, lerpHex(SKIN, 0, 0.25), 0, 0.33, 0.37, 0.22, 0.05, 0.05);    // kaş çıkıntısı
+    E(face, DARKS, 0, 0.23, 0.42, 0.06, 0.045, 0.04);                    // burun
+    for (const s of [-1, 1]) {
+      E(face, 0xffffff, s * 0.1, 0.29, 0.38, 0.045, 0.04, 0.025); E(face, 0x14182a, s * 0.1, 0.29, 0.405, 0.025, 0.028, 0.01);
+      if (female) E(face, 0x14182a, s * 0.13, 0.33, 0.39, 0.035, 0.008, 0.01, 0, 0, s * 0.4); // kirpik
+    }
+    E(face, 0x3a1a2a, 0, 0.11, 0.39, 0.13, 0.04, 0.03);                  // ağız
+    for (const s of [-1, 1]) face.push(P(new THREE.ConeGeometry(0.022, female ? 0.04 : 0.08, 6), 0xfafaf0, s * 0.07, female ? 0.12 : 0.15, 0.405, 1, 1, 1, Math.PI, 0, 0)); // dişler
+    if (!female) for (const s of [-1, 1]) face.push(P(new THREE.ConeGeometry(0.05, 0.26, 8), 0xe8dcc0, s * 0.3, 0.6, 0.0, 1, 1, 1, -0.3, 0, -s * 0.6)); // boynuzlar
+    if (female) { for (let i = 0; i < 5; i++) { const a = i * 1.256; E(face, 0xf06aa0, 0.22 + Math.sin(a) * 0.05, 0.6, 0.12 + Math.cos(a) * 0.05, 0.04, 0.02, 0.04); } E(face, 0xf8e060, 0.22, 0.61, 0.12, 0.025, 0.02, 0.025); } // çiçek
+    head.add(sm(face));
+    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    return { g, body, head, legs, arms };
+  }
+  function spawnYeti() {
+    const partner = yetis.find(y => !y.partner);
+    const female = partner ? !partner.female : Math.random() < 0.5;
+    let x, z;
+    for (let tries = 0; tries < 12; tries++) {
+      if (partner && tries < 6) { const a = Math.random() * 6.28; x = partner.x + Math.sin(a) * 5; z = partner.z + Math.cos(a) * 5; }
+      else { const a = Math.random() * 6.28, d = 32 + Math.random() * 14; x = S.x + Math.sin(a) * d; z = S.z + Math.cos(a) * d; }
+      if (Math.hypot(x - S.x, z - S.z) > 26 && !buildings.some(b => Math.hypot(b.x - x, b.z - z) < 25)) break;
+      x = undefined;
+    }
+    if (x === undefined) return;
+    const m = makeYeti(female);
+    const y = { m, female, x, z, yaw: Math.random() * 6.28, want: 0, speed: 0, target: 0, timer: 0, t: Math.random() * 9, phase: 0, state: 'walk', partner: partner || null, lastStep: 0 };
+    if (partner) partner.partner = y;
+    y.want = y.yaw; m.g.position.set(x, 0, z); scene.add(m.g); yetis.push(y);
+  }
+  function crushTree(t, yaw) {
+    t.crushed = true; t.crushK = 0;
+    t.qBase = t.mesh.quaternion.clone();
+    t.crushAxis = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw)); // yetinin yürüdüğü yöne devrilir
+    if (!crushed.includes(t)) crushed.push(t);
+    if (Math.hypot(t.x - S.x, t.z - S.z) < 30) sfx('crack', Math.max(0.2, 1 - Math.hypot(t.x - S.x, t.z - S.z) / 30));
+  }
+  function stepYetis(dt) {
+    if (yetis.length < MAX_YETI && Math.random() < dt * 0.05) spawnYeti();
+    for (let i = yetis.length - 1; i >= 0; i--) {
+      const y = yetis[i], m = y.m, dx = S.x - y.x, dz = S.z - y.z, d = Math.hypot(dx, dz);
+      if (d > 80) { scene.remove(m.g); yetis.splice(i, 1); if (y.partner) y.partner.partner = null; continue; }
+      if (d < 22 && !S.seen.has('yeti') && !S.inside) { S.seen.add('yeti'); dirty = true; flash('Yeti gördün! Sakın ona vurma!', 2600); updateHUD(); }
+      y.t += dt; y.timer -= dt;
+      if (y.state === 'angry') { // vurulunca döner, kükrer ve tokatlar
+        y.want = Math.atan2(dx, dz); y.target = 0; y.angryT -= dt;
+        m.arms[1].sh.rotation.x = y.angryT > 0.5 ? -2.6 : -2.6 + (0.5 - y.angryT) * 6; m.arms[0].sh.rotation.x = -1.2;
+        if (y.angryT <= 0) { y.state = 'leave'; y.timer = 10; }
+      } else {
+        // evlerden uzak dur
+        let nearB = null; for (const b of buildings) if (Math.hypot(b.x - y.x, b.z - y.z) < Math.max(b.hw, b.hd) + 7) { nearB = b; break; }
+        if (nearB) { y.want = Math.atan2(y.x - nearB.x, y.z - nearB.z); y.target = 1.3; }
+        else if (y.state === 'leave') { y.want = Math.atan2(-dx, -dz); y.target = 1.6; if (y.timer <= 0) y.state = 'walk'; }
+        else if (y.partner && Math.hypot(y.partner.x - y.x, y.partner.z - y.z) > 9) { y.want = Math.atan2(y.partner.x - y.x, y.partner.z - y.z); y.target = 1.3; }
+        else if (y.timer <= 0) {
+          y.timer = 4 + Math.random() * 5;
+          if (Math.random() < 0.25) { y.target = 0; y.state = 'idle'; } else { y.state = 'walk'; y.target = 1.1; y.want = y.yaw + (Math.random() - 0.5) * 2; }
+        }
+      }
+      y.yaw += Math.max(-1.6 * dt, Math.min(1.6 * dt, angDiff(y.want, y.yaw)));
+      y.speed += (y.target - y.speed) * Math.min(dt * 2, 1);
+      if (y.speed > 0.02) {
+        const p = { x: y.x + Math.sin(y.yaw) * y.speed * dt, z: y.z + Math.cos(y.yaw) * y.speed * dt };
+        collide(p, 1.0, true); y.x = p.x; y.z = p.z; // ağaçlardan geçer (onları ezer), evlere çarpar
+      }
+      // ayağının altındaki ağaçları ez
+      for (const t of nearThings(y.x, y.z)) if (t.kind === 'tree' && !t.crushed && Math.hypot(t.x - y.x, t.z - y.z) < t.r + 1.0) crushTree(t, y.yaw);
+      // animasyon: ağır adımlar
+      const prev = y.phase; y.phase += y.speed * dt * 2.6;
+      const sw = Math.sin(y.phase), amt = Math.min(y.speed / 1.1, 1);
+      m.legs[0].hip.rotation.x = sw * 0.45 * amt; m.legs[1].hip.rotation.x = -sw * 0.45 * amt;
+      m.legs[0].knee.rotation.x = Math.max(0, Math.sin(y.phase - 1.2)) * 0.6 * amt; m.legs[1].knee.rotation.x = Math.max(0, Math.sin(y.phase + Math.PI - 1.2)) * 0.6 * amt;
+      if (y.state !== 'angry') {
+        m.arms[0].sh.rotation.x = -sw * 0.35 * amt; m.arms[1].sh.rotation.x = sw * 0.35 * amt;
+        if (y.state === 'idle') { m.arms[1].sh.rotation.x = -2.4 + Math.sin(y.t * 3) * 0.2; m.arms[1].el.rotation.x = -1.6; } // başını kaşır
+        else m.arms[1].el.rotation.x = -0.25;
+      }
+      m.body.position.y = 1.1 + Math.abs(Math.cos(y.phase)) * 0.06 * amt;
+      m.body.rotation.z = Math.sin(y.phase) * 0.05 * amt;
+      m.head.rotation.y = y.state === 'idle' ? Math.sin(y.t * 0.7) * 0.5 : 0;
+      if (Math.floor(prev / Math.PI) !== Math.floor(y.phase / Math.PI) && amt > 0.3) { // her adımda gümleme
+        if (d < 30 && !S.inside) { sfx('thud', 1 - d / 30); S.shake = Math.max(S.shake || 0, d < 16 ? 0.12 * (1 - d / 16) : 0); }
+      }
+      m.g.position.set(y.x, 0, y.z); m.g.rotation.y = y.yaw;
+    }
+    // ezilen ağaçlar: yeti oradan gidene kadar yerde kalır, sonra yavaşça düzelir
+    for (let i = crushed.length - 1; i >= 0; i--) {
+      const t = crushed[i];
+      if (!t.mesh.parent || !t.alive) { crushed.splice(i, 1); continue; }
+      const yetiNear = yetis.some(y => Math.hypot(y.x - t.x, y.z - t.z) < 7);
+      t.crushK = yetiNear ? Math.min(1, t.crushK + dt * 3) : Math.max(0, t.crushK - dt * 0.6);
+      const k = t.crushK, e = k * k * (3 - 2 * k);
+      t.mesh.quaternion.setFromAxisAngle(t.crushAxis, e * 1.45).multiply(t.qBase);
+      t.mesh.position.y = -e * 0.25;
+      if (k <= 0 && !yetiNear) { t.crushed = false; t.mesh.quaternion.copy(t.qBase); t.mesh.position.y = 0; crushed.splice(i, 1); }
+    }
+  }
+  // bayılınca en yakın kulübede uyan
+  function knockOut(y) {
+    S.knocked = true; selectBuild(-1); showPrompt('');
+    setTimeout(() => { sfx('thud', 1); $('fade').style.opacity = 1; }, 650);
+    setTimeout(() => {
+      const homes = buildings.filter(b => b.id === 'kulube');
+      const pool = homes.length ? homes : buildings.filter(b => ENTERABLE[b.id]);
+      if (S.inside && IN) { IN.group.remove(player.g); disposeInterior(); scene.add(player.g); S.inside = false; }
+      if (pool.length) {
+        const b = pool.reduce((a, c) => (Math.hypot(c.x - S.x, c.z - S.z) < Math.hypot(a.x - S.x, a.z - S.z) ? c : a));
+        const dd = BMAP[b.id].d / 2 + 1.3; S.x = b.x + Math.sin(b.rot) * dd; S.z = b.z + Math.cos(b.rot) * dd;
+        enterNow(b);
+        S.ix = 0; S.iz = 0; S.yaw = Math.PI;
+        flash(homes.length ? 'Yeti seni bayılttı! En yakın kulübede uyandın.' : 'Yeti seni bayılttı! Kulüben yok, en yakın evde uyandın.', 3200);
+      } else {
+        S.x = 0; S.z = 0; S.yaw = 0; player.g.position.set(0, 0, 0); camPos.set(0, 6, -8);
+        flash('Yeti seni bayılttı! Bir kulübe yap, bir dahaki sefere orada uyan.', 3200);
+      }
+      S.y = 0; S.vy = 0; S.knocked = false; S.dizzy = 2.5;
+      $('fade').style.opacity = 0;
+    }, 1300);
+  }
+  function hitYeti() {
+    const fx = Math.sin(S.yaw), fz = Math.cos(S.yaw);
+    for (const y of yetis) {
+      const dx = y.x - S.x, dz = y.z - S.z, d = Math.hypot(dx, dz);
+      if (d < 2.9 && (dx * fx + dz * fz) / (d || 1) > 0.3 && y.state !== 'angry') {
+        y.state = 'angry'; y.angryT = 1.2; sfx('roar'); S.shake = 0.25; knockOut(y); return true;
+      }
+    }
+    return false;
   }
 
   // ================= Bulutlar ve baca dumanı =================
@@ -1767,6 +1953,24 @@
           o.start(t + dl); o2.start(t + dl); o.stop(t + dl + du + 0.02); o2.stop(t + dl + du + 0.02);
         }
         return;
+      }
+      if (type === 'roar' || type === 'thud') {
+        const roar = type === 'roar', dur = roar ? 1.3 : 0.35;
+        const o = actx.createOscillator(), gn = actx.createGain(), f = actx.createBiquadFilter();
+        o.type = roar ? 'sawtooth' : 'sine';
+        o.frequency.setValueAtTime(roar ? 110 : 70, t); o.frequency.exponentialRampToValueAtTime(roar ? 55 : 35, t + dur);
+        f.type = 'lowpass'; f.frequency.value = roar ? 700 : 200;
+        gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime((roar ? 0.25 : 0.35) * vol, t + (roar ? 0.12 : 0.02)); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(f).connect(gn).connect(actx.destination); o.start(t); o.stop(t + dur + 0.05);
+        if (roar) { const n = actx.createBuffer(1, actx.sampleRate * dur, actx.sampleRate), dd = n.getChannelData(0); for (let i = 0; i < dd.length; i++) dd[i] = (Math.random() * 2 - 1) * Math.sin(Math.PI * i / dd.length) * 0.5;
+          const src = actx.createBufferSource(), nf = actx.createBiquadFilter(), ng = actx.createGain(); src.buffer = n; nf.type = 'bandpass'; nf.frequency.value = 400; ng.gain.value = 0.3 * vol; src.connect(nf).connect(ng).connect(actx.destination); src.start(t); }
+        return;
+      }
+      if (type === 'crack') {
+        const n = actx.createBuffer(1, actx.sampleRate * 0.35, actx.sampleRate), dd = n.getChannelData(0);
+        for (let i = 0; i < dd.length; i++) dd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / dd.length, 2) * (Math.random() < 0.08 ? 3 : 1);
+        const src = actx.createBufferSource(), gn = actx.createGain(), f = actx.createBiquadFilter(); src.buffer = n; f.type = 'highpass'; f.frequency.value = 500; gn.gain.value = 0.25 * vol;
+        src.connect(f).connect(gn).connect(actx.destination); src.start(t); return;
       }
       if (type === 'coin') {
         for (const [fq, dl] of [[880, 0], [1320, 0.09], [1760, 0.18]]) {
@@ -2110,7 +2314,7 @@
     let best = null, bd = 1e9;
     for (const t of nearThings(S.x, S.z)) {
       const dx = t.x - S.x, dz = t.z - S.z, d = Math.hypot(dx, dz);
-      if (d < t.r + 1.5 && (dx * fx + dz * fz) / (d || 1) > 0.35 && d < bd) { bd = d; best = t; }
+      if (!t.crushed && d < t.r + 1.5 && (dx * fx + dz * fz) / (d || 1) > 0.35 && d < bd) { bd = d; best = t; }
     }
     return best;
   }
@@ -2124,6 +2328,7 @@
       if (t.hp <= 0) (t.kind === 'rock' ? breakRock : breakTree)(t);
       return;
     }
+    if (hitYeti()) return;
     const fx = Math.sin(S.yaw), fz = Math.cos(S.yaw);
     for (const a of animals) {
       const dx = a.x - S.x, dz = a.z - S.z, d = Math.hypot(dx, dz);
@@ -2237,7 +2442,7 @@
     if (keys[k]) return; keys[k] = true;
     if (k === 'm') { modesOpen ? closeModes() : openModes(); return; }
     if (modesOpen) { if (k >= '1' && k <= '3') chooseMode(MODE_IDS[+k - 1]); else if (k === 'Escape') closeModes(); return; }
-    if (!S.playing || S.paused) return;
+    if (!S.playing || S.paused || S.knocked) return;
     if (S.inside) { // ev içi: A sandığı açar (yakında sandık yoksa zıplar)
       if (k === 'a' && !tryChest() && S.y <= 0.001) { S.vy = JUMP; sfx('jump'); }
       return;
@@ -2306,15 +2511,18 @@
     if (S.fading) return;
     S.fading = true; $('fade').style.opacity = 1; selectBuild(-1); showPrompt(''); sfx('door');
     setTimeout(() => {
-      buildInterior(b);
-      scene.remove(player.g); IN.group.add(player.g); player.g.children.forEach(o => { if (o.isSprite) o.visible = false; });
-      S.inside = true; S.ix = 0; S.iz = IN.hd - 0.9; S.yaw = Math.PI; S.y = 0; S.vy = 0;
-      camPos.set(0, 3.9, IN.hd + 2.9);
-      $('build').classList.add('hidden'); $('target').classList.add('hidden');
-      $('cityDist').textContent = BMAP[b.id].name + ' içindesin';
+      enterNow(b);
       $('fade').style.opacity = 0; S.fading = false;
       if (!S.chestHint) { S.chestHint = true; flash('Sandığı bul ve A ile aç!', 2200); }
     }, 300);
+  }
+  function enterNow(b) {
+    buildInterior(b);
+    scene.remove(player.g); IN.group.add(player.g); player.g.children.forEach(o => { if (o.isSprite) o.visible = false; });
+    S.inside = true; S.ix = 0; S.iz = IN.hd - 0.9; S.yaw = Math.PI; S.y = 0; S.vy = 0;
+    camPos.set(0, 3.9, IN.hd + 2.9);
+    $('build').classList.add('hidden'); $('target').classList.add('hidden');
+    $('cityDist').textContent = BMAP[b.id].name + ' içindesin';
   }
   function exitHouse() {
     if (S.fading) return;
@@ -2406,7 +2614,7 @@
       else h.arms[1].sh.rotation.z = 0.08;
     }
     // dünya yaşamaya devam eder
-    stepAnimals(dt);
+    stepAnimals(dt); stepYetis(dt);
     for (const v of villagers) { if (Math.abs(v.x - S.x) < 80 && Math.abs(v.z - S.z) < 80) stepVillager(v, dt); }
     saveT += dt;
     if (saveT > 4 || (dirty && saveT > 1)) { saveT = 0; writeSave(); }
@@ -2427,10 +2635,10 @@
 
   function step(dt) {
     if (S.inside) { stepInside(dt); return; }
-    const Pl = player;
-    if (keys.ArrowLeft) S.yaw += TURN * dt;
-    if (keys.ArrowRight) S.yaw -= TURN * dt;
-    const f = (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 0.6 : 0);
+    const Pl = player, ctl = !S.knocked;
+    if (ctl && keys.ArrowLeft) S.yaw += TURN * dt;
+    if (ctl && keys.ArrowRight) S.yaw -= TURN * dt;
+    const f = ctl ? (keys.ArrowUp ? 1 : 0) - (keys.ArrowDown ? 0.6 : 0) : 0;
     const moving = !!f, roadBoost = onRoad(S.x, S.z) ? 1.3 : 1;
     if (f) {
       const p = { x: S.x + Math.sin(S.yaw) * WALK * roadBoost * f * dt, z: S.z + Math.cos(S.yaw) * WALK * roadBoost * f * dt };
@@ -2467,6 +2675,8 @@
     const back = new THREE.Vector3(S.x - Math.sin(S.yaw) * 8, S.y + 6, S.z - Math.cos(S.yaw) * 8);
     camPos.lerp(back, Math.min(dt * 5, 1));
     camera.position.copy(camPos); camera.lookAt(S.x, S.y + 1.9, S.z);
+    if (S.shake > 0) { camera.position.x += rnd(-1, 1) * S.shake; camera.position.y += rnd(-1, 1) * S.shake; S.shake = Math.max(0, S.shake - dt * 0.8); } // yeti adımları yeri sarsar
+    if (S.knocked) { player.body.rotation.x = Math.min(1.3, (player.body.rotation.x || 0) + dt * 2); } else player.body.rotation.x = 0;
 
     // kameranın önünü kapatan ağaçları saydamlaştır
     const cx = camera.position.x, cz = camera.position.z, sx = S.x - cx, sz = S.z - cz, sl = sx * sx + sz * sz;
@@ -2477,7 +2687,7 @@
         if (u > -0.1 && u < 0.97) { const px = cx + sx * u - t.x, pz = cz + sz * u - t.z; fade = px * px + pz * pz < (t.r + 1.3) ** 2; }
         t.mesh.material = fade ? vcFade : vcMat;
       }
-      if (t.shake > 0) { t.shake -= dt; t.mesh.rotation.z = Math.sin(t.shake * 60) * (t.kind === 'rock' ? 0.03 : 0.05); } else t.mesh.rotation.z = 0;
+      if (t.shake > 0) { t.shake -= dt; t.mesh.rotation.z = Math.sin(t.shake * 60) * (t.kind === 'rock' ? 0.03 : 0.05); } else if (!t.crushed) t.mesh.rotation.z = 0;
     }
     const target = S.sel < 0 ? frontTarget() : null;
     if (target) {
@@ -2535,7 +2745,7 @@
       if (p.t > 3.5) { scene.remove(p.sp); p.sp.material.dispose(); puffs.splice(i, 1); }
     }
 
-    stepAnimals(dt);
+    stepAnimals(dt); stepYetis(dt);
     for (const v of villagers) { if (Math.abs(v.x - S.x) < 80 && Math.abs(v.z - S.z) < 80) stepVillager(v, dt); }
 
     if (buildings.length) {
