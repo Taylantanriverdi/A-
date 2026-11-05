@@ -9,8 +9,10 @@ if (a.includes('-Liste')) { process.stdout.write(JSON.stringify(YAZICILAR)); pro
 const deger = ad => { const i = a.indexOf(ad); return i >= 0 ? a[i + 1] : null; };
 const yazici = deger('-Yazici');
 if (yazici && !YAZICILAR.some(y => y.ad === yazici)) { process.stderr.write('Yazıcı bulunamadı: ' + yazici); process.exit(1); }
-const form = JSON.parse(fs.readFileSync(deger('-Veri'), 'utf8'));
+const resim = deger('-Resim');
+const form = resim ? { hasta: deger('-Baslik'), resim: true } : JSON.parse(fs.readFileSync(deger('-Veri'), 'utf8'));
 const klasor = process.env.SAHTE_YAZICI_CIKTI;
 fs.mkdirSync(klasor, { recursive: true });
 fs.writeFileSync(path.join(klasor, Date.now() + '-' + Math.random().toString(36).slice(2, 6) + '.json'), JSON.stringify({ yazici: yazici || '(varsayılan)', kopya: deger('-Kopya'), kagit: deger('-Kagit'), form }, null, 1));
+if (resim) fs.copyFileSync(resim, path.join(klasor, 'son-form.png'));
 process.stdout.write('YAZDIRILDI');

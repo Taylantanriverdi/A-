@@ -1,12 +1,14 @@
 ﻿# ═══════════════════════════════════════════════════════════════════
 #  DIGICAD Dental — SESSİZ YAZDIRMA
 #  Sunucu tarafından çağrılır; ekrana hiçbir pencere açmadan seçili
-#  yazıcıya A4 "Hekim İş Talebi" formu basar. Ek program gerekmez
-#  (Windows'un kendi System.Drawing yazdırma altyapısı kullanılır).
-#    yazdir.ps1 -Liste                         → yazıcı listesi (JSON)
-#    yazdir.ps1 -Veri is.json -Yazici "Ad" -Kagit A5   → formu yazdır (A5 ya da A4)
+#  yazıcıya iş formu basar. Ek program gerekmez (Windows'un kendi
+#  System.Drawing yazdırma altyapısı kullanılır).
+#    yazdir.ps1 -Liste                                  → yazıcı listesi (JSON)
+#    yazdir.ps1 -Resim form.png -Yazici "Ad" -Kagit A5  → hazır form resmini bas
+#                (Sipariş Takip Formu; sunucu Edge ile resme çevirir)
+#    yazdir.ps1 -Veri is.json -Yazici "Ad" -Kagit A5    → yedek: formu kendisi çizer
 # ═══════════════════════════════════════════════════════════════════
-param([string]$Veri, [string]$Yazici, [int]$Kopya = 1, [string]$Kagit = 'A5', [switch]$Liste)
+param([string]$Veri, [string]$Resim, [string]$Baslik = 'DIGICAD Sipariş Formu', [string]$Yazici, [int]$Kopya = 1, [string]$Kagit = 'A5', [switch]$Liste)
 $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}
 
@@ -19,13 +21,14 @@ if ($Liste) {
 }
 
 Add-Type -AssemblyName System.Drawing
-$script:d = Get-Content -LiteralPath $Veri -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($Resim) { $script:resim = [System.Drawing.Image]::FromFile($Resim) }
+else { $script:d = Get-Content -LiteralPath $Veri -Raw -Encoding UTF8 | ConvertFrom-Json }
 
 $pd = New-Object System.Drawing.Printing.PrintDocument
 if ($Yazici) { $pd.PrinterSettings.PrinterName = $Yazici }
 if (-not $pd.PrinterSettings.IsValid) { throw ('Yazıcı bulunamadı: ' + $Yazici) }
 if ($Kopya -gt 1) { $pd.PrinterSettings.Copies = [int16]$Kopya }
-$pd.DocumentName = 'DIGICAD İş Talebi - ' + $script:d.hasta
+$pd.DocumentName = $(if ($Resim) { $Baslik } else { 'DIGICAD İş Talebi - ' + $script:d.hasta })
 # Durum penceresi ("Yazdırılıyor...") açılmasın
 $pd.PrintController = New-Object System.Drawing.Printing.StandardPrintController
 # Kağıt boyutu: A5 (148x210 mm) varsayılan, A4 isteğe bağlı. Ölçüler 1/100 inç.
@@ -38,8 +41,25 @@ if (-not $kagitBoyu) {
 }
 $pd.DefaultPageSettings.PaperSize = $kagitBoyu
 $pd.DefaultPageSettings.Landscape = $false
-$pd.DefaultPageSettings.Margins = $(if ($script:A5) { New-Object System.Drawing.Printing.Margins(32, 32, 28, 28) } else { New-Object System.Drawing.Printing.Margins(55, 55, 45, 45) })
+$pd.DefaultPageSettings.Margins = $(if ($Resim) { New-Object System.Drawing.Printing.Margins(12, 12, 12, 12) } elseif ($script:A5) { New-Object System.Drawing.Printing.Margins(32, 32, 28, 28) } else { New-Object System.Drawing.Printing.Margins(55, 55, 45, 45) })
 
+if ($Resim) {
+  # Hazır form resmini (A4 oranında) sayfaya orantılı sığdır — A5'te birebir küçültülmüş hâli çıkar
+  $pd.add_PrintPage({
+    param($gonderen, $e)
+    $g = $e.Graphics
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $b = $e.MarginBounds
+    $img = $script:resim
+    $oran = [Math]::Min(($b.Width / $img.Width), ($b.Height / $img.Height))
+    $gen = [single]($img.Width * $oran); $yuk = [single]($img.Height * $oran)
+    $sol = [single]($b.Left + ($b.Width - $gen) / 2)
+    $g.DrawImage($img, (New-Object System.Drawing.RectangleF($sol, [single]$b.Top, $gen, $yuk)))
+    $e.HasMorePages = $false
+  })
+} else {
 $pd.add_PrintPage({
   param($gonderen, $e)
   $d = $script:d
@@ -160,6 +180,7 @@ $pd.add_PrintPage({
   $g.DrawString('Hekim Portalı üzerinden gönderildi · DIGICAD Dental otomatik yazdırma', $fAlt, $gri, $x, ($m.Bottom - 11 * $o))
   $e.HasMorePages = $false
 })
+}
 
-$pd.Print()
+try { $pd.Print() } finally { if ($script:resim) { $script:resim.Dispose() } }
 Write-Output 'YAZDIRILDI'

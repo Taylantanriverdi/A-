@@ -318,10 +318,15 @@ Yönetim paneli → **Ayarlar → 🖨️ Hekimden Gelen İşleri Otomatik Yazd�
 - **🧾 Test sayfası yazdır** düğmesi ile ayarların doğruluğu denenir.
 
 Açıkken hekim portalından gelen her iş, hiçbir pencere açılmadan seçili
-yazıcıdan iş formu olarak çıkar (varsayılan A5; Ayarlar'dan A4 seçilebilir). Formda hekim, hasta, iş türü, diş şeması,
-renk, çene, teslim tarihi, notlar ve dosya/bağlantı listesi bulunur.
-Yazdırmayı sunucu yaptığı için yönetim paneli kapalıyken de çalışır. Aynı iş
-iki kez basılmaz.
+yazıcıdan çıkar. Kâğıt boyutu varsayılan olarak A5'tir, Ayarlar'dan A4
+seçilebilir. Çıktı, yönetim panelindeki **Sipariş Takip Formu** ile birebir
+aynı görünür. Hekimin çene bilgisi, dosyaları ve bağlantıları, panelin
+"Forma Aktar" özelliğindeki gibi Notlar bölümüne yazılır.
+
+Form, bilgisayardaki Edge tarayıcısıyla ekran açılmadan resme çevrilip
+basılır. Edge bulunamazsa basit bir yedek form basılır; Ayarlar kartındaki
+geçmişte "basit form" yazar. Yazdırmayı sunucu yaptığı için yönetim paneli
+kapalıyken de çalışır. Aynı iş iki kez basılmaz.
 
 Yazıcı listede görünmüyorsa, yazıcı muhtemelen yalnızca sizin Windows
 kullanıcınıza ağ yazıcısı olarak eklenmiştir. Arka planda çalışan sunucu bu

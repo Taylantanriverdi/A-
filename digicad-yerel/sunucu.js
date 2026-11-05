@@ -546,7 +546,7 @@ function isleyiciOlustur(kapi) {
         }
         if (yol === '/api/yazdirma/test' && req.method === 'POST') {
           const y = yazdirmaAyari();
-          await yazdirma.yazdir(yazdirma.formatla(yazdirma.ornekIs(), true), y.yazici, 1, y.kagit);
+          await yazdirma.talebiYazdir(yazdirma.ornekIs(), { ...y, kopya: 1 }, true);
           return json(res, 200, { tamam: true });
         }
         if (yol === '/api/yazdirma/tekrar' && req.method === 'POST') {
@@ -554,7 +554,7 @@ function isleyiciOlustur(kapi) {
           const k = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', String(g.id || '')]);
           if (!k) return json(res, 404, { hata: 'İş bulunamadı' });
           const y = yazdirmaAyari();
-          await yazdirma.yazdir(yazdirma.formatla(k), y.yazici, y.kopya, y.kagit);
+          await yazdirma.talebiYazdir(k, y);
           return json(res, 200, { tamam: true });
         }
         return json(res, 404, { hata: 'Bilinmeyen adres' });
@@ -685,7 +685,7 @@ function otomatikYazdir(id) {
   if (!kayit) return;
   basilan.push(String(id));
   fs.writeFileSync(YAZDIRILANLAR, JSON.stringify(basilan.slice(-1000)));
-  yazdirma.yazdir(yazdirma.formatla(kayit), y.yazici, y.kopya, y.kagit)
+  yazdirma.talebiYazdir(kayit, y)
     .then(() => console.log(`[yazdırma] ${kayit.patient || id} — ${y.yazici || 'varsayılan yazıcı'}`))
     .catch(e => console.error(`[yazdırma] HATA (${kayit.patient || id}): ${e.message}`));
 }
