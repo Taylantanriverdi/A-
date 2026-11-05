@@ -267,11 +267,18 @@ function dosyaSun(req, res, oturumVarMi) {
   res.writeHead(200, {
     'Content-Type': satirIci ? tur : 'application/octet-stream',
     'Content-Length': st.size,
-    'Content-Disposition': `${satirIci ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(ad)}`,
+    'Content-Disposition': indirmeBasligi(ad, satirIci ? 'inline' : 'attachment'),
     'Cache-Control': 'private, max-age=86400',
     'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
   });
   fs.createReadStream(tam).pipe(res);
+}
+
+// İndirme başlığı: Türkçe karakterli ad (filename*) + eski tarayıcılar için sadeleştirilmiş ad (filename)
+function indirmeBasligi(ad, tur = 'attachment') {
+  const sade = String(ad).replace(/[çÇğĞıİöÖşŞüÜ]/g, c => ({ ç: 'c', Ç: 'C', ğ: 'g', Ğ: 'G', ı: 'i', İ: 'I', ö: 'o', Ö: 'O', ş: 's', Ş: 'S', ü: 'u', Ü: 'U' }[c]))
+    .replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+  return `${tur}; filename="${sade}"; filename*=UTF-8''${encodeURIComponent(ad)}`;
 }
 
 function guvenliDosyaAdi(ad) {
@@ -520,6 +527,39 @@ function isleyiciOlustur(kapi) {
         depo.uygula(islemler);
         for (const id of yeniGonderimler) otomatikYazdir(id);
         return json(res, 200, { tamam: true });
+      }
+
+      // ── Mail Kutusu: tarama dosyasını anlamlı adla indirme (sadece yönetici) ──
+      // Runyes 3DS gibi mailerdeki S3 bağlantısı sunucu üzerinden alınır ve
+      // "KLİNİK - HASTA - tarih.zip" adıyla verilir (tarayıcı başka sitedeki
+      // dosyanın adını değiştiremediği için). Sadece izinli adresler (S3).
+      if (yol === '/api/mail-indir' && req.method === 'GET') {
+        if (!oturum || oturum.rol !== 'yonetici') { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Yönetici girişi gerekiyor'); return; }
+        let hedef = null;
+        try { hedef = new URL(url.searchParams.get('u') || ''); } catch (e) { hedef = null; }
+        const izin = new RegExp(process.env.DIGICAD_MAIL_INDIR_IZIN || '(^|\\.)amazonaws\\.com$', 'i');
+        const protokolUygun = hedef && (hedef.protocol === 'https:' || (process.env.DIGICAD_MAIL_INDIR_IZIN && hedef.protocol === 'http:'));
+        if (!hedef || !protokolUygun || !izin.test(hedef.hostname)) {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bu bağlantı türü bu yolla indirilemez'); return;
+        }
+        const ad = guvenliDosyaAdi(url.searchParams.get('ad') || decodeURIComponent(hedef.pathname.split('/').pop() || 'tarama.zip'));
+        let r;
+        try { r = await fetch(hedef.href); } catch (e) { r = null; }
+        if (!r || !r.ok || !r.body) {
+          res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('Dosya indirilemedi' + (r ? ` (HTTP ${r.status}) — bağlantının süresi dolmuş olabilir` : ' — internet bağlantısını kontrol edin'));
+          return;
+        }
+        const basliklar = {
+          'Content-Type': 'application/octet-stream',
+          'Content-Disposition': indirmeBasligi(ad),
+          'Cache-Control': 'no-store',
+        };
+        if (r.headers.get('content-length')) basliklar['Content-Length'] = r.headers.get('content-length');
+        res.writeHead(200, basliklar);
+        const { Readable } = require('stream');
+        Readable.fromWeb(r.body).on('error', () => res.destroy()).pipe(res);
+        return;
       }
 
       // ── Otomatik yazdırma ayarları (sadece yönetici) ────

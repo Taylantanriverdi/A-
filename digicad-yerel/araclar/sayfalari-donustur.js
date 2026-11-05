@@ -486,8 +486,38 @@ function _mailGovdeHtml(metin) {
       (_mailIndirmeMi(u.replace(/&amp;/g, '&')) ? '⬇️ ' : '🔗 ') + u + '</a>' + son;
   });
 }
+// Runyes 3DS sipariş maili mi? Konu: "new order from <KLİNİK>"
+// Metin: "new order for <HASTA>, This is an auto-generated email by Runyes 3DS Click <BAĞLANTI> to get scanned data. <NOT>"
+function _runyesCoz(konu, metin) {
+  metin = String(metin || '');
+  const h = /new order for\\s+([\\s\\S]+?)\\s*,\\s*This is an auto-generated email/i.exec(metin);
+  if (!h) return null;
+  const url = _mailBaglantilari(metin).find(u => /amazonaws\\.com/i.test(u)) || _mailBaglantilari(metin)[0] || '';
+  let klinik = (/new order from\\s+(.+)$/i.exec(String(konu || '').trim()) || [])[1] || '';
+  if (!klinik && url) { try { klinik = (decodeURIComponent(new URL(url).pathname.split('/').pop() || '').match(/^(.+?)_\\d{8}_\\d{6}/) || [])[1] || ''; } catch (e) { /* yoksay */ } }
+  const not = ((/to get scanned data\\.?\\s*([\\s\\S]*)$/i.exec(metin) || [])[1] || '').trim();
+  const zaman = ((url.match(/_(\\d{8}_\\d{6})\\.[a-z0-9]+(\\?|$)/i) || [])[1]) || '';
+  const buyuk = x => String(x || '').trim().replace(/\\s+/g, ' ').toLocaleUpperCase('tr-TR');
+  const uzanti = (url.match(/\\.([a-z0-9]{2,5})(\\?|$)/i) || [])[1] || 'zip';
+  const temiz = x => x.replace(/[\\\\/:*?"<>|]/g, '_');
+  const dosyaAdi = temiz([buyuk(klinik), buyuk(h[1]), zaman].filter(Boolean).join(' - ')) + '.' + uzanti.toLowerCase();
+  return { klinik: buyuk(klinik), hasta: buyuk(h[1]), not, url, dosyaAdi };
+}
+
 // Mail üstündeki belirgin "indirme bağlantıları" kutusu
-function _mailBaglantiCubugu(metin) {
+function _mailBaglantiCubugu(metin, konu) {
+  const r = _runyesCoz(konu, metin);
+  if (r && r.url) {
+    const yerel = '/api/mail-indir?panel=yonetici&u=' + encodeURIComponent(r.url) + '&ad=' + encodeURIComponent(r.dosyaAdi);
+    const bilgi = (etiket, deger) => deger ? '<div style="display:flex;gap:8px;font-size:13px;margin-bottom:4px"><span style="color:#047857;font-weight:700;min-width:58px">' + etiket + '</span><span style="font-weight:700;color:var(--text)">' + escHtml(deger) + '</span></div>' : '';
+    return '<div style="margin:14px 20px 0;padding:12px 14px;background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px">' +
+      '<div style="font-size:12px;font-weight:800;color:#047857;margin-bottom:8px">🦷 Runyes 3DS tarama siparişi</div>' +
+      bilgi('Klinik', r.klinik) + bilgi('Hasta', r.hasta) + bilgi('Not', r.not) +
+      '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+      '<a href="' + escHtml(yerel) + '" title="' + escHtml(r.url) + '" style="display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:800;text-decoration:none;background:#059669;color:#fff;box-shadow:0 2px 8px rgba(5,150,105,.3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">⬇️ İndir: ' + escHtml(r.dosyaAdi) + '</a>' +
+      '<a href="' + escHtml(r.url) + '" target="_blank" rel="noopener" style="font-size:12px;color:var(--text-soft);text-decoration:underline">orijinal adıyla indir</a>' +
+      '</div></div>';
+  }
   const l = _mailBaglantilari(metin);
   if (!l.length) return '';
   const indir = l.filter(_mailIndirmeMi), diger = l.filter(u => !_mailIndirmeMi(u));
@@ -509,7 +539,7 @@ function parseGmailMessage(m) {`, 'parseGmailMessage');
 
   // 2) Mail ayrıntısı: bağlantı kutusu + tıklanabilir gövde (eski kayıtlar da onarılır)
   html = degistir(html, "    <div class=\"mail-detail-body\">${escHtml(m.body||m.preview||'(İçerik yok)')}</div>`;",
-    "    ${_mailBaglantiCubugu(_utfOnar(m.body||m.preview||''))}\n    <div class=\"mail-detail-body\">${_mailGovdeHtml(_utfOnar(m.body||m.preview||'(İçerik yok)'))}</div>`;",
+    "    ${_mailBaglantiCubugu(_utfOnar(m.body||m.preview||''), _utfOnar(m.subject||''))}\n    <div class=\"mail-detail-body\">${_mailGovdeHtml(_utfOnar(m.body||m.preview||'(İçerik yok)'))}</div>`;",
     'mail gövdesi');
   html = degistir(html, "<div class=\"mail-preview\">${escHtml((m.preview||'').slice(0,80))}</div>",
     "<div class=\"mail-preview\">${escHtml(_utfOnar(m.preview||'').slice(0,80))}</div>", 'mail listesi önizleme');
