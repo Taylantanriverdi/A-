@@ -65,6 +65,10 @@
   .pin-kutu input { text-align:center; font-size:22px; letter-spacing:.5em; margin:12px 0; }
   details { margin-top:10px; font-size:13px; color:var(--soluk); }
   details li { word-break:break-all; }
+  .yedek { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; border:1px solid var(--cizgi); border-radius:10px; padding:12px 14px; margin-top:10px; }
+  .yedek b { display:block; }
+  .yedek small { color:var(--soluk); }
+  .guvence { background:var(--yesil-acik); color:var(--yesil); border-radius:8px; padding:10px 12px; font-size:13.5px; margin-bottom:14px; }
   .yukleniyor::after { content:''; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; display:inline-block; animation: don .7s linear infinite; }
   @keyframes don { to { transform: rotate(360deg); } }
 </style>
@@ -86,10 +90,26 @@
   </div>
 
   <div id="icerik" class="gizli">
-    <!-- 1. KAYNAK -->
+    <!-- 1. FIREBASE YEDEĞİ -->
+    <section class="kart" id="yedek-kart">
+      <h2><span class="no">1</span> Eski sistemin (Firebase) tam yedeğini alın</h2>
+      <p class="alt">Eski sistemdeki <b>tüm</b> veriler (hasta / iş kayıtları, hekimler, kasa, arşiv, mesajlar) ve <b>tüm dosyalar</b> (STL, fotoğraf, PDF) bu bilgisayara kopyalanır. Yedek salt-okunur bir klasörde saklanır; istediğiniz zaman aşağıdan yeni sisteme yükleyebilirsiniz — internet ya da Firebase gerekmeden.</p>
+      <div class="guvence">🔒 <b>Firebase'deki veriler değiştirilmez.</b> Bu işlem eski sisteme yalnızca <b>okuma</b> isteği gönderir; yazma, silme ya da değiştirme isteklerini yazılım kendisi engeller. Eski sistem bu sırada çalışmaya devam eder.</div>
+      <button id="yedek-al-btn">📥 Firebase'in tam yedeğini al</button>
+      <div id="yedek-ilerleme" class="gizli">
+        <p id="yedek-asama" class="alt" style="margin:12px 0 0"></p>
+        <div class="cubuk"><div id="yedek-cubuk"></div></div>
+        <p id="yedek-sayac" class="alt"></p>
+      </div>
+      <div id="yedek-sonuc"></div>
+      <div class="ws-baslik" style="margin-top:22px">Alınmış yedekler</div>
+      <div id="yedek-liste"><p class="alt">Yükleniyor…</p></div>
+    </section>
+
+    <!-- DİĞER KAYNAKLAR -->
     <section class="kart" id="adim1">
-      <h2><span class="no">1</span> Verilerin nereden alınacağını seçin</h2>
-      <p class="alt">Hasta / iş kayıtları, hekimler, teknisyenler, kasa (ödemeler, giderler, satışlar), arşiv (hesap kapanışları), hekimden gelenler, sipariş formları, mesajlar ve tüm dosyalar (STL, fotoğraf, PDF) aktarılır. Bir sonraki adımda ne ekleneceğini görüp onaylamadan <b>hiçbir şey değişmez</b>.</p>
+      <h2><span class="no">•</span> Diğer yollar</h2>
+      <p class="alt">Yedek almadan doğrudan aktarmak ya da elinizdeki bir yedek dosyasını yüklemek için. Her durumda bir sonraki adımda ne ekleneceğini görüp onaylamadan <b>hiçbir şey değişmez</b>.</p>
       <div class="secenekler">
         <div class="secenek">
           <b>☁️ Firebase'den doğrudan al</b>
@@ -180,7 +200,7 @@
   function pinGiris() {
     const p = $('pin').value;
     if (!/^\d{4}$/.test(p)) { hataGoster('pin-hata', 'PIN 4 haneli olmalı'); return; }
-    DL.giris({ pin: p }).then(() => { $('pin').value = ''; hataGoster('pin-hata', ''); baslat(); })
+    DL.giris({ pin: p }).then(() => { $('pin').value = ''; hataGoster('pin-hata', ''); baslat(); yedekleriYukle(); yedekDurum(true); })
       .catch(e => { $('pin').value = ''; hataGoster('pin-hata', e.message); });
   }
   $('pin-btn').onclick = pinGiris;
@@ -283,7 +303,57 @@
     }).catch(e => { if (!ilkAcilis) $('sonuc').innerHTML = `<div class="hata">${esc(e.message)}</div>`; });
   }
 
+  // ── Firebase tam yedeği ──
+  const boyutYaz = b => b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
+  const ETIKET = { doctors: 'hekim', jobs: 'iş', payments: 'ödeme', expenses: 'gider', sales: 'satış', statementClosures: 'hesap kapanışı', doctorSubmissions: 'hekimden gelen', chats: 'mesaj dizisi' };
+  function yedekleriYukle() {
+    istek('GET', '/api/aktarim/firebase-yedekleri').then(r => {
+      if (!r.yedekler.length) { $('yedek-liste').innerHTML = '<p class="alt">Henüz yedek alınmamış.</p>'; return; }
+      $('yedek-liste').innerHTML = r.yedekler.map(y => {
+        const d = y.sayilar.digicad || {};
+        const ozet = Object.keys(ETIKET).filter(k => d[k]).map(k => `${d[k]} ${ETIKET[k]}`).join(' · ');
+        const p = y.sayilar.primer ? ' · Primer verisi var' : '';
+        return `<div class="yedek"><div><b>📦 ${esc(new Date(y.tarih).toLocaleString('tr-TR'))}</b>
+          <small>${esc(ozet)}${p}<br>${y.dosyalar.tamam}/${y.dosyalar.toplam} dosya (${boyutYaz(y.dosyalar.toplamBoyut)})${y.dosyalar.hatali ? ` · <span style="color:var(--kirmizi)">${y.dosyalar.hatali} indirilemedi</span>` : ''} · klasör: ${esc(y.ad)}</small></div>
+          <button class="ikincil" data-yedek="${esc(y.ad)}">Yeni sisteme yükle →</button></div>`;
+      }).join('') + `<p class="alt" style="margin-top:10px">Yedekler bu bilgisayarda: <code>${esc(r.klasor)}</code></p>`;
+      document.querySelectorAll('[data-yedek]').forEach(b => b.onclick = () => {
+        mesgul(b, true, 'Yedek okunuyor…');
+        istek('POST', '/api/aktarim/hazirla?kaynak=yedek&klasor=' + encodeURIComponent(b.dataset.yedek), {})
+          .then(onizle).catch(e => alert(e.message)).finally(() => mesgul(b, false));
+      });
+    }).catch(e => { $('yedek-liste').innerHTML = `<div class="hata">${esc(e.message)}</div>`; });
+  }
+  $('yedek-al-btn').onclick = () => {
+    $('yedek-sonuc').innerHTML = '';
+    istek('POST', '/api/aktarim/firebase-yedekle', {}).then(() => yedekDurum(false)).catch(e => { $('yedek-sonuc').innerHTML = `<div class="hata">${esc(e.message)}</div>`; });
+  };
+  function yedekDurum(ilkAcilis) {
+    istek('GET', '/api/aktarim/yedek-durum').then(d => {
+      if (d.calisiyor) {
+        $('yedek-al-btn').disabled = true;
+        goster($('yedek-ilerleme'), true);
+        $('yedek-asama').innerHTML = '<span class="yukleniyor"></span> ' + esc(d.asama || '');
+        if (d.dosya && d.dosya.toplam) { $('yedek-cubuk').style.width = Math.round(100 * d.dosya.biten / d.dosya.toplam) + '%'; $('yedek-sayac').textContent = `${d.dosya.biten} / ${d.dosya.toplam} dosya`; }
+        else { $('yedek-cubuk').style.width = '10%'; $('yedek-sayac').textContent = ''; }
+        setTimeout(() => yedekDurum(false), 1000);
+        return;
+      }
+      $('yedek-al-btn').disabled = false;
+      goster($('yedek-ilerleme'), false);
+      if (!d.bitti || ilkAcilis) return;
+      if (d.hata) { $('yedek-sonuc').innerHTML = `<div class="hata">Yedek alınamadı: ${esc(d.hata)}<br>Firebase'de hiçbir şey değiştirilmedi.</div>`; return; }
+      const s = d.sonuc;
+      $('yedek-sonuc').innerHTML = `<div class="basari" style="margin-top:14px">✓ Yedek alındı — ${s.dosyalar.tamam}/${s.dosyalar.toplam} dosya (${boyutYaz(s.dosyalar.toplamBoyut)})</div>` +
+        (s.hatali.length ? `<details><summary>${s.hatali.length} dosya indirilemedi</summary><ul>${s.hatali.map(h => `<li>${esc(h.depoYolu)} — ${esc(h.hata)}</li>`).join('')}</ul></details>` : '') +
+        '<p class="alt" style="margin-top:8px">Aşağıdaki listeden <b>Yeni sisteme yükle</b> ile aktarabilirsiniz.</p>';
+      yedekleriYukle();
+    }).catch(() => {});
+  }
+
   baslat();
+  // giriş yapılmışsa yedek listesini ve süren işi göster
+  DL.ben().then(r => { if (r && r.kullanici && r.kullanici.rol === 'yonetici') { yedekleriYukle(); yedekDurum(true); } }).catch(() => {});
 })();
 </script>
 </body>

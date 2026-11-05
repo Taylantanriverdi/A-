@@ -23,6 +23,7 @@ const agac = require('./lib/agac');
 const Depo = require('./lib/depo');
 const yetki = require('./lib/yetki');
 const aktarim = require('./lib/aktarim');
+const firebaseYedek = require('./lib/firebase-yedek');
 
 const KOK = __dirname;
 const GENEL = path.join(KOK, 'public');
@@ -31,6 +32,7 @@ const DOSYALAR = path.join(VERI, 'dosyalar');
 const AYAR_DOSYASI = path.join(VERI, 'ayarlar.json');
 const OTURUM_DOSYASI = path.join(VERI, 'oturumlar.json');
 const DOSYA_DIZINI = path.join(VERI, 'dosya-dizini.json');
+const FIREBASE_YEDEKLERI = path.join(VERI, 'firebase-yedekleri');
 fs.mkdirSync(DOSYALAR, { recursive: true });
 
 // ── AYARLAR ─────────────────────────────────────────────────────────
@@ -474,11 +476,18 @@ function isleyiciOlustur(kapi) {
           const kaynak = url.searchParams.get('kaynak');
           const hedef = url.searchParams.get('hedef') || null;
           let ham, kaynakAdi;
-          if (kaynak === 'firebase') { ham = await aktarim.firebaseIndir(); kaynakAdi = 'Firebase (eski sistem)'; }
+          let yerelDosyalar = null;
+          if (kaynak === 'firebase') { ham = await aktarim.firebaseIndir(); kaynakAdi = 'Firebase (eski sistem, canlı)'; }
+          else if (kaynak === 'yedek') {
+            const y = firebaseYedek.yedegiOku(FIREBASE_YEDEKLERI, url.searchParams.get('klasor'));
+            ham = y.veri; yerelDosyalar = y.yerelDosyalar;
+            yerelDosyalar.sadeceYerel = true; // yedekten yüklerken Firebase'e hiç bağlanılmaz
+            kaynakAdi = `Firebase yedeği — ${new Date(y.bilgi.tarih).toLocaleString('tr-TR')} (bütünlük kontrolü geçti)`;
+          }
           else { ham = await jsonOku(req); kaynakAdi = url.searchParams.get('ad') || 'Yedek dosyası'; }
           const gelen = aktarim.bicimlendir(ham, hedef);
           ham = null;
-          aktarimHazirlik = { id: crypto.randomBytes(8).toString('hex'), gelen, kaynakAdi, zaman: Date.now() };
+          aktarimHazirlik = { id: crypto.randomBytes(8).toString('hex'), gelen, kaynakAdi, yerelDosyalar, zaman: Date.now() };
           return json(res, 200, { id: aktarimHazirlik.id, kaynakAdi, ozet: aktarim.ozetle(depo.kok, gelen) });
         }
 
@@ -493,6 +502,20 @@ function isleyiciOlustur(kapi) {
         }
 
         if (yol === '/api/aktarim/durum' && req.method === 'GET') return json(res, 200, aktarimDurumu);
+
+        // ── Firebase tam yedeği (salt-okunur) ──
+        if (yol === '/api/aktarim/firebase-yedekleri' && req.method === 'GET') {
+          return json(res, 200, { yedekler: firebaseYedek.yedekleriListele(FIREBASE_YEDEKLERI), klasor: FIREBASE_YEDEKLERI });
+        }
+        if (yol === '/api/aktarim/firebase-yedekle' && req.method === 'POST') {
+          if (yedekIsi.calisiyor) return json(res, 409, { hata: 'Yedek alma zaten sürüyor' });
+          yedekIsi = { calisiyor: true, asama: 'Başlatılıyor…' };
+          firebaseYedek.yedekAl({ kokKlasor: FIREBASE_YEDEKLERI, ilerleme: d => { yedekIsi = { ...yedekIsi, ...d }; } })
+            .then(s => { yedekIsi = { calisiyor: false, bitti: true, sonuc: { ...s, hatali: s.hatali.map(h => ({ depoYolu: h.depoYolu, hata: h.hata })) } }; console.log('[firebase yedeği] ' + s.klasor); })
+            .catch(e => { yedekIsi = { calisiyor: false, bitti: true, hata: e.message }; console.error('[firebase yedeği] HATA:', e.message); });
+          return json(res, 200, { tamam: true });
+        }
+        if (yol === '/api/aktarim/yedek-durum' && req.method === 'GET') return json(res, 200, yedekIsi);
         return json(res, 404, { hata: 'Bilinmeyen adres' });
       }
 
@@ -547,6 +570,7 @@ function isleyiciOlustur(kapi) {
 // ── VERİ AKTARIMI İŞİ ───────────────────────────────────────────────
 let aktarimHazirlik = null;
 let aktarimDurumu = { calisiyor: false };
+let yedekIsi = { calisiyor: false };
 async function aktarimBaslat(hazirlik, mod) {
   aktarimDurumu = { calisiyor: true, asama: 'Mevcut veriler yedekleniyor…', baslangic: Date.now() };
   try {
@@ -560,8 +584,8 @@ async function aktarimBaslat(hazirlik, mod) {
     // 2) Gelen veride ve yerelde kalan Firebase dosya bağlantılarını indir
     const alanlar = Object.keys(hazirlik.gelen.calismaAlanlari);
     const taranacak = { gelen: hazirlik.gelen.calismaAlanlari, yerel: alanlar.map(ws => depo.oku(['db', ws])) };
-    aktarimDurumu.asama = 'Dosyalar indiriliyor…';
-    const dosyaSonucu = await aktarim.dosyalariTasi(taranacak, dosyaDizini, DOSYALAR, (b, t) => { aktarimDurumu.dosya = { biten: b, toplam: t }; });
+    aktarimDurumu.asama = hazirlik.yerelDosyalar ? 'Dosyalar yedekten kopyalanıyor…' : 'Dosyalar indiriliyor…';
+    const dosyaSonucu = await aktarim.dosyalariTasi(taranacak, dosyaDizini, DOSYALAR, (b, t) => { aktarimDurumu.dosya = { biten: b, toplam: t }; }, hazirlik.yerelDosyalar);
     dosyaDiziniKaydet();
     // 3) Birleştirme — bu kısım eşzamanlı çalışır, araya başka yazım giremez
     aktarimDurumu.asama = 'Veriler birleştiriliyor…';

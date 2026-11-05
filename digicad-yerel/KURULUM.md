@@ -221,6 +221,27 @@ açılır. Bu sayfadan şunları yapabilirsiniz:
 - **Tam yedeği indir** düğmesi, yeni sistemdeki tüm kayıtları tek bir dosya
   olarak indirir.
 
+## Eski sistemin (Firebase) tam yedeği
+
+Yönetim paneli → **Ayarlar → 🔄 Eski Sistemden Veri Aktar** sayfasındaki
+**📥 Firebase'in tam yedeğini al** düğmesi eski sistemi bu bilgisayara yedekler.
+Aynı işlemi `Firebase-Yedek-Al.bat` dosyasıyla da yapabilirsiniz.
+
+- **Firebase'deki veriler değiştirilmez.** Yazılım eski sisteme yalnızca
+  okuma (GET) isteği gönderir. Yazma, silme ve değiştirme istekleri kod
+  içinde engellenir (`lib/firebase-okuyucu.js`).
+- Yedek `veri\firebase-yedekleri\<tarih-saat>\` klasörüne alınır:
+  - `veritabani.json`: Firebase'in gönderdiği veri, hiç değiştirilmeden
+  - `dosyalar\`: Firebase'deki tüm dosyalar, aynı klasör yapısıyla
+  - `dosya-listesi.json`: Her dosyanın boyutu ve SHA-256 özeti
+  - `OZET.txt`: Kaç hekim, iş, ödeme ve dosya olduğu
+- Yedek klasöründeki dosyalar **salt-okunur** işaretlenir.
+- **Yeni sisteme yükle** düğmesi yedeği internete ve Firebase'e hiç
+  bağlanmadan yükler. Dosyalar yedekten kopyalanır, yedeğin kendisine
+  dokunulmaz. Yüklemeden önce yedeğin bozulmadığı SHA-256 ile kontrol edilir.
+- Bu yedeği USB belleğe ya da harici diske de kopyalayın. Firebase
+  kapatıldıktan sonra eski sistemin elinizdeki tek tam kopyası budur.
+
 ## Yazılımı güncelleme
 
 1. Sunucu penceresini kapatın. Arka plan kurulumu yaptıysanız bu adımı atlayın.

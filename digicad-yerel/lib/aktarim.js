@@ -11,10 +11,7 @@ const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const { temizle } = require('./agac');
 
-const FIREBASE = {
-  apiKey: 'AIzaSyBKf0ze58oEbOcSVfPPdqX1ElTaxm7JN8E',
-  databaseURL: 'https://primer-dental-default-rtdb.europe-west1.firebasedatabase.app',
-};
+const okuyucu = require('./firebase-okuyucu');
 
 // Ekranda gösterilecek Türkçe adlar
 const KOLEKSIYON_ADLARI = {
@@ -35,17 +32,10 @@ const KOLEKSIYON_ADLARI = {
 // Bir çalışma alanı verisinde bulunabilecek koleksiyonlar (format tanıma için)
 const BILINEN = Object.keys(KOLEKSIYON_ADLARI);
 
+// Firebase'in güncel verisini okur (yalnızca okuma — bkz. firebase-okuyucu.js)
 async function firebaseIndir() {
-  const g = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE.apiKey}`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }),
-  });
-  const gj = await g.json().catch(() => ({}));
-  const token = gj.idToken;
-  const r = await fetch(`${FIREBASE.databaseURL}/.json${token ? '?auth=' + encodeURIComponent(token) : ''}`);
-  if (!r.ok) throw new Error(`Firebase verisi indirilemedi (HTTP ${r.status}). Firebase kapatılmış olabilir; bunun yerine yedek dosyası yükleyin.`);
-  const v = await r.json();
-  if (!v) throw new Error('Firebase boş döndü (veri silinmiş ya da erişim kapatılmış olabilir).');
-  return v;
+  const { metin } = await okuyucu.veritabaniniOku();
+  return JSON.parse(metin);
 }
 
 // Eski formatlarda koleksiyonlar dizi olabilir → { id: kayıt } nesnesine çevir
@@ -188,15 +178,29 @@ function dolas(v, fn) {
 function guvenliAd(ad) {
   return (String(ad || 'dosya').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').replace(/^\.+/, '').slice(-150)) || 'dosya';
 }
-async function dosyaIndir(adres, dizin, dosyalarKlasoru) {
+async function dosyaIndir(adres, dizin, dosyalarKlasoru, yerelKaynak) {
   const u = new URL(adres.replace(/&amp;/g, '&'));
   const depoYolu = decodeURIComponent(u.pathname.split('/o/')[1] || '');
   if (dizin[depoYolu]) return dizin[depoYolu].adres;
   const ad = guvenliAd(depoYolu.split('/').pop());
+  // Firebase yedeğinden yükleniyorsa dosya yedekten KOPYALANIR (internete çıkılmaz,
+  // yedekteki dosyaya dokunulmaz)
+  const kopya = yerelKaynak && (yerelKaynak.get(adres) || yerelKaynak.get(adres.replace(/&amp;/g, '&')));
+  if (kopya) {
+    const belirtec = crypto.randomBytes(24).toString('base64url');
+    const klasor = path.join(dosyalarKlasoru, belirtec);
+    fs.mkdirSync(klasor, { recursive: true });
+    fs.copyFileSync(kopya.yol, path.join(klasor, ad));
+    fs.chmodSync(path.join(klasor, ad), 0o644); // yedekteki salt-okunur işareti kopyaya geçmesin
+    const yerel = `/dosya/${belirtec}/${encodeURIComponent(ad)}`;
+    dizin[depoYolu] = { adres: yerel, boyut: fs.statSync(path.join(klasor, ad)).size, tarih: new Date().toISOString(), yukleyen: 'firebase-yedegi' };
+    return yerel;
+  }
+  if (yerelKaynak && yerelKaynak.sadeceYerel) throw new Error('Yedekte bu dosya yok (yedek alınırken indirilememişti)');
   let sonHata;
   for (let deneme = 1; deneme <= 3; deneme++) {
     try {
-      const r = await fetch(u.toString());
+      const r = await okuyucu.dosyaOku(depoYolu, u.toString());
       if (!r.ok) throw new Error(r.status === 404 ? 'Firebase\'de bulunamadı (silinmiş)' : 'HTTP ' + r.status);
       const belirtec = crypto.randomBytes(24).toString('base64url');
       const klasor = path.join(dosyalarKlasoru, belirtec);
@@ -215,7 +219,7 @@ async function dosyaIndir(adres, dizin, dosyalarKlasoru) {
 }
 
 // Verideki tüm Firebase dosya bağlantılarını indirir, bağlantıları değiştirir.
-async function dosyalariTasi(veri, dizin, dosyalarKlasoru, ilerleme = () => {}) {
+async function dosyalariTasi(veri, dizin, dosyalarKlasoru, ilerleme = () => {}, yerelKaynak = null) {
   const adresler = new Set();
   dolas(veri, s => { for (const m of s.match(STORAGE_DESENI) || []) adresler.add(m); return s; });
   const liste = [...adresler];
@@ -225,7 +229,7 @@ async function dosyalariTasi(veri, dizin, dosyalarKlasoru, ilerleme = () => {}) 
   async function isci() {
     while (sira < liste.length) {
       const a = liste[sira++];
-      try { eslesme.set(a, await dosyaIndir(a, dizin, dosyalarKlasoru)); }
+      try { eslesme.set(a, await dosyaIndir(a, dizin, dosyalarKlasoru, yerelKaynak)); }
       catch (e) { basarisiz.push({ adres: a, hata: e.message }); }
       ilerleme(++biten, liste.length);
     }
