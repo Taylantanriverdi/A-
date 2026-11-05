@@ -101,6 +101,10 @@ function numPress(n) {
 
   html = yazdirmaKarti(html);
   html = mailDuzeltmeleri(html);
+  {
+    const son = html.lastIndexOf('</body>');
+    html = html.slice(0, son) + '<script src="mail-ek.js"></script>\n' + html.slice(son);
+  }
 
   // Gmail giriş penceresi kapanır ya da hata verirse sebebi ekranda görünsün
   html = degistir(html, "    scope: GMAIL_SCOPES,\n    callback: (resp) => {",
@@ -505,7 +509,7 @@ function _runyesCoz(konu, metin) {
 }
 
 // Mail üstündeki belirgin "indirme bağlantıları" kutusu
-function _mailBaglantiCubugu(metin, konu) {
+function _mailBaglantiCubugu(metin, konu, mailId) {
   const r = _runyesCoz(konu, metin);
   if (r && r.url) {
     const yerel = '/api/mail-indir?panel=yonetici&u=' + encodeURIComponent(r.url) + '&ad=' + encodeURIComponent(r.dosyaAdi);
@@ -520,13 +524,15 @@ function _mailBaglantiCubugu(metin, konu) {
   }
   const l = _mailBaglantilari(metin);
   if (!l.length) return '';
+  const adlar = typeof _mailDosyaAdlari === 'function' ? _mailDosyaAdlari(metin) : new Map();
   const indir = l.filter(_mailIndirmeMi), diger = l.filter(u => !_mailIndirmeMi(u));
+  const tumu = indir.length > 1 && mailId && typeof _mailTumuDugmesi === 'function' ? _mailTumuDugmesi(mailId, indir.length) : '';
   const dugme = (u, ana) => '<a href="' + escHtml(u) + '" target="_blank" rel="noopener" title="' + escHtml(u) + '" ' +
     'style="display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
     (ana ? 'background:#059669;color:#fff;box-shadow:0 2px 8px rgba(5,150,105,.3)' : 'background:#fff;color:var(--primary);border:1.5px solid var(--primary)') + '">' +
-    (ana ? '⬇️ İndir: ' : '🔗 ') + escHtml(_mailBaglantiAdi(u)) + '</a>';
+    (ana ? '⬇️ ' : '🔗 ') + escHtml(adlar.get(u) || _mailBaglantiAdi(u)) + '</a>';
   return '<div style="margin:14px 20px 0;padding:12px 14px 4px;background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px">' +
-    '<div style="font-size:12px;font-weight:800;color:#047857;margin-bottom:8px">' + (indir.length ? '⬇️ Maildeki indirme bağlantıları' : '🔗 Maildeki bağlantılar') + '</div>' +
+    '<div style="font-size:12px;font-weight:800;color:#047857;margin-bottom:8px">' + (indir.length ? '⬇️ Maildeki indirme bağlantıları' : '🔗 Maildeki bağlantılar') + '</div>' + tumu +
     indir.map(u => dugme(u, true)).join('') + diger.map(u => dugme(u, false)).join('') + '</div>';
 }
 
@@ -539,7 +545,7 @@ function parseGmailMessage(m) {`, 'parseGmailMessage');
 
   // 2) Mail ayrıntısı: bağlantı kutusu + tıklanabilir gövde (eski kayıtlar da onarılır)
   html = degistir(html, "    <div class=\"mail-detail-body\">${escHtml(m.body||m.preview||'(İçerik yok)')}</div>`;",
-    "    ${_mailBaglantiCubugu(_utfOnar(m.body||m.preview||''), _utfOnar(m.subject||''))}\n    <div class=\"mail-detail-body\">${_mailGovdeHtml(_utfOnar(m.body||m.preview||'(İçerik yok)'))}</div>`;",
+    "    ${_mailBaglantiCubugu(_utfOnar(m.body||m.preview||''), _utfOnar(m.subject||''), id)}\n    <div class=\"mail-detail-body\">${_mailGovdeHtml(_utfOnar(m.body||m.preview||'(İçerik yok)'))}</div>`;",
     'mail gövdesi');
   html = degistir(html, "<div class=\"mail-preview\">${escHtml((m.preview||'').slice(0,80))}</div>",
     "<div class=\"mail-preview\">${escHtml(_utfOnar(m.preview||'').slice(0,80))}</div>", 'mail listesi önizleme');

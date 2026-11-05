@@ -530,25 +530,44 @@ function isleyiciOlustur(kapi) {
       }
 
       // ── Mail Kutusu: tarama dosyasını anlamlı adla indirme (sadece yönetici) ──
-      // Runyes 3DS gibi mailerdeki S3 bağlantısı sunucu üzerinden alınır ve
+      // Runyes 3DS (S3) ve Google Drive bağlantıları sunucu üzerinden alınır ve
       // "KLİNİK - HASTA - tarih.zip" adıyla verilir (tarayıcı başka sitedeki
-      // dosyanın adını değiştiremediği için). Sadece izinli adresler (S3).
+      // dosyanın adını değiştiremediği için). Sadece izinli adresler (S3, Drive).
       if (yol === '/api/mail-indir' && req.method === 'GET') {
         if (!oturum || oturum.rol !== 'yonetici') { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Yönetici girişi gerekiyor'); return; }
         let hedef = null;
         try { hedef = new URL(url.searchParams.get('u') || ''); } catch (e) { hedef = null; }
-        const izin = new RegExp(process.env.DIGICAD_MAIL_INDIR_IZIN || '(^|\\.)amazonaws\\.com$', 'i');
+        // Google Drive "görüntüle" bağlantısı → doğrudan indirme adresi
+        let drive = false;
+        if (hedef && /^(drive|docs)\.google\.com$/i.test(hedef.hostname)) {
+          const id = (/\/file\/d\/([\w-]{10,})/.exec(hedef.pathname) || [])[1] || hedef.searchParams.get('id');
+          if (id && /^[\w-]+$/.test(id)) { hedef = new URL(`https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`); drive = true; }
+        }
+        const izin = new RegExp(process.env.DIGICAD_MAIL_INDIR_IZIN || '(^|\\.)(amazonaws\\.com|drive\\.usercontent\\.google\\.com)$', 'i');
         const protokolUygun = hedef && (hedef.protocol === 'https:' || (process.env.DIGICAD_MAIL_INDIR_IZIN && hedef.protocol === 'http:'));
         if (!hedef || !protokolUygun || !izin.test(hedef.hostname)) {
           res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bu bağlantı türü bu yolla indirilemez'); return;
         }
-        const ad = guvenliDosyaAdi(url.searchParams.get('ad') || decodeURIComponent(hedef.pathname.split('/').pop() || 'tarama.zip'));
+        let ad = guvenliDosyaAdi(url.searchParams.get('ad') || decodeURIComponent(hedef.pathname.split('/').pop() || 'tarama.zip'));
         let r;
         try { r = await fetch(hedef.href); } catch (e) { r = null; }
         if (!r || !r.ok || !r.body) {
           res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
           res.end('Dosya indirilemedi' + (r ? ` (HTTP ${r.status}) — bağlantının süresi dolmuş olabilir` : ' — internet bağlantısını kontrol edin'));
           return;
+        }
+        // Drive dosya yerine giriş/uyarı sayfası döndürdüyse dosya herkese açık değildir
+        if (drive && /text\/html/i.test(r.headers.get('content-type') || '')) {
+          try { await r.body.cancel(); } catch (e) { /* yoksay */ }
+          res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8', 'X-DL-Drive': 'izin-gerekli' });
+          res.end('Bu Google Drive dosyası herkese açık paylaşılmamış (Drive izni gerekiyor)');
+          return;
+        }
+        // Drive dosya adını kendisi bildiriyorsa ve ad verilmediyse onu kullan
+        if (drive && !url.searchParams.get('ad')) {
+          const cd = r.headers.get('content-disposition') || '';
+          const m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="([^"]+)"/i.exec(cd);
+          if (m) { try { ad = guvenliDosyaAdi(decodeURIComponent(m[1])); } catch (e) { /* yoksay */ } }
         }
         const basliklar = {
           'Content-Type': 'application/octet-stream',
