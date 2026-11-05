@@ -115,11 +115,40 @@ Tunnel ile `https://portal.digicaddental.com` gibi bir adres de
 kullanılabilir. Burada da tünel `http://localhost:8081` adresine
 yönlendirilmeli.
 
-## 5. Bilgisayar açılınca otomatik başlasın
+## 5. Sunucuyu arka planda çalıştırın (pencere açık kalmasın)
 
-1. `Win + R` tuşlarına basın, `shell:startup` yazıp Enter'a basın.
-2. Açılan klasöre `Baslat.bat` dosyasının **kısayolunu** koyun: dosyaya sağ
-   tıklayın, "Kısayol oluştur" deyin, sonra kısayolu bu klasöre taşıyın.
+`Baslat.bat` ile açılan siyah pencere kapatılırsa sistem durur. Bu pencerenin
+sürekli açık kalmaması için sunucuyu bir kez arka plana kurun:
+
+1. `Baslat.bat` ile açtığınız siyah **sunucu penceresini kapatın**.
+2. **`Arka-Plan-Kur.bat`** dosyasına çift tıklayın. Windows izin isterse
+   **Evet** deyin.
+3. Ekranda "Sunucu CALISIYOR" yazısını görünce pencereyi kapatabilirsiniz.
+
+Bundan sonra:
+
+- Sunucu **pencere olmadan** arka planda çalışır.
+- Bilgisayar açıldığında, **kimse Windows'a giriş yapmasa bile** kendiliğinden
+  başlar.
+- Bir hata olup kapanırsa birkaç saniye içinde kendini yeniden başlatır.
+- `Baslat.bat` dosyasını artık kullanmayın. Başlangıç klasörüne (`shell:startup`)
+  onun kısayolunu koyduysanız silin.
+
+Arka plan sunucusunu yönetmek için şu dosyaları kullanın:
+
+| Dosya | Ne yapar |
+|---|---|
+| `Sunucu-Durumu.bat` | Sunucu çalışıyor mu, gösterir |
+| `Sunucuyu-Yeniden-Baslat.bat` | Güncelleme sonrası ya da sorun olduğunda yeniden başlatır |
+| `Sunucuyu-Durdur.bat` | Sunucuyu durdurur. Bilgisayar yeniden açılınca tekrar başlar |
+| `Arka-Plan-Kaldir.bat` | Arka plan kurulumunu tamamen kaldırır. Sonra `Baslat.bat` ile eski yönteme dönülür |
+
+Sunucunun ekran çıktıları `veri\sunucu.log` dosyasına yazılır.
+
+Tailscale tarafında da **Preferences → Run unattended** seçeneğinin işaretli
+olduğundan emin olun. Böylece tünel de Windows'a giriş yapılmadan açılır.
+Tailscale komutlarını çalıştırdığınız yönetici penceresi kapatılabilir, tünel
+arka planda çalışmaya devam eder.
 
 Bilgisayarın uyku moduna girmemesi gerekir:
 **Ayarlar → Sistem → Güç → Ekran ve uyku → "Uyku: Hiçbir zaman"**.
@@ -194,11 +223,12 @@ açılır. Bu sayfadan şunları yapabilirsiniz:
 
 ## Yazılımı güncelleme
 
-1. Sunucu penceresini kapatın.
+1. Sunucu penceresini kapatın. Arka plan kurulumu yaptıysanız bu adımı atlayın.
 2. Yeni ZIP'teki `public`, `lib`, `araclar` ve `Kisayollar` klasörlerini, ayrıca
    `sunucu.js` dosyasını `C:\digicad-yerel` klasörünün üzerine kopyalayın.
    **`veri` klasörüne dokunmayın.**
-3. `Baslat` dosyasına çift tıklayın.
+3. Arka plan kurulumu yaptıysanız `Sunucuyu-Yeniden-Baslat.bat` dosyasına,
+   yapmadıysanız `Baslat` dosyasına çift tıklayın.
 
 ## Sık sorulanlar
 
