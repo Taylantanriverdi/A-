@@ -3555,6 +3555,7 @@ function initGIS() {
   _gisClient = google.accounts.oauth2.initTokenClient({
     client_id: GMAIL_CLIENT_ID,
     scope: GMAIL_SCOPES,
+    error_callback: (err) => toast('Gmail girişi tamamlanamadı: ' + ((err && (err.message || err.type)) || 'pencere kapandı'), 'error'),
     callback: (resp) => {
       if (resp.error) { toast('Gmail giriş hatası: ' + resp.error, 'error'); return; }
       gmailToken = resp.access_token;

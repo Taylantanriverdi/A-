@@ -175,7 +175,9 @@ function guvenlikBasliklari(res) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  // Google ile giriş (Gmail) açılır penceresinin sonucu panele iletebilmesi için
+  // 'same-origin-allow-popups' gerekir; 'same-origin' bu pencereyi koparır.
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
 }
 function json(res, durum, veri) {
   const govde = JSON.stringify(veri);

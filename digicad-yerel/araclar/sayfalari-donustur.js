@@ -101,6 +101,11 @@ function numPress(n) {
 
   html = yazdirmaKarti(html);
 
+  // Gmail giriş penceresi kapanır ya da hata verirse sebebi ekranda görünsün
+  html = degistir(html, "    scope: GMAIL_SCOPES,\n    callback: (resp) => {",
+    "    scope: GMAIL_SCOPES,\n    error_callback: (err) => toast('Gmail girişi tamamlanamadı: ' + ((err && (err.message || err.type)) || 'pencere kapandı'), 'error'),\n    callback: (resp) => {",
+    'Gmail giriş hata bildirimi');
+
   // Ayarlar sayfasına "Veri Aktarımı" düğmesi
   html = degistir(html, '<button class="btn btn-outline" onclick="exportDB()">⬇️ Yedek İndir (.json)</button>',
     '<button class="btn btn-outline" onclick="exportDB()">⬇️ Yedek İndir (.json)</button>\n            ' +
