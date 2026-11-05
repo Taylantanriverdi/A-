@@ -1,0 +1,2738 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gelen İşler Paneli | DIGICAD Dental Laboratuvar</title>
+<!-- Firebase SDK — DIGICAD Dental Laboratuvar Yönetim Sistemi ile AYNI proje/veri -->
+<script>window.DL_PANEL='yonetici';</script>
+<script src="firebase-yerel.js"></script>
+<script src="jszip.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f0f4f8; --surface:#fff; --sidebar:#0c1a2e; --border:#dde3ec;
+  --text:#1a2740; --text-soft:#6b7f99; --primary:#1565c0; --primary-light:#e8f0fe;
+  --accent:#00b4d8; --success:#00897b; --warning:#f59e0b; --danger:#e53935;
+  --radius:14px; --shadow:0 2px 16px rgba(21,101,192,.08); --shadow-lg:0 8px 32px rgba(21,101,192,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,var(--sidebar),#16324f);color:#fff;padding:18px 24px;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;box-shadow:0 2px 12px rgba(0,0,0,.15)}
+.h-left{display:flex;align-items:center;gap:14px}
+.h-logo{width:44px;height:44px;background:linear-gradient(135deg,var(--accent),var(--primary));border-radius:12px;
+  display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;flex-shrink:0;box-shadow:0 4px 12px rgba(0,180,216,.35)}
+.h-title{font-weight:700;font-size:16px;line-height:1.25}
+.h-sub{font-size:11px;color:#93a5c2;font-weight:400;letter-spacing:.5px;margin-top:2px}
+.h-right{display:flex;align-items:center;gap:10px}
+.conn-dot{width:9px;height:9px;border-radius:50%;background:var(--warning);display:inline-block;margin-right:6px;transition:background .2s}
+.conn-dot.online{background:#22c55e}
+.conn-label{font-size:11.5px;color:#c5d2e5}
+
+.wrap{max-width:1400px;margin:0 auto;padding:20px 24px 60px}
+
+/* TOOLBAR */
+.page-tabs{display:flex;gap:8px;margin-bottom:16px}
+.page-tab-btn{padding:12px 20px;border-radius:12px;border:1.5px solid var(--border);background:#fff;font-family:inherit;
+  font-weight:700;font-size:13.5px;color:var(--text-soft);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:8px}
+.page-tab-btn:hover{border-color:var(--primary);color:var(--primary)}
+.page-tab-btn.active{background:var(--sidebar);border-color:var(--sidebar);color:#fff}
+.page-tab-btn .tab-count{background:rgba(0,0,0,.15);border-radius:20px;padding:2px 8px;font-size:11px}
+.page-tab-btn.active .tab-count{background:rgba(255,255,255,.2)}
+.page-tab-btn:not(.active) .tab-count{background:var(--primary-light);color:var(--primary)}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.tab-group{display:flex;gap:6px;background:#fff;padding:5px;border-radius:12px;box-shadow:var(--shadow)}
+.tab-btn{padding:9px 16px;border-radius:8px;border:none;background:transparent;font-family:inherit;font-weight:700;
+  font-size:12.5px;color:var(--text-soft);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{background:var(--primary);color:#fff;box-shadow:0 3px 10px rgba(21,101,192,.3)}
+.tab-count{background:rgba(255,255,255,.25);border-radius:20px;padding:1px 7px;font-size:10.5px}
+.tab-btn:not(.active) .tab-count{background:var(--primary-light);color:var(--primary)}
+
+.filter-group{display:flex;gap:8px;align-items:center;background:#fff;padding:6px;border-radius:12px;box-shadow:var(--shadow)}
+.filter-select,.filter-date{border:1.5px solid var(--border);border-radius:8px;padding:8px 10px;font-family:inherit;
+  font-size:12.5px;color:var(--text);background:#fff;outline:none}
+.filter-select{min-width:150px;cursor:pointer}
+.filter-select:focus,.filter-date:focus{border-color:var(--primary)}
+.filter-date-sep{color:var(--text-soft);font-size:12px}
+.filter-clear{background:none;border:none;color:var(--text-soft);cursor:pointer;font-size:16px;padding:2px 6px}
+.filter-clear:hover{color:var(--danger)}
+
+.search-box{flex:1;min-width:200px;position:relative}
+.search-box input{width:100%;padding:11px 14px 11px 38px;border:1.5px solid var(--border);border-radius:10px;
+  font-family:inherit;font-size:13.5px;background:#fff;outline:none}
+.search-box input:focus{border-color:var(--primary)}
+.search-box .icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.5}
+.refresh-btn{padding:11px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-family:inherit;
+  font-weight:700;font-size:12.5px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:6px}
+.refresh-btn:hover{border-color:var(--primary);color:var(--primary)}
+
+/* TEK SATIRLIK LİSTE TABLOSU */
+.list-table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.list-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.list-table thead th{text-align:left;font-size:9.5px;font-weight:700;color:var(--text-soft);text-transform:uppercase;
+  letter-spacing:.3px;padding:12px 8px;border-bottom:2px solid #f0f4f8;background:#fafbfc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-table tbody td{padding:10px 8px;border-bottom:1px solid #f0f4f8;font-size:12px;color:var(--text);vertical-align:middle;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-table tbody tr.row-item{cursor:pointer;transition:background .1s}
+.list-table tbody tr.row-item:hover{background:#f7f9fc}
+.list-table tbody tr.row-item:last-child td{border-bottom:none}
+.cell-patient{font-weight:700}
+.cell-doctor{color:var(--primary);font-weight:600}
+.cell-teeth{overflow:hidden;text-overflow:ellipsis;white-space:nowrap!important}
+.cell-notes-dot{width:7px;height:7px;border-radius:50%;background:var(--warning);display:inline-block;margin-left:5px;vertical-align:middle}
+/* İŞLEM sütunu — birden fazla buton varsa yan yana sığmazsa alt satıra geçer */
+.list-table td.cell-actions{white-space:normal;overflow:visible}
+.cell-actions-inner{display:flex;flex-wrap:wrap;gap:5px;justify-content:flex-start}
+.cell-actions-inner .btn{white-space:nowrap;padding:5px 8px;font-size:10px;text-align:center;justify-content:center;flex:0 0 auto}
+.cell-actions-inner .btn:disabled{opacity:.35;cursor:not-allowed;background:#f0f4f8 !important;
+  color:var(--text-soft) !important;border-color:var(--border) !important;box-shadow:none !important}
+
+/* Sütun genişlikleri — tabloyu ekrana tam oturtmak için (table-layout:fixed) */
+.list-table th:nth-child(1){width:7%}   /* Durum */
+.list-table th:nth-child(2){width:7%}   /* Tarih */
+.list-table th:nth-child(3){width:9%}   /* Hekim */
+.list-table th:nth-child(4){width:9%}   /* Hasta */
+.list-table th:nth-child(5){width:10%}  /* İş Türü */
+.list-table th:nth-child(6){width:10%}  /* Çene/Diş */
+.list-table th:nth-child(7){width:5%}   /* Renk */
+.list-table th:nth-child(8){width:5%}   /* Dosya */
+.list-table th:nth-child(9){width:8%}   /* Teknisyen */
+.list-table th:nth-child(10){width:30%} /* İşlem — 7 buton sığması için geniş */
+
+/* CARD LIST */
+.sub-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:12px;
+  border-left:4px solid var(--border);transition:box-shadow .15s;cursor:pointer}
+.sub-card:hover{box-shadow:var(--shadow-lg)}
+.sub-card.status-new{border-left-color:var(--accent)}
+.sub-card.status-seen{border-left-color:var(--warning)}
+.sub-card.status-done{border-left-color:var(--success)}
+.sc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.sc-main{flex:1;min-width:220px}
+.sc-patient{font-weight:800;font-size:15px;color:var(--text)}
+.sc-doctor{font-size:12.5px;color:var(--primary);font-weight:600;margin-top:2px}
+.sc-meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:11.5px;color:var(--text-soft)}
+.sc-meta span{display:flex;align-items:center;gap:4px}
+.sc-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.badge{padding:4px 10px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.badge.new{background:var(--accent);color:#fff}
+.badge.seen{background:#fff7ed;color:#c2410c;border:1px solid #fed7aa}
+.badge.processing{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.badge.done{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+.badge.processing{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+
+/* 🔀 TEKNİSYEN ATA sekmesi — fiyat bilgisi İÇERMEZ */
+.dispatch-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);
+  background:#fff}
+.dispatch-row:last-child{border-bottom:none}
+.dispatch-row.overdue{background:#fef7f7}
+.dispatch-avatar{width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.dispatch-body{flex:1;min-width:0}
+.dispatch-patient{font-size:14px;font-weight:700;color:var(--text)}
+.dispatch-meta{font-size:11.5px;color:var(--text-soft);margin-top:2px}
+.dispatch-date{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:#f0f4f8;
+  color:var(--text-soft);white-space:nowrap;flex-shrink:0}
+.dispatch-date.overdue{background:#fef2f2;color:#dc2626}
+.dispatch-assign-btn{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:9px 14px;
+  font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;flex-shrink:0}
+.dispatch-assign-btn:hover{opacity:.9}
+
+.tp-tech-row{display:flex;align-items:center;gap:12px;padding:12px 10px;border-radius:11px;cursor:pointer;
+  margin-bottom:6px;border:1.5px solid var(--border)}
+.tp-tech-row:hover{background:#f7f9fb;border-color:var(--accent)}
+.tp-tech-avatar{width:38px;height:38px;border-radius:50%;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}
+.tp-tech-name{font-size:13.5px;font-weight:700}
+.tp-tech-meta{font-size:11px;color:var(--text-soft);margin-top:2px}
+
+.sc-date{font-size:10.5px;color:var(--text-soft);white-space:nowrap}
+.sc-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid #f0f4f8}
+.sc-files{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.file-chip{font-size:10.5px;padding:3px 9px;border-radius:20px;background:var(--primary-light);color:var(--primary);
+  font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.sc-notes{margin-top:8px;font-size:12px;color:var(--text-soft);font-style:italic;max-width:700px}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-soft)}
+.empty-state .icon{font-size:44px;margin-bottom:10px}
+.empty-state h4{font-size:15px;color:var(--text);margin-bottom:4px}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,20,35,.55);display:none;align-items:center;justify-content:center;
+  z-index:2000;padding:20px}
+.modal-overlay.open{display:flex}
+.modal-box{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3);transition:max-width .15s}
+.modal-box.wide{max-width:760px}
+
+/* SİPARİŞ TAKİP FORMU (ekran görünümü — admin paneliyle aynı tasarım) */
+.of-sheet{border:0;padding:0}
+.of-head{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;padding-bottom:12px;border-bottom:2px solid #1a2740;margin-bottom:14px}
+.of-logo-wrap{text-align:center}
+.of-logo{font-size:32px;font-weight:900;color:#1a2740;letter-spacing:1.5px;line-height:1}
+.of-name{font-size:9.5px;font-weight:700;color:#1a2740;margin-top:3px;letter-spacing:.5px}
+.of-addr{font-size:8px;color:#5a6b7a;margin-top:4px;line-height:1.4}
+.of-title{text-align:center;margin-top:6px;font-size:12px;letter-spacing:2px;color:#1a2740;font-weight:700}
+.of-tooth-mini{display:grid;grid-template-columns:1fr 1fr;gap:6px 4px;font-family:'JetBrains Mono',monospace}
+.of-tooth-row{display:flex;gap:2px;justify-content:center}
+.of-tooth-cell{width:18px;height:18px;border-radius:4px;font-size:8.5px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.of-tooth-cell.sel{background:#1a2740;color:#fff}
+.of-tooth-cell.off{background:#f0f4f8;color:#9aa8bd}
+.of-row{display:grid;border:1.5px solid #1a2740;margin-bottom:10px}
+.of-row-2{grid-template-columns:1fr 1fr}
+.of-cell{padding:8px 10px;border-right:1.5px solid #1a2740}
+.of-cell:last-child{border-right:none}
+.of-lbl{font-size:9.5px;font-weight:700;color:#1a2740;letter-spacing:.6px;margin-bottom:4px}
+.of-input{width:100%;border:none;outline:none;font-family:inherit;font-weight:700;color:#1a2740;background:transparent;padding:2px 0}
+.of-input.big{font-size:16px;text-align:center}
+.mat-list{display:flex;flex-direction:column;gap:5px}
+.mat-row{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#1a2740;cursor:pointer}
+.of-notes-box{border:1.5px solid #1a2740;padding:8px 10px}
+.of-notes-box textarea{width:100%;border:none;outline:none;font-family:inherit;font-size:12px;font-weight:600;
+  resize:vertical;color:#1a2740;background:transparent;line-height:1.5;min-height:70px}
+.of-teeth-summary{margin-top:10px;padding:7px 10px;background:#f5f7f9;border-radius:5px;font-size:11px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border)}
+.modal-header h3{font-size:16px}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-soft);padding:4px 8px;border-radius:8px}
+.modal-close:hover{background:#f0f4f8}
+.modal-body{padding:20px 24px}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+
+/* 🤖 YARDIM ASİSTANI */
+#ai-helper-btn{position:fixed;bottom:24px;right:24px;width:54px;height:54px;border-radius:50%;
+  background:linear-gradient(135deg,var(--primary),var(--accent));color:#fff;border:none;font-size:24px;
+  cursor:pointer;box-shadow:0 8px 24px rgba(21,101,192,.4);z-index:5000;transition:transform .15s}
+#ai-helper-btn:hover{transform:scale(1.08)}
+.chat-modal-box{max-width:520px;display:flex;flex-direction:column;max-height:80vh}
+.chat-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.chat-header-title{font-size:15px;font-weight:700;color:var(--text)}
+.chat-header-sub{font-size:11.5px;color:var(--text-soft);margin-top:2px}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:10px;background:#f7f9fc;min-height:260px}
+.chat-input-row{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--border);background:#fff}
+.chat-text-input{flex:1;padding:10px 14px;border-radius:20px;border:1.5px solid var(--border);font-family:inherit;font-size:13px;outline:none}
+.chat-text-input:focus{border-color:var(--primary)}
+.chat-send-btn{width:38px;height:38px;border-radius:50%;border:none;background:var(--primary);color:#fff;font-size:15px;cursor:pointer;flex-shrink:0}
+.chat-attach-btn{width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);background:#fff;font-size:15px;cursor:pointer;flex-shrink:0}
+.chat-bubble-row{display:flex;flex-direction:column;max-width:78%}
+.chat-bubble-row.mine{align-self:flex-end;align-items:flex-end}
+.chat-bubble-row.theirs{align-self:flex-start;align-items:flex-start}
+.chat-sender-label{font-size:10.5px;font-weight:700;color:var(--text-soft);margin-bottom:3px;padding:0 4px}
+.chat-bubble{padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word}
+.chat-bubble-row.mine .chat-bubble{background:var(--primary);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble-row.theirs .chat-bubble{background:#fff;color:var(--text);border:1px solid var(--border);border-bottom-left-radius:4px}
+.chat-timestamp{font-size:9.5px;color:var(--text-soft);margin-top:3px;padding:0 4px}
+.chat-file-img{max-width:180px;border-radius:10px;margin-top:4px;cursor:pointer;display:block}
+.chat-file-chip{display:inline-flex;align-items:center;gap:5px;margin-top:4px;font-size:12px;text-decoration:none;
+  color:inherit;background:rgba(0,0,0,.06);padding:5px 10px;border-radius:8px}
+.chat-empty{text-align:center;padding:40px 20px;color:var(--text-soft);font-size:13px}
+
+/* 📤 DOSYA YÜKLEME İLERLEME PANELİ */
+.upw-file-row{margin-bottom:9px}
+.upw-file-row:last-child{margin-bottom:0}
+.upw-file-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
+.upw-file-name{font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.upw-file-pct{font-size:10.5px;color:var(--text-soft);font-weight:700;flex-shrink:0}
+.upw-bar-track{height:6px;background:#f0f4f8;border-radius:4px;overflow:hidden}
+.upw-bar-fill{height:100%;background:var(--primary);border-radius:4px;transition:width .2s ease-out}
+.upw-bar-fill.done{background:var(--success,#00897b)}
+.upw-bar-fill.error{background:var(--danger,#e53935)}
+.upw-file-err{font-size:10px;color:var(--danger,#e53935);margin-top:3px}
+.chat-empty .icon{font-size:32px;margin-bottom:8px}
+.chat-upload-note{padding:8px 18px;font-size:11.5px;color:var(--text-soft);background:#f7f9fc;
+  border-top:1px solid var(--border)}
+
+.ai-msg-row{display:flex;flex-direction:column;max-width:80%}
+.ai-msg-row.user{align-self:flex-end;align-items:flex-end}
+.ai-msg-row.bot{align-self:flex-start;align-items:flex-start}
+.ai-msg-bubble{padding:10px 14px;border-radius:16px;font-size:13.5px;line-height:1.55;white-space:pre-wrap}
+.ai-msg-row.user .ai-msg-bubble{background:var(--primary);color:#fff;border-bottom-right-radius:5px}
+.ai-msg-row.bot .ai-msg-bubble{background:#fff;color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px}
+.ai-helper-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px;border-top:1px solid var(--border)}
+.ai-suggest-chip{background:var(--primary-light);color:var(--primary);border:none;border-radius:16px;
+  padding:6px 12px;font-size:11.5px;font-weight:600;cursor:pointer;transition:background .15s}
+.ai-suggest-chip:hover{background:#d5e5fc}
+
+.detail-row{display:flex;padding:10px 0;border-bottom:1px solid #f0f4f8;gap:14px}
+.detail-row .dr-label{width:130px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--text-soft);text-transform:uppercase;letter-spacing:.4px;padding-top:2px}
+.detail-row .dr-val{flex:1;font-size:13.5px;color:var(--text);line-height:1.5}
+.tooth-tags{display:flex;flex-wrap:wrap;gap:5px}
+.tooth-tag{background:var(--primary-light);color:var(--primary);font-family:'JetBrains Mono',monospace;font-weight:700;
+  font-size:11.5px;padding:3px 8px;border-radius:6px}
+
+.field{margin-bottom:14px}
+label.f-label{display:block;font-size:11px;font-weight:700;color:var(--text-soft);letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px}
+.inp{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-family:inherit;font-size:13.5px;
+  color:var(--text);background:#fff;outline:none}
+.inp:focus{border-color:var(--primary)}
+.inp[readonly]{background:#f7f9fb;color:var(--text-soft)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+
+/* MİNİ DİŞ ŞEMASI (salt okunur önizleme) */
+.mini-tooth-chart{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#f7f9fb;border:1.5px solid var(--border);
+  border-radius:10px;padding:10px 8px;margin-top:6px}
+.mini-tc-quad{display:flex;flex-direction:column;gap:3px}
+.mini-tc-label{font-size:8.5px;font-weight:700;color:var(--text-soft);text-align:center;letter-spacing:.5px}
+.mini-tooth-row{display:flex;gap:2px;justify-content:center;flex-wrap:wrap}
+.mini-tooth{width:22px;height:22px;border-radius:5px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-size:9.5px;font-weight:700;color:var(--text-soft);background:#fff;flex-shrink:0}
+.mini-tooth.sel{background:var(--primary);border-color:var(--primary);color:#fff}
+
+/* MATERYAL LİSTESİ */
+.mat-list{display:flex;flex-direction:column;gap:7px}
+.mat-row{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text)}
+.mat-row input{accent-color:var(--primary);width:15px;height:15px}
+
+.btn{padding:10px 18px;border-radius:9px;border:none;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;
+  transition:all .15s;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:linear-gradient(90deg,var(--primary),#1976d2);color:#fff;box-shadow:0 3px 10px rgba(21,101,192,.3)}
+.btn-primary:hover{filter:brightness(1.06)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-outline{background:#fff;border:1.5px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:#fff;border:1.5px solid #fecaca;color:var(--danger)}
+.btn-danger:hover{background:#fef2f2}
+.btn-sm{padding:7px 12px;font-size:11.5px}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:#fff;
+  padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;display:none;align-items:center;gap:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:3000;max-width:90vw}
+#toast.success{background:#0f5132}
+#toast.error{background:#7a1f1f}
+#toast.info{background:#1a2740}
+
+/* LOCK SCREEN */
+#lock-screen{position:fixed;inset:0;background:linear-gradient(135deg,var(--sidebar),#16324f);z-index:5000;
+  display:flex;align-items:center;justify-content:center}
+.lock-card{background:#fff;border-radius:20px;padding:36px 32px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.lock-logo{width:56px;height:56px;background:linear-gradient(135deg,var(--accent),var(--primary));border-radius:16px;
+  display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;margin:0 auto 16px;box-shadow:0 6px 18px rgba(0,180,216,.35)}
+.lock-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.lock-sub{font-size:12px;color:var(--text-soft);margin-bottom:20px}
+.dots{display:flex;gap:12px;justify-content:center;margin-bottom:20px}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border);transition:all .15s}
+.dot.filled{background:var(--primary);border-color:var(--primary)}
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.num-btn{padding:16px;border-radius:12px;border:1.5px solid var(--border);background:#fff;font-family:inherit;
+  font-size:18px;font-weight:700;cursor:pointer;color:var(--text)}
+.num-btn:hover{border-color:var(--primary);color:var(--primary)}
+.num-btn.wide{grid-column:span 1}
+#lock-msg{font-size:12px;color:var(--danger);font-weight:600;min-height:16px;margin-bottom:8px}
+
+.hidden{display:none !important}
+
+/* ═══════════════════════════════════════════════════════════════
+   📱 MOBİL — DİK (PORTRAIT) TELEFON EKRANLARI İÇİN
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  body{font-size:14px}
+  .wrap{padding:12px 12px 40px}
+
+  .header{flex-direction:column;align-items:stretch;gap:10px;padding:14px 14px}
+  .h-left{gap:10px}
+  .h-logo{width:36px;height:36px;font-size:17px}
+  .h-title{font-size:15px}
+  .h-sub{font-size:10.5px}
+  .h-right{justify-content:flex-start}
+
+  .page-tabs{flex-wrap:wrap}
+  .page-tab-btn{flex:1 1 auto;white-space:nowrap;font-size:12.5px;padding:9px 10px;text-align:center}
+
+  .toolbar{flex-direction:column;align-items:stretch;gap:8px}
+  .tab-group{flex-wrap:wrap;width:100%}
+  .tab-btn{flex:1 1 auto;white-space:nowrap;text-align:center}
+  .filter-group{flex-wrap:wrap;width:100%}
+  .filter-group select,.filter-group input{flex:1;min-width:120px}
+  .search-box{width:100%;min-width:0}
+  .refresh-btn{width:100%}
+
+  /* TABLO — yatay kaydırma tamamen kaldırıldı, dikey kartlara döner */
+  .list-table-wrap{overflow-x:visible}
+  .list-table{min-width:0;width:100%;border-collapse:collapse}
+  .list-table thead{display:none}
+  .list-table tbody{display:flex;flex-direction:column;gap:10px}
+  .list-table tr{display:flex;flex-direction:column;background:#fff;border:1.5px solid var(--border);
+    border-radius:12px;padding:10px 12px;gap:6px}
+  .list-table td{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;
+    padding:4px 0;border:none;font-size:13px;text-align:right;max-width:none;white-space:normal}
+  .list-table td[data-label]:not([data-label=""])::before{
+    content:attr(data-label);font-size:10.5px;font-weight:700;color:var(--text-soft);
+    text-transform:uppercase;letter-spacing:.4px;text-align:left;flex-shrink:0;padding-top:2px}
+  .list-table td[data-label=""]{flex-direction:column;align-items:stretch}
+  .list-table td[data-label=""] .btn{width:100%;margin-top:4px}
+
+  .detail-row{flex-direction:column;gap:2px}
+  .dr-label{width:auto !important}
+
+  .modal-overlay{padding:0}
+  .modal-box{max-width:100%;width:100%;height:100%;max-height:100%;border-radius:0}
+  .modal-header{padding:14px 16px}
+  .modal-body{padding:14px 16px}
+  .modal-footer{padding:12px 16px;flex-wrap:wrap}
+
+  .numpad{gap:8px}
+  .num-btn{padding:14px;font-size:16px}
+
+  .btn{min-height:38px}
+
+  body,.wrap{overflow-x:hidden}
+}
+@media (max-width: 380px) {
+  .wrap{padding:8px 8px 36px}
+  .h-title{font-size:13.5px}
+  .h-sub{display:none}
+}
+</style>
+</head>
+<body>
+
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-logo">🦷</div>
+    <div class="lock-title">Gelen İşler Paneli</div>
+    <div class="lock-sub">DIGICAD Dental Laboratuvarı — Personel Girişi<br>Laboratuvar şifrenizi girin</div>
+    <div class="dots" id="lock-dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div id="lock-msg"></div>
+    <div class="numpad">
+      <button class="num-btn" onclick="numPress('1')">1</button>
+      <button class="num-btn" onclick="numPress('2')">2</button>
+      <button class="num-btn" onclick="numPress('3')">3</button>
+      <button class="num-btn" onclick="numPress('4')">4</button>
+      <button class="num-btn" onclick="numPress('5')">5</button>
+      <button class="num-btn" onclick="numPress('6')">6</button>
+      <button class="num-btn" onclick="numPress('7')">7</button>
+      <button class="num-btn" onclick="numPress('8')">8</button>
+      <button class="num-btn" onclick="numPress('9')">9</button>
+      <div></div>
+      <button class="num-btn" onclick="numPress('0')">0</button>
+      <button class="num-btn" onclick="numBackspace()">⌫</button>
+    </div>
+  </div>
+</div>
+
+<div class="header">
+  <div class="h-left">
+    <div class="h-logo">📥</div>
+    <div>
+      <div class="h-title">Gelen İşler Paneli</div>
+      <div class="h-sub">DIGICAD Dental Laboratuvar · Hekimden Gelenler</div>
+    </div>
+  </div>
+  <div class="h-right">
+    <span class="conn-dot" id="conn-dot"></span>
+    <span class="conn-label" id="conn-label">Bağlanıyor…</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="page-tabs" style="justify-content:space-between">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="page-tab-btn active" id="page-tab-incoming" onclick="setPageTab('incoming')">📥 Gelen İşler <span class="tab-count" id="cnt-incoming">0</span></button>
+      <button class="page-tab-btn" id="page-tab-processed" onclick="setPageTab('processed')">🔧 İşleme Alınanlar <span class="tab-count" id="cnt-processed">0</span></button>
+      <button class="page-tab-btn" id="page-tab-completed" onclick="setPageTab('completed')">✅ Tamamlanan İşler <span class="tab-count" id="cnt-completed">0</span></button>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="startBlankOrderForm()" title="Bir hekim talebine bağlı olmadan, elden/telefonla gelen bir sipariş için boş form açar">+ Yeni Sipariş Formu</button>
+  </div>
+
+  <div class="toolbar" id="main-toolbar">
+    <div class="tab-group" id="status-subtabs">
+      <button class="tab-btn active" data-status="all" onclick="setStatusFilter('all')">Tümü <span class="tab-count" id="cnt-all">0</span></button>
+      <button class="tab-btn" data-status="Yeni" onclick="setStatusFilter('Yeni')">🆕 Yeni <span class="tab-count" id="cnt-new">0</span></button>
+      <button class="tab-btn" data-status="İncelendi" onclick="setStatusFilter('İncelendi')">👁️ İncelendi <span class="tab-count" id="cnt-seen">0</span></button>
+    </div>
+    <div class="filter-group">
+      <select id="doctor-filter" class="filter-select" onchange="renderList()">
+        <option value="">Tüm Hekimler</option>
+      </select>
+      <input type="date" id="date-from-filter" class="filter-date" onchange="renderList()" title="Başlangıç tarihi">
+      <span class="filter-date-sep">—</span>
+      <input type="date" id="date-to-filter" class="filter-date" onchange="renderList()" title="Bitiş tarihi">
+      <button class="filter-clear" onclick="clearFilters()" title="Filtreleri temizle">✕</button>
+    </div>
+    <div class="search-box">
+      <span class="icon">🔍</span>
+      <input type="text" id="search-input" placeholder="Hekim veya hasta adı ara..." oninput="renderList()">
+    </div>
+    <button class="refresh-btn" onclick="manualRefreshHint()">🔄 Canlı</button>
+  </div>
+
+  <div id="list-container"></div>
+</div>
+
+<!-- DETAY / AKTARMA MODALI -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>📥 Hekim Talebi Detayı</h3>
+      <button class="modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="modal-body" id="detail-body"></div>
+    <div class="modal-footer" id="detail-footer"></div>
+  </div>
+</div>
+
+<!-- 🔀 TEKNİSYEN SEÇİM MODALI — fiyat/tutar bilgisi kesinlikle içermez -->
+<div class="modal-overlay" id="tech-pick-modal">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h3 id="tp-job-title">Teknisyene Ata</h3>
+      <button class="modal-close" onclick="closeTechPickModal()">✕</button>
+    </div>
+    <div class="modal-body" id="tech-pick-list" style="max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
+
+<!-- 💬 İŞ ÖZELİNDE SOHBET — laboratuvar, hekim ve teknisyenle aynı dizide
+     yazışma. Kayıt admin panelindeki/teknisyen portalındaki ile BİREBİR
+     aynı yerde (db/{workspace}/chats/job_{jobId}/messages) tutulur. -->
+<div class="modal-overlay" id="job-chat-modal">
+  <div class="modal-box chat-modal-box">
+    <div class="chat-header">
+      <div>
+        <div class="chat-header-title">💬 <span id="job-chat-title">İş Sohbeti</span></div>
+        <div class="chat-header-sub" id="job-chat-sub">Bu iş hakkında hekim ve teknisyenle doğrudan yazışın</div>
+      </div>
+      <button class="modal-close" onclick="closeJobChatModal()">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <div class="chat-input-row">
+      <button class="chat-attach-btn" onclick="document.getElementById('chat-file-input').click()" title="Dosya ekle">📎</button>
+      <input type="file" id="chat-file-input" style="display:none" onchange="onChatFilePicked(this.files)">
+      <input type="text" id="chat-text-input" class="chat-text-input" placeholder="Mesajınızı yazın..." onkeydown="if(event.key==='Enter')sendChatMessage()">
+      <button class="chat-send-btn" onclick="sendChatMessage()">➤</button>
+    </div>
+    <div id="chat-upload-note" class="chat-upload-note hidden">📤 Dosya yükleniyor…</div>
+  </div>
+</div>
+
+<!-- 🤖 YARDIM ASİSTANI — programın kendi özelliklerini bilen, dışarıya
+     hiçbir veri göndermeyen, yerleşik soru-cevap yardımcısı -->
+<button id="ai-helper-btn" onclick="toggleAiHelper()" title="Yardım Asistanı">🤖</button>
+<div class="modal-overlay" id="ai-helper-modal">
+  <div class="modal-box chat-modal-box">
+    <div class="chat-header">
+      <div>
+        <div class="chat-header-title">🤖 Yardım Asistanı</div>
+        <div class="chat-header-sub">Gelen İşler Paneli'nin kullanımıyla ilgili soru sorun</div>
+      </div>
+      <button class="modal-close" onclick="toggleAiHelper()">✕</button>
+    </div>
+    <div class="chat-messages" id="ai-helper-messages"></div>
+    <div class="ai-helper-suggestions" id="ai-helper-suggestions"></div>
+    <div class="chat-input-row">
+      <input type="text" id="ai-helper-input" class="chat-text-input" placeholder="Örn: talebi nasıl aktarırım?" onkeydown="if(event.key==='Enter')sendAiHelperQuestion()">
+      <button class="chat-send-btn" onclick="sendAiHelperQuestion()">➤</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 📤 DOSYA YÜKLEME İLERLEME PANELİ -->
+<div id="upload-progress-widget" class="hidden" style="position:fixed;bottom:24px;right:24px;background:#fff;
+  border-radius:14px;box-shadow:0 10px 34px rgba(16,32,60,.18);padding:14px 16px;min-width:270px;
+  max-width:340px;z-index:9999;border:1.5px solid var(--border)">
+  <div style="font-size:12.5px;font-weight:700;margin-bottom:10px;color:var(--text)" id="upw-title">📤 Dosyalar yükleniyor…</div>
+  <div id="upw-list"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  FİREBASE BAĞLANTISI — DIGICAD Dental Laboratuvar Yönetim
+//  Sistemi ile AYNI Firebase projesi ve AYNI veri yolu (db/digicad).
+//  Bu panel: doctorSubmissions'ı okur/günceller, doctors'ı salt okunur
+//  okur (fiyat listesi için), ve onaylanan talepleri pendingJobs'a
+//  yazarak MEVCUT "Onay Bekleyen" akışına dahil eder. Diğer verilere
+//  (jobs, technicians, payments, vb.) hiç dokunmaz.
+// ═══════════════════════════════════════════════════════
+const firebaseConfig = {}; // Yerel sunucu kullanılıyor — Firebase bağlantısı yok
+firebase.initializeApp(firebaseConfig);
+const rtdb = firebase.database();
+const fbStorage = firebase.storage();
+let _storageAuthReady = false;
+firebase.auth().signInAnonymously().catch(err => console.error('Depolama girişi başarısız:', err));
+firebase.auth().onAuthStateChanged(user => { if (user) _storageAuthReady = true; });
+const WORKSPACE = 'digicad';
+const dbRoot = 'db/' + WORKSPACE;
+
+const escHtml = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ═══════════════════════════════════════════════════════
+//  🤖 YARDIM ASİSTANI — dışarıya hiçbir veri göndermeyen, tamamen bu
+//  dosyanın içinde çalışan, anahtar kelime eşleştirmeli soru-cevap
+//  yardımcısı. Gelen İşler Paneli'nin kendi özellikleri hakkında bilgi verir.
+// ═══════════════════════════════════════════════════════
+const AI_HELPER_KB = [
+  { keywords: ['sipariş formuna aktar','aktar','forma aktar'],
+    a: 'Bir talebin yanındaki "📝 Sipariş Formuna Aktar" butonuna basınca, hekimin gönderdiği bilgiler otomatik olarak Sipariş Formu\'na doldurulur. Kontrol edip "Onaya Gönder" ile admin onayına yollayabilirsiniz.' },
+  { keywords: ['zaten aktarıldı','tekrar aktar','işleme alındı'],
+    a: 'Bir talep zaten aktarılmışsa "✅ İşleme Alındı" etiketi görünür ve tekrar aktarılamaz — bu, aynı işin mükerrer kaydedilmesini önlemek içindir.' },
+  { keywords: ['gelen işler','işleme alınanlar','sekme'],
+    a: 'Üstteki iki sekme: "📥 Gelen İşler" (henüz aktarılmamış yeni talepler) ve "✅ İşleme Alınanlar" (zaten Sipariş Formu\'na aktarılmış talepler).' },
+  { keywords: ['filtre','arama','hekim filtre','tarih filtre'],
+    a: 'Araç çubuğundan durum sekmesi (Tümü/Yeni/İncelendi), hekim seçici, tarih aralığı ve arama kutusuyla listeyi filtreleyebilirsiniz. "✕" ile filtreleri temizleyebilirsiniz.' },
+  { keywords: ['dosya indir','tarama indir','📦'],
+    a: 'Bir talebin dosyası varsa, satırdaki "📦 İndir" butonuna ya da detay penceresindeki "Tümünü Klasöre İndir" butonuna basarak tüm tarama dosyalarını tek seferde indirebilirsiniz.' },
+  { keywords: ['detay','talep detayı','diş','renk','not'],
+    a: 'Bir talebe tıklayınca açılan detay penceresinde hekim, hasta, iş türü, çene/diş seçimi, renk, notlar ve yüklenen dosyaları görebilirsiniz.' },
+  { keywords: ['canlı','yenile','güncel değil'],
+    a: 'Panel Firebase üzerinden canlı çalışır — yeni bir talep geldiğinde sayfa otomatik güncellenir, elle yenilemenize gerek yoktur.' },
+  { keywords: ['nasıl kullan','yardım','ne yapabilirim','özellik'],
+    a: 'Bu panelden: hekimlerin Hekim Portalı üzerinden gönderdiği talepleri görüntüleyebilir, detaylarını inceleyebilir, dosyalarını indirebilir ve Sipariş Formu\'na aktarıp admin onayına gönderebilirsiniz.' }
+];
+const AI_HELPER_SUGGESTIONS = ['Talebi nasıl aktarırım?', 'Dosyaları nasıl indiririm?', 'Filtreleri nasıl kullanırım?'];
+const AI_HELPER_FALLBACK = 'Bu konuda henüz hazır bir cevabım yok. "Aktarma", "filtre", "dosya indirme", "detay" gibi anahtar kelimelerle tekrar sorabilir, ya da laboratuvarla doğrudan iletişime geçebilirsiniz.';
+let _aiHelperHistory = [];
+
+function toggleAiHelper() {
+  const modal = document.getElementById('ai-helper-modal');
+  const opening = !modal.classList.contains('open');
+  modal.classList.toggle('open');
+  if (opening && !_aiHelperHistory.length) {
+    appendAiHelperMessage('Merhaba! Ben Gelen İşler Paneli Yardım Asistanı 🤖 Programın kullanımıyla ilgili aklınıza takılan her şeyi sorabilirsiniz.', 'bot');
+    renderAiHelperSuggestions();
+  }
+}
+function renderAiHelperSuggestions() {
+  const el = document.getElementById('ai-helper-suggestions');
+  el.innerHTML = AI_HELPER_SUGGESTIONS.map(s => `<button class="ai-suggest-chip" onclick="askAiHelperDirect('${s.replace(/'/g,"\\'")}')">${escHtml(s)}</button>`).join('');
+}
+function askAiHelperDirect(q) {
+  document.getElementById('ai-helper-input').value = q;
+  sendAiHelperQuestion();
+}
+function findAiHelperAnswer(question) {
+  const q = question.toLocaleLowerCase('tr-TR');
+  let best = null, bestScore = 0;
+  AI_HELPER_KB.forEach(entry => {
+    let score = 0;
+    entry.keywords.forEach(kw => { if (q.includes(kw.toLocaleLowerCase('tr-TR'))) score += kw.length; });
+    if (score > bestScore) { bestScore = score; best = entry; }
+  });
+  return best ? best.a : AI_HELPER_FALLBACK;
+}
+function appendAiHelperMessage(text, role) {
+  _aiHelperHistory.push({ text, role });
+  const el = document.getElementById('ai-helper-messages');
+  const div = document.createElement('div');
+  div.className = `ai-msg-row ${role === 'user' ? 'user' : 'bot'}`;
+  div.innerHTML = `<div class="ai-msg-bubble">${escHtml(text)}</div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+function sendAiHelperQuestion() {
+  const input = document.getElementById('ai-helper-input');
+  const q = input.value.trim();
+  if (!q) return;
+  appendAiHelperMessage(q, 'user');
+  input.value = '';
+  document.getElementById('ai-helper-suggestions').innerHTML = '';
+  setTimeout(() => {
+    appendAiHelperMessage(findAiHelperAnswer(q), 'bot');
+  }, 350);
+}
+
+function fmtDate(d) {
+  if (!d) return '-';
+  const [y, m, g] = d.split('-');
+  return `${g}.${m}.${y}`;
+}
+// Admin panelindeki Sipariş Formu ile BİREBİR aynı sabitler — tutarlılık için
+const FDI_QUADRANTS = {
+  ur: [18,17,16,15,14,13,12,11], ul: [21,22,23,24,25,26,27,28],
+  br: [48,47,46,45,44,43,42,41], bl: [31,32,33,34,35,36,37,38]
+};
+const ORDER_MATERIALS = ['ZIRCONIA', 'METAL DESTEKLİ PORSELEN', 'EMAX', 'LAMİNE', 'PMMA', 'TITANIUM'];
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  const icons = {success:'✅', error:'❌', info:'ℹ️'};
+  el.innerHTML = `<span>${icons[type]||'•'}</span><span>${msg}</span>`;
+  el.className = type; el.style.display = 'flex';
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => el.style.display = 'none', 3500);
+}
+
+// ── Kilit Ekranı (mevcut sistemle AYNI 4 haneli laboratuvar şifresi) ──
+let lockInput = '';
+let dbPass = '0000';
+let _unlocked = false;
+
+// Şifre artık sunucuda doğrulanır (veritabanından okunmaz)
+
+function updateDots() {
+  document.querySelectorAll('#lock-dots .dot').forEach((d,i) => d.classList.toggle('filled', i < lockInput.length));
+}
+function numPress(n) {
+  if (lockInput.length >= 4) return;
+  lockInput += n;
+  updateDots();
+  if (lockInput.length === 4) {
+    const denenen = lockInput;
+    DL.giris({ pin: denenen }).then(() => {
+      _unlocked = true;
+      document.getElementById('lock-screen').style.display = 'none';
+      DL.yenidenBaglan();
+      startApp();
+    }).catch(e => {
+      document.getElementById('lock-msg').innerText = '❌ ' + (e.message || 'Hatalı şifre!');
+      lockInput = '';
+      updateDots();
+    });
+  }
+}
+function numBackspace() {
+  lockInput = lockInput.slice(0, -1);
+  document.getElementById('lock-msg').innerText = '';
+  updateDots();
+}
+
+// ── Uygulama Verisi ──────────────────────────────────────
+let submissions = [];   // doctorSubmissions listesi
+let doctorsById = {};   // fiyat listesi lookup için
+let techniciansById = {}; // "Otomatik Teknisyen" ad çözümlemesi için
+let jobsBySubmissionId = {}; // sourceDoctorSubmissionId -> [job,...] — atanan teknisyen ve tasarım dosyaları için
+let allJobsList = []; // TÜM işler — sourceDoctorSubmissionId bağlantısı olmayan eski kayıtlarda hasta+hekim adıyla yedek eşleştirme için
+// 🚀 Admin panelindeki "Direkt Mod" anahtarı — açıkken gönderilen işler
+// onay beklemeden direkt "jobs"a yazılır VE silme özelliği aktif olur.
+let gipDirectMode = false;
+// Not: _openDetailId/_currentDetailView burada erkenden tanımlanıyor —
+// aksi halde canlı Firebase dinleyicileri (doctorSubmissions vb.) sayfa
+// tamamen yüklenmeden önce tetiklenirse "tanımsız değişken" hatası
+// oluşabiliyordu.
+let _openDetailId = null;
+let _currentDetailView = null; // 'detail' | 'orderform' — canlı yenilemenin doğru görünümü koruması için
+let allPendingJobsList = []; // Admin onayı bekleyen (henüz "jobs"a geçmemiş) işler — teknisyen ataması bu kayıtlar için de mümkün olsun diye ayrıca takip edilir
+let statusFilter = 'all';   // 'all' | 'Yeni' | 'İncelendi'  (sadece "incoming" sayfasında anlamlı)
+let pageTab = 'incoming';   // 'incoming' (Gelen İşler) | 'processed' (İşleme Alınanlar)
+let _appStarted = false;
+let _knownDoctorNames = [];
+
+function startApp() {
+  if (_appStarted) return;
+  _appStarted = true;
+
+  rtdb.ref('.info/connected').on('value', snap => {
+    const online = snap.val() === true;
+    document.getElementById('conn-dot').classList.toggle('online', online);
+    document.getElementById('conn-label').textContent = online ? 'Canlı bağlantı' : 'Bağlanıyor…';
+  });
+
+  rtdb.ref(dbRoot + '/doctors').on('value', snap => {
+    const data = snap.val() || {};
+    doctorsById = data;
+  });
+
+  rtdb.ref(dbRoot + '/technicians').on('value', snap => {
+    const data = snap.val() || {};
+    techniciansById = data;
+    updateTabCounts();
+  });
+
+  // 🚀 Admin panelindeki "Direkt Mod" anahtarını canlı takip eder — admin
+  // istediği an açıp kapatabilsin diye sayfa yenilenmeden anında etkiler.
+  rtdb.ref(dbRoot + '/settings/gipDirectMode').on('value', snap => {
+    gipDirectMode = !!snap.val();
+    renderList();
+  });
+
+  // İşlenmiş taleplerin atandığı teknisyeni ve tasarım dosyalarını
+  // gösterebilmek için, hangi işin hangi talepten geldiğini takip ederiz.
+  rtdb.ref(dbRoot + '/jobs').on('value', snap => {
+    const data = snap.val() || {};
+    allJobsList = Object.values(data).filter(j => !j.deleted);
+    rebuildJobsBySubmissionId();
+    renderList();
+    updateTabCounts();
+  });
+
+  // Admin panelinde henüz onaylanmamış (bu yüzden "jobs"a değil "pendingJobs"a
+  // yazılmış) işler de takip edilir — aksi halde bir talep aktarıldıktan hemen
+  // sonra, admin onaylayana kadar teknisyene atama YAPILAMAZDI (çünkü ortada
+  // henüz gerçek bir "jobs" kaydı olmuyordu).
+  rtdb.ref(dbRoot + '/pendingJobs').on('value', snap => {
+    const data = snap.val() || {};
+    allPendingJobsList = Object.values(data).filter(j => !j.deleted && j.status !== 'Reddedildi');
+    rebuildJobsBySubmissionId();
+    renderList();
+    updateTabCounts();
+  });
+
+  function rebuildJobsBySubmissionId() {
+    const map = {};
+    allJobsList.forEach(j => {
+      if (!j.sourceDoctorSubmissionId) return;
+      (map[j.sourceDoctorSubmissionId] = map[j.sourceDoctorSubmissionId] || []).push(j);
+    });
+    allPendingJobsList.forEach(j => {
+      if (!j.sourceDoctorSubmissionId) return;
+      (map[j.sourceDoctorSubmissionId] = map[j.sourceDoctorSubmissionId] || []).push(j);
+    });
+    jobsBySubmissionId = map;
+  }
+
+  rtdb.ref(dbRoot + '/doctorSubmissions').on('value', snap => {
+    const data = snap.val() || {};
+    submissions = Object.values(data).sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    updateTabCounts();
+    populateDoctorFilter();
+    renderList();
+    // Açık olan detay modalı varsa güncel veriyle tazele — AMA sipariş formu
+    // editörü açıkken bu otomatik yenilemeyi YAPMA: "Onaya Gönder" tam da bu
+    // kaydın durumunu değiştirdiği için (Yeni/İncelendi → Aktarıldı) bu dinleyici
+    // hemen tetikleniyor ve eskiden formu sıfırlayıp "Yazdır" butonunu iptal
+    // ediyordu. Editör görünümündeyken sessizce görmezden gel.
+    if (_openDetailId && _currentDetailView === 'detail') {
+      const fresh = submissions.find(s => s.id === _openDetailId);
+      if (fresh) openDetailModal(_openDetailId, true);
+    }
+  }, err => {
+    console.error('doctorSubmissions okunamadı:', err);
+    toast('Bağlantı hatası: ' + err.message, 'error');
+  });
+}
+
+function manualRefreshHint() {
+  toast('Bu panel canlı senkronize — yeni talepler otomatik görünür 🔄', 'info');
+}
+
+// ── Hekim filtre listesini, gelen taleplerde geçen isimlerden otomatik kurar ──
+function populateDoctorFilter() {
+  const names = Array.from(new Set(submissions.map(s => s.doctorName).filter(Boolean)))
+    .sort((a,b) => a.localeCompare(b, 'tr'));
+  if (JSON.stringify(names) === JSON.stringify(_knownDoctorNames)) return; // gereksiz yeniden çizimi atla
+  _knownDoctorNames = names;
+  const sel = document.getElementById('doctor-filter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Tüm Hekimler</option>' +
+    names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  if (names.includes(cur)) sel.value = cur;
+}
+
+function clearFilters() {
+  document.getElementById('doctor-filter').value = '';
+  document.getElementById('date-from-filter').value = '';
+  document.getElementById('date-to-filter').value = '';
+  document.getElementById('search-input').value = '';
+  renderList();
+}
+
+// ── Ana sayfa sekmesi: Gelen İşler (bekleyen) / İşleme Alınanlar (arşiv) ──
+// Bir talebin arkasındaki gerçek iş kaydını bulur. Önce doğrudan bağlantıyı
+// (sourceDoctorSubmissionId) dener — bu, yeni kayıtlarda her zaman vardır.
+// Bulunamazsa (eski kayıtlarda bu alan hiç yazılmamış olabilir), hasta adı
+// + hekim adı eşleşmesiyle YEDEK bir arama yapar — admin panelindeki
+// "Hekimden Gelenler" sayfasıyla aynı mantık.
+function getLinkedJobsFor(s) {
+  const direct = jobsBySubmissionId[s.id];
+  if (direct && direct.length) return direct;
+  if (!s.patient || !s.doctorName) return [];
+  const nameMatch = j =>
+    (j.patient||'').trim().toLocaleLowerCase('tr-TR') === s.patient.trim().toLocaleLowerCase('tr-TR') &&
+    (j.drName||'').trim().toLocaleLowerCase('tr-TR') === s.doctorName.trim().toLocaleLowerCase('tr-TR');
+  return allJobsList.filter(nameMatch).concat(allPendingJobsList.filter(nameMatch));
+}
+
+// Bir talebin arkasındaki iş(ler) tamamen "Tamamlandı" durumuna geçtiyse
+// bu talep "tamamlanmış" sayılır. Birden fazla iş kalemi varsa (çoklu
+// sipariş), hepsi tamamlanmadan "Tamamlanan İşler"e düşmez — hâlâ
+// "İşleme Alınanlar"da kalmaya devam eder.
+function isSubmissionCompleted(s) {
+  const linkedJobs = getLinkedJobsFor(s);
+  return linkedJobs.length > 0 && linkedJobs.every(j => j.status === 'Tamamlandı');
+}
+
+function setPageTab(tab) {
+  pageTab = tab;
+  document.getElementById('page-tab-incoming').classList.toggle('active', tab === 'incoming');
+  document.getElementById('page-tab-processed').classList.toggle('active', tab === 'processed');
+  document.getElementById('page-tab-completed').classList.toggle('active', tab === 'completed');
+  // Durum alt-sekmeleri (Yeni/İncelendi) sadece "Gelen İşler" sayfasında anlamlı
+  document.getElementById('status-subtabs').style.display = (tab === 'incoming') ? 'flex' : 'none';
+  if (tab !== 'incoming') statusFilter = 'all';
+  renderList();
+}
+
+function updateTabCounts() {
+  const transferred = submissions.filter(s => s.status === 'Aktarıldı');
+  const completedSubmissions = transferred.filter(isSubmissionCompleted);
+  const processed = transferred.length - completedSubmissions.length;
+  const incoming = submissions.filter(s => s.status !== 'Aktarıldı').length;
+  const yeni = submissions.filter(s => !s.status || s.status === 'Yeni').length;
+  const seen = submissions.filter(s => s.status === 'İncelendi').length;
+  // ÖNEMLİ: "Tamamlanan İşler" sekmesindeki rozet sayısı, o sekme
+  // açıldığında GERÇEKTEN listelenen kayıtlarla (renderCompletedList'in
+  // kullandığı veri kaynağıyla — tek tek İŞ kayıtları, sipariş/talep
+  // sayısı değil) BİREBİR aynı yöntemle sayılmalı. Aksi halde, birden
+  // fazla kalemli bir siparişte (örn. 1 talep ama 2 ayrı iş kalemi)
+  // rozet ile listede görünen satır sayısı birbirini tutmuyordu.
+  const completedJobsCount = allJobsList.filter(j => j.status === 'Tamamlandı').length;
+  document.getElementById('cnt-incoming').textContent  = incoming;
+  document.getElementById('cnt-processed').textContent = processed;
+  document.getElementById('cnt-completed').textContent = completedJobsCount;
+  document.getElementById('cnt-all').textContent  = incoming;
+  document.getElementById('cnt-new').textContent  = yeni;
+  document.getElementById('cnt-seen').textContent = seen;
+  document.title = (yeni > 0 ? `(${yeni}) ` : '') + 'Gelen İşler Paneli | DIGICAD Dental Laboratuvar';
+}
+
+// ═══════════════════════════════════════════════════════
+//  🔀 TEKNİSYEN ATA — kaydı zaten açılmış (Sipariş Formu'na aktarılmış,
+//  yani gerçek bir iş kaydı oluşmuş) ama henüz teknisyene atanmamış
+//  işleri listeler. Bir ÇALIŞAN kullanacağı için burada HİÇBİR fiyat/
+//  tutar bilgisi gösterilmez — sadece hekim, hasta, iş türü, teslim
+//  tarihi ve atama butonu vardır.
+// ═══════════════════════════════════════════════════════
+function getUnassignedJobs() {
+  return allJobsList.filter(j => !j.techId && j.status !== 'Tamamlandı');
+}
+// Sadece atanmamışları göster kutucuğu açıkken kullanılır (sayaç rozeti
+// için de kullanılır) — kutucuk kapalıyken atanmış işler de listeye dahil
+// edilir, böylece mevcut ataması yanlış olan bir iş de buradan görülüp
+// teknisyeni değiştirilebilir.
+let dispatchShowUnassignedOnly = false;
+function getDispatchJobs() {
+  const all = allJobsList.filter(j => j.status !== 'Tamamlandı');
+  return dispatchShowUnassignedOnly ? all.filter(j => !j.techId) : all;
+}
+function toggleDispatchUnassignedOnly(checked) {
+  dispatchShowUnassignedOnly = checked;
+  renderDispatchList();
+}
+
+function renderDispatchList() {
+  const q = (document.getElementById('dispatch-search')?.value || '').trim().toLocaleLowerCase('tr-TR');
+  let jobs = getDispatchJobs().sort((a,b) => {
+    // Atanmamışlar her zaman önce gelsin, sonra teslim tarihine göre sırala
+    const au = a.techId ? 1 : 0, bu = b.techId ? 1 : 0;
+    if (au !== bu) return au - bu;
+    return (a.dateout||'9999').localeCompare(b.dateout||'9999');
+  });
+  if (q) {
+    jobs = jobs.filter(j =>
+      (j.drName||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (j.patient||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (j.type||'').toLocaleLowerCase('tr-TR').includes(q));
+  }
+  const el = document.getElementById('dispatch-container');
+  if (!jobs.length) {
+    el.innerHTML = dispatchShowUnassignedOnly
+      ? `<div class="empty-state"><div class="icon">🎉</div><h4>Atama bekleyen iş yok</h4><p style="font-size:12px">Kaydı açılmış tüm işler bir teknisyene atanmış durumda.</p></div>`
+      : `<div class="empty-state"><div class="icon">📭</div><h4>Kaydı açılmış iş yok</h4><p style="font-size:12px">Sipariş Formu'na aktarılmış bir iş bulunamadı.</p></div>`;
+    return;
+  }
+  const todayStr = new Date().toISOString().slice(0,10);
+  el.innerHTML = jobs.map(j => {
+    const overdue = j.dateout && j.dateout < todayStr;
+    const initial = (j.patient||'?').trim().charAt(0).toLocaleUpperCase('tr-TR');
+    const assigned = !!j.techId;
+    return `<div class="dispatch-row ${overdue?'overdue':''}">
+      <div class="dispatch-avatar">${initial}</div>
+      <div class="dispatch-body">
+        <div class="dispatch-patient">${escHtml(j.patient||'—')}</div>
+        <div class="dispatch-meta">👨‍⚕️ ${escHtml(j.drName||'—')} · 🦷 ${escHtml(j.type||'Belirtilmemiş')}${assigned ? ` · 🔧 ${escHtml(j.techName||'—')}` : ''}</div>
+      </div>
+      <div class="dispatch-date ${overdue?'overdue':''}">${overdue?'⚠️ ':''}${fmtDate(j.dateout)}</div>
+      ${assigned
+        ? `<button class="dispatch-assign-btn" style="background:#fff;color:var(--accent);border:1.5px solid var(--accent)" onclick="openTechPickModal(${j.id})">🔀 Değiştir</button>`
+        : `<button class="dispatch-assign-btn" onclick="openTechPickModal(${j.id})">🔀 Ata</button>`}
+    </div>`;
+  }).join('');
+}
+
+let _tpJobIds = []; // seçilen iş VE aynı siparişin diğer kalemleri (orderGroupId eşleşenler)
+// Bir iş kaydını hem "jobs" (onaylanmış) hem "pendingJobs" (admin onayı
+// bekleyen) koleksiyonlarında arar — bulduğu yeri de bildirir ki
+// güncelleme doğru koleksiyona yazılabilsin.
+function _findJobAnywhere(jobId) {
+  const j = allJobsList.find(x => x.id === jobId);
+  if (j) return { job: j, collection: 'jobs' };
+  const p = allPendingJobsList.find(x => x.id === jobId);
+  if (p) return { job: p, collection: 'pendingJobs' };
+  return null;
+}
+
+// Bir siparişin AYNI kalemine (orderGroupId) ait tüm iş kayıtlarını bulur
+// — 2 (ya da daha fazla) kalemli bir sipariş tek bir talepten geldiğinde,
+// hepsi aynı teknisyene atanabilsin diye.
+function _findOrderGroupJobs(jobId) {
+  const found = _findJobAnywhere(jobId);
+  if (!found) return [];
+  const groupId = found.job.orderGroupId;
+  if (!groupId) return [jobId];
+  const ids = new Set();
+  allJobsList.forEach(j => { if (j.orderGroupId === groupId) ids.add(j.id); });
+  allPendingJobsList.forEach(j => { if (j.orderGroupId === groupId) ids.add(j.id); });
+  return ids.size ? Array.from(ids) : [jobId];
+}
+
+function openTechPickModal(jobId) {
+  const found = _findJobAnywhere(jobId);
+  if (!found) { toast('İş bulunamadı', 'error'); return; }
+  const j = found.job;
+  _tpJobIds = _findOrderGroupJobs(jobId);
+  const multiCount = _tpJobIds.length;
+  document.getElementById('tp-job-title').textContent = multiCount > 1
+    ? `${j.patient||'Hasta'} — Teknisyene Ata (${multiCount} kalem)`
+    : `${j.patient||'Hasta'} — Teknisyene Ata`;
+  const techs = Object.values(techniciansById).filter(t => t && !t.deleted);
+  const listEl = document.getElementById('tech-pick-list');
+  const infoNote = multiCount > 1
+    ? `<p style="font-size:11.5px;color:var(--primary);background:var(--primary-light);padding:8px 10px;border-radius:8px;margin-bottom:10px">🔗 Bu sipariş ${multiCount} kalemden oluşuyor — seçtiğiniz teknisyen tüm kalemlere birden atanacak.</p>`
+    : '';
+  if (!techs.length) {
+    listEl.innerHTML = infoNote + '<p style="font-size:13px;color:var(--text-soft);text-align:center;padding:20px">Kayıtlı teknisyen yok.</p>';
+  } else {
+    listEl.innerHTML = infoNote + techs.map(t => {
+      const load = allJobsList.filter(x => x.techId === t.id && x.status !== 'Tamamlandı').length;
+      const initial = (t.name||'?').trim().charAt(0).toLocaleUpperCase('tr-TR');
+      const typeLabel = t.type === 'dis' ? 'Dış Teknisyen' : 'İç Teknisyen';
+      return `<div class="tp-tech-row" onclick="assignTechToJob(${t.id})">
+        <div class="tp-tech-avatar">${initial}</div>
+        <div style="flex:1">
+          <div class="tp-tech-name">${escHtml(t.name)}</div>
+          <div class="tp-tech-meta">${typeLabel} · ${load} aktif iş</div>
+        </div>
+        <span style="color:var(--text-soft)">→</span>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('tech-pick-modal').style.display = 'flex';
+}
+function closeTechPickModal() {
+  document.getElementById('tech-pick-modal').style.display = 'none';
+  _tpJobIds = [];
+}
+async function assignTechToJob(techId) {
+  const jobIds = _tpJobIds;
+  const t = techniciansById[techId];
+  if (!jobIds.length || !t) { toast('İşlem yapılamadı', 'error'); return; }
+  try {
+    let patientLabel = '';
+    for (const jobId of jobIds) {
+      const found = _findJobAnywhere(jobId);
+      if (!found) continue;
+      const { job: j, collection } = found;
+      if (!patientLabel) patientLabel = j.patient || '';
+      if (collection === 'jobs') {
+        // Onaylanmış, gerçek bir iş kaydı — normal atama.
+        await rtdb.ref(`${dbRoot}/jobs/${jobId}`).update({
+          techId: t.id,
+          techName: t.name,
+          status: 'Üretimde',
+          acceptedByTech: false,
+          acceptedAt: null,
+          acceptedByTechName: null
+        });
+      } else {
+        // Henüz admin onayı bekleyen bir kayıt — durumunu "Onay Bekliyor"
+        // olarak DEĞİŞTİRMEDEN sadece teknisyen bilgisini işliyoruz, ki
+        // admin onayladığında iş zaten doğru teknisyene atanmış olsun.
+        await rtdb.ref(`${dbRoot}/pendingJobs/${jobId}`).update({
+          techId: t.id,
+          techName: t.name
+        });
+      }
+    }
+    const suffix = jobIds.length > 1 ? ` (${jobIds.length} kalemin tamamına)` : '';
+    toast(`✅ ${patientLabel} → ${t.name}${suffix}`, 'success');
+    closeTechPickModal();
+  } catch (err) {
+    toast('Atama kaydedilemedi: ' + err.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  💬 İŞ ÖZELİNDE SOHBET — her iş (job) için ayrı bir sohbet dizisi:
+//  db/{workspace}/chats/job_{jobId}/messages — hekim, teknisyen ve
+//  laboratuvar (bu panel dahil) AYNI dizide yazışır. Bu panelden
+//  gönderilen mesajlar "Laboratuvar" (admin) rolüyle işaretlenir.
+//  Sohbet, ancak bir talebin arkasında GERÇEK bir iş kaydı oluştuktan
+//  sonra (yani Sipariş Formu'na aktarıldıktan sonra) açılabilir —
+//  henüz aktarılmamış bir talep için iş kimliği (jobId) yoktur.
+// ═══════════════════════════════════════════════════════
+let _jobChatRef = null;
+let _jobChatMessages = [];
+let _activeJobChatId = null;
+
+function openJobChatModal(jobId, title, sub) {
+  if (!jobId) { toast('Bu talep henüz Sipariş Formu\'na aktarılmadığı için sohbet açılamıyor', 'info'); return; }
+  _activeJobChatId = 'job_' + jobId;
+  document.getElementById('job-chat-title').textContent = title || 'İş Sohbeti';
+  document.getElementById('job-chat-sub').textContent = sub || 'Bu iş hakkında hekim ve teknisyenle doğrudan yazışın';
+  document.getElementById('chat-text-input').value = '';
+  document.getElementById('job-chat-modal').classList.add('open');
+  startJobChatListener();
+}
+function closeJobChatModal() {
+  document.getElementById('job-chat-modal').classList.remove('open');
+  stopJobChatListener();
+  _activeJobChatId = null;
+}
+function startJobChatListener() {
+  if (_jobChatRef || !_activeJobChatId) return;
+  _jobChatRef = rtdb.ref(`${dbRoot}/chats/${_activeJobChatId}/messages`);
+  _jobChatRef.on('value', snap => {
+    const data = snap.val() || {};
+    _jobChatMessages = Object.values(data).sort((a,b) => (a.timestamp||'').localeCompare(b.timestamp||''));
+    renderChatMessages();
+  });
+}
+function stopJobChatListener() {
+  if (_jobChatRef) { _jobChatRef.off(); _jobChatRef = null; }
+  _jobChatMessages = [];
+}
+function chatRoleLabel(senderRole) {
+  if (senderRole === 'admin') return 'Laboratuvar';
+  if (senderRole === 'technician') return 'Teknisyen';
+  if (senderRole === 'doctor') return 'Hekim';
+  return 'Bilinmeyen';
+}
+function renderChatMessages() {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  if (!_jobChatMessages.length) {
+    el.innerHTML = `<div class="chat-empty"><div class="icon">💬</div><div>Bu iş hakkında henüz mesaj yok — hekime veya teknisyene buradan yazabilirsiniz.</div></div>`;
+  } else {
+    el.innerHTML = _jobChatMessages.map(m => {
+      const mine = m.senderRole === 'admin';
+      const dt = m.timestamp ? new Date(m.timestamp).toLocaleString('tr-TR', {dateStyle:'short', timeStyle:'short'}) : '';
+      const roleIcon = m.senderRole === 'admin' ? '🧪' : (m.senderRole === 'doctor' ? '👨‍⚕️' : '🔧');
+      let fileHtml = '';
+      if (m.fileUrl) {
+        const isImg = /\.(png|jpe?g|gif|webp)$/i.test(m.fileName||'');
+        fileHtml = isImg
+          ? `<img src="${escHtml(m.fileUrl)}" class="chat-file-img" onclick="window.open('${escHtml(m.fileUrl)}','_blank')">`
+          : `<a href="${escHtml(m.fileUrl)}" target="_blank" rel="noopener" class="chat-file-chip">📎 ${escHtml(m.fileName||'Dosya')}</a>`;
+      }
+      return `<div class="chat-bubble-row ${mine?'mine':'theirs'}">
+        <div class="chat-sender-label">${mine ? 'Siz' : roleIcon + ' ' + chatRoleLabel(m.senderRole)}</div>
+        <div class="chat-bubble">
+          ${m.text ? escHtml(m.text).replace(/\n/g,'<br>') : ''}
+          ${fileHtml}
+        </div>
+        <div class="chat-timestamp">${dt}</div>
+      </div>`;
+    }).join('');
+  }
+  el.scrollTop = el.scrollHeight;
+}
+function sendChatMessage() {
+  if (!_activeJobChatId) return;
+  const input = document.getElementById('chat-text-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const msgId = Date.now();
+  const msg = {
+    id: msgId,
+    senderRole: 'admin',
+    senderName: 'Laboratuvar',
+    text,
+    timestamp: new Date().toISOString()
+  };
+  input.value = '';
+  rtdb.ref(`${dbRoot}/chats/${_activeJobChatId}/messages/${msgId}`).set(msg)
+    .catch(err => toast('Mesaj gönderilemedi: ' + err.message, 'error'));
+}
+async function onChatFilePicked(fileListObj) {
+  const file = fileListObj[0];
+  if (!file || !_activeJobChatId) return;
+  const note = document.getElementById('chat-upload-note');
+
+  if (!_storageAuthReady) {
+    note.classList.remove('hidden');
+    let waited = 0;
+    while (!_storageAuthReady && waited < 6000) { await new Promise(r => setTimeout(r, 200)); waited += 200; }
+    note.classList.add('hidden');
+    if (!_storageAuthReady) { toast('Dosya yükleme servisine bağlanılamadı', 'error'); return; }
+  }
+
+  note.textContent = `📤 "${file.name}" yükleniyor…`;
+  note.classList.remove('hidden');
+  try {
+    const path = `chatFiles/${WORKSPACE}/${_activeJobChatId}/${Date.now()}_${file.name}`;
+    const ref = fbStorage.ref(path);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    const msgId = Date.now();
+    const msg = {
+      id: msgId,
+      senderRole: 'admin',
+      senderName: 'Laboratuvar',
+      text: '',
+      fileUrl: url,
+      fileName: file.name,
+      timestamp: new Date().toISOString()
+    };
+    await rtdb.ref(`${dbRoot}/chats/${_activeJobChatId}/messages/${msgId}`).set(msg);
+  } catch (err) {
+    console.error(err);
+    toast('Dosya yüklenemedi: ' + err.message, 'error');
+  } finally {
+    note.classList.add('hidden');
+    document.getElementById('chat-file-input').value = '';
+  }
+}
+
+function setStatusFilter(f) {
+  statusFilter = f;
+  document.querySelectorAll('#status-subtabs .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.status === f));
+  renderList();
+}
+
+function statusClass(s) {
+  if (s.cancelRequested) return 'seen'; // turuncu tonlu, dikkat çeksin
+  if (!s.status || s.status === 'Yeni') return 'new';
+  if (s.status === 'İncelendi') return 'seen';
+  if (s.status === 'Aktarıldı' && isSubmissionCompleted(s)) return 'done';
+  if (s.status === 'Aktarıldı') return 'processing';
+  return 'done';
+}
+function statusLabel(s) {
+  if (s.cancelRequested) return '🚫 İptal Bekliyor';
+  if (!s.status || s.status === 'Yeni') return '🆕 Yeni';
+  if (s.status === 'İncelendi') return '👁️ İncelendi';
+  if (s.status === 'Aktarıldı' && isSubmissionCompleted(s)) return '✅ Tamamlandı';
+  if (s.status === 'Aktarıldı') return '🔧 Üretimde';
+  return '✅ İşleme Alındı';
+}
+function jawLabel(s) {
+  if (s.jaw === 'upper') return 'Üst Çene';
+  if (s.jaw === 'lower') return 'Alt Çene';
+  if (s.jaw === 'both') return 'Üst + Alt Çene';
+  return null;
+}
+
+function renderList() {
+  const el = document.getElementById('list-container');
+
+  // "Tamamlanan İşler" ve "İşleme Alınanlar" sekmeleri artık admin
+  // panelindeki karşılıklarıyla (Tamamlanan İşler / Devam Eden İşler)
+  // BİREBİR aynı sütun düzeninde, doğrudan İŞ kayıtlarından (submissions
+  // değil) besleniyor. Sadece fiyat/tutar sütunu bu panelde (çalışan
+  // paneli olduğu için) hiç gösterilmez.
+  if (pageTab === 'completed') { renderCompletedList(); return; }
+  if (pageTab === 'processed') { renderProcessingList(); return; }
+
+  const q = (document.getElementById('search-input').value || '').toLocaleLowerCase('tr-TR');
+  const doctorFilterVal = document.getElementById('doctor-filter').value;
+  const dateFrom = document.getElementById('date-from-filter').value; // "YYYY-MM-DD"
+  const dateTo   = document.getElementById('date-to-filter').value;
+
+  // Gelen İşler = henüz aktarılmamış
+  let list = submissions.filter(s => s.status !== 'Aktarıldı');
+
+  // 2) Gelen İşler sayfasında durum alt-filtresi (Yeni / İncelendi)
+  if (pageTab === 'incoming' && statusFilter !== 'all') {
+    list = list.filter(s => statusFilter === 'Yeni' ? (!s.status || s.status === 'Yeni') : s.status === statusFilter);
+  }
+
+  // 3) Hekim filtresi
+  if (doctorFilterVal) list = list.filter(s => s.doctorName === doctorFilterVal);
+
+  // 4) Tarih aralığı filtresi (gönderim tarihine göre)
+  if (dateFrom) list = list.filter(s => s.createdAt && s.createdAt.slice(0,10) >= dateFrom);
+  if (dateTo)   list = list.filter(s => s.createdAt && s.createdAt.slice(0,10) <= dateTo);
+
+  // 5) Serbest metin arama
+  if (q) {
+    list = list.filter(s =>
+      (s.doctorName||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (s.patient||'').toLocaleLowerCase('tr-TR').includes(q));
+  }
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📭</div><h4>Kayıt bulunamadı</h4><p style="font-size:12px">Hekim Portalı üzerinden gönderilen talepler burada listelenir.</p></div>`;
+    return;
+  }
+
+  const rows = list.map(s => {
+    const teeth = Array.isArray(s.teeth) ? s.teeth.slice().sort((a,b)=>a-b) : [];
+    const jaw = jawLabel(s);
+    const teethStr = jaw ? `${jaw}${teeth.length ? ': ' + teeth.join(', ') : ''}` : '—';
+    const dt = s.createdAt ? new Date(s.createdAt).toLocaleString('tr-TR', {dateStyle:'short', timeStyle:'short'}) : '—';
+    const fileCount = Array.isArray(s.files) ? s.files.length : 0;
+    const jobTypeList = Array.isArray(s.jobTypes) && s.jobTypes.length
+      ? s.jobTypes
+      : (s.jobType ? [{ type: s.jobType, qty: teeth.length || 1 }] : []);
+    const jobTypeStr = jobTypeList.length
+      ? jobTypeList.map(jt => jt.qty > 1 ? `${jt.type} ×${jt.qty}` : jt.type).join(', ')
+      : '—';
+    const linkedJobs = getLinkedJobsFor(s);
+    const techNames = [...new Set(linkedJobs.filter(j => j.techName).map(j => j.techName))];
+    const techCell = techNames.length ? escHtml(techNames.join(', ')) : '<span style="color:var(--danger);font-weight:700">Atanmamış</span>';
+    const designFileCount = linkedJobs.reduce((n, j) => n + (Array.isArray(j.designFiles) ? j.designFiles.length : 0), 0);
+    const primaryJobId = linkedJobs.length ? linkedJobs[0].id : null;
+    const chatTitle = `${(s.patient||'—')} — ${(jobTypeStr||'')}`.trim();
+    return `<tr class="row-item" onclick="openDetailModal(${s.id})">
+      <td data-label="Durum"><span class="badge ${statusClass(s)}">${statusLabel(s)}</span></td>
+      <td data-label="Tarih">${dt}</td>
+      <td data-label="Hekim" class="cell-doctor">${escHtml(s.doctorName||'—')}</td>
+      <td data-label="Hasta" class="cell-patient">${escHtml(s.patient||'—')}${s.notes ? '<span class="cell-notes-dot" title="Not var"></span>' : ''}</td>
+      <td data-label="İş Türü" class="cell-teeth" title="${escHtml(jobTypeStr)}">${escHtml(jobTypeStr)}${s.designSource === 'doctor' ? ' <span title="Hekim kendi tasarımını gönderdi" style="font-size:9px;background:#fdf4ff;color:#a21caf;border:1px solid #f0abfc;border-radius:10px;padding:1px 6px;font-weight:700">🎨 Hazır Tasarım</span>' : ''}</td>
+      <td data-label="Çene/Diş" class="cell-teeth" title="${escHtml(teethStr)}">${escHtml(teethStr)}</td>
+      <td data-label="Renk">${s.color ? escHtml(s.color) : '—'}</td>
+      <td data-label="Dosya">${fileCount ? fileCount + ' dosya' : '—'}</td>
+      <td data-label="Teknisyen" title="${escHtml(techCell.replace(/<[^>]+>/g,''))}">${techCell}</td>
+      <td data-label="" class="cell-actions" onclick="event.stopPropagation()"><div class="cell-actions-inner">
+        <button type="button" class="btn btn-outline btn-sm" title="${fileCount ? 'Tarama dosyalarını indir' : 'Bu talepte tarama dosyası yok'}" ${fileCount ? '' : 'disabled'} onclick="downloadAllSubmissionFiles(${s.id})">📦 Tarama</button>
+        <button type="button" class="btn btn-outline btn-sm" title="${designFileCount ? 'Tasarım dosyalarını indir (' + designFileCount + ')' : 'Henüz yüklenmiş tasarım dosyası yok'}" ${designFileCount ? '' : 'disabled'} onclick="downloadAllSubmissionDesignFiles(${s.id})">🎨 Tasarım</button>
+        <button type="button" class="btn btn-outline btn-sm" title="${primaryJobId ? 'Bu iş hakkında mesajlaş' : 'Önce Sipariş Formuna aktarılmalı'}" ${primaryJobId ? '' : 'disabled'} onclick="openJobChatModal(${primaryJobId}, '${escHtml(chatTitle).replace(/'/g,"\\'")}', '👨‍⚕️ Hekim ve 🔧 teknisyenle bu iş hakkında yazışın')">💬 Mesaj</button>
+        <button type="button" class="btn btn-outline btn-sm" title="${primaryJobId ? 'Teknisyen ata / değiştir' : 'Önce Sipariş Formuna aktarılmalı'}" ${primaryJobId ? '' : 'disabled'} onclick="openTechPickModal(${primaryJobId})">🔀 Teknisyen Ata</button>
+        <button type="button" class="btn btn-primary btn-sm" title="${s.status !== 'Aktarıldı' ? 'Sipariş Formuna Aktar' : 'Bu talep zaten aktarıldı'}" ${s.status !== 'Aktarıldı' ? '' : 'disabled'} onclick="openOrderFormFromList(${s.id})">📝 Aktar</button>
+        <button type="button" class="btn btn-danger btn-sm" title="Silme, sadece İşleme Alınanlar sekmesinde yapılabilir" disabled>🗑️ Sil</button>
+        <button type="button" class="btn btn-outline btn-sm" title="${s.cancelRequested ? 'İptal talebi zaten gönderildi, admin onayı bekleniyor' : 'Yanlış girildiyse admin onayına iptal talebi gönder'}" style="${s.cancelRequested ? 'color:#b45309;border-color:#fde68a;background:#fffbeb' : 'color:#b45309;border-color:#fde68a'}" ${s.cancelRequested ? 'disabled' : ''} onclick="requestCancelSubmission(${s.id})">${s.cancelRequested ? '⏳ İptal Bekliyor' : '🚫 İptal Talebi'}</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<div class="list-table-wrap"><table class="list-table">
+    <thead><tr>
+      <th>Durum</th><th>Tarih</th><th>Hekim</th><th>Hasta</th><th>İş Türü</th><th>Çene / Diş</th><th>Renk</th><th>Dosya</th><th>Teknisyen</th><th>İşlem</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  🔧 İŞLEME ALINANLAR — artık "Onay Bekleyenler" ve "İşleme Alınanlar"
+//  (onaylanmış/üretimdeki işler) İKİ AYRI tablo olarak listelenir. Her
+//  ikisi de admin panelindeki "Devam Eden İşler" ile aynı sütun mantığında
+//  (Hekim, Hasta, İş, Teknisyen, Durum, Teslim, Tarama, Tasarım), doğrudan
+//  İŞ kayıtlarından oluşur. Bu panel bir çalışan tarafından kullanıldığı
+//  için Tutar/fiyat sütunu HİÇ gösterilmez. Her satırda artık hem tarama
+//  hem tasarım dosyaları için AYRI AYRI "yükle" ve "indir" seçenekleri var.
+// ═══════════════════════════════════════════════════════
+// "İşleme Alınanlar" tablosundan doğrudan bir işe TARAMA dosyası yükler.
+// İş hangi koleksiyondaysa (jobs/pendingJobs) oraya yazar; ayrıca bağlı
+// bir talep (sourceDoctorSubmissionId) varsa o talebin dosya listesini de
+// günceller ki Gelen İşler sekmesiyle tutarlı kalsın.
+async function onProcessingScanFilesPicked(jobId, fileListObj) {
+  const files = Array.from(fileListObj || []);
+  if (!files.length) return;
+  const found = _findJobAnywhere(jobId);
+  if (!found) { toast('İş bulunamadı', 'error'); return; }
+  const { job: j, collection } = found;
+
+  if (!_storageAuthReady) {
+    toast('Dosya yükleme servisine bağlanılıyor, birkaç saniye sonra tekrar deneyin', 'info');
+    let waited = 0;
+    while (!_storageAuthReady && waited < 6000) { await new Promise(r => setTimeout(r, 200)); waited += 200; }
+    if (!_storageAuthReady) { toast('Dosya yükleme servisine bağlanılamadı', 'error'); return; }
+  }
+
+  _uploadProgressList = files.map(f => ({ name: f.name, progress: 0, done: false, error: false, errMsg: '' }));
+  showUploadProgress(`📤 ${files.length} tarama dosyası yükleniyor…`);
+  renderUploadProgress();
+
+  const uploaded = [];
+  await Promise.all(files.map((file, idx) => new Promise(resolve => {
+    const path = `doctorScans/${WORKSPACE}/${jobId}/${Date.now()}_${file.name}`;
+    const ref = fbStorage.ref(path);
+    const task = ref.put(file);
+    task.on('state_changed',
+      snap => { _uploadProgressList[idx].progress = Math.round((snap.bytesTransferred / snap.totalBytes) * 100); renderUploadProgress(); },
+      err => { _uploadProgressList[idx].error = true; _uploadProgressList[idx].errMsg = err.message; renderUploadProgress(); resolve(); },
+      async () => {
+        try {
+          const url = await task.snapshot.ref.getDownloadURL();
+          uploaded.push({ name: file.name, url, size: file.size });
+          _uploadProgressList[idx].done = true;
+        } catch (e) { _uploadProgressList[idx].error = true; }
+        renderUploadProgress(); resolve();
+      }
+    );
+  })));
+
+  setTimeout(hideUploadProgress, uploaded.length === files.length ? 900 : 2500);
+  if (!uploaded.length) { toast('Hiçbir dosya yüklenemedi', 'error'); return; }
+
+  const newFiles = (Array.isArray(j.files) ? j.files : []).concat(uploaded);
+  try {
+    await rtdb.ref(`${dbRoot}/${collection}/${jobId}`).update({ files: newFiles });
+    if (j.sourceDoctorSubmissionId) {
+      const s = submissions.find(x => x.id === j.sourceDoctorSubmissionId);
+      if (s) {
+        const subFiles = (Array.isArray(s.files) ? s.files : []).concat(uploaded);
+        await rtdb.ref(`${dbRoot}/doctorSubmissions/${j.sourceDoctorSubmissionId}/files`).set(subFiles);
+        s.files = subFiles;
+      }
+    }
+    j.files = newFiles;
+    toast(`✅ ${uploaded.length} tarama dosyası eklendi`, 'success');
+    renderProcessingList();
+  } catch (err) {
+    toast('Kaydedilemedi: ' + err.message, 'error');
+  }
+}
+
+// "İşleme Alınanlar" tablosundan doğrudan bir işe TASARIM dosyası yükler
+// (normalde teknisyen yükler, ama staff'ın da elden/telefonla aldığı bir
+// tasarımı sisteme ekleyebilmesi için burada da mevcut).
+async function onProcessingDesignFilesPicked(jobId, fileListObj) {
+  const files = Array.from(fileListObj || []);
+  if (!files.length) return;
+  const found = _findJobAnywhere(jobId);
+  if (!found) { toast('İş bulunamadı', 'error'); return; }
+  const { job: j, collection } = found;
+
+  if (!_storageAuthReady) {
+    toast('Dosya yükleme servisine bağlanılıyor, birkaç saniye sonra tekrar deneyin', 'info');
+    let waited = 0;
+    while (!_storageAuthReady && waited < 6000) { await new Promise(r => setTimeout(r, 200)); waited += 200; }
+    if (!_storageAuthReady) { toast('Dosya yükleme servisine bağlanılamadı', 'error'); return; }
+  }
+
+  _uploadProgressList = files.map(f => ({ name: f.name, progress: 0, done: false, error: false, errMsg: '' }));
+  showUploadProgress(`📤 ${files.length} tasarım dosyası yükleniyor…`);
+  renderUploadProgress();
+
+  const uploaded = [];
+  await Promise.all(files.map((file, idx) => new Promise(resolve => {
+    const path = `techDesigns/${WORKSPACE}/${jobId}/${Date.now()}_${file.name}`;
+    const ref = fbStorage.ref(path);
+    const task = ref.put(file);
+    task.on('state_changed',
+      snap => { _uploadProgressList[idx].progress = Math.round((snap.bytesTransferred / snap.totalBytes) * 100); renderUploadProgress(); },
+      err => { _uploadProgressList[idx].error = true; _uploadProgressList[idx].errMsg = err.message; renderUploadProgress(); resolve(); },
+      async () => {
+        try {
+          const url = await task.snapshot.ref.getDownloadURL();
+          uploaded.push({ name: file.name, url, size: file.size, uploadedAt: new Date().toISOString() });
+          _uploadProgressList[idx].done = true;
+        } catch (e) { _uploadProgressList[idx].error = true; }
+        renderUploadProgress(); resolve();
+      }
+    );
+  })));
+
+  setTimeout(hideUploadProgress, uploaded.length === files.length ? 900 : 2500);
+  if (!uploaded.length) { toast('Hiçbir dosya yüklenemedi', 'error'); return; }
+
+  const newDesignFiles = (Array.isArray(j.designFiles) ? j.designFiles : []).concat(uploaded);
+  try {
+    await rtdb.ref(`${dbRoot}/${collection}/${jobId}`).update({ designFiles: newDesignFiles, designFilesUpdatedAt: new Date().toISOString() });
+    j.designFiles = newDesignFiles;
+    toast(`✅ ${uploaded.length} tasarım dosyası eklendi`, 'success');
+    renderProcessingList();
+  } catch (err) {
+    toast('Kaydedilemedi: ' + err.message, 'error');
+  }
+}
+
+function _processingRowFilters(list) {
+  const q = (document.getElementById('search-input').value || '').toLocaleLowerCase('tr-TR');
+  const doctorFilterVal = document.getElementById('doctor-filter').value;
+  const dateFrom = document.getElementById('date-from-filter').value;
+  const dateTo   = document.getElementById('date-to-filter').value;
+  if (doctorFilterVal) list = list.filter(j => j.drName === doctorFilterVal);
+  if (dateFrom) list = list.filter(j => j.dateout && j.dateout >= dateFrom);
+  if (dateTo)   list = list.filter(j => j.dateout && j.dateout <= dateTo);
+  if (q) {
+    list = list.filter(j =>
+      (j.drName||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (j.patient||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (j.type||'').toLocaleLowerCase('tr-TR').includes(q));
+  }
+  return list;
+}
+
+function _processingFileCell(j, kind) {
+  // kind: 'scan' | 'design'
+  const isScan = kind === 'scan';
+  const count = isScan
+    ? (Array.isArray(j.files) ? j.files.length : 0)
+    : (Array.isArray(j.designFiles) ? j.designFiles.length : 0);
+  const downloadFn = isScan ? 'downloadAllJobFilesDirect' : 'downloadAllJobDesignFilesDirect';
+  const uploadFn = isScan ? 'onProcessingScanFilesPicked' : 'onProcessingDesignFilesPicked';
+  const inputId = `${isScan?'scan':'design'}-upload-${j.id}`;
+  return `<div style="display:flex;flex-direction:column;gap:4px;align-items:stretch;min-width:120px">
+    ${count ? `<button type="button" class="btn btn-outline btn-sm" title="İndir" onclick="${downloadFn}(${j.id})">${isScan?'📦':'🎨'} ${count} indir</button>` : ''}
+    <button type="button" class="btn btn-outline btn-sm" title="Yükle" onclick="document.getElementById('${inputId}').click()">📤 ${count ? 'Ekle' : 'Yükle'}</button>
+    <input type="file" id="${inputId}" multiple style="display:none" onchange="${uploadFn}(${j.id}, this.files)">
+  </div>`;
+}
+
+function _processingRowHtml(j) {
+  const tech = j.techId ? techniciansById[j.techId] : null;
+  const chatTitle = `${(j.patient||'—')} — ${(j.type||'')}`.trim();
+  const statusText = j._pending ? '📨 Onay Bekliyor' : (j.status || '—');
+  const canDelete = gipDirectMode && !!j.sourceDoctorSubmissionId;
+  return `<tr${j._pending ? ' style="background:#fffbeb"' : ''}>
+      <td data-label="Hekim"><strong>${escHtml(j.drName||'-')}</strong></td>
+      <td data-label="Hasta">${escHtml(j.patient||'-')}</td>
+      <td data-label="İş">${j.type ? escHtml(j.type) : '<span style="color:var(--text-soft)">—</span>'}${j.designSource === 'doctor' ? ' <span title="Hekim kendi tasarımını gönderdi" style="font-size:9px;background:#fdf4ff;color:#a21caf;border:1px solid #f0abfc;border-radius:10px;padding:1px 6px;font-weight:700">🎨 Hazır Tasarım</span>' : ''}</td>
+      <td data-label="Teknisyen">${tech ? `<span class="badge-spec">🔧 ${escHtml(tech.name)}</span>` : '<span style="color:var(--danger);font-weight:700;font-size:11px">Atanmamış</span>'}</td>
+      <td data-label="Durum"><span class="badge ${j._pending ? 'seen' : 'processing'}">${escHtml(statusText)}</span></td>
+      <td data-label="Teslim">${fmtDate(j.dateout)}</td>
+      <td data-label="Tarama">${_processingFileCell(j, 'scan')}</td>
+      <td data-label="Tasarım">${_processingFileCell(j, 'design')}</td>
+      <td data-label="" class="cell-actions" onclick="event.stopPropagation()"><div class="cell-actions-inner">
+        <button type="button" class="btn btn-outline btn-sm" title="Bu iş hakkında mesajlaş" onclick="openJobChatModal(${j.id}, '${escHtml(chatTitle).replace(/'/g,"\\'")}', '👨‍⚕️ Hekim ve 🔧 teknisyenle bu iş hakkında yazışın')">💬 Mesaj</button>
+        <button type="button" class="btn btn-outline btn-sm" title="${tech ? 'Teknisyeni değiştir' : 'Teknisyene ata'}" onclick="openTechPickModal(${j.id})">🔀 Teknisyen Ata</button>
+        <button type="button" class="btn btn-danger btn-sm" title="${!gipDirectMode ? 'Silme özelliği admin tarafından kapatıldı' : (!j.sourceDoctorSubmissionId ? 'Bağlı bir talep bulunamadı' : 'Sil (şifre gerektirir)')}" ${canDelete ? '' : 'disabled'} onclick="deleteProcessingSubmissionWithPassword(${j.sourceDoctorSubmissionId})">🗑️ Sil</button>
+      </div></td>
+    </tr>`;
+}
+
+function renderProcessingList() {
+  const el = document.getElementById('list-container');
+
+  let pending = _processingRowFilters(allPendingJobsList.map(p => Object.assign({}, p, { _pending: true })))
+    .sort((a,b) => (a.dateout||'9999').localeCompare(b.dateout||'9999'));
+  let active = _processingRowFilters(allJobsList.filter(j => j.status !== 'Tamamlandı'))
+    .sort((a,b) => (a.dateout||'9999').localeCompare(b.dateout||'9999'));
+
+  if (!pending.length && !active.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">🎉</div><h4>İşleme alınan iş yok</h4><p style="font-size:12px">Şu anda üretimde olan (henüz tamamlanmamış) bir iş yok.</p></div>`;
+    return;
+  }
+
+  const theadRow = `<thead><tr><th>Hekim</th><th>Hasta</th><th>İş</th><th>Teknisyen</th><th>Durum</th><th>Teslim</th><th>Tarama</th><th>Tasarım</th><th></th></tr></thead>`;
+
+  let h = '';
+  h += `<h3 style="font-size:14px;margin:0 0 8px;color:var(--text)">📨 Onay Bekleyenler <span class="chip" style="margin-left:6px">${pending.length}</span></h3>`;
+  h += pending.length
+    ? `<div class="list-table-wrap" style="margin-bottom:22px"><table class="list-table">${theadRow}<tbody>${pending.map(_processingRowHtml).join('')}</tbody></table></div>`
+    : `<div class="empty-state" style="margin-bottom:22px;padding:20px"><p style="font-size:12px">Onay bekleyen iş yok.</p></div>`;
+
+  h += `<h3 style="font-size:14px;margin:0 0 8px;color:var(--text)">🔧 İşleme Alınanlar <span class="chip" style="margin-left:6px">${active.length}</span></h3>`;
+  h += active.length
+    ? `<div class="list-table-wrap"><table class="list-table">${theadRow}<tbody>${active.map(_processingRowHtml).join('')}</tbody></table></div>`
+    : `<div class="empty-state" style="padding:20px"><p style="font-size:12px">İşleme alınmış (onaylanmış, üretimdeki) iş yok.</p></div>`;
+
+  el.innerHTML = h;
+}
+
+// ═══════════════════════════════════════════════════════
+//  ✅ TAMAMLANAN İŞLER — admin panelindeki "Tamamlanan İşler" tablosuyla
+//  BİREBİR aynı sütun düzeninde (Hekim, Hasta, İş, Teknisyen, Teslim,
+//  Tarama, Tasarım), gerçek iş kayıtlarından (submissions'dan değil,
+//  doğrudan jobs'tan) oluşturulur. Bu panel bir çalışan tarafından
+//  kullanıldığı için Tutar/fiyat sütunu HİÇ gösterilmez. Teknisyen
+//  değiştirme burada yoktur (tamamlanmış işte gerek yok). Silme
+//  işlemi şifre korumalıdır (kalıcı değil, "Silinenler"den geri
+//  alınabilir bir soft-delete'tir).
+// ═══════════════════════════════════════════════════════
+function renderCompletedList() {
+  const el = document.getElementById('list-container');
+  const q = (document.getElementById('search-input').value || '').toLocaleLowerCase('tr-TR');
+  const doctorFilterVal = document.getElementById('doctor-filter').value;
+  const dateFrom = document.getElementById('date-from-filter').value;
+  const dateTo   = document.getElementById('date-to-filter').value;
+
+  let list = allJobsList.filter(j => j.status === 'Tamamlandı').sort((a,b) => b.id - a.id);
+  if (doctorFilterVal) list = list.filter(j => j.drName === doctorFilterVal);
+  if (dateFrom) list = list.filter(j => j.dateout && j.dateout >= dateFrom);
+  if (dateTo)   list = list.filter(j => j.dateout && j.dateout <= dateTo);
+  if (q) {
+    list = list.filter(j =>
+      (j.drName||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (j.patient||'').toLocaleLowerCase('tr-TR').includes(q) ||
+      (j.type||'').toLocaleLowerCase('tr-TR').includes(q));
+  }
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state"><div class="icon">📦</div><h4>Tamamlanan iş yok</h4><p style="font-size:12px">Tamamlanmış (kazınmış/teslim edilmiş) bir iş bulunamadı.</p></div>`;
+    return;
+  }
+
+  let h = `<div style="margin-bottom:12px"><span class="chip">${list.length} kayıt</span></div>`;
+  h += `<div class="list-table-wrap"><table class="list-table"><thead><tr>
+    <th>Hekim</th><th>Hasta</th><th>İş</th><th>Teknisyen</th><th>Teslim</th><th>Tarama</th><th>Tasarım</th><th></th>
+  </tr></thead><tbody>`;
+  list.forEach(j => {
+    const tech = j.techId ? techniciansById[j.techId] : null;
+    const scanCount = Array.isArray(j.files) ? j.files.length : 0;
+    const designCount = Array.isArray(j.designFiles) ? j.designFiles.length : 0;
+    const chatTitle = `${(j.patient||'—')} — ${(j.type||'')}`.trim();
+    h += `<tr>
+      <td data-label="Hekim"><strong>${escHtml(j.drName||'-')}</strong></td>
+      <td data-label="Hasta">${escHtml(j.patient||'-')}</td>
+      <td data-label="İş">${j.type ? escHtml(j.type) : '<span style="color:var(--text-soft)">—</span>'}${j.designSource === 'doctor' ? ' <span title="Hekim kendi tasarımını gönderdi" style="font-size:9px;background:#fdf4ff;color:#a21caf;border:1px solid #f0abfc;border-radius:10px;padding:1px 6px;font-weight:700">🎨 Hazır Tasarım</span>' : ''}</td>
+      <td data-label="Teknisyen">${tech ? `<span class="badge-spec">🔧 ${escHtml(tech.name)}</span>` : '<span style="color:var(--text-soft);font-size:11px">—</span>'}</td>
+      <td data-label="Teslim">${fmtDate(j.dateout)}</td>
+      <td data-label="Tarama">${scanCount ? `<button type="button" class="btn btn-outline btn-sm" title="Tarama dosyalarını indir" onclick="downloadAllJobFilesDirect(${j.id})">📦 ${scanCount}</button>` : '<span style="color:var(--text-soft);font-size:11px">—</span>'}</td>
+      <td data-label="Tasarım">${designCount ? `<button type="button" class="btn btn-outline btn-sm" title="Tasarım dosyalarını indir" onclick="downloadAllJobDesignFilesDirect(${j.id})">🎨 ${designCount}</button>` : '<span style="color:var(--text-soft);font-size:11px">—</span>'}</td>
+      <td data-label="" class="cell-actions" onclick="event.stopPropagation()"><div class="cell-actions-inner">
+        <button type="button" class="btn btn-outline btn-sm" title="Bu iş hakkında mesajlaş" onclick="openJobChatModal(${j.id}, '${escHtml(chatTitle).replace(/'/g,"\\'")}', '👨‍⚕️ Hekim ve 🔧 teknisyenle bu iş hakkında yazışın')">💬</button>
+        <button type="button" class="btn btn-danger btn-sm" title="${gipDirectMode ? 'Sil (şifre gerektirir)' : 'Silme özelliği admin tarafından kapatıldı'}" ${gipDirectMode ? '' : 'disabled'} onclick="deleteCompletedJobWithPassword(${j.id})">🗑️ Sil</button>
+      </div></td>
+    </tr>`;
+  });
+  h += '</tbody></table></div>';
+  el.innerHTML = h;
+}
+
+// Şifre doğrulandıktan sonra bu işi (soft-delete) siler — kalıcı değildir,
+// admin panelindeki "Silinenler" sayfasından geri alınabilir.
+function deleteCompletedJobWithPassword(jobId) {
+  if (!gipDirectMode) { toast('Silme özelliği admin tarafından kapatıldı', 'error'); return; }
+  const pass = prompt('Bu işi silmek için şifreyi girin:');
+  if (pass === null) return; // iptal edildi
+  if (pass !== '2457') { toast('❌ Şifre yanlış', 'error'); return; }
+  const j = allJobsList.find(x => x.id === jobId);
+  if (!j) { toast('İş bulunamadı', 'error'); return; }
+  if (!confirm(`"${j.patient||'Bu iş'}" silinsin mi?`)) return;
+  rtdb.ref(`${dbRoot}/jobs/${jobId}`).update({ deleted: true })
+    .then(() => toast('🗑️ İş silindi', 'info'))
+    .catch(err => toast('Silinemedi: ' + err.message, 'error'));
+}
+
+// "İşleme Alınanlar" sekmesindeki bir talebi (ve bağlı olduğu iş
+// kaydını/kayıtlarını) siler — şifre ile korunur. Talep, bağlı iş(ler)
+// hem "jobs" hem "pendingJobs" koleksiyonundan biri olabileceği için
+// hangisindeyse oradan silinir. Admin panelinde bir iş silindiğinde de
+// bu panelden karşılığı otomatik kalktığı için (bkz. delJob/
+// adminDeletePending), iki panel her zaman PARALEL ilerler.
+async function deleteProcessingSubmissionWithPassword(submissionId) {
+  if (!gipDirectMode) { toast('Silme özelliği admin tarafından kapatıldı', 'error'); return; }
+  const pass = prompt('Bu kaydı silmek için şifreyi girin:');
+  if (pass === null) return;
+  if (pass !== '2457') { toast('❌ Şifre yanlış', 'error'); return; }
+  const s = submissions.find(x => x.id === submissionId);
+  if (!s) { toast('Kayıt bulunamadı', 'error'); return; }
+  if (!confirm(`"${s.patient||'Bu talep'}" ve bağlı olduğu iş kaydı silinsin mi?\n\nBu işlem geri alınamaz.`)) return;
+  try {
+    const linkedJobs = getLinkedJobsFor(s);
+    for (const j of linkedJobs) {
+      if (allJobsList.find(x => x.id === j.id)) {
+        await rtdb.ref(`${dbRoot}/jobs/${j.id}`).update({ deleted: true });
+      } else {
+        await rtdb.ref(`${dbRoot}/pendingJobs/${j.id}`).remove();
+      }
+    }
+    await rtdb.ref(`${dbRoot}/doctorSubmissions/${submissionId}`).remove();
+    toast('🗑️ Kayıt silindi', 'info');
+  } catch (err) {
+    toast('Silinemedi: ' + err.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  🚫 İPTAL TALEBİ — bu panelde silme yetkisi olmayan (ya da şifreyi
+//  bilmeyen) bir çalışan, yanlış girilmiş bir işi DOĞRUDAN silmek yerine
+//  admin onayına "iptal talebi" gönderebilir. Hiçbir veri hemen silinmez
+//  — sadece işaretlenir; admin panelinde bu talepler görülüp onaylanır
+//  (o zaman gerçekten silinir) ya da reddedilir (işaret kalkar, iş
+//  olduğu gibi kalır).
+// ═══════════════════════════════════════════════════════
+async function requestCancelSubmission(submissionId) {
+  const s = submissions.find(x => x.id === submissionId);
+  if (!s) { toast('Kayıt bulunamadı', 'error'); return; }
+  if (s.cancelRequested) { toast('Bu talep için zaten bir iptal talebi gönderilmiş', 'info'); return; }
+  const reason = prompt(`"${s.patient||'Bu talep'}" için iptal talebi gönderilecek.\n\nSebebini kısaca yazın (admin görecek):`, '');
+  if (reason === null) return; // iptal edildi
+  try {
+    await rtdb.ref(`${dbRoot}/doctorSubmissions/${submissionId}`).update({
+      cancelRequested: true,
+      cancelRequestReason: (reason || '').trim() || 'Sebep belirtilmedi',
+      cancelRequestedAt: new Date().toISOString()
+    });
+    // Bağlı iş kaydı varsa (jobs veya pendingJobs), oraya da aynı işareti
+    // koyuyoruz ki admin panelinde nerede görürse görsün fark edebilsin.
+    const linkedJobs = getLinkedJobsFor(s);
+    for (const j of linkedJobs) {
+      const path = allJobsList.find(x => x.id === j.id) ? 'jobs' : 'pendingJobs';
+      await rtdb.ref(`${dbRoot}/${path}/${j.id}`).update({
+        cancelRequested: true,
+        cancelRequestReason: (reason || '').trim() || 'Sebep belirtilmedi',
+        cancelRequestedAt: new Date().toISOString()
+      });
+    }
+    toast('🚫 İptal talebi admin onayına gönderildi', 'success');
+  } catch (err) {
+    toast('Talep gönderilemedi: ' + err.message, 'error');
+  }
+}
+
+
+function openDetailModal(id, silentRefresh) {
+  const s = submissions.find(x => x.id === id);
+  if (!s) return;
+  _openDetailId = id;
+  _currentDetailView = 'detail';
+
+  document.querySelector('#detail-modal .modal-header h3').textContent = '📥 Hekim Talebi Detayı';
+
+  const teeth = Array.isArray(s.teeth) ? s.teeth.slice().sort((a,b)=>a-b) : [];
+  const jaw = jawLabel(s);
+  const dt = s.createdAt ? new Date(s.createdAt).toLocaleString('tr-TR', {dateStyle:'long', timeStyle:'short'}) : '—';
+  const files = Array.isArray(s.files) ? s.files : [];
+
+  const body = document.getElementById('detail-body');
+  body.innerHTML = `
+    <div class="detail-row"><div class="dr-label">Durum</div><div class="dr-val"><span class="badge ${statusClass(s)}">${statusLabel(s)}</span></div></div>
+    <div class="detail-row"><div class="dr-label">Hekim</div><div class="dr-val"><b>${escHtml(s.doctorName||'—')}</b></div></div>
+    <div class="detail-row"><div class="dr-label">Hasta</div><div class="dr-val"><b>${escHtml(s.patient||'—')}</b></div></div>
+    <div class="detail-row"><div class="dr-label">İş Türü</div><div class="dr-val">${(() => {
+      const jl = Array.isArray(s.jobTypes) && s.jobTypes.length ? s.jobTypes : (s.jobType ? [{type:s.jobType, qty:teeth.length||1}] : []);
+      return jl.length ? jl.map(jt => `<span class="tooth-tag" style="font-family:inherit">${escHtml(jt.type)}${jt.qty>1?` ×${jt.qty}`:''}</span>`).join(' ') : '—';
+    })()}</div></div>
+    <div class="detail-row"><div class="dr-label">Çene</div><div class="dr-val">${jaw || '—'}</div></div>
+    <div class="detail-row"><div class="dr-label">Dişler</div><div class="dr-val">${teeth.length ? `<div class="tooth-tags">${teeth.map(t=>`<span class="tooth-tag">${t}</span>`).join('')}</div>` : '—'}</div></div>
+    <div class="detail-row"><div class="dr-label">Diş Rengi</div><div class="dr-val">${s.color ? escHtml(s.color) : '—'}</div></div>
+    <div class="detail-row"><div class="dr-label">Notlar</div><div class="dr-val">${s.notes ? escHtml(s.notes) : '—'}</div></div>
+    <div class="detail-row"><div class="dr-label">Tarama Dosyaları</div><div class="dr-val">${
+      files.length
+        ? files.map(f => `<a href="${escHtml(f.url)}" target="_blank" rel="noopener" class="file-chip">📎 ${escHtml(f.name)}</a>`).join(' ') +
+          `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="downloadAllSubmissionFiles(${s.id})">📦 Tümünü Klasöre İndir</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('detail-scan-upload').click()">📤 Dosya Ekle</button>
+          </div>`
+        : `<span style="color:var(--text-soft)">Henüz dosya yok</span>
+           <div style="margin-top:8px"><button class="btn btn-outline btn-sm" onclick="document.getElementById('detail-scan-upload').click()">📤 Tarama Yükle</button></div>`
+    }<input type="file" id="detail-scan-upload" multiple style="display:none" onchange="onDetailScanFilesPicked(${s.id}, this.files)"></div></div>
+    ${(() => {
+      const linkedJobs = getLinkedJobsFor(s);
+      if (!linkedJobs.length) return '';
+      const techNames = [...new Set(linkedJobs.filter(j => j.techName).map(j => j.techName))];
+      const designFiles = [];
+      linkedJobs.forEach(j => (Array.isArray(j.designFiles) ? j.designFiles : []).forEach(f => designFiles.push(f)));
+      return `
+        <div class="detail-row"><div class="dr-label">Atanan Teknisyen</div><div class="dr-val">${techNames.length ? escHtml(techNames.join(', ')) : '<span style="color:var(--text-soft)">Henüz atanmadı</span>'}</div></div>
+        <div class="detail-row"><div class="dr-label">Tasarım Dosyaları</div><div class="dr-val">${
+          designFiles.length
+            ? designFiles.map(f => `<a href="${escHtml(f.url)}" target="_blank" rel="noopener" class="file-chip">🎨 ${escHtml(f.name)}</a>`).join(' ') +
+              `<div style="margin-top:8px"><button class="btn btn-outline btn-sm" onclick="downloadAllSubmissionDesignFiles(${s.id})">📦 Tümünü Klasöre İndir</button></div>`
+            : '<span style="color:var(--text-soft)">Teknisyen henüz tasarım dosyası yüklemedi</span>'
+        }</div></div>`;
+    })()}
+    <div class="detail-row"><div class="dr-label">Gönderim Tarihi</div><div class="dr-val" style="font-size:12px;color:var(--text-soft)">${dt}</div></div>
+    ${s.status === 'Aktarıldı' ? `<div class="detail-row"><div class="dr-label">Aktarılma</div><div class="dr-val" style="font-size:12px;color:var(--text-soft)">${s.transferredAt ? new Date(s.transferredAt).toLocaleString('tr-TR') : '—'}</div></div>` : ''}
+  `;
+
+  const footer = document.getElementById('detail-footer');
+  const canTransfer = s.status !== 'Aktarıldı';
+  const footerLinkedJobs = getLinkedJobsFor(s);
+  const footerPrimaryJobId = footerLinkedJobs.length ? footerLinkedJobs[0].id : null;
+  footer.innerHTML = `
+    ${footerPrimaryJobId ? `<button class="btn btn-outline btn-sm" onclick="openJobChatModal(${footerPrimaryJobId}, '${escHtml(s.patient||'—').replace(/'/g,"\\'")}', '👨‍⚕️ Hekim ve 🔧 teknisyenle bu iş hakkında yazışın')">💬 Mesaj</button>` : ''}
+    <div style="flex:1"></div>
+    ${(!s.status || s.status === 'Yeni') ? `<button class="btn btn-outline btn-sm" onclick="markSeen(${s.id})">👁️ İncelendi İşaretle</button>` : ''}
+    ${canTransfer ? `<button class="btn btn-primary" onclick="openOrderFormEditor(${s.id})">📝 Sipariş Formuna Aktar</button>` : `<span style="font-size:12px;color:var(--success);font-weight:700;align-self:center">✅ Bu talep zaten işleme alındı</span>`}
+  `;
+
+  document.getElementById('detail-modal').querySelector('.modal-box').classList.remove('wide');
+
+  document.getElementById('detail-modal').classList.add('open');
+
+  // Modal açıldığında henüz "Yeni" ise otomatik "İncelendi" yap (silent, arka planda)
+  if (!silentRefresh && (!s.status || s.status === 'Yeni')) {
+    markSeen(s.id, true);
+  }
+}
+
+// Detay penceresinden hekimin gönderdiği talebe EK tarama dosyası yükler
+// (ör. hekim eksik dosya gönderdiyse ya da elden/WhatsApp'tan gelen bir
+// dosyayı sisteme eklemek gerekiyorsa). Talep zaten bir işe aktarılmışsa,
+// dosya doğrudan o iş kaydına da eklenir ki teknisyen de görebilsin.
+// ═══════════════════════════════════════════════════════
+//  🆕 YENİ SİPARİŞ FORMU — hekim talebi olmadan (elden/telefonla gelen
+//  bir sipariş için) tek tıkla, hiçbir ara soru sormadan doğrudan boş
+//  bir "talep" kaydı oluşturur ve MEVCUT Sipariş Formu düzenleyicisini
+//  (openOrderFormEditor) o kayıt üzerinden açar. Hekim, hasta ve diğer
+//  tüm bilgiler artık SADECE formun kendi içinden giriliyor —
+//  openOrderFormEditor, drId'si olmayan (yani manuel oluşturulmuş) bir
+//  kayıt için "KLİNİK / HEKİM" alanını salt-okunur metin yerine
+//  seçilebilir bir açılır menü olarak çiziyor.
+// ═══════════════════════════════════════════════════════
+async function startBlankOrderForm() {
+  const id = Date.now();
+  const record = {
+    id, drId: null, doctorName: '',
+    patient: '',
+    status: 'İncelendi', // manuel girildiği için "yeni" bildirim gürültüsü yaratmasın
+    createdAt: new Date().toISOString(),
+    manuallyCreated: true
+  };
+  try {
+    await rtdb.ref(`${dbRoot}/doctorSubmissions/${id}`).set(record);
+    // Canlı dinleyici bu kaydı yerel `submissions` dizisine henüz
+    // yansıtmamış olabilir (küçük bir gecikme payı) — editörün hemen
+    // açılabilmesi için burada elle de ekliyoruz, dinleyici geldiğinde
+    // zaten aynı kayıtla eşleşip üzerine yazacak.
+    if (!submissions.find(x => x.id === id)) submissions.unshift(record);
+    // openOrderFormEditor tek başına modalı AÇMAZ — bunu normalde çağıran
+    // openOrderFormFromList yapıyordu. Doğrudan çağırdığımız için bu iki
+    // adımı burada elle yapıyoruz.
+    _openDetailId = id;
+    document.getElementById('detail-modal').classList.add('open');
+    openOrderFormEditor(id);
+  } catch (err) {
+    toast('Oluşturulamadı: ' + err.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  📤 DOSYA YÜKLEME İLERLEME PANELİ — yardımcı fonksiyonlar
+// ═══════════════════════════════════════════════════════
+let _uploadProgressList = [];
+function showUploadProgress(title) {
+  document.getElementById('upw-title').textContent = title || '📤 Dosyalar yükleniyor…';
+  document.getElementById('upload-progress-widget').classList.remove('hidden');
+}
+function hideUploadProgress() {
+  document.getElementById('upload-progress-widget').classList.add('hidden');
+  _uploadProgressList = [];
+}
+function renderUploadProgress() {
+  document.getElementById('upw-list').innerHTML = _uploadProgressList.map(f => `
+    <div class="upw-file-row">
+      <div class="upw-file-top">
+        <span class="upw-file-name" title="${escHtml(f.name)}">${escHtml(f.name)}</span>
+        <span class="upw-file-pct">${f.error ? '⚠️' : f.done ? '✅' : f.progress + '%'}</span>
+      </div>
+      <div class="upw-bar-track"><div class="upw-bar-fill ${f.done?'done':''} ${f.error?'error':''}" style="width:${f.error ? 100 : f.progress}%"></div></div>
+      ${f.error ? `<div class="upw-file-err">${escHtml(f.errMsg||'Yüklenemedi')}</div>` : ''}
+    </div>`).join('');
+}
+
+// Ortak yükleme mantığı — hem "Talep Detayı" ekranından hem "Sipariş Takip
+// Formu" ekranından çağrılabilir. Yükleme bitince HANGİ ekrandan
+// çağrıldıysa o ekranı (detay ya da form) doğru şekilde yeniler — aksi
+// halde form ekranındayken yükleme sonrası detay ekranına geri
+// atlanıyordu, bu da "yükleme kısmı kayboluyor" gibi görünüyordu.
+async function _uploadScanFilesForSubmission(submissionId, fileListObj, inputElId) {
+  const files = Array.from(fileListObj || []);
+  if (!files.length) return;
+  const s = submissions.find(x => x.id === submissionId);
+  if (!s) return;
+
+  if (!_storageAuthReady) {
+    toast('Dosya yükleme servisine bağlanılıyor, birkaç saniye sonra tekrar deneyin', 'info');
+    let waited = 0;
+    while (!_storageAuthReady && waited < 6000) { await new Promise(r => setTimeout(r, 200)); waited += 200; }
+    if (!_storageAuthReady) { toast('Dosya yükleme servisine bağlanılamadı', 'error'); return; }
+  }
+
+  _uploadProgressList = files.map(f => ({ name: f.name, progress: 0, done: false, error: false, errMsg: '' }));
+  showUploadProgress(`📤 ${files.length} tarama dosyası yükleniyor…`);
+  renderUploadProgress();
+
+  const uploaded = [];
+  await Promise.all(files.map((file, idx) => new Promise(resolve => {
+    const path = `doctorScans/${WORKSPACE}/${submissionId}/${Date.now()}_${file.name}`;
+    const ref = fbStorage.ref(path);
+    const task = ref.put(file);
+    task.on('state_changed',
+      snap => {
+        _uploadProgressList[idx].progress = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        renderUploadProgress();
+      },
+      err => {
+        console.error('Yüklenemedi:', file.name, err);
+        _uploadProgressList[idx].error = true;
+        _uploadProgressList[idx].errMsg = err.message;
+        renderUploadProgress();
+        resolve();
+      },
+      async () => {
+        try {
+          const url = await task.snapshot.ref.getDownloadURL();
+          uploaded.push({ name: file.name, url, size: file.size });
+          _uploadProgressList[idx].done = true;
+        } catch (e) {
+          _uploadProgressList[idx].error = true;
+        }
+        renderUploadProgress();
+        resolve();
+      }
+    );
+  })));
+
+  setTimeout(hideUploadProgress, uploaded.length === files.length ? 900 : 2500);
+  if (!uploaded.length) { toast('Hiçbir dosya yüklenemedi', 'error'); return false; }
+
+  const newFiles = (Array.isArray(s.files) ? s.files : []).concat(uploaded);
+  try {
+    await rtdb.ref(`${dbRoot}/doctorSubmissions/${submissionId}/files`).set(newFiles);
+    s.files = newFiles; // yerel kopya da anında güncellensin (canlı dinleyici gelmeden ekran yenilenirse diye)
+    // Talep zaten bir işe aktarılmışsa, teknisyenin de görebilmesi için
+    // dosyaları o iş kaydına da ekle.
+    const linkedJobs = getLinkedJobsFor(s);
+    for (const j of linkedJobs) {
+      const jobFiles = (Array.isArray(j.files) ? j.files : []).concat(uploaded);
+      await rtdb.ref(`${dbRoot}/jobs/${j.id}/files`).set(jobFiles);
+    }
+    toast(`✅ ${uploaded.length} dosya eklendi`, 'success');
+    const inputEl = document.getElementById(inputElId);
+    if (inputEl) inputEl.value = '';
+    return true;
+  } catch (err) {
+    toast('Kaydedilemedi: ' + err.message, 'error');
+    return false;
+  }
+}
+
+async function onDetailScanFilesPicked(submissionId, fileListObj) {
+  const ok = await _uploadScanFilesForSubmission(submissionId, fileListObj, 'detail-scan-upload');
+  if (ok) openDetailModal(submissionId, true);
+}
+
+// "Sipariş Takip Formu" ekranından yükleme — yükleme bitince form
+// ekranını (detay ekranına değil) yeniler.
+async function onOf2ScanFilesPicked(submissionId, fileListObj) {
+  const ok = await _uploadScanFilesForSubmission(submissionId, fileListObj, 'of2-scan-upload');
+  if (ok) openOrderFormEditor(submissionId);
+}
+
+function closeDetailModal() {
+  document.getElementById('detail-modal').classList.remove('open');
+  _openDetailId = null;
+  _currentDetailView = null;
+}
+
+// Dosya/klasör adlarında sorun çıkarabilecek karakterleri temizler
+function _sanitizeFolderFileName(s) {
+  return String(s||'').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim() || 'dosya';
+}
+
+// Hekim/hasta/iş bilgilerini okunaklı bir metin haline getirir — indirilen
+// klasörün içine "Siparis_Bilgisi.txt" olarak eklenir.
+function _buildSubmissionInfoText(s) {
+  const teeth = Array.isArray(s.teeth) ? s.teeth.slice().sort((a,b)=>a-b) : [];
+  const jaw = jawLabel(s);
+  const dt = s.createdAt ? new Date(s.createdAt).toLocaleString('tr-TR', {dateStyle:'long', timeStyle:'short'}) : '—';
+  const jobTypeList = Array.isArray(s.jobTypes) && s.jobTypes.length
+    ? s.jobTypes
+    : (s.jobType ? [{ type: s.jobType, qty: teeth.length || 1 }] : []);
+  const jobTypeStr = jobTypeList.length
+    ? jobTypeList.map(jt => jt.qty > 1 ? `${jt.type} ×${jt.qty}` : jt.type).join(', ')
+    : '—';
+  const lines = [
+    'DIGICAD DENTAL LABORATUVAR — HEKİM PORTALI SİPARİŞ BİLGİSİ',
+    '='.repeat(56),
+    `Hekim         : ${s.doctorName || '—'}`,
+    `Hasta         : ${s.patient || '—'}`,
+    `Çene          : ${jaw || '—'}`,
+    `Dişler        : ${teeth.length ? teeth.join(', ') : '—'}`,
+    `Diş Rengi     : ${s.color || '—'}`,
+    `İş Türü       : ${jobTypeStr}`,
+    `Gönderim Tarihi: ${dt}`,
+    `Durum         : ${statusLabel(s).replace(/^[^ ]+ /, '')}`,
+    '',
+    'Notlar:',
+    s.notes ? s.notes : '—',
+    '',
+    'Bu klasördeki dosyalar:',
+    ...(Array.isArray(s.files) ? s.files.map((f,i) => `  ${i+1}. ${f.name}`) : ['  —'])
+  ];
+  return lines.join('\r\n');
+}
+
+// ✅ Tamamlanan İşler listesi doğrudan İŞ kayıtlarından beslendiği için,
+// talep (submission) ID'si yerine doğrudan İŞ ID'siyle çalışan basit
+// indirme yardımcıları — yukarıdaki iki fonksiyonla aynı ZIP mantığını
+// kullanır, sadece kaynak veriyi doğrudan allJobsList'ten alır.
+async function downloadAllJobFilesDirect(jobId) {
+  const j = allJobsList.find(x => x.id === jobId);
+  if (!j) { toast('İş bulunamadı!', 'error'); return; }
+  const files = Array.isArray(j.files) ? j.files : [];
+  if (!files.length) { toast('Bu işte indirilecek dosya yok', 'info'); return; }
+  if (typeof JSZip === 'undefined') { toast('ZIP kütüphanesi yüklenemedi', 'error'); return; }
+  const folderName = _sanitizeFolderFileName(`${j.drName || 'Hekim'}_${j.patient || 'Hasta'}${j.toothColor ? '_' + j.toothColor : ''}`);
+  toast(`📦 ${files.length} dosya hazırlanıyor…`, 'info');
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(folderName);
+    let ok = 0;
+    for (const f of files) {
+      try {
+        const resp = await fetch(f.url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        folder.file(_sanitizeFolderFileName(f.name), await resp.blob());
+        ok++;
+      } catch (err) { console.error('Dosya indirilemedi:', f.name, err); }
+    }
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const zipUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a'); a.href = zipUrl; a.download = `${folderName}.zip`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(zipUrl), 15000);
+    toast(ok === files.length ? `✅ ${files.length} dosya indirildi` : `⚠️ ${ok}/${files.length} dosya paketlendi`, ok === files.length ? 'success' : 'error');
+  } catch (err) { toast('İndirme hatası: ' + err.message, 'error'); }
+}
+async function downloadAllJobDesignFilesDirect(jobId) {
+  const j = allJobsList.find(x => x.id === jobId);
+  if (!j) { toast('İş bulunamadı!', 'error'); return; }
+  const files = Array.isArray(j.designFiles) ? j.designFiles : [];
+  if (!files.length) { toast('Bu iş için henüz tasarım dosyası yok', 'info'); return; }
+  if (typeof JSZip === 'undefined') { toast('ZIP kütüphanesi yüklenemedi', 'error'); return; }
+  const folderName = _sanitizeFolderFileName(`${j.drName || 'Hekim'}_${j.patient || 'Hasta'}${j.toothColor ? '_' + j.toothColor : ''}`);
+  toast(`📦 ${files.length} dosya hazırlanıyor…`, 'info');
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(folderName);
+    let ok = 0;
+    for (const f of files) {
+      try {
+        const resp = await fetch(f.url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        folder.file(_sanitizeFolderFileName(f.name), await resp.blob());
+        ok++;
+      } catch (err) { console.error('Dosya indirilemedi:', f.name, err); }
+    }
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const zipUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a'); a.href = zipUrl; a.download = `${folderName}_Tasarim.zip`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(zipUrl), 15000);
+    toast(ok === files.length ? `✅ ${files.length} tasarım dosyası indirildi` : `⚠️ ${ok}/${files.length} dosya paketlendi`, ok === files.length ? 'success' : 'error');
+  } catch (err) { toast('İndirme hatası: ' + err.message, 'error'); }
+}
+
+// Bir hekim talebine ait TÜM dosyaları (ve sipariş bilgi metnini) TEK BİR ZIP
+// arşivinde toplayıp tek seferde indirir. Ayrı ayrı indirme denendiğinde
+// tarayıcılar hem art arda gelen otomatik indirmeleri engelleyebiliyor hem de
+// farklı kaynaktan (Firebase Storage) gelen dosyalarda özel dosya adını/klasör
+// yolunu yok sayabiliyordu — ZIP'e paketleyip TEK dosya olarak indirmek bu iki
+// sorunu da kökten çözüyor ve tüm dosyalar gerçekten "bütün halinde" iniyor.
+async function downloadAllSubmissionFiles(id) {
+  const s = submissions.find(x => x.id === id);
+  if (!s) { toast('Kayıt bulunamadı!', 'error'); return; }
+  const files = Array.isArray(s.files) ? s.files : [];
+  if (!files.length) { toast('Bu talepte indirilecek dosya yok', 'info'); return; }
+  if (typeof JSZip === 'undefined') { toast('ZIP kütüphanesi yüklenemedi — internet bağlantınızı kontrol edin', 'error'); return; }
+
+  const folderName = _sanitizeFolderFileName(`${s.doctorName || 'Hekim'}_${s.patient || 'Hasta'}${s.color ? '_' + s.color : ''}`);
+  toast(`📦 ${files.length} dosya hazırlanıyor, lütfen bekleyin…`, 'info');
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(folderName);
+    folder.file('Siparis_Bilgisi.txt', _buildSubmissionInfoText(s));
+
+    let ok = 0;
+    for (const f of files) {
+      try {
+        const resp = await fetch(f.url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        folder.file(_sanitizeFolderFileName(f.name), blob);
+        ok++;
+      } catch (err) {
+        console.error('Dosya indirilemedi:', f.name, err);
+        folder.file(_sanitizeFolderFileName(f.name) + '_INDIRILEMEDI.txt',
+          `Bu dosya otomatik paketlenemedi.\nDosya adı: ${f.name}\nBağlantı: ${f.url}\nHata: ${err.message}\n\nBu bağlantıyı tarayıcınızda açarak dosyayı manuel indirebilirsiniz.`);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const zipUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = zipUrl;
+    a.download = `${folderName}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(zipUrl), 15000);
+
+    if (ok === files.length) {
+      toast(`✅ ${files.length} dosya "${folderName}.zip" olarak indirildi`, 'success');
+    } else {
+      toast(`⚠️ ${ok}/${files.length} dosya paketlendi — bazı dosyalara ulaşılamadı, ZIP içindeki bilgilendirme dosyasına bakın`, 'error');
+    }
+  } catch (err) {
+    console.error('ZIP oluşturma hatası:', err);
+    toast('❌ İndirme paketi oluşturulamadı: ' + err.message, 'error');
+  }
+}
+
+// Bu talepten oluşan iş(ler)e teknisyenin yüklediği TASARIM dosyalarını indirir
+// (orijinal tarama dosyalarından ayrı — downloadAllSubmissionFiles ile karıştırılmasın)
+async function downloadAllSubmissionDesignFiles(id) {
+  const s = submissions.find(x => x.id === id);
+  if (!s) { toast('Kayıt bulunamadı!', 'error'); return; }
+  const linkedJobs = getLinkedJobsFor(s);
+  const files = [];
+  linkedJobs.forEach(j => {
+    (Array.isArray(j.designFiles) ? j.designFiles : []).forEach(f => files.push(f));
+  });
+  if (!files.length) { toast('Bu talep için henüz yüklenmiş bir tasarım dosyası yok', 'info'); return; }
+  if (typeof JSZip === 'undefined') { toast('ZIP kütüphanesi yüklenemedi — internet bağlantınızı kontrol edin', 'error'); return; }
+
+  const folderName = _sanitizeFolderFileName(`TASARIM_${s.doctorName || 'Hekim'}_${s.patient || 'Hasta'}${s.color ? '_' + s.color : ''}`);
+  toast(`📦 ${files.length} tasarım dosyası hazırlanıyor, lütfen bekleyin…`, 'info');
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder(folderName);
+    const techNames = [...new Set(linkedJobs.filter(j => j.techName).map(j => j.techName))];
+    folder.file('Tasarim_Bilgisi.txt',
+      `DIGICAD DENTAL LABORATUVAR — TASARIM DOSYALARI\n${'='.repeat(56)}\n` +
+      `Hekim         : ${s.doctorName || '—'}\n` +
+      `Hasta         : ${s.patient || '—'}\n` +
+      `Teknisyen     : ${techNames.length ? techNames.join(', ') : '—'}\n\n` +
+      `Bu klasördeki tasarım dosyaları:\n` +
+      files.map((f,i) => `  ${i+1}. ${f.name}${f.uploadedBy ? ' — ' + f.uploadedBy : ''}`).join('\n'));
+
+    let ok = 0;
+    for (const f of files) {
+      try {
+        const resp = await fetch(f.url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        folder.file(_sanitizeFolderFileName(f.name), blob);
+        ok++;
+      } catch (err) {
+        console.error('Tasarım dosyası indirilemedi:', f.name, err);
+        folder.file(_sanitizeFolderFileName(f.name) + '_INDIRILEMEDI.txt',
+          `Bu dosya otomatik paketlenemedi.\nDosya adı: ${f.name}\nBağlantı: ${f.url}\nHata: ${err.message}`);
+      }
+    }
+
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const zipUrl = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = zipUrl;
+    a.download = `${folderName}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(zipUrl), 15000);
+
+    toast(ok === files.length
+      ? `✅ ${files.length} tasarım dosyası "${folderName}.zip" olarak indirildi`
+      : `⚠️ ${ok}/${files.length} dosya paketlendi — bazılarına ulaşılamadı`, ok === files.length ? 'success' : 'error');
+  } catch (err) {
+    console.error('ZIP oluşturma hatası:', err);
+    toast('❌ İndirme paketi oluşturulamadı: ' + err.message, 'error');
+  }
+}
+
+function markSeen(id, silent) {
+  rtdb.ref(`${dbRoot}/doctorSubmissions/${id}/status`).set('İncelendi')
+    .then(() => { if (!silent) toast('👁️ İncelendi olarak işaretlendi', 'info'); })
+    .catch(e => toast('Hata: ' + e.message, 'error'));
+}
+
+// Bu panel sadece VERİ GİRİŞİ için kullanılır — hiçbir kayıt buradan
+// silinemez (talep, dosya, mesaj vb. fark etmez). Bu fonksiyon, eski bir
+// buton/çağrı kalırsa diye kasıtlı olarak devre dışı bırakıldı; gerçek
+// bir silme işlemi ASLA gerçekleştirmez.
+function deleteSubmission(id) {
+  toast('Bu panelden kayıt silinemez — sadece görüntüleme ve giriş yapılabilir.', 'info');
+}
+
+// ── SİPARİŞ FORMUNA AKTAR: admin panelindeki "Sipariş Takip Formu" ile
+//    aynı tasarımda, hekimden gelen bilgilerle ÖNCEDEN DOLDURULMUŞ ekran ──
+// Ana listedeki "Sipariş Formuna Aktar" butonu — satırdan doğrudan, detay
+// penceresini önce açmaya gerek kalmadan Sipariş Takip Formu'nu başlatır.
+function openOrderFormFromList(id) {
+  _openDetailId = id;
+  document.getElementById('detail-modal').classList.add('open');
+  openOrderFormEditor(id);
+}
+
+function openOrderFormEditor(id) {
+  const s = submissions.find(x => x.id === id);
+  if (!s) return;
+  _lastSubmittedOrderFormJobId = null;
+  _currentDetailView = 'orderform';
+
+  const dr = s.drId ? doctorsById[s.drId] : null;
+  const prices = dr && dr.prices ? (Array.isArray(dr.prices) ? dr.prices : Object.values(dr.prices)) : [];
+  const teeth = Array.isArray(s.teeth) ? s.teeth : [];
+  const defaultQty = teeth.length || 1;
+
+  // Notlara çene/diş/dosya bilgisini otomatik ekle (admin'in "Forma Aktar" mantığıyla aynı)
+  let autoNotes = '';
+  const jaw = jawLabel(s);
+  if (jaw) autoNotes += `ÇENE: ${jaw.toLocaleUpperCase('tr-TR')}\n`;
+  if (Array.isArray(s.files) && s.files.length) autoNotes += `TARAMA DOSYALARI: ${s.files.map(f=>f.name).join(', ')}\n`;
+  if (s.notes) autoNotes += s.notes.toLocaleUpperCase('tr-TR');
+  autoNotes = autoNotes.trim();
+
+  document.querySelector('#detail-modal .modal-box').classList.add('wide');
+  document.querySelector('#detail-modal .modal-header h3').textContent = '📝 Sipariş Takip Formu';
+
+  const teethSet = new Set(teeth);
+  const drawMiniRow = nums => nums.map(n =>
+    `<div class="of-tooth-cell ${teethSet.has(n)?'sel':'off'}">${n}</div>`).join('');
+
+  const body = document.getElementById('detail-body');
+  body.innerHTML = `
+    <div class="of-sheet">
+      <div class="of-head">
+        <div class="of-logo-wrap">
+          <div class="of-logo">DC</div>
+          <div class="of-name">DIGICAD DENTAL STUDIO</div>
+          <div class="of-addr">Oğuzlar Mh. 1379 Sk. 13/12<br>Balgat / Çankaya / Ankara<br>0(505) 648 18 93 · 0(553) 002 76 76</div>
+        </div>
+        <div>
+          <div class="of-tooth-mini">
+            <div><div class="of-tooth-row">${drawMiniRow(FDI_QUADRANTS.ur)}</div></div>
+            <div><div class="of-tooth-row">${drawMiniRow(FDI_QUADRANTS.ul)}</div></div>
+            <div><div class="of-tooth-row">${drawMiniRow(FDI_QUADRANTS.br)}</div></div>
+            <div><div class="of-tooth-row">${drawMiniRow(FDI_QUADRANTS.bl)}</div></div>
+          </div>
+          <div class="of-title">SİPARİŞ TAKİP FORMU</div>
+        </div>
+      </div>
+
+      <div class="of-row of-row-2">
+        <div class="of-cell">
+          <div class="of-lbl">KLİNİK / HEKİM</div>
+          ${!s.drId ? `<select id="of2-doctor-select" class="of-input" style="font-size:14px" onchange="onOf2DoctorChange(this)">
+            <option value="">— Hekim seçin —</option>
+            ${Object.values(doctorsById).filter(d => d && !d.deleted).sort((a,b) => (a.name||'').localeCompare(b.name||'', 'tr'))
+              .map(d => `<option value="${d.id}">${escHtml((d.name||'').toLocaleUpperCase('tr-TR'))}</option>`).join('')}
+          </select>`
+          : `<input id="of2-doctor" class="of-input" style="font-size:14px" value="${escHtml((s.doctorName||'').toLocaleUpperCase('tr-TR'))}" readonly>`}
+        </div>
+        <div class="of-cell">
+          <div class="of-lbl">HASTA ADI - SOYADI</div>
+          <input id="of2-patient" class="of-input" style="font-size:14px" value="${escHtml((s.patient||'').toLocaleUpperCase('tr-TR'))}" placeholder="Hasta adı soyadı">
+        </div>
+      </div>
+
+      <div class="of-row">
+        <div class="of-cell" style="border-right:none">
+          <div class="of-lbl">İŞ TÜRÜ / KALEMLERİ ${prices.length ? '(hekimin fiyat listesinden)' : ''}</div>
+          <div id="of2-jobtype-lines"></div>
+          <button type="button" onclick="addOf2JobTypeLine()" style="margin-top:6px;padding:6px 12px;border-radius:7px;border:1.5px dashed #c7d2e0;background:#fafcfe;color:#1565c0;font-family:inherit;font-weight:700;font-size:11px;cursor:pointer">+ Kalem Ekle</button>
+          <p style="font-size:10px;color:#8093ab;margin-top:6px;line-height:1.4">Aynı sipariş için birden fazla iş türü gerekiyorsa (örn. titanyum bar + üzeri zirkonyum) ek satır açın — her satır ayrı bir iş olarak onaya gönderilir.</p>
+        </div>
+      </div>
+
+      <div class="of-row of-row-2">
+        <div class="of-cell" style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div class="of-lbl">RENK</div>
+            <input id="of2-color" class="of-input big" value="${escHtml(s.color||'')}">
+          </div>
+          <div>
+            <div class="of-lbl">ÜYE SAYISI</div>
+            <input id="of2-qty" type="number" min="1" class="of-input big" value="${defaultQty}">
+          </div>
+          <div>
+            <div class="of-lbl">TESLİM TARİHİ</div>
+            <input id="of2-dateout" type="date" class="of-input" style="text-align:center;font-size:12px" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+        </div>
+        <div class="of-cell">
+          <div class="of-lbl">MATERYAL</div>
+          <div class="mat-list" id="of2-material-list">
+            ${ORDER_MATERIALS.map(m => `<label class="mat-row"><input type="radio" name="of2-material" value="${escHtml(m)}"><span>${escHtml(m)}</span></label>`).join('')}
+          </div>
+        </div>
+      </div>
+
+      <div class="of-notes-box">
+        <div class="of-lbl">NOTLAR</div>
+        <textarea id="of2-notes">${escHtml(autoNotes)}</textarea>
+      </div>
+
+      <div class="of-teeth-summary">
+        <span style="color:var(--text-soft);font-weight:600">Seçilen Dişler:</span>
+        <span style="font-weight:700;color:var(--text)">${teeth.length ? teeth.slice().sort((a,b)=>a-b).join(', ') + ` (${teeth.length} diş)` : '—'}</span>
+      </div>
+
+      <div style="margin-top:14px;padding:10px 12px;background:#eef6ff;border-radius:9px;font-size:11.5px;color:var(--primary)">
+        ℹ️ Bu form Hekim Portalı'ndan gelen bilgilerle önceden dolduruldu. Gerekirse düzenleyip <b>Yazdır</b> ya da <b>Onaya Gönder</b> butonunu kullanabilirsiniz — onaya gönderildiğinde bu iş, ana yönetim panelindeki "Onay Bekleyen" listesine ve "Sipariş Formu" geçmişine otomatik eklenir.
+      </div>
+
+      <div style="margin-top:12px;padding:12px 14px;background:#f7f9fb;border:1.5px solid var(--border);border-radius:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:${(s.files && s.files.length) ? '8px' : '0'}">
+          <span style="font-size:12.5px;font-weight:700;color:var(--text)">📎 Tarama Dosyaları ${s.files && s.files.length ? `(${s.files.length})` : ''}</span>
+          <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('of2-scan-upload').click()">📤 Dosya Yükle</button>
+          <input type="file" id="of2-scan-upload" multiple style="display:none" onchange="onOf2ScanFilesPicked(${s.id}, this.files)">
+        </div>
+        ${(s.files && s.files.length) ? `
+        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:8px">
+          <input type="checkbox" id="of2-include-scan-files" checked style="margin-top:3px;width:16px;height:16px;flex-shrink:0">
+          <span style="font-size:11.5px;color:var(--text-soft)">İşaretliyse, yazdırılan Sipariş Takip Formu'nun altına bu ${s.files.length} dosyanın adları bir liste olarak eklenir — teknisyen/kazıyıcı hangi dijital dosyaların bu iş için hazır olduğunu kağıt üzerinden de görebilir.</span>
+        </label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${s.files.map(f => `<span style="font-size:10.5px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:3px 10px;color:var(--text-soft)">📄 ${escHtml(f.name)}</span>`).join('')}
+        </div>` : `<p style="font-size:11.5px;color:var(--text-soft);margin:0">Henüz tarama dosyası yok — "📤 Dosya Yükle" ile ekleyebilirsiniz.</p>`}
+      </div>
+    </div>
+  `;
+
+  const footer = document.getElementById('detail-footer');
+  footer.innerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="openDetailModal(${s.id})">← Geri</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-outline" id="of2-print-btn" onclick="printOrderFormFromSubmission(${s.id})" disabled style="opacity:.45;cursor:not-allowed" title="Önce 'Onaya Gönder' butonuna basmalısınız">🖨️ Yazdır</button>
+    <button class="btn btn-primary" id="of2-submit-btn" onclick="submitOrderFormFromSubmission(${s.id})">✅ Onaya Gönder</button>
+  `;
+
+  // İş türü kalemlerini oluştur: hekimin Hekim Portalı'ndan gönderdiği çok kalemli
+  // "jobTypes" listesi varsa onunla, yoksa eski tek "jobType" alanıyla doldurulur.
+  _of2JobTypePrices = prices;
+  document.getElementById('of2-jobtype-lines').innerHTML = '';
+  const subJobTypes = Array.isArray(s.jobTypes) && s.jobTypes.length
+    ? s.jobTypes
+    : (s.jobType ? [{ type: s.jobType, qty: defaultQty }] : []);
+  if (subJobTypes.length) {
+    subJobTypes.forEach(jt => _appendOf2JobTypeLine(jt.type, jt.qty));
+  } else {
+    addOf2JobTypeLine();
+  }
+}
+
+let _of2JobTypePrices = [];
+function _of2JtOptionsHTML() {
+  return _of2JobTypePrices.length
+    ? '<option value="">— Seçiniz / Boş bırak —</option>' +
+      _of2JobTypePrices.map(p => `<option value="${escHtml(p.name)}" data-p="${p.price}" data-c="${p.currency||'TRY'}">${escHtml((p.name||'').toLocaleUpperCase('tr-TR'))}</option>`).join('')
+    : '';
+}
+function _appendOf2JobTypeLine(typeVal, qtyVal) {
+  const container = document.getElementById('of2-jobtype-lines');
+  const div = document.createElement('div');
+  div.className = 'of2-jt-line';
+  div.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  const typeField = _of2JobTypePrices.length
+    ? `<select class="of2-jt-type of-input" style="font-size:13px;border:1px solid #dbe3ee;border-radius:6px;padding:6px 8px" onchange="onOf2JobTypeLineChange(this)">${_of2JtOptionsHTML()}</select>`
+    : `<input class="of2-jt-type of-input" style="font-size:13px;border:1px solid #dbe3ee;border-radius:6px;padding:6px 8px" placeholder="Kron, Köprü, Zirkonya..." oninput="onOf2JobTypeLineChange(this)">`;
+  div.innerHTML = `${typeField}
+    <input type="number" class="of2-jt-qty" min="1" value="${qtyVal||1}" title="Adet" style="width:64px;flex-shrink:0;border:1px solid #dbe3ee;border-radius:6px;font-size:12.5px;font-weight:700;text-align:center;padding:6px 4px">
+    <button type="button" onclick="removeOf2JobTypeLine(this)" title="Bu kalemi kaldır" style="width:28px;height:28px;flex-shrink:0;border-radius:6px;border:1px solid #dbe3ee;background:#fff;color:#e53935;font-weight:700;cursor:pointer">✕</button>`;
+  container.appendChild(div);
+
+  const typeEl = div.querySelector('.of2-jt-type');
+  if (typeVal) {
+    if (typeEl.tagName === 'SELECT') {
+      let matched = Array.from(typeEl.options).find(o => o.value === typeVal) ||
+        Array.from(typeEl.options).find(o => (o.value||'').toLocaleUpperCase('tr-TR') === typeVal.toLocaleUpperCase('tr-TR'));
+      if (!matched) {
+        matched = document.createElement('option');
+        matched.value = typeVal;
+        matched.textContent = typeVal.toLocaleUpperCase('tr-TR') + ' (hekimin seçtiği)';
+        typeEl.appendChild(matched);
+      }
+      typeEl.value = matched.value;
+    } else {
+      typeEl.value = typeVal;
+    }
+    onOf2JobTypeLineChange(typeEl);
+  }
+  syncOf2JobTypeRemoveButtons();
+}
+function addOf2JobTypeLine() { _appendOf2JobTypeLine('', ''); }
+
+// Manuel (hekim talebine bağlı olmayan) Sipariş Formu'nda, kullanıcı
+// "KLİNİK / HEKİM" açılır menüsünden bir hekim seçtiğinde, o hekimin
+// fiyat listesini yükleyip iş türü kalemlerini SIFIRDAN yeniden çizer —
+// aksi halde önceki (ya da hiçbir) hekimin fiyat listesi kullanılmaya
+// devam ederdi.
+function onOf2DoctorChange(selEl) {
+  const drId = parseInt(selEl.value) || null;
+  const dr = drId ? doctorsById[drId] : null;
+  _of2JobTypePrices = dr && dr.prices ? (Array.isArray(dr.prices) ? dr.prices : Object.values(dr.prices)) : [];
+  document.getElementById('of2-jobtype-lines').innerHTML = '';
+  addOf2JobTypeLine();
+}
+function removeOf2JobTypeLine(btn) {
+  const line = btn.closest('.of2-jt-line');
+  if (line) line.remove();
+  syncOf2JobTypeRemoveButtons();
+}
+function syncOf2JobTypeRemoveButtons() {
+  const lines = document.querySelectorAll('#of2-jobtype-lines .of2-jt-line');
+  lines.forEach(l => {
+    const b = l.querySelector('button');
+    if (b) b.style.visibility = lines.length > 1 ? 'visible' : 'hidden';
+  });
+}
+function onOf2JobTypeLineChange(el) {
+  const typeName = (el.value || '').toLocaleUpperCase('tr-TR');
+  const alreadyChecked = document.querySelector('input[name="of2-material"]:checked');
+  if (typeName && !alreadyChecked) {
+    const guess = ORDER_MATERIALS.find(m => typeName.includes(m.split(' ')[0]));
+    if (guess) {
+      const radio = document.querySelector(`input[name="of2-material"][value="${guess.replace(/"/g,'\\"')}"]`);
+      if (radio) radio.checked = true;
+    }
+  }
+}
+// DOM'daki satırlardan geçerli (türü dolu) iş kalemlerini fiyat bilgisiyle birlikte okur
+function getOf2JobTypeLines() {
+  return Array.from(document.querySelectorAll('#of2-jobtype-lines .of2-jt-line')).map(l => {
+    const typeEl = l.querySelector('.of2-jt-type');
+    const qtyEl = l.querySelector('.of2-jt-qty');
+    let price = 0, currency = 'TRY';
+    if (typeEl.tagName === 'SELECT') {
+      const opt = typeEl.options[typeEl.selectedIndex];
+      if (opt && opt.dataset.p) { price = parseFloat(opt.dataset.p) || 0; currency = opt.dataset.c || 'TRY'; }
+    }
+    return { type: (typeEl.value||'').trim(), qty: parseInt(qtyEl.value)||1, price, currency };
+  }).filter(x => x.type);
+}
+
+function _readOrderFormEditor(id) {
+  const s = submissions.find(x => x.id === id);
+  const teeth = Array.isArray(s.teeth) ? s.teeth.slice().sort((a,b)=>a-b) : [];
+  const matInput = document.querySelector('input[name="of2-material"]:checked');
+  const jobTypeLines = getOf2JobTypeLines();
+  // Manuel (hekim talebine bağlı olmayan) Sipariş Formu'nda hekim bilgisi
+  // açılır menüden okunur; normal (hekim talebinden gelen) formda ise
+  // zaten sabit olan s.doctorName kullanılır.
+  const doctorSelectEl = document.getElementById('of2-doctor-select');
+  let doctorName = s.doctorName || '';
+  if (doctorSelectEl) {
+    const drId = parseInt(doctorSelectEl.value) || null;
+    const dr = drId ? doctorsById[drId] : null;
+    s.drId = drId; // seçilen hekimi kayda işle ki f.s.drId doğru gitsin
+    doctorName = dr ? dr.name : '';
+  }
+  return {
+    s, teeth,
+    doctorName: (doctorName||'').toLocaleUpperCase('tr-TR'),
+    patient: (document.getElementById('of2-patient').value || '').trim().toLocaleUpperCase('tr-TR'),
+    jobTypeLines,
+    jobType: jobTypeLines.length ? jobTypeLines[0].type : '',
+    color: (document.getElementById('of2-color').value || '').trim().toLocaleUpperCase('tr-TR'),
+    qty: parseInt(document.getElementById('of2-qty').value) || 1,
+    dateout: document.getElementById('of2-dateout').value || '',
+    notes: (document.getElementById('of2-notes').value || '').trim(),
+    material: matInput ? matInput.value : '',
+    price: jobTypeLines.length ? jobTypeLines[0].price : 0,
+    currency: jobTypeLines.length ? jobTypeLines[0].currency : 'TRY'
+  };
+}
+
+// 🖨️ Admin panelindeki yazdırma çıktısıyla BİREBİR aynı tasarımda yazdırır
+function printOrderFormFromSubmission(id) {
+  const printBtn = document.getElementById('of2-print-btn');
+  if (printBtn && printBtn.disabled) { toast("Önce 'Onaya Gönder' butonuna basmalısınız", 'error'); return; }
+
+  const f = _readOrderFormEditor(id);
+  const teethSet = new Set(f.teeth);
+  const drawTeethRow = nums => nums.map(n => {
+    const sel = teethSet.has(n);
+    return `<td style="width:30px;text-align:center;padding:2px;border:1px solid #ccc;background:${sel?'#1a2740':'#fff'};color:${sel?'#fff':'#1a2740'};font-weight:${sel?'700':'500'};font-size:11px">${n}</td>`;
+  }).join('');
+  const drawNumRow = nums => nums.map(n => `<td style="width:30px;text-align:center;padding:1px;font-size:8px;color:#888">${n}</td>`).join('');
+  const matList = ORDER_MATERIALS.map(m => {
+    const checked = f.material === m;
+    return `<div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;margin-bottom:6px">
+      <span style="display:inline-block;width:14px;height:14px;border:1.5px solid #1a2740;text-align:center;line-height:12px;font-size:12px">${checked?'✓':''}</span>
+      ${escHtml(m)}
+    </div>`;
+  }).join('');
+
+  const jobLinesBlock = f.jobTypeLines.length > 1
+    ? `<div>
+        <div class="lbl">İŞ KALEMLERİ</div>
+        <table style="width:100%;border-collapse:collapse;margin-top:4px">
+          ${f.jobTypeLines.map(l => `<tr>
+            <td style="padding:3px 0;font-size:13px;font-weight:700;border-bottom:1px dotted #ccc">${escHtml(l.type)}</td>
+            <td style="padding:3px 0;font-size:13px;font-weight:700;text-align:right;border-bottom:1px dotted #ccc;width:50px">${l.qty} ad.</td>
+          </tr>`).join('')}
+        </table>
+      </div>`
+    : `<div><div class="lbl">ÜYE SAYISI</div><div class="val-big">${f.qty || ''}</div></div>`;
+
+  // 📎 Hekimden gelen tarama dosyalarını forma ekleme seçeneği — işaretliyse
+  // (varsayılan: işaretli), dosya adları formun altına bir liste olarak
+  // eklenir, ki teknisyen/kazıyıcı hangi dijital dosyaların hazır olduğunu
+  // kağıt üzerinden de görebilsin.
+  const includeFilesCheckbox = document.getElementById('of2-include-scan-files');
+  const includeFiles = includeFilesCheckbox ? includeFilesCheckbox.checked : false;
+  const scanFiles = Array.isArray(f.s.files) ? f.s.files : [];
+  const scanFilesBlock = (includeFiles && scanFiles.length) ? `
+    <div class="row" style="border-color:#1a2740">
+      <div class="cell" style="border-right:none">
+        <div class="lbl">📎 EKLİ TARAMA DOSYALARI (${scanFiles.length} adet)</div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">
+          ${scanFiles.map((sf, i) => `<div style="font-size:12px;padding:3px 0;border-bottom:1px dotted #ccc">${i+1}. ${escHtml(sf.name)}</div>`).join('')}
+        </div>
+      </div>
+    </div>` : '';
+
+  const html = `<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"><title>Sipariş Takip Formu</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;color:#1a2740;padding:20px;font-size:12px}
+  .head{display:grid;grid-template-columns:240px 1fr;gap:20px;align-items:center;border-bottom:2px solid #1a2740;padding-bottom:14px;margin-bottom:14px}
+  .logo-wrap{text-align:center}
+  .logo{font-size:42px;font-weight:900;letter-spacing:2px;line-height:1}
+  .name{font-size:12px;font-weight:700;margin-top:4px}
+  .addr{font-size:9px;color:#5a6b7a;margin-top:4px;line-height:1.4}
+  .form-title{text-align:center;font-size:18px;font-weight:700;letter-spacing:3px;margin-top:8px}
+  .row{display:grid;border:1.5px solid #1a2740;margin-bottom:10px}
+  .row-2{grid-template-columns:1fr 1fr}
+  .cell{padding:10px 12px;border-right:1.5px solid #1a2740}
+  .cell:last-child{border-right:none}
+  .lbl{font-size:10px;font-weight:700;letter-spacing:.8px;margin-bottom:6px}
+  .val{font-size:18px;font-weight:700;min-height:28px;border-bottom:1px dotted #ccc;padding:4px 0}
+  .val-big{font-size:22px;text-align:center;padding:8px 0;border-bottom:1px dotted #ccc}
+  .notes{border:1.5px solid #1a2740;padding:10px 12px;min-height:130px;margin-top:10px}
+  .notes .val-text{white-space:pre-wrap;font-size:13px;font-weight:500;line-height:1.6;margin-top:6px}
+  .tooth-table{margin:0 auto;border-collapse:collapse}
+  .quad-divider{border:none;height:1.5px;background:#1a2740;margin:0}
+  @media print { body { padding:14px } }
+</style></head>
+<body>
+  <div class="head">
+    <div class="logo-wrap">
+      <div class="logo">DC</div>
+      <div class="name">DIGICAD DENTAL STUDIO</div>
+      <div class="addr">Oğuzlar Mh. 1379 Sk. 13/12<br>Balgat / Çankaya / Ankara<br>0(505) 648 18 93<br>0(553) 002 76 76</div>
+    </div>
+    <div>
+      <table class="tooth-table">
+        <tr>${drawNumRow(FDI_QUADRANTS.ur)}<td style="width:4px"></td>${drawNumRow(FDI_QUADRANTS.ul)}</tr>
+        <tr>${drawTeethRow(FDI_QUADRANTS.ur)}<td style="width:4px;border-left:2px solid #1a2740"></td>${drawTeethRow(FDI_QUADRANTS.ul)}</tr>
+        <tr><td colspan="${FDI_QUADRANTS.ur.length*2+1}"><hr class="quad-divider"></td></tr>
+        <tr>${drawTeethRow(FDI_QUADRANTS.br)}<td style="width:4px;border-left:2px solid #1a2740"></td>${drawTeethRow(FDI_QUADRANTS.bl)}</tr>
+        <tr>${drawNumRow(FDI_QUADRANTS.br)}<td style="width:4px"></td>${drawNumRow(FDI_QUADRANTS.bl)}</tr>
+      </table>
+      <div class="form-title">SİPARİŞ TAKİP FORMU</div>
+    </div>
+  </div>
+  <div class="row row-2">
+    <div class="cell"><div class="lbl">KLİNİK / HEKİM</div><div class="val">${escHtml(f.doctorName||'')}</div></div>
+    <div class="cell"><div class="lbl">HASTA ADI - SOYADI</div><div class="val">${escHtml(f.patient||'')}</div></div>
+  </div>
+  <div class="row row-2" style="min-height:200px">
+    <div class="cell" style="display:flex;flex-direction:column;gap:14px">
+      <div><div class="lbl">RENK</div><div class="val-big">${escHtml(f.color||'')}</div></div>
+      ${jobLinesBlock}
+      ${f.dateout ? `<div><div class="lbl">TESLİM TARİHİ</div><div class="val" style="text-align:center;font-size:14px">${fmtDate(f.dateout)}</div></div>` : ''}
+    </div>
+    <div class="cell">
+      <div class="lbl">MATERYAL</div>
+      <div style="margin-top:8px">${matList}</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="lbl">NOTLAR</div>
+    <div class="val-text">${escHtml(f.notes||'')}</div>
+  </div>
+  ${scanFilesBlock}
+  <script>window.onload = () => { setTimeout(() => window.print(), 300); };<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { toast('Tarayıcı yeni pencereyi engelledi', 'error'); return; }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+
+  // Yazdırıldı işareti (admin panelindeki geçmiş listesinde görünür) — çok kalemli
+  // siparişlerde grup içindeki TÜM kalemler işaretlenir.
+  if (_lastSubmittedOrderGroupId) {
+    rtdb.ref(`${dbRoot}/orderForms`).orderByChild('orderGroupId').equalTo(_lastSubmittedOrderGroupId).once('value')
+      .then(snap => {
+        const data = snap.val() || {};
+        Object.keys(data).forEach(key => {
+          rtdb.ref(`${dbRoot}/orderForms/${key}`).update({ printed: true, printedAt: new Date().toISOString() }).catch(()=>{});
+        });
+      }).catch(()=>{});
+  } else if (_lastSubmittedOrderFormJobId) {
+    rtdb.ref(`${dbRoot}/orderForms/${_lastSubmittedOrderFormJobId}`).update({ printed: true, printedAt: new Date().toISOString() }).catch(()=>{});
+  }
+}
+
+// ✅ Onaya Gönder: admin panelindeki "pendingJobs" + "orderForms" akışına
+//    BİREBİR aynı şemayla yazar — böylece iki panel tam entegre çalışır.
+//    Birden fazla iş kalemi girildiyse (örn. titanyum + üzeri zirkonyum),
+//    her kalem AYRI bir pendingJob/orderForm kaydı olarak, ortak bir
+//    orderGroupId ile birbirine bağlı şekilde gönderilir.
+function submitOrderFormFromSubmission(id) {
+  const f = _readOrderFormEditor(id);
+  const doctorSelectEl = document.getElementById('of2-doctor-select');
+  if (doctorSelectEl && !f.s.drId) { toast('Lütfen hekim seçin!', 'error'); doctorSelectEl.focus(); return; }
+  if (!f.patient) { toast('Hasta adı boş olamaz!', 'error'); document.getElementById('of2-patient').focus(); return; }
+
+  const lines = f.jobTypeLines.length ? f.jobTypeLines : [{ type: '', qty: f.qty, price: 0, currency: 'TRY' }];
+  const multiLine = lines.length > 1;
+  const groupId = Date.now();
+  const files = Array.isArray(f.s.files) ? f.s.files : [];
+  // Bu hekim için "Otomatik Teknisyen" tanımlıysa YA DA admin "Direkt Mod"u
+  // açtıysa, iş onay beklemeden doğrudan Devam Eden İşler'e (jobs) düşer.
+  const drRecord = f.s.drId ? doctorsById[f.s.drId] : null;
+  const autoTech = drRecord && drRecord.autoTechId ? techniciansById[drRecord.autoTechId] : null;
+  const skipApproval = !!autoTech || gipDirectMode;
+
+  const writes = [];
+  const createdIds = [];
+
+  lines.forEach((line, idx) => {
+    const jobId = groupId + idx;
+    const finalType = line.type || f.material || 'Belirsiz';
+
+    let combinedNote = '';
+    if (f.teeth.length) combinedNote += `DİŞLER: ${f.teeth.join(', ')}\n`;
+    if (f.material && f.material !== line.type) combinedNote += `MATERYAL: ${f.material}\n`;
+    if (multiLine) combinedNote += `KALEM: ${idx+1}/${lines.length} — aynı siparişin parçası\n`;
+    if (f.notes) combinedNote += f.notes;
+    combinedNote = combinedNote.trim();
+
+    if (skipApproval) {
+      // Onay adımı atlanır — doğrudan gerçek iş kaydı (jobs) oluşturulur.
+      // Otomatik teknisyen varsa ona atanır; sadece "Direkt Mod" nedeniyle
+      // atlanıyorsa teknisyen boş bırakılır (Gelen İş Paneli'nden ya da
+      // admin panelinden sonradan atanabilir).
+      const job = {
+        id: jobId,
+        drId: f.s.drId || null,
+        drName: f.doctorName,
+        patient: f.patient,
+        type: finalType,
+        price: line.price || 0,
+        currency: line.currency || 'TRY',
+        qty: line.qty || 1,
+        dateout: f.dateout,
+        techId: autoTech ? autoTech.id : null,
+        techName: autoTech ? autoTech.name : null,
+        toothColor: f.color,
+        // 🎨 Hekim kendi tasarımını gönderdiyse (designSource:'doctor'),
+        // gelen dosyalar hem "files" (orijinal gönderim kaydı) hem
+        // "designFiles" (üretime hazır tasarım) olarak işlenir ve iş
+        // doğrudan "Üretimde" durumuyla başlar — tasarım aşaması atlanır.
+        status: f.s.designSource === 'doctor' ? 'Üretimde' : 'Bekliyor',
+        deleted: false,
+        approvedFrom: null,
+        approvedAt: new Date().toISOString(),
+        note: combinedNote,
+        files,
+        designFiles: f.s.designSource === 'doctor' ? files : [],
+        designFilesUpdatedAt: f.s.designSource === 'doctor' ? new Date().toISOString() : null,
+        designSource: f.s.designSource || 'lab',
+        sourceDoctorSubmissionId: id,
+        orderGroupId: multiLine ? groupId : null,
+        orderGroupIndex: multiLine ? idx : null,
+        orderGroupTotal: multiLine ? lines.length : null,
+        orderForm: { teeth: f.teeth, material: f.material, jobType: finalType, doctorName: f.doctorName, color: f.color, notes: f.notes },
+        autoAssigned: !!autoTech,
+        directMode: !autoTech && gipDirectMode
+      };
+      writes.push(rtdb.ref(`${dbRoot}/jobs/${jobId}`).set(job));
+    } else {
+      const pendingJob = {
+        id: jobId,
+        drId: f.s.drId || null,
+        drName: f.doctorName,
+        patient: f.patient,
+        type: finalType,
+        price: line.price || 0,
+        currency: line.currency || 'TRY',
+        qty: line.qty || 1,
+        dateout: f.dateout,
+        toothColor: f.color,
+        techId: null,
+        techName: null,
+        note: combinedNote,
+        files,
+        designFiles: f.s.designSource === 'doctor' ? files : [],
+        designFilesUpdatedAt: f.s.designSource === 'doctor' ? new Date().toISOString() : null,
+        designSource: f.s.designSource || 'lab',
+        sourceDoctorSubmissionId: id, // Hekim Portalı'ndaki gerçek zamanlı durum takibi için
+        orderGroupId: multiLine ? groupId : null,
+        orderGroupIndex: multiLine ? idx : null,
+        orderGroupTotal: multiLine ? lines.length : null,
+        orderForm: {
+          teeth: f.teeth, material: f.material, jobType: finalType,
+          doctorName: f.doctorName, color: f.color, notes: f.notes
+        },
+        submittedBy: 'doctorPortal',
+        submittedAt: new Date().toISOString(),
+        status: 'Onay Bekliyor'
+      };
+      writes.push(rtdb.ref(`${dbRoot}/pendingJobs/${jobId}`).set(pendingJob));
+    }
+
+    // Admin panelindeki "Geçmiş Sipariş Formları" listesinde de görünmesi için
+    // aynı kalıcı arşiv kaydı (orderForms) da oluşturulur.
+    const orderFormRecord = {
+      id: jobId,
+      createdAt: new Date().toISOString(),
+      drId: f.s.drId || null,
+      drName: f.doctorName,
+      patient: f.patient,
+      jobType: finalType,
+      material: f.material,
+      finalType,
+      color: f.color,
+      qty: line.qty || 1,
+      dateout: f.dateout,
+      notes: f.notes,
+      teeth: f.teeth,
+      price: line.price || 0,
+      currency: line.currency || 'TRY',
+      pendingJobId: skipApproval ? null : jobId,
+      printed: false,
+      printedAt: null,
+      source: 'gelenIslerPaneli',
+      orderGroupId: multiLine ? groupId : null,
+      orderGroupIndex: multiLine ? idx : null,
+      orderGroupTotal: multiLine ? lines.length : null
+    };
+
+    writes.push(rtdb.ref(`${dbRoot}/orderForms/${jobId}`).set(orderFormRecord));
+    createdIds.push(jobId);
+  });
+
+  const btn = document.getElementById('of2-submit-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Gönderiliyor…'; }
+
+  Promise.all(writes)
+    .then(() => rtdb.ref(`${dbRoot}/doctorSubmissions/${id}`).update({
+      status: 'Aktarıldı',
+      transferredAt: new Date().toISOString(),
+      // Manuel (hekim talebine bağlı olmayan) formda hekim/hasta/iş türü
+      // gibi bilgiler SADECE form üzerinden giriliyordu ve talebin kendi
+      // kaydına hiç yazılmıyordu — bu yüzden liste ve detay ekranında
+      // "Hekim / Hasta / İş Türü" hâlâ boş ("—") görünüyordu. Artık
+      // gönderilen değerler talebin kaydına da işleniyor.
+      drId: f.s.drId || null,
+      doctorName: f.doctorName,
+      patient: f.patient,
+      jobTypes: lines.map(l => ({ type: l.type || f.material || 'Belirsiz', qty: l.qty || 1 })),
+      teeth: f.teeth,
+      color: f.color,
+      notes: f.notes
+    }))
+    .then(() => {
+      _lastSubmittedOrderFormJobId = createdIds[0];
+      _lastSubmittedOrderGroupId = multiLine ? groupId : null;
+      toast(autoTech
+        ? `⚡ ${lines.length > 1 ? lines.length + ' kalem' : 'İş'} onay beklemeden doğrudan ${autoTech.name}'e atandı — Devam Eden İşler'de görünüyor`
+        : (skipApproval
+            ? `🚀 ${lines.length > 1 ? lines.length + ' kalem' : 'İş'} Direkt Mod sayesinde onay beklemeden Devam Eden İşler'e düştü`
+            : (multiLine
+                ? `📤 ${lines.length} kalem, ${lines.length} ayrı iş olarak onay bekleyen işlere gönderildi — şimdi yazdırabilirsiniz`
+                : '📤 Sipariş onay bekleyen işlere gönderildi — şimdi yazdırabilirsiniz')), 'success');
+
+      // Admin panelindeki davranışın AYNISI: gönderildikten sonra modal kapanmaz,
+      // "Yazdır" butonu aktif olur, "Onaya Gönder" ise tekrar basılamasın diye kilitlenir.
+      if (btn) {
+        btn.disabled = true; btn.innerHTML = '✅ Gönderildi';
+        btn.style.opacity = '.7'; btn.style.cursor = 'not-allowed';
+        btn.title = 'Bu sipariş zaten gönderildi';
+      }
+      const printBtn = document.getElementById('of2-print-btn');
+      if (printBtn) {
+        printBtn.disabled = false;
+        printBtn.style.opacity = '1';
+        printBtn.style.cursor = 'pointer';
+        printBtn.title = 'Sipariş formunu yazdır';
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      toast('❌ Gönderim başarısız: ' + err.message, 'error');
+      if (btn) { btn.disabled = false; btn.innerHTML = '✅ Onaya Gönder'; }
+    });
+}
+
+let _lastSubmittedOrderFormJobId = null;
+let _lastSubmittedOrderGroupId = null;
+
+document.getElementById('detail-modal').addEventListener('click', e => {
+  if (e.target.id === 'detail-modal') closeDetailModal();
+});
+</script>
+</body>
+</html>

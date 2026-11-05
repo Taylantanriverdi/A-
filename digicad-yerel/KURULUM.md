@@ -1,0 +1,225 @@
+# DIGICAD Dental — Yerel Sunucu Kurulumu
+
+Bu klasör, DIGICAD Dental Laboratuvar Yönetim Sistemi'ni **Firebase olmadan,
+laboratuvardaki Windows bilgisayarında** çalıştırır. Bütün veriler ve dosyalar
+(STL, fotoğraf, PDF) bu bilgisayarda durur.
+
+## Neler değişti, neden daha güvenli?
+
+| Eskiden (Firebase + GitHub Pages) | Şimdi (yerel sunucu) |
+|---|---|
+| Hekim portalı, giriş için **tüm hekimlerin şifrelerini** tarayıcıya indiriyordu. Sayfa kaynağına bakan herkes görebiliyordu. | Şifre **sunucuda** kontrol ediliyor. Hiçbir şifre tarayıcıya gönderilmiyor. |
+| Hekim, teknisyen ve laboratuvarın tüm verileri her portala iniyor, süzme tarayıcıda yapılıyordu. | Hekim **sadece kendi işlerini**, teknisyen **sadece kendine atanan işleri** alıyor. Süzme sunucuda yapılıyor. |
+| Oturum tarayıcı belleğindeki bir kimlik numarasıydı. Numarayı değiştiren başka bir hekim gibi görünebiliyordu. | Oturum, sunucunun verdiği tahmin edilemez, şifreli bir çerez. |
+| Yönetici şifresi (4 hane) veritabanında açık metin olarak duruyordu ve sınırsız deneme yapılabiliyordu. | PIN şifrelenmiş olarak saklanıyor. 5 hatalı denemede 15 dakika kilit. |
+| Yönetim paneline internetteki herkes ulaşabiliyordu. | Yönetim paneline **sadece laboratuvar ağından** girilebiliyor. İnternete açılan kapıda bu sayfa hiç yok. |
+| Dosya bağlantısını bilen herkes dosyayı indirebiliyordu. | Dosyaları sadece giriş yapmış kullanıcılar indirebiliyor. |
+| Veriler Google sunucularındaydı. | Veriler bu bilgisayarda. Her gün otomatik yedek alınıyor. |
+
+---
+
+## 1. Kurulum (bir kez yapılır)
+
+1. **Node.js kurun:** https://nodejs.org adresinden **LTS** sürümünü indirip
+   "Next, Next" ile kurun.
+2. **Bu klasörü** (`digicad-yerel`) bilgisayarda kalıcı bir yere kopyalayın,
+   örneğin `C:\DIGICAD`. Masaüstüne veya İndirilenler klasörüne koymayın.
+
+## 2. Verileri Firebase'den aktarın (bir kez yapılır)
+
+1. `Firebase-Aktar.bat` dosyasına çift tıklayın.
+2. Program Firebase'deki bütün kayıtları ve dosyaları indirir. Dosya sayısına
+   göre birkaç dakika sürebilir.
+3. Sonunda hekim, iş ve dosya sayılarını gösterir. Kontrol edin.
+4. Eski 4 haneli yönetici şifreniz yeni sistemin PIN'i olarak aktarılır.
+
+**Otomatik indirme çalışmazsa:** Firebase konsolunda
+(https://console.firebase.google.com → primer-dental → Realtime Database)
+sağ üstteki **⋮ → JSON'u dışa aktar** seçeneğine tıklayın. İnen dosyayı bu
+klasöre koyun ve komut isteminde şunu çalıştırın:
+
+```
+node araclar\firebase-aktar.js indirdiginiz-dosya.json
+```
+
+**Primer Teknoloji verileri:** Primer Teknoloji çalışma alanı eskiden sadece
+tarayıcı belleğinde duruyordu, Firebase'de değildi. Bu verileri de taşımak için:
+
+1. Eski sitede Primer Teknoloji'yi açın ve **Ayarlar → ⬇️ Yedek İndir (.json)** ile JSON
+   dosyasını alın.
+2. Aktarımı şu şekilde çalıştırın:
+
+```
+node araclar\firebase-aktar.js --primer DIGICAD_yedek_XXXX.json
+```
+
+> Aktarımı bir kez daha yapmanız gerekirse sonuna `--uzerine-yaz` ekleyin.
+> Mevcut yerel veri önce otomatik olarak yedeklenir.
+
+## 3. Sunucuyu başlatın
+
+`Baslat.bat` dosyasına çift tıklayın. Açılan siyah pencere **sunucunun kendisi**.
+Bu pencere açık kaldığı sürece sistem çalışır.
+
+- PIN daha önce belirlenmediyse, ilk açılışta 4 haneli bir PIN sorulur.
+- Windows Güvenlik Duvarı izin isterse **sadece "Özel ağlar"** kutusunu
+  işaretleyip izin verin.
+
+Tarayıcıda açılacak adresler:
+
+| Sayfa | Adres |
+|---|---|
+| Ana sayfa (tüm paneller) | http://localhost:8080 |
+| Yönetim paneli | http://localhost:8080/PrimerLab.html |
+| Gelen İşler paneli | http://localhost:8080/GelenIslerPaneli.html |
+
+**Laboratuvardaki başka bir bilgisayar veya tabletten** girmek için
+`localhost` yerine bu bilgisayarın IP adresini yazın. Örnek:
+`http://192.168.1.20:8080`. IP adresini öğrenmek için komut isteminde
+`ipconfig` yazın ve "IPv4 Adresi" satırına bakın.
+
+## 4. Hekimlerin dışarıdan bağlanması (Tailscale Funnel)
+
+Hekimler muayenehanelerinden iş gönderebilsin diye bilgisayarı internete
+**güvenli bir tünelle** açıyoruz. Modeminizde port açmanız gerekmez. Ücretsizdir
+ve sabit bir `https://` adresi verir.
+
+1. https://tailscale.com/download adresinden Windows sürümünü kurun ve bir
+   hesapla (ör. Google hesabınız) giriş yapın.
+2. **Komut İstemi'ni yönetici olarak** açın ve şunu yazın:
+
+   ```
+   tailscale funnel --bg 8081
+   ```
+
+3. İlk seferde ekranda bir bağlantı çıkar. Bağlantıyı açıp "HTTPS" ve
+   "Funnel" özelliklerini onaylayın, sonra komutu tekrar çalıştırın.
+4. Ekranda şuna benzer bir adres görünür:
+   `https://digicad-pc.tail1234.ts.net`. Hekimlere vereceğiniz adres:
+
+   ```
+   https://digicad-pc.tail1234.ts.net/HekimPortali.html
+   ```
+
+   Teknisyenler için `/TeknisyenPaneli.html`.
+
+> ⚠️ Tünel **mutlaka 8081'e** yönlendirilmeli, **8080'e değil**. 8081 sadece
+> Hekim ve Teknisyen portallarını sunar. Yönetim paneli bu kapıdan açılmaz,
+> açılmaya çalışılırsa sunucu girişi reddeder.
+
+`--bg` seçeneği sayesinde tünel bilgisayar yeniden başladığında da kendiliğinden
+açılır. Kapatmak için: `tailscale funnel reset`
+
+*Alternatif:* Kendi alan adınız varsa (ör. `digicaddental.com`) Cloudflare
+Tunnel ile `https://portal.digicaddental.com` gibi bir adres de
+kullanılabilir. Burada da tünel `http://localhost:8081` adresine
+yönlendirilmeli.
+
+## 5. Bilgisayar açılınca otomatik başlasın
+
+1. `Win + R` tuşlarına basın, `shell:startup` yazıp Enter'a basın.
+2. Açılan klasöre `Baslat.bat` dosyasının **kısayolunu** koyun: dosyaya sağ
+   tıklayın, "Kısayol oluştur" deyin, sonra kısayolu bu klasöre taşıyın.
+
+Bilgisayarın uyku moduna girmemesi gerekir:
+**Ayarlar → Sistem → Güç → Ekran ve uyku → "Uyku: Hiçbir zaman"**.
+
+## 6. Yedekleme
+
+- Sunucu her gün `veri\yedekler\` klasörüne veritabanının bir kopyasını alır
+  ve son 60 günü saklar.
+- **Bilgisayar bozulursa verileri kaybetmemek için** ikinci bir yere de yedek
+  alın. Bunun için `veri\ayarlar.json` dosyasını Not Defteri ile açın ve
+  harici disk ya da ağ klasörünü yazın:
+
+  ```json
+  "yedekKlasoru": "E:\\DIGICAD-Yedek",
+  ```
+
+  Sunucuyu yeniden başlatın. Bundan sonra her gün veritabanı ve tüm dosyalar
+  bu klasöre de kopyalanır.
+- Yönetim panelindeki "otomatik yedek klasörü" özelliği de çalışmaya devam eder.
+
+**Tüm veriler `veri\` klasöründedir.** Bilgisayar değiştirirken bu klasörü
+yeni bilgisayara kopyalamanız yeterlidir.
+
+## 7. Firebase'i kapatın (yeni sistem sorunsuz çalıştıktan sonra)
+
+Yeni sistemi birkaç gün kullanıp verilerin eksiksiz olduğundan emin olduktan
+sonra:
+
+1. **Firebase konsolu → Realtime Database → Kurallar** bölümünü şöyle
+   değiştirip Yayınla'ya basın:
+
+   ```json
+   { "rules": { ".read": false, ".write": false } }
+   ```
+
+2. **Storage → Kurallar** bölümünde de bütün erişimi kapatın:
+
+   ```
+   rules_version = '2';
+   service firebase.storage { match /b/{bucket}/o { match /{allPaths=**} { allow read, write: if false; } } }
+   ```
+
+3. **Authentication → Sign-in method** bölümünde **Anonymous** girişi kapatın.
+4. Sonra Realtime Database ve Storage'daki verileri silin. İsterseniz projeyi
+   tamamen silin.
+5. GitHub'da `dental-lab` deposu için iki seçenekten birini uygulayın:
+   **Settings → Pages** bölümünden yayını kapatın, ya da depoyu **Private**
+   yapın. Böylece eski site de kapanır.
+6. OpenAI veya Gmail anahtarlarını eski sitede kullandıysanız, ilgili
+   hesaplardan bu anahtarları **iptal edip yenileyin**.
+
+## Sık sorulanlar
+
+**PIN'i nasıl değiştiririm?**
+İki yol var:
+- Yönetim panelinde **Ayarlar → 🔒 Program Giriş Şifresi** bölümü.
+- Sunucu kapalıyken `PIN-Degistir.bat`.
+
+**Hekim şifresini nasıl değiştiririm?**
+Eskisi gibi, yönetim panelinde **Hekimler** sayfasından. Şifre değiştiği anda
+hekimin açık oturumları da kapanır.
+
+**"Yönetim paneline sadece laboratuvar ağından erişilebilir" hatası alıyorum.**
+Yönetim paneline internet tünelinden girmeye çalışıyorsunuz. Bu bilinçli olarak
+engellendi. Laboratuvardaki bir bilgisayardan girin.
+
+**Mail Kutusu (Gmail) çalışmıyor.**
+Sayfanın adresi değiştiği için (`localhost:8080`) Google Cloud Console'daki
+OAuth istemcisine `http://localhost:8080` adresini "Yetkili JavaScript
+kaynakları" listesine eklemeniz gerekir.
+
+**Yapay zekâ özellikleri?**
+Kapalı durumdalar. Ayarlardan bir OpenAI anahtarı girilmedikçe çalışmazlar.
+
+**Orijinal sayfalarda değişiklik yaptım, yerel sürüme nasıl aktarırım?**
+Değiştirdiğiniz HTML dosyalarını bir klasöre koyun ve şunu çalıştırın:
+
+```
+node araclar\sayfalari-donustur.js C:\orijinal-sayfalar-klasoru
+```
+
+Dönüştürülmüş sayfalar `public\` klasörüne yazılır. Ardından güvenlik
+testlerini çalıştırın:
+
+```
+node test\calistir.js
+```
+
+## Teknik özet
+
+- `sunucu.js` — sunucu. Ek paket gerektirmez, sadece Node.js yeterli.
+  - İç kapı (8080) tüm paneller içindir.
+  - Dış kapı (8081, sadece `127.0.0.1`) yalnızca hekim ve teknisyen portalları
+    içindir.
+- `lib/yetki.js` — kim neyi okuyup yazabilir. Bütün güvenlik kuralları burada.
+- `public/firebase-yerel.js` — sayfalardaki Firebase çağrılarını yerel
+  sunucuya yönlendirir.
+- `veri/veritabani.json` — tüm kayıtlar. Atomik olarak yazılır, yazma sırasında
+  elektrik kesilse bile dosya bozulmaz.
+- `veri/dosyalar/` — yüklenen dosyalar.
+- `veri/ayarlar.json` — kapılar, yedek klasörü ve şifrelenmiş PIN.
+- `veri/` klasörü `.gitignore` içinde. Gerçek veriler hiçbir zaman GitHub'a
+  gönderilmez.

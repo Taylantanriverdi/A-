@@ -1,0 +1,13 @@
+{"meta":{"pass":"4826","migratedToWorkspaces":true},
+ "db":{"digicad":{"pass":"4826",
+  "doctors":{"1":{"id":1,"name":"Dr Ali Kaya","username":"ali","password":"ali123","phone":"555","prices":{"Zirkon":{"price":1000,"currency":"TRY"}}},
+             "2":{"id":2,"name":"Dr Ayşe Er","username":"ayse","password":"ayse123","prices":{}}},
+  "technicians":{"10":{"id":10,"name":"Veli Usta","username":"veli","password":"veli123","type":"ic","spec":"Tasarım"},
+                 "11":{"id":11,"name":"Can Usta","username":"can","password":"can123","type":"dis"}},
+  "jobs":{"100":{"id":100,"drId":1,"drName":"Dr Ali Kaya","techId":10,"techName":"Veli Usta","patient":"Hasta A","status":"Tasarımda","type":"Zirkon","date":"2026-11-01","price":1000,"currency":"TRY","qty":1},
+          "101":{"id":101,"drId":2,"drName":"Dr Ayşe Er","techId":11,"techName":"Can Usta","patient":"Hasta B","status":"Bekliyor","type":"Zirkon","date":"2026-11-02","price":900,"currency":"TRY","qty":1}},
+  "chats":{"job_100":{"messages":{"m1":{"id":"m1","senderRole":"admin","text":"Merhaba Ali","timestamp":"2026-11-01T10:00:00Z"}}},
+           "job_101":{"messages":{"m2":{"id":"m2","senderRole":"admin","text":"Gizli Ayşe","timestamp":"2026-11-01T10:00:00Z"}}}},
+  "doctorSubmissions":{"500":{"id":500,"drId":2,"patient":"Ayşe hastası","status":"Yeni"}},
+  "pendingJobs":{}
+ }}}
