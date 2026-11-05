@@ -171,6 +171,35 @@ sonra:
 6. OpenAI veya Gmail anahtarlarını eski sitede kullandıysanız, ilgili
    hesaplardan bu anahtarları **iptal edip yenileyin**.
 
+## Veri Aktarımı sayfası (eski sistemden kopyalama ve tam yedek)
+
+Yönetim panelinde **Ayarlar → 🔄 Eski Sistemden Veri Aktar / Tam Yedek**
+düğmesiyle ya da doğrudan http://localhost:8080/VeriAktarimi.html adresinden
+açılır. Bu sayfadan şunları yapabilirsiniz:
+
+- **Firebase'den doğrudan al:** Eski sistemdeki DIGICAD verisinin güncel hâlini
+  çeker. Hasta ve iş kayıtları, hekimler, teknisyenler, kasa (ödemeler, giderler,
+  satışlar), arşiv (hesap kapanışları), mesajlar ve dosyaların hepsi gelir.
+- **Yedek dosyasından al:** Eski sistemde **Ayarlar → ⬇️ Yedek İndir (.json)**
+  ile alınan dosya, Firebase konsolundan dışa aktarılan JSON ya da bu sistemin
+  kendi tam yedeği. Primer Teknoloji verileri yalnızca bu yolla aktarılabilir.
+- Aktarımı başlatmadan önce **neyin ekleneceğini tabloda görürsünüz**.
+- **Sadece eksikleri ekle** (önerilen) seçeneği yalnızca yeni sistemde olmayan
+  kayıtları ekler. Yeni sistemde yaptığınız değişikliklere dokunulmaz.
+- **Tamamen değiştir** seçeneği, çalışma alanındaki tüm veriyi yedektekiyle
+  değiştirir.
+- Her aktarımdan önce `veri\yedekler\` klasörüne otomatik yedek alınır.
+- **Tam yedeği indir** düğmesi, yeni sistemdeki tüm kayıtları tek bir dosya
+  olarak indirir.
+
+## Yazılımı güncelleme
+
+1. Sunucu penceresini kapatın.
+2. Yeni ZIP'teki `public`, `lib`, `araclar` ve `Kisayollar` klasörlerini, ayrıca
+   `sunucu.js` dosyasını `C:\digicad-yerel` klasörünün üzerine kopyalayın.
+   **`veri` klasörüne dokunmayın.**
+3. `Baslat` dosyasına çift tıklayın.
+
 ## Sık sorulanlar
 
 **PIN'i nasıl değiştiririm?**

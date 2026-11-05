@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veri Aktarımı | DIGICAD Dental</title>
+<script>window.DL_PANEL='yonetici';</script>
+<script src="firebase-yerel.js"></script>
+<style>
+  :root {
+    --bg:#f2f5fa; --kart:#ffffff; --yazi:#16202e; --soluk:#5d6a7e; --cizgi:#e0e6ef;
+    --mavi:#1565c0; --mavi-acik:#e8f0fb; --yesil:#0f8a5f; --yesil-acik:#e5f5ee;
+    --turuncu:#b45309; --turuncu-acik:#fdf3e4; --kirmizi:#c62828; --kirmizi-acik:#fdecec;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg:#0f141c; --kart:#18202b; --yazi:#e7edf5; --soluk:#9aa7b9; --cizgi:#2a3443;
+    --mavi:#64a6f2; --mavi-acik:#1a2a40; --yesil:#4cc79a; --yesil-acik:#15302a;
+    --turuncu:#f0a75a; --turuncu-acik:#33261a; --kirmizi:#f07c7c; --kirmizi-acik:#3a1d1f;
+  } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--yazi); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { background:#0f2440; color:#fff; padding:16px; }
+  header .ic { max-width:960px; margin:0 auto; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header p { margin:0; opacity:.75; font-size:13px; }
+  header a { margin-left:auto; color:#cfe2ff; font-size:14px; }
+  main { max-width:960px; margin:0 auto; padding:20px 16px 60px; }
+  .kart { background:var(--kart); border:1px solid var(--cizgi); border-radius:12px; padding:20px; margin-bottom:16px; }
+  .kart h2 { font-size:16px; margin:0 0 4px; display:flex; align-items:center; gap:10px; }
+  .kart h2 .no { width:26px; height:26px; border-radius:50%; background:var(--mavi-acik); color:var(--mavi); display:inline-flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex:none; }
+  .alt { color:var(--soluk); font-size:14px; margin:0 0 16px; }
+  .secenekler { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:12px; }
+  .secenek { border:1px solid var(--cizgi); border-radius:10px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .secenek b { font-size:15px; }
+  .secenek span { color:var(--soluk); font-size:13.5px; }
+  button, .dugme { font:inherit; font-weight:600; border:0; border-radius:8px; padding:10px 16px; cursor:pointer; background:var(--mavi); color:#fff; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+  button.ikincil, .dugme.ikincil { background:transparent; color:var(--mavi); border:1px solid var(--mavi); }
+  button.tehlike { background:var(--kirmizi); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  select, input[type=password] { font:inherit; padding:9px 10px; border:1px solid var(--cizgi); border-radius:8px; background:var(--kart); color:var(--yazi); width:100%; }
+  label.dosya { border:1.5px dashed var(--cizgi); border-radius:8px; padding:12px; text-align:center; cursor:pointer; color:var(--soluk); font-size:13.5px; }
+  label.dosya:hover { border-color:var(--mavi); color:var(--mavi); }
+  input[type=file] { display:none; }
+  .tablo-kap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--soluk); font-weight:600; padding:8px 10px; border-bottom:1px solid var(--cizgi); white-space:nowrap; }
+  td { padding:9px 10px; border-bottom:1px solid var(--cizgi); }
+  td.sayi, th.sayi { text-align:right; font-variant-numeric: tabular-nums; }
+  td .rozet { display:inline-block; min-width:34px; text-align:center; padding:1px 8px; border-radius:20px; font-weight:600; }
+  .r-yeni { background:var(--yesil-acik); color:var(--yesil); }
+  .r-farkli { background:var(--turuncu-acik); color:var(--turuncu); }
+  .ws-baslik { font-weight:700; margin:18px 0 8px; }
+  .mod { display:flex; gap:10px; align-items:flex-start; border:1px solid var(--cizgi); border-radius:10px; padding:12px 14px; margin-top:10px; cursor:pointer; }
+  .mod input { margin-top:4px; }
+  .mod.secili { border-color:var(--mavi); background:var(--mavi-acik); }
+  .mod small { display:block; color:var(--soluk); }
+  .uyari { background:var(--turuncu-acik); color:var(--turuncu); border-radius:8px; padding:10px 12px; font-size:14px; margin-top:12px; }
+  .hata { background:var(--kirmizi-acik); color:var(--kirmizi); border-radius:8px; padding:10px 12px; font-size:14px; margin-top:12px; }
+  .basari { background:var(--yesil-acik); color:var(--yesil); border-radius:8px; padding:12px 14px; font-size:15px; font-weight:600; }
+  .cubuk { height:10px; background:var(--cizgi); border-radius:10px; overflow:hidden; margin:10px 0 4px; }
+  .cubuk div { height:100%; background:var(--mavi); width:0; transition: width .3s; }
+  .satir { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; align-items:center; }
+  .gizli { display:none !important; }
+  .pin-kutu { max-width:320px; margin:40px auto; text-align:center; }
+  .pin-kutu input { text-align:center; font-size:22px; letter-spacing:.5em; margin:12px 0; }
+  details { margin-top:10px; font-size:13px; color:var(--soluk); }
+  details li { word-break:break-all; }
+  .yukleniyor::after { content:''; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; display:inline-block; animation: don .7s linear infinite; }
+  @keyframes don { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header><div class="ic">
+  <div><h1>🔄 Veri Aktarımı</h1><p>Eski sistemdeki (Firebase) tüm verileri bu bilgisayardaki yeni sisteme kopyalayın</p></div>
+  <a href="PrimerLab.html">← Yönetim paneline dön</a>
+</div></header>
+
+<main>
+  <!-- PIN -->
+  <div id="giris" class="kart pin-kutu gizli">
+    <h2 style="justify-content:center">🔒 Yönetici girişi</h2>
+    <p class="alt">Yönetim paneli PIN'inizi girin</p>
+    <input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">
+    <button id="pin-btn" style="width:100%">Giriş</button>
+    <div id="pin-hata" class="hata gizli"></div>
+  </div>
+
+  <div id="icerik" class="gizli">
+    <!-- 1. KAYNAK -->
+    <section class="kart" id="adim1">
+      <h2><span class="no">1</span> Verilerin nereden alınacağını seçin</h2>
+      <p class="alt">Hasta / iş kayıtları, hekimler, teknisyenler, kasa (ödemeler, giderler, satışlar), arşiv (hesap kapanışları), hekimden gelenler, sipariş formları, mesajlar ve tüm dosyalar (STL, fotoğraf, PDF) aktarılır. Bir sonraki adımda ne ekleneceğini görüp onaylamadan <b>hiçbir şey değişmez</b>.</p>
+      <div class="secenekler">
+        <div class="secenek">
+          <b>☁️ Firebase'den doğrudan al</b>
+          <span>DIGICAD Dental çalışma alanının eski sistemdeki güncel hâli internetten indirilir. Eski sistem hâlâ açıkken kullanılabilir.</span>
+          <button id="firebase-btn">Firebase'den getir</button>
+        </div>
+        <div class="secenek">
+          <b>📁 Yedek dosyasından al</b>
+          <span>Eski sistemde <b>Ayarlar → ⬇️ Yedek İndir (.json)</b> ile aldığınız dosya, Firebase konsolundan dışa aktarılan JSON ya da bu sistemin "Tam yedek" dosyası. <b>Primer Teknoloji verileri yalnızca bu yolla aktarılabilir</b> (eskiden sadece tarayıcıda duruyordu).</span>
+          <select id="hedef">
+            <option value="digicad">Bu yedek: DIGICAD Dental</option>
+            <option value="primer">Bu yedek: Primer Teknoloji</option>
+          </select>
+          <label class="dosya" for="dosya" id="dosya-etiket">Yedek dosyasını seçin (.json)</label>
+          <input type="file" id="dosya" accept=".json,application/json">
+        </div>
+      </div>
+      <div id="adim1-hata" class="hata gizli"></div>
+    </section>
+
+    <!-- 2. ÖNİZLEME -->
+    <section class="kart gizli" id="adim2">
+      <h2><span class="no">2</span> Kontrol edin ve onaylayın</h2>
+      <p class="alt" id="kaynak-adi"></p>
+      <div id="ozet"></div>
+      <div class="mod secili" data-mod="birlestir">
+        <input type="radio" name="mod" value="birlestir" checked>
+        <div><b>Sadece eksikleri ekle</b> <span style="color:var(--yesil);font-size:13px">(önerilen)</span>
+          <small>Yeni sistemde olmayan kayıtlar eklenir. Yeni sistemde zaten olan kayıtlara <b>dokunulmaz</b>, sizin yeni sistemde yaptığınız değişiklikler korunur. Mesajlarda eksik mesajlar eklenir. Daha önce indirilemeyen dosyalar tekrar denenir.</small></div>
+      </div>
+      <div class="mod" data-mod="degistir">
+        <input type="radio" name="mod" value="degistir">
+        <div><b>Tamamen değiştir</b>
+          <small>Yukarıdaki çalışma alan(lar)ının yeni sistemdeki tüm verisi silinip yedekteki veriyle değiştirilir. Yeni sistemde girilmiş ama yedekte olmayan kayıtlar <b>kaybolur</b>.</small></div>
+      </div>
+      <div id="degistir-uyari" class="uyari gizli">⚠️ Yeni sistemde yaptığınız tüm değişiklikler bu çalışma alanında silinecek. İşlemden önce otomatik yedek alınır ama yine de emin olun.</div>
+      <div class="satir">
+        <button id="uygula-btn">Aktarımı başlat</button>
+        <button class="ikincil" id="vazgec-btn">Vazgeç</button>
+      </div>
+      <div id="adim2-hata" class="hata gizli"></div>
+    </section>
+
+    <!-- 3. İLERLEME / SONUÇ -->
+    <section class="kart gizli" id="adim3">
+      <h2><span class="no">3</span> Aktarım</h2>
+      <p id="asama" class="alt"></p>
+      <div class="cubuk"><div id="cubuk"></div></div>
+      <p id="dosya-ilerleme" class="alt"></p>
+      <div id="sonuc"></div>
+    </section>
+
+    <!-- YEDEK -->
+    <section class="kart">
+      <h2>💾 Yeni sistemin tam yedeği</h2>
+      <p class="alt">Tüm çalışma alanlarının (DIGICAD + Primer) bütün kayıtlarını tek bir dosya olarak indirir. Bu dosyayı USB belleğe ya da başka bir bilgisayara saklayın; gerekirse yukarıdaki "Yedek dosyasından al" ile geri yükleyebilirsiniz. (Yüklenen dosyalar — STL, fotoğraf — <code>C:\digicad-yerel\veri\dosyalar</code> klasöründedir; onları da klasör olarak kopyalayın.)</p>
+      <a class="dugme ikincil" href="/api/yedek-indir?panel=yonetici">⬇️ Tam yedeği indir</a>
+    </section>
+  </div>
+</main>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const goster = (el, v) => el.classList.toggle('gizli', !v);
+  const hataGoster = (id, m) => { const e = $(id); e.textContent = m || ''; goster(e, !!m); };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ALAN = { digicad: '🦷 DIGICAD Dental', primer: '🛠️ Primer Teknoloji' };
+  let hazirlikId = null;
+
+  function istek(yontem, adres, govde, ham) {
+    const h = { 'X-DL-Panel': 'yonetici' };
+    let body;
+    if (ham !== undefined) { h['Content-Type'] = 'application/json'; body = ham; }
+    else if (govde !== undefined) { h['Content-Type'] = 'application/json'; body = JSON.stringify(govde); }
+    return fetch(adres, { method: yontem, headers: h, body, credentials: 'same-origin' })
+      .then(r => r.json().catch(() => ({})).then(j => { if (!r.ok) throw new Error(j.hata || ('Hata ' + r.status)); return j; }));
+  }
+
+  // ── Giriş ──
+  function baslat() {
+    DL.ben().then(r => {
+      const ok = r && r.kullanici && r.kullanici.rol === 'yonetici';
+      goster($('giris'), !ok); goster($('icerik'), ok);
+      if (ok) durumKontrol(true); else $('pin').focus();
+    }).catch(e => { goster($('giris'), true); hataGoster('pin-hata', e.message); });
+  }
+  function pinGiris() {
+    const p = $('pin').value;
+    if (!/^\d{4}$/.test(p)) { hataGoster('pin-hata', 'PIN 4 haneli olmalı'); return; }
+    DL.giris({ pin: p }).then(() => { $('pin').value = ''; hataGoster('pin-hata', ''); baslat(); })
+      .catch(e => { $('pin').value = ''; hataGoster('pin-hata', e.message); });
+  }
+  $('pin-btn').onclick = pinGiris;
+  $('pin').onkeydown = e => { if (e.key === 'Enter') pinGiris(); };
+
+  // ── 1. Kaynak ──
+  function mesgul(btn, v, metin) {
+    btn.disabled = v;
+    if (v) { btn.dataset.eski = btn.innerHTML; btn.innerHTML = '<span class="yukleniyor"></span> ' + metin; }
+    else if (btn.dataset.eski) btn.innerHTML = btn.dataset.eski;
+  }
+  $('firebase-btn').onclick = () => {
+    const b = $('firebase-btn');
+    hataGoster('adim1-hata', '');
+    mesgul(b, true, 'Firebase\'den indiriliyor…');
+    istek('POST', '/api/aktarim/hazirla?kaynak=firebase', {})
+      .then(onizle).catch(e => hataGoster('adim1-hata', e.message)).finally(() => mesgul(b, false));
+  };
+  $('dosya').onchange = () => {
+    const f = $('dosya').files[0];
+    if (!f) return;
+    hataGoster('adim1-hata', '');
+    const et = $('dosya-etiket');
+    et.innerHTML = '<span class="yukleniyor"></span> ' + esc(f.name) + ' okunuyor…';
+    istek('POST', '/api/aktarim/hazirla?kaynak=dosya&hedef=' + $('hedef').value + '&ad=' + encodeURIComponent(f.name), undefined, f)
+      .then(onizle).catch(e => hataGoster('adim1-hata', e.message))
+      .finally(() => { et.textContent = 'Yedek dosyasını seçin (.json)'; $('dosya').value = ''; });
+  };
+
+  // ── 2. Önizleme ──
+  function onizle(r) {
+    hazirlikId = r.id;
+    $('kaynak-adi').textContent = 'Kaynak: ' + r.kaynakAdi;
+    let h = '';
+    for (const [ws, satirlar] of Object.entries(r.ozet)) {
+      const toplamYeni = satirlar.reduce((t, s) => t + s.yeni, 0);
+      h += `<div class="ws-baslik">${ALAN[ws] || esc(ws)} — ${toplamYeni ? `<span style="color:var(--yesil)">${toplamYeni} yeni kayıt eklenecek</span>` : 'eklenecek yeni kayıt yok'}</div>`;
+      h += '<div class="tablo-kap"><table><thead><tr><th>Veri</th><th class="sayi">Yeni sistemde</th><th class="sayi">Yedekte</th><th class="sayi">Eklenecek</th><th class="sayi">Aynı</th><th class="sayi">Farklı*</th></tr></thead><tbody>';
+      for (const s of satirlar) {
+        if (!s.gelen && !s.yerel) continue;
+        h += `<tr><td>${esc(s.ad)}${s.birim === 'mesaj' ? ' <small style="color:var(--soluk)">(mesaj)</small>' : ''}</td>
+          <td class="sayi">${s.yerel}</td><td class="sayi">${s.gelen}</td>
+          <td class="sayi">${s.yeni ? `<span class="rozet r-yeni">+${s.yeni}</span>` : '—'}</td>
+          <td class="sayi">${s.ayni || '—'}</td>
+          <td class="sayi">${s.farkli ? `<span class="rozet r-farkli">${s.farkli}</span>` : '—'}</td></tr>`;
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '<p class="alt" style="margin-top:10px">* <b>Farklı</b>: iki sistemde de olan ama içeriği değişmiş kayıtlar (ör. yeni sistemde durumu güncellenmiş iş). "Sadece eksikleri ekle" seçiliyken bunlarda <b>yeni sistemdeki hâli korunur</b>.</p>';
+    $('ozet').innerHTML = h;
+    goster($('adim2'), true); goster($('adim3'), false);
+    hataGoster('adim2-hata', '');
+    $('adim2').scrollIntoView({ behavior: 'smooth' });
+  }
+  document.querySelectorAll('.mod').forEach(el => el.onclick = () => {
+    document.querySelectorAll('.mod').forEach(x => { x.classList.toggle('secili', x === el); x.querySelector('input').checked = x === el; });
+    goster($('degistir-uyari'), el.dataset.mod === 'degistir');
+    $('uygula-btn').classList.toggle('tehlike', el.dataset.mod === 'degistir');
+  });
+  $('vazgec-btn').onclick = () => { goster($('adim2'), false); hazirlikId = null; };
+  $('uygula-btn').onclick = () => {
+    const mod = document.querySelector('input[name=mod]:checked').value;
+    if (mod === 'degistir' && !confirm('Seçilen çalışma alanının yeni sistemdeki verileri tamamen yedektekiyle DEĞİŞTİRİLECEK. Devam edilsin mi?')) return;
+    hataGoster('adim2-hata', '');
+    istek('POST', '/api/aktarim/uygula', { id: hazirlikId, mod }).then(() => {
+      goster($('adim2'), false); goster($('adim3'), true); $('sonuc').innerHTML = '';
+      $('adim3').scrollIntoView({ behavior: 'smooth' });
+      durumKontrol(false);
+    }).catch(e => hataGoster('adim2-hata', e.message));
+  };
+
+  // ── 3. İlerleme ──
+  function durumKontrol(ilkAcilis) {
+    istek('GET', '/api/aktarim/durum').then(d => {
+      if (d.calisiyor) {
+        goster($('adim3'), true);
+        $('asama').innerHTML = '<span class="yukleniyor"></span> ' + esc(d.asama || 'Çalışıyor…');
+        const f = d.dosya;
+        if (f && f.toplam) { $('cubuk').style.width = Math.round(100 * f.biten / f.toplam) + '%'; $('dosya-ilerleme').textContent = `${f.biten} / ${f.toplam} dosya`; }
+        else { $('cubuk').style.width = '15%'; $('dosya-ilerleme').textContent = ''; }
+        setTimeout(() => durumKontrol(false), 1000);
+        return;
+      }
+      if (!d.bitti || ilkAcilis) return;
+      $('cubuk').style.width = '100%';
+      if (d.hata) { $('asama').textContent = ''; $('sonuc').innerHTML = `<div class="hata">Aktarım yapılamadı: ${esc(d.hata)}<br>Verilerinizde hiçbir değişiklik yapılmadı.</div>`; return; }
+      $('asama').textContent = 'Tamamlandı';
+      let eklenen = 0;
+      for (const satirlar of Object.values(d.ozet)) for (const s of satirlar) eklenen += d.mod === 'degistir' ? s.gelen : s.yeni;
+      let h = `<div class="basari">✓ Aktarım tamamlandı — ${d.mod === 'degistir' ? 'veriler yedektekiyle değiştirildi' : eklenen + ' yeni kayıt eklendi'}</div>`;
+      h += `<p class="alt" style="margin-top:12px">Dosyalar: ${d.dosya.indirilen} indirildi${d.dosya.basarisiz.length ? `, <b style="color:var(--kirmizi)">${d.dosya.basarisiz.length} indirilemedi</b>` : ''}.<br>Aktarımdan önceki verilerin yedeği: <code>${esc(d.yedekDosyasi || '—')}</code></p>`;
+      if (d.dosya.basarisiz.length) {
+        h += '<details><summary>İndirilemeyen dosyalar</summary><ul>' +
+          d.dosya.basarisiz.map(b => `<li>${esc(b.hata)} — ${esc(decodeURIComponent((b.adres.split('/o/')[1] || '').split('?')[0]))}</li>`).join('') +
+          '</ul><p>"Firebase\'de bulunamadı" yazanlar eski sistemde de silinmiş dosyalardır; bunlar kurtarılamaz.</p></details>';
+      }
+      h += '<div class="satir"><a class="dugme" href="PrimerLab.html">Yönetim paneline git</a><button class="ikincil" onclick="location.reload()">Başka bir aktarım yap</button></div>';
+      $('sonuc').innerHTML = h;
+      $('dosya-ilerleme').textContent = '';
+    }).catch(e => { if (!ilkAcilis) $('sonuc').innerHTML = `<div class="hata">${esc(e.message)}</div>`; });
+  }
+
+  baslat();
+})();
+</script>
+</body>
+</html>

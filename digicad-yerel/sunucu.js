@@ -22,6 +22,7 @@ const readline = require('readline');
 const agac = require('./lib/agac');
 const Depo = require('./lib/depo');
 const yetki = require('./lib/yetki');
+const aktarim = require('./lib/aktarim');
 
 const KOK = __dirname;
 const GENEL = path.join(KOK, 'public');
@@ -452,6 +453,49 @@ function isleyiciOlustur(kapi) {
         return json(res, 200, { tamam: true });
       }
 
+      // ── Veri aktarımı (sadece yönetici) ─────────────────
+      if (yol.startsWith('/api/aktarim/') || yol === '/api/yedek-indir') {
+        if (!oturum || oturum.rol !== 'yonetici') return json(res, 401, { hata: 'Yönetici girişi gerekiyor' });
+
+        if (yol === '/api/yedek-indir' && req.method === 'GET') {
+          depo.kaydet();
+          const tarih = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Disposition': `attachment; filename="DIGICAD-tam-yedek-${tarih}.json"`,
+            'Cache-Control': 'no-store',
+          });
+          fs.createReadStream(depo.dosya).pipe(res);
+          return;
+        }
+
+        if (yol === '/api/aktarim/hazirla' && req.method === 'POST') {
+          if (aktarimDurumu.calisiyor) return json(res, 409, { hata: 'Bir aktarım zaten sürüyor' });
+          const kaynak = url.searchParams.get('kaynak');
+          const hedef = url.searchParams.get('hedef') || null;
+          let ham, kaynakAdi;
+          if (kaynak === 'firebase') { ham = await aktarim.firebaseIndir(); kaynakAdi = 'Firebase (eski sistem)'; }
+          else { ham = await jsonOku(req); kaynakAdi = url.searchParams.get('ad') || 'Yedek dosyası'; }
+          const gelen = aktarim.bicimlendir(ham, hedef);
+          ham = null;
+          aktarimHazirlik = { id: crypto.randomBytes(8).toString('hex'), gelen, kaynakAdi, zaman: Date.now() };
+          return json(res, 200, { id: aktarimHazirlik.id, kaynakAdi, ozet: aktarim.ozetle(depo.kok, gelen) });
+        }
+
+        if (yol === '/api/aktarim/uygula' && req.method === 'POST') {
+          const g = await jsonOku(req);
+          if (aktarimDurumu.calisiyor) return json(res, 409, { hata: 'Bir aktarım zaten sürüyor' });
+          if (!aktarimHazirlik || aktarimHazirlik.id !== g.id) return json(res, 400, { hata: 'Önizleme bulunamadı, tekrar hazırlayın' });
+          if (!['birlestir', 'degistir'].includes(g.mod)) return json(res, 400, { hata: 'Geçersiz mod' });
+          aktarimBaslat(aktarimHazirlik, g.mod);
+          aktarimHazirlik = null;
+          return json(res, 200, { tamam: true });
+        }
+
+        if (yol === '/api/aktarim/durum' && req.method === 'GET') return json(res, 200, aktarimDurumu);
+        return json(res, 404, { hata: 'Bilinmeyen adres' });
+      }
+
       // ── Dosya yükleme ───────────────────────────────────
       if (yol === '/api/yukle' && req.method === 'POST') {
         if (!oturum) return json(res, 401, { hata: 'Dosya yüklemek için giriş yapın' });
@@ -498,6 +542,46 @@ function isleyiciOlustur(kapi) {
       if (!res.headersSent) json(res, durum, { hata: e.message || 'Sunucu hatası' });
     }
   };
+}
+
+// ── VERİ AKTARIMI İŞİ ───────────────────────────────────────────────
+let aktarimHazirlik = null;
+let aktarimDurumu = { calisiyor: false };
+async function aktarimBaslat(hazirlik, mod) {
+  aktarimDurumu = { calisiyor: true, asama: 'Mevcut veriler yedekleniyor…', baslangic: Date.now() };
+  try {
+    // 1) Önce mevcut verinin yedeği
+    depo.kaydet();
+    let yedekDosyasi = null;
+    if (fs.existsSync(depo.dosya)) {
+      yedekDosyasi = path.join(depo.yedekKlasoru, `veritabani-aktarim-oncesi-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+      fs.copyFileSync(depo.dosya, yedekDosyasi);
+    }
+    // 2) Gelen veride ve yerelde kalan Firebase dosya bağlantılarını indir
+    const alanlar = Object.keys(hazirlik.gelen.calismaAlanlari);
+    const taranacak = { gelen: hazirlik.gelen.calismaAlanlari, yerel: alanlar.map(ws => depo.oku(['db', ws])) };
+    aktarimDurumu.asama = 'Dosyalar indiriliyor…';
+    const dosyaSonucu = await aktarim.dosyalariTasi(taranacak, dosyaDizini, DOSYALAR, (b, t) => { aktarimDurumu.dosya = { biten: b, toplam: t }; });
+    dosyaDiziniKaydet();
+    // 3) Birleştirme — bu kısım eşzamanlı çalışır, araya başka yazım giremez
+    aktarimDurumu.asama = 'Veriler birleştiriliyor…';
+    const gelen = { ...hazirlik.gelen, calismaAlanlari: aktarim.adresleriDegistir(hazirlik.gelen.calismaAlanlari, dosyaSonucu.eslesme) };
+    const yerelKok = aktarim.adresleriDegistir(depo.kok, dosyaSonucu.eslesme);
+    const once = aktarim.ozetle(depo.kok, hazirlik.gelen);
+    const yeni = aktarim.birlestir(yerelKok, gelen, mod);
+    depo.uygula(Object.entries(yeni).map(([ws, deger]) => ({ parcalar: ['db', ws], deger })));
+    if (!depo.oku(['meta', 'migratedToWorkspaces'])) depo.uygula([{ parcalar: ['meta', 'migratedToWorkspaces'], deger: true }]);
+    depo.kaydet();
+    aktarimDurumu = {
+      calisiyor: false, bitti: true, mod, kaynakAdi: hazirlik.kaynakAdi, yedekDosyasi,
+      ozet: once,
+      dosya: { toplam: dosyaSonucu.toplam, indirilen: dosyaSonucu.indirilen, basarisiz: dosyaSonucu.basarisiz },
+    };
+    console.log(`[aktarım] ${hazirlik.kaynakAdi} — ${mod === 'degistir' ? 'tamamen değiştirildi' : 'eksik kayıtlar eklendi'} (yedek: ${yedekDosyasi})`);
+  } catch (e) {
+    console.error('[aktarım] HATA:', e);
+    aktarimDurumu = { calisiyor: false, bitti: true, hata: e.message };
+  }
 }
 
 // ── YEDEKLEME ───────────────────────────────────────────────────────

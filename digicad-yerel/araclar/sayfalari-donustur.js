@@ -99,6 +99,12 @@ function numPress(n) {
   html = degistir(html, "Firebase'e bağlanıyor...", 'Sunucuya bağlanıyor...', 'yükleniyor yazısı');
   html = degistir(html, "toast('Firebase bağlantı hatası — çevrimdışı mod', 'error');", "toast('Sunucu bağlantı hatası', 'error');", 'bağlantı hatası');
 
+  // Ayarlar sayfasına "Veri Aktarımı" düğmesi
+  html = degistir(html, '<button class="btn btn-outline" onclick="exportDB()">⬇️ Yedek İndir (.json)</button>',
+    '<button class="btn btn-outline" onclick="exportDB()">⬇️ Yedek İndir (.json)</button>\n            ' +
+    '<a class="btn btn-outline" href="VeriAktarimi.html" target="_blank" style="text-decoration:none">🔄 Eski Sistemden Veri Aktar / Tam Yedek</a>',
+    'Yedek İndir düğmesi');
+
   html = fonksiyonDegistir(html, 'changePass', `
 function changePass() {
   const old = document.getElementById('pass-old').value;
