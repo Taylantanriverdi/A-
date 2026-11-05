@@ -242,15 +242,34 @@ Aynı işlemi `Firebase-Yedek-Al.bat` dosyasıyla da yapabilirsiniz.
 - Bu yedeği USB belleğe ya da harici diske de kopyalayın. Firebase
   kapatıldıktan sonra eski sistemin elinizdeki tek tam kopyası budur.
 
-## Yazılımı güncelleme
+## Yazılımı güncelleme (otomatik)
 
-1. Sunucu penceresini kapatın. Arka plan kurulumu yaptıysanız bu adımı atlayın.
-2. Yeni ZIP'teki **her şeyi** (`veri` hariç) `C:\digicad-yerel` klasörünün
-   üzerine kopyalayın. Yalnızca bazı dosyaları kopyalamayın, eksik dosya
-   sunucunun açılmamasına yol açar.
-   **`veri` klasörüne dokunmayın.**
-3. Arka plan kurulumu yaptıysanız `Sunucuyu-Yeniden-Baslat.bat` dosyasına,
-   yapmadıysanız `Baslat` dosyasına çift tıklayın.
+Güncellemeleri `DIGICAD-Guncelle.bat` dosyası sizin yerinize yapar.
+
+**Her güncellemede:**
+
+1. Yeni `digicad-yerel.zip` dosyasını indirin. İndirilenler klasöründe kalsın,
+   açmanıza gerek yok.
+2. Masaüstündeki **DIGICAD-Guncelle** dosyasına çift tıklayın. Windows izin
+   isterse **Evet** deyin.
+3. Ekranda yeşil **"GÜNCELLEME TAMAMLANDI"** yazısı çıkınca pencereyi kapatın.
+
+`DIGICAD-Guncelle.bat` şunları yapar:
+
+- İndirilenler klasöründeki **en yeni** `digicad-yerel*.zip` dosyasını bulur.
+- Paketteki her dosyayı SHA-256 ile kontrol eder. Eksik ya da bozuk dosya
+  varsa **hiçbir şeyi değiştirmeden** durur.
+- Mevcut programı `veri\program-yedekleri\` klasörüne yedekler. Son 5 yedek
+  saklanır.
+- Sunucuyu durdurur ve yeni dosyaları `C:\digicad-yerel` klasörüne kopyalar.
+  **`veri` klasörüne (kayıtlarınıza) dokunmaz.**
+- Sunucuyu arka planda yeniden başlatır ve çalıştığını kontrol eder.
+- **Sunucu açılmazsa eski sürümü otomatik olarak geri yükler.**
+
+**İlk sefer:** Masaüstünde henüz `DIGICAD-Guncelle` yoksa ZIP'i bir kez açın
+ve içindeki `DIGICAD-Guncelle` dosyasına çift tıklayın. Güncellemeyi yapar
+ve kendini masaüstüne kopyalar. Sonraki güncellemelerde ZIP'i açmanız
+gerekmez.
 
 ## Sık sorulanlar
 
