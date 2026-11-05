@@ -240,10 +240,10 @@ const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const INK = 0x1d2140, INKC = '#1d2140';
 const PAPER_W = 220, PAPER_D = 300, HALF_W = PAPER_W / 2, HALF_D = PAPER_D / 2;
 const ARENA_R = 22;
-const DESK = 3, VILLAGE = 4, SHARP = 5, GIANT = 6; // masa (kedi), Kalem Köyü, kalemtıraş mağarası, devin ini
-const ZR = [ARENA_R, ARENA_R, ARENA_R, 30, 58, ARENA_R, 34]; // her bölgenin yarıçapı
-const ZOBST = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
-const TRIG = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+const DESK = 3, VILLAGE = 4, SHARP = 5, GIANT = 6, VOID = 7; // masa (kedi), Kalem Köyü, kalemtıraş mağarası, devin ini
+const ZR = [ARENA_R, ARENA_R, ARENA_R, 30, 58, ARENA_R, 34, 40]; // her bölgenin yarıçapı
+const ZOBST = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
+const TRIG = { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
 const openZone = z => z === -1 || z === VILLAGE; // serbest dolaşılan bölgeler
 const GRAV = 32;
 let seed = 7;
@@ -1367,7 +1367,7 @@ function hitBoss(b) {
     if (b.cat) { toast('Dev Tekir yenildi! Fare deliği açıldı.', 3.5); deskBars.visible = false; splash(new V3(AC[DESK].x, 0, AC[DESK].z - ZR[DESK] + 1.5), 0xffc928, 14); P.hp = 10; updateHearts(); }
     else if (b.i === SHARP) { toast('Kalemtıraş Canavarı yenildi! Yerde bir delik açıldı.', 3.5); sharpHole.visible = true; caveMouths[SHARP].sign.mark('YENİLDİ'); P.hp = 10; updateHearts(); }
     else if (b.giant) { toast('Dev Ressam yenildi! Kalem Köyü kurtuldu!', 4.5); P.hp = 10; updateHearts(); say(P, 'Ben mi yendim? Ben mi?! Yaşasııın!', 3); for (let k = 0; k < 4; k++) splash(P.pos, PENCIL_COLORS[k * 2], 12); caveMouths[SHARP].sign.mark('KAHRAMAN');
-      setTimeout(() => { $('winStars').textContent = stars >= 3 ? 'Üç altın yıldızı da toplamıştın. Tam bir kahramansın!' : `Topladığın yıldız: ${stars} / 3. Kalanları da bulmak istersen oyun devam ediyor.`; $('winScreen').hidden = false; $('againBtn').focus(); }, 2600); }
+      setTimeout(enterVoid, 3200); }
     else { toast(b.def.name + ' yenildi!'); caveMouths[b.i].sign.mark('YENİLDİ'); }
   } else if (Math.random() < .5) say(b, pick(b.def.taunt), 1.6);
 }
@@ -1692,6 +1692,8 @@ function setZoneLook(zone) {
     scene.fog = new THREE.Fog(0xf6f3ea, 90, 260); scene.background = null; hemi.intensity = .62; hemi.groundColor.setHex(0xcfc3a8); sun.intensity = .72;
   } else if (zone === DESK) {
     scene.fog = new THREE.Fog(0xdcc39c, 50, 170); scene.background = new THREE.Color(0xdcc39c); hemi.intensity = .7; hemi.groundColor.setHex(0xb08a5a); sun.intensity = .6;
+  } else if (zone === VOID) {
+    scene.fog = new THREE.Fog(0x000000, 4, 45); scene.background = new THREE.Color(0x000000); hemi.intensity = .55; hemi.groundColor.setHex(0x000000); sun.intensity = .35;
   } else if (zone === GIANT) {
     scene.fog = new THREE.Fog(0x2e2430, 45, 130); scene.background = new THREE.Color(0x2e2430); hemi.intensity = .6; hemi.groundColor.setHex(0x8a7060); sun.intensity = .5;
   } else if (zone === VILLAGE) {
@@ -1739,6 +1741,60 @@ function backToDesk() {
 }
 function toNotebook() {
   goZone(-1, () => { P.pos.set(SPAWN.x, terrain(SPAWN.x, SPAWN.z), SPAWN.z); P.yaw = 0; cam.yaw = 0; toast('Deftere geri döndün!'); });
+}
+/* ---------------- Son: simsiyah boşluk ve beyaz kapı ---------------- */
+let voidDoor = null, backDoor = null, backDoorFade = -1, backDoorT = 0;
+function buildVoid() {
+  const i = VOID, g = new THREE.Group(); g.visible = false; scene.add(g); caveGroups.push(g);
+  const ac = new V3(3200, 0, 0); AC.push(ac); g.position.copy(ac);
+  g.add(new THREE.Mesh(new THREE.CircleGeometry(80, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x000000 })));
+  voidDoor = new THREE.Group(); voidDoor.position.set(0, 0, -24); g.add(voidDoor);
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 7), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .18, fog: false, depthWrite: false })); glow.position.y = 3.3; voidDoor.add(glow);
+  const door = new THREE.Mesh(new THREE.PlaneGeometry(3, 5.6), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false })); door.position.y = 2.8; voidDoor.add(door);
+  voidDoor.userData.glow = glow;
+  TRIG[i].push({ x: ac.x, z: ac.z - 24, r: 1.8, go: throughDoor });
+}
+function enterVoid() {
+  if (transitioning) { setTimeout(enterVoid, 300); return; }
+  if (P.state === 'dead') return;
+  goZone(VOID, () => {
+    const ac = AC[VOID]; P.pos.set(ac.x, 0, ac.z + 6); P.yaw = Math.PI; cam.yaw = 0; P.state = 'ok';
+    toast('Her yer kararıyor...', 3); tone(110, 2.5, 'sine', .15, 55);
+  });
+}
+function throughDoor() {
+  goZone(-1, () => {
+    const y = terrain(SPAWN.x, SPAWN.z);
+    P.pos.set(SPAWN.x, y, SPAWN.z); P.yaw = Math.PI; cam.yaw = 0; // kapıdan çıkıp ileri bakıyor
+    // arkada, geldiğin karanlık: sadece arkana dönünce görünür, bakınca kaybolur
+    if (!backDoor) {
+      backDoor = new THREE.Mesh(new THREE.PlaneGeometry(3, 5.6), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, fog: false }));
+      worldGroup.add(backDoor);
+    }
+    backDoor.position.set(SPAWN.x, y + 2.8, SPAWN.z + 2.2); backDoor.rotation.y = Math.PI; // yüzü oyuncuya dönük değil, arkaya bakınca görünür
+    backDoor.material.opacity = 1; backDoor.visible = true; backDoorFade = -1; backDoorT = 0;
+    toast('Burası... başladığın yer?', 3);
+  });
+}
+function showWin() {
+  $('winStars').textContent = stars >= 3 ? 'Üç altın yıldızı da toplamıştın. Tam bir kahramansın!' : `Topladığın yıldız: ${stars} / 3. Kalanları da bulmak istersen oyun devam ediyor.`;
+  $('winScreen').hidden = false; $('againBtn').focus();
+}
+const camFwd = new V3(), toDoor = new V3();
+function updateBackDoor(dt) {
+  if (!backDoor || !backDoor.visible || P.zone !== -1) return;
+  backDoorT += dt;
+  if (backDoorFade < 0) {
+    camera.getWorldDirection(camFwd); toDoor.copy(backDoor.position).sub(camera.position);
+    const facing = camera.position.z < backDoor.position.z; // kamera kapının arka (karanlık) tarafında
+    if (facing && toDoor.normalize().dot(camFwd) > .75) { backDoorFade = 0; tone(880, 1.2, 'triangle', .08, 1760); }
+    else if (backDoorT > 5 && backDoorT - dt <= 5) say(P, 'Arkamda bir şey var gibi...', 2.5);
+    else if (backDoorT > 20) backDoorFade = 0;
+  } else {
+    backDoorFade += dt;
+    backDoor.material.opacity = Math.max(0, 1 - backDoorFade / 1.1);
+    if (backDoorFade > 1.1) { backDoor.visible = false; setTimeout(showWin, 900); }
+  }
 }
 function enterGiant() {
   goZone(GIANT, () => {
@@ -2133,6 +2189,8 @@ function frame(now) {
   }
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').style.opacity = 0; }
   for (const cl of CLOUDS) { cl.position.x += cl.userData.v * dt; if (cl.position.x > 140) cl.position.x = -140; }
+  updateBackDoor(dt);
+  if (voidDoor && P.zone === VOID) voidDoor.userData.glow.material.opacity = .14 + Math.sin(time * 2) * .08;
   for (const g of PORTALS) g.material.opacity = .45 + Math.sin(time * 4) * .25;
   for (const f of FLAMES) f.scale.y = 1.9 + Math.sin(time * 14 + f.userData.ph) * .2;
   // çizgi titremesi: konturlar elle çizilmiş gibi kıpırdasın
@@ -2158,7 +2216,7 @@ function buildWorld() {
   decorate();
   CAVES.forEach((_, i) => { buildArena(i); makeBoss(i); });
   buildDesk(); makeBoss(DESK);
-  buildVillage(); buildArena(SHARP); makeBoss(SHARP); buildGiantLair(); makeBoss(GIANT);
+  buildVillage(); buildArena(SHARP); makeBoss(SHARP); buildGiantLair(); makeBoss(GIANT); buildVoid();
   NPC_DEFS.forEach((d, i) => makeNpc(d, i));
   PENCIL_NPCS.forEach((d, i) => makeNpc(d, i, VILLAGE));
   const erasers = ['erPink', 'erWhite', 'erTwin'], vc = AC[VILLAGE];
@@ -2199,6 +2257,7 @@ function revive() {
   placePlayerAtSpawn(); say(P, 'Yeniden çizildim! Biraz yamuk ama olsun.', 3);
 }
 function resetAll() {
+  if (backDoor) backDoor.visible = false; backDoorFade = -1;
   $('winScreen').hidden = true;
   for (const b of BOSS_LIST) { b.dead = false; b.thud = false; b.collected = false; b.starSpawned = false; b.deadT = 0; resetBoss(b); }
   for (const k of pickups) k.m.parent && k.m.parent.remove(k.m); pickups.length = 0;
