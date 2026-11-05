@@ -99,6 +99,8 @@ function numPress(n) {
   html = degistir(html, "Firebase'e bağlanıyor...", 'Sunucuya bağlanıyor...', 'yükleniyor yazısı');
   html = degistir(html, "toast('Firebase bağlantı hatası — çevrimdışı mod', 'error');", "toast('Sunucu bağlantı hatası', 'error');", 'bağlantı hatası');
 
+  html = yazdirmaKarti(html);
+
   // Ayarlar sayfasına "Veri Aktarımı" düğmesi
   html = degistir(html, '<button class="btn btn-outline" onclick="exportDB()">⬇️ Yedek İndir (.json)</button>',
     '<button class="btn btn-outline" onclick="exportDB()">⬇️ Yedek İndir (.json)</button>\n            ' +
@@ -312,6 +314,98 @@ function getUploadedFileRecords() {
   html = html.replace(ipucu[0], ipucu[0] + `
     <div class="login-hint" style="margin-top:10px">💻 <a href="HekimPortaliKurulum.bat" style="color:var(--primary);font-weight:600">Bu bilgisayara kur</a> (masaüstüne simge ekler) · 📱 Telefonda tarayıcı menüsünden <b>“Ana ekrana ekle”</b></div>`);
   return html;
+}
+
+
+// ── YÖNETİM PANELİ: "Hekimden gelen işleri otomatik yazdır" ayarı ───────
+function yazdirmaKarti(html) {
+  const kart = `<div class="card" style="border-color:#0ea5e9" id="yazdirma-karti">
+          <div class="card-title">🖨️ Hekimden Gelen İşleri Otomatik Yazdır</div>
+          <p style="font-size:12px;color:var(--text-soft);margin-bottom:14px">
+            Açıkken, <b>Hekim Portalı'ndan gönderilen her iş</b> hiçbir şey sormadan seçtiğiniz yazıcıdan <b>A4 iş formu</b> olarak çıkar (hekim, hasta, iş türü, diş şeması, renk, teslim tarihi, notlar, dosya/bağlantı listesi). Yazdırmayı sunucu yaptığı için bu panel kapalıyken de çalışır.
+          </p>
+          <label style="display:flex;align-items:center;gap:12px;cursor:pointer;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:12px 16px;margin-bottom:12px">
+            <input type="checkbox" id="yazdirma-toggle" onchange="yazdirmaKaydet()" style="width:20px;height:20px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:700"><span id="yazdirma-toggle-label">Otomatik Yazdırma: Kapalı</span>
+              <div style="font-size:11px;color:var(--text-soft);font-weight:400;margin-top:2px">Ayar anında geçerli olur.</div></span>
+          </label>
+          <div class="form-group">
+            <label>Yazıcı</label>
+            <div style="display:flex;gap:8px">
+              <select id="yazdirma-yazici" class="inp inp-w100" style="flex:1" onchange="yazdirmaKaydet()"><option value="">Yükleniyor…</option></select>
+              <button class="btn btn-outline btn-sm" type="button" title="Yazıcı listesini yenile" onclick="yazdirmaYukle(true)">🔄</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Kopya sayısı</label>
+            <select id="yazdirma-kopya" class="inp inp-w100" onchange="yazdirmaKaydet()"><option value="1">1 kopya</option><option value="2">2 kopya</option><option value="3">3 kopya</option></select>
+          </div>
+          <button class="btn btn-outline btn-sm" type="button" onclick="yazdirmaTest()">🧾 Test sayfası yazdır</button>
+          <div id="yazdirma-durum" style="font-size:11px;color:var(--text-soft);margin-top:10px"></div>
+        </div>
+
+        `;
+  html = degistir(html, '<div class="card" style="border-color:#7c3aed">\n          <div class="card-title">🤖 AI Destekli Mail Analizi</div>',
+    kart + '<div class="card" style="border-color:#7c3aed">\n          <div class="card-title">🤖 AI Destekli Mail Analizi</div>', 'ayarlar kartı yeri');
+  html = degistir(html, 'function renderSettingsPage() {\n  renderMailFilterList();',
+    'function renderSettingsPage() {\n  try { yazdirmaYukle(false); } catch (e) {}\n  renderMailFilterList();', 'ayarlar sayfası açılışı');
+
+  const betik = `<script>
+// ── Otomatik yazdırma ayarları (yerel sunucu) ──
+function _yzIstek(yontem, adres, govde) {
+  return fetch(adres, { method: yontem, credentials: 'same-origin', headers: Object.assign({ 'X-DL-Panel': 'yonetici' }, govde ? { 'Content-Type': 'application/json' } : {}), body: govde ? JSON.stringify(govde) : undefined })
+    .then(r => r.json().catch(() => ({})).then(j => { if (!r.ok) throw new Error(j.hata || ('Hata ' + r.status)); return j; }));
+}
+let _yzYukleniyor = false;
+function _yzEtiket() {
+  const acik = document.getElementById('yazdirma-toggle').checked;
+  const l = document.getElementById('yazdirma-toggle-label');
+  l.textContent = 'Otomatik Yazdırma: ' + (acik ? 'Açık' : 'Kapalı');
+  l.style.color = acik ? '#0369a1' : '';
+}
+function yazdirmaYukle(yenile) {
+  const durum = document.getElementById('yazdirma-durum');
+  if (!durum) return;
+  _yzYukleniyor = true;
+  _yzIstek('GET', '/api/yazdirma' + (yenile ? '?yenile=1' : '')).then(a => {
+    document.getElementById('yazdirma-toggle').checked = !!a.otomatik;
+    document.getElementById('yazdirma-kopya').value = String(a.kopya || 1);
+    const sel = document.getElementById('yazdirma-yazici');
+    const liste = a.yazicilar || [];
+    const varsayilan = liste.find(y => y.varsayilan);
+    sel.innerHTML = '<option value="">Varsayılan yazıcı' + (varsayilan ? ' (' + escHtml(varsayilan.ad) + ')' : '') + '</option>' +
+      liste.map(y => '<option value="' + escHtml(y.ad) + '">' + escHtml(y.ad) + (y.cevrimdisi ? ' — çevrimdışı' : '') + '</option>').join('') +
+      (a.yazici && !liste.some(y => y.ad === a.yazici) ? '<option value="' + escHtml(a.yazici) + '">' + escHtml(a.yazici) + ' (bulunamadı)</option>' : '');
+    sel.value = a.yazici || '';
+    _yzEtiket();
+    let h = a.listeHatasi ? '<span style="color:var(--danger)">⚠️ ' + escHtml(a.listeHatasi) + '</span><br>' : '';
+    if (a.gecmis && a.gecmis.length) {
+      h += '<b>Son yazdırılanlar:</b><br>' + a.gecmis.slice(0, 5).map(g => escHtml(new Date(g.zaman).toLocaleString('tr-TR')) + ' — ' + escHtml(g.test ? 'Test sayfası' : (g.hasta || '')) + ' — ' + (/^HATA/.test(g.durum) ? '<span style="color:var(--danger)">' + escHtml(g.durum) + '</span>' : '✅ ' + escHtml(g.durum))).join('<br>');
+    }
+    durum.innerHTML = h;
+  }).catch(e => { durum.innerHTML = '<span style="color:var(--danger)">⚠️ ' + escHtml(e.message) + '</span>'; })
+    .finally(() => { _yzYukleniyor = false; });
+}
+function yazdirmaKaydet() {
+  if (_yzYukleniyor) return;
+  _yzEtiket();
+  _yzIstek('POST', '/api/yazdirma', {
+    otomatik: document.getElementById('yazdirma-toggle').checked,
+    yazici: document.getElementById('yazdirma-yazici').value,
+    kopya: Number(document.getElementById('yazdirma-kopya').value) || 1,
+  }).then(a => toast(a.otomatik ? '🖨️ Otomatik yazdırma açıldı' : 'Otomatik yazdırma kapatıldı', a.otomatik ? 'success' : 'info'))
+    .catch(e => { toast('Kaydedilemedi: ' + e.message, 'error'); yazdirmaYukle(false); });
+}
+function yazdirmaTest() {
+  toast('🧾 Test sayfası yazıcıya gönderiliyor…', 'info');
+  _yzIstek('POST', '/api/yazdirma/test', {}).then(() => { toast('✅ Test sayfası yazdırıldı', 'success'); yazdirmaYukle(false); })
+    .catch(e => { toast('Yazdırılamadı: ' + e.message, 'error'); yazdirmaYukle(false); });
+}
+</script>
+`;
+  const son = html.lastIndexOf('</body>');
+  if (son < 0) throw new Error('</body> bulunamadı');
+  return html.slice(0, son) + betik + html.slice(son);
 }
 
 const SAYFALAR = {

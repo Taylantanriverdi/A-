@@ -24,6 +24,7 @@ const Depo = require('./lib/depo');
 const yetki = require('./lib/yetki');
 const aktarim = require('./lib/aktarim');
 const firebaseYedek = require('./lib/firebase-yedek');
+const yazdirma = require('./lib/yazdirma');
 
 const KOK = __dirname;
 const GENEL = path.join(KOK, 'public');
@@ -509,8 +510,53 @@ function isleyiciOlustur(kapi) {
       if (yol === '/api/yaz' && req.method === 'POST') {
         const g = await jsonOku(req);
         const islemler = yetki.yazimDenetle(depo.kok, oturum, agac.islemleriAc(g.islem, g.yol, g.deger));
+        // Hekim portalından YENİ bir iş mi geldi? (otomatik yazdırma için)
+        const yeniGonderimler = oturum && oturum.rol === 'hekim'
+          ? [...new Set(islemler.map(i => i.parcalar).filter(p => p[0] === 'db' && p[1] === yetki.CALISMA_ALANI && p[2] === 'doctorSubmissions' && p[3]).map(p => p[3]))]
+              .filter(id => depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]) === null)
+          : [];
         depo.uygula(islemler);
+        for (const id of yeniGonderimler) otomatikYazdir(id);
         return json(res, 200, { tamam: true });
+      }
+
+      // ── Otomatik yazdırma ayarları (sadece yönetici) ────
+      if (yol === '/api/yazdirma' || yol.startsWith('/api/yazdirma/')) {
+        if (!oturum || oturum.rol !== 'yonetici') return json(res, 401, { hata: 'Yönetici girişi gerekiyor' });
+        if (yol === '/api/yazdirma' && req.method === 'GET') {
+          const y = yazdirmaAyari();
+          let liste = [], listeHatasi = null;
+          if (yazdirma.destekleniyor()) {
+            try { liste = await yazdirma.yazicilar(url.searchParams.get('yenile') === '1'); } catch (e) { listeHatasi = e.message; }
+          } else listeHatasi = 'Otomatik yazdırma yalnızca Windows bilgisayarda çalışır';
+          return json(res, 200, { ...y, yazicilar: liste, listeHatasi, gecmis: yazdirma.gecmis });
+        }
+        if (yol === '/api/yazdirma' && req.method === 'POST') {
+          const g = await jsonOku(req);
+          ayarlar = ayarlariOku();
+          ayarlar.yazdirma = {
+            otomatik: !!g.otomatik,
+            yazici: typeof g.yazici === 'string' ? g.yazici.slice(0, 200) : '',
+            kopya: Math.max(1, Math.min(5, Number(g.kopya) || 1)),
+          };
+          ayarlariYaz(ayarlar);
+          console.log(`[yazdırma] Otomatik yazdırma ${ayarlar.yazdirma.otomatik ? 'AÇIK' : 'kapalı'} — yazıcı: ${ayarlar.yazdirma.yazici || '(varsayılan)'}`);
+          return json(res, 200, { tamam: true, ...ayarlar.yazdirma });
+        }
+        if (yol === '/api/yazdirma/test' && req.method === 'POST') {
+          const y = yazdirmaAyari();
+          await yazdirma.yazdir(yazdirma.formatla(yazdirma.ornekIs(), true), y.yazici, 1);
+          return json(res, 200, { tamam: true });
+        }
+        if (yol === '/api/yazdirma/tekrar' && req.method === 'POST') {
+          const g = await jsonOku(req);
+          const k = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', String(g.id || '')]);
+          if (!k) return json(res, 404, { hata: 'İş bulunamadı' });
+          const y = yazdirmaAyari();
+          await yazdirma.yazdir(yazdirma.formatla(k), y.yazici, y.kopya);
+          return json(res, 200, { tamam: true });
+        }
+        return json(res, 404, { hata: 'Bilinmeyen adres' });
       }
 
       // ── Veri aktarımı (sadece yönetici) ─────────────────
@@ -623,6 +669,24 @@ function isleyiciOlustur(kapi) {
       if (!res.headersSent) json(res, durum, { hata: e.message || 'Sunucu hatası' });
     }
   };
+}
+
+// ── OTOMATİK YAZDIRMA ───────────────────────────────────────────────
+const YAZDIRILANLAR = path.join(VERI, 'yazdirilanlar.json');
+function yazdirmaAyari() { return { otomatik: false, yazici: '', kopya: 1, ...(ayarlar.yazdirma || {}) }; }
+function otomatikYazdir(id) {
+  const y = yazdirmaAyari();
+  if (!y.otomatik) return;
+  let basilan = [];
+  try { basilan = JSON.parse(fs.readFileSync(YAZDIRILANLAR, 'utf8')); } catch (e) { basilan = []; }
+  if (basilan.includes(String(id))) return; // aynı iş iki kez basılmasın
+  const kayit = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]);
+  if (!kayit) return;
+  basilan.push(String(id));
+  fs.writeFileSync(YAZDIRILANLAR, JSON.stringify(basilan.slice(-1000)));
+  yazdirma.yazdir(yazdirma.formatla(kayit), y.yazici, y.kopya)
+    .then(() => console.log(`[yazdırma] ${kayit.patient || id} — ${y.yazici || 'varsayılan yazıcı'}`))
+    .catch(e => console.error(`[yazdırma] HATA (${kayit.patient || id}): ${e.message}`));
 }
 
 // ── VERİ AKTARIMI İŞİ ───────────────────────────────────────────────

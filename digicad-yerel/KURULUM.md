@@ -309,6 +309,28 @@ Yine de çalıştır** seçeneğine tıklamalı.
 Telefonda: portalı açıp tarayıcı menüsünden **"Ana ekrana ekle"** seçilir.
 Ana ekranda diş simgesi oluşur.
 
+## Hekimden gelen işleri otomatik yazdırma
+
+Yönetim paneli → **Ayarlar → 🖨️ Hekimden Gelen İşleri Otomatik Yazdır**:
+
+- **Açık/Kapalı** düğmesi. Değişiklik anında geçerli olur.
+- **Yazıcı** ve **kopya sayısı** seçimi.
+- **🧾 Test sayfası yazdır** düğmesi ile ayarların doğruluğu denenir.
+
+Açıkken hekim portalından gelen her iş, hiçbir pencere açılmadan seçili
+yazıcıdan A4 iş formu olarak çıkar. Formda hekim, hasta, iş türü, diş şeması,
+renk, çene, teslim tarihi, notlar ve dosya/bağlantı listesi bulunur.
+Yazdırmayı sunucu yaptığı için yönetim paneli kapalıyken de çalışır. Aynı iş
+iki kez basılmaz.
+
+Yazıcı listede görünmüyorsa, yazıcı muhtemelen yalnızca sizin Windows
+kullanıcınıza ağ yazıcısı olarak eklenmiştir. Arka planda çalışan sunucu bu
+yazıcıyı göremez. Çözüm:
+
+1. Yazıcıyı **Ayarlar → Yazıcılar ve tarayıcılar → Yazıcı ekle** ile IP
+   adresinden ya da USB ile bu bilgisayara doğrudan ekleyin.
+2. Sonra listeyi 🔄 ile yenileyin.
+
 ## Sık sorulanlar
 
 **PIN'i nasıl değiştiririm?**
