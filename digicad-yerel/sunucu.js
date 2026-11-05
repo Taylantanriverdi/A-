@@ -227,7 +227,7 @@ const TURLER = {
   '.gif': 'image/gif', '.webp': 'image/webp', '.txt': 'text/plain; charset=utf-8', '.zip': 'application/zip',
 };
 // Dış kapıdan (internet) sadece bunlar açılabilir
-const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|jszip\.min\.js|sw\.js|favicon\.ico)$/;
+const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
 
 function statikSun(req, res, kapi) {
   let yol = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -314,6 +314,58 @@ depo.on('degisti', yollar => {
 });
 setInterval(() => { for (const b of baglantilar.values()) b.res.write(': canli\n\n'); }, 25e3).unref();
 
+// ── HEKİM PORTALI: paylaşım bağlantıları ve kurulum dosyası ─────────
+// İsteğin geldiği internet adresi (Tailscale/Cloudflare tüneli üzerinden)
+function istekAdresi(req) {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().toLowerCase();
+  if (!host || /^(localhost|127\.|\[::1\]|0\.0\.0\.0)/.test(host) || !/^[a-z0-9.-]+(:\d+)?$/.test(host)) return null;
+  const https = httpsMi(req) || /\.ts\.net(:\d+)?$/.test(host) || !!req.headers['cf-ray'];
+  return (https ? 'https://' : 'http://') + host;
+}
+function genelAdresiOgren(req) {
+  const adres = istekAdresi(req);
+  if (!adres || ayarlar.genelAdres === adres) return;
+  try {
+    ayarlar = ayarlariOku(); ayarlar.genelAdres = adres; ayarlariYaz(ayarlar);
+    console.log('[ayar] Hekim portalının internet adresi: ' + adres);
+  } catch (e) { /* yoksay */ }
+}
+function oturumuVarMi(req, kapi) {
+  const c = cerezleriOku(req);
+  return PANELLER.some(p => (kapi === 'ic' || p !== 'yonetici') && oturumGetir(c[CEREZ_ADI[p]], p));
+}
+// Hekimin gönderdiği paylaşım bağlantısı (WeTransfer, Drive…):
+// tıklanınca bağlantıya yönlendirir; programdan (ZIP indirme) istenirse
+// çift tıklanabilir bir internet kısayolu (.url) dosyası verir.
+function baglantiSun(req, res, kapi, url) {
+  if (!oturumuVarMi(req, kapi)) { res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bağlantıyı açmak için giriş yapın'); return; }
+  let hedef = null;
+  try { hedef = new URL(url.searchParams.get('u') || ''); } catch (e) { hedef = null; }
+  if (!hedef || !/^https?:$/.test(hedef.protocol)) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Geçersiz bağlantı'); return; }
+  const amac = req.headers['sec-fetch-dest'];
+  if (amac === 'document' || amac === 'iframe' || (!amac && /text\/html/.test(req.headers.accept || ''))) {
+    res.writeHead(302, { Location: hedef.href, 'Cache-Control': 'no-store' }); res.end(); return;
+  }
+  res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="baglanti.url"', 'Cache-Control': 'no-store' });
+  res.end(`[InternetShortcut]\r\nURL=${hedef.href}\r\n`);
+}
+// Hekim bilgisayarı için kurulum dosyası — sistemin internet adresi içine yazılır
+function hekimKurulumSun(req, res, kapi) {
+  const adres = (kapi === 'dis' && istekAdresi(req)) || ayarlar.genelAdres;
+  if (!adres) {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Hekim portalının internet adresi henüz bilinmiyor. Hekim portalını bir kez internet adresinden (ör. https://...ts.net/HekimPortali.html) açın, sonra tekrar deneyin.');
+    return;
+  }
+  const metin = fs.readFileSync(path.join(KOK, 'araclar', 'hekim-kurulum-sablonu.bat'), 'utf8').split('__ADRES__').join(adres);
+  res.writeHead(200, {
+    'Content-Type': 'application/octet-stream',
+    'Content-Disposition': 'attachment; filename="DIGICAD-Hekim-Portali-Kurulum.bat"',
+    'Cache-Control': 'no-store',
+  });
+  res.end(metin);
+}
+
 // ── İSTEK İŞLEYİCİ ──────────────────────────────────────────────────
 function isleyiciOlustur(kapi) {
   return async (req, res) => {
@@ -321,6 +373,12 @@ function isleyiciOlustur(kapi) {
     const url = new URL(req.url, 'http://x');
     const yol = url.pathname;
     try {
+      // Dış kapıdan (internet) gelen isteklerden sistemin internet adresini öğren
+      // (hekim kurulum dosyası bu adresi kullanır)
+      if (kapi === 'dis') genelAdresiOgren(req);
+      if (yol === '/baglanti' && (req.method === 'GET' || req.method === 'HEAD')) return baglantiSun(req, res, kapi, url);
+      if (yol === '/HekimPortaliKurulum.bat' && req.method === 'GET') return hekimKurulumSun(req, res, kapi);
+
       if (!yol.startsWith('/api/') && !yol.startsWith('/dosya/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
         return statikSun(req, res, kapi);

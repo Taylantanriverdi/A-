@@ -177,6 +177,7 @@ function doctorLogin() {
     btn.disabled = false; btn.innerHTML = 'Giriş Yap';
   });
 }`);
+  html = baglantiDestegi(html);
   html = degistir(html, 'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  stopMySubmissionsListener();',
     'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  DL.cikis().catch(() => {}).then(() => DL.yenidenBaglan());\n  stopMySubmissionsListener();',
     'Hekim çıkış');
@@ -212,6 +213,104 @@ function techLogin() {
   html = degistir(html, 'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  currentTech = null;',
     'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  DL.cikis().catch(() => {}).then(() => DL.yenidenBaglan());\n  currentTech = null;',
     'Teknisyen çıkış');
+  return html;
+}
+
+
+// ── HEKİM PORTALI: tarama dosyası yerine BAĞLANTI (link) gönderebilme ───
+// Hekim STL/PLY yükleyemediğinde WeTransfer / Drive / Medit Link vb. paylaşım
+// bağlantısını yapıştırabilir. Bağlantılar, laboratuvar tarafının hiçbir
+// değişiklik gerektirmeden gösterebilmesi için "files" listesine
+// `/baglanti?u=...` adresiyle eklenir: tıklanınca sunucu bağlantıya
+// yönlendirir, "ZIP olarak indir"de ise ZIP'e çift tıklanabilir .url
+// kısayolu olarak girer.
+function baglantiDestegi(html) {
+  const css = `
+/* ── Tarama bağlantısı (link) ── */
+.hp-link-box{margin-top:14px;border:1.5px dashed var(--border,#c3d0e0);border-radius:12px;padding:14px;background:var(--primary-light,#e8f0fe)}
+.hp-link-title{font-weight:700;font-size:14px;color:var(--text,#101d33)}
+.hp-link-sub{font-size:12.5px;color:var(--text-soft,#4c5f78);margin:3px 0 10px}
+.hp-link-row{display:flex;gap:8px}
+.hp-link-row .inp{flex:1;min-width:0}
+.hp-link-add{border:0;border-radius:10px;background:var(--primary,#1565c0);color:#fff;font-weight:700;padding:0 18px;cursor:pointer;font-family:inherit}
+.hp-link-item{display:flex;align-items:center;gap:8px;background:var(--surface,#fff);border:1px solid var(--border,#c3d0e0);border-radius:10px;padding:8px 10px;margin-top:8px;font-size:13px}
+.hp-link-item a{font-weight:600;color:var(--primary,#1565c0);text-decoration:none;white-space:nowrap}
+.hp-link-item small{color:var(--text-soft,#4c5f78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.hp-link-item button{border:0;background:none;color:var(--danger,#e53935);font-size:16px;cursor:pointer;padding:0 4px}
+`;
+  const ilkStil = html.indexOf('</style>');
+  if (ilkStil < 0) throw new Error('</style> bulunamadı');
+  html = html.slice(0, ilkStil) + css + html.slice(ilkStil);
+
+  html = degistir(html, '<div class="conn-note" id="upload-conn-note">⏳ Dosya yükleme bağlantısı hazırlanıyor…</div>',
+    `<div class="conn-note" id="upload-conn-note">⏳ Dosya yükleme bağlantısı hazırlanıyor…</div>
+            <div class="hp-link-box" id="hp-link-box">
+              <div class="hp-link-title">🔗 Dosya yükleyemiyor musunuz? Bağlantı (link) olarak gönderin</div>
+              <div class="hp-link-sub">WeTransfer, Google Drive, Dropbox, OneDrive, Medit Link, 3Shape Communicate, iTero vb. paylaşım bağlantısını yapıştırıp <b>Ekle</b>'ye basın. Dosya yerine bağlantı eklemeniz yeterlidir.</div>
+              <div class="hp-link-row">
+                <input type="url" id="hp-link-input" class="inp" placeholder="https://…" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();addScanLink();}">
+                <button type="button" class="hp-link-add" onclick="addScanLink()">Ekle</button>
+              </div>
+              <div id="hp-link-list"></div>
+            </div>`, 'bağlantı kutusu yeri');
+
+  html = degistir(html, 'let uploadedFiles = [];     // {name, size, url, uploading, error}',
+    `let uploadedFiles = [];     // {name, size, url, uploading, error}
+let scanLinks = [];         // {url, name} — dosya yerine gönderilen paylaşım bağlantıları
+function _linkSaglayici(u) {
+  const bilinen = { 'wetransfer.com':'WeTransfer', 'we.tl':'WeTransfer', 'drive.google.com':'Google Drive', 'docs.google.com':'Google Drive',
+    'dropbox.com':'Dropbox', 'onedrive.live.com':'OneDrive', '1drv.ms':'OneDrive', 'sharepoint.com':'OneDrive', 'meditlink.com':'Medit Link',
+    '3shapecommunicate.com':'3Shape Communicate', 'icloud.com':'iCloud', 'mega.nz':'MEGA', 'itero.com':'iTero', 'yandex.com':'Yandex Disk', 'disk.yandex.com.tr':'Yandex Disk' };
+  try { const h = new URL(u).hostname.replace(/^www\\./, ''); for (const k in bilinen) if (h === k || h.endsWith('.' + k)) return bilinen[k]; return h; }
+  catch (e) { return 'Bağlantı'; }
+}
+function addScanLink() {
+  const inp = document.getElementById('hp-link-input');
+  let v = (inp.value || '').trim();
+  if (!v) { toast('Önce bağlantıyı yapıştırın', 'info'); return; }
+  if (!/^https?:\\/\\//i.test(v)) v = 'https://' + v;
+  let u;
+  try { u = new URL(v); } catch (e) { toast('Geçerli bir bağlantı girin (https://… ile başlayan)', 'error'); return; }
+  if (!/^https?:$/.test(u.protocol) || u.hostname.indexOf('.') < 0) { toast('Geçerli bir bağlantı girin', 'error'); return; }
+  if (!scanLinks.some(l => l.url === u.href)) scanLinks.push({ url: u.href, name: 'Tarama bağlantısı - ' + _linkSaglayici(u.href) });
+  inp.value = '';
+  renderScanLinks();
+  updateSummary();
+  toast('🔗 Bağlantı eklendi', 'success');
+}
+function removeScanLink(i) { scanLinks.splice(i, 1); renderScanLinks(); updateSummary(); }
+function renderScanLinks() {
+  const el = document.getElementById('hp-link-list');
+  if (!el) return;
+  el.innerHTML = scanLinks.map((l, i) => '<div class="hp-link-item"><span>🔗</span>' +
+    '<a href="' + escHtml(l.url) + '" target="_blank" rel="noopener">' + escHtml(l.name.replace('Tarama bağlantısı - ', '')) + '</a>' +
+    '<small>' + escHtml(l.url) + '</small>' +
+    '<button type="button" title="Kaldır" onclick="removeScanLink(' + i + ')">✕</button></div>').join('');
+}`, 'uploadedFiles tanımı');
+
+  html = fonksiyonDegistir(html, 'getUploadedFileRecords', `
+function getUploadedFileRecords() {
+  const dosyalar = uploadedFiles.filter(f => f.url).map(f => ({ name: f.name, url: f.url, size: f.size }));
+  // Bağlantılar da laboratuvara "dosya" gibi gider: tıklanınca bağlantı açılır,
+  // ZIP indirmede çift tıklanabilir internet kısayolu (.url) olur
+  const baglantilar = scanLinks.map(l => ({ name: l.name + '.url', url: '/baglanti?u=' + encodeURIComponent(l.url), size: 0, link: true, linkUrl: l.url }));
+  return dosyalar.concat(baglantilar);
+}`);
+
+  html = degistir(html, "{ key:'files', label:'Tarama Dosyası', value: fileCount ? `${fileCount} dosya yüklendi` : '', stepId:'step-files' },",
+    "{ key:'files', label:'Tarama Dosyası / Bağlantı', value: fileCount ? `${fileCount} dosya / bağlantı eklendi` : '', stepId:'step-files' },",
+    'özet satırı');
+  html = degistir(html, "if (!files.length) missing.push('Tarama Dosyası');", "if (!files.length) missing.push('Tarama Dosyası veya Bağlantı');", 'eksik alan');
+  html = degistir(html, '\n  uploadedFiles = [];', '\n  uploadedFiles = [];\n  scanLinks = []; renderScanLinks();', 'form sıfırlama');
+
+  // Simge, ana ekrana ekleme ve "bu bilgisayara kur" bağlantısı
+  html = degistir(html, "<script>window.DL_PANEL='hekim';</script>",
+    `<link rel="icon" href="favicon.ico"><link rel="apple-touch-icon" href="simge-192.png"><link rel="manifest" href="hekim.webmanifest"><meta name="theme-color" content="#1565c0">
+<script>window.DL_PANEL='hekim';</script>`, 'hekim başlık');
+  const ipucu = html.match(/<div class="login-hint">[\s\S]*?<\/div>/);
+  if (!ipucu) throw new Error('login-hint bulunamadı');
+  html = html.replace(ipucu[0], ipucu[0] + `
+    <div class="login-hint" style="margin-top:10px">💻 <a href="HekimPortaliKurulum.bat" style="color:var(--primary);font-weight:600">Bu bilgisayara kur</a> (masaüstüne simge ekler) · 📱 Telefonda tarayıcı menüsünden <b>“Ana ekrana ekle”</b></div>`);
   return html;
 }
 

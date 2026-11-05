@@ -278,6 +278,37 @@ kendiliğinden ekler. Simgeye çift tıklayınca yönetim paneli, adres çubuğu
 olmayan ayrı bir program penceresinde açılır. Simge silinirse
 `Masaustu-Simgesi-Olustur.bat` ile yeniden oluşturulabilir.
 
+## Hekimler için
+
+**Tarama bağlantısı:** Hekim STL/PLY dosyasını yükleyemezse portaldaki
+**"🔗 Dosya yükleyemiyor musunuz? Bağlantı olarak gönderin"** kutusuna
+WeTransfer, Google Drive, Dropbox, Medit Link, 3Shape Communicate gibi bir
+paylaşım bağlantısı yapıştırabilir. Bağlantı laboratuvar tarafında dosyaların
+yanında görünür:
+
+- Tıklanınca bağlantı açılır.
+- "ZIP olarak indir" ile indirilirse ZIP'in içinde çift tıklanabilir bir
+  kısayol (`.url`) olur.
+- Bağlantılar yalnızca giriş yapmış kullanıcılar tarafından açılabilir.
+
+**Hekim bilgisayarına kurulum:**
+
+1. Ana sayfadaki **💻 Hekim kurulum dosyası** kartından
+   `DIGICAD-Hekim-Portali-Kurulum.bat` dosyasını indirin.
+2. Dosyayı hekimlere gönderin. Hekimler isterse portalın giriş ekranındaki
+   **Bu bilgisayara kur** bağlantısından da indirebilir.
+3. Hekim dosyaya çift tıklar. Dosya:
+   - Masaüstüne ve Başlat menüsüne **DIGICAD Hekim Portalı** simgesini ekler.
+   - Portalı ayrı bir uygulama penceresinde açar.
+
+   Yönetici izni gerekmez, bilgisayara program kurulmaz.
+
+Windows "Bilgisayarınız korundu" uyarısı gösterirse hekim **Ek bilgi →
+Yine de çalıştır** seçeneğine tıklamalı.
+
+Telefonda: portalı açıp tarayıcı menüsünden **"Ana ekrana ekle"** seçilir.
+Ana ekranda diş simgesi oluşur.
+
 ## Sık sorulanlar
 
 **PIN'i nasıl değiştiririm?**
