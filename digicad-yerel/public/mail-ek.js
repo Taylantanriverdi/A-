@@ -127,14 +127,17 @@ async function mailTumunuIndir(id, btn) {
     } else {
       toast('Dosyalar indirilemedi: ' + (hatali[0] ? hatali[0].hata : ''), 'error');
     }
-    // Drive dosyası herkese açık değilse: izin iste
-    if (izinKutusu && hatali.some(h => h.drive)) {
+    // İndirilemeyen dosyalar: nedenleri + çözüm yolları
+    if (izinKutusu && hatali.length) {
       const apiKapali = hatali.some(h => h.driveApi);
+      const driveVar = hatali.some(h => h.drive);
+      const dugmeStil = 'margin:8px 8px 0 0;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font:inherit;font-weight:800;color:#fff;';
       izinKutusu.innerHTML = '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:#fff7ed;border:1.5px solid #fdba74;font-size:12.5px;color:#9a3412">' +
-        (apiKapali
-          ? '⚠️ Google Drive API bu projede kapalı. <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com?project=primer-dental" target="_blank" rel="noopener" style="font-weight:700;color:#9a3412">Buradan “Etkinleştir”e basın</a>, birkaç dakika bekleyip tekrar deneyin.'
-          : '🔒 ' + hatali.filter(h => h.drive).length + ' Google Drive dosyası herkese açık paylaşılmamış. Gmail hesabınızın bu dosyalara erişimi varsa Drive izni vererek indirebilirsiniz.<br>' +
-            '<button type="button" onclick="mailDriveIzni(\'' + escHtml(id) + '\')" style="margin-top:8px;padding:8px 14px;border:0;border-radius:8px;cursor:pointer;font:inherit;font-weight:800;background:#ea580c;color:#fff">🔑 Google Drive izni ver ve tekrar dene</button>') +
+        '<b>' + hatali.length + ' dosya ZIP\'e eklenemedi:</b>' +
+        '<ul style="margin:6px 0 0 18px;padding:0">' + hatali.map(h => '<li>' + escHtml(h.ad) + ' — <i>' + escHtml(h.hata) + '</i></li>').join('') + '</ul>' +
+        (apiKapali ? '<div style="margin-top:6px">⚠️ Google Drive API kapalı: <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com?project=primer-dental" target="_blank" rel="noopener" style="font-weight:700;color:#9a3412">buradan “Etkinleştir”e basın</a>, birkaç dakika sonra tekrar deneyin.</div>' : '') +
+        (driveVar && !apiKapali ? '<button type="button" onclick="mailDriveIzni(\'' + escHtml(id) + '\')" style="' + dugmeStil + 'background:#ea580c">🔑 Google Drive izni ver ve tekrar dene</button>' : '') +
+        '<button type="button" onclick="mailTarayicidaIndir(\'' + escHtml(id) + '\')" style="' + dugmeStil + 'background:#0f766e">⬇️ Hepsini tarayıcıyla indir (ayrı ayrı)</button>' +
         '</div>';
     }
   } finally {
@@ -151,6 +154,11 @@ function mailDriveIzni(id) {
       scope: 'https://www.googleapis.com/auth/drive.readonly',
       callback: resp => {
         if (resp.error) { toast('Drive izni alınamadı: ' + resp.error, 'error'); return; }
+        const kapsam = 'https://www.googleapis.com/auth/drive.readonly';
+        if (google.accounts.oauth2.hasGrantedAllScopes && !google.accounts.oauth2.hasGrantedAllScopes(resp, kapsam)) {
+          toast('Drive izni verilmedi: izin penceresinde “Google Drive dosyalarınızı görme ve indirme” kutucuğunu İŞARETLEYİP devam edin', 'error');
+          return;
+        }
         _driveToken = resp.access_token;
         toast('✅ Drive izni verildi, dosyalar indiriliyor…', 'success');
         mailTumunuIndir(_sonTumuMail, document.getElementById('mail-tumu-btn'));
@@ -159,4 +167,24 @@ function mailDriveIzni(id) {
     });
   }
   _driveIstemci.requestAccessToken();
+}
+
+// Yedek yol: dosyaları tarayıcının kendi Google oturumuyla (tek tek düğmelerin
+// çalıştığı gibi) sırayla indirir. Dosyalar ayrı ayrı iner (ZIP olmaz).
+async function mailTarayicidaIndir(id) {
+  const m = mailDB.mails.find(x => x.id === id);
+  if (!m) return;
+  const linkler = _mailBaglantilari(_utfOnar(m.body || m.preview || '')).filter(_mailIndirmeMi);
+  if (!linkler.length) return;
+  toast('⬇️ ' + linkler.length + ' dosya tarayıcıyla indiriliyor. Chrome “birden fazla dosya indirilsin mi?” diye sorarsa İzin ver’e basın.', 'info');
+  for (let i = 0; i < linkler.length; i++) {
+    const did = _driveId(linkler[i]);
+    const adres = did ? 'https://drive.usercontent.google.com/download?id=' + encodeURIComponent(did) + '&export=download&confirm=t' : linkler[i];
+    const f = document.createElement('iframe');
+    f.style.display = 'none';
+    f.src = adres;
+    document.body.appendChild(f);
+    setTimeout(() => f.remove(), 120000);
+    await new Promise(c => setTimeout(c, 1500));
+  }
 }
