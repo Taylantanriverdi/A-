@@ -192,8 +192,9 @@ sonra:
    ```
 
 3. **Authentication → Sign-in method** bölümünde **Anonymous** girişi kapatın.
-4. Sonra Realtime Database ve Storage'daki verileri silin. İsterseniz projeyi
-   tamamen silin.
+4. Sonra Realtime Database ve Storage'daki verileri silin. **Projeyi tamamen
+   silmeyin:** Mail Kutusu'nun Gmail bağlantısı aynı Google projesinde
+   (primer-dental) tanımlı, proje silinirse Mail Kutusu çalışmaz.
 5. GitHub'da `dental-lab` deposu için iki seçenekten birini uygulayın:
    **Settings → Pages** bölümünden yayını kapatın, ya da depoyu **Private**
    yapın. Böylece eski site de kapanır.
@@ -353,9 +354,19 @@ Yönetim paneline internet tünelinden girmeye çalışıyorsunuz. Bu bilinçli 
 engellendi. Laboratuvardaki bir bilgisayardan girin.
 
 **Mail Kutusu (Gmail) çalışmıyor.**
-Sayfanın adresi değiştiği için (`localhost:8080`) Google Cloud Console'daki
-OAuth istemcisine `http://localhost:8080` adresini "Yetkili JavaScript
-kaynakları" listesine eklemeniz gerekir.
+Sayfanın adresi değiştiği için Google'a yeni adresi bir kez tanıtmanız gerekir:
+
+1. https://console.cloud.google.com/apis/credentials?project=primer-dental
+   adresini açın.
+2. **OAuth 2.0 İstemci Kimlikleri** altında `900268652902-c0dt7tv7…` ile
+   başlayan kimliğe tıklayın.
+3. **Yetkilendirilmiş JavaScript kaynakları** bölümüne `http://localhost:8080`
+   adresini ekleyip kaydedin.
+4. 5 dakika ile birkaç saat arasında bir süre içinde etkinleşir.
+
+"Erişim engellendi" uyarısı alırsanız **OAuth consent screen → Test users**
+bölümüne Gmail adresinizi ekleyin. Mail Kutusu yalnızca bu bilgisayarda,
+masaüstündeki **DIGICAD Dental** simgesiyle açılan pencerede çalışır.
 
 **Yapay zekâ özellikleri?**
 Kapalı durumdalar. Ayarlardan bir OpenAI anahtarı girilmedikçe çalışmazlar.
