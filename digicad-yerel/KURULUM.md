@@ -368,6 +368,15 @@ Sayfanın adresi değiştiği için Google'a yeni adresi bir kez tanıtmanız ge
 bölümüne Gmail adresinizi ekleyin. Mail Kutusu yalnızca bu bilgisayarda,
 masaüstündeki **DIGICAD Dental** simgesiyle açılan pencerede çalışır.
 
+**Maildeki dosyalar nereye iniyor?**
+Bir mailde **📦 Tümünü İndir**'e ya da tek bir **⬇️** bağlantısına basınca
+küçük bir pencere açılır. Hekim, hasta ve diş rengi mailden okunup doldurulur;
+gerekirse düzeltip **💾 Kaydet**'e basın. Dosyalar seçtiğiniz ana klasörün
+içinde `HEKİM - HASTA - RENK` adlı bir klasöre kaydedilir. Bu klasöre mailin
+metni de `MAIL.txt` olarak eklenir. Ana klasör ilk kayıtta sorulur ve
+hatırlanır. Değiştirmek için penceredeki **📁 Ana klasörü değiştir**
+düğmesini kullanın.
+
 **Yapay zekâ özellikleri?**
 Kapalı durumdalar. Ayarlardan bir OpenAI anahtarı girilmedikçe çalışmazlar.
 
