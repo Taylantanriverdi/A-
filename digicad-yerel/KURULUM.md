@@ -318,7 +318,7 @@ Yönetim paneli → **Ayarlar → 🖨️ Hekimden Gelen İşleri Otomatik Yazd�
 - **🧾 Test sayfası yazdır** düğmesi ile ayarların doğruluğu denenir.
 
 Açıkken hekim portalından gelen her iş, hiçbir pencere açılmadan seçili
-yazıcıdan A4 iş formu olarak çıkar. Formda hekim, hasta, iş türü, diş şeması,
+yazıcıdan iş formu olarak çıkar (varsayılan A5; Ayarlar'dan A4 seçilebilir). Formda hekim, hasta, iş türü, diş şeması,
 renk, çene, teslim tarihi, notlar ve dosya/bağlantı listesi bulunur.
 Yazdırmayı sunucu yaptığı için yönetim paneli kapalıyken de çalışır. Aynı iş
 iki kez basılmaz.

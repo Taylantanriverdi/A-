@@ -538,14 +538,15 @@ function isleyiciOlustur(kapi) {
             otomatik: !!g.otomatik,
             yazici: typeof g.yazici === 'string' ? g.yazici.slice(0, 200) : '',
             kopya: Math.max(1, Math.min(5, Number(g.kopya) || 1)),
+            kagit: g.kagit === 'A4' ? 'A4' : 'A5',
           };
           ayarlariYaz(ayarlar);
-          console.log(`[yazdırma] Otomatik yazdırma ${ayarlar.yazdirma.otomatik ? 'AÇIK' : 'kapalı'} — yazıcı: ${ayarlar.yazdirma.yazici || '(varsayılan)'}`);
+          console.log(`[yazdırma] Otomatik yazdırma ${ayarlar.yazdirma.otomatik ? 'AÇIK' : 'kapalı'} — yazıcı: ${ayarlar.yazdirma.yazici || '(varsayılan)'}, kağıt: ${ayarlar.yazdirma.kagit}`);
           return json(res, 200, { tamam: true, ...ayarlar.yazdirma });
         }
         if (yol === '/api/yazdirma/test' && req.method === 'POST') {
           const y = yazdirmaAyari();
-          await yazdirma.yazdir(yazdirma.formatla(yazdirma.ornekIs(), true), y.yazici, 1);
+          await yazdirma.yazdir(yazdirma.formatla(yazdirma.ornekIs(), true), y.yazici, 1, y.kagit);
           return json(res, 200, { tamam: true });
         }
         if (yol === '/api/yazdirma/tekrar' && req.method === 'POST') {
@@ -553,7 +554,7 @@ function isleyiciOlustur(kapi) {
           const k = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', String(g.id || '')]);
           if (!k) return json(res, 404, { hata: 'İş bulunamadı' });
           const y = yazdirmaAyari();
-          await yazdirma.yazdir(yazdirma.formatla(k), y.yazici, y.kopya);
+          await yazdirma.yazdir(yazdirma.formatla(k), y.yazici, y.kopya, y.kagit);
           return json(res, 200, { tamam: true });
         }
         return json(res, 404, { hata: 'Bilinmeyen adres' });
@@ -673,7 +674,7 @@ function isleyiciOlustur(kapi) {
 
 // ── OTOMATİK YAZDIRMA ───────────────────────────────────────────────
 const YAZDIRILANLAR = path.join(VERI, 'yazdirilanlar.json');
-function yazdirmaAyari() { return { otomatik: false, yazici: '', kopya: 1, ...(ayarlar.yazdirma || {}) }; }
+function yazdirmaAyari() { return { otomatik: false, yazici: '', kopya: 1, kagit: 'A5', ...(ayarlar.yazdirma || {}) }; }
 function otomatikYazdir(id) {
   const y = yazdirmaAyari();
   if (!y.otomatik) return;
@@ -684,7 +685,7 @@ function otomatikYazdir(id) {
   if (!kayit) return;
   basilan.push(String(id));
   fs.writeFileSync(YAZDIRILANLAR, JSON.stringify(basilan.slice(-1000)));
-  yazdirma.yazdir(yazdirma.formatla(kayit), y.yazici, y.kopya)
+  yazdirma.yazdir(yazdirma.formatla(kayit), y.yazici, y.kopya, y.kagit)
     .then(() => console.log(`[yazdırma] ${kayit.patient || id} — ${y.yazici || 'varsayılan yazıcı'}`))
     .catch(e => console.error(`[yazdırma] HATA (${kayit.patient || id}): ${e.message}`));
 }

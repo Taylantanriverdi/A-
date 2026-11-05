@@ -322,7 +322,7 @@ function yazdirmaKarti(html) {
   const kart = `<div class="card" style="border-color:#0ea5e9" id="yazdirma-karti">
           <div class="card-title">🖨️ Hekimden Gelen İşleri Otomatik Yazdır</div>
           <p style="font-size:12px;color:var(--text-soft);margin-bottom:14px">
-            Açıkken, <b>Hekim Portalı'ndan gönderilen her iş</b> hiçbir şey sormadan seçtiğiniz yazıcıdan <b>A4 iş formu</b> olarak çıkar (hekim, hasta, iş türü, diş şeması, renk, teslim tarihi, notlar, dosya/bağlantı listesi). Yazdırmayı sunucu yaptığı için bu panel kapalıyken de çalışır.
+            Açıkken, <b>Hekim Portalı'ndan gönderilen her iş</b> hiçbir şey sormadan seçtiğiniz yazıcıdan <b>iş formu</b> olarak çıkar (hekim, hasta, iş türü, diş şeması, renk, teslim tarihi, notlar, dosya/bağlantı listesi). Yazdırmayı sunucu yaptığı için bu panel kapalıyken de çalışır.
           </p>
           <label style="display:flex;align-items:center;gap:12px;cursor:pointer;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:12px;padding:12px 16px;margin-bottom:12px">
             <input type="checkbox" id="yazdirma-toggle" onchange="yazdirmaKaydet()" style="width:20px;height:20px;flex-shrink:0">
@@ -335,6 +335,10 @@ function yazdirmaKarti(html) {
               <select id="yazdirma-yazici" class="inp inp-w100" style="flex:1" onchange="yazdirmaKaydet()"><option value="">Yükleniyor…</option></select>
               <button class="btn btn-outline btn-sm" type="button" title="Yazıcı listesini yenile" onclick="yazdirmaYukle(true)">🔄</button>
             </div>
+          </div>
+          <div class="form-group">
+            <label>Kağıt boyutu</label>
+            <select id="yazdirma-kagit" class="inp inp-w100" onchange="yazdirmaKaydet()"><option value="A5">A5 (148 × 210 mm)</option><option value="A4">A4 (210 × 297 mm)</option></select>
           </div>
           <div class="form-group">
             <label>Kopya sayısı</label>
@@ -370,6 +374,7 @@ function yazdirmaYukle(yenile) {
   _yzIstek('GET', '/api/yazdirma' + (yenile ? '?yenile=1' : '')).then(a => {
     document.getElementById('yazdirma-toggle').checked = !!a.otomatik;
     document.getElementById('yazdirma-kopya').value = String(a.kopya || 1);
+    document.getElementById('yazdirma-kagit').value = a.kagit === 'A4' ? 'A4' : 'A5';
     const sel = document.getElementById('yazdirma-yazici');
     const liste = a.yazicilar || [];
     const varsayilan = liste.find(y => y.varsayilan);
@@ -393,6 +398,7 @@ function yazdirmaKaydet() {
     otomatik: document.getElementById('yazdirma-toggle').checked,
     yazici: document.getElementById('yazdirma-yazici').value,
     kopya: Number(document.getElementById('yazdirma-kopya').value) || 1,
+    kagit: document.getElementById('yazdirma-kagit').value,
   }).then(a => toast(a.otomatik ? '🖨️ Otomatik yazdırma açıldı' : 'Otomatik yazdırma kapatıldı', a.otomatik ? 'success' : 'info'))
     .catch(e => { toast('Kaydedilemedi: ' + e.message, 'error'); yazdirmaYukle(false); });
 }

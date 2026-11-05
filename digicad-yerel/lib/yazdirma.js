@@ -84,12 +84,12 @@ function ornekIs() {
 // Sıralı yazdırma kuyruğu (aynı anda tek iş)
 let kuyruk = Promise.resolve();
 const gecmis = []; // son 20 yazdırma
-function yazdir(form, yazici, kopya = 1) {
+function yazdir(form, yazici, kopya = 1, kagit = 'A5') {
   const is = kuyruk.then(async () => {
     const dosya = path.join(os.tmpdir(), `digicad-yazdir-${crypto.randomBytes(6).toString('hex')}.json`);
     fs.writeFileSync(dosya, JSON.stringify(form), 'utf8');
     try {
-      const arg = ['-Veri', dosya, '-Kopya', String(Math.max(1, Math.min(5, Number(kopya) || 1)))];
+      const arg = ['-Veri', dosya, '-Kopya', String(Math.max(1, Math.min(5, Number(kopya) || 1))), '-Kagit', kagit === 'A4' ? 'A4' : 'A5'];
       if (yazici) arg.push('-Yazici', yazici);
       await calistir(arg);
       gecmis.unshift({ zaman: new Date().toISOString(), hasta: form.hasta, hekim: form.hekim, test: form.test, durum: 'yazdırıldı', yazici });
