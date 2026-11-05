@@ -3678,6 +3678,82 @@ async function fetchMails() {
   document.getElementById('btn-refresh-mail').disabled = false;
 }
 
+// Gmail'in base64url gövdesini doğru karakter kodlamasıyla çözer
+function _b64Metin(veri, charset) {
+  const bin = atob(String(veri).replace(/-/g, '+').replace(/_/g, '/'));
+  const b = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i);
+  const adaylar = [];
+  if (charset) adaylar.push(charset.toLowerCase());
+  adaylar.push('utf-8', 'windows-1254');
+  for (const c of adaylar) {
+    try { return new TextDecoder(c, { fatal: c === 'utf-8' }).decode(b); } catch (e) { /* sıradaki */ }
+  }
+  return bin;
+}
+function _partCharset(part) {
+  const h = (part.headers || []).find(x => (x.name || '').toLowerCase() === 'content-type');
+  const m = h && /charset="?([^";\s]+)/i.exec(h.value || '');
+  return m ? m[1] : '';
+}
+// Önceden yanlış çözülmüş (UTF-8'in Latin-1 sanılması) metinleri onarır
+// (hem Latin-1 hem Windows-1252 biçimindeki bozulmaları — "Ã§", "Ä±", "ÄŸ" — kapsar)
+const _CP1252 = { 0x20AC:0x80, 0x201A:0x82, 0x0192:0x83, 0x201E:0x84, 0x2026:0x85, 0x2020:0x86, 0x2021:0x87, 0x02C6:0x88, 0x2030:0x89, 0x0160:0x8A, 0x2039:0x8B, 0x0152:0x8C, 0x017D:0x8E,
+  0x2018:0x91, 0x2019:0x92, 0x201C:0x93, 0x201D:0x94, 0x2022:0x95, 0x2013:0x96, 0x2014:0x97, 0x02DC:0x98, 0x2122:0x99, 0x0161:0x9A, 0x203A:0x9B, 0x0153:0x9C, 0x017E:0x9E, 0x0178:0x9F };
+function _utfOnar(s) {
+  s = String(s || '');
+  if (!/[\u00c2-\u00c5][\u0080-\u00bf\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u2013-\u2122]/.test(s)) return s;
+  const b = [];
+  for (const ch of s) {
+    const c = ch.codePointAt(0);
+    if (c < 256) b.push(c); else if (_CP1252[c] !== undefined) b.push(_CP1252[c]); else return s; // gerçek bir Unicode karakter var — dokunma
+  }
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(b)); } catch (e) { return s; }
+}
+// Metindeki bağlantıları sırayla döndürür (sondaki noktalama hariç)
+function _mailBaglantilari(metin) {
+  const sonuc = [];
+  (String(metin || '').match(/https?:\/\/[^\s<>"']+/g) || []).forEach(u => {
+    u = u.replace(/[.,;:!?)\]]+$/, '');
+    if (!sonuc.includes(u)) sonuc.push(u);
+  });
+  return sonuc;
+}
+function _mailIndirmeMi(u) {
+  return /\.(zip|rar|7z|stl|ply|obj|dcm|3oxz|pdf|jpg|jpeg|png)(\?|$)/i.test(u) ||
+    /amazonaws\.com|wetransfer\.com|we\.tl|drive\.google|dropbox\.com|meditlink|3shape|1drv\.ms|onedrive|mega\.nz/i.test(u);
+}
+function _mailBaglantiAdi(u) {
+  try {
+    const a = new URL(u);
+    const son = decodeURIComponent(a.pathname.split('/').filter(Boolean).pop() || '');
+    if (/\.[a-z0-9]{2,5}$/i.test(son)) return son;
+    return a.hostname.replace(/^www\./, '');
+  } catch (e) { return u.slice(0, 60); }
+}
+// Mail gövdesi: kaçışlı metin + tıklanabilir bağlantılar
+function _mailGovdeHtml(metin) {
+  return escHtml(metin).replace(/https?:\/\/[^\s<>"']+/g, u => {
+    let son = '';
+    while (/[.,;:!?)\]]$/.test(u)) { son = u.slice(-1) + son; u = u.slice(0, -1); }
+    return '<a href="' + u + '" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;text-decoration:underline;word-break:break-all">' +
+      (_mailIndirmeMi(u.replace(/&amp;/g, '&')) ? '⬇️ ' : '🔗 ') + u + '</a>' + son;
+  });
+}
+// Mail üstündeki belirgin "indirme bağlantıları" kutusu
+function _mailBaglantiCubugu(metin) {
+  const l = _mailBaglantilari(metin);
+  if (!l.length) return '';
+  const indir = l.filter(_mailIndirmeMi), diger = l.filter(u => !_mailIndirmeMi(u));
+  const dugme = (u, ana) => '<a href="' + escHtml(u) + '" target="_blank" rel="noopener" title="' + escHtml(u) + '" ' +
+    'style="display:inline-flex;align-items:center;gap:6px;margin:0 8px 8px 0;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+    (ana ? 'background:#059669;color:#fff;box-shadow:0 2px 8px rgba(5,150,105,.3)' : 'background:#fff;color:var(--primary);border:1.5px solid var(--primary)') + '">' +
+    (ana ? '⬇️ İndir: ' : '🔗 ') + escHtml(_mailBaglantiAdi(u)) + '</a>';
+  return '<div style="margin:14px 20px 0;padding:12px 14px 4px;background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px">' +
+    '<div style="font-size:12px;font-weight:800;color:#047857;margin-bottom:8px">' + (indir.length ? '⬇️ Maildeki indirme bağlantıları' : '🔗 Maildeki bağlantılar') + '</div>' +
+    indir.map(u => dugme(u, true)).join('') + diger.map(u => dugme(u, false)).join('') + '</div>';
+}
+
 function parseGmailMessage(m) {
   try {
     const hdrs = {};
@@ -3693,9 +3769,9 @@ function parseGmailMessage(m) {
     function extractBody(part) {
       if (!part) return;
       if (part.mimeType === 'text/plain' && part.body?.data)
-        body = atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/'));
+        body = _b64Metin(part.body.data, _partCharset(part));
       else if (part.mimeType === 'text/html' && part.body?.data)
-        html = atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/'));
+        html = _b64Metin(part.body.data, _partCharset(part));
       (part.parts || []).forEach(extractBody);
     }
     extractBody(m.payload);
@@ -3787,7 +3863,7 @@ function renderMailList() {
       <div class="mail-content">
         <div class="mail-from">${escHtml(m.from||'Bilinmeyen')}${isRegistered?'<span style="font-size:9px;padding:1px 5px;border-radius:10px;background:#ecfdf5;color:var(--success);margin-left:4px;font-weight:700">✓</span>':''}</div>
         <div class="mail-subject" style="${!isRead?'font-weight:700':''}">${escHtml(m.subject||'(Konu yok)')}</div>
-        <div class="mail-preview">${escHtml((m.preview||'').slice(0,80))}</div>
+        <div class="mail-preview">${escHtml(_utfOnar(m.preview||'').slice(0,80))}</div>
         ${m.has_attachments?`<div class="mail-attach">📎 ${(m.attachments||[]).length} Ek</div>`:''}
       </div>
       <div class="mail-meta">
@@ -3832,7 +3908,8 @@ function openMail(id) {
       </div>
       ${ahtml?`<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">${ahtml}</div>`:''}
     </div>
-    <div class="mail-detail-body">${escHtml(m.body||m.preview||'(İçerik yok)')}</div>`;
+    ${_mailBaglantiCubugu(_utfOnar(m.body||m.preview||''))}
+    <div class="mail-detail-body">${_mailGovdeHtml(_utfOnar(m.body||m.preview||'(İçerik yok)'))}</div>`;
 }
 
 function escHtml(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
