@@ -271,6 +271,13 @@ ve içindeki `DIGICAD-Guncelle` dosyasına çift tıklayın. Güncellemeyi yapar
 ve kendini masaüstüne kopyalar. Sonraki güncellemelerde ZIP'i açmanız
 gerekmez.
 
+## Masaüstü simgesi
+
+Güncelleme (`DIGICAD-Guncelle`) masaüstüne **DIGICAD Dental** simgesini
+kendiliğinden ekler. Simgeye çift tıklayınca yönetim paneli, adres çubuğu
+olmayan ayrı bir program penceresinde açılır. Simge silinirse
+`Masaustu-Simgesi-Olustur.bat` ile yeniden oluşturulabilir.
+
 ## Sık sorulanlar
 
 **PIN'i nasıl değiştiririm?**

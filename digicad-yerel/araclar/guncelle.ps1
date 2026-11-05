@@ -139,6 +139,8 @@ if ($basarili) {
   Write-Host '  ✓ GÜNCELLEME TAMAMLANDI — sistem çalışıyor' -ForegroundColor Green
   Write-Host ('    http://localhost:' + (Port-Oku)) -ForegroundColor Green
   Write-Host '══════════════════════════════════════════════════════' -ForegroundColor Green
+  # Masaüstü simgesi (yönetim panelini açar)
+  try { & (Join-Path $Hedef 'araclar\simge-olustur.ps1') -Hedef $Hedef } catch { Yaz ('  Masaüstü simgesi oluşturulamadı: ' + $_.Exception.Message) 'Yellow' }
   # Masaüstündeki güncelleme dosyasını da yenile
   try {
     $masaustu = [Environment]::GetFolderPath('Desktop')
