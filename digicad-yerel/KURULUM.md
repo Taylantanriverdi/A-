@@ -245,8 +245,9 @@ Aynı işlemi `Firebase-Yedek-Al.bat` dosyasıyla da yapabilirsiniz.
 ## Yazılımı güncelleme
 
 1. Sunucu penceresini kapatın. Arka plan kurulumu yaptıysanız bu adımı atlayın.
-2. Yeni ZIP'teki `public`, `lib`, `araclar` ve `Kisayollar` klasörlerini, ayrıca
-   `sunucu.js` dosyasını `C:\digicad-yerel` klasörünün üzerine kopyalayın.
+2. Yeni ZIP'teki **her şeyi** (`veri` hariç) `C:\digicad-yerel` klasörünün
+   üzerine kopyalayın. Yalnızca bazı dosyaları kopyalamayın, eksik dosya
+   sunucunun açılmamasına yol açar.
    **`veri` klasörüne dokunmayın.**
 3. Arka plan kurulumu yaptıysanız `Sunucuyu-Yeniden-Baslat.bat` dosyasına,
    yapmadıysanız `Baslat` dosyasına çift tıklayın.
