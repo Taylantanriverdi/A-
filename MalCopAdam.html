@@ -189,7 +189,7 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
   <div class="page">
     <h1>Çöp Adam</h1>
     <p>Birisi seni kareli bir defterin sayfasına çizdi ve sonra unuttu. Sayfada başka çöp adamlar, tuhaf yaratıklar ve üç karanlık mağara var.</p>
-    <p>Her mağarada bir boss yaşıyor. Üçünü de yen, üç altın yıldızı topla.</p>
+    <p>Her mağarada bir boss yaşıyor. Üçünü de yen, üç altın yıldızı topla. Asıl düşman ise Kalem Köyü'nün altında yaşayan Dev Ressam. Onu yenersen oyunu kazanırsın.</p>
     <p>Defterin kenarından düşersen masaya inersin. Orada dev bir kedi var. Onu yenersen fare deliğinden Kalem Köyü'ne geçersin.</p>
     <div class="keys desk-only">
       <kbd>Oklar</kbd><span>yürü</span>
@@ -217,8 +217,12 @@ html, body { height: 100%; margin: 0; overflow: hidden; background: var(--paper)
 <div class="screen" id="winScreen" hidden>
   <div class="page">
     <h1>Kazandın!</h1>
-    <p>Üç bossu da yendin ve üç altın yıldızı topladın. Artık defterin en ünlü çöp adamı sensin.</p>
-    <button class="btn" id="againBtn" type="button">Baştan oyna</button>
+    <p>Dev Ressam'ı yendin! Kocaman kalemi elinden düştü ve defter artık güvende. Artık defterin en ünlü çöp adamı sensin.</p>
+    <p class="note" id="winStars"></p>
+    <div style="display:flex; flex-wrap:wrap; gap:14px;">
+      <button class="btn" id="againBtn" type="button">Baştan oyna</button>
+      <button class="btn" id="keepBtn" type="button" style="background: var(--paper); color: var(--ink);">Devam et</button>
+    </div>
   </div>
 </div>
 
@@ -1362,7 +1366,8 @@ function hitBoss(b) {
     say(b, 'Hayıııır!', 2); clearHazards();
     if (b.cat) { toast('Dev Tekir yenildi! Fare deliği açıldı.', 3.5); deskBars.visible = false; splash(new V3(AC[DESK].x, 0, AC[DESK].z - ZR[DESK] + 1.5), 0xffc928, 14); P.hp = 10; updateHearts(); }
     else if (b.i === SHARP) { toast('Kalemtıraş Canavarı yenildi! Yerde bir delik açıldı.', 3.5); sharpHole.visible = true; caveMouths[SHARP].sign.mark('YENİLDİ'); P.hp = 10; updateHearts(); }
-    else if (b.giant) { toast('Dev Ressam yenildi! Kalem Köyü kurtuldu!', 4.5); P.hp = 10; updateHearts(); say(P, 'Ben mi yendim? Ben mi?! Yaşasııın!', 3); for (let k = 0; k < 4; k++) splash(P.pos, PENCIL_COLORS[k * 2], 12); caveMouths[SHARP].sign.mark('KAHRAMAN'); }
+    else if (b.giant) { toast('Dev Ressam yenildi! Kalem Köyü kurtuldu!', 4.5); P.hp = 10; updateHearts(); say(P, 'Ben mi yendim? Ben mi?! Yaşasııın!', 3); for (let k = 0; k < 4; k++) splash(P.pos, PENCIL_COLORS[k * 2], 12); caveMouths[SHARP].sign.mark('KAHRAMAN');
+      setTimeout(() => { $('winStars').textContent = stars >= 3 ? 'Üç altın yıldızı da toplamıştın. Tam bir kahramansın!' : `Topladığın yıldız: ${stars} / 3. Kalanları da bulmak istersen oyun devam ediyor.`; $('winScreen').hidden = false; $('againBtn').focus(); }, 2600); }
     else { toast(b.def.name + ' yenildi!'); caveMouths[b.i].sign.mark('YENİLDİ'); }
   } else if (Math.random() < .5) say(b, pick(b.def.taunt), 1.6);
 }
@@ -1834,7 +1839,7 @@ function updatePlayer(dt, time) {
   setFace(s, face);
   s.root.rotation.y = P.yaw;
   const hs = Math.hypot(P.vel.x, P.vel.z) / speed;
-  const won = stars >= 3 && !$('winScreen').hidden;
+  const won = !$('winScreen').hidden;
   poseStick(s, dt, { move: P.onGround && P.state === 'ok' ? clamp(hs, 0, 1) : 0, air: !P.onGround && P.state === 'ok', fall: P.state !== 'ok', punch: P.punchT > 0 ? 1 : 0, punchSide: P.punchSide, dance: won, eat: P.eatT > 0 }, time);
   s.root.visible = P.inv <= 0 || P.state === 'dead' || Math.floor(time * 16) % 2 === 0;
   s.shadow.position.y = (P.gh > -100 ? P.gh - P.pos.y : -999) + .05;
@@ -2076,7 +2081,7 @@ function updateHazards(dt) {
       if (k.kind === 'heart') { P.hp = Math.min(10, P.hp + 2); updateHearts(); SFX.pick(); say(P, pick(['Mmm, kalp!', 'Kendimi çizilmiş gibi hissediyorum!', 'Yaşasın!']), 1.5); }
       else {
         k.boss.collected = true; stars++; updateStars(); P.hp = 10; updateHearts(); SFX.star(); splash(P.pos, 0xf5b82e, 16);
-        if (stars >= 3) { toast('Üç yıldız tamam!'); setTimeout(() => { $('winScreen').hidden = false; $('againBtn').focus(); }, 1500); }
+        if (stars >= 3) toast('Üç yıldız tamam! Şimdi Dev Ressam\'ı yen.', 3.5);
         else { toast(`Altın yıldız! ${stars} / 3`); say(P, 'Parlak! Ama yenmiyor.', 2); }
       }
     }
@@ -2206,6 +2211,7 @@ function resetAll() {
 $('startBtn').addEventListener('click', startGame);
 $('reviveBtn').addEventListener('click', revive);
 $('againBtn').addEventListener('click', resetAll);
+$('keepBtn').addEventListener('click', () => { $('winScreen').hidden = true; });
 
 function fontsReady() {
   if (!document.fonts || !document.fonts.load) return Promise.resolve();
