@@ -430,17 +430,18 @@ function baglantiSun(req, res, kapi, url) {
   res.end(`[InternetShortcut]\r\nURL=${hedef.href}\r\n`);
 }
 // Hekim bilgisayarı için kurulum dosyası — sistemin internet adresi içine yazılır
-function hekimKurulumSun(req, res, kapi) {
+function hekimKurulumSun(req, res, kapi, rol = 'hekim') {
   const adres = (kapi === 'dis' && istekAdresi(req)) || ayarlar.genelAdres;
   if (!adres) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('Hekim portalının internet adresi henüz bilinmiyor. Hekim portalını internet adresinden (ör. https://...ts.net/HekimPortali.html) açıp bir kez GİRİŞ YAPIN, sonra tekrar deneyin.');
     return;
   }
-  const metin = fs.readFileSync(path.join(KOK, 'araclar', 'hekim-kurulum-sablonu.bat'), 'utf8').split('__ADRES__').join(adres);
+  const sablon = rol === 'teknisyen' ? 'teknisyen-kurulum-sablonu.bat' : 'hekim-kurulum-sablonu.bat';
+  const metin = fs.readFileSync(path.join(KOK, 'araclar', sablon), 'utf8').split('__ADRES__').join(adres);
   res.writeHead(200, {
     'Content-Type': 'application/octet-stream',
-    'Content-Disposition': 'attachment; filename="DIGICAD-Hekim-Portali-Kurulum.bat"',
+    'Content-Disposition': `attachment; filename="DIGICAD-${rol === 'teknisyen' ? 'Teknisyen' : 'Hekim'}-Portali-Kurulum.bat"`,
     'Cache-Control': 'no-store',
   });
   res.end(metin);
@@ -460,6 +461,7 @@ function isleyiciOlustur(kapi) {
       if (kapi === 'dis' && istekAdresi(req) !== ayarlar.genelAdres && oturumuVarMi(req, kapi)) genelAdresiOgren(req);
       if (yol === '/baglanti' && (req.method === 'GET' || req.method === 'HEAD')) return baglantiSun(req, res, kapi, url);
       if (yol === '/HekimPortaliKurulum.bat' && req.method === 'GET') return hekimKurulumSun(req, res, kapi);
+      if (yol === '/TeknisyenPaneliKurulum.bat' && req.method === 'GET') return hekimKurulumSun(req, res, kapi, 'teknisyen');
 
       if (!yol.startsWith('/api/') && !yol.startsWith('/dosya/')) {
         if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }

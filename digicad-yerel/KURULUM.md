@@ -339,6 +339,15 @@ Yine de çalıştır** seçeneğine tıklamalı.
 Telefonda: portalı açıp tarayıcı menüsünden **"Ana ekrana ekle"** seçilir.
 Ana ekranda diş simgesi oluşur.
 
+## Teknisyenler için
+
+Teknisyen bilgisayarına kurulum, hekimlerdeki gibi tek dosyayla yapılır:
+Teknisyen Portalı giriş ekranındaki **💻 Bu bilgisayara kur** bağlantısı
+`DIGICAD-Teknisyen-Portali-Kurulum.bat` dosyasını indirir. Çift tıklanınca
+masaüstüne ve Başlat menüsüne **DIGICAD Teknisyen Portalı** simgesi eklenir.
+Yönetici izni gerekmez. Portal internet adresinden açıldığı için teknisyen
+laboratuvar dışında da çalışabilir.
+
 ## Tasarım onayı (önizleme → hekim onayı → nihai dosya)
 
 Her panelin sağ alt köşesinde **🦷 Tasarım Onayı** düğmesi vardır. Üzerindeki

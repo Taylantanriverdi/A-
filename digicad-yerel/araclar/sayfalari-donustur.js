@@ -225,6 +225,14 @@ function techLogin() {
   html = degistir(html, 'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  currentTech = null;',
     'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  DL.cikis().catch(() => {}).then(() => DL.yenidenBaglan());\n  currentTech = null;',
     'Teknisyen çıkış');
+  // Simge ve "bu bilgisayara kur" bağlantısı
+  html = degistir(html, "<script>window.DL_PANEL='teknisyen';</script>",
+    `<link rel="icon" href="favicon.ico"><link rel="apple-touch-icon" href="simge-192.png"><meta name="theme-color" content="#1565c0">
+<script>window.DL_PANEL='teknisyen';</script>`, 'teknisyen başlık');
+  const ipucu = html.match(/<div class="login-hint">[\s\S]*?<\/div>/);
+  if (!ipucu) throw new Error('teknisyen login-hint bulunamadı');
+  html = html.replace(ipucu[0], ipucu[0] + `
+    <div class="login-hint" style="margin-top:10px">💻 <a href="TeknisyenPaneliKurulum.bat" style="color:var(--primary);font-weight:600">Bu bilgisayara kur</a> (masaüstüne simge ekler) · 📱 Telefonda tarayıcı menüsünden <b>“Ana ekrana ekle”</b></div>`);
   return html;
 }
 
