@@ -116,6 +116,59 @@ module.exports = (async()=>{
   bekle('HTML dosyası indirme olarak sunulur (XSS yok)', s.headers.get('content-disposition').startsWith('attachment') && s.headers.get('content-type')==='application/octet-stream', [...s.headers]);
   s=await fetch(IC+'/..%2f..%2fsunucu.js'); bekle('Klasör dışına çıkılamaz', s.status!==200, s.status);
 
+  console.log('Yol güvenliği (prototype pollution)');
+  r=await istek(IC,'hekim','/api/yaz',{islem:'set',yol:'db/digicad/doctorSubmissions/600/__proto__/drId',deger:1},ali);
+  bekle('__proto__ içeren yola yazılamaz', r.durum===400, r);
+  r=await istek(IC,'hekim','/api/yaz',{islem:'update',yol:'db/digicad/doctorSubmissions/600',deger:{'constructor/prototype/drId':1}},ali);
+  bekle('constructor/prototype içeren yola yazılamaz', r.durum===400, r);
+  r=await istek(IC,'hekim','/api/oku',{yol:'db/digicad/constructor'},ali);
+  bekle('constructor koleksiyonu okunamaz', r.durum===400||r.durum===403, r);
+  r=await istek(IC,'hekim','/api/yaz',{islem:'set',yol:'db/digicad/doctorSubmissions/601',deger:{id:601,patient:'Sahipsiz'}},ali);
+  bekle('Sunucu iç yapısı bozulmadı (drId\'siz kayıt hâlâ reddediliyor)', r.durum===403, r);
+
+  console.log('Girişsiz / büyük istekler');
+  r=await istek(IC,'hekim','/api/yaz',{islem:'set',yol:'db/digicad/doctorSubmissions/700',deger:{id:700,drId:1}});
+  bekle('Girişsiz yazma reddedilir', r.durum===401||r.durum===403, r);
+  r=await istek(DIS,'hekim','/api/giris',{kullaniciAdi:'x',sifre:'y'.repeat(600000)});
+  bekle('Aşırı büyük giriş isteği reddedilir', r.durum===413, r.durum);
+
+  console.log('Dosya kayıtları');
+  r=await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ayse',sifre:'ayse123'});
+  const ayse=r.cerez; bekle('İkinci hekim girişi', r.durum===200, r);
+  s=await fetch(IC+'/api/dosya-adresi?yol='+encodeURIComponent('chatFiles/digicad/job_100/x.stl'),{headers:{'X-DL-Panel':'hekim',Cookie:ayse}});
+  bekle('Başka hekimin dosya adresi sorulamaz', s.status===404, s.status);
+  s=await fetch(IC+'/api/dosya-adresi?yol='+encodeURIComponent('chatFiles/digicad/job_100/x.stl'),{headers:{'X-DL-Panel':'hekim',Cookie:ali}});
+  bekle('Kendi dosya adresini sorabilir', s.status===200, s.status);
+  s=await fetch(IC+'/api/yukle?yol=chatFiles/digicad/job_100/x.stl&ad=x.stl',{method:'POST',headers:{'X-DL-Panel':'hekim',Cookie:ayse},body:'sahte'});
+  bekle('Başkasının dosya kaydının üzerine yazılamaz', s.status===403, s.status);
+  s=await fetch(IC+'/api/yukle?yol=__proto__&ad=x.stl',{method:'POST',headers:{'X-DL-Panel':'hekim',Cookie:ayse},body:'sahte'});
+  bekle('Geçersiz dosya yolu reddedilir', s.status===403, s.status);
+
+  console.log('İnternet adresi öğrenme');
+  await fetch(DIS+'/HekimPortali.html',{headers:{'X-Forwarded-Host':'kotu-site.example','X-Forwarded-Proto':'https'}});
+  s=await fetch(IC+'/HekimPortaliKurulum.bat');
+  bekle('Girişsiz istek sahte internet adresi öğretemez', s.status===404 || !(await s.text()).includes('kotu-site'), s.status);
+
+  console.log('Yönetim paneli: eski kopyayla üzerine yazma koruması');
+  const pencere={'X-DL-Istemci':'testpenceresi0001'};
+  r=await istek(IC,'yonetici','/api/oku',{yol:'db/digicad'},yon,pencere);
+  const kopya=JSON.parse(JSON.stringify(r.j.deger.jobs));
+  await istek(IC,'teknisyen','/api/yaz',{islem:'update',yol:'db/digicad/jobs/100',deger:{status:'Tamamlandı'}},veli);
+  await istek(IC,'hekim','/api/yaz',{islem:'set',yol:'db/digicad/doctorSubmissions/610',deger:{id:610,drId:1,patient:'Araya giren'}},ali);
+  kopya['101'].notes='yönetici notu';
+  kopya['900']={id:900,drId:2,patient:'Yeni iş'};
+  r=await istek(IC,'yonetici','/api/yaz',{islem:'update',yol:'db/digicad',deger:{jobs:kopya,settings:{a:2}}},yon,pencere);
+  bekle('Toplu kayıt kabul edilir', r.durum===200, r);
+  r=await istek(IC,'yonetici','/api/oku',{yol:'db/digicad'},yon,pencere);
+  bekle('Teknisyenin araya giren değişikliği korunur', r.j.deger.jobs['100'].status==='Tamamlandı', r.j.deger.jobs['100']);
+  bekle('Yöneticinin kendi değişikliği yazılır', r.j.deger.jobs['101'].notes==='yönetici notu' && !!r.j.deger.jobs['900'], r.j.deger.jobs);
+  bekle('Hekimin araya giren gönderimi durur', !!r.j.deger.doctorSubmissions['610']);
+  const kopya2=JSON.parse(JSON.stringify(r.j.deger.jobs)); delete kopya2['900'];
+  await istek(IC,'yonetici','/api/yaz',{islem:'update',yol:'db/digicad',deger:{jobs:kopya2}},yon,pencere);
+  r=await istek(IC,'yonetici','/api/oku',{yol:'db/digicad/jobs'},yon,pencere);
+  bekle('Yöneticinin sildiği kayıt silinir, diğerleri kalır', !r.j.deger['900'] && !!r.j.deger['100'] && !!r.j.deger['101'], Object.keys(r.j.deger));
+  await istek(IC,'yonetici','/api/yaz',{islem:'update',yol:'db/digicad/jobs/100',deger:{status:'Üretimde'}},yon);
+
   console.log('Kaba kuvvet');
   for(let i=0;i<5;i++) await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ayse',sifre:'x'+i});
   r=await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ayse',sifre:'ayse123'});

@@ -13,6 +13,7 @@
 const agac = require('./agac');
 
 const CALISMA_ALANI = 'digicad'; // Hekim/teknisyen portalları yalnızca bu alana erişir
+const sahip = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 const ayni = (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && String(a) === String(b);
 
 class YetkiHatasi extends Error {
@@ -45,7 +46,7 @@ function isSohbetiIsId(anahtar) {
 }
 function isBul(kok, isId) {
   const isler = agac.al(kok, ['db', CALISMA_ALANI, 'jobs']) || {};
-  if (isler[isId]) return isler[isId];
+  if (sahip(isler, isId) && isler[isId]) return isler[isId];
   return Object.values(isler).find(j => j && ayni(j.id, isId)) || null;
 }
 
@@ -84,12 +85,12 @@ const gorunumler = {
 function oku(kok, oturum, parcalar) {
   if (!oturum) return null;
   if (oturum.rol === 'yonetici') return agac.al(kok, parcalar);
-  const g = gorunumler[oturum.rol];
+  const g = sahip(gorunumler, oturum.rol) ? gorunumler[oturum.rol] : null;
   if (!g) return null;
   if (parcalar[0] !== 'db' || parcalar[1] !== CALISMA_ALANI || parcalar.length < 3) throw new YetkiHatasi();
   const koleksiyon = parcalar[2];
-  const fn = g[koleksiyon];
-  if (!fn) throw new YetkiHatasi();
+  const fn = sahip(g, koleksiyon) ? g[koleksiyon] : null;
+  if (typeof fn !== 'function') throw new YetkiHatasi();
   const gorunum = fn(agac.al(kok, ['db', CALISMA_ALANI, koleksiyon]), oturum, kok);
   return agac.al(gorunum, parcalar.slice(3));
 }
@@ -138,7 +139,7 @@ function yazimDenetle(kok, oturum, islemler) {
   if (!oturum) throw new YetkiHatasi('Oturum açmanız gerekiyor');
   if (oturum.rol === 'yonetici') return pinAlanlariniAyikla(islemler);
 
-  const rolKurallari = kurallar[oturum.rol] || {};
+  const rolKurallari = sahip(kurallar, oturum.rol) ? kurallar[oturum.rol] : {};
   const kayitlar = new Map(); // "koleksiyon/anahtar" -> [islem]
   for (const is of islemler) {
     const p = is.parcalar;
@@ -149,7 +150,7 @@ function yazimDenetle(kok, oturum, islemler) {
   }
 
   for (const [anahtar, liste] of kayitlar) {
-    const [koleksiyon, kayitId] = anahtar.split('/');
+    const koleksiyon = liste[0].parcalar[2], kayitId = liste[0].parcalar[3];
 
     if (koleksiyon === 'chats') {
       // Sadece kendi işlerinin sohbetine mesaj yazabilir: chats/job_X/messages/M
@@ -167,8 +168,8 @@ function yazimDenetle(kok, oturum, islemler) {
       continue;
     }
 
-    const kural = rolKurallari[koleksiyon];
-    if (!kural) throw new YetkiHatasi();
+    const kural = sahip(rolKurallari, koleksiyon) ? rolKurallari[koleksiyon] : null;
+    if (typeof kural !== 'function') throw new YetkiHatasi();
     const kayitYolu = ['db', CALISMA_ALANI, koleksiyon, kayitId];
     const once = agac.al(kok, kayitYolu);
     let sonra = { kok: agac.kopya(once) };

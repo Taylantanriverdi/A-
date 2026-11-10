@@ -11,6 +11,14 @@
 (function () {
   'use strict';
   var PANEL = window.DL_PANEL || 'yonetici';
+  // Bu pencerenin kimliği: sunucu, pencerenin en son gördüğü veriyi bununla izler
+  // (eski bir kopyayla başkasının değişikliğinin üzerine yazılmasını önlemek için).
+  var ISTEMCI = (function () {
+    var h = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', s = '', i, r;
+    try { r = new Uint8Array(20); (window.crypto || window.msCrypto).getRandomValues(r); for (i = 0; i < 20; i++) s += h.charAt(r[i] % h.length); }
+    catch (e) { for (i = 0; i < 20; i++) s += h.charAt(Math.floor(Math.random() * h.length)); }
+    return s;
+  })();
 
   function parcala(yol) { return String(yol == null ? '' : yol).split('/').filter(Boolean); }
   function birlestir(p) { return p.join('/'); }
@@ -24,7 +32,7 @@
 
   // ── HTTP ─────────────────────────────────────────────────────────
   function istek(yontem, adres, govde) {
-    var secenek = { method: yontem, credentials: 'same-origin', headers: { 'X-DL-Panel': PANEL } };
+    var secenek = { method: yontem, credentials: 'same-origin', headers: { 'X-DL-Panel': PANEL, 'X-DL-Istemci': ISTEMCI } };
     if (govde !== undefined) {
       secenek.headers['Content-Type'] = 'application/json';
       secenek.body = JSON.stringify(govde, function (k, v) { return v === undefined ? null : v; });
@@ -56,14 +64,99 @@
   }
   function aboneKaydet(id) {
     var a = abonelikler[id];
-    if (!a || !baglantiId) return;
+    if (!a) return;
+    if (yoklamaModu) { yoklaBir(id); return; }
+    if (!baglantiId) return;
     istek('POST', '/api/abone', { baglanti: baglantiId, abone: id, yol: a.yol, sorgu: a.sorgu })
       .catch(function (e) { console.warn('[yerel] abonelik hatası', e); });
   }
+
+  // ── CANLI BAĞLANTI SAYISI SINIRI ─────────────────────────────────
+  // Tarayıcılar aynı adrese en fazla 6 bağlantı açar. Her pencere bir "canlı
+  // bağlantı" tuttuğu için 6 pencere açılınca hiçbir pencere sunucuya ulaşamaz
+  // hâle gelirdi. Bu yüzden aynı anda en fazla 4 pencere canlı bağlantı kullanır;
+  // sonraki pencereler veriyi birkaç saniyede bir sorarak (yoklama) çalışır.
+  var akisIstegi = 0;
+  var YUVA_SAYISI = 4, yuvaVar = false, yoklamaModu = false, yoklamaZamanlayici = null, yoklamaTuru = 0;
+  var yuvaIstegi = null;
+  function yuvaAl() {
+    if (yuvaVar || !(navigator.locks && navigator.locks.request)) return Promise.resolve(true);
+    if (yuvaIstegi) return yuvaIstegi; // aynı anda iki kez istenirse tek yuva alınsın
+    yuvaIstegi = yuvaAra();
+    yuvaIstegi.then(function () { yuvaIstegi = null; });
+    return yuvaIstegi;
+  }
+  function yuvaAra() {
+    return new Promise(function (coz) {
+      var i = 0;
+      (function dene() {
+        if (i >= YUVA_SAYISI) { coz(false); return; }
+        var ad = 'dl-canli-baglanti-' + (i++);
+        navigator.locks.request(ad, { ifAvailable: true }, function (kilit) {
+          if (!kilit) { dene(); return undefined; }
+          yuvaVar = true; coz(true);
+          return new Promise(function () {}); // pencere kapanana kadar yuvayı tut
+        }).catch(function () { coz(true); });
+      })();
+    });
+  }
+  function yoklaBir(id) {
+    var a = abonelikler[id];
+    if (!a || a.yoklaniyor) return Promise.resolve();
+    a.yoklaniyor = true;
+    return istek('POST', '/api/oku', { yol: a.yol, sorgu: a.sorgu }).then(function (j) {
+      a.yoklaniyor = false;
+      bagliAyarla(true);
+      if (abonelikler[id] !== a) return;
+      var metin = JSON.stringify(j.deger === undefined ? null : j.deger);
+      if (metin === a.sonMetin) return;
+      a.sonMetin = metin;
+      try { a.cb(new AnlikGoruntu(a.ref, j.deger)); } catch (x) { console.error(x); }
+    }, function (e) {
+      a.yoklaniyor = false;
+      if (e && e.durum === 403 && a.hataCb) { try { a.hataCb(e); } catch (x) { console.error(x); } }
+      else if (!e || !e.durum) bagliAyarla(false);
+    });
+  }
+  function yoklamaDongusu() {
+    if (!yoklamaModu) return;
+    yoklamaTuru++;
+    // Arada bir canlı bağlantı yuvası boşalmış mı diye bak
+    if (yoklamaTuru % 8 === 0) {
+      yuvaAl().then(function (oldu) { if (oldu && yoklamaModu) akisBaslat(); });
+    }
+    var bekleyen = [];
+    Object.keys(abonelikler).forEach(function (id) { bekleyen.push(yoklaBir(id)); });
+    if (oturumAcik) {
+      bekleyen.push(istek('GET', '/api/ben').then(function (r) {
+        if (oturumAcik && !(r && r.kullanici)) location.reload(); // oturum bitti → giriş ekranı
+      }, function () {}));
+    }
+    Promise.all(bekleyen).then(function () {
+      if (yoklamaModu) yoklamaZamanlayici = setTimeout(yoklamaDongusu, 4000);
+    });
+  }
+  function yoklamaBaslat() {
+    if (yoklamaZamanlayici) clearTimeout(yoklamaZamanlayici);
+    yoklamaModu = true;
+    Object.keys(abonelikler).forEach(function (id) { abonelikler[id].sonMetin = undefined; });
+    yoklamaDongusu();
+  }
+
   function akisBaslat() {
-    if (akis) { try { akis.close(); } catch (e) {} }
+    if (akis) { try { akis.close(); } catch (e) {} akis = null; }
     baglantiId = null;
-    akis = new EventSource('/api/akis?panel=' + encodeURIComponent(PANEL));
+    if (!yuvaVar) {
+      var buIstek = ++akisIstegi;
+      yuvaAl().then(function (oldu) {
+        if (buIstek !== akisIstegi) return; // bu arada yeni bir bağlanma isteği geldi
+        if (oldu) { yuvaVar = true; akisBaslat(); } else yoklamaBaslat();
+      });
+      return;
+    }
+    yoklamaModu = false;
+    if (yoklamaZamanlayici) { clearTimeout(yoklamaZamanlayici); yoklamaZamanlayici = null; }
+    akis = new EventSource('/api/akis?panel=' + encodeURIComponent(PANEL) + '&istemci=' + ISTEMCI);
     akis.addEventListener('merhaba', function (e) {
       var m = JSON.parse(e.data);
       // Sayfa giriş yapılmış sanıyor ama sunucuda oturum yok (süresi doldu,
@@ -320,7 +413,8 @@
     signOut: function () { return Promise.resolve(); },
   };
   function database() { return veritabani; }
-  database.ServerValue = { TIMESTAMP: Date.now() };
+  database.ServerValue = {};
+  Object.defineProperty(database.ServerValue, 'TIMESTAMP', { enumerable: true, get: function () { return Date.now(); } });
   window.firebase = {
     apps: [],
     initializeApp: function () { if (!this.apps.length) this.apps.push({}); return this.apps[0]; },

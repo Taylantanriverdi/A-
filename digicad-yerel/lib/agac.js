@@ -3,15 +3,23 @@
 // Yollar "db/digicad/jobs/123" biçimindedir; boş değerler (null, {}, [])
 // Firebase'deki gibi ağaçtan silinir.
 
+// Bu adlar JavaScript nesnelerinin iç yapısına dokunur; veri yolu ya da alan adı
+// olarak kullanılmalarına izin verilmez (aksi halde bir kullanıcı sunucunun
+// çalışmasını bozabilir — "prototype pollution").
+const YASAK_ADLAR = new Set(['__proto__', 'constructor', 'prototype']);
+function yolHatasi() { return Object.assign(new Error('Geçersiz veri yolu'), { durum: 400 }); }
+
 function parcala(yol) {
-  if (Array.isArray(yol)) return yol.slice();
-  return String(yol == null ? '' : yol).split('/').filter(Boolean);
+  const p = Array.isArray(yol) ? yol.map(String) : String(yol == null ? '' : yol).split('/').filter(Boolean);
+  for (const x of p) if (YASAK_ADLAR.has(x)) throw yolHatasi();
+  return p;
 }
 
 function al(agac, parcalar) {
   let v = agac;
   for (const p of parcalar) {
     if (v === null || typeof v !== 'object') return null;
+    if (!Object.prototype.hasOwnProperty.call(v, p)) return null; // kalıtılan (iç) alanlar veri değildir
     v = v[p];
   }
   return v === undefined ? null : v;
@@ -30,6 +38,7 @@ function temizle(v) {
   const n = {};
   let bos = true;
   for (const k of Object.keys(v)) {
+    if (YASAK_ADLAR.has(k)) continue;
     const t = temizle(v[k]);
     if (t !== undefined) { n[k] = t; bos = false; }
   }
@@ -45,6 +54,7 @@ function bosMu(o) {
 
 // Ağaçta bir yola değer yazar (null = sil). Kök nesneyi döner.
 function yaz(kok, parcalar, deger) {
+  for (const p of parcalar) if (YASAK_ADLAR.has(String(p))) throw yolHatasi();
   deger = temizle(deger);
   if (!parcalar.length) return deger === undefined || typeof deger !== 'object' || Array.isArray(deger) ? {} : deger;
   if (kok === null || typeof kok !== 'object') kok = {};
@@ -52,7 +62,7 @@ function yaz(kok, parcalar, deger) {
   let v = kok;
   for (let i = 0; i < parcalar.length - 1; i++) {
     const p = parcalar[i];
-    if (v[p] === null || v[p] === undefined || typeof v[p] !== 'object') {
+    if (!Object.prototype.hasOwnProperty.call(v, p) || v[p] === null || typeof v[p] !== 'object') {
       if (deger === undefined) return kok; // silinecek bir şey yok
       v[p] = {};
     }

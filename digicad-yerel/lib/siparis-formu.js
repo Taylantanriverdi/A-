@@ -34,7 +34,11 @@ function talepten(sub) {
     ? sub.jobTypes.map(j => ({ type: j.type || 'Belirsiz', qty: j.qty || 1 }))
     : (sub.jobType ? [{ type: sub.jobType, qty: teeth.length || 1 }] : []);
   const ilkTur = buyuk((jobLines[0] || {}).type);
-  const material = ilkTur ? (ORDER_MATERIALS.find(m => ilkTur.includes(m.split(' ')[0])) || '') : '';
+  // Panelin kuralı (materyal adının ilk sözcüğü iş türünde geçiyor mu) + Türkçe yazılışlar
+  const ES_ANLAM = [[/Z[İI]RKON|ZIRCON/, 'ZIRCONIA'], [/T[İI]TAN/, 'TITANIUM'], [/E[-. ]?MAX/, 'EMAX'], [/LAM[İI]NA/, 'LAMİNE']];
+  const material = ilkTur
+    ? (ORDER_MATERIALS.find(m => ilkTur.includes(m.split(' ')[0])) || (ES_ANLAM.find(([d]) => d.test(ilkTur)) || [])[1] || '')
+    : '';
 
   const jawLabel = sub.jaw === 'upper' ? 'ÜST ÇENE' : sub.jaw === 'lower' ? 'ALT ÇENE' : sub.jaw === 'both' ? 'ÜST + ALT ÇENE' : '';
   const dosyalar = (Array.isArray(sub.files) ? sub.files : []).filter(Boolean)

@@ -205,7 +205,8 @@ async function dosyaIndir(adres, dizin, dosyalarKlasoru, yerelKaynak) {
       const belirtec = crypto.randomBytes(24).toString('base64url');
       const klasor = path.join(dosyalarKlasoru, belirtec);
       fs.mkdirSync(klasor, { recursive: true });
-      await pipeline(Readable.fromWeb(r.body), fs.createWriteStream(path.join(klasor, ad)));
+      try { await pipeline(Readable.fromWeb(r.body), fs.createWriteStream(path.join(klasor, ad))); }
+      catch (e) { fs.rmSync(klasor, { recursive: true, force: true }); throw e; }
       const yerel = `/dosya/${belirtec}/${encodeURIComponent(ad)}`;
       dizin[depoYolu] = { adres: yerel, boyut: fs.statSync(path.join(klasor, ad)).size, tarih: new Date().toISOString(), yukleyen: 'firebase-aktarim' };
       return yerel;

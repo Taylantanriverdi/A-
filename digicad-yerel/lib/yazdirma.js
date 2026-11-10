@@ -113,10 +113,9 @@ function yazdir(form, yazici, kopya = 1, kagit = 'A5') {
 // Bu başarısız olursa yedek olarak basit iş formu basılır.
 function formAlanlari(kayit, test) {
   const a = siparisFormu.talepten(kayit);
-  const [y, m, g] = String(a.dateout || '').split('-');
   return {
     hekim: a.doctorName, hasta: a.patient, renk: a.color, adet: a.qty,
-    teslim: a.dateout ? `${g}.${m}.${y}` : '',
+    teslim: gunYaz(a.dateout),
     malzeme: a.material, disler: a.teeth,
     kalemler: (a.jobLines || []).map(l => ({ tur: l.type, adet: l.qty })),
     notlar: (test ? '*** TEST SAYFASI — GERÇEK BİR İŞ DEĞİLDİR ***\n' : '') + (a.notes || ''),

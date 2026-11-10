@@ -19,8 +19,10 @@ function Durum {
   if (-not $g) { Write-Host ' Arka plan kurulumu YOK (sunucu Baslat.bat penceresiyle calisiyor olabilir).' -ForegroundColor Yellow }
   else { Write-Host (' Arka plan gorevi: kurulu, durumu: ' + $g.State) }
   try {
-    $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8080/' -UseBasicParsing -TimeoutSec 5
-    Write-Host ' Sunucu CALISIYOR -> http://localhost:8080' -ForegroundColor Green
+    $port = 8080
+    try { $a = Get-Content (Join-Path $kok 'veri\ayarlar.json') -Raw | ConvertFrom-Json; if ($a.icPort) { $port = [int]$a.icPort } } catch {}
+    $r = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $port + '/') -UseBasicParsing -TimeoutSec 5
+    Write-Host (' Sunucu CALISIYOR -> http://localhost:' + $port) -ForegroundColor Green
   } catch { Write-Host ' Sunucu YANIT VERMIYOR.' -ForegroundColor Red; Write-Host (' Kayit dosyasi: ' + (Join-Path $kok 'veri\sunucu.log')) }
 }
 

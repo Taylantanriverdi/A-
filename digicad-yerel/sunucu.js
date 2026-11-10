@@ -138,28 +138,35 @@ setInterval(() => {
 
 // ── GİRİŞ DENEME SINIRI ─────────────────────────────────────────────
 // 5 hatalı denemeden sonra 15 dakika kilit (hem kullanıcı adı hem kapı başına)
+// Kilit her tekrarında iki katına çıkar (15 dk → 30 dk → 1 saat … en çok 24 saat);
+// böylece 4 haneli PIN deneme-yanılmayla bulunamaz. Doğru girişte sıfırlanır.
 const denemeler = new Map();
-const KILIT_DENEME = 5, KILIT_SURE = 15 * 60e3;
+const KILIT_DENEME = 5, KILIT_SURE = 15 * 60e3, KILIT_EN_COK = 24 * 3600e3, DENEME_PENCERESI = 15 * 60e3;
 function kilitliMi(anahtar) {
   const d = denemeler.get(anahtar);
   if (!d) return 0;
   if (d.kilit && d.kilit > Date.now()) return Math.ceil((d.kilit - Date.now()) / 60e3);
-  if (d.kilit) denemeler.delete(anahtar);
   return 0;
 }
-function hataliDeneme(anahtar) {
-  const d = denemeler.get(anahtar) || { sayi: 0, kilit: 0 };
-  d.sayi++;
-  if (d.sayi >= KILIT_DENEME) { d.kilit = Date.now() + KILIT_SURE; d.sayi = 0; }
+function hataliDeneme(anahtar, sinir = KILIT_DENEME) {
+  const simdi = Date.now();
+  const d = denemeler.get(anahtar) || { sayi: 0, kilit: 0, kat: 0, son: 0 };
+  if (simdi - d.son > DENEME_PENCERESI) d.sayi = 0; // eski hatalar birikmesin
+  d.sayi++; d.son = simdi;
+  if (d.sayi >= sinir) { d.kilit = simdi + Math.min(KILIT_EN_COK, KILIT_SURE * 2 ** d.kat); d.kat++; d.sayi = 0; }
   denemeler.set(anahtar, d);
 }
+setInterval(() => {
+  const simdi = Date.now();
+  for (const [k, d] of denemeler) if (d.kilit < simdi && simdi - d.son > KILIT_EN_COK) denemeler.delete(k);
+}, 3600e3).unref();
 
 // ── YARDIMCILAR ─────────────────────────────────────────────────────
 function cerezleriOku(req) {
   const c = {};
   for (const parca of (req.headers.cookie || '').split(';')) {
     const i = parca.indexOf('=');
-    if (i > 0) c[parca.slice(0, i).trim()] = decodeURIComponent(parca.slice(i + 1).trim());
+    if (i > 0) { try { c[parca.slice(0, i).trim()] = decodeURIComponent(parca.slice(i + 1).trim()); } catch (e) { /* bozuk çerez yok sayılır */ } }
   }
   return c;
 }
@@ -189,16 +196,19 @@ function govdeOku(req, sinir) {
     const parcalar = []; let boyut = 0;
     req.on('data', p => {
       boyut += p.length;
-      if (boyut > sinir) { reddet(Object.assign(new Error('İstek çok büyük'), { durum: 413 })); req.destroy(); return; }
+      if (boyut > sinir) { reddet(Object.assign(new Error('İstek çok büyük'), { durum: 413 })); req.removeAllListeners('data'); req.resume(); return; }
       parcalar.push(p);
     });
     req.on('end', () => coz(Buffer.concat(parcalar)));
     req.on('error', reddet);
   });
 }
-async function jsonOku(req) {
+// sinir: giriş yapmamış ya da internetten gelen biri büyük istek göndererek
+// sunucunun belleğini dolduramasın diye her adres için ayrı üst sınır verilir.
+const MB = 1024 * 1024;
+async function jsonOku(req, sinir = 256 * 1024) {
   if (!/^application\/json/.test(req.headers['content-type'] || '')) throw Object.assign(new Error('JSON bekleniyor'), { durum: 415 });
-  const b = await govdeOku(req, 200 * 1024 * 1024);
+  const b = await govdeOku(req, sinir);
   return b.length ? JSON.parse(b.toString('utf8')) : {};
 }
 function ipAdresi(req) { return (req.socket.remoteAddress || '').replace(/^::ffff:/, ''); }
@@ -233,7 +243,9 @@ const TURLER = {
 const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
 
 function statikSun(req, res, kapi) {
-  let yol = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let yol;
+  try { yol = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
+  catch (e) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Geçersiz adres'); return; }
   if (yol === '/') yol = kapi === 'dis' ? '/dis-index.html' : '/index.html';
   if (kapi === 'dis' && !DIS_SAYFALAR.test(yol)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
   const tam = path.normalize(path.join(GENEL, yol));
@@ -245,7 +257,8 @@ function statikSun(req, res, kapi) {
       'Content-Length': st.size,
       'Cache-Control': 'no-cache',
     });
-    fs.createReadStream(tam).pipe(res);
+    if (req.method === 'HEAD') { res.end(); return; }
+    fs.createReadStream(tam).on('error', () => res.destroy()).pipe(res);
   });
 }
 
@@ -259,7 +272,9 @@ function dosyaSun(req, res, oturumVarMi) {
   try { ad = fs.readdirSync(klasor)[0]; } catch (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
   if (!ad) { res.writeHead(404); res.end(); return; }
   const tam = path.join(klasor, ad);
-  const st = fs.statSync(tam);
+  let st;
+  try { st = fs.statSync(tam); } catch (e) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
+  if (!st.isFile()) { res.writeHead(404); res.end(); return; }
   const uzanti = path.extname(ad).toLowerCase();
   const tur = TURLER[uzanti] || 'application/octet-stream';
   // Resim ve PDF tarayıcıda açılır; diğer her şey (özellikle html/svg) indirilir
@@ -271,7 +286,8 @@ function dosyaSun(req, res, oturumVarMi) {
     'Cache-Control': 'private, max-age=86400',
     'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
   });
-  fs.createReadStream(tam).pipe(res);
+  if (req.method === 'HEAD') { res.end(); return; }
+  fs.createReadStream(tam).on('error', () => res.destroy()).pipe(res);
 }
 
 // İndirme başlığı: Türkçe karakterli ad (filename*) + eski tarayıcılar için sadeleştirilmiş ad (filename)
@@ -294,6 +310,57 @@ const baglantilar = new Map(); // id -> { res, panel, anahtar, kapi, abonelikler
 function olayGonder(b, olay, veri) {
   b.res.write(`event: ${olay}\ndata: ${JSON.stringify(veri)}\n\n`);
 }
+// ── YÖNETİM PANELİ: "son gördüğü veri" kaydı ve çakışmasız kayıt ─────
+// Yönetim paneli her kayıtta koleksiyonun TAMAMINI gönderir (ör. tüm işler).
+// Panel o sırada eski bir kopyaya bakıyorsa (bağlantı kopmuş, bilgisayar uykudan
+// yeni çıkmış, aynı anda bir teknisyen/hekim değişiklik yapmış…) bu, başkalarının
+// az önce yaptığı değişiklikleri sessizce geri alırdı. Bunu önlemek için sunucu
+// her panel penceresinin en son gördüğü veriyi tutar ve gelen kaydı onunla
+// karşılaştırır: panelin gerçekten değiştirdiği / sildiği kayıtlar yazılır,
+// dokunmadığı kayıtlar sunucudaki güncel hâliyle kalır.
+const BIRLESEN_KOLEKSIYONLAR = new Set(['doctors', 'jobs', 'payments', 'technicians', 'pendingJobs', 'expenses', 'sales', 'orderForms', 'statementClosures']);
+const istemciGorusleri = new Map(); // pencere kimliği -> { zaman, alanlar: Map(çalışma alanı -> { metin, nesne }) }
+const istemciKimligi = v => (typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v) ? v : null);
+function gorusKaydet(istemci, parcalar, sorgu, metin) {
+  if (!istemci || sorgu || parcalar.length !== 2 || parcalar[0] !== 'db') return;
+  let g = istemciGorusleri.get(istemci);
+  if (!g) {
+    if (istemciGorusleri.size >= 12) { // en eski pencereyi unut
+      let eski = null;
+      for (const [k, v] of istemciGorusleri) if (!eski || v.zaman < istemciGorusleri.get(eski).zaman) eski = k;
+      istemciGorusleri.delete(eski);
+    }
+    g = { zaman: 0, alanlar: new Map() };
+    istemciGorusleri.set(istemci, g);
+  }
+  g.zaman = Date.now();
+  g.alanlar.set(parcalar[1], { metin, nesne: undefined });
+}
+const duzNesne = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+function yoneticiKaydiniBirlestir(islemler, istemci) {
+  const g = istemci && istemciGorusleri.get(istemci);
+  if (!g) return islemler;
+  const sonuc = [];
+  for (const is of islemler) {
+    const p = is.parcalar;
+    const gorus = p.length === 3 && p[0] === 'db' && BIRLESEN_KOLEKSIYONLAR.has(p[2]) ? g.alanlar.get(p[1]) : null;
+    if (!gorus || !duzNesne(is.deger)) { sonuc.push(is); continue; }
+    if (gorus.nesne === undefined) { try { gorus.nesne = JSON.parse(gorus.metin) || {}; } catch (e) { gorus.nesne = {}; } }
+    const taban = gorus.nesne[p[2]] === undefined ? {} : gorus.nesne[p[2]];
+    if (!duzNesne(taban)) { sonuc.push(is); continue; }
+    const istenen = agac.temizle(is.deger) || {};
+    for (const id of new Set([...Object.keys(istenen), ...Object.keys(taban)])) {
+      const yeni = istenen[id], eski = taban[id];
+      if (yeni !== undefined && eski !== undefined && JSON.stringify(yeni) === JSON.stringify(eski)) continue; // panel dokunmamış
+      sonuc.push({ parcalar: [...p, id], deger: yeni === undefined ? null : yeni });
+    }
+  }
+  return sonuc;
+}
+setInterval(() => {
+  for (const [k, g] of istemciGorusleri) if (Date.now() - g.zaman > 24 * 3600e3) istemciGorusleri.delete(k);
+}, 3600e3).unref();
+
 function aboneDegeriGonder(b, abone, oturum) {
   let deger, hata = null;
   try { deger = agac.sorguUygula(yetki.oku(depo.kok, oturum, abone.parcalar), abone.sorgu); }
@@ -301,6 +368,7 @@ function aboneDegeriGonder(b, abone, oturum) {
   const metin = JSON.stringify(deger === undefined ? null : deger);
   if (metin === abone.son && !hata) return;
   abone.son = metin;
+  if (oturum && oturum.rol === 'yonetici' && !hata) gorusKaydet(b.istemci, abone.parcalar, abone.sorgu, metin);
   b.res.write(`event: veri\ndata: {"abone":${JSON.stringify(abone.id)},"deger":${metin}${hata ? ',"hata":' + JSON.stringify(hata) : ''}}\n\n`);
 }
 
@@ -364,7 +432,7 @@ function hekimKurulumSun(req, res, kapi) {
   const adres = (kapi === 'dis' && istekAdresi(req)) || ayarlar.genelAdres;
   if (!adres) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Hekim portalının internet adresi henüz bilinmiyor. Hekim portalını bir kez internet adresinden (ör. https://...ts.net/HekimPortali.html) açın, sonra tekrar deneyin.');
+    res.end('Hekim portalının internet adresi henüz bilinmiyor. Hekim portalını internet adresinden (ör. https://...ts.net/HekimPortali.html) açıp bir kez GİRİŞ YAPIN, sonra tekrar deneyin.');
     return;
   }
   const metin = fs.readFileSync(path.join(KOK, 'araclar', 'hekim-kurulum-sablonu.bat'), 'utf8').split('__ADRES__').join(adres);
@@ -385,7 +453,9 @@ function isleyiciOlustur(kapi) {
     try {
       // Dış kapıdan (internet) gelen isteklerden sistemin internet adresini öğren
       // (hekim kurulum dosyası bu adresi kullanır)
-      if (kapi === 'dis') genelAdresiOgren(req);
+      // — yalnızca giriş yapmış bir hekim/teknisyenin isteğinden; aksi halde internetten
+      // biri sahte bir adres bildirip kurulum dosyasını başka bir siteye yönlendirebilirdi.
+      if (kapi === 'dis' && istekAdresi(req) !== ayarlar.genelAdres && oturumuVarMi(req, kapi)) genelAdresiOgren(req);
       if (yol === '/baglanti' && (req.method === 'GET' || req.method === 'HEAD')) return baglantiSun(req, res, kapi, url);
       if (yol === '/HekimPortaliKurulum.bat' && req.method === 'GET') return hekimKurulumSun(req, res, kapi);
 
@@ -399,6 +469,7 @@ function isleyiciOlustur(kapi) {
       const panel = req.headers['x-dl-panel'] || url.searchParams.get('panel');
 
       if (yol.startsWith('/dosya/')) {
+        if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
         const oturumVar = PANELLER.some(p => (kapi === 'ic' || p !== 'yonetici') && oturumGetir(cerezler[CEREZ_ADI[p]], p));
         return dosyaSun(req, res, oturumVar);
       }
@@ -423,18 +494,26 @@ function isleyiciOlustur(kapi) {
       if (yol === '/api/giris' && req.method === 'POST') {
         const g = await jsonOku(req);
         if (panel === 'yonetici') {
-          const k = 'yonetici:' + kapi;
-          const dk = kilitliMi(k);
+          // Kilit bilgisayar başına tutulur; ağdaki başka bir cihazın hatalı denemeleri
+          // bu bilgisayardan (sunucunun kendisinden) girişi engelleyemez.
+          const ip = ipAdresi(req);
+          const k = 'yonetici:' + ip, kGenel = 'yonetici:genel';
+          const sunucununKendisi = ip === '127.0.0.1' || ip === '::1';
+          const dk = Math.max(kilitliMi(k), sunucununKendisi ? 0 : kilitliMi(kGenel));
           if (dk) return json(res, 429, { hata: `Çok fazla hatalı deneme. ${dk} dakika sonra tekrar deneyin.` });
-          if (!pinDogruMu(g.pin)) { hataliDeneme(k); console.warn(`[güvenlik] Hatalı yönetici PIN denemesi (${ipAdresi(req)})`); return json(res, 401, { hata: 'Hatalı şifre!' }); }
+          if (!pinDogruMu(g.pin)) {
+            hataliDeneme(k); if (!sunucununKendisi) hataliDeneme(kGenel, 20);
+            console.warn(`[güvenlik] Hatalı yönetici PIN denemesi (${ip})`);
+            return json(res, 401, { hata: 'Hatalı şifre!' });
+          }
           denemeler.delete(k);
           oturumKapat(anahtar);
           cerezYaz(res, req, CEREZ_ADI.yonetici, oturumAc('yonetici', 'yonetici'), SURE.yonetici);
           return json(res, 200, { kullanici: { rol: 'yonetici' } });
         }
-        const kAdi = String(g.kullaniciAdi || '').trim().toLowerCase();
-        const sifre = String(g.sifre || '');
-        const k1 = panel + ':' + kAdi, k2 = panel + ':kapi:' + kapi + ':' + istemciAdresi(req, kapi);
+        const kAdi = String(g.kullaniciAdi || '').trim().toLowerCase().slice(0, 80);
+        const sifre = String(g.sifre || '').slice(0, 200);
+        const k1 = panel + ':' + kAdi, k2 = panel + ':kapi:' + kapi + ':' + String(istemciAdresi(req, kapi)).slice(0, 60);
         const dk = Math.max(kilitliMi(k1), kilitliMi(k2));
         if (dk) return json(res, 429, { hata: `Çok fazla hatalı deneme. ${dk} dakika sonra tekrar deneyin.` });
         const kisi = kisiKayitlari(panel).find(x => (x.username || '').toLowerCase() === kAdi && kAdi);
@@ -444,7 +523,7 @@ function isleyiciOlustur(kapi) {
           hataliDeneme(k1); hataliDeneme(k2);
           return json(res, 401, { hata: 'Kullanıcı adı veya şifre hatalı.' });
         }
-        denemeler.delete(k1);
+        denemeler.delete(k1); denemeler.delete(k2);
         oturumKapat(anahtar);
         cerezYaz(res, req, CEREZ_ADI[panel], oturumAc(panel, kisi.id, sifreIzi(kisi)), SURE[panel]);
         return json(res, 200, { kullanici: yetki.sifresiz(kisi) });
@@ -466,7 +545,12 @@ function isleyiciOlustur(kapi) {
       if (yol === '/api/pin-degistir' && req.method === 'POST') {
         if (!oturum || oturum.rol !== 'yonetici') return json(res, 401, { hata: 'Giriş yapmanız gerekiyor' });
         const g = await jsonOku(req);
-        if (!pinDogruMu(g.eski)) return json(res, 400, { hata: 'Mevcut şifre hatalı!' });
+        const kp = 'pin-degistir:' + ipAdresi(req);
+        const dkp = kilitliMi(kp);
+        if (dkp) return json(res, 429, { hata: `Çok fazla hatalı deneme. ${dkp} dakika sonra tekrar deneyin.` });
+        if (!pinDogruMu(g.eski)) { hataliDeneme(kp); return json(res, 400, { hata: 'Mevcut şifre hatalı!' }); }
+        denemeler.delete(kp);
+        if (['0000', '1234'].includes(String(g.yeni))) return json(res, 400, { hata: 'Bu şifre çok kolay tahmin edilir, başka bir şifre seçin!' });
         if (!pinGecerliMi(g.yeni)) return json(res, 400, { hata: 'Yeni şifre 4 haneli rakam olmalı!' });
         ayarlar = ayarlariOku();
         ayarlar.pin = pinOzetle(g.yeni);
@@ -479,12 +563,19 @@ function isleyiciOlustur(kapi) {
 
       // ── Canlı akış ──────────────────────────────────────
       if (yol === '/api/akis' && req.method === 'GET') {
+        // Giriş yapmamış bağlantılar sınırlıdır (internetten binlerce boş bağlantı
+        // açılarak sunucunun yorulması engellenir)
+        if (!oturum) {
+          let girissiz = 0;
+          for (const x of baglantilar.values()) if (!x.anahtar) girissiz++;
+          if (girissiz >= 200) { res.writeHead(503, { 'Retry-After': '30' }); res.end(); return; }
+        }
         res.writeHead(200, {
           'Content-Type': 'text/event-stream; charset=utf-8',
           'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no',
         });
         const id = crypto.randomBytes(16).toString('hex');
-        const b = { res, panel, anahtar: oturum ? anahtar : null, kapi, abonelikler: new Map() };
+        const b = { res, panel, anahtar: oturum ? anahtar : null, kapi, abonelikler: new Map(), istemci: istemciKimligi(url.searchParams.get('istemci')) };
         baglantilar.set(id, b);
         res.write('retry: 3000\n\n');
         olayGonder(b, 'merhaba', { baglanti: id, oturum: !!oturum });
@@ -496,6 +587,7 @@ function isleyiciOlustur(kapi) {
         const g = await jsonOku(req);
         const b = baglantilar.get(g.baglanti);
         if (!b || b.panel !== panel) return json(res, 404, { hata: 'Bağlantı bulunamadı' });
+        if (b.abonelikler.size >= 200 && !b.abonelikler.has(String(g.abone))) return json(res, 429, { hata: 'Çok fazla abonelik' });
         const abone = { id: String(g.abone), parcalar: agac.parcala(g.yol), sorgu: g.sorgu || null, son: undefined };
         b.abonelikler.set(abone.id, abone);
         aboneDegeriGonder(b, abone, oturumGetir(b.anahtar, b.panel));
@@ -512,13 +604,20 @@ function isleyiciOlustur(kapi) {
       // ── Okuma / yazma ───────────────────────────────────
       if (yol === '/api/oku' && req.method === 'POST') {
         const g = await jsonOku(req);
-        const deger = agac.sorguUygula(yetki.oku(depo.kok, oturum, agac.parcala(g.yol)), g.sorgu);
-        return json(res, 200, { deger: deger === undefined ? null : deger });
+        const parcalar = agac.parcala(g.yol);
+        const deger = agac.sorguUygula(yetki.oku(depo.kok, oturum, parcalar), g.sorgu);
+        const metin = JSON.stringify(deger === undefined ? null : deger);
+        if (oturum && oturum.rol === 'yonetici') gorusKaydet(istemciKimligi(req.headers['x-dl-istemci']), parcalar, g.sorgu || null, metin);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end('{"deger":' + metin + '}');
+        return;
       }
 
       if (yol === '/api/yaz' && req.method === 'POST') {
-        const g = await jsonOku(req);
-        const islemler = yetki.yazimDenetle(depo.kok, oturum, agac.islemleriAc(g.islem, g.yol, g.deger));
+        if (!oturum) return json(res, 401, { hata: 'Oturum açmanız gerekiyor' }); // gövde okunmadan
+        const g = await jsonOku(req, (oturum.rol === 'yonetici' ? 300 : 20) * MB);
+        let islemler = yetki.yazimDenetle(depo.kok, oturum, agac.islemleriAc(g.islem, g.yol, g.deger));
+        if (oturum.rol === 'yonetici') islemler = yoneticiKaydiniBirlestir(islemler, istemciKimligi(req.headers['x-dl-istemci']));
         // Hekim portalından YENİ bir iş mi geldi? (otomatik yazdırma için)
         const yeniGonderimler = oturum && oturum.rol === 'hekim'
           ? [...new Set(islemler.map(i => i.parcalar).filter(p => p[0] === 'db' && p[1] === yetki.CALISMA_ALANI && p[2] === 'doctorSubmissions' && p[3]).map(p => p[3]))]
@@ -549,8 +648,27 @@ function isleyiciOlustur(kapi) {
           res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bu bağlantı türü bu yolla indirilemez'); return;
         }
         let ad = guvenliDosyaAdi(url.searchParams.get('ad') || decodeURIComponent(hedef.pathname.split('/').pop() || 'tarama.zip'));
-        let r;
-        try { r = await fetch(hedef.href); } catch (e) { r = null; }
+        // Yönlendirmeler tek tek izlenir: izinli bir adres, isteği başka bir yere
+        // (ör. bu bilgisayardaki ya da ağdaki bir adrese) yönlendiremez.
+        const yonlendirmeIzni = /(^|\.)(amazonaws\.com|google\.com|googleusercontent\.com)$/i;
+        const kesici = new AbortController();
+        const sure = setTimeout(() => kesici.abort(), 60e3);
+        res.on('close', () => kesici.abort()); // kullanıcı vazgeçtiyse indirmeyi bırak
+        let r = null;
+        try {
+          let adres = hedef;
+          for (let i = 0; i < 6; i++) {
+            r = await fetch(adres.href, { redirect: 'manual', signal: kesici.signal });
+            if (r.status < 300 || r.status >= 400 || !r.headers.get('location')) break;
+            const yeni = new URL(r.headers.get('location'), adres);
+            try { await r.body.cancel(); } catch (e) { /* yoksay */ }
+            r = null;
+            if (!(yeni.protocol === 'https:' && (izin.test(yeni.hostname) || yonlendirmeIzni.test(yeni.hostname))) &&
+                !(process.env.DIGICAD_MAIL_INDIR_IZIN && izin.test(yeni.hostname))) break;
+            adres = yeni;
+          }
+        } catch (e) { r = null; }
+        clearTimeout(sure); // süre yalnızca bağlantı kurulana kadar; büyük dosyanın inmesi sınırlanmaz
         if (!r || !r.ok || !r.body) {
           res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
           res.end('Dosya indirilemedi' + (r ? ` (HTTP ${r.status}) — bağlantının süresi dolmuş olabilir` : ' — internet bağlantısını kontrol edin'));
@@ -577,7 +695,10 @@ function isleyiciOlustur(kapi) {
         if (r.headers.get('content-length')) basliklar['Content-Length'] = r.headers.get('content-length');
         res.writeHead(200, basliklar);
         const { Readable } = require('stream');
-        Readable.fromWeb(r.body).on('error', () => res.destroy()).pipe(res);
+        const akis = Readable.fromWeb(r.body);
+        akis.on('error', () => res.destroy());
+        res.on('close', () => akis.destroy());
+        akis.pipe(res);
         return;
       }
 
@@ -650,7 +771,7 @@ function isleyiciOlustur(kapi) {
             yerelDosyalar.sadeceYerel = true; // yedekten yüklerken Firebase'e hiç bağlanılmaz
             kaynakAdi = `Firebase yedeği — ${new Date(y.bilgi.tarih).toLocaleString('tr-TR')} (bütünlük kontrolü geçti)`;
           }
-          else { ham = await jsonOku(req); kaynakAdi = url.searchParams.get('ad') || 'Yedek dosyası'; }
+          else { ham = await jsonOku(req, 1024 * MB); kaynakAdi = String(url.searchParams.get('ad') || 'Yedek dosyası').slice(0, 200); }
           const gelen = aktarim.bicimlendir(ham, hedef);
           ham = null;
           aktarimHazirlik = { id: crypto.randomBytes(8).toString('hex'), gelen, kaynakAdi, yerelDosyalar, zaman: Date.now() };
@@ -688,39 +809,58 @@ function isleyiciOlustur(kapi) {
       // ── Dosya yükleme ───────────────────────────────────
       if (yol === '/api/yukle' && req.method === 'POST') {
         if (!oturum) return json(res, 401, { hata: 'Dosya yüklemek için giriş yapın' });
-        const depoYolu = String(url.searchParams.get('yol') || '');
+        const depoYolu = String(url.searchParams.get('yol') || '').slice(0, 500);
         const ad = guvenliDosyaAdi(url.searchParams.get('ad') || depoYolu.split('/').pop());
         const sinir = (ayarlar.maksDosyaMB || 500) * 1024 * 1024;
         if (Number(req.headers['content-length'] || 0) > sinir) return json(res, 413, { hata: `Dosya çok büyük (en fazla ${ayarlar.maksDosyaMB} MB)` });
+        const yukleyen = `${oturum.rol}:${oturum.id}`;
+        // Bir hekim/teknisyen, başkasının yüklediği dosyanın kaydını kendi dosyasıyla değiştiremez
+        const onceki = Object.prototype.hasOwnProperty.call(dosyaDizini, depoYolu) ? dosyaDizini[depoYolu] : null;
+        if (depoYolu && (depoYolu === '__proto__' || (onceki && oturum.rol !== 'yonetici' && onceki.yukleyen !== yukleyen))) {
+          return json(res, 403, { hata: 'Bu dosya adı kullanılamaz' });
+        }
         const belirtec = crypto.randomBytes(24).toString('base64url');
         const klasor = path.join(DOSYALAR, belirtec);
         fs.mkdirSync(klasor);
         const hedef = path.join(klasor, ad);
         const yazici = fs.createWriteStream(hedef);
-        let boyut = 0, asildi = false;
+        let boyut = 0, bitti = false;
+        const iptal = (durum, mesaj) => { // yarım kalan dosyayı diskte bırakma
+          if (bitti) return;
+          bitti = true;
+          req.unpipe(yazici);
+          yazici.destroy();
+          fs.rm(klasor, { recursive: true, force: true }, () => {});
+          if (durum && !res.headersSent) { res.setHeader('Connection', 'close'); json(res, durum, { hata: mesaj }); req.resume(); }
+        };
         req.on('data', p => {
           boyut += p.length;
-          if (boyut > sinir && !asildi) { asildi = true; req.unpipe(yazici); yazici.destroy(); req.destroy(); }
+          if (boyut > sinir) iptal(413, `Dosya çok büyük (en fazla ${ayarlar.maksDosyaMB} MB)`);
         });
-        req.pipe(yazici);
+        req.on('aborted', () => iptal());
+        req.on('error', () => iptal());
+        req.on('close', () => { if (!req.complete) iptal(); });
+        yazici.on('error', e => iptal(500, 'Dosya kaydedilemedi: ' + e.message));
         yazici.on('finish', () => {
-          if (asildi) return;
+          if (bitti) return;
+          bitti = true;
           const adres = `/dosya/${belirtec}/${encodeURIComponent(ad)}`;
           if (depoYolu) {
-            dosyaDizini[depoYolu] = { adres, boyut, tarih: new Date().toISOString(), yukleyen: `${oturum.rol}:${oturum.id}` };
-            dosyaDiziniKaydet();
+            dosyaDizini[depoYolu] = { adres, boyut, tarih: new Date().toISOString(), yukleyen };
+            try { dosyaDiziniKaydet(); } catch (e) { console.error('[dosya] dizin kaydedilemedi:', e.message); }
           }
           json(res, 200, { url: adres, boyut });
         });
-        yazici.on('error', e => { if (!res.headersSent) json(res, 500, { hata: e.message }); });
-        req.on('close', () => { if (asildi) fs.rm(klasor, { recursive: true, force: true }, () => {}); });
+        req.pipe(yazici);
         return;
       }
 
       if (yol === '/api/dosya-adresi' && req.method === 'GET') {
         if (!oturum) return json(res, 401, { hata: 'Giriş yapın' });
-        const k = dosyaDizini[String(url.searchParams.get('yol') || '')];
-        if (!k) return json(res, 404, { hata: 'Dosya bulunamadı' });
+        const dy = String(url.searchParams.get('yol') || '');
+        const k = Object.prototype.hasOwnProperty.call(dosyaDizini, dy) ? dosyaDizini[dy] : null;
+        // Hekim/teknisyen yalnızca kendi yüklediği dosyanın adresini sorabilir
+        if (!k || (oturum.rol !== 'yonetici' && k.yukleyen !== `${oturum.rol}:${oturum.id}`)) return json(res, 404, { hata: 'Dosya bulunamadı' });
         return json(res, 200, { url: k.adres });
       }
 
@@ -845,6 +985,16 @@ async function baslat() {
   const ic = http.createServer(isleyiciOlustur('ic'));
   const dis = http.createServer(isleyiciOlustur('dis'));
   for (const s of [ic, dis]) { s.requestTimeout = 0; s.headersTimeout = 60e3; }
+  ic.on('error', e => {
+    if (e.code === 'EADDRINUSE') console.error(`\nHATA: ${ayarlar.icPort} numaralı kapı başka bir program tarafından kullanılıyor.\n` +
+      'Büyük olasılıkla sunucu zaten çalışıyor (arka planda ya da başka bir pencerede). İkinci kez başlatmanıza gerek yok.');
+    else console.error('\nHATA: Sunucu başlatılamadı: ' + e.message);
+    process.exit(1);
+  });
+  dis.on('error', e => {
+    // Dış kapı açılamazsa laboratuvar içi kullanım sürer; yalnızca hekimlerin internetten erişimi çalışmaz
+    console.error(`UYARI: İnternet tüneli kapısı (${ayarlar.disPort}) açılamadı: ${e.message} — hekim portalına dışarıdan erişilemez.`);
+  });
   ic.listen(ayarlar.icPort, ayarlar.icAdres, () => {
     console.log('\n══════════════════════════════════════════════════════');
     console.log('  DIGICAD Dental — Yerel Sunucu çalışıyor');
@@ -873,5 +1023,9 @@ async function baslat() {
   process.on('SIGHUP', kapat);
 }
 
-if (require.main === module) baslat();
+// Beklenmeyen bir hata tüm sistemi durdurmasın: kayda geçir, çalışmaya devam et.
+process.on('uncaughtException', e => { console.error('[beklenmeyen hata]', e); });
+process.on('unhandledRejection', e => { console.error('[beklenmeyen hata]', e); });
+
+if (require.main === module) baslat().catch(e => { console.error('HATA: ' + (e && e.message || e)); process.exit(1); });
 module.exports = { isleyiciOlustur, depo, pinOzetle };

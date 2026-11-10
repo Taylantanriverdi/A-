@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 // Güvenlik testleri: geçici bir veri klasörüyle sunucuyu ayrı kapılarda
-// (18080/18081) başlatır, örnek veriyi yükler ve 55 kontrolü çalıştırır.
+// (18080/18081) başlatır, örnek veriyi yükler ve tüm kontrolleri çalıştırır.
 // Gerçek verilerinize dokunmaz. Kullanım:  node test/calistir.js
 const fs = require('fs'), os = require('os'), path = require('path');
 const { spawn, execFileSync } = require('child_process');

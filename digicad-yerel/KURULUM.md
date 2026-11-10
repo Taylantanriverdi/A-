@@ -11,12 +11,41 @@ laboratuvardaki Windows bilgisayarında** çalıştırır. Bütün veriler ve do
 | Hekim portalı, giriş için **tüm hekimlerin şifrelerini** tarayıcıya indiriyordu. Sayfa kaynağına bakan herkes görebiliyordu. | Şifre **sunucuda** kontrol ediliyor. Hiçbir şifre tarayıcıya gönderilmiyor. |
 | Hekim, teknisyen ve laboratuvarın tüm verileri her portala iniyor, süzme tarayıcıda yapılıyordu. | Hekim **sadece kendi işlerini**, teknisyen **sadece kendine atanan işleri** alıyor. Süzme sunucuda yapılıyor. |
 | Oturum tarayıcı belleğindeki bir kimlik numarasıydı. Numarayı değiştiren başka bir hekim gibi görünebiliyordu. | Oturum, sunucunun verdiği tahmin edilemez, şifreli bir çerez. |
-| Yönetici şifresi (4 hane) veritabanında açık metin olarak duruyordu ve sınırsız deneme yapılabiliyordu. | PIN şifrelenmiş olarak saklanıyor. 5 hatalı denemede 15 dakika kilit. |
+| Yönetici şifresi (4 hane) veritabanında açık metin olarak duruyordu ve sınırsız deneme yapılabiliyordu. | PIN şifrelenmiş olarak saklanıyor. 5 hatalı denemede 15 dakika kilit; tekrarında süre uzuyor. |
 | Yönetim paneline internetteki herkes ulaşabiliyordu. | Yönetim paneline **sadece laboratuvar ağından** girilebiliyor. İnternete açılan kapıda bu sayfa hiç yok. |
 | Dosya bağlantısını bilen herkes dosyayı indirebiliyordu. | Dosyaları sadece giriş yapmış kullanıcılar indirebiliyor. |
 | Veriler Google sunucularındaydı. | Veriler bu bilgisayarda. Her gün otomatik yedek alınıyor. |
 
 ---
+
+## Genel denetimde düzeltilenler
+
+Yazılım baştan sona gözden geçirildi. Düzeltilen başlıca sorunlar:
+
+- **Güvenlik:** Giriş yapmış bir hekim ya da teknisyen, özel hazırlanmış bir
+  istekle sunucunun yetki denetimini bozabiliyordu. Kapatıldı.
+- **Veri kaybı riski:** Yönetim paneli her kayıtta tüm listeyi gönderdiği için,
+  panel eski bir kopyaya bakarken (bağlantı kopmuş, bilgisayar uykudan çıkmış,
+  aynı anda bir teknisyen değişiklik yapmış) yapılan kayıt başkalarının
+  değişikliklerini geri alabiliyordu. Artık sunucu yalnızca panelin gerçekten
+  değiştirdiği kayıtları yazar.
+- **Çok pencere:** Aynı bilgisayarda 6'dan fazla pencere açılınca sistem
+  kilitleniyordu. Artık istenen sayıda pencere açılabilir.
+- **PIN:** Yanlış PIN kilidi her tekrarda uzar (15 dk, 30 dk, 1 saat…) ve
+  bilgisayar başına tutulur. Ağdaki başka bir cihaz, sunucunun kurulu olduğu
+  bilgisayardan girişi kilitleyemez.
+- **Dosyalar:** Bir hekim başkasının dosya kaydını değiştiremez ya da adresini
+  soramaz. Yarıda kesilen yüklemeler diskte artık bırakmaz.
+- **Dayanıklılık:** Disk dolarsa kayıt yeniden denenir. Veritabanı dosyası
+  bozulursa bozuk dosya saklanır ve en yeni sağlam yedek yüklenir. Sunucu
+  kayıt dosyası (`sunucu.log`) 5 MB'ı geçince yenisine başlanır.
+- **Hekim kurulum dosyası:** İnternet adresi artık yalnızca giriş yapmış bir
+  hekimin bağlantısından öğrenilir. Adres bilinmiyorsa hekim portalına
+  internet adresinden bir kez giriş yapmanız yeterlidir.
+- **Yazdırma:** "Zirkonya", "Titanyum", "E-max", "Lamina" gibi Türkçe yazılan
+  iş türlerinde de formdaki materyal kutusu işaretlenir.
+
+Denetim sonrası `node test\calistir.js` komutu 72 kontrolün tamamını geçer.
 
 ## 1. Kurulum (bir kez yapılır)
 
