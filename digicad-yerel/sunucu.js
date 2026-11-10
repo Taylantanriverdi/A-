@@ -25,6 +25,8 @@ const yetki = require('./lib/yetki');
 const aktarim = require('./lib/aktarim');
 const firebaseYedek = require('./lib/firebase-yedek');
 const yazdirma = require('./lib/yazdirma');
+const tasarim = require('./lib/tasarim');
+const eposta = require('./lib/eposta');
 
 const KOK = __dirname;
 const GENEL = path.join(KOK, 'public');
@@ -240,7 +242,7 @@ const TURLER = {
   '.gif': 'image/gif', '.webp': 'image/webp', '.txt': 'text/plain; charset=utf-8', '.zip': 'application/zip',
 };
 // Dış kapıdan (internet) sadece bunlar açılabilir
-const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
+const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|tasarim-ek\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
 
 function statikSun(req, res, kapi) {
   let yol;
@@ -702,6 +704,63 @@ function isleyiciOlustur(kapi) {
         return;
       }
 
+      // ── Tasarım onayı akışı (önizleme, hekim kararı, nihai dosya) ──
+      if (yol.startsWith('/api/tasarim/') && req.method === 'POST') {
+        if (!oturum) return json(res, 401, { hata: 'Giriş yapmanız gerekiyor' });
+        const g = await jsonOku(req);
+        const sonuc = tasarim.calistir(depo.kok, oturum, yol.slice('/api/tasarim/'.length), g);
+        depo.uygula(sonuc.islemler);
+        if (sonuc.bildirim) hekimeBildir(sonuc.bildirim);
+        return json(res, 200, { tamam: true });
+      }
+
+      // ── Sistem ayarları: e-posta bildirimi, yedek klasörü, disk durumu (sadece yönetici) ──
+      if (yol === '/api/sistem' || yol.startsWith('/api/sistem/')) {
+        if (!oturum || oturum.rol !== 'yonetici') return json(res, 401, { hata: 'Yönetici girişi gerekiyor' });
+        if (yol === '/api/sistem' && req.method === 'GET') {
+          const e = epostaAyari();
+          return json(res, 200, {
+            eposta: { acik: !!e.acik, kullanici: e.kullanici || '', gonderenAd: e.gonderenAd || '', sifreVar: !!e.sifre },
+            epostaGecmisi: eposta.gecmis,
+            yedekKlasoru: ayarlar.yedekKlasoru || '', sonYedek,
+            disk: diskDurumu(), genelAdres: ayarlar.genelAdres || '',
+          });
+        }
+        if (yol === '/api/sistem' && req.method === 'POST') {
+          const g = await jsonOku(req);
+          const yeni = ayarlariOku();
+          if (g.eposta && typeof g.eposta === 'object') {
+            const onceki = yeni.eposta || {};
+            const kullanici = String(g.eposta.kullanici || '').trim();
+            if (kullanici && !eposta.adresGecerli(kullanici)) return json(res, 400, { hata: 'Gönderen e-posta adresi geçersiz' });
+            const sifre = typeof g.eposta.sifre === 'string' && g.eposta.sifre.trim() ? g.eposta.sifre.replace(/\s+/g, '').slice(0, 200) : (onceki.sifre || '');
+            if (g.eposta.acik && (!kullanici || !sifre)) return json(res, 400, { hata: 'E-posta bildirimi için adres ve uygulama şifresi gerekli' });
+            yeni.eposta = { acik: !!g.eposta.acik, sunucu: 'smtp.gmail.com', port: 465, kullanici, sifre, gonderenAd: String(g.eposta.gonderenAd || 'DIGICAD Dental Studio').slice(0, 80) };
+          }
+          if (typeof g.yedekKlasoru === 'string') {
+            const k = g.yedekKlasoru.trim();
+            if (k) {
+              if (!path.isAbsolute(k)) return json(res, 400, { hata: 'Yedek klasörü tam yol olmalı (ör. E:\\DIGICAD-Yedek)' });
+              try { fs.mkdirSync(k, { recursive: true }); fs.writeFileSync(path.join(k, '.digicad-deneme'), 'ok'); fs.unlinkSync(path.join(k, '.digicad-deneme')); }
+              catch (e) { return json(res, 400, { hata: 'Bu klasöre yazılamıyor: ' + e.message }); }
+            }
+            yeni.yedekKlasoru = k;
+          }
+          ayarlariYaz(yeni); ayarlar = yeni;
+          if (typeof g.yedekKlasoru === 'string' && g.yedekKlasoru.trim()) yedekAl();
+          return json(res, 200, { tamam: true });
+        }
+        if (yol === '/api/sistem/eposta-test' && req.method === 'POST') {
+          const g = await jsonOku(req);
+          const e = epostaAyari();
+          try {
+            await eposta.gonder(e, { alici: String(g.alici || e.kullanici || '').trim(), konu: 'DIGICAD — deneme iletisi', metin: 'Bu bir deneme iletisidir. E-posta bildirimi doğru çalışıyor.\n\nDIGICAD Dental Studio' });
+          } catch (x) { return json(res, 400, { hata: x.message }); }
+          return json(res, 200, { tamam: true });
+        }
+        return json(res, 404, { hata: 'Bilinmeyen adres' });
+      }
+
       // ── Otomatik yazdırma ayarları (sadece yönetici) ────
       if (yol === '/api/yazdirma' || yol.startsWith('/api/yazdirma/')) {
         if (!oturum || oturum.rol !== 'yonetici') return json(res, 401, { hata: 'Yönetici girişi gerekiyor' });
@@ -873,6 +932,29 @@ function isleyiciOlustur(kapi) {
   };
 }
 
+// ── E-POSTA BİLDİRİMİ ve SİSTEM DURUMU ──────────────────────────────
+function epostaAyari() { return ayarlar.eposta || {}; }
+// Tasarım akışındaki bir olayı hekime e-postayla bildirir (açıksa ve hekimin adresi varsa)
+function hekimeBildir(bildirim) {
+  try {
+    if (!epostaAyari().acik) return;
+    const posta = tasarim.epostaMetni(bildirim, ayarlar.genelAdres || '');
+    if (!posta) return;
+    const hekim = kisiKayitlari('hekim').find(h => yetki.ayni(h.id, bildirim.is.drId));
+    const alici = hekim && String(hekim.email || '').trim();
+    if (!eposta.adresGecerli(alici)) return;
+    eposta.sirayaKoy(epostaAyari, { alici, ...posta });
+  } catch (e) { console.error('[e-posta] bildirim hazırlanamadı:', e.message); }
+}
+let sonYedek = null; // { zaman, hata }
+function diskDurumu() {
+  try {
+    const d = fs.statfsSync(VERI);
+    const gb = n => Math.round(n / 1073741824 * 10) / 10;
+    return { bosGB: gb(d.bavail * d.bsize), toplamGB: gb(d.blocks * d.bsize) };
+  } catch (e) { return null; }
+}
+
 // ── OTOMATİK YAZDIRMA ───────────────────────────────────────────────
 const YAZDIRILANLAR = path.join(VERI, 'yazdirilanlar.json');
 function yazdirmaAyari() { return { otomatik: false, yazici: '', kopya: 1, kagit: 'A5', ...(ayarlar.yazdirma || {}) }; }
@@ -949,8 +1031,11 @@ function yedekAl() {
       fs.copyFileSync(dosya, path.join(ayarlar.yedekKlasoru, path.basename(dosya)));
       klasorKopyala(DOSYALAR, path.join(ayarlar.yedekKlasoru, 'dosyalar'));
     }
+    sonYedek = { zaman: new Date().toISOString(), hata: null };
     console.log(`[yedek] ${new Date().toLocaleString('tr-TR')} — yedek alındı${ayarlar.yedekKlasoru ? ' (+ ' + ayarlar.yedekKlasoru + ')' : ''}`);
-  } catch (e) { console.error('[yedek] HATA:', e.message); }
+  } catch (e) { sonYedek = { zaman: new Date().toISOString(), hata: e.message }; console.error('[yedek] HATA:', e.message); }
+  const d = diskDurumu();
+  if (d && d.bosGB < 5) console.error(`[disk] UYARI: diskte yalnızca ${d.bosGB} GB boş yer kaldı!`);
 }
 
 // ── PIN BELİRLEME ───────────────────────────────────────────────────

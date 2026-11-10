@@ -573,7 +573,11 @@ function main() {
     const kaynak = klasorler.map(k => path.join(k, ad)).find(f => fs.existsSync(f));
     if (!kaynak) { console.log(`-  ${ad}: bulunamadı, atlandı`); continue; }
     try {
-      const html = donustur(fs.readFileSync(kaynak, 'utf8').replace(/\r\n/g, '\n'));
+      let html = donustur(fs.readFileSync(kaynak, 'utf8').replace(/\r\n/g, '\n'));
+      // Tasarım onayı penceresi (önizleme → hekim onayı → nihai dosya) her panelde ortaktır
+      const govdeSonu = html.lastIndexOf('</body>');
+      if (govdeSonu < 0) throw new Error('</body> bulunamadı');
+      html = html.slice(0, govdeSonu) + '<script src="tasarim-ek.js"></script>\n' + html.slice(govdeSonu);
       if (/gstatic\.com\/firebasejs|firebasedatabase\.app|AIzaSy/.test(html)) throw new Error('Dönüşüm sonrası Firebase izi kaldı');
       fs.writeFileSync(path.join(HEDEF, ad), html);
       console.log(`✓  ${ad}`);

@@ -45,7 +45,7 @@ Yazılım baştan sona gözden geçirildi. Düzeltilen başlıca sorunlar:
 - **Yazdırma:** "Zirkonya", "Titanyum", "E-max", "Lamina" gibi Türkçe yazılan
   iş türlerinde de formdaki materyal kutusu işaretlenir.
 
-Denetim sonrası `node test\calistir.js` komutu 72 kontrolün tamamını geçer.
+Denetim sonrası `node test\calistir.js` komutu 104 kontrolün tamamını geçer.
 
 ## 1. Kurulum (bir kez yapılır)
 
@@ -338,6 +338,60 @@ Yine de çalıştır** seçeneğine tıklamalı.
 
 Telefonda: portalı açıp tarayıcı menüsünden **"Ana ekrana ekle"** seçilir.
 Ana ekranda diş simgesi oluşur.
+
+## Tasarım onayı (önizleme → hekim onayı → nihai dosya)
+
+Her panelin sağ alt köşesinde **🦷 Tasarım Onayı** düğmesi vardır. Üzerindeki
+kırmızı sayı, sizden işlem bekleyen iş sayısıdır.
+
+1. **Hekim** işi portaldan gönderir; iş yönetim paneline düşer.
+2. **Laboratuvar** işi bir teknisyene atar.
+3. **Teknisyen** Tasarım Onayı penceresinden işi açar, tasarımın önizlemesini
+   (STL ve/veya ekran görüntüsü) ve isterse bir not yükler.
+4. **Hekim** e-posta alır. Portalda önizlemeyi açar; STL dosyası ekranda
+   3 boyutlu döndürülebilir. **Onaylıyorum** ya da **Revizyon istiyorum** der.
+   Revizyonda ne istediğini yazması zorunludur.
+5. Revizyon istendiyse teknisyen yeni önizleme (2, 3…) yükler. Eski
+   önizlemeler ve kararlar silinmez.
+6. Hekim onaylayınca teknisyen **nihai dosyayı** yükler. Nihai dosya hem
+   laboratuvarda (yönetim panelindeki tasarım dosyaları) hem hekim portalında
+   indirilebilir; hekime ikinci bir e-posta gider.
+
+Kurallar:
+
+- Hekim portalından gelen işlerde hekim onaylamadan teknisyen nihai dosya
+  yükleyemez ve işi "Tamamlandı" yapamaz. Hekim kendi tasarımını gönderdiyse
+  onay adımı yoktur.
+- Hekim telefonla onay verdiyse laboratuvar, pencerede açıklama yazarak
+  **hekim adına onaylayabilir**. Kayıtta "laboratuvar, hekim adına" yazar.
+- Laboratuvar bir işi **onaydan muaf** tutabilir ("Bu iş için hekim onayı arama").
+- Her adım işin sohbetine de düşer; hekim ve teknisyen aynı sohbette yazışır.
+- **Dış (fason) teknisyen** hekimin adını yalnızca kısaltılmış görür (ör. "A. K."),
+  hekim de onu "Teknisyen" olarak görür. Bu gizleme sunucuda yapılır.
+- Teknisyen kendi işinde yalnızca durumu, dosyaları ve implant notunu
+  değiştirebilir; fiyat, hasta, hekim gibi alanlara dokunamaz.
+- Yönetim panelinde "Süren onaylar" listesi, hekimin kaç gündür yanıt
+  vermediğini gösterir.
+
+### E-posta bildirimi (bir kez ayarlanır)
+
+Yönetim paneli → **🦷 Tasarım Onayı** → **⚙️ E-posta ve yedek ayarları**:
+
+1. https://myaccount.google.com/apppasswords adresini açın (Google hesabında
+   2 adımlı doğrulama açık olmalı). Bir ad yazıp **Oluştur**'a basın.
+2. Çıkan 16 haneli şifreyi **Uygulama şifresi** alanına yapıştırın, Gmail
+   adresinizi yazın, **E-posta bildirimi açık**'ı işaretleyip **Kaydet**'e basın.
+3. **Deneme iletisi gönder** ile kontrol edin.
+
+Bildirim yalnızca hekim kartında e-posta adresi kayıtlı hekimlere gider. Aynı
+sayfa, adresi eksik hekimleri listeler.
+
+### İkinci yedek ve disk
+
+Aynı ayar sayfasında **İkinci yedek klasörü** alanına harici disk ya da ikinci
+sürücüdeki bir klasörü yazın (ör. `E:\DIGICAD-Yedek`). Veritabanı ve tüm
+dosyalar her gün oraya da kopyalanır. Sayfa boş disk alanını ve son yedeğin
+durumunu gösterir.
 
 ## Hekimden gelen işleri otomatik yazdırma
 

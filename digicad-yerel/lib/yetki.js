@@ -11,6 +11,7 @@
 //   teknisyen — Sadece kendisine atanmış işler, kendi girdiği kayıtlar.
 
 const agac = require('./agac');
+const tasarim = require('./tasarim');
 
 const CALISMA_ALANI = 'digicad'; // Hekim/teknisyen portalları yalnızca bu alana erişir
 const sahip = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -50,32 +51,104 @@ function isBul(kok, isId) {
   return Object.values(isler).find(j => j && ayni(j.id, isId)) || null;
 }
 
+// ── DIŞ (FASON) TEKNİSYEN: hekim ve teknisyen birbirinin adını öğrenmez ──
+// Gizleme tarayıcıda değil burada yapılır; ad dış teknisyenin bilgisayarına hiç gitmez.
+function teknisyenBul(kok, id) {
+  return Object.values(agac.al(kok, ['db', CALISMA_ALANI, 'technicians']) || {}).find(t => t && ayni(t.id, id)) || null;
+}
+function disTeknisyenMi(kok, id) { const t = teknisyenBul(kok, id); return !!(t && t.type === 'dis'); }
+// "Ali Veli Kaya" → "A. V. K." (teknisyen panelinin gösterdiği kısaltmayla uyumlu)
+function adKisalt(ad) {
+  return String(ad || '').trim().split(/\s+/).filter(Boolean).map(p => p.charAt(0).toLocaleUpperCase('tr-TR') + '.').join(' ');
+}
+// Sohbet mesajlarında karşı tarafın adını rol adıyla değiştirir
+function sohbetAdlariniGizle(sohbet, gizlenecekRol, yerine) {
+  if (!sohbet || typeof sohbet !== 'object' || !sohbet.messages) return sohbet;
+  const mesajlar = {};
+  for (const [k, m] of Object.entries(sohbet.messages)) {
+    mesajlar[k] = m && m.senderRole === gizlenecekRol ? { ...m, senderName: yerine, senderId: null } : m;
+  }
+  return { ...sohbet, messages: mesajlar };
+}
+// Önizleme kayıtlarında yükleyen / karar veren adlarını gizler
+function onizlemeAdlariniGizle(kayit, alan) {
+  if (!kayit || !kayit.previews) return kayit;
+  const p = {};
+  for (const [k, v] of Object.entries(kayit.previews)) {
+    if (!v) continue;
+    const n = { ...v };
+    if (alan === 'yukleyen' && n.by) n.by = { rol: n.by.rol };
+    if (alan === 'karar') delete n.kararVerenAd;
+    p[k] = n;
+  }
+  return { ...kayit, previews: p };
+}
+
 // ── OKUMA GÖRÜNÜMLERİ ───────────────────────────────────────────────
 // Her koleksiyon için "bu kişi bu koleksiyondan neyi görebilir" fonksiyonu
 const gorunumler = {
   hekim: {
     doctors: (v, o) => haritala(v, d => (ayni(d.id, o.id) ? sifresiz(d) : undefined)),
-    jobs: (v, o) => sahibine(v, 'drId', o.id),
+    // Dış teknisyenin adı hekime gösterilmez
+    jobs: (v, o, kok) => haritala(v, j => {
+      if (!ayni(j.drId, o.id)) return undefined;
+      return j.techId && disTeknisyenMi(kok, j.techId) ? { ...j, techName: 'Teknisyen', acceptedByTechName: j.acceptedByTechName ? 'Teknisyen' : undefined } : j;
+    }),
     pendingJobs: (v, o) => sahibine(v, 'drId', o.id),
     doctorSubmissions: (v, o) => sahibine(v, 'drId', o.id),
     chats: (v, o, kok) => haritala(v, (sohbet, anahtar) => {
       const isId = isSohbetiIsId(anahtar);
       const is = isId && isBul(kok, isId);
-      return is && ayni(is.drId, o.id) ? sohbet : undefined;
+      if (!is || !ayni(is.drId, o.id)) return undefined;
+      return is.techId && disTeknisyenMi(kok, is.techId) ? sohbetAdlariniGizle(sohbet, 'technician', 'Teknisyen') : sohbet;
+    }),
+    // Tasarım önizlemeleri ve onay kayıtları: yalnızca kendi işleri
+    designReviews: (v, o, kok) => haritala(v, (kayit, anahtar) => {
+      const b = tasarim.isBul(kok, kayit.jobId !== undefined ? kayit.jobId : anahtar);
+      if (!b || !ayni(b.is.drId, o.id)) return undefined;
+      return b.is.techId && disTeknisyenMi(kok, b.is.techId) ? onizlemeAdlariniGizle(kayit, 'yukleyen') : kayit;
     }),
   },
   teknisyen: {
     technicians: (v, o) => haritala(v, t => (ayni(t.id, o.id)
       ? sifresiz(t)
       : { id: t.id, name: t.name, spec: t.spec, type: t.type })),
-    doctors: v => haritala(v, d => { const k = sifresiz(d); delete k.username; return k; }),
-    jobs: (v, o) => sahibine(v, 'techId', o.id),
-    pendingJobs: (v, o) => sahibine(v, 'techId', o.id),
+    // İç teknisyen hekim kartını (şifresiz) görür; dış teknisyen yalnızca kısaltılmış adı
+    doctors: (v, o, kok) => {
+      const dis = disTeknisyenMi(kok, o.id);
+      return haritala(v, d => {
+        if (dis) return { id: d.id, name: adKisalt(d.name), prices: d.prices };
+        const k = sifresiz(d); delete k.username; return k;
+      });
+    },
+    jobs: (v, o, kok) => {
+      const dis = disTeknisyenMi(kok, o.id);
+      return haritala(v, j => {
+        if (!ayni(j.techId, o.id)) return undefined;
+        return dis ? { ...j, drName: adKisalt(j.drName) } : j;
+      });
+    },
+    pendingJobs: (v, o, kok) => {
+      const dis = disTeknisyenMi(kok, o.id);
+      return haritala(v, j => {
+        if (!ayni(j.techId, o.id)) return undefined;
+        return dis && j.drName ? { ...j, drName: adKisalt(j.drName) } : j;
+      });
+    },
+    designReviews: (v, o, kok) => {
+      const dis = disTeknisyenMi(kok, o.id);
+      return haritala(v, (kayit, anahtar) => {
+        const b = tasarim.isBul(kok, kayit.jobId !== undefined ? kayit.jobId : anahtar);
+        if (!b || !ayni(b.is.techId, o.id)) return undefined;
+        return dis ? onizlemeAdlariniGizle(kayit, 'karar') : kayit;
+      });
+    },
     orderForms: (v, o) => sahibine(v, 'submittedByTechId', o.id),
     chats: (v, o, kok) => haritala(v, (sohbet, anahtar) => {
       const isId = isSohbetiIsId(anahtar);
       const is = isId && isBul(kok, isId);
-      return is && ayni(is.techId, o.id) ? sohbet : undefined;
+      if (!is || !ayni(is.techId, o.id)) return undefined;
+      return disTeknisyenMi(kok, o.id) ? sohbetAdlariniGizle(sohbet, 'doctor', 'Hekim') : sohbet;
     }),
   },
 };
@@ -99,6 +172,8 @@ function oku(kok, oturum, parcalar) {
 // Kayıt düzeyinde kontrol: yazımdan ÖNCEKİ ve SONRAKİ kayıt birlikte
 // değerlendirilir; böylece "başkasının kaydını kendime çevireyim" ya da
 // "kendi kaydımı başkasınınmış gibi göstereyim" türü hileler engellenir.
+const TEKNISYEN_IS_ALANLARI = new Set(['status', 'completedAt', 'acceptedByTech', 'acceptedAt', 'acceptedByTechName',
+  'files', 'designFiles', 'designFilesUpdatedAt', 'implantParts']);
 const kurallar = {
   hekim: {
     doctorSubmissions: (once, sonra, o) =>
@@ -107,9 +182,23 @@ const kurallar = {
       once !== null && sonra !== null && ayni(once.drId, o.id) && ayni(sonra.drId, o.id),
   },
   teknisyen: {
-    jobs: (once, sonra, o) =>
-      once !== null && sonra !== null && ayni(once.techId, o.id) && ayni(sonra.techId, o.id) &&
-      String(once.drId) === String(sonra.drId),
+    // Teknisyen kendi işinde yalnızca kendi alanlarını değiştirebilir (fiyat, hekim,
+    // hasta, teslim tarihi gibi alanlara dokunamaz). Hekim onayı gereken işte onay
+    // gelmeden nihai tasarım dosyası ekleyemez ve işi tamamlayamaz.
+    jobs: (once, sonra, o, kok) => {
+      if (once === null || sonra === null || !ayni(once.techId, o.id) || !ayni(sonra.techId, o.id)) return false;
+      for (const k of new Set([...Object.keys(once), ...Object.keys(sonra)])) {
+        if (TEKNISYEN_IS_ALANLARI.has(k)) continue;
+        if (JSON.stringify(once[k]) !== JSON.stringify(sonra[k])) throw new YetkiHatasi('Teknisyen bu alanı değiştiremez: ' + k);
+      }
+      const kayit = tasarim.kayitAl(kok, once.id !== undefined && once.id !== null ? once.id : '');
+      if (!tasarim.uretimeHazir(once, kayit)) {
+        const say = j => (Array.isArray(j.designFiles) ? j.designFiles.filter(Boolean).length : 0);
+        if (say(sonra) > say(once)) throw new YetkiHatasi('Önce önizleme yükleyip hekim onayı alın: nihai tasarım dosyası hekim onayından sonra yüklenebilir ("Tasarım Onayı" penceresini kullanın)');
+        if (sonra.status === 'Tamamlandı' && once.status !== 'Tamamlandı') throw new YetkiHatasi('Hekim tasarımı onaylamadan iş tamamlanamaz');
+      }
+      return true;
+    },
     pendingJobs: (once, sonra, o) =>
       (once === null || ayni(once.techId, o.id)) && (sonra === null || ayni(sonra.techId, o.id)),
     orderForms: (once, sonra, o) =>
@@ -175,7 +264,21 @@ function yazimDenetle(kok, oturum, islemler) {
     let sonra = { kok: agac.kopya(once) };
     for (const y of liste) sonra = agac.yaz(sonra, ['kok', ...y.parcalar.slice(4)], agac.kopya(y.deger));
     const sonraKayit = agac.al(sonra, ['kok']);
-    if (!kural(once, sonraKayit, oturum)) throw new YetkiHatasi();
+    if (!kural(once, sonraKayit, oturum, kok)) throw new YetkiHatasi();
+  }
+  // Dış teknisyen hekim adlarını kısaltılmış görür; oluşturduğu kayıtlara (iş talebi,
+  // sipariş formu) kısaltma değil hekimin gerçek adı yazılır.
+  if (oturum.rol === 'teknisyen' && disTeknisyenMi(kok, oturum.id)) {
+    const hekimler = Object.values(agac.al(kok, ['db', CALISMA_ALANI, 'doctors']) || {});
+    return islemler.map(is => {
+      const p = is.parcalar, d = is.deger;
+      if (p.length !== 4 || !['pendingJobs', 'orderForms'].includes(p[2]) || !d || typeof d !== 'object') return is;
+      const hekim = hekimler.find(h => h && ayni(h.id, d.drId));
+      if (!hekim) return is;
+      const n = { ...d };
+      for (const alan of ['drName', 'doctorName']) if (typeof n[alan] === 'string' && n[alan]) n[alan] = hekim.name;
+      return { parcalar: p, deger: n };
+    });
   }
   return islemler;
 }
