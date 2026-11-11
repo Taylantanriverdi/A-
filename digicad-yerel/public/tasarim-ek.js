@@ -368,6 +368,7 @@
       (sistem.genelAdres ? '' : '<div class="to-karar" style="background:#fef3c7;color:#92400e">ℹ️ Hekim portalının internet adresi henüz bilinmiyor; e-postalarda bağlantı yer almaz. Portala internet adresinden bir kez giriş yapılınca öğrenilir.</div>') +
       (sistem.epostaGecmisi.length ? '<div style="margin-top:10px;font-size:12.5px;color:#475569"><b>Son gönderimler</b><br>' + sistem.epostaGecmisi.slice(0, 8).map(g => tarih(g.zaman) + ' · ' + esc(g.alici) + ' · ' + esc(g.durum)).join('<br>') + '</div>' : '') +
       '</div>' +
+      eskiPortalKutusu(sistem.eskiPortal) +
       '<div class="to-kutu"><h3>💾 Yedekleme ve disk</h3>' +
       '<div style="color:#64748b;font-size:13px;margin-bottom:6px">Veritabanı her gün bu bilgisayarda yedeklenir. Bilgisayar bozulursa veriler kaybolmasın diye <b>harici disk ya da ikinci bir sürücüde</b> bir klasör yazın; veritabanı ve tüm dosyalar her gün oraya da kopyalanır.</div>' +
       '<label class="to-etiket">İKİNCİ YEDEK KLASÖRÜ</label><input class="to-alan" id="to-y-klasor" value="' + esc(sistem.yedekKlasoru) + '" placeholder="Ör. E:\\DIGICAD-Yedek">' +
@@ -387,6 +388,40 @@
         .then(() => bildir('✅ Deneme iletisi gönderildi: ' + alici), x => bildir('Gönderilemedi: ' + x.message, 'error')).then(() => { this.disabled = false; });
     };
     document.getElementById('to-y-kaydet').onclick = () => kaydet({ yedekKlasoru: document.getElementById('to-y-klasor').value }, 'Yedek klasörü kaydedildi').catch(x => bildir(x.message, 'error'));
+    document.getElementById('to-k-oto').onchange = function () { kaydet({ eskiPortal: { otomatik: this.checked } }, this.checked ? 'Eski portal köprüsü açıldı' : 'Eski portal köprüsü kapatıldı').catch(x => bildir(x.message, 'error')); };
+    document.getElementById('to-k-liste').onclick = () => eskiListeyiGetir();
+  }
+
+  // Eski (Firebase) hekim portalına gönderilmiş işler
+  function eskiPortalKutusu(k) {
+    k = k || {};
+    return '<div class="to-kutu" id="to-kopru"><h3>🔁 Eski hekim portalından gelen işler</h3>' +
+      '<div style="color:#64748b;font-size:13px;margin-bottom:6px">Eski adresi (github.io) kullanmaya devam eden hekimlerin işleri eski sisteme (Firebase) gider. Sunucu Firebase\'i 2 dakikada bir <b>yalnızca okur</b> ve bu işleri tarama dosyalarıyla birlikte “Hekimden Gelenler” listesine ekler. Firebase\'de hiçbir şey değiştirilmez.</div>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-weight:700;margin:8px 0"><input type="checkbox" id="to-k-oto"' + (k.otomatik !== false ? ' checked' : '') + '> Eski portala gönderilen işleri otomatik al</label>' +
+      '<div style="font-size:13px;color:#475569">' +
+      (k.sonKontrol ? 'Son kontrol: ' + tarih(k.sonKontrol) + (k.sonHata ? ' — <b style="color:#b91c1c">Firebase okunamadı: ' + esc(k.sonHata) + '</b>' : ' — başarılı') + '<br>' : 'Henüz kontrol edilmedi (sunucu açıldıktan 20 sn sonra başlar).<br>') +
+      (k.toplamAlinan ? '<b style="color:#047857">Sunucu açıldığından beri ' + k.toplamAlinan + ' iş eski portaldan alındı.</b> Bu hekimlere yeni adresi gönderin.<br>' : '') +
+      (k.bekleyen ? '<b style="color:#b45309">' + k.bekleyen + ' eski tarihli iş otomatik alınmadı; aşağıdan inceleyin.</b>' : '') + '</div>' +
+      '<div style="margin-top:10px"><button type="button" class="to-d cizgi" id="to-k-liste">Firebase\'de olup yeni sistemde olmayan işleri listele</button></div><div id="to-k-sonuc"></div></div>';
+  }
+  function eskiListeyiGetir() {
+    const yer = document.getElementById('to-k-sonuc');
+    yer.innerHTML = '<div style="color:#64748b;margin-top:8px">Firebase okunuyor…</div>';
+    api('/api/sistem/eski-portal', null, 'GET').then(r => {
+      if (!r.liste.length) { yer.innerHTML = '<div class="to-karar" style="background:#d1fae5;color:#065f46">✅ Eksik iş yok: eski portala gönderilen tüm işler yeni sistemde.</div>'; return; }
+      yer.innerHTML = '<div style="margin-top:10px;font-size:13px">' + r.liste.map(x =>
+        '<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px dashed #e2e8f0"><input type="checkbox" value="' + esc(x.id) + '" checked>' +
+        '<span style="flex:1"><b>' + esc(x.hasta || '(hasta adı yok)') + '</b> — ' + esc(x.hekim) + (x.tur ? ' · ' + esc(x.tur) : '') + ' · ' + (x.tarih ? tarih(x.tarih) : 'tarih yok') + ' · ' + x.dosya + ' dosya</span></label>').join('') +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="to-d ana" id="to-k-al">Seçilenleri yeni sisteme al</button><button type="button" class="to-d cizgi" id="to-k-gizle">Seçilenleri bir daha gösterme</button></div></div>';
+      const secili = () => [...yer.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
+      document.getElementById('to-k-al').onclick = function () {
+        const idler = secili(); if (!idler.length) return;
+        this.disabled = true; this.textContent = '⏳ Alınıyor (dosyalar indiriliyor)…';
+        api('/api/sistem/eski-portal/al', { idler }).then(x => { bildir('✅ ' + x.alinan + ' iş “Hekimden Gelenler” listesine eklendi' + (x.indirilemeyen ? ' (' + x.indirilemeyen + ' dosya indirilemedi)' : '')); eskiListeyiGetir(); },
+          e => { bildir(e.message, 'error'); this.disabled = false; this.textContent = 'Seçilenleri yeni sisteme al'; });
+      };
+      document.getElementById('to-k-gizle').onclick = () => { const idler = secili(); if (idler.length && confirm(idler.length + ' iş bu listede bir daha gösterilmeyecek. Emin misiniz?')) api('/api/sistem/eski-portal/gizle', { idler }).then(eskiListeyiGetir, e => bildir(e.message, 'error')); };
+    }, e => { yer.innerHTML = '<div class="to-karar" style="background:#fee2e2;color:#991b1b">Firebase okunamadı: ' + esc(e.message) + '</div>'; });
   }
 
   // ── 3 BOYUTLU STL GÖRÜNTÜLEYİCİ (ek kütüphane gerektirmez) ────────
@@ -528,6 +563,35 @@
     }, () => {});
   }
   baslat();
+
+  // Yönetim paneli: eski portaldan iş alındıysa / Firebase okunamıyorsa üstte uyarı
+  if (PANEL === 'yonetici') {
+    let gorulen = 0;
+    const kontrol = () => {
+      if (!girisli) return;
+      api('/api/sistem', null, 'GET').then(r => {
+        const k = r.eskiPortal || {};
+        let serit = document.getElementById('to-kopru-serit');
+        const mesaj = k.toplamAlinan > gorulen
+          ? '🔁 Eski hekim portalına gönderilmiş ' + (k.toplamAlinan - gorulen) + ' iş Firebase\'den alındı ve “Hekimden Gelenler”e eklendi. Bu hekimler eski adresi kullanıyor; yeni adresi gönderin.'
+          : (k.bekleyen ? '🔁 Firebase\'de, yeni sistemde olmayan ' + k.bekleyen + ' eski hekim işi var.' : '');
+        if (!mesaj) { if (serit) serit.remove(); return; }
+        if (!serit) {
+          serit = document.createElement('div'); serit.id = 'to-kopru-serit';
+          serit.style.cssText = 'position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:9400;max-width:min(760px,94vw);background:#fff7ed;border:1.5px solid #fdba74;color:#9a3412;border-radius:12px;padding:10px 14px;font:600 13.5px/1.4 system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.15);display:flex;gap:10px;align-items:center';
+          document.body.appendChild(serit);
+        }
+        serit.innerHTML = '<span style="flex:1"></span>';
+        serit.firstChild.textContent = mesaj;
+        const incele = document.createElement('button'); incele.className = 'to-d kucuk ana'; incele.textContent = 'İncele';
+        incele.onclick = () => { gorulen = k.toplamAlinan; serit.remove(); gorunum = 'ayar'; sistem = null; ac(); };
+        const kapatD = document.createElement('button'); kapatD.className = 'to-d kucuk cizgi'; kapatD.textContent = '✕';
+        kapatD.onclick = () => { gorulen = k.toplamAlinan; serit.remove(); };
+        serit.appendChild(incele); serit.appendChild(kapatD);
+      }).catch(() => {});
+    };
+    setTimeout(kontrol, 3000); setInterval(kontrol, 120e3);
+  }
   // Hata ayıklama / testler için
   window.TasarimOnayi = { ac: (isId) => { if (isId) { seciliIs = String(isId); gorunum = 'ayrinti'; } else gorunum = 'liste'; ac(); }, kapat, durum: id => { const j = isAl(id); return j ? durum(j).kod : null; } };
 })();

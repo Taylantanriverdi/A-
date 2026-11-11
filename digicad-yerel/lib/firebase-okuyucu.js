@@ -62,6 +62,19 @@ async function veritabaniniOku() {
   return { metin, yontem };
 }
 
+// Veritabanının tek bir dalını okur (ör. "db/digicad/doctorSubmissions"); yalnızca GET
+async function yolOku(yol) {
+  const temiz = String(yol).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  const adres = `${FIREBASE.databaseURL}/${temiz}.json`;
+  let r = await guvenliIstek(adres);
+  if (r.status === 401 || r.status === 403) {
+    const t = await anonimOturum();
+    r = await guvenliIstek(`${adres}?auth=${encodeURIComponent(t)}`);
+  }
+  if (!r.ok) throw new Error(`Firebase okunamadı (HTTP ${r.status})`);
+  return JSON.parse(await r.text());
+}
+
 // Dosya deposundaki tüm dosyaların listesi (kurallar izin veriyorsa).
 // İzin yoksa null döner — o durumda sadece veritabanında bağlantısı olan dosyalar yedeklenir.
 async function depoListesi() {
@@ -94,4 +107,4 @@ async function dosyaOku(depoYolu, indirmeAdresi) {
   return guvenliIstek(`https://firebasestorage.googleapis.com/v0/b/${FIREBASE.storageBucket}/o/${encodeURIComponent(depoYolu)}?alt=media`, { headers: basliklar });
 }
 
-module.exports = { FIREBASE, guvenliIstek, veritabaniniOku, depoListesi, dosyaOku };
+module.exports = { FIREBASE, guvenliIstek, veritabaniniOku, yolOku, depoListesi, dosyaOku };

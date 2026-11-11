@@ -33,7 +33,7 @@ module.exports = (async()=>{
   r=await istek(IC,'hekim','/api/oku',{yol:'db/digicad/chats'},ali);
   bekle('Sadece kendi iş sohbetleri', Object.keys(r.j.deger||{}).join()==='job_100', r.j);
   r=await istek(IC,'hekim','/api/oku',{yol:'db/digicad/doctorSubmissions'},ali);
-  bekle('Başkasının gönderimlerini görmez', r.j.deger===null, r.j);
+  bekle('Başkasının gönderimlerini görmez', Object.values(r.j.deger||{}).every(s=>s.drId===1), r.j);
   for (const y of ['db/digicad/payments','db/digicad/technicians','db','db/digicad','meta','db/primer/jobs']) {
     r=await istek(IC,'hekim','/api/oku',{yol:y},ali);
     bekle(`Yasak: ${y}`, r.durum===403, r);
@@ -247,6 +247,25 @@ module.exports = (async()=>{
   bekle('Dış teknisyenin adı hekime gizli', r.j.deger && r.j.deger.techName==='Teknisyen', r.j.deger && r.j.deger.techName);
   r=await istek(IC,'teknisyen','/api/oku',{yol:'db/digicad/jobs'},veli);
   bekle('İç teknisyen hekim adını tam görür', Object.values(r.j.deger||{}).some(j=>/Ali/.test(j.drName||'')), r.j.deger);
+
+  console.log('Eski (Firebase) portala gönderilen işler');
+  r=await istek(IC,'yonetici','/api/oku',{yol:'db/digicad/doctorSubmissions/fb900'},yon);
+  bekle('Eski portala gönderilen iş yeni sisteme otomatik alınır', r.j.deger && r.j.deger.patient==='ESKİ PORTAL HASTASI' && r.j.deger.eskiPortaldan===true, r.j.deger);
+  bekle('Tarama dosyası yerele indirilir', r.j.deger && r.j.deger.files[0].url.startsWith('/dosya/'), r.j.deger && r.j.deger.files);
+  r=await istek(IC,'hekim','/api/oku',{yol:'db/digicad/doctorSubmissions/fb900'},ali);
+  bekle('Hekim, eski portaldan gönderdiği işi yeni portalda görür', r.j.deger && r.j.deger.patient==='ESKİ PORTAL HASTASI', r.j);
+  r=await istek(IC,'yonetici','/api/sistem/eski-portal',undefined,yon);
+  bekle('Alınan iş bekleyenler listesinde yok, eski kayıt listede', r.durum===200 && !r.j.liste.some(x=>x.id==='fb900') && r.j.liste.some(x=>x.id==='fb800'), r.j);
+  r=await istek(IC,'yonetici','/api/sistem/eski-portal/al',{idler:['fb800']},yon);
+  bekle('Eski kayıt elle alınır', r.durum===200 && r.j.alinan===1, r.j);
+  r=await istek(IC,'yonetici','/api/sistem/eski-portal',undefined,yon);
+  bekle('Elle alınan listeden düşer', !r.j.liste.some(x=>x.id==='fb800'), r.j);
+  r=await istek(IC,'hekim','/api/sistem/eski-portal',undefined,ali);
+  bekle('Hekim köprüyü kullanamaz', r.durum===401, r.durum);
+  if (process.env.SAHTE_FIREBASE_KAYIT) {
+    const yontemler=fs.readFileSync(process.env.SAHTE_FIREBASE_KAYIT,'utf8').trim().split('\n').map(l=>JSON.parse(l)).filter(x=>!x.adres.startsWith('identitytoolkit'));
+    bekle('Firebase\'e yalnızca okuma (GET) isteği gitti', yontemler.length>0 && yontemler.every(x=>x.yontem==='GET'), yontemler.slice(0,3));
+  }
 
   console.log('Kaba kuvvet');
   for(let i=0;i<5;i++) await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ayse',sifre:'x'+i});

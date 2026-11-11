@@ -49,7 +49,18 @@ globalThis.fetch = async function sahteFetch(adres, secenek = {}) {
   if (u.hostname === 'primer-dental-default-rtdb.europe-west1.firebasedatabase.app') {
     if (yontem !== 'GET') return yanit('{"error":"yazma"}', 400);
     if (!u.searchParams.get('auth')) return yanit('{"error":"Permission denied"}', 401);
-    const m = veriMetni();
+    let m = veriMetni();
+    // Belirli bir dal istendiyse (ör. /db/digicad/doctorSubmissions.json) yalnızca o dal
+    const dal = decodeURIComponent(u.pathname.replace(/\.json$/, '')).split('/').filter(Boolean);
+    if (dal.length) {
+      let v = JSON.parse(m);
+      if (process.env.SAHTE_FIREBASE_EK) { // testlerin eklediği yeni kayıtlar
+        const ek = JSON.parse(fs.readFileSync(process.env.SAHTE_FIREBASE_EK, 'utf8'));
+        Object.assign(v.db.digicad.doctorSubmissions, ek);
+      }
+      for (const p of dal) v = v && typeof v === 'object' ? v[p] : undefined;
+      m = JSON.stringify(v === undefined ? null : v);
+    }
     return yanit(m, 200, { 'content-type': 'application/json' });
   }
   if (u.hostname === 'firebasestorage.googleapis.com') {

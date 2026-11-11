@@ -45,7 +45,7 @@ Yazılım baştan sona gözden geçirildi. Düzeltilen başlıca sorunlar:
 - **Yazdırma:** "Zirkonya", "Titanyum", "E-max", "Lamina" gibi Türkçe yazılan
   iş türlerinde de formdaki materyal kutusu işaretlenir.
 
-Denetim sonrası `node test\calistir.js` komutu 104 kontrolün tamamını geçer.
+Denetim sonrası `node test\calistir.js` komutu 112 kontrolün tamamını geçer.
 
 ## 1. Kurulum (bir kez yapılır)
 
@@ -338,6 +338,25 @@ Yine de çalıştır** seçeneğine tıklamalı.
 
 Telefonda: portalı açıp tarayıcı menüsünden **"Ana ekrana ekle"** seçilir.
 Ana ekranda diş simgesi oluşur.
+
+## Eski hekim portalından gelen işler (köprü)
+
+Hekim eski adresi (`taylantanriverdi.github.io/...`) ya da eski bir simgeyi
+kullanırsa iş eski sisteme (Firebase) gider. Hekim "gönderildi" ekranını görür
+ama iş yönetim paneline düşmez.
+
+Bunu yakalamak için sunucu Firebase'i **2 dakikada bir yalnızca okur**. Yeni
+sistemde olmayan hekim işlerini tarama dosyalarıyla birlikte "Hekimden
+Gelenler" listesine ekler ve otomatik yazdırma açıksa basar. Firebase'de hiçbir
+şey değiştirilmez.
+
+- Böyle bir iş alındığında yönetim panelinin üstünde turuncu bir şerit çıkar.
+  O hekime yeni adresi ya da `DIGICAD-Hekim-Portali-Kurulum.bat` dosyasını gönderin.
+- 14 günden eski kayıtlar otomatik alınmaz. **🦷 Tasarım Onayı → ⚙️ E-posta ve
+  yedek ayarları → Eski hekim portalından gelen işler** bölümünden listeleyip
+  elle alabilir ya da gizleyebilirsiniz.
+- Firebase'i kapattığınızda (kurallarla kilitlediğinizde) köprü de durur. O
+  zaman eski adresi kullanan hekim hata görür ve yeni adrese geçmek zorunda kalır.
 
 ## Teknisyenler için
 

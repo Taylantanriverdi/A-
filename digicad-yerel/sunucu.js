@@ -27,6 +27,7 @@ const firebaseYedek = require('./lib/firebase-yedek');
 const yazdirma = require('./lib/yazdirma');
 const tasarim = require('./lib/tasarim');
 const eposta = require('./lib/eposta');
+const eskiPortal = require('./lib/eski-portal');
 
 const KOK = __dirname;
 const GENEL = path.join(KOK, 'public');
@@ -628,7 +629,11 @@ function isleyiciOlustur(kapi) {
               .filter(id => depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]) === null)
           : [];
         depo.uygula(islemler);
-        for (const id of yeniGonderimler) otomatikYazdir(id);
+        for (const id of yeniGonderimler) {
+          const k = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]) || {};
+          console.log(`[hekim portalı] Yeni iş: ${k.doctorName || ''} — ${k.patient || id}`);
+          otomatikYazdir(id);
+        }
         return json(res, 200, { tamam: true });
       }
 
@@ -726,6 +731,7 @@ function isleyiciOlustur(kapi) {
             epostaGecmisi: eposta.gecmis,
             yedekKlasoru: ayarlar.yedekKlasoru || '', sonYedek,
             disk: diskDurumu(), genelAdres: ayarlar.genelAdres || '',
+            eskiPortal: { otomatik: eskiPortalAyari().otomatik, ...kopru },
           });
         }
         if (yol === '/api/sistem' && req.method === 'POST') {
@@ -748,9 +754,25 @@ function isleyiciOlustur(kapi) {
             }
             yeni.yedekKlasoru = k;
           }
+          if (g.eskiPortal && typeof g.eskiPortal === 'object') {
+            yeni.eskiPortal = { ...eskiPortalAyari(), otomatik: !!g.eskiPortal.otomatik };
+          }
           ayarlariYaz(yeni); ayarlar = yeni;
           if (typeof g.yedekKlasoru === 'string' && g.yedekKlasoru.trim()) yedekAl();
           return json(res, 200, { tamam: true });
+        }
+        // Eski (Firebase) hekim portalına gönderilmiş, yeni sistemde olmayan işler
+        if (yol === '/api/sistem/eski-portal' && req.method === 'GET') {
+          const liste = await eskiPortal.adaylar(depo.kok, VERI);
+          return json(res, 200, { liste: liste.map(a => ({ id: a.id, hekim: a.kayit.doctorName || a.kayit.drName || '', hasta: a.kayit.patient || '', tur: a.kayit.jobType || '', tarih: a.kayit.createdAt || '', dosya: Array.isArray(a.kayit.files) ? a.kayit.files.length : 0 })) });
+        }
+        if ((yol === '/api/sistem/eski-portal/al' || yol === '/api/sistem/eski-portal/gizle') && req.method === 'POST') {
+          const g = await jsonOku(req);
+          const idler = new Set((Array.isArray(g.idler) ? g.idler : []).map(String));
+          if (yol.endsWith('/gizle')) { eskiPortal.gizle(VERI, [...idler]); return json(res, 200, { tamam: true }); }
+          const secilen = (await eskiPortal.adaylar(depo.kok, VERI)).filter(a => idler.has(a.id));
+          const sonuc = await eskiPortaldanAl(secilen, false);
+          return json(res, 200, { tamam: true, alinan: sonuc.alinan.length, indirilemeyen: sonuc.indirilemeyen });
         }
         if (yol === '/api/sistem/eposta-test' && req.method === 'POST') {
           const g = await jsonOku(req);
@@ -934,6 +956,48 @@ function isleyiciOlustur(kapi) {
   };
 }
 
+// ── ESKİ HEKİM PORTALI KÖPRÜSÜ (Firebase'den yalnızca okur) ─────────
+function eskiPortalAyari() {
+  const a = ayarlar.eskiPortal || {};
+  return { otomatik: a.otomatik !== false, baslangic: a.baslangic || null };
+}
+const kopru = { sonKontrol: null, sonHata: null, bekleyen: 0, toplamAlinan: 0 };
+let kopruCalisiyor = false;
+async function eskiPortaldanAl(secilen, yazdir = true) {
+  const sonuc = await eskiPortal.al(secilen, {
+    kok: () => depo.kok, veriKlasoru: VERI, dosyaDizini, dosyalarKlasoru: DOSYALAR,
+    uygula: islemler => depo.uygula(islemler), dizinKaydet: dosyaDiziniKaydet,
+  });
+  for (const id of sonuc.alinan) {
+    const k = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]) || {};
+    console.log(`[eski portal] Firebase'deki eski portaldan iş alındı: ${k.doctorName || ''} — ${k.patient || id}`);
+    if (yazdir) otomatikYazdir(id); // elle alınan eski işler kâğıda basılmaz
+  }
+  kopru.toplamAlinan += sonuc.alinan.length;
+  return sonuc;
+}
+async function eskiPortaliKontrolEt() {
+  const a = eskiPortalAyari();
+  if (!a.otomatik || kopruCalisiyor) return;
+  kopruCalisiyor = true;
+  try {
+    if (!a.baslangic) { ayarlar = ayarlariOku(); ayarlar.eskiPortal = { otomatik: true, baslangic: new Date().toISOString() }; ayarlariYaz(ayarlar); }
+    const liste = await eskiPortal.adaylar(depo.kok, VERI);
+    const baslangic = eskiPortalAyari().baslangic;
+    const otomatik = liste.filter(x => eskiPortal.otomatikSecilir(x, baslangic));
+    if (otomatik.length) await eskiPortaldanAl(otomatik);
+    kopru.bekleyen = liste.length - otomatik.length;
+    if (kopru.sonHata) console.log('[eski portal] Firebase bağlantısı yeniden sağlandı');
+    kopru.sonHata = null;
+  } catch (e) {
+    if (kopru.sonHata !== e.message) console.error('[eski portal] Firebase okunamadı: ' + e.message);
+    kopru.sonHata = e.message;
+  } finally {
+    kopru.sonKontrol = new Date().toISOString();
+    kopruCalisiyor = false;
+  }
+}
+
 // ── E-POSTA BİLDİRİMİ ve SİSTEM DURUMU ──────────────────────────────
 function epostaAyari() { return ayarlar.eposta || {}; }
 // Tasarım akışındaki bir olayı hekime e-postayla bildirir (açıksa ve hekimin adresi varsa)
@@ -1098,6 +1162,9 @@ async function baslat() {
 
   yedekAl();
   setInterval(yedekAl, 24 * 3600e3).unref();
+  // Eski portala gönderilen işleri yakala (açılıştan 20 sn sonra, sonra 2 dakikada bir)
+  setTimeout(eskiPortaliKontrolEt, Number(process.env.DIGICAD_KOPRU_ILK_MS || 20e3)).unref();
+  setInterval(eskiPortaliKontrolEt, Number(process.env.DIGICAD_KOPRU_ARALIK_MS || 120e3)).unref();
 
   const kapat = () => {
     console.log('\nKapatılıyor, veriler kaydediliyor…');
