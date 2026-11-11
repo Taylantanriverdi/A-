@@ -105,6 +105,11 @@ function numPress(n) {
   html = degistir(html, "${overdue?' ⚠️':''}</td>\n      <td>${scanCount ?",
     "${overdue?' ⚠️':''}</td>\n      <td>${typeof isAkisiHucre === 'function' ? isAkisiHucre(j) : ''}</td>\n      <td>${scanCount ?",
     'Devam Eden İşler aşama hücresi');
+  html = yoneticiGecisi(html, `_appUnlocked = true; lockInput = '';
+    document.getElementById('lock-screen').style.display = 'none';
+    DL.yenidenBaglan();
+    if (ws === 'digicad' || ws === 'primer') migrateLegacyDataIfNeeded().then(() => selectWorkspace(ws));
+    else showWorkspaceScreen();`);
   html = yazdirmaKarti(html);
   html = mailDuzeltmeleri(html);
   {
@@ -138,9 +143,40 @@ function changePass() {
   return html;
 }
 
+// Tek giriş ekranında (giris.html) PIN girildiyse yönetim sayfası PIN'i tekrar sormaz.
+// Yalnızca o sekmede ve 1 dakika içinde geçerlidir; sayfa sonradan yenilenirse kilit yine çıkar.
+function yoneticiGecisi(html, acilis) {
+  const betik = `<script>
+(function () {
+  var t = 0;
+  try { t = Number(sessionStorage.getItem('dl-yonetici-gecis')) || 0; sessionStorage.removeItem('dl-yonetici-gecis'); } catch (e) {}
+  if (!t || Date.now() - t > 60000) return;
+  var ws = new URLSearchParams(location.search).get('ws');
+  DL.ben().then(function (r) {
+    if (!r || !r.kullanici || r.kullanici.rol !== 'yonetici') return;
+    // Sayfa kilit ekranını açılış işlemleri bittikten sonra gösterir; onu bekle
+    var bitis = Date.now() + 15000;
+    (function bekle() {
+      var k = document.getElementById('lock-screen');
+      if (!k || getComputedStyle(k).display === 'none') { if (Date.now() < bitis) setTimeout(bekle, 100); return; }
+      ${acilis}
+    })();
+  }).catch(function () {});
+})();
+</script>
+`;
+  const son = html.lastIndexOf('</body>');
+  if (son < 0) throw new Error('</body> bulunamadı');
+  return html.slice(0, son) + betik + html.slice(son);
+}
+
 // ── GELEN İŞLER PANELİ ──────────────────────────────────────────────
 function gelenIsler(html) {
   html = ortakDonusum(html, 'yonetici');
+  html = yoneticiGecisi(html, `_unlocked = true;
+    document.getElementById('lock-screen').style.display = 'none';
+    DL.yenidenBaglan();
+    startApp();`);
   html = degistir(html,
     "rtdb.ref(dbRoot + '/pass').once('value').then(snap => {\n  dbPass = snap.val() || '0000';\n}).catch(() => {});",
     '// Şifre artık sunucuda doğrulanır (veritabanından okunmaz)',

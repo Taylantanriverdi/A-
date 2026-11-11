@@ -245,13 +245,13 @@ const TURLER = {
   '.gif': 'image/gif', '.webp': 'image/webp', '.txt': 'text/plain; charset=utf-8', '.zip': 'application/zip',
 };
 // Dış kapıdan (internet) sadece bunlar açılabilir
-const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|tasarim-ek\.js|is-akisi(-kural)?\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
+const DIS_SAYFALAR = /^\/(giris\.html|dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|tasarim-ek\.js|is-akisi(-kural)?\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
 
 function statikSun(req, res, kapi) {
   let yol;
   try { yol = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
   catch (e) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Geçersiz adres'); return; }
-  if (yol === '/') yol = kapi === 'dis' ? '/dis-index.html' : '/index.html';
+  if (yol === '/') yol = '/giris.html'; // tek giriş ekranı (her iki kapıda)
   if (kapi === 'dis' && !DIS_SAYFALAR.test(yol)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bulunamadı'); return; }
   const tam = path.normalize(path.join(GENEL, yol));
   if (!tam.startsWith(GENEL + path.sep)) { res.writeHead(400); res.end(); return; }
@@ -492,6 +492,50 @@ function isleyiciOlustur(kapi) {
       if (req.headers.origin) {
         let kaynak; try { kaynak = new URL(req.headers.origin).host; } catch (e) { kaynak = ''; }
         if (kaynak !== req.headers.host) return json(res, 403, { hata: 'Geçersiz kaynak' });
+      }
+
+      // ── Tek giriş ekranı (giris.html) ───────────────────
+      // Hangi panellerde açık oturum var, yönetici girişi bu bilgisayardan mümkün mü?
+      if (yol === '/api/giris-durumu' && req.method === 'GET') {
+        const durumu = {};
+        for (const p of ['hekim', 'teknisyen']) {
+          const o = oturumGetir(cerezler[CEREZ_ADI[p]], p);
+          const k = o && kisiKayitlari(p).find(x => yetki.ayni(x.id, o.id));
+          durumu[p] = k ? { ad: k.name || '' } : null;
+        }
+        const yoneticiMumkun = kapi === 'ic' && !vekilUzerindenMi(req) && (!ayarlar.yoneticiYalnizcaYerelAg || yerelAgMi(ipAdresi(req)));
+        durumu.yonetici = yoneticiMumkun && !!oturumGetir(cerezler[CEREZ_ADI.yonetici], 'yonetici');
+        return json(res, 200, { oturumlar: durumu, yoneticiMumkun });
+      }
+      // Kullanıcı adı + şifre: hekim mi teknisyen mi olduğunu sunucu bulur
+      if (yol === '/api/giris-tek' && req.method === 'POST') {
+        const g = await jsonOku(req);
+        const kAdi = String(g.kullaniciAdi || '').trim().toLowerCase().slice(0, 80);
+        const sifre = String(g.sifre || '').slice(0, 200);
+        const istenen = ['hekim', 'teknisyen'].includes(g.rol) ? [g.rol] : ['hekim', 'teknisyen'];
+        const k2 = 'tek:kapi:' + kapi + ':' + String(istemciAdresi(req, kapi)).slice(0, 60);
+        const anahtarlar = istenen.map(p => p + ':' + kAdi).concat(k2);
+        const dk = Math.max(...anahtarlar.map(kilitliMi));
+        if (dk) return json(res, 429, { hata: `Çok fazla hatalı deneme. ${dk} dakika sonra tekrar deneyin.` });
+        // Her iki listede de aynı sürede karşılaştır (hangisinde kayıtlı olduğu dışarıdan anlaşılmasın)
+        const eslesen = [];
+        for (const p of ['hekim', 'teknisyen']) {
+          const kisi = kisiKayitlari(p).find(x => (x.username || '').toLowerCase() === kAdi && kAdi);
+          const dogru = esitMi(kisi && kisi.password ? kisi.password : crypto.randomBytes(16).toString('hex'), sifre) && !!(kisi && kisi.password);
+          if (dogru && istenen.includes(p)) eslesen.push({ panel: p, kisi });
+        }
+        if (!eslesen.length) {
+          for (const a of anahtarlar) hataliDeneme(a);
+          return json(res, 401, { hata: 'Kullanıcı adı veya şifre hatalı.' });
+        }
+        // Aynı kullanıcı adı ve şifre hem hekimde hem teknisyende tanımlıysa kişi seçer
+        if (eslesen.length > 1) return json(res, 200, { secim: eslesen.map(e => e.panel) });
+        const { panel: rol, kisi } = eslesen[0];
+        for (const a of anahtarlar) denemeler.delete(a);
+        oturumKapat(cerezler[CEREZ_ADI[rol]]);
+        cerezYaz(res, req, CEREZ_ADI[rol], oturumAc(rol, kisi.id, sifreIzi(kisi)), SURE[rol]);
+        if (kapi === 'dis' && istekAdresi(req) !== ayarlar.genelAdres) genelAdresiOgren(req);
+        return json(res, 200, { rol, kullanici: yetki.sifresiz(kisi) });
       }
 
       const anahtar = cerezler[CEREZ_ADI[panel]];

@@ -352,6 +352,36 @@ module.exports = (async()=>{
   bekle('PMMA yoksa yol tasarım → zirkonyum (20.12 − 1 − 2 = 17.12)', K.sonTarih(ornek2,ek)==='2026-12-17', K.sonTarih(ornek2,ek));
   bekle('Renk: geçmiş kırmızı, 1 gün kala sarı, sonrası normal', K.aciliyet(gunSonra(-1))==='gecikmis' && K.aciliyet(gunSonra(1))==='yakin' && K.aciliyet(gunSonra(0))==='yakin' && K.aciliyet(gunSonra(3))==='normal');
 
+  console.log('Tek giriş ekranı');
+  let tg=await fetch(IC+'/'); bekle('Ana adres tek giriş ekranını açar (iç kapı)', tg.status===200 && (await tg.text()).includes('form-kullanici'));
+  tg=await fetch(DIS+'/'); bekle('Ana adres tek giriş ekranını açar (internet kapısı)', tg.status===200 && (await tg.text()).includes('form-kullanici'));
+  r=await istek(IC,'hekim','/api/giris-tek',{kullaniciAdi:'veli',sifre:'veli123'});
+  bekle('Tek giriş: teknisyen tanınır', r.durum===200 && r.j.rol==='teknisyen' && /dl_teknisyen=/.test(r.cerez) && !('password' in r.j.kullanici), r);
+  const tekVeli=r.cerez;
+  r=await istek(IC,'teknisyen','/api/oku',{yol:'db/digicad/jobs'},tekVeli);
+  bekle('Tek girişin oturumu teknisyen panelinde geçerli', Object.keys(r.j.deger||{}).length>0, r.j);
+  r=await istek(DIS,'hekim','/api/giris-tek',{kullaniciAdi:'ayse',sifre:'ayse123'});
+  bekle('Tek giriş: hekim tanınır (internetten)', r.durum===200 && r.j.rol==='hekim' && /dl_hekim=/.test(r.cerez), r);
+  r=await istek(IC,'hekim','/api/giris-durumu',undefined,r.cerez);
+  bekle('Açık oturum gösterilir', r.j.oturumlar && r.j.oturumlar.hekim && r.j.oturumlar.hekim.ad, r.j);
+  r=await istek(DIS,'hekim','/api/giris-durumu');
+  bekle('İnternetten yönetici girişi seçeneği yok', r.j.yoneticiMumkun===false, r.j);
+  r=await istek(IC,'hekim','/api/giris-durumu');
+  bekle('Laboratuvar ağından yönetici girişi mümkün', r.j.yoneticiMumkun===true, r.j);
+  r=await istek(IC,'hekim','/api/giris-tek',{kullaniciAdi:'veli',sifre:'yanlis'});
+  bekle('Tek giriş: yanlış şifre reddedilir', r.durum===401 && !r.cerez, r);
+  await istek(IC,'yonetici','/api/yaz',{islem:'set',yol:'db/digicad/doctors/30',deger:{id:30,name:'Dr Ortak',username:'ortak',password:'ortak1'}},yon);
+  await istek(IC,'yonetici','/api/yaz',{islem:'set',yol:'db/digicad/technicians/30',deger:{id:30,name:'Ortak Usta',username:'ortak',password:'ortak1'}},yon);
+  r=await istek(IC,'hekim','/api/giris-tek',{kullaniciAdi:'ortak',sifre:'ortak1'});
+  bekle('Aynı bilgiler iki hesapta: seçim istenir, oturum açılmaz', r.durum===200 && JSON.stringify(r.j.secim)==='["hekim","teknisyen"]' && !r.cerez, r);
+  r=await istek(IC,'hekim','/api/giris-tek',{kullaniciAdi:'ortak',sifre:'ortak1',rol:'teknisyen'});
+  bekle('Seçilen rolle giriş', r.durum===200 && r.j.rol==='teknisyen', r);
+  for(let i=0;i<5;i++) await istek(IC,'hekim','/api/giris-tek',{kullaniciAdi:'ortak',sifre:'x'+i});
+  r=await istek(IC,'hekim','/api/giris-tek',{kullaniciAdi:'ortak',sifre:'ortak1'});
+  bekle('Tek girişte de 5 hatalı denemede kilit', r.durum===429, r);
+  r=await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ortak',sifre:'ortak1'});
+  bekle('Kilit eski giriş sayfasını da kapsar', r.durum===429, r);
+
   console.log('Kaba kuvvet');
   for(let i=0;i<5;i++) await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ayse',sifre:'x'+i});
   r=await istek(IC,'hekim','/api/giris',{kullaniciAdi:'ayse',sifre:'ayse123'});

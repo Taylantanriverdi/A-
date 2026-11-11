@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DIGICAD Dental — Giriş</title>
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="simge-192.png">
+<link rel="manifest" href="hekim.webmanifest">
+<meta name="theme-color" content="#0b1b33">
+<style>
+  :root {
+    --zemin: #eef2f8; --kart: #ffffff; --yazi: #0f1b2d; --soluk: #5b6b82; --cizgi: #dbe3ee;
+    --ana: #1565c0; --ana-koyu: #0d4f9e; --ana-acik: #e8f0fe; --hata: #c62828; --hata-zemin: #fdecea;
+    --koyu: #0b1b33; --koyu2: #16324f; --yesil: #0f9d6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --zemin: #0b1220; --kart: #131c2c; --yazi: #e7edf6; --soluk: #9aa9bf; --cizgi: #263347; --ana: #4b9bf0; --ana-koyu: #2f7fd6; --ana-acik: #16263d; --hata: #ff8a80; --hata-zemin: #3a1b1b; }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--yazi); background: var(--zemin);
+    display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); min-height: 100vh;
+  }
+  /* ── Sol tanıtım alanı ── */
+  .tanitim {
+    background: radial-gradient(1200px 600px at -10% -20%, #2a5fa3 0%, transparent 55%), linear-gradient(150deg, var(--koyu) 0%, var(--koyu2) 100%);
+    color: #e8f0ff; padding: 48px 56px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden;
+  }
+  .tanitim::after { content: ""; position: absolute; right: -120px; bottom: -120px; width: 380px; height: 380px; border-radius: 50%; border: 60px solid rgba(255,255,255,.05); }
+  .marka { display: flex; align-items: center; gap: 14px; }
+  .marka img { width: 52px; height: 52px; border-radius: 14px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+  .marka b { display: block; font-size: 19px; letter-spacing: .02em; }
+  .marka span { font-size: 13px; opacity: .75; }
+  .tanitim h1 { font-size: clamp(28px, 3.2vw, 40px); line-height: 1.15; margin: 0 0 14px; font-weight: 800; letter-spacing: -.01em; }
+  .tanitim p { margin: 0; max-width: 460px; font-size: 15.5px; line-height: 1.6; opacity: .85; }
+  .roller { display: grid; gap: 12px; margin-top: 30px; max-width: 460px; position: relative; z-index: 1; }
+  .rol { display: flex; gap: 12px; align-items: flex-start; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 12px 14px; }
+  .rol i { font-style: normal; font-size: 22px; line-height: 1.2; }
+  .rol b { display: block; font-size: 14.5px; }
+  .rol span { font-size: 13px; opacity: .78; }
+  .alt-bilgi { font-size: 12.5px; opacity: .6; position: relative; z-index: 1; }
+
+  /* ── Sağ giriş alanı ── */
+  .giris { display: flex; align-items: center; justify-content: center; padding: 40px 24px; }
+  .kutu { width: 100%; max-width: 420px; }
+  .kutu h2 { margin: 0 0 6px; font-size: 26px; font-weight: 800; }
+  .kutu .aciklama { margin: 0 0 22px; color: var(--soluk); font-size: 14.5px; }
+  .devam { display: grid; gap: 10px; margin-bottom: 22px; }
+  .devam a { display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit; background: var(--kart); border: 1.5px solid var(--cizgi); border-radius: 14px; padding: 12px 14px; transition: border-color .15s, transform .15s; }
+  .devam a:hover { border-color: var(--ana); transform: translateY(-1px); }
+  .devam i { font-style: normal; font-size: 22px; }
+  .devam b { display: block; font-size: 14.5px; }
+  .devam span { font-size: 12.5px; color: var(--soluk); }
+  .devam em { margin-left: auto; font-style: normal; color: var(--ana); font-weight: 700; font-size: 13px; white-space: nowrap; }
+  .sekmeler { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; background: var(--ana-acik); padding: 4px; border-radius: 12px; margin-bottom: 18px; }
+  .sekmeler button { border: 0; background: transparent; color: var(--soluk); font: inherit; font-weight: 700; font-size: 14px; padding: 10px 8px; border-radius: 9px; cursor: pointer; }
+  .sekmeler button[aria-selected="true"] { background: var(--kart); color: var(--yazi); box-shadow: 0 1px 4px rgba(15,27,45,.12); }
+  .kart { background: var(--kart); border: 1px solid var(--cizgi); border-radius: 18px; padding: 24px; box-shadow: 0 10px 30px rgba(15,27,45,.06); }
+  label.alan { display: block; margin-bottom: 14px; }
+  label.alan span { display: block; font-size: 12.5px; font-weight: 700; color: var(--soluk); margin-bottom: 6px; letter-spacing: .02em; }
+  .girdi { position: relative; }
+  .girdi input { width: 100%; padding: 13px 14px; border: 1.5px solid var(--cizgi); border-radius: 11px; font: inherit; font-size: 15.5px; background: var(--kart); color: var(--yazi); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .girdi input:focus { border-color: var(--ana); box-shadow: 0 0 0 3px rgba(21,101,192,.15); }
+  .goster { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--soluk); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 6px; }
+  .dugme { width: 100%; border: 0; border-radius: 12px; padding: 14px; font: inherit; font-size: 15.5px; font-weight: 800; color: #fff; background: var(--ana); cursor: pointer; transition: background .15s; }
+  .dugme:hover { background: var(--ana-koyu); }
+  .dugme:disabled { opacity: .6; cursor: default; }
+  .ikincil { background: var(--kart); color: var(--yazi); border: 1.5px solid var(--cizgi); }
+  .ikincil:hover { background: var(--ana-acik); }
+  .mesaj { display: none; margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; font-weight: 600; background: var(--hata-zemin); color: var(--hata); }
+  .mesaj.goster-m { display: block; }
+  .ipucu { margin-top: 14px; font-size: 12.5px; color: var(--soluk); text-align: center; line-height: 1.5; }
+  /* PIN */
+  .pin-noktalar { display: flex; justify-content: center; gap: 14px; margin: 6px 0 20px; }
+  .pin-noktalar i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--ana); transition: background .1s; }
+  .pin-noktalar i.dolu { background: var(--ana); }
+  .tus-takimi { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 290px; margin: 0 auto; }
+  .tus-takimi button { border: 1.5px solid var(--cizgi); background: var(--kart); color: var(--yazi); border-radius: 14px; font: inherit; font-size: 22px; font-weight: 700; padding: 14px 0; cursor: pointer; }
+  .tus-takimi button:hover { border-color: var(--ana); background: var(--ana-acik); }
+  .tus-takimi button.kucuk { font-size: 15px; color: var(--soluk); }
+  .titre { animation: titre .35s; }
+  @keyframes titre { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+  /* Yönetici panel seçimi */
+  .secimler { display: grid; gap: 10px; }
+  .secimler a { display: flex; gap: 12px; align-items: center; text-decoration: none; color: inherit; border: 1.5px solid var(--cizgi); border-radius: 14px; padding: 13px 14px; background: var(--kart); }
+  .secimler a:hover { border-color: var(--ana); background: var(--ana-acik); }
+  .secimler i { font-style: normal; font-size: 22px; }
+  .secimler b { display: block; font-size: 14.5px; }
+  .secimler span { font-size: 12.5px; color: var(--soluk); }
+  .kurulum { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; font-size: 12.5px; }
+  .kurulum a { color: var(--ana); font-weight: 600; text-decoration: none; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; }
+    .tanitim { padding: 22px 20px 26px; }
+    .tanitim h1 { font-size: 22px; margin: 18px 0 6px; }
+    .tanitim p { font-size: 14px; }
+    .roller, .alt-bilgi, .tanitim::after { display: none; }
+    .giris { padding: 22px 16px 36px; align-items: flex-start; }
+    .kart { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+  <aside class="tanitim">
+    <div>
+      <div class="marka"><img src="simge-192.png" alt=""><div><b>DIGICAD Dental</b><span>Laboratuvar Yönetim Sistemi</span></div></div>
+      <h1 style="margin-top:56px">Tek giriş,<br>herkes kendi ekranına.</h1>
+      <p>Kullanıcı adınız ve şifrenizle giriş yapın; sistem sizi hekim portalına ya da teknisyen paneline kendisi yönlendirir. Laboratuvar yönetimi PIN ile açılır.</p>
+      <div class="roller">
+        <div class="rol"><i>👨‍⚕️</i><div><b>Hekim</b><span>İş gönderme, tasarım onayı, prova sonuçları ve randevular</span></div></div>
+        <div class="rol"><i>🔧</i><div><b>Teknisyen</b><span>Size atanan işler, dosyalar, önizleme ve aşamalar</span></div></div>
+        <div class="rol"><i>🧪</i><div><b>Laboratuvar</b><span>Yönetim paneli, gelen işler, kasa ve raporlar</span></div></div>
+      </div>
+    </div>
+    <div class="alt-bilgi">Veriler laboratuvarın kendi sunucusunda saklanır.</div>
+  </aside>
+
+  <main class="giris">
+    <div class="kutu">
+      <h2 id="baslik">Giriş yap</h2>
+      <p class="aciklama" id="aciklama">Laboratuvarın size verdiği bilgilerle giriş yapın.</p>
+
+      <div class="devam" id="devam" hidden></div>
+
+      <div class="sekmeler" id="sekmeler" role="tablist" hidden>
+        <button type="button" role="tab" id="sekme-kullanici" aria-selected="true">👤 Hekim / Teknisyen</button>
+        <button type="button" role="tab" id="sekme-pin" aria-selected="false">🧪 Laboratuvar</button>
+      </div>
+
+      <!-- Hekim / teknisyen -->
+      <form class="kart" id="form-kullanici" autocomplete="on" novalidate>
+        <label class="alan"><span>KULLANICI ADI</span>
+          <div class="girdi"><input id="kadi" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></div></label>
+        <label class="alan"><span>ŞİFRE</span>
+          <div class="girdi"><input id="sifre" name="password" type="password" autocomplete="current-password" required>
+            <button type="button" class="goster" id="goster">Göster</button></div></label>
+        <button class="dugme" id="gir" type="submit">Giriş yap</button>
+        <div class="mesaj" id="mesaj-k" role="alert"></div>
+        <div id="rol-secimi" hidden style="margin-top:14px">
+          <div class="ipucu" style="margin:0 0 10px">Bu bilgiler hem hekim hem teknisyen hesabına ait. Hangisiyle girmek istiyorsunuz?</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <button type="button" class="dugme ikincil" data-rol="hekim">👨‍⚕️ Hekim</button>
+            <button type="button" class="dugme ikincil" data-rol="teknisyen">🔧 Teknisyen</button>
+          </div>
+        </div>
+        <div class="ipucu">Hesabınız yoksa ya da şifrenizi unuttuysanız laboratuvarla iletişime geçin.</div>
+      </form>
+
+      <!-- Laboratuvar PIN -->
+      <div class="kart" id="form-pin" hidden>
+        <div class="ipucu" style="margin:0 0 6px">Laboratuvar PIN'ini girin</div>
+        <div class="pin-noktalar" id="noktalar"><i></i><i></i><i></i><i></i></div>
+        <div class="tus-takimi" id="tuslar"></div>
+        <div class="mesaj" id="mesaj-p" role="alert"></div>
+      </div>
+
+      <!-- Yönetici: panel seçimi -->
+      <div class="kart" id="panel-secimi" hidden>
+        <div class="secimler">
+          <a href="PrimerLab.html?ws=digicad" data-yonetici><i>🦷</i><div><b>Yönetim Sistemi — DIGICAD</b><span>İşler, hekimler, kasa, raporlar</span></div></a>
+          <a href="PrimerLab.html?ws=primer" data-yonetici><i>🏷️</i><div><b>Yönetim Sistemi — Primer Teknoloji</b><span>Satışlar ve Primer kayıtları</span></div></a>
+          <a href="GelenIslerPaneli.html" data-yonetici data-mobil="GelenIslerPaneliMobil.html"><i>📥</i><div><b>Gelen İşler Paneli</b><span>Hekimlerden gelen talepler</span></div></a>
+          <a href="VeriAktarimi.html"><i>🔄</i><div><b>Veri Aktarımı ve Yedek</b><span>Eski sistemden kopyalama, tam yedek</span></div></a>
+        </div>
+        <button type="button" class="dugme ikincil" id="yonetici-cikis" style="margin-top:14px">🔒 Laboratuvar oturumunu kapat</button>
+      </div>
+
+      <div class="kurulum" id="kurulum">
+        <a href="HekimPortaliKurulum.bat">💻 Hekim: bilgisayara kur</a>
+        <a href="TeknisyenPaneliKurulum.bat">💻 Teknisyen: bilgisayara kur</a>
+        <span style="color:var(--soluk)">📱 Telefonda: tarayıcı menüsü → “Ana ekrana ekle”</span>
+      </div>
+    </div>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const mobil = () => window.matchMedia('(max-width: 760px)').matches;
+  const HEDEF = {
+    hekim: () => mobil() ? 'HekimPortaliMobil.html' : 'HekimPortali.html',
+    teknisyen: () => mobil() ? 'TeknisyenPaneliMobil.html' : 'TeknisyenPaneli.html',
+  };
+  function api(adres, govde, panel) {
+    return fetch(adres, {
+      method: govde ? 'POST' : 'GET', credentials: 'same-origin',
+      headers: Object.assign({ 'X-DL-Panel': panel || 'hekim' }, govde ? { 'Content-Type': 'application/json' } : {}),
+      body: govde ? JSON.stringify(govde) : undefined,
+    }).then(r => r.json().catch(() => ({})).then(j => { if (!r.ok) throw new Error(j.hata || 'Sunucuya ulaşılamadı (' + r.status + ')'); return j; }));
+  }
+  function mesaj(el, metin) { el.textContent = metin || ''; el.classList.toggle('goster-m', !!metin); }
+  function titret(el) { el.classList.remove('titre'); void el.offsetWidth; el.classList.add('titre'); }
+
+  // ── Sekmeler ──
+  function sekme(ad) {
+    const pin = ad === 'pin';
+    $('sekme-kullanici').setAttribute('aria-selected', String(!pin));
+    $('sekme-pin').setAttribute('aria-selected', String(pin));
+    $('form-kullanici').hidden = pin; $('form-pin').hidden = !pin; $('panel-secimi').hidden = true;
+    $('baslik').textContent = pin ? 'Laboratuvar girişi' : 'Giriş yap';
+    $('aciklama').textContent = pin ? 'Yönetim paneli yalnızca laboratuvar ağından açılır.' : 'Laboratuvarın size verdiği bilgilerle giriş yapın.';
+    if (!pin) $('kadi').focus();
+    try { localStorage.setItem('dl-giris-sekme', ad); } catch (e) { /* yoksay */ }
+  }
+  $('sekme-kullanici').onclick = () => sekme('kullanici');
+  $('sekme-pin').onclick = () => sekme('pin');
+
+  // ── Hekim / teknisyen girişi ──
+  $('goster').onclick = () => { const s = $('sifre'); s.type = s.type === 'password' ? 'text' : 'password'; $('goster').textContent = s.type === 'password' ? 'Göster' : 'Gizle'; };
+  function gir(rol) {
+    const kullaniciAdi = $('kadi').value.trim(), sifre = $('sifre').value;
+    mesaj($('mesaj-k'));
+    if (!kullaniciAdi || !sifre) { mesaj($('mesaj-k'), 'Kullanıcı adı ve şifre gerekli.'); titret($('form-kullanici')); return; }
+    const d = $('gir'); d.disabled = true; d.textContent = 'Giriş yapılıyor…';
+    api('/api/giris-tek', { kullaniciAdi, sifre, rol }).then(r => {
+      if (r.secim) { $('rol-secimi').hidden = false; d.disabled = false; d.textContent = 'Giriş yap'; return; }
+      d.textContent = r.rol === 'hekim' ? 'Hekim portalı açılıyor…' : 'Teknisyen paneli açılıyor…';
+      location.href = HEDEF[r.rol]();
+    }).catch(e => {
+      d.disabled = false; d.textContent = 'Giriş yap';
+      mesaj($('mesaj-k'), e.message); titret($('form-kullanici')); $('sifre').select();
+    });
+  }
+  $('form-kullanici').addEventListener('submit', e => { e.preventDefault(); $('rol-secimi').hidden = true; gir(); });
+  document.querySelectorAll('#rol-secimi [data-rol]').forEach(b => { b.onclick = () => gir(b.dataset.rol); });
+
+  // ── Laboratuvar PIN ──
+  let pin = '', bekliyor = false;
+  const noktalar = () => document.querySelectorAll('#noktalar i').forEach((n, i) => n.classList.toggle('dolu', i < pin.length));
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'sil', '0', '⌫'].forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = t === 'sil' ? 'Temizle' : t;
+    if (t === 'sil' || t === '⌫') b.className = 'kucuk';
+    b.onclick = () => tus(t);
+    $('tuslar').appendChild(b);
+  });
+  function tus(t) {
+    if (bekliyor) return;
+    mesaj($('mesaj-p'));
+    if (t === 'sil') pin = ''; else if (t === '⌫') pin = pin.slice(0, -1); else if (pin.length < 4) pin += t;
+    noktalar();
+    if (pin.length === 4) {
+      bekliyor = true;
+      api('/api/giris', { pin }, 'yonetici').then(() => { pin = ''; noktalar(); bekliyor = false; panelSecimi(); },
+        e => { pin = ''; noktalar(); bekliyor = false; mesaj($('mesaj-p'), e.message); titret($('form-pin')); });
+    }
+  }
+  document.addEventListener('keydown', e => {
+    if ($('form-pin').hidden) return;
+    if (/^[0-9]$/.test(e.key)) tus(e.key); else if (e.key === 'Backspace') tus('⌫'); else if (e.key === 'Escape') tus('sil');
+  });
+  function panelSecimi() {
+    $('form-kullanici').hidden = $('form-pin').hidden = true; $('sekmeler').hidden = true; $('devam').hidden = true;
+    $('panel-secimi').hidden = false;
+    $('baslik').textContent = 'Laboratuvar';
+    $('aciklama').textContent = 'Hangi bölümü açmak istiyorsunuz?';
+  }
+  // Yönetim paneline buradan geçerken PIN'i ikinci kez sormasın (yalnızca bu sekmede, 1 dakika geçerli)
+  document.querySelectorAll('#panel-secimi a').forEach(a => a.addEventListener('click', e => {
+    try { sessionStorage.setItem('dl-yonetici-gecis', String(Date.now())); } catch (x) { /* yoksay */ }
+    if (a.dataset.mobil && mobil()) { e.preventDefault(); location.href = a.dataset.mobil; }
+  }));
+  $('yonetici-cikis').onclick = () => api('/api/cikis', {}, 'yonetici').catch(() => {}).then(() => location.reload());
+
+  // ── Açık oturumlar ve yönetici girişi mümkün mü ──
+  api('/api/giris-durumu').then(d => {
+    const o = d.oturumlar || {};
+    const kartlar = [];
+    if (o.hekim) kartlar.push({ i: '👨‍⚕️', b: o.hekim.ad || 'Hekim', s: 'Hekim portalı — oturum açık', h: HEDEF.hekim() });
+    if (o.teknisyen) kartlar.push({ i: '🔧', b: o.teknisyen.ad || 'Teknisyen', s: 'Teknisyen paneli — oturum açık', h: HEDEF.teknisyen() });
+    if (o.yonetici) kartlar.push({ i: '🧪', b: 'Laboratuvar', s: 'Yönetim — oturum açık', yonetici: true });
+    if (kartlar.length) {
+      const yer = $('devam');
+      for (const k of kartlar) {
+        const a = document.createElement('a');
+        a.href = k.h || '#';
+        const i = document.createElement('i'); i.textContent = k.i;
+        const m = document.createElement('div');
+        const b = document.createElement('b'); b.textContent = k.b;
+        const s = document.createElement('span'); s.textContent = k.s;
+        const em = document.createElement('em'); em.textContent = 'Devam et →';
+        m.append(b, s); a.append(i, m, em);
+        if (k.yonetici) a.onclick = e => { e.preventDefault(); panelSecimi(); };
+        yer.appendChild(a);
+      }
+      yer.hidden = false;
+    }
+    if (d.yoneticiMumkun) {
+      $('sekmeler').hidden = false;
+      let son = 'kullanici';
+      try { son = localStorage.getItem('dl-giris-sekme') || son; } catch (e) { /* yoksay */ }
+      sekme(son === 'pin' ? 'pin' : 'kullanici');
+    } else $('kadi').focus();
+  }).catch(() => { $('kadi').focus(); });
+})();
+</script>
+</body>
+</html>

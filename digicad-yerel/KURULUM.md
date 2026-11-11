@@ -45,7 +45,7 @@ Yazılım baştan sona gözden geçirildi. Düzeltilen başlıca sorunlar:
 - **Yazdırma:** "Zirkonya", "Titanyum", "E-max", "Lamina" gibi Türkçe yazılan
   iş türlerinde de formdaki materyal kutusu işaretlenir.
 
-Denetim sonrası `node test\calistir.js` komutu 153 kontrolün tamamını geçer.
+Denetim sonrası `node test\calistir.js` komutu 166 kontrolün tamamını geçer.
 
 ## 1. Kurulum (bir kez yapılır)
 
@@ -338,6 +338,28 @@ Yine de çalıştır** seçeneğine tıklamalı.
 
 Telefonda: portalı açıp tarayıcı menüsünden **"Ana ekrana ekle"** seçilir.
 Ana ekranda diş simgesi oluşur.
+
+## Tek giriş ekranı
+
+Sistemin ana adresi artık herkes için aynı giriş ekranını açar:
+
+- Laboratuvarda: `http://localhost:8080/`
+- İnternetten (hekim, teknisyen): `https://<tailscale-adresiniz>.ts.net/`
+
+Kullanıcı adı ve şifreyi girince sistem kişinin hekim mi teknisyen mi olduğunu
+kendisi bulur. Hekimi hekim portalına, teknisyeni teknisyen paneline götürür.
+Telefonda mobil sürüm açılır. Aynı kullanıcı adı ve şifre hem hekimde hem
+teknisyende tanımlıysa hangisiyle gireceği sorulur.
+
+**Laboratuvar** sekmesi PIN ister ve yalnızca laboratuvar ağından görünür;
+internetten açılan giriş ekranında yoktur. PIN'den sonra Yönetim Sistemi
+(DIGICAD / Primer), Gelen İşler ya da Veri Aktarımı seçilir ve PIN ikinci kez
+sorulmaz. Yönetim sayfası sonradan yenilenirse kilit yine çıkar.
+
+Açık oturumu olan kişi giriş ekranında "Devam et" kartını görür. Hatalı
+denemelerdeki kilit (5 deneme) bu ekranda da geçerlidir. Eski adresler
+(HekimPortali.html, TeknisyenPaneli.html, PrimerLab.html) ve masaüstü
+simgeleri aynen çalışmaya devam eder.
 
 ## Eski hekim portalından gelen işler (köprü)
 

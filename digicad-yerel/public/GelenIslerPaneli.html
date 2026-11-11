@@ -2734,6 +2734,27 @@ document.getElementById('detail-modal').addEventListener('click', e => {
   if (e.target.id === 'detail-modal') closeDetailModal();
 });
 </script>
+<script>
+(function () {
+  var t = 0;
+  try { t = Number(sessionStorage.getItem('dl-yonetici-gecis')) || 0; sessionStorage.removeItem('dl-yonetici-gecis'); } catch (e) {}
+  if (!t || Date.now() - t > 60000) return;
+  var ws = new URLSearchParams(location.search).get('ws');
+  DL.ben().then(function (r) {
+    if (!r || !r.kullanici || r.kullanici.rol !== 'yonetici') return;
+    // Sayfa kilit ekranını açılış işlemleri bittikten sonra gösterir; onu bekle
+    var bitis = Date.now() + 15000;
+    (function bekle() {
+      var k = document.getElementById('lock-screen');
+      if (!k || getComputedStyle(k).display === 'none') { if (Date.now() < bitis) setTimeout(bekle, 100); return; }
+      _unlocked = true;
+    document.getElementById('lock-screen').style.display = 'none';
+    DL.yenidenBaglan();
+    startApp();
+    })();
+  }).catch(function () {});
+})();
+</script>
 <script src="tasarim-ek.js"></script>
 <script src="is-akisi-kural.js"></script>
 <script src="is-akisi.js"></script>
