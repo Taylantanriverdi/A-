@@ -99,6 +99,12 @@ function numPress(n) {
   html = degistir(html, "Firebase'e bağlanıyor...", 'Sunucuya bağlanıyor...', 'yükleniyor yazısı');
   html = degistir(html, "toast('Firebase bağlantı hatası — çevrimdışı mod', 'error');", "toast('Sunucu bağlantı hatası', 'error');", 'bağlantı hatası');
 
+  html = degistir(html, "let h = `<table><thead><tr><th>Hekim</th><th>Hasta</th><th>İş</th><th>Teknisyen</th><th>Tutar</th><th>Teslim</th><th>Tarama</th><th>Tasarım</th><th>Durum</th><th></th></tr></thead><tbody>`;",
+    "if (typeof isAkisiSuzgec === 'function') list = isAkisiSuzgec(list);\n  let h = `<table><thead><tr><th>Hekim</th><th>Hasta</th><th>İş</th><th>Teknisyen</th><th>Tutar</th><th>Teslim</th><th>Aşama</th><th>Tarama</th><th>Tasarım</th><th>Durum</th><th></th></tr></thead><tbody>`;",
+    'Devam Eden İşler başlığı');
+  html = degistir(html, "${overdue?' ⚠️':''}</td>\n      <td>${scanCount ?",
+    "${overdue?' ⚠️':''}</td>\n      <td>${typeof isAkisiHucre === 'function' ? isAkisiHucre(j) : ''}</td>\n      <td>${scanCount ?",
+    'Devam Eden İşler aşama hücresi');
   html = yazdirmaKarti(html);
   html = mailDuzeltmeleri(html);
   {
@@ -190,6 +196,9 @@ function doctorLogin() {
   });
 }`);
   html = baglantiDestegi(html);
+  html = degistir(html, "if (!files.length) missing.push('Tarama Dosyası veya Bağlantı');",
+    "if (!files.length) missing.push('Tarama Dosyası veya Bağlantı');\n  if (typeof isAkisiFormEksik === 'function') missing.push(...isAkisiFormEksik());", 'iş akışı zorunlu alanlar');
+  html = degistir(html, "    source: 'hekim-portal'\n  };", "    source: 'hekim-portal',\n    ...(typeof isAkisiFormAlanlari === 'function' ? isAkisiFormAlanlari() : {})\n  };", 'iş akışı gönderim alanları');
   html = degistir(html, 'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  stopMySubmissionsListener();',
     'try { localStorage.removeItem(SESSION_KEY); } catch(e) {}\n  DL.cikis().catch(() => {}).then(() => DL.yenidenBaglan());\n  stopMySubmissionsListener();',
     'Hekim çıkış');
@@ -585,7 +594,7 @@ function main() {
       // Tasarım onayı penceresi (önizleme → hekim onayı → nihai dosya) her panelde ortaktır
       const govdeSonu = html.lastIndexOf('</body>');
       if (govdeSonu < 0) throw new Error('</body> bulunamadı');
-      html = html.slice(0, govdeSonu) + '<script src="tasarim-ek.js"></script>\n' + html.slice(govdeSonu);
+      html = html.slice(0, govdeSonu) + '<script src="tasarim-ek.js"></script>\n<script src="is-akisi-kural.js"></script>\n<script src="is-akisi.js"></script>\n' + html.slice(govdeSonu);
       if (/gstatic\.com\/firebasejs|firebasedatabase\.app|AIzaSy/.test(html)) throw new Error('Dönüşüm sonrası Firebase izi kaldı');
       fs.writeFileSync(path.join(HEDEF, ad), html);
       console.log(`✓  ${ad}`);

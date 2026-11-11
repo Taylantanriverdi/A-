@@ -1567,6 +1567,7 @@ function submitDoctorJob() {
   if (!teeth.length) missing.push('Diş Seçimi');
   if (!color) missing.push('Diş Rengi');
   if (!files.length) missing.push('Tarama Dosyası veya Bağlantı');
+  if (typeof isAkisiFormEksik === 'function') missing.push(...isAkisiFormEksik());
   if (!dateout) missing.push('Teslim Tarihi');
 
   if (missing.length) {
@@ -1600,7 +1601,8 @@ function submitDoctorJob() {
     designSource,
     status: 'Yeni',
     createdAt: new Date().toISOString(),
-    source: 'hekim-portal'
+    source: 'hekim-portal',
+    ...(typeof isAkisiFormAlanlari === 'function' ? isAkisiFormAlanlari() : {})
   };
 
   const btn = document.getElementById('hp-submit-btn');
@@ -2464,5 +2466,7 @@ document.getElementById('hist-detail-modal').addEventListener('click', e => {
 });
 </script>
 <script src="tasarim-ek.js"></script>
+<script src="is-akisi-kural.js"></script>
+<script src="is-akisi.js"></script>
 </body>
 </html>

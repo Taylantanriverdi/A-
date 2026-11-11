@@ -4630,7 +4630,8 @@ function renderJobs(resetFilter) {
   if (q)  list = list.filter(j => (j.drName||'').toLowerCase().includes(q)||(j.patient||'').toLowerCase().includes(q));
   if (sf) list = list.filter(j => j.status === sf);
   if (!list.length) { document.getElementById('main-job-list').innerHTML = emptyState('🎉','Devam eden iş yok'); return; }
-  let h = `<table><thead><tr><th>Hekim</th><th>Hasta</th><th>İş</th><th>Teknisyen</th><th>Tutar</th><th>Teslim</th><th>Tarama</th><th>Tasarım</th><th>Durum</th><th></th></tr></thead><tbody>`;
+  if (typeof isAkisiSuzgec === 'function') list = isAkisiSuzgec(list);
+  let h = `<table><thead><tr><th>Hekim</th><th>Hasta</th><th>İş</th><th>Teknisyen</th><th>Tutar</th><th>Teslim</th><th>Aşama</th><th>Tarama</th><th>Tasarım</th><th>Durum</th><th></th></tr></thead><tbody>`;
   list.forEach(j => {
     const overdue = j.dateout && j.dateout < today();
     const tech = j.techId ? techArr().find(t=>t.id===j.techId) : null;
@@ -4646,6 +4647,7 @@ function renderJobs(resetFilter) {
       <td>${tech ? `<span class="badge-spec">🔧 ${tech.name}</span>${tech.type === 'dis' ? (j.acceptedByTech ? `<div style="font-size:9.5px;color:#047857;font-weight:700;margin-top:3px" title="${j.acceptedAt ? new Date(j.acceptedAt).toLocaleString('tr-TR') : ''}">✅ Kabul Etti</div>` : `<div style="font-size:9.5px;color:#b45309;font-weight:700;margin-top:3px">⏳ Kabul Bekliyor</div>`) : ''}` : '<span style="color:var(--text-soft);font-size:11px">Atanmamış</span>'}</td>
       <td class="mono">${fmtMoney((Number(j.price)||0)*qtyOf(j), j.currency)}</td>
       <td style="${overdue?'color:var(--danger);font-weight:700':''}">${fmtDate(j.dateout)}${overdue?' ⚠️':''}</td>
+      <td>${typeof isAkisiHucre === 'function' ? isAkisiHucre(j) : ''}</td>
       <td>${scanCount ? `<button class="btn btn-sm btn-outline" title="Tarama dosyalarını görüntüle / indir / sil" onclick="openFileManager(${j.id}, 'scan')">📦 ${scanCount}</button>` : '<span style="color:var(--text-soft);font-size:11px">—</span>'}</td>
       <td>${designCount ? `<button class="btn btn-sm btn-outline" title="Tasarım dosyalarını görüntüle / indir / sil" onclick="openFileManager(${j.id}, 'design')">🎨 ${designCount}</button>` : '<span style="color:var(--text-soft);font-size:11px">—</span>'}${j.implantParts && j.implantParts.trim() ? ` <span title="İmplant parçaları notu: ${escHtml(j.implantParts)}" style="display:inline-block;margin-left:4px;font-size:13px;cursor:help">🦷</span>` : ''}</td>
       <td>${j.status === 'Tamamlama Onayı'
@@ -13180,5 +13182,7 @@ function yazdirmaTest() {
 </script>
 <script src="mail-ek.js"></script>
 <script src="tasarim-ek.js"></script>
+<script src="is-akisi-kural.js"></script>
+<script src="is-akisi.js"></script>
 </body>
 </html>

@@ -45,7 +45,7 @@ Yazılım baştan sona gözden geçirildi. Düzeltilen başlıca sorunlar:
 - **Yazdırma:** "Zirkonya", "Titanyum", "E-max", "Lamina" gibi Türkçe yazılan
   iş türlerinde de formdaki materyal kutusu işaretlenir.
 
-Denetim sonrası `node test\calistir.js` komutu 112 kontrolün tamamını geçer.
+Denetim sonrası `node test\calistir.js` komutu 153 kontrolün tamamını geçer.
 
 ## 1. Kurulum (bir kez yapılır)
 
@@ -366,6 +366,53 @@ Teknisyen Portalı giriş ekranındaki **💻 Bu bilgisayara kur** bağlantısı
 masaüstüne ve Başlat menüsüne **DIGICAD Teknisyen Portalı** simgesi eklenir.
 Yönetici izni gerekmez. Portal internet adresinden açıldığı için teknisyen
 laboratuvar dışında da çalışabilir.
+
+## İş akışı: aşamalar, PMMA/zirkonyum provaları, randevular
+
+Her panelde sağ altta **🧭 İş Akışı** düğmesi vardır. İşin klinik aşaması,
+mevcut "Durum" alanından ayrı tutulur. Durum (Bekliyor, Tasarımda, Üretimde…)
+ve kasa, raporlar aynen çalışır; yalnızca **Teslim edildi** aşaması işi
+"Tamamlandı" yapar.
+
+Aşamalar: İş kabul → Tasarım → PMMA geçici üretim → PMMA hekimde prova →
+(PMMA revizyon ⇄ PMMA prova, sınırsız) → Zirkonyum tasarım/üretim → Zirkonyum
+hekimde prova → (İlave/düzeltme ⇄ Zirkonyum prova, sınırsız) → Teslim edildi.
+
+- **Laboratuvar** her aşamaya alabilir; geri alma ve kural dışı geçişler geçmişe
+  "düzeltme" olarak yazılır.
+- **Teknisyen** kendi işinde üretim aşamalarını ilerletir ve işi provaya gönderir.
+  Prova sonucunu ve teslimi giremez.
+- **Hekim** prova aşamasında portalda sonucu bildirir: uygun ya da revizyon
+  (talep notu zorunlu). Her prova sonucunda bir sonraki randevu tarihi zorunludur.
+  Hekim randevuyu istediği zaman değiştirebilir; laboratuvarda 🔔 bildirimi çıkar.
+- İş prova aşamasına gelince hekime e-posta gider (e-posta bildirimi açıksa).
+- Gereksiz aşamalar atlanabilir (ör. PMMA'sız işte Tasarım → Zirkonyum).
+- Her revizyon numaralıdır (PMMA Revizyon 1, 2…) ve hekimin talebi, teknisyen,
+  başlangıç/bitiş ve yeni tarih ile saklanır. Her revizyonda PMMA'yı kimin
+  basacağı yeniden seçilebilir.
+- Her geçiş kim, ne zaman, not bilgisiyle saklanır. **İç not** işaretli notları
+  hekim görmez.
+
+**Hekim portalında yeni iş:** "PMMA (geçici) üretimi" seçimi zorunludur
+(Laboratuvar / Hekim basacak / PMMA yok). Teslim tarihi zorunludur; bu artık
+mobil portalda da geçerli. Hekim tarihi bilmiyorsa **“laboratuvar önersin”**
+der; iş tipinin standart süresiyle bir tarih önerilir, hekim onaylar ya da
+değiştirir.
+
+**Son tarihler ve renkler:** Her aşamanın son tarihi, hedef tarihten (sonraki
+randevu ya da teslim) aradaki aşamaların süreleri düşülerek hesaplanır. Son
+tarihe 1 gün ya da daha az kalan işler sarı, geçmiş olanlar kırmızıdır. Genel
+Bakış'ta "Bugün ve yarın teslim/randevu", "Gecikmiş işler" ve "Hekimden
+güncelleme" listeleri vardır. Devam Eden İşler'de Aşama sütunu, aşama süzgeci
+ve "Teslim tarihine göre sırala" seçeneği vardır.
+
+**Süreler:** 🧭 İş Akışı → ⚙️ Süre ayarları. Burada aşama süreleri ve iş tipine
+göre standart teslim süreleri ayarlanır.
+
+**Eski işler:** İş akışı eklenmeden önce açılmış işlerin aşaması, mevcut
+durumundan hesaplanır (Bekliyor → İş kabul, Tasarımda → Tasarım, Üretimde →
+Zirkonyum, Tamamlandı → Teslim edildi). Veri değiştirilmez; ilk aşama
+değişikliğinde kayıt oluşur.
 
 ## Tasarım onayı (önizleme → hekim onayı → nihai dosya)
 

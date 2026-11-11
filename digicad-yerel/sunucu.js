@@ -28,6 +28,8 @@ const yazdirma = require('./lib/yazdirma');
 const tasarim = require('./lib/tasarim');
 const eposta = require('./lib/eposta');
 const eskiPortal = require('./lib/eski-portal');
+const isAkisi = require('./lib/is-akisi');
+const isAkisiKural = require('./public/is-akisi-kural');
 
 const KOK = __dirname;
 const GENEL = path.join(KOK, 'public');
@@ -243,7 +245,7 @@ const TURLER = {
   '.gif': 'image/gif', '.webp': 'image/webp', '.txt': 'text/plain; charset=utf-8', '.zip': 'application/zip',
 };
 // Dış kapıdan (internet) sadece bunlar açılabilir
-const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|tasarim-ek\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
+const DIS_SAYFALAR = /^\/(dis-index\.html|HekimPortali(Mobil)?\.html|TeknisyenPaneli(Mobil)?\.html|firebase-yerel\.js|tasarim-ek\.js|is-akisi(-kural)?\.js|jszip\.min\.js|sw\.js|favicon\.ico|hekim\.webmanifest|simge-(192|512)\.png)$/;
 
 function statikSun(req, res, kapi) {
   let yol;
@@ -628,6 +630,16 @@ function isleyiciOlustur(kapi) {
           ? [...new Set(islemler.map(i => i.parcalar).filter(p => p[0] === 'db' && p[1] === yetki.CALISMA_ALANI && p[2] === 'doctorSubmissions' && p[3]).map(p => p[3]))]
               .filter(id => depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]) === null)
           : [];
+        // Hekimin gönderimdeki tercihleri (PMMA, teslim tarihi) iş akışı için saklanır;
+        // gönderim işe aktarılınca silindiği için ayrı tutulur
+        if (oturum.rol === 'hekim') {
+          for (const i of islemler.slice()) {
+            const p = i.parcalar;
+            if (p.length !== 4 || p[2] !== 'doctorSubmissions' || !i.deger || typeof i.deger !== 'object') continue;
+            const s = isAkisi.seedIslemi(i.deger, p[3]);
+            if (s) islemler.push(s);
+          }
+        }
         depo.uygula(islemler);
         for (const id of yeniGonderimler) {
           const k = depo.oku(['db', yetki.CALISMA_ALANI, 'doctorSubmissions', id]) || {};
@@ -718,6 +730,22 @@ function isleyiciOlustur(kapi) {
         const sonuc = tasarim.calistir(depo.kok, oturum, yol.slice('/api/tasarim/'.length), g);
         depo.uygula(sonuc.islemler);
         if (sonuc.bildirim) hekimeBildir(sonuc.bildirim);
+        return json(res, 200, { tamam: true });
+      }
+
+      // ── İş akışı: aşamalar, prova sonucu, randevu ──────
+      if (yol === '/api/is-akisi/oneri' && req.method === 'GET') {
+        if (!oturum) return json(res, 401, { hata: 'Giriş yapmanız gerekiyor' });
+        const ayar = isAkisi.ayarAl(depo.kok);
+        return json(res, 200, { tarih: isAkisiKural.oneriTarihi(String(url.searchParams.get('tur') || '').slice(0, 100), ayar) });
+      }
+      if (yol.startsWith('/api/is-akisi/') && req.method === 'POST') {
+        if (!oturum) return json(res, 401, { hata: 'Giriş yapmanız gerekiyor' });
+        const g = await jsonOku(req);
+        const sonuc = isAkisi.calistir(depo.kok, oturum, yol.slice('/api/is-akisi/'.length), g);
+        depo.uygula(sonuc.islemler);
+        if (sonuc.bildirim) isAkisiBildir(sonuc.bildirim);
+        if (sonuc.labBildirim) console.log(`[iş akışı] Hekimden ${sonuc.labBildirim.tur === 'randevu' ? 'randevu değişikliği' : 'prova sonucu'}: ${sonuc.labBildirim.is.drName || ''} — ${sonuc.labBildirim.is.patient || ''}`);
         return json(res, 200, { tamam: true });
       }
 
@@ -1005,6 +1033,17 @@ function hekimeBildir(bildirim) {
   try {
     if (!epostaAyari().acik) return;
     const posta = tasarim.epostaMetni(bildirim, ayarlar.genelAdres || '');
+    if (!posta) return;
+    const hekim = kisiKayitlari('hekim').find(h => yetki.ayni(h.id, bildirim.is.drId));
+    const alici = hekim && String(hekim.email || '').trim();
+    if (!eposta.adresGecerli(alici)) return;
+    eposta.sirayaKoy(epostaAyari, { alici, ...posta });
+  } catch (e) { console.error('[e-posta] bildirim hazırlanamadı:', e.message); }
+}
+function isAkisiBildir(bildirim) {
+  try {
+    if (!epostaAyari().acik) return;
+    const posta = isAkisi.epostaMetni(bildirim, ayarlar.genelAdres || '');
     if (!posta) return;
     const hekim = kisiKayitlari('hekim').find(h => yetki.ayni(h.id, bildirim.is.drId));
     const alici = hekim && String(hekim.email || '').trim();

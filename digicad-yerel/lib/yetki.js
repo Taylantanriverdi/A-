@@ -84,6 +84,35 @@ function onizlemeAdlariniGizle(kayit, alan) {
   return { ...kayit, previews: p };
 }
 
+// İş akışı kaydını hekim/teknisyen için süzer: iç notlar hekime gitmez,
+// dış teknisyen ile hekim birbirinin adını görmez.
+function isAkisiSuz(kayit, { icNotlarGizli, gizliRol, yerine }) {
+  if (!kayit || typeof kayit !== 'object') return kayit;
+  const n = { ...kayit };
+  if (n.history) {
+    const h = {};
+    for (const [k, v] of Object.entries(n.history)) {
+      if (!v || (icNotlarGizli && v.ic)) continue;
+      h[k] = gizliRol && v.by && v.by.rol === gizliRol ? { ...v, by: { rol: v.by.rol, name: yerine } } : v;
+    }
+    n.history = h;
+  }
+  if (n.revisions && gizliRol === 'teknisyen') {
+    const r = {};
+    for (const [k, v] of Object.entries(n.revisions)) if (v) r[k] = { ...v, teknisyenAd: v.teknisyenAd ? yerine : null, bitiren: v.bitiren ? yerine : null, acan: v.acan && v.acan !== 'Laboratuvar' ? yerine : v.acan };
+    n.revisions = r;
+  }
+  if (n.randevu && n.randevu.by && gizliRol && n.randevu.by.rol === gizliRol) n.randevu = { ...n.randevu, by: { rol: gizliRol, name: yerine } };
+  if (icNotlarGizli) delete n.labGormedi;
+  return n;
+}
+function isAkisiIsi(kok, kayit, anahtar) { return tasarim.isBul(kok, kayit && kayit.jobId !== undefined ? kayit.jobId : anahtar); }
+function bagliGonderimler(kok, techId) {
+  const s = new Set();
+  for (const j of Object.values(agac.al(kok, ['db', CALISMA_ALANI, 'jobs']) || {})) if (j && ayni(j.techId, techId) && j.sourceDoctorSubmissionId != null) s.add(String(j.sourceDoctorSubmissionId));
+  return s;
+}
+
 // ── OKUMA GÖRÜNÜMLERİ ───────────────────────────────────────────────
 // Her koleksiyon için "bu kişi bu koleksiyondan neyi görebilir" fonksiyonu
 const gorunumler = {
@@ -102,6 +131,14 @@ const gorunumler = {
       if (!is || !ayni(is.drId, o.id)) return undefined;
       return is.techId && disTeknisyenMi(kok, is.techId) ? sohbetAdlariniGizle(sohbet, 'technician', 'Teknisyen') : sohbet;
     }),
+    // İş akışı (aşama, revizyonlar, randevu): kendi işleri, iç notlar hariç
+    workflows: (v, o, kok) => haritala(v, (kayit, anahtar) => {
+      const b = isAkisiIsi(kok, kayit, anahtar);
+      if (!b || !ayni(b.is.drId, o.id)) return undefined;
+      const dis = b.is.techId && disTeknisyenMi(kok, b.is.techId);
+      return isAkisiSuz(kayit, { icNotlarGizli: true, gizliRol: dis ? 'teknisyen' : null, yerine: 'Teknisyen' });
+    }),
+    workflowSeeds: (v, o) => sahibine(v, 'drId', o.id),
     // Tasarım önizlemeleri ve onay kayıtları: yalnızca kendi işleri
     designReviews: (v, o, kok) => haritala(v, (kayit, anahtar) => {
       const b = tasarim.isBul(kok, kayit.jobId !== undefined ? kayit.jobId : anahtar);
@@ -135,6 +172,16 @@ const gorunumler = {
         return dis && j.drName ? { ...j, drName: adKisalt(j.drName) } : j;
       });
     },
+    workflows: (v, o, kok) => {
+      const dis = disTeknisyenMi(kok, o.id);
+      return haritala(v, (kayit, anahtar) => {
+        const b = isAkisiIsi(kok, kayit, anahtar);
+        if (!b || !ayni(b.is.techId, o.id)) return undefined;
+        return isAkisiSuz(kayit, { icNotlarGizli: false, gizliRol: dis ? 'hekim' : null, yerine: 'Hekim' });
+      });
+    },
+    workflowSeeds: (v, o, kok) => { const bagli = bagliGonderimler(kok, o.id); return haritala(v, (s, k) => (bagli.has(String(k)) ? s : undefined)); },
+    workflowSettings: v => v,
     designReviews: (v, o, kok) => {
       const dis = disTeknisyenMi(kok, o.id);
       return haritala(v, (kayit, anahtar) => {
