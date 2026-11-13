@@ -451,6 +451,16 @@ class CanliOkuyucu:
             time.sleep(0.005)
         return False, None
 
+    def son(self):
+        """Son kareyi okundu saymadan verir (kalibrasyon icin)."""
+        bitis = time.time() + 15
+        while time.time() < bitis:
+            with self.kilit:
+                if self.kare is not None:
+                    return self.kare.copy()
+            time.sleep(0.01)
+        return None
+
     def release(self):
         self.dur = True
         time.sleep(0.1)
@@ -613,14 +623,29 @@ def miot_spec_indir(model, klasor):
     if os.path.exists(yol):
         return json.load(open(yol, encoding="utf-8"))
     import requests
+    taban = "https://miot-spec.org/miot-spec-v2/instance"
+    parca = model.split(".")
+    kisa = parca[0] + "-" + parca[-1]  # chuangmi.camera.026c02 -> chuangmi-026c02
+    spec = None
     print("Kamera ozellik listesi (MIoT spec) indiriliyor...")
-    liste = requests.get("https://miot-spec.org/miot-spec-v2/instances?status=all", timeout=60).json()
-    uygun = [i for i in liste.get("instances", []) if i.get("model") == model]
-    if not uygun:
-        raise RuntimeError("MIoT spec bulunamadi: " + model)
-    urn = max(uygun, key=lambda i: i.get("version", 0))["type"]
-    spec = requests.get("https://miot-spec.org/miot-spec-v2/instance", params={"type": urn}, timeout=60).json()
+    for surum in (1, 2, 3):  # once dogrudan tahmin (kucuk ve hizli)
+        urn = "urn:miot-spec-v2:device:camera:0000A01C:%s:%d" % (kisa, surum)
+        try:
+            r = requests.get(taban, params={"type": urn}, timeout=20)
+            if r.ok and r.json().get("services"):
+                spec = r.json()
+        except Exception as e:
+            print("  ", urn, "->", str(e)[:60])
+    if spec is None:
+        print("  Tum cihaz listesi indiriliyor (buyuk dosya, 1-2 dk surebilir)...")
+        liste = requests.get("https://miot-spec.org/miot-spec-v2/instances?status=all", timeout=(15, 180)).json()
+        uygun = [x for x in liste.get("instances", []) if x.get("model") == model]
+        if not uygun:
+            raise RuntimeError("MIoT spec bulunamadi: " + model)
+        urn = max(uygun, key=lambda x: x.get("version", 0))["type"]
+        spec = requests.get(taban, params={"type": urn}, timeout=30).json()
     json.dump(spec, open(yol, "w", encoding="utf-8"))
+    print("  Spec indirildi:", len(spec.get("services", [])), "servis")
     return spec
 
 
@@ -768,7 +793,11 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
             eslesme = json.load(open(ayar_yolu, encoding="utf-8"))
             print("PTZ ayari yuklendi:", ", ".join(sorted(eslesme)))
         else:
-            spec = miot_spec_indir(bilgi["model"], betik_klasor)
+            try:
+                spec = miot_spec_indir(bilgi["model"], betik_klasor)
+            except Exception as e:
+                print("Spec indirilemedi (%s), yedek komutlarla denenecek." % str(e)[:80])
+                spec = {}
             eslesme = ptz_kalibre(gonder, ptz_adaylari(spec), son_kare)
             if not eslesme:
                 print("PTZ: hicbir komut kamerayi dondurmedi. Sabit kamera modunda devam.")
@@ -821,20 +850,27 @@ def main():
         return cv2.resize(k, (a.genislik, int(h0 * a.genislik / w0))) if w0 > a.genislik else k
 
     def son_kare():
+        if isinstance(okuyucu, CanliOkuyucu):
+            time.sleep(0.15)  # tampondaki eski kareler gecsin
+            return kucult(okuyucu.son())
         ok, k = okuyucu.read()
-        if isinstance(okuyucu, CanliOkuyucu):  # tampondaki eski kareyi atla
-            ok, k = okuyucu.read()
         return kucult(k)
 
     ptz = None
+    ptz_durum = {"ptz": None, "hazirlaniyor": False}
     if a.ptz == "otomatik":
         if a.simulasyon:
             esl = ptz_kalibre(okuyucu.gonder, okuyucu.adaylar(), son_kare, bekle=0.6)
             ptz = PTZ(okuyucu.gonder, esl) if esl else None
         elif a.kaynak.startswith("rtsp://127.0.0.1:8554/"):
-            ptz = ptz_hazirla(betik_klasor, son_kare, a.ptz_kalibre)
-    if ptz:
-        print("Doner kamera modu: tarama yapilacak, yuz gorulunce takip edilecek.")
+            # Arka planda hazirla: bu sirada goruntu penceresi acik kalir
+            def hazirla():
+                ptz_durum["ptz"] = ptz_hazirla(betik_klasor, son_kare, a.ptz_kalibre)
+                ptz_durum["hazirlaniyor"] = False
+                if ptz_durum["ptz"]:
+                    print("Doner kamera modu: tarama yapilacak, yuz gorulunce takip edilecek.")
+            ptz_durum["hazirlaniyor"] = True
+            threading.Thread(target=hazirla, daemon=True).start()
 
     arka_plan = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=32, detectShadows=True)
     cekirdek = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -862,6 +898,9 @@ def main():
         temiz = kare.copy()  # fotograf icin cizimsiz kopya
         simdi = time.time()
 
+        if ptz is None and ptz_durum["ptz"] is not None:
+            ptz = ptz_durum["ptz"]
+            yuz_takip.max_mesafe = 260
         if ptz:
             # Doner kamera: hareket algilama yok (kamera donerken her sey hareketli
             # gorunur). Her karede yuz aranir.
@@ -980,7 +1019,9 @@ def main():
                     ptz.hareket(tarama_yonu, random.randint(1, 3))
                 sonraki_tarama = simdi + random.uniform(1.5, 4.0)
 
-        if aktif:
+        if ptz_durum["hazirlaniyor"]:
+            durum_yaz(kare, "KAMERA MOTORU HAZIRLANIYOR...", MAVI)
+        elif aktif:
             durum_yaz(kare, f"YUZ TAKIP: {len(aktif)}", YESIL)
         elif ptz and simdi - son_yuz_zamani <= 3:
             durum_yaz(kare, "Yuz kayboldu - bekleniyor", SARI)
