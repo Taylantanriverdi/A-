@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v16
+title Kamera Hareket Takibi v17
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v16
+echo Kamera Takip v17
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v16"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v17"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -331,6 +331,34 @@ def go2rtc_ffmpeg_ayarla(yaml_yolu):
     return True
 
 
+GO2RTC_YAMA = "v1.9.15-xiaomi-ses-1"
+GO2RTC_YAMA_URL = "https://github.com/Taylantanriverdi/A-/releases/latest/download/go2rtc-xiaomi-ses.exe"
+
+
+def go2rtc_yamali_kur(klasor, exe_yolu):
+    """Xiaomi hoparlor duzeltmeli go2rtc'yi indirir (Windows). go2rtc calismiyorken cagrilmali."""
+    if os.name != "nt":
+        return False
+    isaret = os.path.join(klasor, "yama.txt")
+    try:
+        if open(isaret).read().strip() == GO2RTC_YAMA and os.path.exists(exe_yolu):
+            return True
+    except OSError:
+        pass
+    try:
+        print("Hoparl\u00f6r d\u00fczeltmeli go2rtc indiriliyor...")
+        gecici = exe_yolu + ".yeni"
+        model_indir(GO2RTC_YAMA_URL, gecici, "D\u00fczeltilmi\u015f go2rtc", lambda m: None, en_az=10000000)
+        os.replace(gecici, exe_yolu)
+        with open(isaret, "w") as f:
+            f.write(GO2RTC_YAMA)
+        print("D\u00fczeltilmi\u015f go2rtc kuruldu (%s)." % GO2RTC_YAMA)
+        return True
+    except Exception as e:
+        print("D\u00fczeltilmi\u015f go2rtc indirilemedi (%s); orijinal go2rtc kullan\u0131lacak." % str(e)[:80])
+        return False
+
+
 def go2rtc_hazirla(klasor):
     """go2rtc'yi gerekirse indirir ve baslatir, kamera eklenene kadar bekler.
     Donus: (rtsp adresi, baslatilan surec veya None)"""
@@ -359,6 +387,7 @@ def go2rtc_hazirla(klasor):
         time.sleep(1.0)
 
     if _akislar() is None:
+        go2rtc_yamali_kur(klasor, exe_yolu)
         if not os.path.exists(exe_yolu):
             url = "https://github.com/AlexxIT/go2rtc/releases/latest/download/" + dosya
             print("go2rtc indiriliyor:", url)
@@ -648,7 +677,7 @@ def selam_metni(ad):
 
 SESLER = {"emel": "tr-TR-EmelNeural", "ahmet": "tr-TR-AhmetNeural"}
 SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None, "son_hata": "",
-            "uyarlama": True}
+            "uyarlama": False}
 
 
 def _ses_dosyasi(metin):
@@ -724,7 +753,7 @@ def kamera_ses_kanali():
             kodek = parca[2].upper()  # ornek: PCMA/16000, PCMA, PCMU/8000, OPUS/48000/2
             ad = kodek.split("/")[0]
             hiz = kodek.split("/")[1] if "/" in kodek else "8000"
-            if ad == "PCMA" and hiz == "16000" and SES_AYAR.get("uyarlama", True):
+            if ad == "PCMA" and hiz == "16000" and SES_AYAR.get("uyarlama", False):
                 return "xiaomi_hoparlor", kodek + " (8 kHz uyarlamal\u0131)"
             if ad in ("PCMA", "PCMU"):
                 return "%s/%s" % (ad.lower(), hiz), kodek
@@ -761,7 +790,7 @@ def kameradan_cal(dosya):
         denenecek = [bicim]
     else:
         print("Kamera hoparl\u00f6r kanal\u0131: %s" % aciklama)
-        denenecek = ["xiaomi_hoparlor", "pcma/8000", "opus"]
+        denenecek = ["pcma/16000", "pcma/8000", "opus"]
     hatalar = []
     for kodek in denenecek:
         src = "ffmpeg:%s#input=file#audio=%s" % (giris, kodek)
@@ -2217,7 +2246,7 @@ def main():
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
     p.add_argument("--hoparlor", choices=["kamera", "bilgisayar", "ikisi"], default="kamera",
                    help="Selam nereden duyulsun: kameranin hoparloru (varsayilan), bilgisayar veya ikisi")
-    p.add_argument("--hoparlor-uyarlama", choices=["acik", "kapali"], default="acik",
+    p.add_argument("--hoparlor-uyarlama", choices=["acik", "kapali"], default="kapali",
                    help="16 kHz Xiaomi kameralarda cizirtiyi onleyen 8 kHz uyarlamasi")
     p.add_argument("--ses", choices=["emel", "ahmet"], default="emel",
                    help="Selam sesi: emel (kadin) veya ahmet (erkek) - Microsoft dogal Turkce ses")
@@ -2425,7 +2454,7 @@ def main():
                 else:
                     mesaj_ver("Mavi \u0131\u015f\u0131k kontrol\u00fc bu kamerada kullan\u0131lam\u0131yor.")
             elif islem == "uyarlama":
-                SES_AYAR["uyarlama"] = not SES_AYAR.get("uyarlama", True)
+                SES_AYAR["uyarlama"] = not SES_AYAR.get("uyarlama", False)
                 mesaj_ver("Hoparl\u00f6r uyarlamas\u0131 %s. Test sesi \u00e7al\u0131n\u0131yor..." %
                           ("A\u00c7IK" if SES_AYAR["uyarlama"] else "KAPALI"))
                 sesli_soyle("Ses denemesi. Bir, iki, \u00fc\u00e7. Beni duyuyor musunuz?")

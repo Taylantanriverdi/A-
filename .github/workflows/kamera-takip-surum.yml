@@ -17,16 +17,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Yamali go2rtc derle (Xiaomi hoparlor duzeltmesi)
+        run: |
+          set -e
+          export GOFLAGS=-modcacherw GOTOOLCHAIN=auto
+          mkdir -p /tmp/g2 && cd /tmp/g2
+          go mod download -json github.com/AlexxIT/go2rtc@v1.9.15 > bilgi.json
+          DIR=$(python3 -c "import json; print(json.load(open('bilgi.json'))['Dir'])")
+          cp -r "$DIR" src && chmod -R u+w src && cd src
+          patch -p1 < "$GITHUB_WORKSPACE/kamera-takip/go2rtc-yama/xiaomi-ses.patch"
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w" \
+            -o "$GITHUB_WORKSPACE/kamera-takip/go2rtc-xiaomi-ses.exe" .
+          ls -la "$GITHUB_WORKSPACE/kamera-takip/go2rtc-xiaomi-ses.exe"
       - name: Release'i guncelle
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd kamera-takip
           if gh release view son-surum >/dev/null 2>&1; then
-            gh release upload son-surum Guncelle.bat Guncelle.zip KameraTakip.bat KameraTakip.zip --clobber
+            gh release upload son-surum Guncelle.bat Guncelle.zip KameraTakip.bat KameraTakip.zip go2rtc-xiaomi-ses.exe --clobber
             gh release edit son-surum --latest --notes "Son guncelleme: ${GITHUB_SHA::7}"
           else
-            gh release create son-surum Guncelle.bat Guncelle.zip KameraTakip.bat KameraTakip.zip \
+            gh release create son-surum Guncelle.bat Guncelle.zip KameraTakip.bat KameraTakip.zip go2rtc-xiaomi-ses.exe \
               --target "$GITHUB_SHA" --latest --title "Kamera Takip - son surum" \
               --notes "Guncelle.bat dosyasini indir ve cift tikla. Son guncelleme: ${GITHUB_SHA::7}"
           fi

@@ -1,0 +1,76 @@
+diff -ru orig/pkg/xiaomi/miss/backchannel.go src/pkg/xiaomi/miss/backchannel.go
+--- orig/pkg/xiaomi/miss/backchannel.go	2026-11-13 23:00:28.452253194 +0000
++++ src/pkg/xiaomi/miss/backchannel.go	2026-11-13 23:00:28.465709664 +0000
+@@ -1,6 +1,7 @@
+ package miss
+ 
+ import (
++	"os"
+ 	"time"
+ 
+ 	"github.com/AlexxIT/go2rtc/pkg/core"
+@@ -36,9 +37,15 @@
+ 				}
+ 			}
+ 		} else {
++			// kamera-takip yamasi: 40 ms'lik parca boyutu ornekleme hizina gore
++			// (8000 Hz -> 320 bayt, 16000 Hz -> 640 bayt). Eskiden hep 320'ydi;
++			// 16 kHz kamerada her parca 20 ms kaliyor ve cizirti oluyordu.
++			size := 320
++			if r := int(track.Codec.ClockRate); r > 0 && os.Getenv("XIAOMI_SES_BOYUT") != "0" {
++				size = r * 40 / 1000
++			}
+ 			sender.Handler = func(pkt *rtp.Packet) {
+ 				buf = append(buf, pkt.Payload...)
+-				const size = 8000 * 0.040 // 8bit 40 ms
+ 				for len(buf) >= size {
+ 					p.Send += size
+ 					_ = p.client.WriteAudio(codecPCMA, buf[:size])
+diff -ru orig/pkg/xiaomi/miss/client.go src/pkg/xiaomi/miss/client.go
+--- orig/pkg/xiaomi/miss/client.go	2026-11-13 23:00:28.452273483 +0000
++++ src/pkg/xiaomi/miss/client.go	2026-11-13 23:01:10.241885004 +0000
+@@ -8,6 +8,7 @@
+ 	"fmt"
+ 	"net"
+ 	"net/url"
++	"os"
+ 	"time"
+ 
+ 	"github.com/AlexxIT/go2rtc/pkg/tutk"
+@@ -79,6 +80,11 @@
+ 	Conn
+ 	key   []byte
+ 	model string
++
++	// kamera-takip yamasi: hoparlore giden paketlerde kameranin kendi ses
++	// paketlerindeki bicim bayraklarini ve artan sira numarasini kullan
++	audioFlags uint32
++	speakerSeq uint32
+ }
+ 
+ const (
+@@ -243,6 +249,10 @@
+ 		Payload:  payload,
+ 	}
+ 
++	if pkt.CodecID == codecPCMA || pkt.CodecID == codecOPUS {
++		c.audioFlags = pkt.Flags
++	}
++
+ 	switch c.model {
+ 	case ModelDafang, ModelXiaofang, ModelLoockV2:
+ 		// Dafang has ts in sec
+@@ -266,6 +276,13 @@
+ 	header := make([]byte, hdrSize)
+ 	binary.LittleEndian.PutUint32(header, n)
+ 	binary.LittleEndian.PutUint32(header[4:], codecID)
++	if os.Getenv("XIAOMI_SES_SIRA") != "0" {
++		c.speakerSeq++
++		binary.LittleEndian.PutUint32(header[8:], c.speakerSeq)
++	}
++	if os.Getenv("XIAOMI_SES_BAYRAK") != "0" && c.audioFlags != 0 && codecID == codecPCMA {
++		binary.LittleEndian.PutUint32(header[12:], c.audioFlags)
++	}
+ 	binary.LittleEndian.PutUint64(header[16:], uint64(time.Now().UnixMilli())) // not really necessary
+ 	return c.Conn.WritePacket(header, payload)
+ }
