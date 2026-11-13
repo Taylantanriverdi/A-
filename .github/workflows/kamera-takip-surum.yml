@@ -1,0 +1,32 @@
+name: Kamera Takip indirme dosyalari
+
+# kamera-takip klasoru her degistiginde bat dosyalarini "son-surum" adli
+# GitHub Release'e yukler. Boylece su baglanti hep en son dosyayi INDIRIR:
+#   https://github.com/Taylantanriverdi/A-/releases/latest/download/Guncelle.bat
+on:
+  push:
+    branches: [claude/ecstatic-fermat-gzzjnm]
+    paths: ["kamera-takip/**", ".github/workflows/kamera-takip-surum.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  yayinla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release'i guncelle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd kamera-takip
+          if gh release view son-surum >/dev/null 2>&1; then
+            gh release upload son-surum Guncelle.bat KameraTakip.bat KameraTakip.zip --clobber
+            gh release edit son-surum --latest --notes "Son guncelleme: ${GITHUB_SHA::7}"
+          else
+            gh release create son-surum Guncelle.bat KameraTakip.bat KameraTakip.zip \
+              --target "$GITHUB_SHA" --latest --title "Kamera Takip - son surum" \
+              --notes "Guncelle.bat dosyasini indir ve cift tikla. Son guncelleme: ${GITHUB_SHA::7}"
+          fi
