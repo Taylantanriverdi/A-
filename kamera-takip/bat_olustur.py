@@ -3,6 +3,10 @@ import os
 d = os.path.dirname(os.path.abspath(__file__))
 sablon = open(os.path.join(d, "bat_sablon.txt"), encoding="ascii").read()
 kod = open(os.path.join(d, "takip.py"), encoding="ascii").read()
+import re
+surum = re.search(r'^SURUM = "([^"]+)"', kod, re.M).group(1)
+sablon = sablon.replace("title Kamera Hareket Takibi", "title Kamera Hareket Takibi " + surum)
+sablon = sablon.replace("echo [1/4] Python", "echo Kamera Takip " + surum + "\necho.\necho [1/4] Python", 1)
 metin = sablon.rstrip("\n") + "\n" + kod
 with open(os.path.join(d, "KameraTakip.bat"), "w", encoding="ascii", newline="\r\n") as f:
     f.write(metin)

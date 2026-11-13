@@ -102,6 +102,12 @@ kamera eklenene kadar bekler.
 Tapo, Reolink, Hikvision, Dahua gibi RTSP veren kameralarda go2rtc'ye gerek yok;
 kameranın RTSP adresini doğrudan `--kaynak` olarak ver.
 
+## Sürüm
+
+Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ alt
+köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
+geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
+
 ## Döner kamera (360° / yukarı-aşağı)
 
 Kamera go2rtc ile eklendiyse program kameranın motorunu da kullanır:
@@ -111,8 +117,13 @@ Kamera go2rtc ile eklendiyse program kameranın motorunu da kullanır:
    bulur ve her birini dener. Görüntünün hangi yöne ne kadar kaydığını ölçerek
    sol/sağ/yukarı/aşağı komutlarını öğrenir ve `ptz_<did>.json` dosyasına kaydeder.
    Bu sırada kamera birkaç kez döner. Yeniden yapmak için `--ptz-kalibre`.
-2. **Tarama:** Yüz yokken kamera düzensiz şekilde döner: çoğunlukla yatay,
-   arada yukarı/aşağı; adım sayısı ve bekleme süresi rastgele. Durum: `TARAMA`.
+2. **Hızlı tarama:** Yüz yokken kamera bir yöne azami hızla kesintisiz döner
+   (komut aralığı 0,12 sn, aynı anda 3 komut). Görüntü kaymayı bırakınca (dönme
+   sınırı) yön değiştirir ve dikey seviyeye geçer: orta → bir yan → öbür yan.
+   Sınır yoksa her tam turda seviye değişir. Tam tur süresi kalibrasyondaki adım
+   büyüklüğünden hesaplanıp siyah pencereye yazılır. Tarama sırasında yüz eşiği
+   biraz düşürülür ve 1280 px çözünürlükte aranır; yanlış alarm olmasın diye yüz
+   2 karede görülünce takibe geçilir. Durum: `TARAMA`.
 3. **Takip:** Yüz görülünce tarama durur, kamera yüzü ekranın ortasında tutacak
    şekilde döner. Durum: `YUZ TAKIP`.
 4. **Yüz kaybolursa** 3 sn bekler, sonra taramaya döner.
