@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Kamera Hareket Takibi v6
+title Kamera Hareket Takibi v7
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosya kurulum + calistirma
 REM  Bu dosyaya cift tikla. Her seyi kendisi yapar:
@@ -17,7 +17,7 @@ set "KLASOR=%LOCALAPPDATA%\KameraTakip"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v6
+echo Kamera Takip v7
 echo.
 echo [1/4] Python kontrol ediliyor...
 set "PY="
@@ -97,7 +97,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v6"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v7"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -400,23 +400,50 @@ def ascii_ad(ad):
     return ad.translate(TR_ASCII).encode("ascii", "replace").decode()
 
 
+TANIMA_DURUM = {"metin": "Yuz tanima hazirlaniyor..."}
+
+
+def model_indir(url, yol, ad):
+    """Buyuk dosyayi ilerleme gostererek indirir; takilirsa zaman asimiyla keser."""
+    gecici = yol + ".tmp"
+    with urllib.request.urlopen(url, timeout=30) as r, open(gecici, "wb") as f:
+        toplam = int(r.headers.get("Content-Length") or 0)
+        alinan, son_yazi = 0, 0.0
+        while True:
+            parca = r.read(256 * 1024)
+            if not parca:
+                break
+            f.write(parca)
+            alinan += len(parca)
+            if time.time() - son_yazi > 1.0:
+                son_yazi = time.time()
+                yuzde = (" %%%d" % (alinan * 100 // toplam)) if toplam else ""
+                TANIMA_DURUM["metin"] = "%s indiriliyor:%s (%.1f / %.1f MB)" % (
+                    ad, yuzde, alinan / 1e6, toplam / 1e6)
+                print("  " + TANIMA_DURUM["metin"])
+    if alinan < 30000000:
+        raise RuntimeError("eksik indi (%d bayt)" % alinan)
+    os.replace(gecici, yol)
+
+
 class YuzTaniyici:
     ESIK = 0.40  # kosinus benzerligi; ayni kisi genelde 0.6-0.9, farkli kisi 0.0-0.3
 
     def __init__(self, klasor, dedektor):
         yol = os.path.join(klasor, SFACE_DOSYA)
         if not os.path.exists(yol) or os.path.getsize(yol) < 30000000:
+            hata = None
             for url in SFACE_URLLER:
                 try:
-                    print("Yuz tanima modeli indiriliyor (~38 MB, bir kez)...")
-                    urllib.request.urlretrieve(url, yol + ".tmp")
-                    if os.path.getsize(yol + ".tmp") > 30000000:
-                        os.replace(yol + ".tmp", yol)
-                        break
+                    model_indir(url, yol, "Yuz tanima modeli")
+                    hata = None
+                    break
                 except Exception as e:
-                    print("  indirilemedi:", str(e)[:80])
-            else:
-                raise RuntimeError("yuz tanima modeli indirilemedi")
+                    hata = e
+                    print("  indirilemedi:", str(e)[:100])
+            if hata is not None:
+                raise RuntimeError("model indirilemedi: %s" % str(hata)[:100])
+        TANIMA_DURUM["metin"] = "Yuz tanima modeli yukleniyor..."
         self.rec = cv2.FaceRecognizerSF.create(yol, "")
         self.kilit = threading.Lock()
         self.json_yolu = os.path.join(klasor, "kisiler.json")
@@ -1268,7 +1295,7 @@ function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(
  document.getElementById("durum").textContent=d.durum||"";document.getElementById("surum").textContent=d.surum;
  modDugme.className=d.mod;modDugme.textContent=d.mod==="OTO"?"OTOMAT\u0130K":"SAB\u0130T";
  modDugme.disabled=!d.ptz;document.getElementById("alan").textContent=d.alan||"";
- document.getElementById("mesaj").textContent=d.tanima?(d.mesaj||""):"Y\u00fcz tan\u0131ma haz\u0131rlan\u0131yor...";
+ document.getElementById("mesaj").textContent=d.tanima?(d.mesaj||""):(d.tanima_durum||"Y\u00fcz tan\u0131ma haz\u0131rlan\u0131yor...");
  kaydetD.disabled=!d.tanima||d.ogreniyor;kisileriCiz(d);
  if(d.selam){if(sonSelam!==null&&d.selam.no!==sonSelam&&telses.checked&&window.speechSynthesis){
   var u=new SpeechSynthesisUtterance(d.selam.metin);u.lang="tr-TR";speechSynthesis.speak(u);}sonSelam=d.selam.no;}}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
@@ -1597,12 +1624,20 @@ def main():
     tani = {"t": None}
     if a.tanima == "acik":
         def tanima_yukle():
-            try:
-                tani["t"] = YuzTaniyici(betik_klasor, YuzDedektor(betik_klasor, 0.6))
-                kl = tani["t"].liste()
-                print("Yuz tanima hazir. Kayitli kisiler: %s" % (", ".join(k["ad"] for k in kl) or "yok"))
-            except Exception as e:
-                print("Yuz tanima kullanilamiyor:", str(e)[:120])
+            deneme = 0
+            while True:
+                deneme += 1
+                try:
+                    tani["t"] = YuzTaniyici(betik_klasor, YuzDedektor(betik_klasor, 0.6))
+                    kl = tani["t"].liste()
+                    TANIMA_DURUM["metin"] = "hazir"
+                    print("Yuz tanima hazir. Kayitli kisiler: %s" % (", ".join(k["ad"] for k in kl) or "yok"))
+                    return
+                except Exception as e:
+                    TANIMA_DURUM["metin"] = "Yuz tanima hatasi: %s. 60 sn sonra tekrar denenecek (deneme %d)" % (
+                        str(e)[:120], deneme)
+                    print(TANIMA_DURUM["metin"])
+                    time.sleep(60)
         threading.Thread(target=tanima_yukle, daemon=True).start()
 
     web = None
@@ -2042,6 +2077,7 @@ def main():
             web.durum.update(mod=el["mod"], durum=SON_DURUM["metin"], ptz=bool(ptz),
                              alan=alan_metni(ptz, derece_adim) if ptz else "",
                              tanima=bool(tani["t"]), kisiler=tani["t"].liste() if tani["t"] else [],
+                             tanima_durum=TANIMA_DURUM["metin"],
                              mesaj=mesaj["metin"] if simdi - mesaj["zaman"] < 20 else "",
                              ogreniyor=bool(ogren), selam=dict(selam_olay),
                              gorulen=[tanima[i]["ad"] for i, _ in aktif
@@ -2051,6 +2087,8 @@ def main():
         if web and not a.goruntusuz:
             yazi_kutusu(kare, "Kisi kaydi / telefon: http://localhost:%d  PIN %s" % (web.port, web.pin),
                         12, 62 if not ogren else 100, (200, 200, 200), 0.5, 1)
+        if a.tanima == "acik" and not tani["t"] and not a.goruntusuz:
+            yazi_kutusu(kare, ascii_ad(TANIMA_DURUM["metin"])[:90], 12, 88 if not ogren else 126, SARI, 0.5, 1)
 
         if ptz:
             el["dugmeler"] = panel_dugmeleri(w, h)
