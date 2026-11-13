@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Kamera Hareket Takibi v2
+title Kamera Hareket Takibi v3
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosya kurulum + calistirma
 REM  Bu dosyaya cift tikla. Her seyi kendisi yapar:
@@ -17,7 +17,7 @@ set "KLASOR=%LOCALAPPDATA%\KameraTakip"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v2
+echo Kamera Takip v3
 echo.
 echo [1/4] Python kontrol ediliyor...
 set "PY="
@@ -97,7 +97,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v2"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v3"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -403,7 +403,11 @@ def kose_cerceve(kare, x, y, w, h, renk, k=2):
         cv2.line(kare, (px, py), (px, py + dy * u), renk, k, cv2.LINE_AA)
 
 
+SON_DURUM = {"metin": ""}
+
+
 def durum_yaz(kare, metin, renk):
+    SON_DURUM["metin"] = metin
     (tw, _), _ = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
     x = kare.shape[1] - tw - 22
     yazi_kutusu(kare, metin, x, 34, renk, 0.6, 2)
@@ -923,6 +927,219 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
         return None
 
 
+# ===========================================================================
+#  Web arayuzu: telefondan / baska bilgisayardan izleme ve kontrol
+# ===========================================================================
+WEB_SAYFA = r"""<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kamera Takip</title>
+<style>
+:root{--bg:#0f1412;--yuzey:#1a211e;--cizgi:#2c3732;--yazi:#e8eeeb;--soluk:#93a29b;--yesil:#3fbf86;--sari:#f2b33d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--yazi);font:15px system-ui,-apple-system,"Segoe UI",sans-serif;
+ padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 24px max(12px,env(safe-area-inset-left))}
+main{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-size:18px;margin:0;font-weight:700}
+.surum{background:var(--sari);color:#111;font-weight:700;border-radius:6px;padding:2px 8px;font-size:13px}
+.video{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9}
+.video img{width:100%;height:100%;object-fit:contain;display:block}
+.bilgi{position:absolute;left:8px;top:8px;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:6px;font-size:13px}
+#durum{font-weight:600}
+.kontrol{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap}
+.ped{display:grid;grid-template-columns:repeat(3,72px);grid-template-rows:repeat(3,72px);gap:8px;touch-action:none;user-select:none;-webkit-user-select:none}
+.ok{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:14px;color:var(--yazi);font-size:28px;
+ display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:none}
+.ok.basili{background:var(--yazi);color:#111}
+.bos{visibility:hidden}
+#mod{min-width:150px;height:72px;border:0;border-radius:14px;font:700 18px system-ui,sans-serif;cursor:pointer;color:#111}
+#mod.OTO{background:var(--yesil)} #mod.SABIT{background:var(--sari)}
+.not{color:var(--soluk);font-size:13px;text-align:center;margin:0}
+button:focus-visible,.ok:focus-visible{outline:3px solid var(--yesil);outline-offset:2px}
+</style></head><body><main>
+<header><h1>Kamera Takip</h1><span class="surum" id="surum">__SURUM__</span></header>
+<div class="video"><img id="img" src="video" alt="Canl&#305; kamera g&ouml;r&uuml;nt&uuml;s&uuml;">
+<div class="bilgi"><span id="durum">Ba&#287;lan&#305;yor...</span></div></div>
+<div class="kontrol">
+ <div class="ped" id="ped">
+  <div class="bos"></div><div class="ok" data-yon="yukari" aria-label="Yukar&#305;">&#9650;</div><div class="bos"></div>
+  <div class="ok" data-yon="sol" aria-label="Sol">&#9664;</div><div class="bos"></div><div class="ok" data-yon="sag" aria-label="Sa&#287;">&#9654;</div>
+  <div class="bos"></div><div class="ok" data-yon="asagi" aria-label="A&#351;a&#287;&#305;">&#9660;</div><div class="bos"></div>
+ </div>
+ <button id="mod" class="OTO" type="button">OTOMAT&#304;K</button>
+</div>
+<p class="not">Oka dokun: bir ad&#305;m &middot; bas&#305;l&#305; tut: s&uuml;rekli d&ouml;n &middot; oka dokununca SAB&#304;T moda ge&ccedil;er</p>
+</main>
+<script>
+function gonder(v){return fetch("api/komut",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(v)}).catch(function(){});}
+var zaman=null,aktif=null;
+function bas(el){birak();aktif=el;el.classList.add("basili");var y=el.dataset.yon;gonder({islem:"bas",yon:y});
+ zaman=setInterval(function(){gonder({islem:"bas",yon:y});},150);}
+function birak(){if(zaman){clearInterval(zaman);zaman=null;}if(aktif){aktif.classList.remove("basili");aktif=null;gonder({islem:"birak"});}}
+document.querySelectorAll(".ok").forEach(function(el){
+ el.addEventListener("pointerdown",function(e){e.preventDefault();el.setPointerCapture(e.pointerId);bas(el);});
+ ["pointerup","pointercancel","lostpointercapture"].forEach(function(t){el.addEventListener(t,birak);});
+ el.addEventListener("contextmenu",function(e){e.preventDefault();});});
+window.addEventListener("blur",birak);document.addEventListener("visibilitychange",birak);
+document.getElementById("mod").addEventListener("click",function(){gonder({islem:"mod"}).then(guncelle);});
+var modDugme=document.getElementById("mod");
+function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(function(d){
+ document.getElementById("durum").textContent=d.durum||"";document.getElementById("surum").textContent=d.surum;
+ modDugme.className=d.mod;modDugme.textContent=d.mod==="OTO"?"OTOMAT\u0130K":"SAB\u0130T";
+ modDugme.disabled=!d.ptz;}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
+setInterval(guncelle,1000);guncelle();
+var img=document.getElementById("img");img.onerror=function(){setTimeout(function(){img.src="video?t="+Date.now();},2000);};
+</script></body></html>"""
+
+WEB_GIRIS = r"""<!doctype html><html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Kamera Takip</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f1412;
+color:#e8eeeb;font:16px system-ui,sans-serif;padding:16px}form{display:flex;flex-direction:column;gap:12px;width:min(320px,100%)}
+input{font:24px ui-monospace,Consolas,monospace;letter-spacing:.3em;text-align:center;padding:12px;border-radius:10px;
+border:1px solid #2c3732;background:#1a211e;color:#e8eeeb}button{font:700 18px system-ui;padding:14px;border:0;border-radius:10px;
+background:#3fbf86;color:#111}p{color:#93a29b;font-size:14px;margin:0}</style></head><body>
+<form method="get" action="/"><h2 style="margin:0">Kamera Takip</h2>
+<p>Bilgisayardaki siyah pencerede yazan 6 haneli PIN'i gir.</p>
+<input name="pin" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus aria-label="PIN">
+<button type="submit">Gir</button>__HATA__</form></body></html>"""
+
+
+def yerel_adresler():
+    """Bu bilgisayarin ag adresleri (Tailscale 100.x adresleri dahil)."""
+    import socket
+    adresler = set()
+    try:
+        for bilgi in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            adresler.add(bilgi[4][0])
+    except Exception:
+        pass
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        adresler.add(s.getsockname()[0])
+        s.close()
+    except Exception:
+        pass
+    return sorted(a for a in adresler if not a.startswith("127."))
+
+
+class WebSunucu:
+    def __init__(self, port, pin):
+        from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+        from http.cookies import SimpleCookie
+        import queue
+        self.pin, self.jpeg, self.sayac = pin, None, 0
+        self.kosul = threading.Condition()
+        self.komutlar = queue.Queue()
+        self.durum = {"surum": SURUM, "mod": "OTO", "durum": "", "ptz": False}
+        self.son_izleme = 0.0
+        web = self
+
+        class Isleyici(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def _yetkili(self):
+                c = SimpleCookie(self.headers.get("Cookie", ""))
+                return "pin" in c and c["pin"].value == web.pin
+
+            def _yaz(self, kod, govde, tur="text/html; charset=utf-8", ek=None):
+                self.send_response(kod)
+                self.send_header("Content-Type", tur)
+                self.send_header("Cache-Control", "no-store")
+                for k, v in (ek or {}).items():
+                    self.send_header(k, v)
+                self.end_headers()
+                self.wfile.write(govde if isinstance(govde, bytes) else govde.encode("utf-8"))
+
+            def do_GET(self):
+                yol = urllib.parse.urlparse(self.path)
+                q = urllib.parse.parse_qs(yol.query)
+                if yol.path == "/" and "pin" in q:
+                    if q["pin"][0].strip() == web.pin:
+                        return self._yaz(303, "", ek={"Location": "/", "Set-Cookie":
+                                         "pin=%s; Path=/; Max-Age=31536000; SameSite=Strict" % web.pin})
+                    time.sleep(1.0)  # tahmin denemelerini yavaslat
+                    return self._yaz(200, WEB_GIRIS.replace("__HATA__", '<p style="color:#f2b33d">PIN yanl&#305;&#351;</p>'))
+                if not self._yetkili():
+                    if yol.path == "/":
+                        return self._yaz(200, WEB_GIRIS.replace("__HATA__", ""))
+                    return self._yaz(403, "PIN gerekli")
+                if yol.path == "/":
+                    return self._yaz(200, WEB_SAYFA.replace("__SURUM__", SURUM))
+                if yol.path == "/api/durum":
+                    return self._yaz(200, json.dumps(web.durum), "application/json")
+                if yol.path == "/video":
+                    return self._video()
+                self._yaz(404, "yok")
+
+            def do_POST(self):
+                if not self._yetkili():
+                    return self._yaz(403, "PIN gerekli")
+                if self.path.startswith("/api/komut"):
+                    n = int(self.headers.get("Content-Length", 0) or 0)
+                    try:
+                        web.komutlar.put(json.loads(self.rfile.read(min(n, 1000)) or b"{}"))
+                    except ValueError:
+                        pass
+                    return self._yaz(204, b"")
+                self._yaz(404, "yok")
+
+            def _video(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=kare")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                son = -1
+                try:
+                    while True:
+                        web.son_izleme = time.time()
+                        with web.kosul:
+                            web.kosul.wait_for(lambda: web.sayac != son, timeout=2)
+                            jpeg, son = web.jpeg, web.sayac
+                        if jpeg is None:
+                            continue
+                        self.wfile.write(b"--kare\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n" % len(jpeg))
+                        self.wfile.write(jpeg)
+                        self.wfile.write(b"\r\n")
+                except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                    pass
+
+        self.sunucu = ThreadingHTTPServer(("0.0.0.0", port), Isleyici)
+        self.sunucu.daemon_threads = True
+        threading.Thread(target=self.sunucu.serve_forever, daemon=True).start()
+        self._son_kare = 0.0
+
+    def kare_ver(self, kare):
+        """Izleyen varsa kareyi JPEG yapip yayinlar (en fazla ~12 kare/sn)."""
+        simdi = time.time()
+        if simdi - self.son_izleme > 5 or simdi - self._son_kare < 0.08:
+            return
+        self._son_kare = simdi
+        h, w = kare.shape[:2]
+        if w > 960:
+            kare = cv2.resize(kare, (960, int(h * 960 / w)))
+        ok, buf = cv2.imencode(".jpg", kare, [cv2.IMWRITE_JPEG_QUALITY, 70])
+        if ok:
+            with self.kosul:
+                self.jpeg, self.sayac = buf.tobytes(), self.sayac + 1
+                self.kosul.notify_all()
+
+
+def web_pin_al(klasor):
+    yol = os.path.join(klasor, "web_pin.txt")
+    try:
+        pin = open(yol).read().strip()
+        if len(pin) == 6 and pin.isdigit():
+            return pin
+    except OSError:
+        pass
+    pin = "%06d" % random.SystemRandom().randint(0, 999999)
+    with open(yol, "w") as f:
+        f.write(pin)
+    return pin
+
+
 # --- Elle kontrol paneli ----------------------------------------------------
 # Ok yonu (kameranin bakacagi yon) -> goruntunun kayacagi yon (kalibrasyon etkisi)
 OK_ETKI = {"sol": "sag", "sag": "sol", "yukari": "asagi", "asagi": "yukari"}
@@ -992,6 +1209,7 @@ def main():
     p.add_argument("--simulasyon", metavar="RESIM", help="Test: panorama resmiyle sanal doner kamera")
     p.add_argument("--sim-gecikme", type=float, default=0.0, help="Test: sanal kamerada goruntu gecikmesi (sn)")
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
+    p.add_argument("--web-port", type=int, default=8765, help="Telefondan izleme/kontrol sayfasi portu (0 = kapali)")
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
     a = p.parse_args()
     print("=" * 40)
@@ -1000,6 +1218,20 @@ def main():
 
     betik_klasor = os.path.dirname(os.path.abspath(__file__))
     dedektor = YuzDedektor(betik_klasor, a.yuz_esik)
+
+    web = None
+    if a.web_port:
+        try:
+            web = WebSunucu(a.web_port, web_pin_al(betik_klasor))
+            print("-" * 60)
+            print(" Telefondan / baska cihazdan izle ve kontrol et:")
+            for adr in yerel_adresler():
+                ek = "   (Tailscale - disaridan)" if adr.startswith("100.") else "   (ev agi)"
+                print("   http://%s:%d%s" % (adr, a.web_port, ek))
+            print(" PIN: %s" % web.pin)
+            print("-" * 60)
+        except OSError as e:
+            print("Web sayfasi baslatilamadi (port %d): %s" % (a.web_port, e))
 
     go2rtc_surec = None
     if a.kaynak == "go2rtc":
@@ -1076,10 +1308,10 @@ def main():
             ptz.dur()
             ptz.hareket(OK_ETKI[yon], 1)
             el["basla"], el["tekrar"] = simdi, False
-            el["bitis"] = simdi + (0.6 if kaynak == "tus" else 1e9)
-        elif kaynak == "tus":
-            el["tekrar"] = True               # tus basili tutuluyor
-            el["bitis"] = simdi + 0.15        # tekrar gelmezse hemen dur
+            el["bitis"] = simdi + (0.6 if kaynak in ("tus", "web") else 1e9)
+        elif kaynak in ("tus", "web"):
+            el["tekrar"] = True               # tus/dugme basili tutuluyor
+            el["bitis"] = simdi + (0.15 if kaynak == "tus" else 0.45)  # tekrar gelmezse dur
         el["yon"], el["kaynak"] = yon, kaynak
 
     def el_birak():
@@ -1109,6 +1341,16 @@ def main():
             break
         kare_no += 1
         kare = kucult(kare)
+        while web and not web.komutlar.empty():
+            k = web.komutlar.get()
+            islem = k.get("islem")
+            if islem == "bas" and k.get("yon") in OK_ETKI:
+                el_basla(k["yon"], "web")
+            elif islem == "birak" and el["kaynak"] == "web":
+                el_birak()
+            elif islem == "mod" and ptz:
+                el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
+                el_birak()
         h, w = kare.shape[:2]
         temiz = kare.copy()  # fotograf icin cizimsiz kopya
         simdi = time.time()
@@ -1216,7 +1458,7 @@ def main():
             dedektor.esik(a.yuz_esik)
             if el["yon"] and simdi > el["bitis"]:
                 el_birak()  # tus birakildi (tekrar gelmedi)
-            elif el["yon"] and (el["tekrar"] if el["kaynak"] == "tus" else simdi - el["basla"] > 0.35):
+            elif el["yon"] and (el["tekrar"] if el["kaynak"] in ("tus", "web") else simdi - el["basla"] > 0.35):
                 ptz.surekli(OK_ETKI[el["yon"]], 0.15, 2, zorla=True)  # basili tutuluyor
         elif ptz:
             # Tarama sirasinda daha hassas ara, takipte daha secici ol
@@ -1304,6 +1546,10 @@ def main():
                     yazici.release()
                     yazici = None
                     print("Kayit bitti")
+
+        if web:
+            web.durum.update(mod=el["mod"], durum=SON_DURUM["metin"], ptz=bool(ptz))
+            web.kare_ver(kare)
 
         if ptz:
             el["dugmeler"] = panel_dugmeleri(w, h)

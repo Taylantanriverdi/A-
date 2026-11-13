@@ -108,6 +108,27 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## Telefondan izleme ve kontrol (v3)
+
+Program çalışırken küçük bir web sayfası açar (port 8765). Siyah pencerede
+adresler ve 6 haneli PIN yazar:
+
+```
+ Telefondan / baska cihazdan izle ve kontrol et:
+   http://192.168.1.20:8765   (ev agi)
+   http://100.101.102.103:8765   (Tailscale - disaridan)
+ PIN: 123456
+```
+
+- **Evde:** telefon aynı Wi-Fi'deyken "ev agi" adresini aç.
+- **Dışarıdan:** bilgisayara ve telefona **Tailscale** kur (aynı hesap), "Tailscale"
+  adresini aç. Modemden port açmaya gerek yok, açma.
+- PIN her cihazda bir kez sorulur (`web_pin.txt` içinde saklanır).
+- Sayfada takip görüntüsü, ok düğmeleri (dokun = bir adım, basılı tut = sürekli)
+  ve OTOMATİK/SABİT düğmesi var. Bağlantı koparsa kamera kendiliğinden durur.
+- İlk açılışta Windows Güvenlik Duvarı Python için izin sorarsa **İzin ver** de.
+- Kapatmak için: `--web-port 0`.
+
 ## Döner kamera (360° / yukarı-aşağı)
 
 Kamera go2rtc ile eklendiyse program kameranın motorunu da kullanır:
