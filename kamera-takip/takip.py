@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v11"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v12"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -217,23 +217,29 @@ def go2rtc_ffmpeg_ayarla(yaml_yolu):
 def go2rtc_hazirla(klasor):
     """go2rtc'yi gerekirse indirir ve baslatir, kamera eklenene kadar bekler.
     Donus: (rtsp adresi, baslatilan surec veya None)"""
+    klasor = os.path.abspath(klasor)
     os.makedirs(klasor, exist_ok=True)
     dosya, exe = _go2rtc_dosyasi()
     exe_yolu = os.path.join(klasor, exe)
     yaml_yolu = os.path.join(klasor, "go2rtc.yaml")
     surec = None
 
-    # Kameraya ses gonderebilmek icin go2rtc'nin FFmpeg'i bilmesi gerekir
-    if go2rtc_ffmpeg_ayarla(yaml_yolu) and _akislar() is not None:
-        print("go2rtc ses ayarı için yeniden başlatılıyor...")
+    # Kameraya ses gonderebilmek icin go2rtc'nin FFmpeg'i bilmesi gerekir. Onceki bir
+    # calistirmadan kalan go2rtc eski ayarlarla calisiyor olabilir: kapatip yeniden baslat.
+    go2rtc_ffmpeg_ayarla(yaml_yolu)
+    if _akislar() is not None:
+        print("Çalışan go2rtc güncel ayarlarla yeniden başlatılıyor...")
         try:
-            _api("/api/exit", "POST", 5)
+            _api("/api/exit?code=0", "POST", 5)
         except Exception:
             pass
-        for _ in range(20):
+        for _ in range(30):
             if _akislar() is None:
                 break
             time.sleep(0.5)
+        else:
+            print("Uyarı: eski go2rtc kapanmadı; kamera hoparlörü çalışmayabilir.")
+        time.sleep(1.0)
 
     if _akislar() is None:
         if not os.path.exists(exe_yolu):
@@ -524,7 +530,7 @@ def selam_metni(ad):
 
 
 SESLER = {"emel": "tr-TR-EmelNeural", "ahmet": "tr-TR-AhmetNeural"}
-SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None}
+SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None, "son_hata": ""}
 
 
 def _ses_dosyasi(metin):
@@ -584,7 +590,13 @@ def _windows_sesi(metin):
 def kameradan_cal(dosya):
     """Ses dosyasini go2rtc uzerinden kameranin hoparlorunden calar. Basarili ise True."""
     akis = SES_AYAR.get("akis")
-    if not akis or not ffmpeg_yolu():
+    if not akis:
+        SES_AYAR["son_hata"] = "kamera go2rtc üzerinden açılmadığı için hoparlör kullanılamıyor"
+        print("Kamera hoparlörü: " + SES_AYAR["son_hata"])
+        return False
+    if not ffmpeg_yolu():
+        SES_AYAR["son_hata"] = "FFmpeg kurulu değil (imageio-ffmpeg paketi kurulamamış)"
+        print("Kamera hoparlörü: " + SES_AYAR["son_hata"])
         return False
     web = SES_AYAR.get("web")
     if web:  # dosyayi kendi web sunucumuzdan ver (yolda bosluk/Turkce harf sorunu olmasin)
@@ -597,12 +609,15 @@ def kameradan_cal(dosya):
         try:
             _api("/api/streams?dst=%s&src=%s" % (urllib.request.quote(akis), urllib.request.quote(src, safe="")),
                  "POST", 15)
+            SES_AYAR["son_hata"] = ""
+            print("Ses kameranın hoparlörüne gönderildi (%s)." % kodek.upper())
             return True
         except urllib.error.HTTPError as e:
             hata = e.read().decode("utf-8", "replace")[:120]
         except Exception as e:
             hata = str(e)[:120]
-    print("Kamera hoparlörü kullanılamadı (%s). Ses bilgisayardan çalınacak." % hata)
+    SES_AYAR["son_hata"] = "go2rtc sesi kameraya gönderemedi: %s" % (hata.strip() or "bilinmeyen hata")
+    print("Kamera hoparlörü kullanılamadı (%s). Ses bilgisayardan çalınacak." % SES_AYAR["son_hata"])
     return False
 
 
@@ -1376,6 +1391,7 @@ button:focus-visible,.ok:focus-visible{outline:3px solid var(--yesil);outline-of
 .kliste li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--cizgi);border-radius:10px}
 .kliste .ad{font-weight:600;overflow-wrap:anywhere}.kliste .gor{color:var(--yesil);font-size:12px;margin-left:6px}
 .kliste button{border:1px solid var(--cizgi);background:transparent;color:var(--sari);border-radius:8px;padding:6px 10px;font:600 13px system-ui;cursor:pointer}
+.ikincil{min-height:44px;border-radius:10px;border:1px solid var(--cizgi);background:var(--bg);color:var(--yazi);font:600 15px system-ui,sans-serif;cursor:pointer}
 .sec{display:flex;gap:8px;align-items:center;color:var(--soluk);font-size:14px}
 .alanyazi{margin:0;font:13px ui-monospace,Consolas,monospace;color:var(--soluk);overflow-wrap:anywhere}
 </style></head><body><main>
@@ -1417,6 +1433,8 @@ bu s&#305;rada ba&#351;&#305;n&#305; hafif&ccedil;e sa&#287;a sola &ccedil;evirs
 <p id="mesaj" class="alanyazi"></p>
 <ul id="kliste" class="kliste"></ul>
 <label class="sec"><input type="checkbox" id="telses"> Selam&#305; telefonda da sesli s&ouml;yle</label>
+<button type="button" id="sesdene" class="ikincil">&#128264; Kameradan test sesi &ccedil;al</button>
+<p id="seshata" class="alanyazi" style="color:var(--sari)"></p>
 </section>
 </main>
 <script>
@@ -1438,6 +1456,7 @@ kadI.addEventListener("keydown",function(e){if(e.key==="Enter")kaydetD.click();}
 var telses=document.getElementById("telses");try{telses.checked=localStorage.getItem("telses")==="1";}catch(e){}
 telses.addEventListener("change",function(){try{localStorage.setItem("telses",telses.checked?"1":"0");}catch(e){}
  if(telses.checked&&window.speechSynthesis){var u=new SpeechSynthesisUtterance("Ses a\u00e7\u0131k");u.lang="tr-TR";speechSynthesis.speak(u);}});
+document.getElementById("sesdene").addEventListener("click",function(){gonder({islem:"ses_dene"}).then(function(){setTimeout(guncelle,1500);});});
 var sonSelam=null,silOnay=null,sonListe="";
 function kisileriCiz(d){var anahtar=JSON.stringify([d.kisiler,d.gorulen]);if(anahtar===sonListe)return;sonListe=anahtar;
  var ul=document.getElementById("kliste");ul.innerHTML="";
@@ -1461,6 +1480,7 @@ function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(
  document.getElementById("uzakdurum").textContent=d.uzak_durum==="hazir"?"Durum: haz\u0131r":"Durum: "+(d.uzak_durum||"");
  document.getElementById("mesaj").textContent=d.tanima?(d.mesaj||""):(d.tanima_durum||"Y\u00fcz tan\u0131ma haz\u0131rlan\u0131yor...");
  kaydetD.disabled=!d.tanima||d.ogreniyor;kisileriCiz(d);
+ document.getElementById("seshata").textContent=d.ses_hata?("Ses: "+d.ses_hata):"";
  if(d.selam){if(sonSelam!==null&&d.selam.no!==sonSelam&&telses.checked&&window.speechSynthesis){
   var u=new SpeechSynthesisUtterance(d.selam.metin);u.lang="tr-TR";speechSynthesis.speak(u);}sonSelam=d.selam.no;}}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
 setInterval(guncelle,1000);guncelle();
@@ -1903,7 +1923,7 @@ def panel_ciz(kare, dugmeler, mod, basili):
               "sag": [(mx + r, my), (mx - r // 2, my - r), (mx - r // 2, my + r)]}[ad]
         cv2.fillPoly(kare, [np.array(uc, np.int32)], KOYU if basili == ad else (235, 235, 235))
     x0, _, _, y1 = dugmeler["sol"]
-    yazi(kare, "Oklar / WASD: döndür    P: otomatik/sabit    U: QR kod    Q: çıkış",
+    yazi(kare, "Oklar / WASD: döndür    P: otomatik/sabit    T: ses testi    U: QR kod    Q: çıkış",
          x0, dugmeler["asagi"][3] + 6, 14, (235, 235, 235))
     yazi(kare, "Sınırlar: 1 sol   2 sağ   3 üst   4 alt   0 sil",
          x0, dugmeler["yukari"][1] - 24, 14, (235, 235, 235))
@@ -2131,6 +2151,9 @@ def main():
                 else:
                     ogren = {"ad": isim, "bitis": time.time() + 4.0, "ornekler": [], "son": 0.0}
                     mesaj_ver("%s öğreniliyor: kameraya bakın, başınızı hafifçe sağa sola çevirin..." % isim)
+            elif islem == "ses_dene":
+                sesli_soyle("Ses denemesi. Bir, iki, üç. Beni duyuyor musunuz?")
+                mesaj_ver("Test sesi gönderildi. Kameradan duyulmazsa aşağıdaki ses durumuna bakın.")
             elif islem == "kisi_sil" and tani["t"]:
                 tani["t"].sil(str(k.get("ad", "")))
                 tanima.clear()
@@ -2414,7 +2437,7 @@ def main():
             web.durum.update(mod=el["mod"], durum=SON_DURUM["metin"], ptz=bool(ptz),
                              alan=alan_metni(ptz, derece_adim) if ptz else "",
                              tanima=bool(tani["t"]), kisiler=tani["t"].liste() if tani["t"] else [],
-                             tanima_durum=TANIMA_DURUM["metin"],
+                             tanima_durum=TANIMA_DURUM["metin"], ses_hata=SES_AYAR.get("son_hata", ""),
                              uzak_url=uzak.url if uzak else None, uzak_sabit=uzak.sabit if uzak else None,
                              uzak_durum=uzak.durum if uzak else "kapali",
                              mesaj=mesaj["metin"] if simdi - mesaj["zaman"] < 20 else "",
@@ -2449,7 +2472,9 @@ def main():
             if tus != -1:
                 if tus & 0xFF in (ord("q"), ord("Q"), 27) and tus not in TUS_YON:
                     break
-                if tus in (ord("u"), ord("U")) and uzak:
+                if tus in (ord("t"), ord("T")):
+                    sesli_soyle("Ses denemesi. Bir, iki, üç. Beni duyuyor musunuz?")
+                elif tus in (ord("u"), ord("U")) and uzak:
                     qr_goster = not qr_goster
                 elif tus in (ord("p"), ord("P")) and ptz:
                     el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
