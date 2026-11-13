@@ -8,8 +8,12 @@ https://raw.githubusercontent.com/Taylantanriverdi/A-/claude/ecstatic-fermat-gzz
 ZIP'i ayıkla, **`Guncelle.bat`** dosyasına çift tıkla. Her açılışta en son sürümü
 indirir ve programı başlatır (`KameraTakip.bat` güncellemeden doğrudan başlatır).
 
-Güncelleme dosyası tek başına:
-https://raw.githubusercontent.com/Taylantanriverdi/A-/claude/ecstatic-fermat-gzzjnm/kamera-takip/Guncelle.bat Gerisini kendisi yapar:
+**Guncelle.bat — her zaman doğrudan iner (en son sürüm):**
+https://github.com/Taylantanriverdi/A-/releases/latest/download/Guncelle.bat
+
+Diğerleri: `.../releases/latest/download/KameraTakip.bat` ve `.../KameraTakip.zip`.
+`kamera-takip/` her değiştiğinde GitHub Actions bu dosyaları "son-surum"
+release'ine otomatik yükler. Gerisini kendisi yapar:
 Python yoksa kurar, kütüphaneleri kurar, go2rtc'yi indirip başlatır, Xiaomi
 girişi için tarayıcıyı açar. Giriş yapınca hesaptaki kamerayı bütün bölgelerde
 kendisi arar, go2rtc'ye ekler ve takibi başlatır. Hareket kayıtları
