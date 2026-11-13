@@ -1,6 +1,6 @@
 @echo off
 setlocal
-title Kamera Hareket Takibi v8
+title Kamera Hareket Takibi v9
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosya kurulum + calistirma
 REM  Bu dosyaya cift tikla. Her seyi kendisi yapar:
@@ -17,7 +17,7 @@ set "KLASOR=%LOCALAPPDATA%\KameraTakip"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v8
+echo Kamera Takip v9
 echo.
 echo [1/4] Python kontrol ediliyor...
 set "PY="
@@ -97,7 +97,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v8"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v9"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -403,8 +403,11 @@ def ascii_ad(ad):
 TANIMA_DURUM = {"metin": "Yuz tanima hazirlaniyor..."}
 
 
-def model_indir(url, yol, ad):
-    """Buyuk dosyayi ilerleme gostererek indirir; takilirsa zaman asimiyla keser."""
+def model_indir(url, yol, ad, durum=None, en_az=30000000):
+    """Buyuk dosyayi ilerleme gostererek indirir; 30 sn veri gelmezse keser.
+    durum: ilerleme metnini alan fonksiyon (varsayilan: yuz tanima durumu)."""
+    if durum is None:
+        durum = lambda m: TANIMA_DURUM.__setitem__("metin", m)
     gecici = yol + ".tmp"
     with urllib.request.urlopen(url, timeout=30) as r, open(gecici, "wb") as f:
         toplam = int(r.headers.get("Content-Length") or 0)
@@ -418,11 +421,11 @@ def model_indir(url, yol, ad):
             if time.time() - son_yazi > 1.0:
                 son_yazi = time.time()
                 yuzde = (" %%%d" % (alinan * 100 // toplam)) if toplam else ""
-                TANIMA_DURUM["metin"] = "%s indiriliyor:%s (%.1f / %.1f MB)" % (
-                    ad, yuzde, alinan / 1e6, toplam / 1e6)
-                print("  " + TANIMA_DURUM["metin"])
-    if alinan < 30000000:
-        raise RuntimeError("eksik indi (%d bayt)" % alinan)
+                m = "%s indiriliyor:%s (%.1f / %.1f MB)" % (ad, yuzde, alinan / 1e6, toplam / 1e6)
+                durum(m)
+                print("  " + m)
+    if alinan < en_az or (toplam and alinan < toplam):
+        raise RuntimeError("eksik indi (%d / %d bayt)" % (alinan, toplam))
     os.replace(gecici, yol)
 
 
@@ -1567,8 +1570,11 @@ class UzakErisim:
             self.durum = "Cloudflare tunel araci indiriliyor..."
             print(self.durum)
             url = "https://github.com/cloudflare/cloudflared/releases/latest/download/" + dosya
-            gecici = yol + ".tmp"
-            urllib.request.urlretrieve(url, gecici)
+            gecici = yol + ".indirilen"
+
+            def guncelle(m):
+                self.durum = m
+            model_indir(url, gecici, "Cloudflare tunel araci", guncelle, en_az=5000000)
             if dosya.endswith(".tgz"):
                 import tarfile
                 with tarfile.open(gecici) as t:
