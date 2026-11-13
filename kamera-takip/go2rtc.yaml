@@ -1,0 +1,20 @@
+# go2rtc ayar dosyasi - Mi 360 Camera (1080p) / MJSXJ10CM
+#
+# Bu dosyayi go2rtc.exe ile ayni klasore koy.
+# "xiaomi:" ve "streams:" kisimlarini elle yazmana gerek yok:
+# http://localhost:1984 adresinden Add > Xiaomi ile giris yapinca go2rtc
+# bunlari buraya kendisi ekler. Asagidaki ornek nasil gorunecegini gosterir.
+
+api:
+  listen: ":1984"     # Web arayuzu: http://localhost:1984
+
+rtsp:
+  listen: ":8554"     # takip.py buradan okur: rtsp://127.0.0.1:8554/xiaomi
+
+# xiaomi:
+#   1234567890: V1:***           # hesap ID + sifreli anahtar (go2rtc yazar)
+#
+# streams:
+#   xiaomi: xiaomi://1234567890:de@192.168.1.50?did=987654321&model=chuangmi.camera.xxxx
+#   # ":de" = Avrupa sunucusu, Turkiye hesaplari genelde "de" veya "sg" olur
+#   # goruntu gelmezse sonuna &subtype=sd ekleyip dene

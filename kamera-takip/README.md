@@ -29,27 +29,56 @@ python takip.py --kaynak rtsp://... --kaydet kayitlar   # hareket olunca kaydet
 
 Pencerede `q` veya `Esc` ile çıkılır.
 
-## Önemli: Xiaomi kameradan görüntüyü almak
+## Senin kameran: Mi 360° Camera (1080p) — MJSXJ10CM
 
-Xiaomi Home kameraları görüntüyü varsayılan olarak **sadece kendi uygulamasına**
-gönderir; standart bir RTSP adresi vermez. Programın görüntüye ulaşması için
-şu yollardan biri gerekir:
+Bu kamera standart RTSP vermez. Görüntüyü bilgisayara **go2rtc** adlı ücretsiz
+programla alacağız. go2rtc Xiaomi hesabınla giriş yapıp kameraya **yerel ağdan**
+bağlanır ve görüntüyü `rtsp://127.0.0.1:8554/xiaomi` adresinden yayınlar.
+Takip programı da bu adresi okur. Xiaomi Home uygulaması çalışmaya devam eder.
 
-1. **go2rtc** (önerilen, en kolay): Yeni sürümlerinde Xiaomi Mi Home kamera
-   desteği var. Xiaomi hesabınla giriş yapıp kamerayı ekliyorsun, go2rtc sana
-   yerel bir RTSP adresi veriyor (örn. `rtsp://127.0.0.1:8554/xiaomi`).
-   Bu adresi `--kaynak` olarak ver. Her model desteklenmeyebilir.
-2. **Alternatif yazılım (hack firmware)**: Bazı eski modeller için topluluk
-   firmware'leri RTSP açar. Garanti/riski sana ait.
-3. **RTSP destekli kamera**: Tapo, Reolink, Hikvision, Dahua vb. kameralar
-   RTSP'yi doğrudan verir; bu program onlarla ek ayar olmadan çalışır.
+### 1. Python ve kütüphaneler
+- python.org'dan Python 3 kur ("Add Python to PATH" kutusunu işaretle).
+- Bu klasörde: `pip install -r requirements.txt`
 
-Kamera modelini (kameranın altındaki etiket ya da Xiaomi Home → kamera →
-Ayarlar → Hakkında) öğrenirsen hangi yolun çalışacağı netleşir.
+### 2. go2rtc'yi indir
+- https://github.com/AlexxIT/go2rtc/releases adresinden **en son sürümü** indir
+  (Xiaomi desteği v1.9.13'te geldi, v1.9.14'te iyileşti; daha eskisini kullanma).
+  Windows için `go2rtc_win64.zip`, içindeki `go2rtc.exe`'yi bu klasöre koy.
 
-> Not: Kameran 360° döner (PTZ) modelse, Xiaomi Home uygulamasındaki
-> **"Hareket takibi"** ayarı kameranın kendisini hareketli nesneye çevirir.
-> Bu program ise görüntü üzerinde takip, sayma ve kayıt yapar.
+### 3. Kamerayı go2rtc'ye ekle
+1. `go2rtc.exe`'yi çalıştır (Windows güvenlik duvarı sorarsa izin ver).
+2. Tarayıcıda **http://localhost:1984** aç.
+3. **Add → Xiaomi** → Xiaomi hesabının e-posta/telefon ve şifresiyle giriş yap.
+   SMS/e-posta kodu veya captcha isterse doldur.
+4. Hesaptaki kameralar listelenir; kamerayı seç ve ekle. Akışın adını
+   **`xiaomi`** yap (ya da `go2rtc.yaml` içinde `streams:` altındaki adı
+   `xiaomi` olarak değiştir).
+5. Web arayüzünde akışa tıklayıp görüntünün geldiğini kontrol et.
+
+Bilgisayar ve kamera **aynı Wi-Fi/modemde** olmalı. go2rtc her bağlantıda
+şifreleme anahtarı almak için kısa süre internete çıkar; görüntü ise yerel ağdan gelir.
+
+### 4. Takibi başlat
+```bash
+python takip.py --kaynak rtsp://127.0.0.1:8554/xiaomi --maske-saat
+```
+Windows'ta bunun yerine `baslat.bat`'a çift tıklayabilirsin: go2rtc'yi açar,
+5 sn bekler, takibi hareket kaydıyla başlatır.
+
+### Görüntü gelmezse
+- Akış adresinin sonuna `&subtype=sd` ekle (düşük kalite ama daha uyumlu).
+- go2rtc'yi en son sürüme güncelle.
+- MJSXJ10CM, go2rtc'nin uyumluluk listesinde henüz yazılı değil (2020 sonrası
+  kameraların çoğu çalışıyor). Çalışmazsa
+  https://github.com/AlexxIT/go2rtc/issues/1982 sayfasına bak.
+
+> Not: Kameranın kendisinin dönerek nesneyi izlemesini istiyorsan Xiaomi Home →
+> kamera → Ayarlar'daki **"Hareket takibi"** seçeneğini aç. Bu program ise
+> görüntü üzerinde takip, sayma ve kayıt yapar; ikisi birlikte kullanılabilir.
+
+### Başka kameralar
+Tapo, Reolink, Hikvision, Dahua gibi RTSP veren kameralarda go2rtc'ye gerek yok;
+kameranın RTSP adresini doğrudan `--kaynak` olarak ver.
 
 ## Nasıl çalışıyor
 
