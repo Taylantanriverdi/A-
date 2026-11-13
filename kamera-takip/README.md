@@ -96,10 +96,20 @@ kameranın RTSP adresini doğrudan `--kaynak` olarak ver.
 
 ## Nasıl çalışıyor
 
-1. **Arka plan çıkarma (MOG2):** Sabit sahneyi öğrenir, değişen pikselleri bulur.
-   Gölgeler ayıklanır.
-2. **Temizleme:** Morfolojik açma/genişletme ile gürültü silinir, parçalar birleşir.
-3. **Kontur → kutu:** `--min-alan`dan büyük her hareketli bölge bir kutu olur.
-4. **Merkez takibi:** Her kutunun merkezi önceki karedeki en yakın nesneyle
-   eşleştirilir; böylece nesne kare kare aynı ID ile izlenir. 20 kare görünmeyen
-   nesne silinir.
+1. **Hareket algılama (MOG2):** Sabit sahneyi öğrenir; değişen pikselleri bulur.
+   Hareketler ekrana kutu olarak çizilmez, sadece sağ üstteki durum yazısı değişir
+   (`Bekleniyor` → `HAREKET - yuz araniyor`). İstersen `--hareket-goster`.
+2. **Yüz arama (YuNet):** Hareket görülünce OpenCV'nin YuNet yüz modeli çalışır
+   (model ilk açılışta otomatik iner, ~230 KB). Hareket bittikten sonra da 1,5 sn
+   aramaya devam eder.
+3. **Yüz takibi:** Bulunan yüz köşe işaretli çerçeve ve `Yuz 1` etiketiyle
+   kareden kareye aynı numarayla izlenir; sağ üstte yakın planı gösterilir.
+   Durum `YUZ TAKIP: 1` olur.
+4. **Yakalama:** Yeni bir yüz 5 kare boyunca net görülünce fotoğrafı
+   `Resimler\KameraTakip` klasörüne kaydedilir (her yüz için bir kez).
+
+| Ek seçenek | Açıklama |
+|---|---|
+| `--yuz-esik 0.75` | Yüz güven eşiği; yanlış yüz çıkıyorsa yükselt (0.85), kaçırıyorsa düşür (0.6) |
+| `--yuz-klasor KLASOR` | Yakalanan yüz fotoğraflarının kaydedileceği yer |
+| `--hareket-goster` | Hareket bölgesini ince gri çizgiyle göster |

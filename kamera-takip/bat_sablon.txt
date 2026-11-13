@@ -8,7 +8,7 @@ REM   1) Python yoksa kurar
 REM   2) Gerekli kutuphaneleri kurar (opencv, numpy)
 REM   3) Takip programini cikarir
 REM   4) go2rtc'yi indirir ve baslatir, Xiaomi girisi icin tarayici acar
-REM   5) Kamera eklenince hareket takibini baslatir
+REM   5) Kamera eklenince hareket + yuz takibini baslatir
 REM ================================================================
 
 set "BAT_YOLU=%~f0"
@@ -55,9 +55,10 @@ echo.
 echo [4/4] Kamera baglantisi kuruluyor ve takip baslatiliyor...
 echo       Takip penceresinden cikmak icin: q veya Esc
 cd /d "%KLASOR%"
-%PY% takip.py --kaynak go2rtc --maske-saat --kaydet "%USERPROFILE%\Videos\KameraTakip"
+%PY% takip.py --kaynak go2rtc --maske-saat --kaydet "%USERPROFILE%\Videos\KameraTakip" --yuz-klasor "%USERPROFILE%\Pictures\KameraTakip"
 echo.
-echo Hareket kayitlari: %USERPROFILE%\Videos\KameraTakip
+echo Hareket videolari : %USERPROFILE%\Videos\KameraTakip
+echo Yuz fotograflari  : %USERPROFILE%\Pictures\KameraTakip
 pause
 exit /b 0
 

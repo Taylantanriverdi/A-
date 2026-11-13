@@ -8,7 +8,7 @@ REM   1) Python yoksa kurar
 REM   2) Gerekli kutuphaneleri kurar (opencv, numpy)
 REM   3) Takip programini cikarir
 REM   4) go2rtc'yi indirir ve baslatir, Xiaomi girisi icin tarayici acar
-REM   5) Kamera eklenince hareket takibini baslatir
+REM   5) Kamera eklenince hareket + yuz takibini baslatir
 REM ================================================================
 
 set "BAT_YOLU=%~f0"
@@ -55,9 +55,10 @@ echo.
 echo [4/4] Kamera baglantisi kuruluyor ve takip baslatiliyor...
 echo       Takip penceresinden cikmak icin: q veya Esc
 cd /d "%KLASOR%"
-%PY% takip.py --kaynak go2rtc --maske-saat --kaydet "%USERPROFILE%\Videos\KameraTakip"
+%PY% takip.py --kaynak go2rtc --maske-saat --kaydet "%USERPROFILE%\Videos\KameraTakip" --yuz-klasor "%USERPROFILE%\Pictures\KameraTakip"
 echo.
-echo Hareket kayitlari: %USERPROFILE%\Videos\KameraTakip
+echo Hareket videolari : %USERPROFILE%\Videos\KameraTakip
+echo Yuz fotograflari  : %USERPROFILE%\Pictures\KameraTakip
 pause
 exit /b 0
 
@@ -82,9 +83,11 @@ Kaynak olarak RTSP adresi, video dosyasi ya da USB kamera numarasi verilebilir:
     python takip.py --kaynak 0
     python takip.py --kaynak go2rtc     # go2rtc'yi indirir, baslatir, Xiaomi kamerayi bekler
 
-Yontem: arka plan cikarma (MOG2) ile hareketli pikseller bulunur, konturlar
-kutulara cevrilir, her kutu merkez noktasina gore bir kimlik (ID) ile
-kareden kareye takip edilir. Her nesnenin izi ekrana cizilir.
+Yontem:
+  1) Arka plan cikarma (MOG2) ile sahnede hareket olup olmadigina bakilir.
+  2) Hareket gorulunce YuNet yuz dedektoru calisir ve yuz aranir.
+  3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
+     yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
 import argparse
 import json
@@ -315,22 +318,107 @@ def kaynak_ac(kaynak):
     return cv2.VideoCapture(kaynak)
 
 
+YUNET_DOSYA = "face_detection_yunet_2023mar.onnx"
+YUNET_URLLER = [
+    "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/" + YUNET_DOSYA,
+    "https://github.com/opencv/opencv_zoo/raw/main/models/face_detection_yunet/" + YUNET_DOSYA,
+]
+
+
+class YuzDedektor:
+    """OpenCV YuNet yuz dedektoru (model ilk calistirmada indirilir, ~230 KB)."""
+
+    def __init__(self, klasor, esik=0.75):
+        yol = os.path.join(klasor, YUNET_DOSYA)
+        if not os.path.exists(yol) or os.path.getsize(yol) < 100000:
+            for url in YUNET_URLLER:
+                try:
+                    print("Yuz modeli indiriliyor...")
+                    urllib.request.urlretrieve(url, yol)
+                    if os.path.getsize(yol) > 100000:
+                        break
+                except Exception as e:
+                    print("  indirilemedi:", e)
+            else:
+                raise SystemExit("Yuz modeli indirilemedi, internet baglantisini kontrol et.")
+        self.det = cv2.FaceDetectorYN.create(yol, "", (320, 320), esik, 0.3, 50)
+        self.boyut = None
+
+    def bul(self, kare, min_boyut=24):
+        h, w = kare.shape[:2]
+        if self.boyut != (w, h):
+            self.det.setInputSize((w, h))
+            self.boyut = (w, h)
+        _, yuzler = self.det.detect(kare)
+        kutular = []
+        if yuzler is not None:
+            for f in yuzler:
+                x, y, bw, bh = (int(v) for v in f[:4])
+                x, y = max(0, x), max(0, y)
+                bw, bh = min(bw, w - x), min(bh, h - y)
+                if bw >= min_boyut and bh >= min_boyut:
+                    kutular.append((x, y, bw, bh))
+        return kutular
+
+
+# --- Cizim yardimcilari -----------------------------------------------------
+YESIL = (90, 220, 120)
+SARI = (40, 200, 255)
+GRI = (170, 170, 170)
+KOYU = (25, 25, 25)
+
+
+def yazi_kutusu(kare, metin, x, y, renk, olcek=0.55, kalin=1):
+    (tw, th), b = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, olcek, kalin)
+    cv2.rectangle(kare, (x, y - th - 8), (x + tw + 10, y + b - 2), renk, -1)
+    cv2.putText(kare, metin, (x + 5, y - 4), cv2.FONT_HERSHEY_SIMPLEX, olcek, KOYU, kalin, cv2.LINE_AA)
+
+
+def kose_cerceve(kare, x, y, w, h, renk, k=2):
+    """Tam dikdortgen yerine sade kose isaretleri."""
+    u = max(10, min(w, h) // 4)
+    for (px, py, dx, dy) in ((x, y, 1, 1), (x + w, y, -1, 1), (x, y + h, 1, -1), (x + w, y + h, -1, -1)):
+        cv2.line(kare, (px, py), (px + dx * u, py), renk, k, cv2.LINE_AA)
+        cv2.line(kare, (px, py), (px, py + dy * u), renk, k, cv2.LINE_AA)
+
+
+def durum_yaz(kare, metin, renk):
+    (tw, _), _ = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+    x = kare.shape[1] - tw - 22
+    yazi_kutusu(kare, metin, x, 34, renk, 0.6, 2)
+
+
+def yuz_kirp(kare, kutu, pay=0.35):
+    x, y, w, h = kutu
+    H, W = kare.shape[:2]
+    px, py = int(w * pay), int(h * pay)
+    x0, y0 = max(0, x - px), max(0, y - py)
+    x1, y1 = min(W, x + w + px), min(H, y + h + py)
+    return kare[y0:y1, x0:x1]
+
+
 def main():
-    p = argparse.ArgumentParser(description="IP kamera hareketli nesne takibi")
-    p.add_argument("--kaynak", required=True, help="RTSP adresi, video dosyasi veya kamera no (0)")
+    p = argparse.ArgumentParser(description="IP kamera hareket + yuz takibi")
+    p.add_argument("--kaynak", required=True,
+                   help="go2rtc, RTSP adresi, video dosyasi veya kamera no (0)")
     p.add_argument("--min-alan", type=int, default=800, help="Bu alandan kucuk hareketleri yok say (piksel)")
     p.add_argument("--genislik", type=int, default=960, help="Isleme genisligi (kucuk = hizli)")
     p.add_argument("--maske-saat", action="store_true",
-                   help="Sol ustteki tarih/saat yazisini yok say (Xiaomi zaman damgasi)")
-    p.add_argument("--kaydet", metavar="KLASOR", help="Hareket olunca klasore video kaydet")
+                   help="Sol ustteki tarih/saat yazisini hareket sayma (Xiaomi zaman damgasi)")
+    p.add_argument("--yuz-esik", type=float, default=0.75, help="Yuz guven esigi 0-1 (yuksek = daha secici)")
+    p.add_argument("--hareket-goster", action="store_true", help="Hareket bolgesini ince cizgiyle goster")
+    p.add_argument("--kaydet", metavar="KLASOR", help="Hareket/yuz olunca klasore video kaydet")
+    p.add_argument("--yuz-klasor", metavar="KLASOR", help="Yakalanan yuzlerin fotograflarini kaydet")
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
     a = p.parse_args()
 
+    betik_klasor = os.path.dirname(os.path.abspath(__file__))
+    dedektor = YuzDedektor(betik_klasor, a.yuz_esik)
+
     go2rtc_surec = None
     if a.kaynak == "go2rtc":
-        klasor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "go2rtc")
-        a.kaynak, go2rtc_surec = go2rtc_hazirla(klasor)
+        a.kaynak, go2rtc_surec = go2rtc_hazirla(os.path.join(betik_klasor, "go2rtc"))
         print("Baglaniliyor:", a.kaynak)
 
     cap = kaynak_ac(a.kaynak)
@@ -343,10 +431,16 @@ def main():
         raise SystemExit(f"Kaynak acilamadi: {a.kaynak}")
 
     arka_plan = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=32, detectShadows=True)
-    takipci = MerkezTakipci()
     cekirdek = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    yazici, son_hareket, kare_no = None, 0.0, 0
+    yuz_takip = MerkezTakipci(max_kayip=12, max_mesafe=160, iz_uzunlugu=25)
+    yumusak = {}          # yuz id -> titremesiz kutu
+    gorulme = {}          # yuz id -> kac karedir art arda goruluyor
+    kaydedilen = set()    # fotografi alinan yuz id'leri
+    yuz_bekleme = 0       # hareket bitse de bir sure daha yuz ara
+    yazici, son_olay, kare_no = None, 0.0, 0
     fps_t, fps = time.time(), 0.0
+    if a.yuz_klasor:
+        os.makedirs(a.yuz_klasor, exist_ok=True)
 
     while True:
         ok, kare = cap.read()
@@ -364,44 +458,98 @@ def main():
         if w0 > a.genislik:
             kare = cv2.resize(kare, (a.genislik, int(h0 * a.genislik / w0)))
         h, w = kare.shape[:2]
+        temiz = kare.copy()  # fotograf icin cizimsiz kopya
 
-        gri = cv2.GaussianBlur(kare, (5, 5), 0)
-        maske = arka_plan.apply(gri)
-        _, maske = cv2.threshold(maske, 200, 255, cv2.THRESH_BINARY)  # golgeleri (127) at
-        maske = cv2.morphologyEx(maske, cv2.MORPH_OPEN, cekirdek, iterations=1)
-        maske = cv2.dilate(maske, cekirdek, iterations=3)
+        # 1) Hareket var mi? (kucuk kopyada, hizli)
+        kucuk = cv2.resize(kare, (320, int(h * 320 / w)))
+        oran = w / 320.0
+        maske = arka_plan.apply(cv2.GaussianBlur(kucuk, (5, 5), 0))
+        _, maske = cv2.threshold(maske, 200, 255, cv2.THRESH_BINARY)
+        maske = cv2.morphologyEx(maske, cv2.MORPH_OPEN, cekirdek)
+        maske = cv2.dilate(maske, cekirdek, iterations=2)
         if a.maske_saat:
-            maske[: int(h * 0.06), : int(w * 0.3)] = 0
-
+            maske[: int(maske.shape[0] * 0.07), : int(maske.shape[1] * 0.35)] = 0
         konturlar, _ = cv2.findContours(maske, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        kutular = [cv2.boundingRect(c) for c in konturlar if cv2.contourArea(c) >= a.min_alan]
+        hareketli = [cv2.boundingRect(c) for c in konturlar
+                     if cv2.contourArea(c) * oran * oran >= a.min_alan]
+        hareket = kare_no > 30 and bool(hareketli)
 
-        # Ilk ~1 sn arka plan ogreniliyor; o surede tespit yapma
-        if kare_no < 30:
-            kutular = []
-        nesneler = takipci.guncelle(kutular)
+        # 2) Hareket varsa veya yuz takip ediliyorsa yuz ara
+        if hareket:
+            yuz_bekleme = 45  # ~1.5 sn
+        elif yuz_bekleme > 0:
+            yuz_bekleme -= 1
+        takipte = any(k == 0 for k in yuz_takip.kayip.values())
+        yuzler = dedektor.bul(kare) if (hareket or takipte or yuz_bekleme > 0) else []
+        yuz_takip.guncelle(yuzler)
 
-        for i in nesneler:
-            if takipci.kayip[i] > 0:
+        # 3) Cizim
+        if a.hareket_goster and hareket:
+            xs = [x for x, y, bw, bh in hareketli] + [x + bw for x, y, bw, bh in hareketli]
+            ys = [y for x, y, bw, bh in hareketli] + [y + bh for x, y, bw, bh in hareketli]
+            cv2.rectangle(kare, (int(min(xs) * oran), int(min(ys) * oran)),
+                          (int(max(xs) * oran), int(max(ys) * oran)), GRI, 1, cv2.LINE_AA)
+
+        aktif = []
+        for i in list(yuz_takip.nesneler):
+            if i not in yuz_takip.kayip:
                 continue
-            x, y, bw, bh = takipci.kutular[i]
-            renk = tuple(int(c) for c in np.random.default_rng(i).integers(60, 255, 3))
-            cv2.rectangle(kare, (x, y), (x + bw, y + bh), renk, 2)
-            cv2.putText(kare, f"ID {i}", (x, max(15, y - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, renk, 2)
-            iz = list(takipci.izler[i])
-            for k in range(1, len(iz)):
-                cv2.line(kare, tuple(map(int, iz[k - 1])), tuple(map(int, iz[k])), renk, 2)
+            if yuz_takip.kayip[i] > 0:
+                gorulme[i] = 0
+                continue
+            gorulme[i] = gorulme.get(i, 0) + 1
+            x, y, bw, bh = yuz_takip.kutular[i]
+            if i in yumusak:  # titremeyi azalt
+                ox, oy, ow, oh = yumusak[i]
+                x, y = int(0.5 * ox + 0.5 * x), int(0.5 * oy + 0.5 * y)
+                bw, bh = int(0.5 * ow + 0.5 * bw), int(0.5 * oh + 0.5 * bh)
+            yumusak[i] = (x, y, bw, bh)
+            aktif.append((i, (x, y, bw, bh)))
 
-        aktif = sum(1 for i in nesneler if takipci.kayip[i] == 0)
+            iz = list(yuz_takip.izler[i])
+            for k in range(1, len(iz)):
+                cv2.line(kare, iz[k - 1], iz[k], YESIL, 1, cv2.LINE_AA)
+            kose_cerceve(kare, x, y, bw, bh, YESIL, 2)
+            yazi_kutusu(kare, f"Yuz {i}", x, max(22, y - 6), YESIL)
+
+            # Yeni yuz 5 kare boyunca saglam gorulduyse fotografini al
+            if a.yuz_klasor and i not in kaydedilen and gorulme[i] >= 5:
+                kaydedilen.add(i)
+                ad = os.path.join(a.yuz_klasor, datetime.now().strftime(f"yuz_%Y%m%d_%H%M%S_{i}.jpg"))
+                cv2.imwrite(ad, yuz_kirp(temiz, yuz_takip.kutular[i]))
+                print("Yuz yakalandi:", ad)
+        for i in list(yumusak):
+            if i not in yuz_takip.nesneler:
+                yumusak.pop(i, None)
+                gorulme.pop(i, None)
+
+        # En buyuk yuzun yakin plani (sag ust kose)
+        if aktif:
+            _, kutu = max(aktif, key=lambda t: t[1][2] * t[1][3])
+            kirp = yuz_kirp(temiz, kutu)
+            if kirp.size:
+                yb = 150
+                kirp = cv2.resize(kirp, (yb, int(yb * kirp.shape[0] / max(1, kirp.shape[1]))))
+                kirp = kirp[:yb]
+                y0, x0 = 52, w - yb - 12
+                kare[y0:y0 + kirp.shape[0], x0:x0 + yb] = kirp
+                cv2.rectangle(kare, (x0 - 1, y0 - 1), (x0 + yb, y0 + kirp.shape[0]), YESIL, 1)
+
+        if aktif:
+            durum_yaz(kare, f"YUZ TAKIP: {len(aktif)}", YESIL)
+        elif hareket or yuz_bekleme > 0:
+            durum_yaz(kare, "HAREKET - yuz araniyor", SARI)
+        else:
+            durum_yaz(kare, "Bekleniyor", GRI)
+
         simdi = time.time()
         fps = 0.9 * fps + 0.1 / max(simdi - fps_t, 1e-6)
         fps_t = simdi
-        cv2.putText(kare, f"Nesne: {aktif}  FPS: {fps:.1f}", (10, h - 12),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+        cv2.putText(kare, f"{fps:.0f} FPS", (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, GRI, 1, cv2.LINE_AA)
 
         if a.kaydet:
-            if aktif:
-                son_hareket = simdi
+            if hareket or aktif:
+                son_olay = simdi
                 if yazici is None:
                     os.makedirs(a.kaydet, exist_ok=True)
                     ad = os.path.join(a.kaydet, datetime.now().strftime("hareket_%Y%m%d_%H%M%S.mp4"))
@@ -409,19 +557,18 @@ def main():
                     print("Kayit basladi:", ad)
             if yazici is not None:
                 yazici.write(kare)
-                if simdi - son_hareket > 5:  # 5 sn hareket yoksa kaydi kapat
+                if simdi - son_olay > 5:
                     yazici.release()
                     yazici = None
                     print("Kayit bitti")
 
         if not a.goruntusuz:
-            cv2.imshow("Takip", kare)
-            cv2.imshow("Hareket maskesi", maske)
+            cv2.imshow("Kamera Takip  (cikis: q)", kare)
             if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
                 break
-        elif aktif and kare_no % 15 == 0:
-            print(f"kare {kare_no}: {aktif} hareketli nesne " +
-                  ", ".join(f"ID{i}@{nesneler[i]}" for i in nesneler if takipci.kayip[i] == 0))
+        elif kare_no % 15 == 0 and (aktif or hareket):
+            print(f"kare {kare_no}: hareket={hareket} yuzler=" +
+                  ", ".join(f"Yuz{i}@{k[:2]}" for i, k in aktif))
 
         if a.max_kare and kare_no >= a.max_kare:
             break
