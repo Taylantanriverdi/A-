@@ -14,4 +14,6 @@ import zipfile
 with zipfile.ZipFile(os.path.join(d, "KameraTakip.zip"), "w", zipfile.ZIP_DEFLATED) as z:
     z.write(os.path.join(d, "KameraTakip.bat"), "KameraTakip.bat")
     z.write(os.path.join(d, "Guncelle.bat"), "Guncelle.bat")
-print("KameraTakip.bat ve KameraTakip.zip olusturuldu")
+with zipfile.ZipFile(os.path.join(d, "Guncelle.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    z.write(os.path.join(d, "Guncelle.bat"), "Guncelle.bat")
+print("KameraTakip.bat, KameraTakip.zip ve Guncelle.zip olusturuldu")
