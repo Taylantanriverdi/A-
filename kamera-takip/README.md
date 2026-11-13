@@ -117,6 +117,11 @@ Kamera go2rtc ile eklendiyse program kameranın motorunu da kullanır:
    şekilde döner. Durum: `YUZ TAKIP`.
 4. **Yüz kaybolursa** 3 sn bekler, sonra taramaya döner.
 
+**Hız:** `--ptz-hiz 3` (varsayılan, hızlı), `2` normal, `1` sakin. Motorun kendi
+dönüş hızı kamerada sabittir; hız ayarı komutlar arasındaki beklemeyi ve bir
+seferde gönderilen adım sayısını değiştirir. Adımlar paralel gönderilir ve
+Xiaomi bağlantısı açık tutulur.
+
 Xiaomi Home uygulamasındaki kendi **"Hareket takibi"** ayarını **kapat**,
 yoksa kamera iki yerden komut alır. Motor kullanılamazsa program sabit kamera
 moduna geçer. Motoru hiç kullanmamak için: `--ptz kapali`.

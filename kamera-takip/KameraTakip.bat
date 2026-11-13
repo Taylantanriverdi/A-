@@ -544,6 +544,7 @@ class XiaomiBulut:
     def __init__(self, uid, pass_token, bolge):
         import requests
         self.requests = requests
+        self.oturum = requests.Session()  # baglanti acik kalir: her komutta TLS el sikismasi yok
         self.uid = uid
         self.taban = ("https://api.io.mi.com/app" if bolge == "cn"
                       else "https://%s.api.io.mi.com/app" % bolge)
@@ -588,7 +589,7 @@ class XiaomiBulut:
         data_s = b64(_rc4(sn, params.encode()))
         h_s = b64(_rc4(sn, h.encode()))
         form = {"data": data_s, "rc4_hash__": h_s, "signature": imza(data_s, h_s), "_nonce": b64(nonce)}
-        r = self.requests.post(self.taban + api, data=form, timeout=10,
+        r = self.oturum.post(self.taban + api, data=form, timeout=10,
                                headers={"Cookie": self.cerez,
                                         "Content-Type": "application/x-www-form-urlencoded"})
         r.raise_for_status()
@@ -767,14 +768,23 @@ class PTZ:
         self.mesgul, self.son_etki = True, etki
         self.dikey += adet if etki == "yukari" else -adet if etki == "asagi" else 0
 
-        def is_():
+        def tek():
             try:
-                for _ in range(adet):
-                    self.gonder(self.e[etki]["aday"])
+                self.gonder(self.e[etki]["aday"])
             except Exception as ex:
                 print("PTZ komut hatasi:", str(ex)[:80])
-            finally:
-                self.son, self.mesgul = time.time(), False
+
+        def is_():
+            # Adimlar sirayla beklemeden, neredeyse ayni anda gonderilir
+            isler = []
+            for _ in range(adet):
+                t = threading.Thread(target=tek, daemon=True)
+                t.start()
+                isler.append(t)
+                time.sleep(0.08)
+            for t in isler:
+                t.join(12)
+            self.son, self.mesgul = time.time(), False
         threading.Thread(target=is_, daemon=True).start()
         return True
 
@@ -825,6 +835,8 @@ def main():
     p.add_argument("--ptz", choices=["otomatik", "kapali"], default="otomatik",
                    help="Doner kamerada tarama + yuzu takip icin kamerayi dondur")
     p.add_argument("--ptz-kalibre", action="store_true", help="Motor kalibrasyonunu yeniden yap")
+    p.add_argument("--ptz-hiz", type=int, choices=[1, 2, 3], default=3,
+                   help="Motor hizi: 1 yavas/sakin, 2 normal, 3 hizli (varsayilan)")
     p.add_argument("--simulasyon", metavar="RESIM", help="Test: panorama resmiyle sanal doner kamera")
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
@@ -885,6 +897,10 @@ def main():
     sonraki_tarama = time.time() + 1.0
     tarama_yonu = random.choice(["sol", "sag"])
     tarama_onceki = None
+    # hiz: (takip beklemesi sn, takipte max adim, tarama beklemesi aralik, tarama adim aralik)
+    HIZ = {1: (1.2, 3, (1.5, 4.0), (1, 3)),
+           2: (0.8, 4, (0.8, 2.5), (1, 3)),
+           3: (0.35, 5, (0.3, 1.2), (2, 4))}[a.ptz_hiz]
     if a.yuz_klasor:
         os.makedirs(a.yuz_klasor, exist_ok=True)
 
@@ -991,14 +1007,14 @@ def main():
                 _, (x, y, bw, bh) = max(aktif, key=lambda t: t[1][2] * t[1][3])
                 ox = (x + bw / 2 - w / 2) / w   # + ise yuz sagda
                 oy = (y + bh / 2 - h / 2) / h   # + ise yuz asagida
-                if not ptz.mesgul and simdi - ptz.son > 1.2:
+                if not ptz.mesgul and simdi - ptz.son > HIZ[0]:
                     if abs(ox) > 0.12:
                         etki = "sol" if ox > 0 else "sag"   # goruntuyu yuzun tersine kaydir
-                        adet = int(min(3, max(1, round(abs(ox) * w / ptz.adim(etki)))))
+                        adet = int(min(HIZ[1], max(1, round(abs(ox) * w / ptz.adim(etki)))))
                         ptz.hareket(etki, adet)
                     elif abs(oy) > 0.18:
                         etki = "yukari" if oy > 0 else "asagi"
-                        ptz.hareket(etki, 1)
+                        ptz.hareket(etki, int(min(HIZ[1], max(1, round(abs(oy) * h / ptz.adim(etki))))))
             elif simdi - son_yuz_zamani > 3 and not ptz.mesgul and simdi >= sonraki_tarama:
                 # Son yatay hareket goruntuyu kaydirmadiysa kamera sinira dayanmistir: yon degistir
                 if tarama_onceki is not None and ptz.son_etki in ("sol", "sag"):
@@ -1016,8 +1032,8 @@ def main():
                 else:
                     if random.random() < 0.1:
                         tarama_yonu = "sag" if tarama_yonu == "sol" else "sol"
-                    ptz.hareket(tarama_yonu, random.randint(1, 3))
-                sonraki_tarama = simdi + random.uniform(1.5, 4.0)
+                    ptz.hareket(tarama_yonu, random.randint(*HIZ[3]))
+                sonraki_tarama = simdi + random.uniform(*HIZ[2])
 
         if ptz_durum["hazirlaniyor"]:
             durum_yaz(kare, "KAMERA MOTORU HAZIRLANIYOR...", MAVI)
