@@ -133,6 +133,13 @@ dönüş hızı kamerada sabittir; hız ayarı komutlar arasındaki beklemeyi ve
 seferde gönderilen adım sayısını değiştirir. Adımlar paralel gönderilir ve
 Xiaomi bağlantısı açık tutulur.
 
+**Elle kontrol (v2):** Görüntünün sol altında ok tuşları ve mod düğmesi var.
+- **OTOMATIK / SABIT** düğmesi veya **P** tuşu: SABIT modda kamera kendiliğinden
+  hiç hareket etmez (yüz yine bulunur ve fotoğraflanır).
+- **Oklar** (ekrandaki düğmeler, klavye okları veya W/A/S/D): tıkla/bas = bir adım,
+  basılı tut = akıcı dönüş. Oka dokununca program SABIT moda geçer, kamera
+  bıraktığın yerde kalır. Otomatik taramaya dönmek için tekrar P.
+
 Xiaomi Home uygulamasındaki kendi **"Hareket takibi"** ayarını **kapat**,
 yoksa kamera iki yerden komut alır. Motor kullanılamazsa program sabit kamera
 moduna geçer. Motoru hiç kullanmamak için: `--ptz kapali`.

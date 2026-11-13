@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v1"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v2"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -755,9 +755,9 @@ class PTZ:
 
     TERS = {"sol": "sag", "sag": "sol", "yukari": "asagi", "asagi": "yukari"}
 
-    def surekli(self, etki, aralik=0.3, paralel=1):
+    def surekli(self, etki, aralik=0.3, paralel=1, zorla=False):
         # Ters yone donmeden once son hareketin goruntuye yansimasini bekle (sallanmayi onler)
-        if (self.son_etki == self.TERS.get(etki)
+        if (not zorla and self.son_etki == self.TERS.get(etki)
                 and time.time() - self.son_gonderim < self.gecikme + 0.3):
             self.yon = None
             return
@@ -843,6 +843,53 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
     except Exception as e:
         print("PTZ kullanilamiyor (%s). Sabit kamera modunda devam." % str(e)[:120])
         return None
+
+
+# --- Elle kontrol paneli ----------------------------------------------------
+# Ok yonu (kameranin bakacagi yon) -> goruntunun kayacagi yon (kalibrasyon etkisi)
+OK_ETKI = {"sol": "sag", "sag": "sol", "yukari": "asagi", "asagi": "yukari"}
+# Windows'ta cv2.waitKeyEx ok tus kodlari + WASD
+TUS_YON = {2424832: "sol", 2555904: "sag", 2490368: "yukari", 2621440: "asagi",
+           ord("a"): "sol", ord("d"): "sag", ord("w"): "yukari", ord("s"): "asagi",
+           ord("A"): "sol", ord("D"): "sag", ord("W"): "yukari", ord("S"): "asagi"}
+
+
+def panel_dugmeleri(w, h):
+    """Sol alt koseye ok tuslari ve mod dugmesi (x0, y0, x1, y1)."""
+    b, g = 46, 6
+    cx, cy = 16 + b + g, h - 40 - 2 * (b + g)
+    return {
+        "yukari": (cx, cy - b - g, cx + b, cy - g),
+        "sol": (cx - b - g, cy, cx - g, cy + b),
+        "sag": (cx + b + g, cy, cx + 2 * b + g, cy + b),
+        "asagi": (cx, cy + b + g, cx + b, cy + 2 * b + g),
+        "mod": (cx + 2 * b + 3 * g + 8, cy, cx + 2 * b + 3 * g + 150, cy + b),
+    }
+
+
+def panel_ciz(kare, dugmeler, mod, basili):
+    for ad, (x0, y0, x1, y1) in dugmeler.items():
+        bolge = kare[y0:y1, x0:x1]
+        if ad == "mod":
+            renk = YESIL if mod == "OTO" else SARI
+            cv2.addWeighted(bolge, 0.25, np.full_like(bolge, renk), 0.75, 0, bolge)
+            metin = "OTOMATIK" if mod == "OTO" else "SABIT"
+            (tw, th), _ = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+            cv2.putText(kare, metin, (x0 + (x1 - x0 - tw) // 2, y0 + (y1 - y0 + th) // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, KOYU, 2, cv2.LINE_AA)
+            continue
+        dolgu = (255, 255, 255) if basili == ad else (60, 60, 60)
+        cv2.addWeighted(bolge, 0.35, np.full_like(bolge, dolgu), 0.65, 0, bolge)
+        cv2.rectangle(kare, (x0, y0), (x1, y1), (200, 200, 200), 1, cv2.LINE_AA)
+        mx, my, r = (x0 + x1) // 2, (y0 + y1) // 2, (x1 - x0) // 4
+        uc = {"yukari": [(mx, my - r), (mx - r, my + r // 2), (mx + r, my + r // 2)],
+              "asagi": [(mx, my + r), (mx - r, my - r // 2), (mx + r, my - r // 2)],
+              "sol": [(mx - r, my), (mx + r // 2, my - r), (mx + r // 2, my + r)],
+              "sag": [(mx + r, my), (mx - r // 2, my - r), (mx - r // 2, my + r)]}[ad]
+        cv2.fillPoly(kare, [np.array(uc, np.int32)], KOYU if basili == ad else (235, 235, 235))
+    x0, _, _, y1 = dugmeler["sol"]
+    cv2.putText(kare, "Oklar/WASD: dondur   P: oto/sabit   Q: cikis",
+                (x0, dugmeler["asagi"][3] + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
 
 
 def main():
@@ -934,6 +981,49 @@ def main():
     tur_suresi = 20.0         # PTZ hazir olunca adim buyuklugunden hesaplanir
     if a.yuz_klasor:
         os.makedirs(a.yuz_klasor, exist_ok=True)
+
+    # Elle kontrol durumu
+    el = {"mod": "OTO", "yon": None, "basla": 0.0, "bitis": 0.0, "kaynak": None, "tekrar": False,
+          "dugmeler": {}}
+    pencere = "Kamera Takip %s  (cikis: q)" % SURUM
+
+    def el_basla(yon, kaynak):
+        """Ok basildi: SABIT moda gec, hemen bir adim at; basili tutulursa surekli don."""
+        if not ptz:
+            return
+        el["mod"] = "SABIT"
+        simdi = time.time()
+        if el["yon"] != yon:
+            # Yeni basis: tek adim. Tus basili tutulursa Windows tekrar gonderir -> surekli
+            ptz.dur()
+            ptz.hareket(OK_ETKI[yon], 1)
+            el["basla"], el["tekrar"] = simdi, False
+            el["bitis"] = simdi + (0.6 if kaynak == "tus" else 1e9)
+        elif kaynak == "tus":
+            el["tekrar"] = True               # tus basili tutuluyor
+            el["bitis"] = simdi + 0.15        # tekrar gelmezse hemen dur
+        el["yon"], el["kaynak"] = yon, kaynak
+
+    def el_birak():
+        el["yon"] = None
+        if ptz:
+            ptz.dur()
+
+    def fare(olay, x, y, bayrak, _):
+        if olay == cv2.EVENT_LBUTTONDOWN:
+            for ad, (x0, y0, x1, y1) in el["dugmeler"].items():
+                if x0 <= x <= x1 and y0 <= y <= y1:
+                    if ad == "mod":
+                        el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
+                        el_birak()
+                    else:
+                        el_basla(ad, "fare")
+        elif olay == cv2.EVENT_LBUTTONUP and el["kaynak"] == "fare":
+            el_birak()
+
+    if not a.goruntusuz:
+        cv2.namedWindow(pencere, cv2.WINDOW_AUTOSIZE)
+        cv2.setMouseCallback(pencere, fare)
 
     while True:
         ok, kare = okuyucu.read()
@@ -1043,7 +1133,14 @@ def main():
                 cv2.rectangle(kare, (x0 - 1, y0 - 1), (x0 + yb, y0 + kirp.shape[0]), YESIL, 1)
 
         # 4) Doner kamera kontrolu (surekli/akici hareket)
-        if ptz:
+        if ptz and el["mod"] == "SABIT":
+            # SABIT mod: kamera kendiliginden hic hareket etmez, sadece oklarla
+            dedektor.esik(a.yuz_esik)
+            if el["yon"] and simdi > el["bitis"]:
+                el_birak()  # tus birakildi (tekrar gelmedi)
+            elif el["yon"] and (el["tekrar"] if el["kaynak"] == "tus" else simdi - el["basla"] > 0.35):
+                ptz.surekli(OK_ETKI[el["yon"]], 0.15, 2, zorla=True)  # basili tutuluyor
+        elif ptz:
             # Tarama sirasinda daha hassas ara, takipte daha secici ol
             dedektor.esik(a.yuz_esik if aktif else max(0.55, a.yuz_esik - 0.15))
             # Yanlis alarmla taramayi durdurmamak icin yuz en az 2 karede gorulmeli
@@ -1096,6 +1193,8 @@ def main():
 
         if ptz_durum["hazirlaniyor"]:
             durum_yaz(kare, "KAMERA MOTORU HAZIRLANIYOR...", MAVI)
+        elif ptz and el["mod"] == "SABIT":
+            durum_yaz(kare, ("SABIT - yuz: %d" % len(aktif)) if aktif else "SABIT - elle kontrol", SARI)
         elif aktif:
             durum_yaz(kare, f"YUZ TAKIP: {len(aktif)}", YESIL)
         elif ptz and simdi - son_yuz_zamani <= 3:
@@ -1128,10 +1227,21 @@ def main():
                     yazici = None
                     print("Kayit bitti")
 
+        if ptz:
+            el["dugmeler"] = panel_dugmeleri(w, h)
+            panel_ciz(kare, el["dugmeler"], el["mod"], el["yon"])
+
         if not a.goruntusuz:
-            cv2.imshow("Kamera Takip %s  (cikis: q)" % SURUM, kare)
-            if cv2.waitKey(1) & 0xFF in (ord("q"), 27):
-                break
+            cv2.imshow(pencere, kare)
+            tus = cv2.waitKeyEx(1)
+            if tus != -1:
+                if tus & 0xFF in (ord("q"), ord("Q"), 27) and tus not in TUS_YON:
+                    break
+                if tus in (ord("p"), ord("P")) and ptz:
+                    el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
+                    el_birak()
+                elif tus in TUS_YON:
+                    el_basla(TUS_YON[tus], "tus")
         elif kare_no % 15 == 0:
             print(f"kare {kare_no}: hareket={hareket} ptz={ptz.son_etki if ptz else '-'} yuzler=" +
                   ", ".join(f"Yuz{i}@{k[:2]}" for i, k in aktif))
