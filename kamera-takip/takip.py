@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v9"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v10"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -161,7 +161,7 @@ def _xiaomi_hesaplari():
 def xiaomi_kamera_ekle(kullanici):
     """Giris yapilmis Xiaomi hesabinda tum bolgeleri tarar, ilk kamerayi
     go2rtc'ye 'xiaomi' adiyla ekler (go2rtc bunu go2rtc.yaml'a kaydeder)."""
-    print("Xiaomi hesabi bulundu (%s), kamera araniyor..." % kullanici)
+    print("Xiaomi hesabı bulundu (%s), kamera aranıyor..." % kullanici)
     for kod, ad in XIAOMI_BOLGELER:
         try:
             veri = json.loads(_api("/api/xiaomi?id=%s&region=%s" % (kullanici, kod)))
@@ -177,7 +177,7 @@ def xiaomi_kamera_ekle(kullanici):
         _api("/api/streams?name=xiaomi&src=" + urllib.request.quote(k["url"], safe=""), "PUT")
         print("Kamera go2rtc'ye eklendi.")
         return True
-    print("Bu hesapta kamera bulunamadi. Kamera baska bir Xiaomi hesabinda olabilir.")
+    print("Bu hesapta kamera bulunamadı. Kamera başka bir Xiaomi hesabında olabilir.")
     return False
 
 
@@ -206,7 +206,7 @@ def go2rtc_hazirla(klasor):
         if not os.path.exists(yaml_yolu):
             with open(yaml_yolu, "w") as f:
                 f.write(GO2RTC_YAML)
-        print("go2rtc baslatiliyor...")
+        print("go2rtc başlatılıyor...")
         log = open(os.path.join(klasor, "go2rtc.log"), "a")
         surec = subprocess.Popen([exe_yolu, "-config", yaml_yolu], cwd=klasor,
                                  stdout=log, stderr=subprocess.STDOUT)
@@ -214,21 +214,21 @@ def go2rtc_hazirla(klasor):
             if _akislar() is not None:
                 break
             if surec.poll() is not None:
-                raise SystemExit("go2rtc acilamadi, go2rtc.log dosyasina bak.")
+                raise SystemExit("go2rtc açılamadı, go2rtc.log dosyasına bakın.")
             time.sleep(0.5)
         else:
-            raise SystemExit("go2rtc cevap vermiyor (1984 portu dolu olabilir).")
+            raise SystemExit("go2rtc yanıt vermiyor (1984 numaralı port dolu olabilir).")
 
     akislar = _akislar() or {}
     if not akislar:
         print()
         print("=" * 64)
-        print(" Kamera henuz eklenmemis. Tarayicida go2rtc acilacak:")
-        print("   1) Asagida Xiaomi'ye tikla")
-        print("   2) Xiaomi Home hesabinla giris yap (login'e BIR KEZ bas,")
-        print("      gelen kodu yazip send'e bas)")
-        print(" Giris yapinca kamera KENDILIGINDEN bulunup eklenir ve takip")
-        print(" baslar. Bu pencereyi kapatma.")
+        print(" Kamera henüz eklenmemiş. Tarayıcıda go2rtc açılacak:")
+        print("   1) Aşağıda Xiaomi'ye tıklayın")
+        print("   2) Xiaomi Home hesabınızla giriş yapın (login'e YALNIZCA BİR KEZ basın,")
+        print("      gelen kodu yazıp send'e basın)")
+        print(" Giriş yapınca kamera KENDİLİĞİNDEN bulunup eklenir ve takip")
+        print(" başlar. Bu pencereyi kapatmayın.")
         print("=" * 64)
         webbrowser.open("http://localhost:1984/add.html")
         taranan = set()
@@ -243,7 +243,7 @@ def go2rtc_hazirla(klasor):
                             akislar = _akislar() or {}
                             break
     ad = next(iter(akislar))
-    print("Kamera akisi bulundu:", ad)
+    print("Kamera yayını bulundu:", ad)
     return "rtsp://127.0.0.1:8554/" + urllib.request.quote(ad), surec
 
 
@@ -272,14 +272,14 @@ class YuzDedektor:
         if not os.path.exists(yol) or os.path.getsize(yol) < 100000:
             for url in YUNET_URLLER:
                 try:
-                    print("Yuz modeli indiriliyor...")
+                    print("Yüz bulma modeli indiriliyor...")
                     urllib.request.urlretrieve(url, yol)
                     if os.path.getsize(yol) > 100000:
                         break
                 except Exception as e:
-                    print("  indirilemedi:", e)
+                    print("  İndirilemedi:", e)
             else:
-                raise SystemExit("Yuz modeli indirilemedi, internet baglantisini kontrol et.")
+                raise SystemExit("Yüz bulma modeli indirilemedi. İnternet bağlantınızı kontrol edin.")
         self.det = cv2.FaceDetectorYN.create(yol, "", (320, 320), esik, 0.3, 50)
         self.boyut = None
         self.ham = []
@@ -322,7 +322,7 @@ def ascii_ad(ad):
     return ad.translate(TR_ASCII).encode("ascii", "replace").decode()
 
 
-TANIMA_DURUM = {"metin": "Yuz tanima hazirlaniyor..."}
+TANIMA_DURUM = {"metin": "Yüz tanıma hazırlanıyor..."}
 
 
 def model_indir(url, yol, ad, durum=None, en_az=30000000):
@@ -347,7 +347,7 @@ def model_indir(url, yol, ad, durum=None, en_az=30000000):
                 durum(m)
                 print("  " + m)
     if alinan < en_az or (toplam and alinan < toplam):
-        raise RuntimeError("eksik indi (%d / %d bayt)" % (alinan, toplam))
+        raise RuntimeError("dosya eksik indi (%d / %d bayt)" % (alinan, toplam))
     os.replace(gecici, yol)
 
 
@@ -360,15 +360,15 @@ class YuzTaniyici:
             hata = None
             for url in SFACE_URLLER:
                 try:
-                    model_indir(url, yol, "Yuz tanima modeli")
+                    model_indir(url, yol, "Yüz tanıma modeli")
                     hata = None
                     break
                 except Exception as e:
                     hata = e
-                    print("  indirilemedi:", str(e)[:100])
+                    print("  İndirilemedi:", str(e)[:100])
             if hata is not None:
                 raise RuntimeError("model indirilemedi: %s" % str(hata)[:100])
-        TANIMA_DURUM["metin"] = "Yuz tanima modeli yukleniyor..."
+        TANIMA_DURUM["metin"] = "Yüz tanıma modeli yükleniyor..."
         self.rec = cv2.FaceRecognizerSF.create(yol, "")
         self.kilit = threading.Lock()
         self.json_yolu = os.path.join(klasor, "kisiler.json")
@@ -408,13 +408,13 @@ class YuzTaniyici:
                     img = cv2.resize(img, (int(w * o), int(h * o)))
                 kutular = dedektor.bul(img)
                 if not kutular:
-                    print("  %s: yuz bulunamadi" % yol)
+                    print("  %s: yüz bulunamadı" % yol)
                     continue
                 j = max(range(len(kutular)), key=lambda n: kutular[n][2] * kutular[n][3])
                 self.kisiler.setdefault(ad, []).append(self.ozellik(img, dedektor.ham[j]))
                 yeni += 1
         if yeni:
-            print("Klasorden %d yuz ogrenildi." % yeni)
+            print("Klasörden %d yüz öğrenildi." % yeni)
             self.kaydet()
 
     def ozellik(self, kare, ham):
@@ -453,22 +453,99 @@ class YuzTaniyici:
             json.dump(d, f, ensure_ascii=False)
 
 
-def sesli_soyle(metin):
-    """Bilgisayar hoparlorunden konusur (Windows; varsa Turkce ses secilir)."""
-    if platform.system() != "Windows":
-        print("[SES] " + metin)
-        return
+def tr_kucuk(m):
+    return m.replace("I", "ı").replace("İ", "i").lower()
+
+
+def tr_baslik(ad):
+    """'TAYLAN' -> 'Taylan', 'iLKER' -> 'İlker' (Turkce I/İ kurallariyla)."""
+    def buyuk(c):
+        return {"i": "İ", "ı": "I"}.get(c, c.upper())
+    return " ".join(buyuk(k[0]) + k[1:] for k in tr_kucuk(ad).split() if k)
+
+
+def selam_metni(ad):
+    saat = datetime.now().hour
+    if 5 <= saat < 11:
+        selam = "Günaydın"
+    elif 11 <= saat < 17:
+        selam = "Merhaba"
+    elif 17 <= saat < 22:
+        selam = "İyi akşamlar"
+    else:
+        selam = "İyi geceler"
+    return "%s %s, hoş geldin." % (selam, tr_baslik(ad))
+
+
+SESLER = {"emel": "tr-TR-EmelNeural", "ahmet": "tr-TR-AhmetNeural"}
+SES_AYAR = {"klasor": ".", "ses": "emel"}
+
+
+def _ses_dosyasi(metin):
+    """Dogal Turkce ses dosyasi uretir (onbellekli): once Microsoft sinir agi sesi,
+    olmazsa Google. Bir kez uretilen cumle internetsiz de calar."""
+    import hashlib as _h
+    klasor = os.path.join(SES_AYAR["klasor"], "ses_onbellek")
+    os.makedirs(klasor, exist_ok=True)
+    yol = os.path.join(klasor, _h.sha1((SES_AYAR["ses"] + "|" + metin).encode("utf-8")).hexdigest()[:16] + ".mp3")
+    if os.path.exists(yol) and os.path.getsize(yol) > 1000:
+        return yol
+    try:
+        import asyncio
+        import edge_tts
+        asyncio.run(edge_tts.Communicate(metin, SESLER.get(SES_AYAR["ses"], SESLER["emel"]),
+                                         rate="-5%").save(yol))
+        if os.path.getsize(yol) > 1000:
+            return yol
+    except Exception as e:
+        print("Microsoft Türkçe sesi kullanılamadı (%s), Google sesi deneniyor." % str(e)[:60])
+    try:
+        from gtts import gTTS
+        gTTS(metin, lang="tr").save(yol)
+        if os.path.getsize(yol) > 1000:
+            return yol
+    except Exception as e:
+        print("Google Türkçe sesi kullanılamadı (%s), Windows sesi kullanılacak." % str(e)[:60])
+    return None
+
+
+def _mp3_cal(yol):
+    """Windows'ta MP3'u ek program olmadan calar (winmm). Basarili ise True."""
+    import ctypes
+    mci = ctypes.windll.winmm.mciSendStringW
+    takma = "ses%d" % random.randint(0, 10 ** 9)
+    if mci('open "%s" type mpegvideo alias %s' % (yol, takma), None, 0, 0) != 0:
+        return False
+    mci("play %s wait" % takma, None, 0, 0)
+    mci("close %s" % takma, None, 0, 0)
+    return True
+
+
+def _windows_sesi(metin):
     ps = ("Add-Type -AssemblyName System.Speech; "
           "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
           "$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'tr-TR' } | Select-Object -First 1; "
           "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak($env:SELAM_METIN)")
-    ortam = dict(os.environ, SELAM_METIN=metin)
     try:
-        subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps], env=ortam,
+        subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps],
+                         env=dict(os.environ, SELAM_METIN=metin),
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     except OSError as e:
-        print("Ses calinamadi:", e)
+        print("Ses çalınamadı:", e)
+
+
+def sesli_soyle(metin):
+    """Bilgisayar hoparlorunden dogal Turkce sesle konusur (arka planda)."""
+    def is_():
+        dosya = _ses_dosyasi(metin)
+        if platform.system() != "Windows":
+            print("[SES] %s%s" % (metin, (" -> " + dosya) if dosya else ""))
+            return
+        if dosya and _mp3_cal(dosya):
+            return
+        _windows_sesi(metin)
+    threading.Thread(target=is_, daemon=True).start()
 
 
 # --- Cizim yardimcilari -----------------------------------------------------
@@ -479,11 +556,84 @@ MAVI = (230, 170, 60)
 TURUNCU = (40, 140, 255)
 KOYU = (25, 25, 25)
 
+# Turkce harfler (c, g, i, o, s, u ve buyukleri) icin OpenCV'nin kendi yazi tipi yetmez:
+# yazilari Windows'un yazi tipiyle (Segoe UI) Pillow ile cizeriz. Pillow yoksa eski yol.
+_YAZI_TIPLERI = {
+    False: [r"C:\Windows\Fonts\segoeui.ttf", r"C:\Windows\Fonts\arial.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf"],
+    True: [r"C:\Windows\Fonts\segoeuib.ttf", r"C:\Windows\Fonts\arialbd.ttf",
+           "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf"],
+}
+_FONT_ONBELLEK, _YAZI_ONBELLEK = {}, {}
+
+
+def _font(px, kalin):
+    anahtar = (px, kalin)
+    if anahtar not in _FONT_ONBELLEK:
+        f = None
+        try:
+            from PIL import ImageFont
+            for yol in _YAZI_TIPLERI[kalin]:
+                if os.path.exists(yol):
+                    f = ImageFont.truetype(yol, px)
+                    break
+        except Exception:
+            f = None
+        _FONT_ONBELLEK[anahtar] = f
+    return _FONT_ONBELLEK[anahtar]
+
+
+def _yazi_maskesi(metin, px, kalin):
+    """Metni gri tonlu maske olarak cizer (onbellekli). Donus: (maske, ust_bosluk) veya None."""
+    anahtar = (metin, px, kalin)
+    if anahtar in _YAZI_ONBELLEK:
+        return _YAZI_ONBELLEK[anahtar]
+    f = _font(px, kalin)
+    if f is None:
+        return None
+    from PIL import Image, ImageDraw
+    x0, y0, x1, y1 = f.getbbox(metin)
+    w, h = max(1, x1), max(1, int(px * 1.25))
+    img = Image.new("L", (w + 2, h + 2), 0)
+    ImageDraw.Draw(img).text((0, 0), metin, font=f, fill=255)
+    maske = np.asarray(img, np.float32) / 255.0
+    if len(_YAZI_ONBELLEK) > 600:
+        _YAZI_ONBELLEK.clear()
+    _YAZI_ONBELLEK[anahtar] = maske
+    return maske
+
+
+def yazi_boyut(metin, px, kalin=False):
+    m = _yazi_maskesi(metin, px, kalin)
+    if m is None:
+        (tw, th), _ = cv2.getTextSize(ascii_ad(metin), cv2.FONT_HERSHEY_SIMPLEX, px / 30.0, 2 if kalin else 1)
+        return tw, th
+    return m.shape[1], int(px * 1.05)
+
+
+def yazi(kare, metin, x, y_ust, px, renk, kalin=False):
+    """Turkce destekli yazi: (x, y_ust) sol ust kose."""
+    m = _yazi_maskesi(metin, px, kalin)
+    if m is None:
+        cv2.putText(kare, ascii_ad(metin), (x, y_ust + px), cv2.FONT_HERSHEY_SIMPLEX, px / 30.0, renk,
+                    2 if kalin else 1, cv2.LINE_AA)
+        return
+    H, W = kare.shape[:2]
+    x0, y0 = max(0, x), max(0, y_ust)
+    x1, y1 = min(W, x + m.shape[1]), min(H, y_ust + m.shape[0])
+    if x1 <= x0 or y1 <= y0:
+        return
+    a = m[y0 - y_ust:y1 - y_ust, x0 - x:x1 - x][:, :, None]
+    bolge = kare[y0:y1, x0:x1].astype(np.float32)
+    kare[y0:y1, x0:x1] = (bolge * (1 - a) + np.array(renk, np.float32) * a).astype(np.uint8)
+
 
 def yazi_kutusu(kare, metin, x, y, renk, olcek=0.55, kalin=1):
-    (tw, th), b = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, olcek, kalin)
-    cv2.rectangle(kare, (x, y - th - 8), (x + tw + 10, y + b - 2), renk, -1)
-    cv2.putText(kare, metin, (x + 5, y - 4), cv2.FONT_HERSHEY_SIMPLEX, olcek, KOYU, kalin, cv2.LINE_AA)
+    """Renkli kutu icinde koyu yazi. y: kutunun alt cizgisi (eski cv2 duzeniyle uyumlu)."""
+    px = max(10, int(round(olcek * 30)))
+    tw, th = yazi_boyut(metin, px, kalin > 1)
+    cv2.rectangle(kare, (x, y - th - 9), (x + tw + 12, y + 3), renk, -1)
+    yazi(kare, metin, x + 6, y - th - 7, px, KOYU, kalin > 1)
 
 
 def kose_cerceve(kare, x, y, w, h, renk, k=2):
@@ -499,8 +649,8 @@ SON_DURUM = {"metin": ""}
 
 def durum_yaz(kare, metin, renk):
     SON_DURUM["metin"] = metin
-    (tw, _), _ = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-    x = kare.shape[1] - tw - 22
+    tw, _ = yazi_boyut(metin, 18, True)
+    x = kare.shape[1] - tw - 24
     yazi_kutusu(kare, metin, x, 34, renk, 0.6, 2)
 
 
@@ -526,7 +676,7 @@ class CanliOkuyucu:
             time.sleep(2)
             self.cap = kaynak_ac(adres)
         if not self.cap.isOpened():
-            raise SystemExit(f"Kaynak acilamadi: {adres}")
+            raise SystemExit(f"Görüntü kaynağı açılamadı: {adres}")
         self.kare, self.sayac, self.okunan, self.dur = None, 0, 0, False
         self.kilit = threading.Lock()
         threading.Thread(target=self._dongu, daemon=True).start()
@@ -535,7 +685,7 @@ class CanliOkuyucu:
         while not self.dur:
             ok, f = self.cap.read()
             if not ok:
-                print("Baglanti koptu, 2 sn sonra yeniden deneniyor...")
+                print("Kamera bağlantısı koptu, 2 saniye sonra yeniden deneniyor...")
                 self.cap.release()
                 time.sleep(2)
                 self.cap = kaynak_ac(self.adres)
@@ -573,7 +723,7 @@ class DosyaOkuyucu:
     def __init__(self, kaynak):
         self.cap = kaynak_ac(kaynak)
         if not self.cap.isOpened():
-            raise SystemExit(f"Kaynak acilamadi: {kaynak}")
+            raise SystemExit(f"Görüntü kaynağı açılamadı: {kaynak}")
 
     def read(self):
         return self.cap.read()
@@ -590,7 +740,7 @@ class SimKamera:
         self.gecikme, self.tampon = gecikme, deque()
         self.p = cv2.imread(panorama)
         if self.p is None:
-            raise SystemExit("Simulasyon resmi okunamadi: " + panorama)
+            raise SystemExit("Simülasyon resmi okunamadı: " + panorama)
         self.w, self.h, self.ax, self.ay = w, h, adim_x, adim_y
         self.x = (self.p.shape[1] - w) // 2
         self.y = (self.p.shape[0] - h) // 2
@@ -658,10 +808,10 @@ class XiaomiBulut:
         r = requests.get("https://account.xiaomi.com/pass/serviceLogin?_json=true&sid=xiaomiio",
                          headers={"Cookie": "userId=%s; passToken=%s" % (uid, pass_token)}, timeout=15)
         if not r.text.startswith("&&&START&&&"):
-            raise RuntimeError("Xiaomi girisi basarisiz: " + r.text[:200])
+            raise RuntimeError("Xiaomi girişi başarısız: " + r.text[:200])
         v = json.loads(r.text[11:])
         if not v.get("location"):
-            raise RuntimeError("Xiaomi girisi gecersiz, go2rtc'de tekrar login ol: " + str(v.get("desc", ""))[:100])
+            raise RuntimeError("Xiaomi girişi geçersiz, go2rtc'de yeniden giriş yapın: " + str(v.get("desc", ""))[:100])
         ss = v.get("ssecurity")
         r2 = requests.get(v["location"], timeout=15)
         cerezler = {}
@@ -675,7 +825,7 @@ class XiaomiBulut:
                 except ValueError:
                     pass
         if not ss or "serviceToken" not in cerezler:
-            raise RuntimeError("Xiaomi oturumu acilamadi")
+            raise RuntimeError("Xiaomi oturumu açılamadı")
         self.ssecurity = base64.b64decode(ss)
         self.cerez = "userId=%s; cUserId=%s; serviceToken=%s" % (
             cerezler.get("userId", uid), cerezler.get("cUserId", ""), cerezler["serviceToken"])
@@ -731,6 +881,7 @@ def go2rtc_xiaomi_bilgisi(yaml_yolu):
             "did": q.get("did", [""])[0], "model": q.get("model", [""])[0]}
 
 
+YON_AD = {"sol": "sola", "sag": "sağa", "yukari": "yukarı", "asagi": "aşağı"}
 YON_KELIMELERI = {"sol": ["left", "\u5de6"], "sag": ["right", "\u53f3"], "yukari": ["up", "\u4e0a"], "asagi": ["down", "\u4e0b"]}
 PTZ_KELIMELERI = ["motor", "ptz", "turn", "rotat", "direction", "pan", "tilt", "yuntai", "holder",
                   "\u4e91\u53f0", "\u8f6c\u52a8", "\u65b9\u5411", "move"]
@@ -745,7 +896,7 @@ def miot_spec_indir(model, klasor):
     parca = model.split(".")
     kisa = parca[0] + "-" + parca[-1]  # chuangmi.camera.026c02 -> chuangmi-026c02
     spec = None
-    print("Kamera ozellik listesi (MIoT spec) indiriliyor...")
+    print("Kameranın özellik listesi (MIoT) indiriliyor...")
     for surum in (1, 2, 3):  # once dogrudan tahmin (kucuk ve hizli)
         urn = "urn:miot-spec-v2:device:camera:0000A01C:%s:%d" % (kisa, surum)
         try:
@@ -755,15 +906,15 @@ def miot_spec_indir(model, klasor):
         except Exception as e:
             print("  ", urn, "->", str(e)[:60])
     if spec is None:
-        print("  Tum cihaz listesi indiriliyor (buyuk dosya, 1-2 dk surebilir)...")
+        print("  Tüm cihaz listesi indiriliyor (büyük dosya, 1-2 dakika sürebilir)...")
         liste = requests.get("https://miot-spec.org/miot-spec-v2/instances?status=all", timeout=(15, 180)).json()
         uygun = [x for x in liste.get("instances", []) if x.get("model") == model]
         if not uygun:
-            raise RuntimeError("MIoT spec bulunamadi: " + model)
+            raise RuntimeError("Bu modelin özellik listesi bulunamadı: " + model)
         urn = max(uygun, key=lambda x: x.get("version", 0))["type"]
         spec = requests.get(taban, params={"type": urn}, timeout=30).json()
     json.dump(spec, open(yol, "w", encoding="utf-8"))
-    print("  Spec indirildi:", len(spec.get("services", [])), "servis")
+    print("  Özellik listesi indirildi:", len(spec.get("services", [])), "servis")
     return spec
 
 
@@ -837,7 +988,7 @@ def ptz_kalibre(gonder, adaylar, son_kare, bekle=2.0):
     """Her komutu dener, goruntunun nereye kaydigini olcer.
     sonuc: etki -> {aday, adim}. etki = goruntunun kaydigi yon (sol/sag/yukari/asagi)."""
     sonuc = {}
-    print("Kamera motoru kalibre ediliyor (%d komut denenecek, kamera donecek)..." % len(adaylar))
+    print("Kamera motoru ayarlanıyor (%d komut denenecek, kamera birkaç kez dönecek)..." % len(adaylar))
     for tur in range(2):  # ikinci tur: kamera bir uca dayanmis olabilir
         for aday in adaylar:
             if len(sonuc) == 4:
@@ -867,13 +1018,13 @@ def ptz_kalibre(gonder, adaylar, son_kare, bekle=2.0):
                 onceki = (dx, dy) if buyuk else None
                 time.sleep(0.15)
             if max(abs(dx), abs(dy)) < 8:
-                print("  %-28s goruntu kaymadi" % aday.get("ad", "")[:28])
+                print("  %-28s görüntü kaymadı" % aday.get("ad", "")[:28])
                 continue
             if abs(dx) >= abs(dy):
                 etki, adim = ("sol" if dx < 0 else "sag"), abs(dx)
             else:
                 etki, adim = ("yukari" if dy < 0 else "asagi"), abs(dy)
-            print("  %-28s goruntu %s kaydi (%d px, %.1f sn)" % (aday.get("ad", "")[:28], etki, adim, ilk_kayma or 0))
+            print("  %-28s görüntü %s kaydı (%d piksel, gecikme %.1f sn)" % (aday.get("ad", "")[:28], YON_AD[etki], adim, ilk_kayma or 0))
             sonuc.setdefault(etki, {"aday": aday, "adim": float(adim),
                                     "gecikme": round(ilk_kayma or 1.2, 2)})
     return sonuc
@@ -1018,7 +1169,7 @@ class PTZ:
         except Exception as ex:
             self.hata_sayisi += 1
             if self.hata_sayisi in (1, 5) or self.hata_sayisi % 20 == 0:
-                print("PTZ komut hatasi (%d): %s" % (self.hata_sayisi, str(ex)[:80]))
+                print("Motor komutu hatası (%d): %s" % (self.hata_sayisi, str(ex)[:80]))
         finally:
             with self.kilit:
                 self.ucusta -= 1
@@ -1068,7 +1219,7 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
     try:
         bilgi = go2rtc_xiaomi_bilgisi(os.path.join(betik_klasor, "go2rtc", "go2rtc.yaml"))
         if not bilgi:
-            print("PTZ: go2rtc.yaml icinde Xiaomi kamera bilgisi yok.")
+            print("Motor: go2rtc.yaml içinde Xiaomi kamera bilgisi yok.")
             return None
         bulut = XiaomiBulut(bilgi["uid"], bilgi["token"], bilgi["bolge"])
         gonder = bulut_gonderici(bulut, bilgi["did"])
@@ -1077,31 +1228,31 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
         if os.path.exists(ayar_yolu) and not kalibre_zorla:
             eslesme = json.load(open(ayar_yolu, encoding="utf-8"))
             if any("gecikme" not in v for v in eslesme.values()):
-                print("Eski PTZ ayari: gecikme olcumu icin bir kez yeniden kalibre edilecek.")
+                print("Eski motor ayarı: gecikme ölçümü için motor bir kez yeniden ayarlanacak.")
                 eslesme = None
         if eslesme:
-            print("PTZ ayari yuklendi:", ", ".join(sorted(eslesme)))
+            print("Motor ayarı yüklendi:", ", ".join(YON_AD.get(k, k) for k in sorted(eslesme)))
         else:
             try:
                 spec = miot_spec_indir(bilgi["model"], betik_klasor)
             except Exception as e:
-                print("Spec indirilemedi (%s), yedek komutlarla denenecek." % str(e)[:80])
+                print("Özellik listesi indirilemedi (%s), yedek komutlar denenecek." % str(e)[:80])
                 spec = {}
             eslesme = ptz_kalibre(gonder, ptz_adaylari(spec), son_kare)
             if not eslesme:
-                print("PTZ: hicbir komut kamerayi dondurmedi. Sabit kamera modunda devam.")
+                print("Motor: hiçbir komut kamerayı döndürmedi. Sabit kamera olarak devam ediliyor.")
                 return None
             json.dump(eslesme, open(ayar_yolu, "w", encoding="utf-8"), indent=1)
-            print("PTZ ayari kaydedildi:", ", ".join(sorted(eslesme)))
+            print("Motor ayarı kaydedildi:", ", ".join(YON_AD.get(k, k) for k in sorted(eslesme)))
             alan = os.path.join(betik_klasor, "alan_%s.json" % bilgi["did"])
             if os.path.exists(alan):
                 os.remove(alan)  # kalibrasyon kamerayi oynatti: eski konum/sinirlar gecersiz
-                print("Calisma alani sinirlari sifirlandi (kalibrasyon yapildi), yeniden belirleyin.")
+                print("Motor yeniden ayarlandığı için çalışma alanı sınırları silindi; yeniden belirleyin.")
         ptz = PTZ(gonder, eslesme)
         ptz.yukle(os.path.join(betik_klasor, "alan_%s.json" % bilgi["did"]))
         return ptz
     except Exception as e:
-        print("PTZ kullanilamiyor (%s). Sabit kamera modunda devam." % str(e)[:120])
+        print("Motor kullanılamıyor (%s). Sabit kamera olarak devam ediliyor." % str(e)[:120])
         return None
 
 
@@ -1471,7 +1622,7 @@ class UzakErisim:
         self.klasor, self.port = os.path.join(klasor, "cloudflared"), port
         self.konu = uzak_konu_al(klasor)
         self.sabit = "%s/%s" % (NTFY, self.konu)
-        self.url, self.durum, self.surec = None, "Internet erisimi baslatiliyor...", None
+        self.url, self.durum, self.surec = None, "İnternet erişimi başlatılıyor...", None
         self.son_duyuru = 0.0
         threading.Thread(target=self._calis, daemon=True).start()
         threading.Thread(target=self._tazele, daemon=True).start()
@@ -1489,14 +1640,14 @@ class UzakErisim:
             ad = "cloudflared"
         yol = os.path.join(self.klasor, ad)
         if not os.path.exists(yol):
-            self.durum = "Cloudflare tunel araci indiriliyor..."
+            self.durum = "Cloudflare tünel aracı indiriliyor..."
             print(self.durum)
             url = "https://github.com/cloudflare/cloudflared/releases/latest/download/" + dosya
             gecici = yol + ".indirilen"
 
             def guncelle(m):
                 self.durum = m
-            model_indir(url, gecici, "Cloudflare tunel araci", guncelle, en_az=5000000)
+            model_indir(url, gecici, "Cloudflare tünel aracı", guncelle, en_az=5000000)
             if dosya.endswith(".tgz"):
                 import tarfile
                 with tarfile.open(gecici) as t:
@@ -1511,7 +1662,7 @@ class UzakErisim:
         while True:
             try:
                 exe = self._exe()
-                self.durum = "Internet tuneli aciliyor..."
+                self.durum = "İnternet tüneli açılıyor..."
                 self.surec = subprocess.Popen(
                     [exe, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:%d" % self.port],
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
@@ -1522,18 +1673,18 @@ class UzakErisim:
                         self.url = m.group(0)
                         self.durum = "hazir"
                         print("-" * 60)
-                        print(" INTERNETTEN ERISIM (her yerden):")
-                        print("   Bu acilisin adresi : %s" % self.url)
+                        print(" İNTERNETTEN ERİŞİM (her yerden):")
+                        print("   Bu açılışın adresi : %s" % self.url)
                         print("   Sabit yer imi      : %s" % self.sabit)
-                        print("   (yer imi sayfasinda her zaman guncel adres yazar; PIN gerekir)")
+                        print("   (Yer imi sayfasında her zaman güncel adres yazar; giriş için PIN gerekir.)")
                         print("-" * 60)
                         self._duyur()
                 self.surec.wait()
                 self.url = None
-                self.durum = "Internet tuneli kapandi, yeniden aciliyor..."
+                self.durum = "İnternet tüneli kapandı, yeniden açılıyor..."
             except Exception as e:
                 self.url = None
-                self.durum = "Internet erisimi hatasi: %s (30 sn sonra tekrar)" % str(e)[:100]
+                self.durum = "İnternet erişimi hatası: %s (30 saniye sonra yeniden denenecek)" % str(e)[:100]
                 print(self.durum)
             time.sleep(30)
 
@@ -1544,13 +1695,13 @@ class UzakErisim:
         try:
             istek = urllib.request.Request(
                 "%s/%s" % (NTFY, self.konu), method="POST",
-                data=("Kamera Takip adresi: %s\n(Acmak icin dokun. PIN gerekir.)" % self.url).encode("utf-8"),
+                data=("Kamera Takip adresi: %s\n(Açmak için dokunun. Giriş için PIN gerekir.)" % self.url).encode("utf-8"),
                 headers={"Title": "Kamera Takip %s" % SURUM, "Click": self.url, "Tags": "video_camera",
                          "Actions": "view, Kamerayi ac, %s" % self.url})
             urllib.request.urlopen(istek, timeout=15).read()
             self.son_duyuru = time.time()
         except Exception as e:
-            print("Adres panosuna yazilamadi:", str(e)[:100])
+            print("Adres sayfasına yazılamadı:", str(e)[:100])
 
     def _tazele(self):
         while True:
@@ -1603,16 +1754,16 @@ def alan_metni(ptz, derece):
     s = ptz.sinir
     d = lambda v: "%+d (%+.0f\u00b0)" % (v, v * derece)
     if s["sol"] is None and s["sag"] is None:
-        yatay = "Yatay alan: sinirsiz"
+        yatay = "Yatay alan: sınırsız"
     else:
         yatay = "Yatay alan: %s .. %s" % (d(s["sol"]) if s["sol"] is not None else "-",
                                            d(s["sag"]) if s["sag"] is not None else "-")
     if s["ust"] is None and s["alt"] is None:
-        dikey = "Dikey: sinirsiz"
+        dikey = "Dikey alan: sınırsız"
     else:
-        dikey = "Dikey: %s .. %s" % (d(s["alt"]) if s["alt"] is not None else "-",
+        dikey = "Dikey alan: %s .. %s" % (d(s["alt"]) if s["alt"] is not None else "-",
                                      d(s["ust"]) if s["ust"] is not None else "-")
-    return "%s | %s | Konum: %s, %s" % (yatay, dikey, d(ptz.x), d(ptz.y))
+    return "%s  |  %s  |  Şu anki konum: %s, %s" % (yatay, dikey, d(ptz.x), d(ptz.y))
 
 
 def alan_ciz(kare, ptz):
@@ -1653,10 +1804,9 @@ def panel_ciz(kare, dugmeler, mod, basili):
         if ad == "mod":
             renk = YESIL if mod == "OTO" else SARI
             cv2.addWeighted(bolge, 0.25, np.full_like(bolge, renk), 0.75, 0, bolge)
-            metin = "OTOMATIK" if mod == "OTO" else "SABIT"
-            (tw, th), _ = cv2.getTextSize(metin, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-            cv2.putText(kare, metin, (x0 + (x1 - x0 - tw) // 2, y0 + (y1 - y0 + th) // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, KOYU, 2, cv2.LINE_AA)
+            metin = "OTOMATİK" if mod == "OTO" else "SABİT"
+            tw, th = yazi_boyut(metin, 19, True)
+            yazi(kare, metin, x0 + (x1 - x0 - tw) // 2, y0 + (y1 - y0 - th) // 2 - 2, 19, KOYU, True)
             continue
         dolgu = (255, 255, 255) if basili == ad else (60, 60, 60)
         cv2.addWeighted(bolge, 0.35, np.full_like(bolge, dolgu), 0.65, 0, bolge)
@@ -1668,10 +1818,10 @@ def panel_ciz(kare, dugmeler, mod, basili):
               "sag": [(mx + r, my), (mx - r // 2, my - r), (mx - r // 2, my + r)]}[ad]
         cv2.fillPoly(kare, [np.array(uc, np.int32)], KOYU if basili == ad else (235, 235, 235))
     x0, _, _, y1 = dugmeler["sol"]
-    cv2.putText(kare, "Oklar/WASD: dondur   P: oto/sabit   U: QR   Q: cikis",
-                (x0, dugmeler["asagi"][3] + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
-    cv2.putText(kare, "Sinir: 1 sol  2 sag  3 ust  4 alt  0 sil",
-                (x0, dugmeler["yukari"][1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
+    yazi(kare, "Oklar / WASD: döndür    P: otomatik/sabit    U: QR kod    Q: çıkış",
+         x0, dugmeler["asagi"][3] + 6, 14, (235, 235, 235))
+    yazi(kare, "Sınırlar: 1 sol   2 sağ   3 üst   4 alt   0 sil",
+         x0, dugmeler["yukari"][1] - 24, 14, (235, 235, 235))
 
 
 def main():
@@ -1698,6 +1848,8 @@ def main():
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
     p.add_argument("--tanima", choices=["acik", "kapali"], default="acik", help="Kisileri isimleriyle tani")
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
+    p.add_argument("--ses", choices=["emel", "ahmet"], default="emel",
+                   help="Selam sesi: emel (kadin) veya ahmet (erkek) - Microsoft dogal Turkce ses")
     p.add_argument("--selam-ara", type=float, default=600, help="Ayni kisiyi tekrar selamlamadan once beklenecek sn")
     p.add_argument("--uzak", choices=["acik", "kapali"], default="acik",
                    help="Internetten erisim (Cloudflare tuneli + sabit yer imi sayfasi)")
@@ -1710,6 +1862,7 @@ def main():
 
     betik_klasor = os.path.dirname(os.path.abspath(__file__))
     dedektor = YuzDedektor(betik_klasor, a.yuz_esik)
+    SES_AYAR.update(klasor=betik_klasor, ses=a.ses)
 
     tani = {"t": None}
     if a.tanima == "acik":
@@ -1721,10 +1874,10 @@ def main():
                     tani["t"] = YuzTaniyici(betik_klasor, YuzDedektor(betik_klasor, 0.6))
                     kl = tani["t"].liste()
                     TANIMA_DURUM["metin"] = "hazir"
-                    print("Yuz tanima hazir. Kayitli kisiler: %s" % (", ".join(k["ad"] for k in kl) or "yok"))
+                    print("Yüz tanıma hazır. Kayıtlı kişiler: %s" % (", ".join(k["ad"] for k in kl) or "yok"))
                     return
                 except Exception as e:
-                    TANIMA_DURUM["metin"] = "Yuz tanima hatasi: %s. 60 sn sonra tekrar denenecek (deneme %d)" % (
+                    TANIMA_DURUM["metin"] = "Yüz tanıma hatası: %s. 60 saniye sonra yeniden denenecek (%d. deneme)" % (
                         str(e)[:120], deneme)
                     print(TANIMA_DURUM["metin"])
                     time.sleep(60)
@@ -1736,24 +1889,24 @@ def main():
         try:
             web = WebSunucu(a.web_port, web_pin_al(betik_klasor))
             print("-" * 60)
-            print(" Telefondan / baska cihazdan izle ve kontrol et:")
+            print(" Telefondan ya da başka bir cihazdan izleyin ve yönetin:")
             print("   http://localhost:%d   (bu bilgisayardan)" % web.port)
             for adr in yerel_adresler():
-                ek = "   (Tailscale - disaridan)" if adr.startswith("100.") else "   (ev agi)"
+                ek = "   (Tailscale – dışarıdan)" if adr.startswith("100.") else "   (ev ağı)"
                 print("   http://%s:%d%s" % (adr, web.port, ek))
             print(" PIN: %s" % web.pin)
             print("-" * 60)
             if a.uzak == "acik":
                 uzak = UzakErisim(betik_klasor, web.port)
-                print(" Internetten erisim hazirlaniyor. Sabit yer imi: %s" % uzak.sabit)
-                print(" Kamera penceresinde U tusu: telefonla okutmak icin QR kod")
+                print(" İnternetten erişim hazırlanıyor. Sabit yer imi: %s" % uzak.sabit)
+                print(" Kamera penceresinde U tuşu: telefonla okutmak için QR kod")
         except OSError as e:
-            print("Web sayfasi baslatilamadi: %s" % e)
+            print("Web sayfası başlatılamadı: %s" % e)
 
     go2rtc_surec = None
     if a.kaynak == "go2rtc":
         a.kaynak, go2rtc_surec = go2rtc_hazirla(os.path.join(betik_klasor, "go2rtc"))
-        print("Baglaniliyor:", a.kaynak)
+        print("Kameraya bağlanılıyor:", a.kaynak)
 
     if a.simulasyon:
         okuyucu = SimKamera(a.simulasyon, gecikme=a.sim_gecikme)
@@ -1824,7 +1977,7 @@ def main():
     # Elle kontrol durumu
     el = {"mod": "OTO", "yon": None, "basla": 0.0, "bitis": 0.0, "kaynak": None, "tekrar": False,
           "dugmeler": {}}
-    pencere = "Kamera Takip %s  (cikis: q)" % SURUM
+    pencere = "Kamera Takip %s" % SURUM  # Windows pencere basligi Turkce harf gosteremez
 
     def el_basla(yon, kaynak):
         """Ok basildi: SABIT moda gec, hemen bir adim at; basili tutulursa surekli don."""
@@ -1883,19 +2036,19 @@ def main():
             elif islem == "ogren":
                 isim = " ".join(str(k.get("ad", "")).split())[:30]
                 if not tani["t"]:
-                    mesaj_ver("Yuz tanima henuz hazir degil, biraz bekle.")
+                    mesaj_ver("Yüz tanıma henüz hazır değil, lütfen biraz bekleyin.")
                 elif not isim:
-                    mesaj_ver("Once bir isim yaz.")
+                    mesaj_ver("Önce bir isim yazın.")
                 else:
                     ogren = {"ad": isim, "bitis": time.time() + 4.0, "ornekler": [], "son": 0.0}
-                    mesaj_ver("%s ogreniliyor: kameraya bak, basini hafifce cevir..." % isim)
+                    mesaj_ver("%s öğreniliyor: kameraya bakın, başınızı hafifçe sağa sola çevirin..." % isim)
             elif islem == "kisi_sil" and tani["t"]:
                 tani["t"].sil(str(k.get("ad", "")))
                 tanima.clear()
-                mesaj_ver("%s silindi" % k.get("ad", ""))
+                mesaj_ver("%s silindi." % k.get("ad", ""))
             elif islem == "sinir" and ptz and k.get("hangi") in ("sol", "sag", "ust", "alt", "sil"):
                 ptz.sinir_ayarla(k["hangi"])
-                print("Calisma alani:", alan_metni(ptz, derece_adim))
+                print("Çalışma alanı:", alan_metni(ptz, derece_adim))
         h, w = kare.shape[:2]
         temiz = kare.copy()  # fotograf icin cizimsiz kopya
         simdi = time.time()
@@ -1909,11 +2062,11 @@ def main():
             tur_adim = 360.0 / derece_adim
             tur_suresi = max(3.0, tur_adim * HIZ["tarama_aralik"] / HIZ["tarama_paralel"])
             tur_suresi = tur_suresi * 1.5 + ptz.gecikme  # pay: gecikme ve yavas komutlar
-            print("Doner kamera modu: tarama yapilacak, yuz gorulunce takip edilecek."
-                  " (goruntu gecikmesi ~%.1f sn)" % ptz.gecikme)
-            print("Tarama: adim ~%.0f derece, tam tur ~%.0f adim, tahmini ~%.1f sn"
+            print("Döner kamera modu: kamera tarama yapacak, yüz görünce takip edecek."
+                  " (görüntü gecikmesi yaklaşık %.1f sn)" % ptz.gecikme)
+            print("Tarama: bir adım yaklaşık %.0f°, tam tur yaklaşık %.0f adım, tahmini süre %.1f sn"
                   % (derece_adim, tur_adim, tur_suresi))
-            print("Calisma alani:", alan_metni(ptz, derece_adim))
+            print("Çalışma alanı:", alan_metni(ptz, derece_adim))
         if ptz:
             # Doner kamera: hareket algilama yok (kamera donerken her sey hareketli
             # gorunur). Her karede yuz aranir.
@@ -1987,19 +2140,19 @@ def main():
                 elif sayim.get("?", 0) >= 4 and (not en or sayim[en] < 2):
                     td["ad"] = "?"
                 if td["ad"] and td["ad"] != "?" and td["ad"] != onceki:
-                    print("Tanindi: %s (benzerlik %.2f)" % (td["ad"], skor))
+                    print("Tanındı: %s (benzerlik %.2f)" % (td["ad"], skor))
                     if a.selam == "acik" and simdi - son_selam.get(td["ad"], 0) > a.selam_ara:
                         son_selam[td["ad"]] = simdi
-                        metin = "Merhaba %s" % td["ad"]
+                        metin = selam_metni(td["ad"])
                         sesli_soyle(metin)
                         selam_olay["no"] += 1
                         selam_olay["metin"] = metin
             if td["ad"] and td["ad"] != "?":
-                etiket, renk = ascii_ad(td["ad"]), YESIL
+                etiket, renk = td["ad"], YESIL
             elif td["ad"] == "?":
-                etiket, renk = "Taninmiyor", TURUNCU
+                etiket, renk = "Tanınmıyor", TURUNCU
             else:
-                etiket, renk = f"Yuz {i}", (170, 210, 170)
+                etiket, renk = f"Yüz {i}", (170, 210, 170)
 
             iz = list(yuz_takip.izler[i])
             for k in range(1, len(iz)):
@@ -2015,7 +2168,7 @@ def main():
                 kim = ascii_ad(td["ad"]) if td["ad"] and td["ad"] != "?" else str(i)
                 ad = os.path.join(a.yuz_klasor, datetime.now().strftime("yuz_%Y%m%d_%H%M%S_") + kim + ".jpg")
                 cv2.imwrite(ad, yuz_kirp(temiz, yuz_takip.kutular[i]))
-                print("Yuz yakalandi:", ad)
+                print("Yüz fotoğrafı kaydedildi:", ad)
         for i in list(tanima):
             if i not in yuz_takip.nesneler:
                 tanima.pop(i, None)
@@ -2034,17 +2187,17 @@ def main():
                 if ham is not None:
                     ogren["son"] = simdi
                     ogren["ornekler"].append(taniyici.ozellik(temiz, ham))
-            yazi_kutusu(kare, "OGRENILIYOR: %s (%d/10)" % (ascii_ad(ogren["ad"]), len(ogren["ornekler"])),
+            yazi_kutusu(kare, "ÖĞRENİLİYOR: %s (%d/10)" % (ogren["ad"], len(ogren["ornekler"])),
                         12, 70, SARI, 0.6, 2)
             if simdi > ogren["bitis"] or len(ogren["ornekler"]) >= 10:
                 if len(ogren["ornekler"]) >= 3:
                     taniyici.ekle(ogren["ad"], ogren["ornekler"])
-                    mesaj_ver("%s kaydedildi (%d ornek)%s" % (
+                    mesaj_ver("%s kaydedildi (%d örnek)%s" % (
                         ogren["ad"], len(ogren["ornekler"]),
-                        ". Dikkat: birden fazla yuz vardi, en buyugu kaydedildi" if ogren.get("uyari") else ""))
+                        ". Dikkat: görüntüde birden fazla yüz vardı, en büyüğü kaydedildi" if ogren.get("uyari") else ""))
                     tanima.clear()
                 else:
-                    mesaj_ver("%s kaydedilemedi: yuz yeterince gorulmedi. Kameraya bakip tekrar dene."
+                    mesaj_ver("%s kaydedilemedi: yüz yeterince görülmedi. Kameraya bakarak yeniden deneyin."
                               % ogren["ad"])
                 ogren = None
 
@@ -2127,24 +2280,24 @@ def main():
                 ptz.surekli(tarama_yonu, HIZ["tarama_aralik"], HIZ["tarama_paralel"])
 
         if ptz_durum["hazirlaniyor"]:
-            durum_yaz(kare, "KAMERA MOTORU HAZIRLANIYOR...", MAVI)
+            durum_yaz(kare, "KAMERA MOTORU HAZIRLANIYOR…", MAVI)
         elif ptz and el["mod"] == "SABIT":
-            durum_yaz(kare, ("SABIT - yuz: %d" % len(aktif)) if aktif else "SABIT - elle kontrol", SARI)
+            durum_yaz(kare, ("SABİT – %d yüz" % len(aktif)) if aktif else "SABİT – elle kontrol", SARI)
         elif aktif:
-            durum_yaz(kare, f"YUZ TAKIP: {len(aktif)}", YESIL)
+            durum_yaz(kare, f"YÜZ TAKİBİ: {len(aktif)}", YESIL)
         elif ptz and simdi - son_yuz_zamani <= 3:
-            durum_yaz(kare, "Yuz kayboldu - bekleniyor", SARI)
+            durum_yaz(kare, "Yüz kayboldu – bekleniyor", SARI)
         elif ptz:
-            durum_yaz(kare, "TARAMA - yuz araniyor", MAVI)
+            durum_yaz(kare, "TARAMA – yüz aranıyor", MAVI)
         elif hareket or yuz_bekleme > 0:
-            durum_yaz(kare, "HAREKET - yuz araniyor", SARI)
+            durum_yaz(kare, "HAREKET – yüz aranıyor", SARI)
         else:
             durum_yaz(kare, "Bekleniyor", GRI)
 
         fps = 0.9 * fps + 0.1 / max(simdi - fps_t, 1e-6)
         fps_t = simdi
-        cv2.putText(kare, f"{fps:.0f} FPS", (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, GRI, 1, cv2.LINE_AA)
-        (sw, _), _ = cv2.getTextSize(SURUM, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        yazi(kare, f"{fps:.0f} kare/sn", 10, h - 22, 13, GRI)
+        sw, _ = yazi_boyut(SURUM, 21, True)
         yazi_kutusu(kare, SURUM, w - sw - 22, h - 12, SARI, 0.7, 2)
 
         if a.kaydet:
@@ -2154,13 +2307,13 @@ def main():
                     os.makedirs(a.kaydet, exist_ok=True)
                     ad = os.path.join(a.kaydet, datetime.now().strftime("hareket_%Y%m%d_%H%M%S.mp4"))
                     yazici = cv2.VideoWriter(ad, cv2.VideoWriter_fourcc(*"mp4v"), 15, (w, h))
-                    print("Kayit basladi:", ad)
+                    print("Video kaydı başladı:", ad)
             if yazici is not None:
                 yazici.write(kare)
                 if simdi - son_olay > 5:
                     yazici.release()
                     yazici = None
-                    print("Kayit bitti")
+                    print("Video kaydı bitti.")
 
         if ptz:
             alan_ciz(kare, ptz)
@@ -2182,22 +2335,20 @@ def main():
             web.kare_ver(kare)
 
         if web and not a.goruntusuz:
-            yazi_kutusu(kare, "Kisi kaydi / telefon: http://localhost:%d  PIN %s" % (web.port, web.pin),
+            yazi_kutusu(kare, "Kişi kaydı ve telefon: http://localhost:%d    PIN: %s" % (web.port, web.pin),
                         12, 62 if not ogren else 100, (200, 200, 200), 0.5, 1)
         if qr_goster and uzak and not a.goruntusuz:
             q = qr_resmi(uzak.sabit, min(300, h - 120))
             qy, qx = (h - q.shape[0]) // 2, (w - q.shape[1]) // 2
             cv2.rectangle(kare, (qx - 20, qy - 50), (qx + q.shape[1] + 20, qy + q.shape[0] + 40), (255, 255, 255), -1)
             kare[qy:qy + q.shape[0], qx:qx + q.shape[1]] = q
-            cv2.putText(kare, "Telefonla okut, yer imlerine ekle", (qx - 10, qy - 18),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, KOYU, 2, cv2.LINE_AA)
-            cv2.putText(kare, uzak.sabit, (qx - 10, qy + q.shape[0] + 26),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.42, KOYU, 1, cv2.LINE_AA)
+            yazi(kare, "Telefonla okutun, yer imlerine ekleyin", qx - 10, qy - 40, 18, KOYU, True)
+            yazi(kare, uzak.sabit, qx - 10, qy + q.shape[0] + 10, 13, KOYU)
         elif uzak and not a.goruntusuz:
-            yazi_kutusu(kare, ("Internet: hazir  (U: QR kod)" if uzak.url else ascii_ad(uzak.durum)[:70]),
+            yazi_kutusu(kare, ("İnternetten erişim: hazır (QR kod için U)" if uzak.url else uzak.durum[:80]),
                         12, 114 if not ogren else 152, (200, 200, 200), 0.5, 1)
         if a.tanima == "acik" and not tani["t"] and not a.goruntusuz:
-            yazi_kutusu(kare, ascii_ad(TANIMA_DURUM["metin"])[:90], 12, 88 if not ogren else 126, SARI, 0.5, 1)
+            yazi_kutusu(kare, TANIMA_DURUM["metin"][:100], 12, 88 if not ogren else 126, SARI, 0.5, 1)
 
         if ptz:
             el["dugmeler"] = panel_dugmeleri(w, h)
@@ -2218,7 +2369,7 @@ def main():
                     el_basla(TUS_YON[tus], "tus")
                 elif ptz and tus in SINIR_TUS:
                     ptz.sinir_ayarla(SINIR_TUS[tus])
-                    print("Calisma alani:", alan_metni(ptz, derece_adim))
+                    print("Çalışma alanı:", alan_metni(ptz, derece_adim))
         elif kare_no % 15 == 0:
             print(f"kare {kare_no}: hareket={hareket} ptz={ptz.son_etki if ptz else '-'} yuzler=" +
                   ", ".join(f"Yuz{i}@{k[:2]}" for i, k in aktif))

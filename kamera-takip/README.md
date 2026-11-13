@@ -108,6 +108,17 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## Türkçe (v10)
+
+- Kamera penceresindeki bütün yazılar Türkçe harflerle (Segoe UI yazı tipi), siyah
+  pencere ve web sayfası düzgün Türkçe.
+- Selam sesi **Microsoft'un doğal Türkçe sesiyle** söylenir (Emel; erkek sesi için
+  `--ses ahmet`). Olmazsa Google Türkçe sesi, o da olmazsa Windows sesi.
+  Her cümle bir kez üretilip `ses_onbellek` klasöründe saklanır.
+- Selam günün saatine göre: "Günaydın / Merhaba / İyi akşamlar / İyi geceler
+  Taylan, hoş geldin." Büyük harfle kaydedilen adlar Türkçe kurallarla düzeltilir
+  (TAYLAN → Taylan, IŞIL → Işıl).
+
 ## Kişileri tanıma ve isimle selamlama (v5)
 
 Program kayıtlı kişileri yüzünden tanır, ekranda adını yazar ve bilgisayar

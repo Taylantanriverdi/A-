@@ -1,30 +1,31 @@
 @echo off
+chcp 65001 >nul
 setlocal
 title Kamera Hareket Takibi
 REM ================================================================
-REM  Kamera Hareket Takibi - tek dosya kurulum + calistirma
-REM  Bu dosyaya cift tikla. Her seyi kendisi yapar:
+REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
+REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
 REM   1) Python yoksa kurar
-REM   2) Gerekli kutuphaneleri kurar (opencv, numpy)
-REM   3) Takip programini cikarir
-REM   4) go2rtc'yi indirir ve baslatir, Xiaomi girisi icin tarayici acar
-REM   5) Kamera eklenince tarama + yuz takibini baslatir (doner kamerada
-REM      ilk seferde motor kalibrasyonu yapar, kamera biraz doner)
+REM   2) Gerekli kütüphaneleri kurar
+REM   3) Takip programını hazırlar
+REM   4) go2rtc'yi indirip başlatır, Xiaomi girişi için tarayıcıyı açar
+REM   5) Kamera eklenince tarama ve yüz takibini başlatır
 REM ================================================================
 
 set "BAT_YOLU=%~f0"
 set "KLASOR=%LOCALAPPDATA%\KameraTakip"
+set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo [1/4] Python kontrol ediliyor...
+echo [1/4] Python denetleniyor...
 set "PY="
 py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
 if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
 if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PY="%LOCALAPPDATA%\Programs\Python\Python312\python.exe""
 if defined PY goto python_var
 
-echo Python bulunamadi, kuruluyor (birkac dakika surebilir)...
+echo Python bulunamadı, kuruluyor (birkaç dakika sürebilir)...
 where winget >nul 2>&1
 if errorlevel 1 goto python_elle
 winget install -e --id Python.Python.3.12 --scope user --silent --accept-package-agreements --accept-source-agreements
@@ -32,45 +33,45 @@ if not exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" goto python_e
 set "PY="%LOCALAPPDATA%\Programs\Python\Python312\python.exe""
 
 :python_var
-echo Python hazir.
+echo Python hazır.
 
 echo.
-echo [2/4] Kutuphaneler kuruluyor (ilk seferde biraz surer)...
-%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests
+echo [2/4] Kütüphaneler kuruluyor (ilk seferde biraz sürer)...
+%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests pillow edge-tts gTTS
 if errorlevel 1 (
-  echo HATA: Kutuphaneler kurulamadi. Internet baglantini kontrol et.
+  echo HATA: Kütüphaneler kurulamadı. İnternet bağlantınızı kontrol edin.
   pause
   exit /b 1
 )
 
 echo.
-echo [3/4] Takip programi hazirlaniyor...
+echo [3/4] Takip programı hazırlanıyor...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=[IO.File]::ReadAllText($env:BAT_YOLU); $p=$c -split '::PYTHON_KODU_BURADA::'; [IO.File]::WriteAllText($env:KLASOR + '\takip.py', $p[$p.Length-1].TrimStart())"
 if not exist "%KLASOR%\takip.py" (
-  echo HATA: takip.py olusturulamadi.
+  echo HATA: takip.py oluşturulamadı.
   pause
   exit /b 1
 )
 
 echo.
-echo [4/4] Kamera baglantisi kuruluyor ve takip baslatiliyor...
-echo       Takip penceresinden cikmak icin: q veya Esc
+echo [4/4] Kameraya bağlanılıyor ve takip başlatılıyor...
+echo       Takip penceresinden çıkmak için: Q veya Esc
 cd /d "%KLASOR%"
 %PY% takip.py --kaynak go2rtc --maske-saat --kaydet "%USERPROFILE%\Videos\KameraTakip" --yuz-klasor "%USERPROFILE%\Pictures\KameraTakip"
 echo.
-echo Hareket videolari : %USERPROFILE%\Videos\KameraTakip
-echo Yuz fotograflari  : %USERPROFILE%\Pictures\KameraTakip
+echo Hareket videoları  : %USERPROFILE%\Videos\KameraTakip
+echo Yüz fotoğrafları   : %USERPROFILE%\Pictures\KameraTakip
 pause
 exit /b 0
 
 :python_elle
 echo.
-echo Python otomatik kurulamadi.
-echo Lutfen https://www.python.org/downloads/ adresinden Python'u kur,
-echo kurulumda "Add Python to PATH" kutusunu isaretle, sonra bu dosyayi tekrar calistir.
+echo Python otomatik olarak kurulamadı.
+echo Lütfen https://www.python.org/downloads/ adresinden Python'u kurun,
+echo kurulumda "Add Python to PATH" kutusunu işaretleyin, sonra bu dosyayı yeniden çalıştırın.
 start "" https://www.python.org/downloads/
 pause
 exit /b 1
 
-REM ---- Asagisi Python kodudur, bat tarafindan calistirilmaz ----
+REM ---- Aşağısı Python kodudur, bat tarafından çalıştırılmaz ----
 ::PYTHON_KODU_BURADA::
