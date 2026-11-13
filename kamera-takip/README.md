@@ -1,5 +1,15 @@
 # Kamera Hareket Takibi
 
+## En kolay yol (Windows): tek dosya
+
+**`KameraTakip.bat`** dosyasını bilgisayarına indir ve çift tıkla. Gerisini kendisi yapar:
+Python yoksa kurar, kütüphaneleri kurar, go2rtc'yi indirip başlatır, Xiaomi
+girişi için tarayıcıyı açar, kamera eklenince takibi başlatır. Hareket kayıtları
+`Videolar\KameraTakip` klasörüne gider. Sonraki açılışlarda doğrudan takibe geçer.
+
+(`takip.py` değişirse `python bat_olustur.py` ile bat yeniden üretilir.)
+
+
 Xiaomi ev tipi IP kameradan (veya herhangi bir kameradan) gelen görüntüde
 hareket eden nesneleri bulur, her birine kalıcı bir **ID** verir, etrafına kutu
 çizer ve geçtiği yolu (iz) gösterir. İstenirse hareket olduğunda video kaydeder.
@@ -62,8 +72,8 @@ Bilgisayar ve kamera **aynı Wi-Fi/modemde** olmalı. go2rtc her bağlantıda
 ```bash
 python takip.py --kaynak rtsp://127.0.0.1:8554/xiaomi --maske-saat
 ```
-Windows'ta bunun yerine `baslat.bat`'a çift tıklayabilirsin: go2rtc'yi açar,
-5 sn bekler, takibi hareket kaydıyla başlatır.
+`--kaynak go2rtc` yazarsan program go2rtc'yi kendisi indirir, başlatır ve
+kamera eklenene kadar bekler.
 
 ### Görüntü gelmezse
 - Akış adresinin sonuna `&subtype=sd` ekle (düşük kalite ama daha uyumlu).

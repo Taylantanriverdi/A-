@@ -6,14 +6,22 @@ Kaynak olarak RTSP adresi, video dosyasi ya da USB kamera numarasi verilebilir:
     python takip.py --kaynak rtsp://127.0.0.1:8554/xiaomi
     python takip.py --kaynak kayit.mp4
     python takip.py --kaynak 0
+    python takip.py --kaynak go2rtc     # go2rtc'yi indirir, baslatir, Xiaomi kamerayi bekler
 
 Yontem: arka plan cikarma (MOG2) ile hareketli pikseller bulunur, konturlar
 kutulara cevrilir, her kutu merkez noktasina gore bir kimlik (ID) ile
 kareden kareye takip edilir. Her nesnenin izi ekrana cizilir.
 """
 import argparse
+import json
 import os
+import platform
+import subprocess
+import sys
 import time
+import urllib.request
+import webbrowser
+import zipfile
 from collections import OrderedDict, deque
 from datetime import datetime
 
@@ -91,6 +99,89 @@ class MerkezTakipci:
         return self.nesneler
 
 
+GO2RTC_API = "http://127.0.0.1:1984"
+GO2RTC_YAML = """api:
+  listen: ":1984"
+rtsp:
+  listen: ":8554"
+"""
+
+
+def _go2rtc_dosyasi():
+    sistem, mimari = platform.system(), platform.machine().lower()
+    arm = mimari in ("arm64", "aarch64")
+    if sistem == "Windows":
+        return "go2rtc_win_arm64.zip" if arm else "go2rtc_win64.zip", "go2rtc.exe"
+    if sistem == "Darwin":
+        return "go2rtc_mac_arm64.zip" if arm else "go2rtc_mac_amd64.zip", "go2rtc"
+    return "go2rtc_linux_arm64" if arm else "go2rtc_linux_amd64", "go2rtc"
+
+
+def _akislar():
+    try:
+        with urllib.request.urlopen(GO2RTC_API + "/api/streams", timeout=2) as r:
+            return json.loads(r.read().decode() or "{}") or {}
+    except Exception:
+        return None  # go2rtc calismiyor
+
+
+def go2rtc_hazirla(klasor):
+    """go2rtc'yi gerekirse indirir ve baslatir, kamera eklenene kadar bekler.
+    Donus: (rtsp adresi, baslatilan surec veya None)"""
+    os.makedirs(klasor, exist_ok=True)
+    dosya, exe = _go2rtc_dosyasi()
+    exe_yolu = os.path.join(klasor, exe)
+    yaml_yolu = os.path.join(klasor, "go2rtc.yaml")
+    surec = None
+
+    if _akislar() is None:
+        if not os.path.exists(exe_yolu):
+            url = "https://github.com/AlexxIT/go2rtc/releases/latest/download/" + dosya
+            print("go2rtc indiriliyor:", url)
+            hedef = os.path.join(klasor, dosya)
+            urllib.request.urlretrieve(url, hedef)
+            if dosya.endswith(".zip"):
+                with zipfile.ZipFile(hedef) as z:
+                    z.extract(exe, klasor)
+                os.remove(hedef)
+            else:
+                os.replace(hedef, exe_yolu)
+            os.chmod(exe_yolu, 0o755)
+        if not os.path.exists(yaml_yolu):
+            with open(yaml_yolu, "w") as f:
+                f.write(GO2RTC_YAML)
+        print("go2rtc baslatiliyor...")
+        log = open(os.path.join(klasor, "go2rtc.log"), "a")
+        surec = subprocess.Popen([exe_yolu, "-config", yaml_yolu], cwd=klasor,
+                                 stdout=log, stderr=subprocess.STDOUT)
+        for _ in range(30):
+            if _akislar() is not None:
+                break
+            if surec.poll() is not None:
+                raise SystemExit("go2rtc acilamadi, go2rtc.log dosyasina bak.")
+            time.sleep(0.5)
+        else:
+            raise SystemExit("go2rtc cevap vermiyor (1984 portu dolu olabilir).")
+
+    akislar = _akislar() or {}
+    if not akislar:
+        print()
+        print("=" * 64)
+        print(" Kamera henuz eklenmemis. Tarayicida go2rtc acilacak:")
+        print("   1) Add  ->  Xiaomi")
+        print("   2) Xiaomi Home hesabinla giris yap (kod/captcha isterse doldur)")
+        print("   3) Listeden kamerani sec ve ekle")
+        print(" Kamera eklenince takip KENDILIGINDEN baslar. Bu pencereyi kapatma.")
+        print("=" * 64)
+        webbrowser.open("http://localhost:1984/")
+        while not akislar:
+            time.sleep(3)
+            akislar = _akislar() or {}
+    ad = next(iter(akislar))
+    print("Kamera akisi bulundu:", ad)
+    return "rtsp://127.0.0.1:8554/" + urllib.request.quote(ad), surec
+
+
 def kaynak_ac(kaynak):
     if kaynak.isdigit():
         return cv2.VideoCapture(int(kaynak))
@@ -113,7 +204,18 @@ def main():
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
     a = p.parse_args()
 
+    go2rtc_surec = None
+    if a.kaynak == "go2rtc":
+        klasor = os.path.join(os.path.dirname(os.path.abspath(__file__)), "go2rtc")
+        a.kaynak, go2rtc_surec = go2rtc_hazirla(klasor)
+        print("Baglaniliyor:", a.kaynak)
+
     cap = kaynak_ac(a.kaynak)
+    for _ in range(10):  # kamera ilk acilista birkac saniye gecikebilir
+        if cap.isOpened():
+            break
+        time.sleep(2)
+        cap = kaynak_ac(a.kaynak)
     if not cap.isOpened():
         raise SystemExit(f"Kaynak acilamadi: {a.kaynak}")
 
@@ -206,6 +308,8 @@ def main():
     cap.release()
     if not a.goruntusuz:
         cv2.destroyAllWindows()
+    if go2rtc_surec is not None:
+        go2rtc_surec.terminate()
 
 
 if __name__ == "__main__":

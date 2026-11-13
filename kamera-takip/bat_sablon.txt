@@ -1,0 +1,74 @@
+@echo off
+setlocal
+title Kamera Hareket Takibi
+REM ================================================================
+REM  Kamera Hareket Takibi - tek dosya kurulum + calistirma
+REM  Bu dosyaya cift tikla. Her seyi kendisi yapar:
+REM   1) Python yoksa kurar
+REM   2) Gerekli kutuphaneleri kurar (opencv, numpy)
+REM   3) Takip programini cikarir
+REM   4) go2rtc'yi indirir ve baslatir, Xiaomi girisi icin tarayici acar
+REM   5) Kamera eklenince hareket takibini baslatir
+REM ================================================================
+
+set "BAT_YOLU=%~f0"
+set "KLASOR=%LOCALAPPDATA%\KameraTakip"
+if not exist "%KLASOR%" mkdir "%KLASOR%"
+
+echo.
+echo [1/4] Python kontrol ediliyor...
+set "PY="
+py -3 -c "import sys" >nul 2>&1 && set "PY=py -3"
+if not defined PY python -c "import sys" >nul 2>&1 && set "PY=python"
+if not defined PY if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PY="%LOCALAPPDATA%\Programs\Python\Python312\python.exe""
+if defined PY goto python_var
+
+echo Python bulunamadi, kuruluyor (birkac dakika surebilir)...
+where winget >nul 2>&1
+if errorlevel 1 goto python_elle
+winget install -e --id Python.Python.3.12 --scope user --silent --accept-package-agreements --accept-source-agreements
+if not exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" goto python_elle
+set "PY="%LOCALAPPDATA%\Programs\Python\Python312\python.exe""
+
+:python_var
+echo Python hazir.
+
+echo.
+echo [2/4] Kutuphaneler kuruluyor (ilk seferde biraz surer)...
+%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy
+if errorlevel 1 (
+  echo HATA: Kutuphaneler kurulamadi. Internet baglantini kontrol et.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [3/4] Takip programi hazirlaniyor...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$c=[IO.File]::ReadAllText($env:BAT_YOLU); $p=$c -split '::PYTHON_KODU_BURADA::'; [IO.File]::WriteAllText($env:KLASOR + '\takip.py', $p[$p.Length-1].TrimStart())"
+if not exist "%KLASOR%\takip.py" (
+  echo HATA: takip.py olusturulamadi.
+  pause
+  exit /b 1
+)
+
+echo.
+echo [4/4] Kamera baglantisi kuruluyor ve takip baslatiliyor...
+echo       Takip penceresinden cikmak icin: q veya Esc
+cd /d "%KLASOR%"
+%PY% takip.py --kaynak go2rtc --maske-saat --kaydet "%USERPROFILE%\Videos\KameraTakip"
+echo.
+echo Hareket kayitlari: %USERPROFILE%\Videos\KameraTakip
+pause
+exit /b 0
+
+:python_elle
+echo.
+echo Python otomatik kurulamadi.
+echo Lutfen https://www.python.org/downloads/ adresinden Python'u kur,
+echo kurulumda "Add Python to PATH" kutusunu isaretle, sonra bu dosyayi tekrar calistir.
+start "" https://www.python.org/downloads/
+pause
+exit /b 1
+
+REM ---- Asagisi Python kodudur, bat tarafindan calistirilmaz ----
+::PYTHON_KODU_BURADA::
