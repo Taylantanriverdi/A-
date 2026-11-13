@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v15
+title Kamera Hareket Takibi v16
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v15
+echo Kamera Takip v16
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v15"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v16"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -308,18 +308,26 @@ def go2rtc_ffmpeg_ayarla(yaml_yolu):
         print("Uyar\u0131: FFmpeg yolunda bo\u015fluk var, kamera hoparl\u00f6r\u00fc \u00e7al\u0131\u015fmayabilir: " + ff)
     ff = ff.replace("\\", "/")
     metin = open(yaml_yolu, encoding="utf-8").read()
-    satir = '  bin: "%s"' % ff
-    m = re.search(r"^ffmpeg:[ \t]*\n([ \t]+bin:.*)$", metin, re.M)
-    if m:
-        if m.group(1).strip() == satir.strip():
-            return False
-        metin = metin[:m.start(1)] + satir + metin[m.end(1):]
-    elif re.search(r"^ffmpeg:", metin, re.M):
-        metin = re.sub(r"^ffmpeg:[ \t]*\n", "ffmpeg:\n" + satir + "\n", metin, count=1, flags=re.M)
-    else:
-        metin = metin.rstrip("\n") + "\n\nffmpeg:\n" + satir + "\n"
+    # ffmpeg bolumunu bastan yaz: FFmpeg yolu + Xiaomi hoparlor uyarlamasi.
+    # go2rtc'nin Xiaomi surucusu hoparlore 8 kHz (40 ms = 320 bayt) PCMA yollar ama kanali
+    # kameranin mikrofon bicimiyle (PCMA/16000) acar. 16 kHz ses yollarsak kamera iki kat
+    # veri alir ve cizirti olur. Bu ayar sesi 8 kHz'e indirip 16000 etiketiyle yollar.
+    bolum = ('ffmpeg:\n  bin: "%s"\n'
+             '  xiaomi_hoparlor: "-c:a pcm_alaw -af aresample=8000,asetrate=16000 -ar:a 16000 -ac:a 1"\n' % ff)
+    satirlar, atla = [], False
+    for satir in metin.splitlines():
+        if re.match(r"^ffmpeg:\s*$", satir):
+            atla = True
+            continue
+        if atla and (satir.startswith((" ", "\t")) or not satir.strip()):
+            continue
+        atla = False
+        satirlar.append(satir)
+    yeni_metin = "\n".join(satirlar).rstrip("\n") + "\n\n" + bolum
+    if yeni_metin == metin:
+        return False
     with open(yaml_yolu, "w", encoding="utf-8") as f:
-        f.write(metin)
+        f.write(yeni_metin)
     return True
 
 
@@ -639,7 +647,8 @@ def selam_metni(ad):
 
 
 SESLER = {"emel": "tr-TR-EmelNeural", "ahmet": "tr-TR-AhmetNeural"}
-SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None, "son_hata": ""}
+SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None, "son_hata": "",
+            "uyarlama": True}
 
 
 def _ses_dosyasi(metin):
@@ -715,6 +724,8 @@ def kamera_ses_kanali():
             kodek = parca[2].upper()  # ornek: PCMA/16000, PCMA, PCMU/8000, OPUS/48000/2
             ad = kodek.split("/")[0]
             hiz = kodek.split("/")[1] if "/" in kodek else "8000"
+            if ad == "PCMA" and hiz == "16000" and SES_AYAR.get("uyarlama", True):
+                return "xiaomi_hoparlor", kodek + " (8 kHz uyarlamal\u0131)"
             if ad in ("PCMA", "PCMU"):
                 return "%s/%s" % (ad.lower(), hiz), kodek
             if ad == "OPUS":
@@ -750,7 +761,7 @@ def kameradan_cal(dosya):
         denenecek = [bicim]
     else:
         print("Kamera hoparl\u00f6r kanal\u0131: %s" % aciklama)
-        denenecek = ["pcma/16000", "pcma/8000", "opus"]
+        denenecek = ["xiaomi_hoparlor", "pcma/8000", "opus"]
     hatalar = []
     for kodek in denenecek:
         src = "ffmpeg:%s#input=file#audio=%s" % (giris, kodek)
@@ -758,7 +769,7 @@ def kameradan_cal(dosya):
             _api("/api/streams?dst=%s&src=%s" % (urllib.request.quote(akis), urllib.request.quote(src, safe="")),
                  "POST", 20)
             SES_AYAR["son_hata"] = ""
-            print("Ses kameran\u0131n hoparl\u00f6r\u00fcne g\u00f6nderildi (%s)." % kodek.upper())
+            print("Ses kameran\u0131n hoparl\u00f6r\u00fcne g\u00f6nderildi (%s)." % (aciklama if bicim else kodek))
             return True
         except urllib.error.HTTPError as e:
             hatalar.append("%s: %s" % (kodek, e.read().decode("utf-8", "replace").strip()[:80]))
@@ -1681,6 +1692,7 @@ bu s&#305;rada ba&#351;&#305;n&#305; hafif&ccedil;e sa&#287;a sola &ccedil;evirs
 <ul id="kliste" class="kliste"></ul>
 <label class="sec"><input type="checkbox" id="telses"> Selam&#305; telefonda da sesli s&ouml;yle</label>
 <button type="button" id="sesdene" class="ikincil">&#128264; Kameradan test sesi &ccedil;al</button>
+<button type="button" id="uyarlama" class="ikincil">&#128260; Hoparl&ouml;r uyarlamas&#305;n&#305; a&ccedil;/kapat ve dene</button>
 <button type="button" id="leddene" class="ikincil">&#128309; Mavi &#305;&#351;&#305;&#287;&#305; dene (5 sn yan&#305;p s&ouml;ner)</button>
 <p id="seshata" class="alanyazi" style="color:var(--sari)"></p>
 </section>
@@ -1704,6 +1716,7 @@ kadI.addEventListener("keydown",function(e){if(e.key==="Enter")kaydetD.click();}
 var telses=document.getElementById("telses");try{telses.checked=localStorage.getItem("telses")==="1";}catch(e){}
 telses.addEventListener("change",function(){try{localStorage.setItem("telses",telses.checked?"1":"0");}catch(e){}
  if(telses.checked&&window.speechSynthesis){var u=new SpeechSynthesisUtterance("Ses a\u00e7\u0131k");u.lang="tr-TR";speechSynthesis.speak(u);}});
+document.getElementById("uyarlama").addEventListener("click",function(){gonder({islem:"uyarlama"}).then(function(){setTimeout(guncelle,500);});});
 document.getElementById("leddene").addEventListener("click",function(){gonder({islem:"led_dene"}).then(function(){setTimeout(guncelle,500);});});
 document.getElementById("sesdene").addEventListener("click",function(){gonder({islem:"ses_dene"}).then(function(){setTimeout(guncelle,1500);});});
 var sonSelam=null,silOnay=null,sonListe="";
@@ -2204,6 +2217,8 @@ def main():
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
     p.add_argument("--hoparlor", choices=["kamera", "bilgisayar", "ikisi"], default="kamera",
                    help="Selam nereden duyulsun: kameranin hoparloru (varsayilan), bilgisayar veya ikisi")
+    p.add_argument("--hoparlor-uyarlama", choices=["acik", "kapali"], default="acik",
+                   help="16 kHz Xiaomi kameralarda cizirtiyi onleyen 8 kHz uyarlamasi")
     p.add_argument("--ses", choices=["emel", "ahmet"], default="emel",
                    help="Selam sesi: emel (kadin) veya ahmet (erkek) - Microsoft dogal Turkce ses")
     p.add_argument("--selam-ara", type=float, default=600, help="Ayni kisiyi tekrar selamlamadan once beklenecek sn")
@@ -2218,7 +2233,7 @@ def main():
 
     betik_klasor = os.path.dirname(os.path.abspath(__file__))
     dedektor = YuzDedektor(betik_klasor, a.yuz_esik)
-    SES_AYAR.update(klasor=betik_klasor, ses=a.ses, hoparlor=a.hoparlor)
+    SES_AYAR.update(klasor=betik_klasor, ses=a.ses, hoparlor=a.hoparlor, uyarlama=a.hoparlor_uyarlama == "acik")
 
     tani = {"t": None}
     if a.tanima == "acik":
@@ -2409,6 +2424,11 @@ def main():
                     mesaj_ver("Mavi \u0131\u015f\u0131k 5 saniye yan\u0131p s\u00f6necek.")
                 else:
                     mesaj_ver("Mavi \u0131\u015f\u0131k kontrol\u00fc bu kamerada kullan\u0131lam\u0131yor.")
+            elif islem == "uyarlama":
+                SES_AYAR["uyarlama"] = not SES_AYAR.get("uyarlama", True)
+                mesaj_ver("Hoparl\u00f6r uyarlamas\u0131 %s. Test sesi \u00e7al\u0131n\u0131yor..." %
+                          ("A\u00c7IK" if SES_AYAR["uyarlama"] else "KAPALI"))
+                sesli_soyle("Ses denemesi. Bir, iki, \u00fc\u00e7. Beni duyuyor musunuz?")
             elif islem == "ses_dene":
                 sesli_soyle("Ses denemesi. Bir, iki, \u00fc\u00e7. Beni duyuyor musunuz?")
                 mesaj_ver("Test sesi g\u00f6nderildi. Kameradan duyulmazsa a\u015fa\u011f\u0131daki ses durumuna bak\u0131n.")
