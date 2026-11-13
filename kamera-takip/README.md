@@ -108,6 +108,17 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## Selam kameranın hoparlöründen (v11)
+
+Selam artık kameranın kendi hoparlöründen duyulur. go2rtc'nin iki yönlü ses
+özelliği kullanılır; sesi kameranın anlayacağı biçime (PCMA ya da Opus) çevirmek
+için FFmpeg gerekir, o da `imageio-ffmpeg` paketiyle otomatik kurulur ve yeri
+`go2rtc.yaml` dosyasına yazılır (go2rtc bir kez yeniden başlatılır).
+
+- `--hoparlor kamera` (varsayılan), `bilgisayar` ya da `ikisi`.
+- Kamera hoparlörü kullanılamazsa ses kendiliğinden bilgisayardan çalar.
+- Kamera sesini Xiaomi Home uygulamasından açabilirsin (kamera ayarları → ses).
+
 ## Türkçe (v10)
 
 - Kamera penceresindeki bütün yazılar Türkçe harflerle (Segoe UI yazı tipi), siyah

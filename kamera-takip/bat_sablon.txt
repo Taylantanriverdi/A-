@@ -37,7 +37,7 @@ echo Python hazır.
 
 echo.
 echo [2/4] Kütüphaneler kuruluyor (ilk seferde biraz sürer)...
-%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests pillow edge-tts gTTS
+%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests pillow edge-tts gTTS imageio-ffmpeg
 if errorlevel 1 (
   echo HATA: Kütüphaneler kurulamadı. İnternet bağlantınızı kontrol edin.
   pause

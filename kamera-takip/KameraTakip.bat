@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v10
+title Kamera Hareket Takibi v11
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v10
+echo Kamera Takip v11
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -39,7 +39,7 @@ echo Python hazır.
 
 echo.
 echo [2/4] Kütüphaneler kuruluyor (ilk seferde biraz sürer)...
-%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests pillow edge-tts gTTS
+%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests pillow edge-tts gTTS imageio-ffmpeg
 if errorlevel 1 (
   echo HATA: Kütüphaneler kurulamadı. İnternet bağlantınızı kontrol edin.
   pause
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v10"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v11"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -110,6 +110,7 @@ import random
 import re
 import struct
 import threading
+import urllib.error
 import urllib.parse
 import subprocess
 import sys
@@ -260,6 +261,38 @@ def xiaomi_kamera_ekle(kullanici):
     return False
 
 
+def ffmpeg_yolu():
+    """FFmpeg (go2rtc'nin kameraya ses gondermesi icin). pip paketi imageio-ffmpeg ile gelir."""
+    try:
+        import imageio_ffmpeg
+        yol = imageio_ffmpeg.get_ffmpeg_exe()
+        return yol if yol and os.path.exists(yol) else None
+    except Exception:
+        return None
+
+
+def go2rtc_ffmpeg_ayarla(yaml_yolu):
+    """go2rtc.yaml'a FFmpeg'in yerini yazar. Degisiklik yapildiysa True."""
+    ff = ffmpeg_yolu()
+    if not ff or not os.path.exists(yaml_yolu):
+        return False
+    ff = ff.replace("\\", "/")
+    metin = open(yaml_yolu, encoding="utf-8").read()
+    satir = '  bin: "%s"' % ff
+    m = re.search(r"^ffmpeg:[ \t]*\n([ \t]+bin:.*)$", metin, re.M)
+    if m:
+        if m.group(1).strip() == satir.strip():
+            return False
+        metin = metin[:m.start(1)] + satir + metin[m.end(1):]
+    elif re.search(r"^ffmpeg:", metin, re.M):
+        metin = re.sub(r"^ffmpeg:[ \t]*\n", "ffmpeg:\n" + satir + "\n", metin, count=1, flags=re.M)
+    else:
+        metin = metin.rstrip("\n") + "\n\nffmpeg:\n" + satir + "\n"
+    with open(yaml_yolu, "w", encoding="utf-8") as f:
+        f.write(metin)
+    return True
+
+
 def go2rtc_hazirla(klasor):
     """go2rtc'yi gerekirse indirir ve baslatir, kamera eklenene kadar bekler.
     Donus: (rtsp adresi, baslatilan surec veya None)"""
@@ -268,6 +301,18 @@ def go2rtc_hazirla(klasor):
     exe_yolu = os.path.join(klasor, exe)
     yaml_yolu = os.path.join(klasor, "go2rtc.yaml")
     surec = None
+
+    # Kameraya ses gonderebilmek icin go2rtc'nin FFmpeg'i bilmesi gerekir
+    if go2rtc_ffmpeg_ayarla(yaml_yolu) and _akislar() is not None:
+        print("go2rtc ses ayar\u0131 i\u00e7in yeniden ba\u015flat\u0131l\u0131yor...")
+        try:
+            _api("/api/exit", "POST", 5)
+        except Exception:
+            pass
+        for _ in range(20):
+            if _akislar() is None:
+                break
+            time.sleep(0.5)
 
     if _akislar() is None:
         if not os.path.exists(exe_yolu):
@@ -285,6 +330,7 @@ def go2rtc_hazirla(klasor):
         if not os.path.exists(yaml_yolu):
             with open(yaml_yolu, "w") as f:
                 f.write(GO2RTC_YAML)
+            go2rtc_ffmpeg_ayarla(yaml_yolu)
         print("go2rtc ba\u015flat\u0131l\u0131yor...")
         log = open(os.path.join(klasor, "go2rtc.log"), "a")
         surec = subprocess.Popen([exe_yolu, "-config", yaml_yolu], cwd=klasor,
@@ -557,7 +603,7 @@ def selam_metni(ad):
 
 
 SESLER = {"emel": "tr-TR-EmelNeural", "ahmet": "tr-TR-AhmetNeural"}
-SES_AYAR = {"klasor": ".", "ses": "emel"}
+SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None}
 
 
 def _ses_dosyasi(metin):
@@ -614,10 +660,41 @@ def _windows_sesi(metin):
         print("Ses \u00e7al\u0131namad\u0131:", e)
 
 
+def kameradan_cal(dosya):
+    """Ses dosyasini go2rtc uzerinden kameranin hoparlorunden calar. Basarili ise True."""
+    akis = SES_AYAR.get("akis")
+    if not akis or not ffmpeg_yolu():
+        return False
+    web = SES_AYAR.get("web")
+    if web:  # dosyayi kendi web sunucumuzdan ver (yolda bosluk/Turkce harf sorunu olmasin)
+        giris = "http://127.0.0.1:%d/ses/%s/%s" % (web.port, web.ses_anahtari, os.path.basename(dosya))
+    else:
+        giris = os.path.abspath(dosya).replace("\\", "/")
+    hata = ""
+    for kodek in ("pcma", "opus"):  # kamera hangisini kabul ederse
+        src = "ffmpeg:%s#input=file#audio=%s" % (giris, kodek)
+        try:
+            _api("/api/streams?dst=%s&src=%s" % (urllib.request.quote(akis), urllib.request.quote(src, safe="")),
+                 "POST", 15)
+            return True
+        except urllib.error.HTTPError as e:
+            hata = e.read().decode("utf-8", "replace")[:120]
+        except Exception as e:
+            hata = str(e)[:120]
+    print("Kamera hoparl\u00f6r\u00fc kullan\u0131lamad\u0131 (%s). Ses bilgisayardan \u00e7al\u0131nacak." % hata)
+    return False
+
+
 def sesli_soyle(metin):
-    """Bilgisayar hoparlorunden dogal Turkce sesle konusur (arka planda)."""
+    """Dogal Turkce sesle konusur: kameranin hoparlorunden (varsayilan) ve/veya bilgisayardan."""
     def is_():
         dosya = _ses_dosyasi(metin)
+        hoparlor = SES_AYAR.get("hoparlor", "kamera")
+        kamerada = False
+        if dosya and hoparlor in ("kamera", "ikisi"):
+            kamerada = kameradan_cal(dosya)
+        if hoparlor == "kamera" and kamerada:
+            return
         if platform.system() != "Windows":
             print("[SES] %s%s" % (metin, (" -> " + dosya) if dosya else ""))
             return
@@ -1518,6 +1595,7 @@ class WebSunucu:
         self.durum = {"surum": SURUM, "mod": "OTO", "durum": "", "ptz": False}
         self.son_izleme = 0.0
         self.hatalar = []  # yanlis PIN zamanlari (10 yanlis -> 15 dk kilit)
+        self.ses_anahtari = "%032x" % random.SystemRandom().getrandbits(128)
         web = self
 
         class Isleyici(BaseHTTPRequestHandler):
@@ -1540,6 +1618,13 @@ class WebSunucu:
             def do_GET(self):
                 yol = urllib.parse.urlparse(self.path)
                 q = urllib.parse.parse_qs(yol.query)
+                if yol.path.startswith("/ses/"):  # go2rtc kameraya ses calarken buradan alir
+                    parca = yol.path.split("/")
+                    if len(parca) == 4 and parca[2] == web.ses_anahtari and re.match(r"^[0-9a-f]{16}\.mp3$", parca[3]):
+                        dosya = os.path.join(SES_AYAR["klasor"], "ses_onbellek", parca[3])
+                        if os.path.exists(dosya):
+                            return self._yaz(200, open(dosya, "rb").read(), "audio/mpeg")
+                    return self._yaz(404, "yok")
                 if yol.path == "/kimlik":
                     return self._yaz(200, "kamera-takip", "text/plain")
                 if yol.path == "/" and "pin" in q:
@@ -1927,6 +2012,8 @@ def main():
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
     p.add_argument("--tanima", choices=["acik", "kapali"], default="acik", help="Kisileri isimleriyle tani")
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
+    p.add_argument("--hoparlor", choices=["kamera", "bilgisayar", "ikisi"], default="kamera",
+                   help="Selam nereden duyulsun: kameranin hoparloru (varsayilan), bilgisayar veya ikisi")
     p.add_argument("--ses", choices=["emel", "ahmet"], default="emel",
                    help="Selam sesi: emel (kadin) veya ahmet (erkek) - Microsoft dogal Turkce ses")
     p.add_argument("--selam-ara", type=float, default=600, help="Ayni kisiyi tekrar selamlamadan once beklenecek sn")
@@ -1941,7 +2028,7 @@ def main():
 
     betik_klasor = os.path.dirname(os.path.abspath(__file__))
     dedektor = YuzDedektor(betik_klasor, a.yuz_esik)
-    SES_AYAR.update(klasor=betik_klasor, ses=a.ses)
+    SES_AYAR.update(klasor=betik_klasor, ses=a.ses, hoparlor=a.hoparlor)
 
     tani = {"t": None}
     if a.tanima == "acik":
@@ -1967,6 +2054,7 @@ def main():
     if a.web_port:
         try:
             web = WebSunucu(a.web_port, web_pin_al(betik_klasor))
+            SES_AYAR["web"] = web
             print("-" * 60)
             print(" Telefondan ya da ba\u015fka bir cihazdan izleyin ve y\u00f6netin:")
             print("   http://localhost:%d   (bu bilgisayardan)" % web.port)
@@ -1985,6 +2073,7 @@ def main():
     go2rtc_surec = None
     if a.kaynak == "go2rtc":
         a.kaynak, go2rtc_surec = go2rtc_hazirla(os.path.join(betik_klasor, "go2rtc"))
+        SES_AYAR["akis"] = urllib.parse.unquote(a.kaynak.rsplit("/", 1)[-1])
         print("Kameraya ba\u011flan\u0131l\u0131yor:", a.kaynak)
 
     if a.simulasyon:
