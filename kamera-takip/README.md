@@ -108,6 +108,33 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## v18: bildirim, insan algılama, bölgeler, olay geçmişi, bas-konuş
+
+**Telefona fotoğraflı bildirim.** Telefona ücretsiz **ntfy** uygulamasını kur ve web
+sayfasının "Bildirimler" bölümünde yazan konuya (`kamera-...`, sabit yer imiyle aynı)
+abone ol. Tanınmayan biri görülünce yüz fotoğrafıyla, yüzü görünmeyen biri 4 sn
+kalırsa fotoğrafla bildirim gelir; dokununca canlı görüntü açılır. Ayarlar: her
+zaman / sadece belirli saatler / kapalı, istenirse tanıdık kişiler için de
+("Taylan geldi"). Aynı türden bildirimler arasında en az 60 sn.
+
+**İnsan algılama.** OpenCV NanoDet modeli (~4 MB) insanın tamamını bulur: arkası dönük
+ya da uzaktaki kişi de olay sayılır, döner kamera onu takip eder; yüz görününce
+tanınır ve kişi kutusuna adı yazılır. İstersen kedi/köpek ve araç da algılanır.
+
+**Bölgeler.** Web sayfasında görüntünün üstüne dokunarak çokgen çiz:
+- *Alarm bölgesi:* bildirim ve kayıt sadece biri bu alana girince.
+- *Maske:* buradaki hareket ve algılamalar yok sayılır (TV, pencere).
+Döner kamerada bölge, çizildiği kamera konumunda geçerlidir.
+
+**Olay geçmişi** (`/olaylar`). Her olay: saat, süre, kim (tanınan / tanınmayan /
+hayvan / araç), girdiği bölge, kapak fotoğrafı ve olaydan 3 sn öncesini de içeren
+video (tarayıcıda oynayan H.264). Güne ve kişiye göre süzme, 24 saatlik zaman
+çizelgesi, silme. Eski olaylar kendiliğinden silinir (varsayılan 14 gün / 10 GB).
+
+**Bas-konuş.** Web sayfasında düğmeyi basılı tutup konuş, bırakınca ses kameranın
+hoparlöründen çıkar. Mikrofon için güvenli bağlantı gerekir: internet (https)
+adresi ya da bilgisayarda `localhost`.
+
 ## Mavi ışık (v13)
 
 Kameranın üzerindeki mavi durum ışığı, görüntüde bir kişi göründüğü sürece yanıp
