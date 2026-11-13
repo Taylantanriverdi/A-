@@ -8,7 +8,8 @@ REM   1) Python yoksa kurar
 REM   2) Gerekli kutuphaneleri kurar (opencv, numpy)
 REM   3) Takip programini cikarir
 REM   4) go2rtc'yi indirir ve baslatir, Xiaomi girisi icin tarayici acar
-REM   5) Kamera eklenince hareket + yuz takibini baslatir
+REM   5) Kamera eklenince tarama + yuz takibini baslatir (doner kamerada
+REM      ilk seferde motor kalibrasyonu yapar, kamera biraz doner)
 REM ================================================================
 
 set "BAT_YOLU=%~f0"
@@ -35,7 +36,7 @@ echo Python hazir.
 
 echo.
 echo [2/4] Kutuphaneler kuruluyor (ilk seferde biraz surer)...
-%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy
+%PY% -m pip install --disable-pip-version-check --quiet --upgrade opencv-python numpy requests
 if errorlevel 1 (
   echo HATA: Kutuphaneler kurulamadi. Internet baglantini kontrol et.
   pause

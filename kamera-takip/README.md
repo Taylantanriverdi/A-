@@ -5,7 +5,11 @@
 **İndir (her zaman en güncel sürüm):**
 https://raw.githubusercontent.com/Taylantanriverdi/A-/claude/ecstatic-fermat-gzzjnm/kamera-takip/KameraTakip.zip
 
-ZIP'i ayıkla, **`KameraTakip.bat`** dosyasına çift tıkla. Gerisini kendisi yapar:
+ZIP'i ayıkla, **`Guncelle.bat`** dosyasına çift tıkla. Her açılışta en son sürümü
+indirir ve programı başlatır (`KameraTakip.bat` güncellemeden doğrudan başlatır).
+
+Güncelleme dosyası tek başına:
+https://raw.githubusercontent.com/Taylantanriverdi/A-/claude/ecstatic-fermat-gzzjnm/kamera-takip/Guncelle.bat Gerisini kendisi yapar:
 Python yoksa kurar, kütüphaneleri kurar, go2rtc'yi indirip başlatır, Xiaomi
 girişi için tarayıcıyı açar. Giriş yapınca hesaptaki kamerayı bütün bölgelerde
 kendisi arar, go2rtc'ye ekler ve takibi başlatır. Hareket kayıtları
@@ -93,6 +97,25 @@ kamera eklenene kadar bekler.
 ### Başka kameralar
 Tapo, Reolink, Hikvision, Dahua gibi RTSP veren kameralarda go2rtc'ye gerek yok;
 kameranın RTSP adresini doğrudan `--kaynak` olarak ver.
+
+## Döner kamera (360° / yukarı-aşağı)
+
+Kamera go2rtc ile eklendiyse program kameranın motorunu da kullanır:
+
+1. **İlk açılışta kalibrasyon:** go2rtc'nin kaydettiği Xiaomi girişiyle (yeni kod
+   istemez) kameranın MIoT özellik listesini indirir, motorla ilgili komutları
+   bulur ve her birini dener. Görüntünün hangi yöne ne kadar kaydığını ölçerek
+   sol/sağ/yukarı/aşağı komutlarını öğrenir ve `ptz_<did>.json` dosyasına kaydeder.
+   Bu sırada kamera birkaç kez döner. Yeniden yapmak için `--ptz-kalibre`.
+2. **Tarama:** Yüz yokken kamera düzensiz şekilde döner: çoğunlukla yatay,
+   arada yukarı/aşağı; adım sayısı ve bekleme süresi rastgele. Durum: `TARAMA`.
+3. **Takip:** Yüz görülünce tarama durur, kamera yüzü ekranın ortasında tutacak
+   şekilde döner. Durum: `YUZ TAKIP`.
+4. **Yüz kaybolursa** 3 sn bekler, sonra taramaya döner.
+
+Xiaomi Home uygulamasındaki kendi **"Hareket takibi"** ayarını **kapat**,
+yoksa kamera iki yerden komut alır. Motor kullanılamazsa program sabit kamera
+moduna geçer. Motoru hiç kullanmamak için: `--ptz kapali`.
 
 ## Nasıl çalışıyor
 
