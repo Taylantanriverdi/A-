@@ -108,6 +108,14 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## Mavi ışık (v13)
+
+Kameranın üzerindeki mavi durum ışığı, görüntüde bir kişi göründüğü sürece yanıp
+söner; kişi gidince 2 saniye sonra eski haline döner. Işığı açıp kapatan ayar
+kameranın MIoT özellik listesinden (genelde "Indicator Light") kendiliğinden
+bulunur; kızılötesi gece ışığı gibi diğer ışıklara dokunulmaz.
+Deneme: kamera penceresinde **L** ya da web sayfasında "Mavi ışığı dene".
+
 ## Selam kameranın hoparlöründen (v11)
 
 Selam artık kameranın kendi hoparlöründen duyulur. go2rtc'nin iki yönlü ses

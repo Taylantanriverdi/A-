@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v12
+title Kamera Hareket Takibi v13
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v12
+echo Kamera Takip v13
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v12"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v13"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -1225,6 +1225,7 @@ class PTZ:
         self.sinira_dayandi = None    # sinir yuzunden gonderilmeyen son yon
         self.gecmis = deque(maxlen=400)  # (zaman, etki): konum duzeltmesi icin
         self.alan_yolu, self.degisti = None, False
+        self.led = None
         threading.Thread(target=self._isci, daemon=True).start()
 
     # --- calisma alani ---
@@ -1385,6 +1386,78 @@ class PTZ:
         return True
 
 
+LED_KELIMELERI = ["indicator", "status-light", "status light", "led", "light", "\u6307\u793a\u706f"]
+LED_YASAK = ["night", "infrared", "ir-", "flood", "flash", "alarm", "wdr", "motion", "sleep", "fill",
+             "\u591c\u89c6", "\u7ea2\u5916"]
+
+
+def led_adayi(spec):
+    """Spec icinde kameranin durum isigini (mavi LED) acip kapatan yazilabilir bool ayari bulur."""
+    adaylar = []
+    for s in spec.get("services", []):
+        s_ad = (s.get("type", "") + " " + s.get("description", "")).lower()
+        for p in s.get("properties", []):
+            ad = s_ad + " " + (p.get("type", "") + " " + p.get("description", "")).lower()
+            if p.get("format") != "bool" or "write" not in p.get("access", []):
+                continue
+            kelimeler = set(re.split(r"[^a-z\u4e00-\u9fff]+", ad))
+            uygun = any((k in kelimeler) if k.isalpha() and k.isascii() else (k in ad) for k in LED_KELIMELERI)
+            if not uygun or any(y in ad for y in LED_YASAK):
+                continue
+            oncelik = 0 if "indicator" in ad or "status" in ad else 1
+            adaylar.append((oncelik, {"siid": s["iid"], "piid": p["iid"], "ad": ad.strip()[-60:]}))
+    adaylar.sort(key=lambda t: t[0])
+    return adaylar[0][1] if adaylar else None
+
+
+class LedKontrol:
+    """Kameranin mavi durum isigini Xiaomi bulutu uzerinden yakip sondurur."""
+
+    def __init__(self, bulut, did, ayar):
+        self.bulut, self.did, self.ayar = bulut, did, ayar
+        self.yanip_sonsun = False
+        self.test_bitis = 0.0
+        self.durum = None
+        self.asil = True
+        try:
+            r = bulut.istek("/miotspec/prop/get", json.dumps(
+                {"params": [{"did": did, "siid": ayar["siid"], "piid": ayar["piid"]}]}))
+            if isinstance(r, list) and r and r[0].get("code", 0) == 0 and "value" in r[0]:
+                self.asil = bool(r[0]["value"])
+        except Exception:
+            pass
+        self.durum = self.asil
+        threading.Thread(target=self._isci, daemon=True).start()
+
+    def _ayarla(self, deger):
+        try:
+            r = self.bulut.istek("/miotspec/prop/set", json.dumps(
+                {"params": [{"did": self.did, "siid": self.ayar["siid"], "piid": self.ayar["piid"], "value": deger}]}))
+            if isinstance(r, list) and r and r[0].get("code", 0) != 0:
+                print("I\u015f\u0131k komutu kabul edilmedi (kod %s)." % r[0].get("code"))
+                return False
+            self.durum = deger
+            return True
+        except Exception as e:
+            print("I\u015f\u0131k komutu hatas\u0131:", str(e)[:80])
+            return False
+
+    def _isci(self):
+        while True:
+            if self.yanip_sonsun or time.time() < self.test_bitis:
+                self._ayarla(not self.durum)
+                time.sleep(0.6)
+            else:
+                if self.durum != self.asil:
+                    self._ayarla(self.asil)
+                time.sleep(0.2)
+
+    def birak(self):
+        self.yanip_sonsun, self.test_bitis = False, 0.0
+        if self.durum != self.asil:
+            self._ayarla(self.asil)
+
+
 def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
     """Gercek Xiaomi kamera icin PTZ'yi hazirlar. Olmazsa None doner."""
     try:
@@ -1421,6 +1494,16 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
                 print("Motor yeniden ayarland\u0131\u011f\u0131 i\u00e7in \u00e7al\u0131\u015fma alan\u0131 s\u0131n\u0131rlar\u0131 silindi; yeniden belirleyin.")
         ptz = PTZ(gonder, eslesme)
         ptz.yukle(os.path.join(betik_klasor, "alan_%s.json" % bilgi["did"]))
+        ptz.led = None
+        try:
+            ayar = led_adayi(miot_spec_indir(bilgi["model"], betik_klasor))
+            if ayar:
+                ptz.led = LedKontrol(bulut, bilgi["did"], ayar)
+                print("Mavi \u0131\u015f\u0131k kontrol\u00fc haz\u0131r (%s). Ki\u015fi g\u00f6r\u00fcl\u00fcnce yan\u0131p s\u00f6necek." % ayar["ad"])
+            else:
+                print("Bu kameran\u0131n \u00f6zellik listesinde mavi \u0131\u015f\u0131k ayar\u0131 bulunamad\u0131.")
+        except Exception as e:
+            print("Mavi \u0131\u015f\u0131k kontrol\u00fc kullan\u0131lam\u0131yor:", str(e)[:100])
         return ptz
     except Exception as e:
         print("Motor kullan\u0131lam\u0131yor (%s). Sabit kamera olarak devam ediliyor." % str(e)[:120])
@@ -1513,6 +1596,7 @@ bu s&#305;rada ba&#351;&#305;n&#305; hafif&ccedil;e sa&#287;a sola &ccedil;evirs
 <ul id="kliste" class="kliste"></ul>
 <label class="sec"><input type="checkbox" id="telses"> Selam&#305; telefonda da sesli s&ouml;yle</label>
 <button type="button" id="sesdene" class="ikincil">&#128264; Kameradan test sesi &ccedil;al</button>
+<button type="button" id="leddene" class="ikincil">&#128309; Mavi &#305;&#351;&#305;&#287;&#305; dene (5 sn yan&#305;p s&ouml;ner)</button>
 <p id="seshata" class="alanyazi" style="color:var(--sari)"></p>
 </section>
 </main>
@@ -1535,6 +1619,7 @@ kadI.addEventListener("keydown",function(e){if(e.key==="Enter")kaydetD.click();}
 var telses=document.getElementById("telses");try{telses.checked=localStorage.getItem("telses")==="1";}catch(e){}
 telses.addEventListener("change",function(){try{localStorage.setItem("telses",telses.checked?"1":"0");}catch(e){}
  if(telses.checked&&window.speechSynthesis){var u=new SpeechSynthesisUtterance("Ses a\u00e7\u0131k");u.lang="tr-TR";speechSynthesis.speak(u);}});
+document.getElementById("leddene").addEventListener("click",function(){gonder({islem:"led_dene"}).then(function(){setTimeout(guncelle,500);});});
 document.getElementById("sesdene").addEventListener("click",function(){gonder({islem:"ses_dene"}).then(function(){setTimeout(guncelle,1500);});});
 var sonSelam=null,silOnay=null,sonListe="";
 function kisileriCiz(d){var anahtar=JSON.stringify([d.kisiler,d.gorulen]);if(anahtar===sonListe)return;sonListe=anahtar;
@@ -2002,7 +2087,7 @@ def panel_ciz(kare, dugmeler, mod, basili):
               "sag": [(mx + r, my), (mx - r // 2, my - r), (mx - r // 2, my + r)]}[ad]
         cv2.fillPoly(kare, [np.array(uc, np.int32)], KOYU if basili == ad else (235, 235, 235))
     x0, _, _, y1 = dugmeler["sol"]
-    yazi(kare, "Oklar / WASD: d\u00f6nd\u00fcr    P: otomatik/sabit    T: ses testi    U: QR kod    Q: \u00e7\u0131k\u0131\u015f",
+    yazi(kare, "Oklar / WASD: d\u00f6nd\u00fcr    P: otomatik/sabit    T: ses testi    L: \u0131\u015f\u0131k testi    U: QR kod    Q: \u00e7\u0131k\u0131\u015f",
          x0, dugmeler["asagi"][3] + 6, 14, (235, 235, 235))
     yazi(kare, "S\u0131n\u0131rlar: 1 sol   2 sa\u011f   3 \u00fcst   4 alt   0 sil",
          x0, dugmeler["yukari"][1] - 24, 14, (235, 235, 235))
@@ -2139,6 +2224,7 @@ def main():
     yazici, son_olay, kare_no = None, 0.0, 0
     fps_t, fps = time.time(), 0.0
     son_yuz_zamani = 0.0
+    son_kisi_zamani = 0.0
     tarama_yonu = random.choice(["sol", "sag"])
     HIZ = {1: dict(takip_aralik=0.9, min_aralik=0.45, tarama_aralik=0.5, tarama_paralel=1),
            2: dict(takip_aralik=0.7, min_aralik=0.3, tarama_aralik=0.3, tarama_paralel=2),
@@ -2230,6 +2316,12 @@ def main():
                 else:
                     ogren = {"ad": isim, "bitis": time.time() + 4.0, "ornekler": [], "son": 0.0}
                     mesaj_ver("%s \u00f6\u011freniliyor: kameraya bak\u0131n, ba\u015f\u0131n\u0131z\u0131 hafif\u00e7e sa\u011fa sola \u00e7evirin..." % isim)
+            elif islem == "led_dene":
+                if ptz and ptz.led:
+                    ptz.led.test_bitis = time.time() + 5
+                    mesaj_ver("Mavi \u0131\u015f\u0131k 5 saniye yan\u0131p s\u00f6necek.")
+                else:
+                    mesaj_ver("Mavi \u0131\u015f\u0131k kontrol\u00fc bu kamerada kullan\u0131lam\u0131yor.")
             elif islem == "ses_dene":
                 sesli_soyle("Ses denemesi. Bir, iki, \u00fc\u00e7. Beni duyuyor musunuz?")
                 mesaj_ver("Test sesi g\u00f6nderildi. Kameradan duyulmazsa a\u015fa\u011f\u0131daki ses durumuna bak\u0131n.")
@@ -2367,6 +2459,12 @@ def main():
             if i not in yuz_takip.nesneler:
                 yumusak.pop(i, None)
                 gorulme.pop(i, None)
+
+        # Mavi isik: kisi goruldugu surece (ve 2 sn sonrasina kadar) yanip soner
+        if ptz and ptz.led:
+            if aktif:
+                son_kisi_zamani = simdi
+            ptz.led.yanip_sonsun = simdi - son_kisi_zamani < 2.0
 
         # Kisi ogrenme (web'den "Kaydet")
         if ogren and taniyici:
@@ -2551,7 +2649,10 @@ def main():
             if tus != -1:
                 if tus & 0xFF in (ord("q"), ord("Q"), 27) and tus not in TUS_YON:
                     break
-                if tus in (ord("t"), ord("T")):
+                if tus in (ord("l"), ord("L")) and ptz and ptz.led:
+                    ptz.led.test_bitis = time.time() + 5
+                    print("Mavi \u0131\u015f\u0131k testi: 5 saniye yan\u0131p s\u00f6necek.")
+                elif tus in (ord("t"), ord("T")):
                     sesli_soyle("Ses denemesi. Bir, iki, \u00fc\u00e7. Beni duyuyor musunuz?")
                 elif tus in (ord("u"), ord("U")) and uzak:
                     qr_goster = not qr_goster
@@ -2576,6 +2677,8 @@ def main():
     if ptz:
         ptz.degisti = True
         ptz.kaydet()
+        if ptz.led:
+            ptz.led.birak()
     if not a.goruntusuz:
         cv2.destroyAllWindows()
     if go2rtc_surec is not None:
