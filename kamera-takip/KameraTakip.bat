@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v14
+title Kamera Hareket Takibi v15
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v14
+echo Kamera Takip v15
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v14"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v15"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -271,11 +271,41 @@ def ffmpeg_yolu():
         return None
 
 
+def _bosluksuz_yol(yol):
+    """Windows kisa yol adi (C:\\PROGRA~1\\...): boslukla bolunmesin."""
+    if " " not in yol or os.name != "nt":
+        return yol
+    try:
+        import ctypes
+        tampon = ctypes.create_unicode_buffer(1024)
+        if ctypes.windll.kernel32.GetShortPathNameW(yol, tampon, 1024):
+            return tampon.value
+    except Exception:
+        pass
+    return yol
+
+
 def go2rtc_ffmpeg_ayarla(yaml_yolu):
-    """go2rtc.yaml'a FFmpeg'in yerini yazar. Degisiklik yapildiysa True."""
-    ff = ffmpeg_yolu()
-    if not ff or not os.path.exists(yaml_yolu):
+    """go2rtc.yaml'a FFmpeg'in yerini yazar. Degisiklik yapildiysa True.
+    go2rtc FFmpeg yolunu bosluktan boler ("C:/Program Files/..." -> "C:/Program"):
+    bu yuzden FFmpeg'i go2rtc klasorune (bosluksuz yere) kopyalariz."""
+    kaynak = ffmpeg_yolu()
+    if not kaynak or not os.path.exists(yaml_yolu):
         return False
+    import shutil
+    hedef = os.path.join(os.path.dirname(os.path.abspath(yaml_yolu)),
+                         "ffmpeg.exe" if os.name == "nt" else "ffmpeg")
+    try:
+        if not os.path.exists(hedef) or os.path.getsize(hedef) != os.path.getsize(kaynak):
+            shutil.copy2(kaynak, hedef)
+            os.chmod(hedef, 0o755)
+        ff = hedef
+    except OSError as e:
+        print("FFmpeg kopyalanamad\u0131 (%s), oldu\u011fu yerden kullan\u0131lacak." % e)
+        ff = kaynak
+    ff = _bosluksuz_yol(ff)
+    if " " in ff:
+        print("Uyar\u0131: FFmpeg yolunda bo\u015fluk var, kamera hoparl\u00f6r\u00fc \u00e7al\u0131\u015fmayabilir: " + ff)
     ff = ff.replace("\\", "/")
     metin = open(yaml_yolu, encoding="utf-8").read()
     satir = '  bin: "%s"' % ff
