@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v5"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v6"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -1262,6 +1262,8 @@ class WebSunucu:
             def do_GET(self):
                 yol = urllib.parse.urlparse(self.path)
                 q = urllib.parse.parse_qs(yol.query)
+                if yol.path == "/kimlik":
+                    return self._yaz(200, "kamera-takip", "text/plain")
                 if yol.path == "/" and "pin" in q:
                     if q["pin"][0].strip() == web.pin:
                         return self._yaz(303, "", ek={"Location": "/", "Set-Cookie":
@@ -1312,9 +1314,37 @@ class WebSunucu:
                 except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
                     pass
 
-        self.sunucu = ThreadingHTTPServer(("0.0.0.0", port), Isleyici)
-        self.sunucu.daemon_threads = True
-        threading.Thread(target=self.sunucu.serve_forever, daemon=True).start()
+        class Sunucu(ThreadingHTTPServer):
+            # Baska bir program ayni portu kullaniyorsa paylasma: hata ver, sonraki portu dene
+            allow_reuse_address = False
+            daemon_threads = True
+
+            def server_bind(self):
+                import socket
+                if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows
+                    self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                ThreadingHTTPServer.server_bind(self)
+
+        self.sunucu = None
+        for p in range(port, port + 20):
+            try:
+                self.sunucu = Sunucu(("0.0.0.0", p), Isleyici)
+            except OSError:
+                continue
+            threading.Thread(target=self.sunucu.serve_forever, daemon=True).start()
+            # localhost gercekten bize mi geliyor? (baska program 127.0.0.1'e baglanmis olabilir)
+            try:
+                with urllib.request.urlopen("http://127.0.0.1:%d/kimlik" % p, timeout=2) as r:
+                    if r.read().decode() == "kamera-takip":
+                        self.port = p
+                        break
+            except Exception:
+                pass
+            self.sunucu.shutdown()
+            self.sunucu.server_close()
+            self.sunucu = None
+        if self.sunucu is None:
+            raise OSError("bos port bulunamadi (%d-%d)" % (port, port + 19))
         self._son_kare = 0.0
 
     def kare_ver(self, kare):
@@ -1476,7 +1506,7 @@ def main():
     p.add_argument("--tanima", choices=["acik", "kapali"], default="acik", help="Kisileri isimleriyle tani")
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
     p.add_argument("--selam-ara", type=float, default=600, help="Ayni kisiyi tekrar selamlamadan once beklenecek sn")
-    p.add_argument("--web-port", type=int, default=8765, help="Telefondan izleme/kontrol sayfasi portu (0 = kapali)")
+    p.add_argument("--web-port", type=int, default=18765, help="Telefondan izleme/kontrol sayfasi portu (0 = kapali)")
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
     a = p.parse_args()
     print("=" * 40)
@@ -1503,13 +1533,14 @@ def main():
             web = WebSunucu(a.web_port, web_pin_al(betik_klasor))
             print("-" * 60)
             print(" Telefondan / baska cihazdan izle ve kontrol et:")
+            print("   http://localhost:%d   (bu bilgisayardan)" % web.port)
             for adr in yerel_adresler():
                 ek = "   (Tailscale - disaridan)" if adr.startswith("100.") else "   (ev agi)"
-                print("   http://%s:%d%s" % (adr, a.web_port, ek))
+                print("   http://%s:%d%s" % (adr, web.port, ek))
             print(" PIN: %s" % web.pin)
             print("-" * 60)
         except OSError as e:
-            print("Web sayfasi baslatilamadi (port %d): %s" % (a.web_port, e))
+            print("Web sayfasi baslatilamadi: %s" % e)
 
     go2rtc_surec = None
     if a.kaynak == "go2rtc":
@@ -1938,6 +1969,10 @@ def main():
                              gorulen=[tanima[i]["ad"] for i, _ in aktif
                                       if i in tanima and tanima[i]["ad"] not in (None, "?")])
             web.kare_ver(kare)
+
+        if web and not a.goruntusuz:
+            yazi_kutusu(kare, "Kisi kaydi / telefon: http://localhost:%d  PIN %s" % (web.port, web.pin),
+                        12, 62 if not ogren else 100, (200, 200, 200), 0.5, 1)
 
         if ptz:
             el["dugmeler"] = panel_dugmeleri(w, h)

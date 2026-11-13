@@ -152,13 +152,13 @@ konum kayar: sınırları silip yeniden belirle.
 
 ## Telefondan izleme ve kontrol (v3)
 
-Program çalışırken küçük bir web sayfası açar (port 8765). Siyah pencerede
+Program çalışırken küçük bir web sayfası açar (port 18765; doluysa sonraki boş port). Siyah pencerede
 adresler ve 6 haneli PIN yazar:
 
 ```
  Telefondan / baska cihazdan izle ve kontrol et:
-   http://192.168.1.20:8765   (ev agi)
-   http://100.101.102.103:8765   (Tailscale - disaridan)
+   http://192.168.1.20:18765   (ev agi)
+   http://100.101.102.103:18765   (Tailscale - disaridan)
  PIN: 123456
 ```
 
