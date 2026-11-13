@@ -108,6 +108,30 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## Kişileri tanıma ve isimle selamlama (v5)
+
+Program kayıtlı kişileri yüzünden tanır, ekranda adını yazar ve bilgisayar
+hoparlöründen **"Merhaba <isim>"** der. Tanıma tamamen bilgisayarda yapılır
+(OpenCV SFace modeli, ilk açılışta ~38 MB iner); hiçbir şey internete gönderilmez.
+
+**Kişi kaydetmek (telefon sayfası → Kişiler):** kişi kameraya bakarken adını yaz,
+**Kaydet**'e bas. 4 saniye boyunca 10 örnek alınır; bu sırada başını hafifçe
+çevirsin. Aynı kişiyi farklı ışıkta/açıda tekrar kaydetmek tanımayı güçlendirir.
+
+**Toplu kayıt:** `%LOCALAPPDATA%\KameraTakip\kisiler\<İsim>\` klasörüne o kişinin
+net yüz fotoğraflarını koy; program açılışta öğrenir.
+
+- Ekranda: tanınan kişi yeşil + adı, tanınmayan turuncu **Taninmiyor**,
+  henüz karar verilmemiş açık yeşil **Yuz N**.
+- Karar son 7 tahminin çoğunluğuyla verilir (tek karelik hata etiketi değiştirmez).
+- Aynı kişi en fazla 10 dakikada bir selamlanır (`--selam-ara`). Kapatmak: `--selam kapali`.
+- Türkçe ses için Windows'ta Türkçe konuşma paketi gerekir (Ayarlar → Saat ve dil →
+  Konuşma). Yoksa Windows'un varsayılan sesi okur.
+- Telefon sayfasında "Selamı telefonda da sesli söyle" seçilirse telefon da söyler.
+- Kişiler `kisiler.json` dosyasında saklanır; sayfadan silinebilir.
+- Yüz verisi kişisel veridir (KVKK): ev dışında çalışanları/ziyaretçileri
+  kaydedeceksen kişilerin bilgisi ve onayıyla yap.
+
 ## Çalışma alanı / açı sınırları (v4)
 
 Kameranın tarama ve takip yaparken çıkmayacağı açı aralığını belirleyebilirsin.

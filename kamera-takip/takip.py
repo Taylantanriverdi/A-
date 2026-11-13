@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v4"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v5"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -282,6 +282,7 @@ class YuzDedektor:
                 raise SystemExit("Yuz modeli indirilemedi, internet baglantisini kontrol et.")
         self.det = cv2.FaceDetectorYN.create(yol, "", (320, 320), esik, 0.3, 50)
         self.boyut = None
+        self.ham = []
 
     def esik(self, deger):
         self.det.setScoreThreshold(deger)
@@ -292,7 +293,7 @@ class YuzDedektor:
             self.det.setInputSize((w, h))
             self.boyut = (w, h)
         _, yuzler = self.det.detect(kare)
-        kutular = []
+        kutular, self.ham = [], []  # ham: tanima icin goz/burun/agiz noktalari
         if yuzler is not None:
             for f in yuzler:
                 x, y, bw, bh = (int(v) for v in f[:4])
@@ -300,7 +301,144 @@ class YuzDedektor:
                 bw, bh = min(bw, w - x), min(bh, h - y)
                 if bw >= min_boyut and bh >= min_boyut:
                     kutular.append((x, y, bw, bh))
+                    self.ham.append(f.copy())
         return kutular
+
+
+# ===========================================================================
+#  Yuz tanima (kisileri isimleriyle tanima) - OpenCV SFace, tamamen yerel
+# ===========================================================================
+SFACE_DOSYA = "face_recognition_sface_2021dec.onnx"
+SFACE_URLLER = [
+    "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/" + SFACE_DOSYA,
+    "https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/" + SFACE_DOSYA,
+]
+TR_ASCII = str.maketrans("\u00e7\u011f\u0131\u00f6\u015f\u00fc\u00c7\u011e\u0130\u00d6\u015e\u00dc",
+                         "cgiosuCGIOSU")
+
+
+def ascii_ad(ad):
+    """OpenCV ekrana Turkce harf yazamaz: s/g/i/o/u/c'ye cevir."""
+    return ad.translate(TR_ASCII).encode("ascii", "replace").decode()
+
+
+class YuzTaniyici:
+    ESIK = 0.40  # kosinus benzerligi; ayni kisi genelde 0.6-0.9, farkli kisi 0.0-0.3
+
+    def __init__(self, klasor, dedektor):
+        yol = os.path.join(klasor, SFACE_DOSYA)
+        if not os.path.exists(yol) or os.path.getsize(yol) < 30000000:
+            for url in SFACE_URLLER:
+                try:
+                    print("Yuz tanima modeli indiriliyor (~38 MB, bir kez)...")
+                    urllib.request.urlretrieve(url, yol + ".tmp")
+                    if os.path.getsize(yol + ".tmp") > 30000000:
+                        os.replace(yol + ".tmp", yol)
+                        break
+                except Exception as e:
+                    print("  indirilemedi:", str(e)[:80])
+            else:
+                raise RuntimeError("yuz tanima modeli indirilemedi")
+        self.rec = cv2.FaceRecognizerSF.create(yol, "")
+        self.kilit = threading.Lock()
+        self.json_yolu = os.path.join(klasor, "kisiler.json")
+        self.klasor = os.path.join(klasor, "kisiler")
+        self.kisiler = {}   # ad -> [ozellik (128 float)]
+        self.dosyalar = []  # klasorden ogrenilmis resimler
+        try:
+            d = json.load(open(self.json_yolu, encoding="utf-8"))
+            self.kisiler = {k: [np.array(f, np.float32).reshape(1, -1) for f in v]
+                            for k, v in d.get("kisiler", {}).items()}
+            self.dosyalar = d.get("dosyalar", [])
+        except (OSError, ValueError):
+            pass
+        self._klasorden_ogren(dedektor)
+
+    def _klasorden_ogren(self, dedektor):
+        """kisiler/<Ad>/*.jpg resimlerinden toplu ogrenme."""
+        if not os.path.isdir(self.klasor):
+            os.makedirs(self.klasor, exist_ok=True)
+            return
+        yeni = 0
+        for ad in sorted(os.listdir(self.klasor)):
+            k = os.path.join(self.klasor, ad)
+            if not os.path.isdir(k):
+                continue
+            for dosya in sorted(os.listdir(k)):
+                yol = os.path.join(k, dosya)
+                if yol in self.dosyalar or not dosya.lower().endswith((".jpg", ".jpeg", ".png")):
+                    continue
+                self.dosyalar.append(yol)
+                img = cv2.imdecode(np.fromfile(yol, np.uint8), cv2.IMREAD_COLOR)
+                if img is None:
+                    continue
+                h, w = img.shape[:2]
+                if max(h, w) > 1280:
+                    o = 1280.0 / max(h, w)
+                    img = cv2.resize(img, (int(w * o), int(h * o)))
+                kutular = dedektor.bul(img)
+                if not kutular:
+                    print("  %s: yuz bulunamadi" % yol)
+                    continue
+                j = max(range(len(kutular)), key=lambda n: kutular[n][2] * kutular[n][3])
+                self.kisiler.setdefault(ad, []).append(self.ozellik(img, dedektor.ham[j]))
+                yeni += 1
+        if yeni:
+            print("Klasorden %d yuz ogrenildi." % yeni)
+            self.kaydet()
+
+    def ozellik(self, kare, ham):
+        return self.rec.feature(self.rec.alignCrop(kare, ham)).copy()
+
+    def tani(self, oz):
+        en_ad, en_skor = None, 0.0
+        with self.kilit:
+            for ad, liste in self.kisiler.items():
+                for f in liste:
+                    skor = self.rec.match(oz, f, cv2.FaceRecognizerSF_FR_COSINE)
+                    if skor > en_skor:
+                        en_ad, en_skor = ad, skor
+        return (en_ad if en_skor >= self.ESIK else None), en_skor
+
+    def ekle(self, ad, ozellikler):
+        with self.kilit:
+            self.kisiler.setdefault(ad, []).extend(ozellikler)
+            self.kisiler[ad] = self.kisiler[ad][-30:]
+        self.kaydet()
+
+    def sil(self, ad):
+        with self.kilit:
+            self.kisiler.pop(ad, None)
+        self.kaydet()
+
+    def liste(self):
+        with self.kilit:
+            return [{"ad": k, "ornek": len(v)} for k, v in sorted(self.kisiler.items())]
+
+    def kaydet(self):
+        with self.kilit:
+            d = {"kisiler": {k: [f.flatten().round(5).tolist() for f in v] for k, v in self.kisiler.items()},
+                 "dosyalar": self.dosyalar}
+        with open(self.json_yolu, "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False)
+
+
+def sesli_soyle(metin):
+    """Bilgisayar hoparlorunden konusur (Windows; varsa Turkce ses secilir)."""
+    if platform.system() != "Windows":
+        print("[SES] " + metin)
+        return
+    ps = ("Add-Type -AssemblyName System.Speech; "
+          "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+          "$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq 'tr-TR' } | Select-Object -First 1; "
+          "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; $s.Speak($env:SELAM_METIN)")
+    ortam = dict(os.environ, SELAM_METIN=metin)
+    try:
+        subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", ps], env=ortam,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except OSError as e:
+        print("Ses calinamadi:", e)
 
 
 # --- Cizim yardimcilari -----------------------------------------------------
@@ -308,6 +446,7 @@ YESIL = (90, 220, 120)
 SARI = (40, 200, 255)
 GRI = (170, 170, 170)
 MAVI = (230, 170, 60)
+TURUNCU = (40, 140, 255)
 KOYU = (25, 25, 25)
 
 
@@ -971,6 +1110,15 @@ button:focus-visible,.ok:focus-visible{outline:3px solid var(--yesil);outline-of
 .sinirlar button{min-height:48px;border-radius:10px;border:1px solid var(--cizgi);background:var(--bg);color:var(--yazi);font:600 15px system-ui,sans-serif;cursor:pointer}
 .sinirlar button:active{background:var(--yazi);color:#111}
 .sinirlar .sil{grid-column:1/-1;color:var(--sari)}
+.ekle{display:flex;gap:8px}.ekle input{flex:1;min-width:0;font:16px system-ui,sans-serif;padding:12px;border-radius:10px;
+ border:1px solid var(--cizgi);background:var(--bg);color:var(--yazi)}
+.ekle button{padding:0 18px;border:0;border-radius:10px;background:var(--yesil);color:#111;font:700 16px system-ui,sans-serif;cursor:pointer}
+.ekle button:disabled{opacity:.5}
+.kliste{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.kliste li{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--cizgi);border-radius:10px}
+.kliste .ad{font-weight:600;overflow-wrap:anywhere}.kliste .gor{color:var(--yesil);font-size:12px;margin-left:6px}
+.kliste button{border:1px solid var(--cizgi);background:transparent;color:var(--sari);border-radius:8px;padding:6px 10px;font:600 13px system-ui;cursor:pointer}
+.sec{display:flex;gap:8px;align-items:center;color:var(--soluk);font-size:14px}
 .alanyazi{margin:0;font:13px ui-monospace,Consolas,monospace;color:var(--soluk);overflow-wrap:anywhere}
 </style></head><body><main>
 <header><h1>Kamera Takip</h1><span class="surum" id="surum">__SURUM__</span></header>
@@ -996,6 +1144,15 @@ Tarama ve takip bu alan&#305;n d&#305;&#351;&#305;na &ccedil;&#305;kmaz; oklar h
  <button type="button" data-sinir="sil" class="sil">S&#305;n&#305;rlar&#305; sil</button>
 </div>
 <p id="alan" class="alanyazi"></p></section>
+<section class="alan"><h2>Ki&#351;iler</h2>
+<p class="not">Ki&#351;i kameraya bakarken ad&#305;n&#305; yaz ve Kaydet'e bas. 4 saniye boyunca y&uuml;z&uuml;nden &ouml;rnek al&#305;n&#305;r;
+bu s&#305;rada ba&#351;&#305;n&#305; hafif&ccedil;e sa&#287;a sola &ccedil;evirsin. Ayn&#305; ki&#351;iyi farkl&#305; &#305;&#351;&#305;klarda tekrar kaydetmek tan&#305;may&#305; g&uuml;&ccedil;lendirir.</p>
+<div class="ekle"><input id="kad" maxlength="30" placeholder="&#304;sim" aria-label="&#304;sim" autocomplete="off">
+<button type="button" id="kaydet">Kaydet</button></div>
+<p id="mesaj" class="alanyazi"></p>
+<ul id="kliste" class="kliste"></ul>
+<label class="sec"><input type="checkbox" id="telses"> Selam&#305; telefonda da sesli s&ouml;yle</label>
+</section>
 </main>
 <script>
 function gonder(v){return fetch("api/komut",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(v)}).catch(function(){});}
@@ -1009,13 +1166,34 @@ document.querySelectorAll(".ok").forEach(function(el){
  el.addEventListener("contextmenu",function(e){e.preventDefault();});});
 window.addEventListener("blur",birak);document.addEventListener("visibilitychange",birak);
 document.getElementById("mod").addEventListener("click",function(){gonder({islem:"mod"}).then(guncelle);});
+var kaydetD=document.getElementById("kaydet"),kadI=document.getElementById("kad");
+kaydetD.addEventListener("click",function(){var ad=kadI.value.trim();if(!ad){kadI.focus();return;}
+ gonder({islem:"ogren",ad:ad}).then(function(){kadI.value="";setTimeout(guncelle,300);});});
+kadI.addEventListener("keydown",function(e){if(e.key==="Enter")kaydetD.click();});
+var telses=document.getElementById("telses");try{telses.checked=localStorage.getItem("telses")==="1";}catch(e){}
+telses.addEventListener("change",function(){try{localStorage.setItem("telses",telses.checked?"1":"0");}catch(e){}
+ if(telses.checked&&window.speechSynthesis){var u=new SpeechSynthesisUtterance("Ses a\u00e7\u0131k");u.lang="tr-TR";speechSynthesis.speak(u);}});
+var sonSelam=null,silOnay=null,sonListe="";
+function kisileriCiz(d){var anahtar=JSON.stringify([d.kisiler,d.gorulen]);if(anahtar===sonListe)return;sonListe=anahtar;
+ var ul=document.getElementById("kliste");ul.innerHTML="";
+ (d.kisiler||[]).forEach(function(k){var li=document.createElement("li");var sol=document.createElement("span");
+  var ad=document.createElement("span");ad.className="ad";ad.textContent=k.ad;sol.appendChild(ad);
+  if((d.gorulen||[]).indexOf(k.ad)>=0){var g=document.createElement("span");g.className="gor";g.textContent="\u25cf \u015fu an g\u00f6r\u00fcl\u00fcyor";sol.appendChild(g);}
+  var b=document.createElement("button");b.type="button";b.textContent="Sil";
+  b.addEventListener("click",function(){if(silOnay===k.ad){gonder({islem:"kisi_sil",ad:k.ad}).then(function(){setTimeout(guncelle,300);});silOnay=null;}
+   else{silOnay=k.ad;b.textContent="Emin misin?";setTimeout(function(){if(silOnay===k.ad){silOnay=null;b.textContent="Sil";}},3000);}});
+  li.appendChild(sol);li.appendChild(b);ul.appendChild(li);});}
 document.querySelectorAll("[data-sinir]").forEach(function(b){b.addEventListener("click",function(){
  gonder({islem:"sinir",hangi:b.dataset.sinir}).then(function(){setTimeout(guncelle,300);});});});
 var modDugme=document.getElementById("mod");
 function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(function(d){
  document.getElementById("durum").textContent=d.durum||"";document.getElementById("surum").textContent=d.surum;
  modDugme.className=d.mod;modDugme.textContent=d.mod==="OTO"?"OTOMAT\u0130K":"SAB\u0130T";
- modDugme.disabled=!d.ptz;document.getElementById("alan").textContent=d.alan||"";}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
+ modDugme.disabled=!d.ptz;document.getElementById("alan").textContent=d.alan||"";
+ document.getElementById("mesaj").textContent=d.tanima?(d.mesaj||""):"Y\u00fcz tan\u0131ma haz\u0131rlan\u0131yor...";
+ kaydetD.disabled=!d.tanima||d.ogreniyor;kisileriCiz(d);
+ if(d.selam){if(sonSelam!==null&&d.selam.no!==sonSelam&&telses.checked&&window.speechSynthesis){
+  var u=new SpeechSynthesisUtterance(d.selam.metin);u.lang="tr-TR";speechSynthesis.speak(u);}sonSelam=d.selam.no;}}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
 setInterval(guncelle,1000);guncelle();
 var img=document.getElementById("img");img.onerror=function(){setTimeout(function(){img.src="video?t="+Date.now();},2000);};
 </script></body></html>"""
@@ -1295,6 +1473,9 @@ def main():
     p.add_argument("--simulasyon", metavar="RESIM", help="Test: panorama resmiyle sanal doner kamera")
     p.add_argument("--sim-gecikme", type=float, default=0.0, help="Test: sanal kamerada goruntu gecikmesi (sn)")
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
+    p.add_argument("--tanima", choices=["acik", "kapali"], default="acik", help="Kisileri isimleriyle tani")
+    p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
+    p.add_argument("--selam-ara", type=float, default=600, help="Ayni kisiyi tekrar selamlamadan once beklenecek sn")
     p.add_argument("--web-port", type=int, default=8765, help="Telefondan izleme/kontrol sayfasi portu (0 = kapali)")
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
     a = p.parse_args()
@@ -1304,6 +1485,17 @@ def main():
 
     betik_klasor = os.path.dirname(os.path.abspath(__file__))
     dedektor = YuzDedektor(betik_klasor, a.yuz_esik)
+
+    tani = {"t": None}
+    if a.tanima == "acik":
+        def tanima_yukle():
+            try:
+                tani["t"] = YuzTaniyici(betik_klasor, YuzDedektor(betik_klasor, 0.6))
+                kl = tani["t"].liste()
+                print("Yuz tanima hazir. Kayitli kisiler: %s" % (", ".join(k["ad"] for k in kl) or "yok"))
+            except Exception as e:
+                print("Yuz tanima kullanilamiyor:", str(e)[:120])
+        threading.Thread(target=tanima_yukle, daemon=True).start()
 
     web = None
     if a.web_port:
@@ -1379,6 +1571,17 @@ def main():
     if a.yuz_klasor:
         os.makedirs(a.yuz_klasor, exist_ok=True)
 
+    # Tanima durumu
+    tanima = {}            # yuz id -> {"son", "oylar", "ad"}
+    son_selam = {}         # ad -> zaman
+    ogren = None           # {"ad", "bitis", "ornekler", "son"}
+    mesaj = {"metin": "", "zaman": 0.0}
+    selam_olay = {"no": 0, "metin": ""}
+
+    def mesaj_ver(m):
+        mesaj["metin"], mesaj["zaman"] = m, time.time()
+        print(m)
+
     # Elle kontrol durumu
     el = {"mod": "OTO", "yon": None, "basla": 0.0, "bitis": 0.0, "kaynak": None, "tekrar": False,
           "dugmeler": {}}
@@ -1438,6 +1641,19 @@ def main():
             elif islem == "mod" and ptz:
                 el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
                 el_birak()
+            elif islem == "ogren":
+                isim = " ".join(str(k.get("ad", "")).split())[:30]
+                if not tani["t"]:
+                    mesaj_ver("Yuz tanima henuz hazir degil, biraz bekle.")
+                elif not isim:
+                    mesaj_ver("Once bir isim yaz.")
+                else:
+                    ogren = {"ad": isim, "bitis": time.time() + 4.0, "ornekler": [], "son": 0.0}
+                    mesaj_ver("%s ogreniliyor: kameraya bak, basini hafifce cevir..." % isim)
+            elif islem == "kisi_sil" and tani["t"]:
+                tani["t"].sil(str(k.get("ad", "")))
+                tanima.clear()
+                mesaj_ver("%s silindi" % k.get("ad", ""))
             elif islem == "sinir" and ptz and k.get("hangi") in ("sol", "sag", "ust", "alt", "sil"):
                 ptz.sinir_ayarla(k["hangi"])
                 print("Calisma alani:", alan_metni(ptz, derece_adim))
@@ -1486,8 +1702,11 @@ def main():
             elif yuz_bekleme > 0:
                 yuz_bekleme -= 1
             takipte = any(k == 0 for k in yuz_takip.kayip.values())
-            yuzler = dedektor.bul(kare) if (hareket or takipte or yuz_bekleme > 0) else []
+            yuzler = dedektor.bul(kare) if (hareket or takipte or yuz_bekleme > 0 or ogren) else []
             yuz_takip.guncelle(yuzler)
+
+        ham_harita = dict(zip(yuzler, dedektor.ham)) if yuzler else {}
+        taniyici = tani["t"]
 
         # 3) Cizim
         if a.hareket_goster and hareket and not ptz:
@@ -1512,24 +1731,83 @@ def main():
             yumusak[i] = (x, y, bw, bh)
             aktif.append((i, (x, y, bw, bh)))
 
+            # Kim? (her yuz icin ~0.4 sn'de bir; son 7 tahminin cogunlugu)
+            td = tanima.setdefault(i, {"son": 0.0, "oylar": deque(maxlen=7), "ad": None})
+            ham = ham_harita.get(yuz_takip.kutular[i])
+            if taniyici and ham is not None and simdi - td["son"] > 0.4 and not ogren:
+                td["son"] = simdi
+                kim, skor = taniyici.tani(taniyici.ozellik(temiz, ham))
+                td["oylar"].append(kim or "?")
+                sayim = {}
+                for o in td["oylar"]:
+                    sayim[o] = sayim.get(o, 0) + 1
+                en = max((k for k in sayim if k != "?"), key=lambda k: sayim[k], default=None)
+                onceki = td["ad"]
+                if en and sayim[en] >= 2 and sayim[en] * 2 >= len(td["oylar"]) - sayim.get("?", 0):
+                    td["ad"] = en
+                elif sayim.get("?", 0) >= 4 and (not en or sayim[en] < 2):
+                    td["ad"] = "?"
+                if td["ad"] and td["ad"] != "?" and td["ad"] != onceki:
+                    print("Tanindi: %s (benzerlik %.2f)" % (td["ad"], skor))
+                    if a.selam == "acik" and simdi - son_selam.get(td["ad"], 0) > a.selam_ara:
+                        son_selam[td["ad"]] = simdi
+                        metin = "Merhaba %s" % td["ad"]
+                        sesli_soyle(metin)
+                        selam_olay["no"] += 1
+                        selam_olay["metin"] = metin
+            if td["ad"] and td["ad"] != "?":
+                etiket, renk = ascii_ad(td["ad"]), YESIL
+            elif td["ad"] == "?":
+                etiket, renk = "Taninmiyor", TURUNCU
+            else:
+                etiket, renk = f"Yuz {i}", (170, 210, 170)
+
             iz = list(yuz_takip.izler[i])
             for k in range(1, len(iz)):
-                cv2.line(kare, iz[k - 1], iz[k], YESIL, 1, cv2.LINE_AA)
-            kose_cerceve(kare, x, y, bw, bh, YESIL, 2)
-            yazi_kutusu(kare, f"Yuz {i}", x, max(22, y - 6), YESIL)
+                cv2.line(kare, iz[k - 1], iz[k], renk, 1, cv2.LINE_AA)
+            kose_cerceve(kare, x, y, bw, bh, renk, 2)
+            yazi_kutusu(kare, etiket, x, max(22, y - 6), renk)
 
             # Yeni yuz 5 kare boyunca saglam gorulduyse fotografini al
             if (a.yuz_klasor and i not in kaydedilen and gorulme[i] >= 8
                     and simdi - son_foto >= a.foto_ara):
                 kaydedilen.add(i)
                 son_foto = simdi
-                ad = os.path.join(a.yuz_klasor, datetime.now().strftime(f"yuz_%Y%m%d_%H%M%S_{i}.jpg"))
+                kim = ascii_ad(td["ad"]) if td["ad"] and td["ad"] != "?" else str(i)
+                ad = os.path.join(a.yuz_klasor, datetime.now().strftime("yuz_%Y%m%d_%H%M%S_") + kim + ".jpg")
                 cv2.imwrite(ad, yuz_kirp(temiz, yuz_takip.kutular[i]))
                 print("Yuz yakalandi:", ad)
+        for i in list(tanima):
+            if i not in yuz_takip.nesneler:
+                tanima.pop(i, None)
         for i in list(yumusak):
             if i not in yuz_takip.nesneler:
                 yumusak.pop(i, None)
                 gorulme.pop(i, None)
+
+        # Kisi ogrenme (web'den "Kaydet")
+        if ogren and taniyici:
+            if len(aktif) > 1 and not ogren.get("uyari"):
+                ogren["uyari"] = True
+            if aktif and simdi - ogren["son"] > 0.3:
+                i_b, kutu_b = max(aktif, key=lambda t: t[1][2] * t[1][3])
+                ham = ham_harita.get(yuz_takip.kutular.get(i_b))
+                if ham is not None:
+                    ogren["son"] = simdi
+                    ogren["ornekler"].append(taniyici.ozellik(temiz, ham))
+            yazi_kutusu(kare, "OGRENILIYOR: %s (%d/10)" % (ascii_ad(ogren["ad"]), len(ogren["ornekler"])),
+                        12, 70, SARI, 0.6, 2)
+            if simdi > ogren["bitis"] or len(ogren["ornekler"]) >= 10:
+                if len(ogren["ornekler"]) >= 3:
+                    taniyici.ekle(ogren["ad"], ogren["ornekler"])
+                    mesaj_ver("%s kaydedildi (%d ornek)%s" % (
+                        ogren["ad"], len(ogren["ornekler"]),
+                        ". Dikkat: birden fazla yuz vardi, en buyugu kaydedildi" if ogren.get("uyari") else ""))
+                    tanima.clear()
+                else:
+                    mesaj_ver("%s kaydedilemedi: yuz yeterince gorulmedi. Kameraya bakip tekrar dene."
+                              % ogren["ad"])
+                ogren = None
 
         # En buyuk yuzun yakin plani (sag ust kose)
         if aktif:
@@ -1653,7 +1931,12 @@ def main():
 
         if web:
             web.durum.update(mod=el["mod"], durum=SON_DURUM["metin"], ptz=bool(ptz),
-                             alan=alan_metni(ptz, derece_adim) if ptz else "")
+                             alan=alan_metni(ptz, derece_adim) if ptz else "",
+                             tanima=bool(tani["t"]), kisiler=tani["t"].liste() if tani["t"] else [],
+                             mesaj=mesaj["metin"] if simdi - mesaj["zaman"] < 20 else "",
+                             ogreniyor=bool(ogren), selam=dict(selam_olay),
+                             gorulen=[tanima[i]["ad"] for i, _ in aktif
+                                      if i in tanima and tanima[i]["ad"] not in (None, "?")])
             web.kare_ver(kare)
 
         if ptz:
