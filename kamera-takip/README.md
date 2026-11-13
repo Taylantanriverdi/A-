@@ -150,6 +150,24 @@ dosyasına kaydedilir; program kapanıp açılınca kaldığı yerden devam eder
 Kamerayı Xiaomi Home uygulamasından çevirirsen veya kamera yeniden başlarsa
 konum kayar: sınırları silip yeniden belirle.
 
+## İnternetten, her yerden erişim (v8)
+
+Program açılınca kendiliğinden ücretsiz bir **Cloudflare tüneli** açar
+(`https://....trycloudflare.com`). Modemden port açmak, hesap açmak gerekmez.
+
+- Tünel adresi her açılışta değişir. Bu yüzden program güncel adresi gizli,
+  rastgele adlı bir **ntfy.sh** sayfasına yazar. O sayfanın adresi hiç değişmez:
+  **sabit yer imi** (`https://ntfy.sh/kamera-...`). Telefonun yer imlerine bir kez
+  ekle; açınca en üstteki mesajda "Kamerayi ac" düğmesi vardır.
+- Sabit yer imi: siyah pencerede, web sayfasının "İnternetten erişim" bölümünde,
+  kamera penceresinde **U** tuşuyla QR kod olarak.
+- Giriş için PIN gerekir. 10 yanlış denemede giriş 15 dakika kilitlenir.
+- Canlı akış bağlantı tarafından tamponlanırsa sayfa 6 sn sonra kendiliğinden
+  saniyede ~4 kare moduna geçer.
+- Bilgisayar açık ve program çalışıyor olmalı. Kapatmak: `--uzak kapali`.
+- ntfy sayfasındaki mesajlar ~12 saat saklanır; program adresi 6 saatte bir
+  yeniden yazar.
+
 ## Telefondan izleme ve kontrol (v3)
 
 Program çalışırken küçük bir web sayfası açar (port 18765; doluysa sonraki boş port). Siyah pencerede

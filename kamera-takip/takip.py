@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v7"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v8"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -1171,6 +1171,13 @@ Tarama ve takip bu alan&#305;n d&#305;&#351;&#305;na &ccedil;&#305;kmaz; oklar h
  <button type="button" data-sinir="sil" class="sil">S&#305;n&#305;rlar&#305; sil</button>
 </div>
 <p id="alan" class="alanyazi"></p></section>
+<section class="alan"><h2>&#304;nternetten eri&#351;im</h2>
+<p class="not">Bu sayfaya her yerden ula&#351;mak i&ccedil;in a&#351;a&#287;&#305;daki <b>sabit yer imi</b> ba&#287;lant&#305;s&#305;n&#305; telefonunun yer imlerine ekle.
+O sayfada her zaman kameran&#305;n g&uuml;ncel adresi yazar (program her a&ccedil;&#305;l&#305;&#351;ta yeni adres al&#305;r).</p>
+<p class="alanyazi" id="uzakdurum"></p>
+<p class="alanyazi">Sabit yer imi: <a id="uzaksabit" href="#" target="_blank" rel="noopener" style="color:var(--yesil)"></a></p>
+<p class="alanyazi">&#350;u anki adres: <a id="uzakurl" href="#" target="_blank" rel="noopener" style="color:var(--yesil)"></a></p>
+</section>
 <section class="alan"><h2>Ki&#351;iler</h2>
 <p class="not">Ki&#351;i kameraya bakarken ad&#305;n&#305; yaz ve Kaydet'e bas. 4 saniye boyunca y&uuml;z&uuml;nden &ouml;rnek al&#305;n&#305;r;
 bu s&#305;rada ba&#351;&#305;n&#305; hafif&ccedil;e sa&#287;a sola &ccedil;evirsin. Ayn&#305; ki&#351;iyi farkl&#305; &#305;&#351;&#305;klarda tekrar kaydetmek tan&#305;may&#305; g&uuml;&ccedil;lendirir.</p>
@@ -1217,12 +1224,22 @@ function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(
  document.getElementById("durum").textContent=d.durum||"";document.getElementById("surum").textContent=d.surum;
  modDugme.className=d.mod;modDugme.textContent=d.mod==="OTO"?"OTOMAT\u0130K":"SAB\u0130T";
  modDugme.disabled=!d.ptz;document.getElementById("alan").textContent=d.alan||"";
+ var us=document.getElementById("uzaksabit"),uu=document.getElementById("uzakurl");
+ if(d.uzak_sabit){us.textContent=d.uzak_sabit;us.href=d.uzak_sabit;}else{us.textContent="kapal\u0131";us.removeAttribute("href");}
+ if(d.uzak_url){uu.textContent=d.uzak_url;uu.href=d.uzak_url;}else{uu.textContent="-";uu.removeAttribute("href");}
+ document.getElementById("uzakdurum").textContent=d.uzak_durum==="hazir"?"Durum: haz\u0131r":"Durum: "+(d.uzak_durum||"");
  document.getElementById("mesaj").textContent=d.tanima?(d.mesaj||""):(d.tanima_durum||"Y\u00fcz tan\u0131ma haz\u0131rlan\u0131yor...");
  kaydetD.disabled=!d.tanima||d.ogreniyor;kisileriCiz(d);
  if(d.selam){if(sonSelam!==null&&d.selam.no!==sonSelam&&telses.checked&&window.speechSynthesis){
   var u=new SpeechSynthesisUtterance(d.selam.metin);u.lang="tr-TR";speechSynthesis.speak(u);}sonSelam=d.selam.no;}}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
 setInterval(guncelle,1000);guncelle();
-var img=document.getElementById("img");img.onerror=function(){setTimeout(function(){img.src="video?t="+Date.now();},2000);};
+var img=document.getElementById("img"),akisCalisti=false,tekKare=false;
+img.onload=function(){akisCalisti=true;};
+img.onerror=function(){if(!tekKare)setTimeout(function(){img.src="video?t="+Date.now();},2000);};
+// Canli akis 6 sn icinde gelmezse (bazi baglantilar akisi tamponlar) tek tek kare cek
+setTimeout(function(){if(akisCalisti&&img.naturalWidth>0)return;tekKare=true;
+ var yeni=new Image();function sonraki(){yeni.src="kare.jpg?t="+Date.now();}
+ yeni.onload=function(){img.src=yeni.src;setTimeout(sonraki,250);};yeni.onerror=function(){setTimeout(sonraki,1000);};sonraki();},6000);
 </script></body></html>"""
 
 WEB_GIRIS = r"""<!doctype html><html lang="tr"><head><meta charset="utf-8">
@@ -1267,6 +1284,7 @@ class WebSunucu:
         self.komutlar = queue.Queue()
         self.durum = {"surum": SURUM, "mod": "OTO", "durum": "", "ptz": False}
         self.son_izleme = 0.0
+        self.hatalar = []  # yanlis PIN zamanlari (10 yanlis -> 15 dk kilit)
         web = self
 
         class Isleyici(BaseHTTPRequestHandler):
@@ -1292,9 +1310,15 @@ class WebSunucu:
                 if yol.path == "/kimlik":
                     return self._yaz(200, "kamera-takip", "text/plain")
                 if yol.path == "/" and "pin" in q:
+                    simdi = time.time()
+                    web.hatalar = [t for t in web.hatalar if simdi - t < 900]
+                    if len(web.hatalar) >= 10:
+                        return self._yaz(429, WEB_GIRIS.replace("__HATA__",
+                                         '<p style="color:#f2b33d">&Ccedil;ok fazla yanl&#305;&#351; deneme. 15 dakika sonra tekrar dene.</p>'))
                     if q["pin"][0].strip() == web.pin:
                         return self._yaz(303, "", ek={"Location": "/", "Set-Cookie":
                                          "pin=%s; Path=/; Max-Age=31536000; SameSite=Strict" % web.pin})
+                    web.hatalar.append(time.time())
                     time.sleep(1.0)  # tahmin denemelerini yavaslat
                     return self._yaz(200, WEB_GIRIS.replace("__HATA__", '<p style="color:#f2b33d">PIN yanl&#305;&#351;</p>'))
                 if not self._yetkili():
@@ -1307,6 +1331,15 @@ class WebSunucu:
                     return self._yaz(200, json.dumps(web.durum), "application/json")
                 if yol.path == "/video":
                     return self._video()
+                if yol.path == "/kare.jpg":  # tek kare (akisi tamponlayan baglantilar icin yedek)
+                    web.son_izleme = time.time()
+                    with web.kosul:  # izleme yeni basladiysa ilk karenin uretilmesini bekle
+                        onceki = web.sayac
+                        web.kosul.wait_for(lambda: web.sayac != onceki, timeout=2)
+                        jpeg = web.jpeg
+                    if jpeg is None:
+                        return self._yaz(503, "henuz kare yok")
+                    return self._yaz(200, jpeg, "image/jpeg")
                 self._yaz(404, "yok")
 
             def do_POST(self):
@@ -1342,8 +1375,10 @@ class WebSunucu:
                     pass
 
         class Sunucu(ThreadingHTTPServer):
-            # Baska bir program ayni portu kullaniyorsa paylasma: hata ver, sonraki portu dene
-            allow_reuse_address = False
+            # Baska bir program ayni portu kullaniyorsa paylasma: hata ver, sonraki portu dene.
+            # Windows'ta SO_REUSEADDR portu baska programla PAYLASTIRIR (kapali olmali);
+            # Linux/Mac'te ise sadece yeni kapanmis portu tekrar kullanmaya izin verir (acik olmali).
+            allow_reuse_address = os.name != "nt"
             daemon_threads = True
 
             def server_bind(self):
@@ -1402,6 +1437,131 @@ def web_pin_al(klasor):
     with open(yol, "w") as f:
         f.write(pin)
     return pin
+
+
+# ===========================================================================
+#  Internetten erisim: Cloudflare tuneli + sabit "adres panosu" (ntfy.sh)
+# ===========================================================================
+NTFY = "https://ntfy.sh"
+
+
+def uzak_konu_al(klasor):
+    """Bu kurulum icin gizli, rastgele ntfy konusu (bir kez uretilir, saklanir)."""
+    yol = os.path.join(klasor, "uzak.json")
+    try:
+        d = json.load(open(yol))
+        if d.get("konu"):
+            return d["konu"]
+    except (OSError, ValueError):
+        pass
+    harfler = "abcdefghijkmnpqrstuvwxyz23456789"
+    konu = "kamera-" + "".join(random.SystemRandom().choice(harfler) for _ in range(20))
+    json.dump({"konu": konu}, open(yol, "w"))
+    return konu
+
+
+class UzakErisim:
+    """cloudflared ile https://....trycloudflare.com adresi acar; adres her
+    degistiginde gizli ntfy sayfasina yazar. Sabit yer imi: https://ntfy.sh/<konu>"""
+
+    def __init__(self, klasor, port):
+        self.klasor, self.port = os.path.join(klasor, "cloudflared"), port
+        self.konu = uzak_konu_al(klasor)
+        self.sabit = "%s/%s" % (NTFY, self.konu)
+        self.url, self.durum, self.surec = None, "Internet erisimi baslatiliyor...", None
+        self.son_duyuru = 0.0
+        threading.Thread(target=self._calis, daemon=True).start()
+        threading.Thread(target=self._tazele, daemon=True).start()
+
+    def _exe(self):
+        os.makedirs(self.klasor, exist_ok=True)
+        sistem, mimari = platform.system(), platform.machine().lower()
+        if sistem == "Windows":
+            dosya, ad = "cloudflared-windows-amd64.exe", "cloudflared.exe"
+        elif sistem == "Darwin":
+            dosya = "cloudflared-darwin-arm64.tgz" if mimari in ("arm64", "aarch64") else "cloudflared-darwin-amd64.tgz"
+            ad = "cloudflared"
+        else:
+            dosya = "cloudflared-linux-arm64" if mimari in ("arm64", "aarch64") else "cloudflared-linux-amd64"
+            ad = "cloudflared"
+        yol = os.path.join(self.klasor, ad)
+        if not os.path.exists(yol):
+            self.durum = "Cloudflare tunel araci indiriliyor..."
+            print(self.durum)
+            url = "https://github.com/cloudflare/cloudflared/releases/latest/download/" + dosya
+            gecici = yol + ".tmp"
+            urllib.request.urlretrieve(url, gecici)
+            if dosya.endswith(".tgz"):
+                import tarfile
+                with tarfile.open(gecici) as t:
+                    t.extract("cloudflared", self.klasor)
+                os.remove(gecici)
+            else:
+                os.replace(gecici, yol)
+            os.chmod(yol, 0o755)
+        return yol
+
+    def _calis(self):
+        while True:
+            try:
+                exe = self._exe()
+                self.durum = "Internet tuneli aciliyor..."
+                self.surec = subprocess.Popen(
+                    [exe, "tunnel", "--no-autoupdate", "--url", "http://127.0.0.1:%d" % self.port],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                for satir in self.surec.stdout:
+                    m = re.search(r"https://[-a-z0-9]+\.trycloudflare\.com", satir)
+                    if m and m.group(0) != self.url and "api.trycloudflare" not in m.group(0):
+                        self.url = m.group(0)
+                        self.durum = "hazir"
+                        print("-" * 60)
+                        print(" INTERNETTEN ERISIM (her yerden):")
+                        print("   Bu acilisin adresi : %s" % self.url)
+                        print("   Sabit yer imi      : %s" % self.sabit)
+                        print("   (yer imi sayfasinda her zaman guncel adres yazar; PIN gerekir)")
+                        print("-" * 60)
+                        self._duyur()
+                self.surec.wait()
+                self.url = None
+                self.durum = "Internet tuneli kapandi, yeniden aciliyor..."
+            except Exception as e:
+                self.url = None
+                self.durum = "Internet erisimi hatasi: %s (30 sn sonra tekrar)" % str(e)[:100]
+                print(self.durum)
+            time.sleep(30)
+
+    def _duyur(self):
+        """Guncel adresi gizli ntfy sayfasina yaz (ntfy mesajlari ~12 saat saklar)."""
+        if not self.url:
+            return
+        try:
+            istek = urllib.request.Request(
+                "%s/%s" % (NTFY, self.konu), method="POST",
+                data=("Kamera Takip adresi: %s\n(Acmak icin dokun. PIN gerekir.)" % self.url).encode("utf-8"),
+                headers={"Title": "Kamera Takip %s" % SURUM, "Click": self.url, "Tags": "video_camera",
+                         "Actions": "view, Kamerayi ac, %s" % self.url})
+            urllib.request.urlopen(istek, timeout=15).read()
+            self.son_duyuru = time.time()
+        except Exception as e:
+            print("Adres panosuna yazilamadi:", str(e)[:100])
+
+    def _tazele(self):
+        while True:
+            time.sleep(60)
+            if self.url and time.time() - self.son_duyuru > 6 * 3600:
+                self._duyur()
+
+    def kapat(self):
+        if self.surec and self.surec.poll() is None:
+            self.surec.terminate()
+
+
+def qr_resmi(metin, boyut=260):
+    q = cv2.QRCodeEncoder.create().encode(metin)
+    q = cv2.copyMakeBorder(q, 3, 3, 3, 3, cv2.BORDER_CONSTANT, value=255)
+    q = cv2.resize(q, (boyut, boyut), interpolation=cv2.INTER_NEAREST)
+    return cv2.cvtColor(q, cv2.COLOR_GRAY2BGR)
 
 
 # --- Elle kontrol paneli ----------------------------------------------------
@@ -1502,7 +1662,7 @@ def panel_ciz(kare, dugmeler, mod, basili):
               "sag": [(mx + r, my), (mx - r // 2, my - r), (mx - r // 2, my + r)]}[ad]
         cv2.fillPoly(kare, [np.array(uc, np.int32)], KOYU if basili == ad else (235, 235, 235))
     x0, _, _, y1 = dugmeler["sol"]
-    cv2.putText(kare, "Oklar/WASD: dondur   P: oto/sabit   Q: cikis",
+    cv2.putText(kare, "Oklar/WASD: dondur   P: oto/sabit   U: QR   Q: cikis",
                 (x0, dugmeler["asagi"][3] + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
     cv2.putText(kare, "Sinir: 1 sol  2 sag  3 ust  4 alt  0 sil",
                 (x0, dugmeler["yukari"][1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
@@ -1533,6 +1693,8 @@ def main():
     p.add_argument("--tanima", choices=["acik", "kapali"], default="acik", help="Kisileri isimleriyle tani")
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
     p.add_argument("--selam-ara", type=float, default=600, help="Ayni kisiyi tekrar selamlamadan once beklenecek sn")
+    p.add_argument("--uzak", choices=["acik", "kapali"], default="acik",
+                   help="Internetten erisim (Cloudflare tuneli + sabit yer imi sayfasi)")
     p.add_argument("--web-port", type=int, default=18765, help="Telefondan izleme/kontrol sayfasi portu (0 = kapali)")
     p.add_argument("--max-kare", type=int, default=0, help="Test icin: bu kadar kareden sonra dur")
     a = p.parse_args()
@@ -1562,7 +1724,8 @@ def main():
                     time.sleep(60)
         threading.Thread(target=tanima_yukle, daemon=True).start()
 
-    web = None
+    web = uzak = None
+    qr_goster = False
     if a.web_port:
         try:
             web = WebSunucu(a.web_port, web_pin_al(betik_klasor))
@@ -1574,6 +1737,10 @@ def main():
                 print("   http://%s:%d%s" % (adr, web.port, ek))
             print(" PIN: %s" % web.pin)
             print("-" * 60)
+            if a.uzak == "acik":
+                uzak = UzakErisim(betik_klasor, web.port)
+                print(" Internetten erisim hazirlaniyor. Sabit yer imi: %s" % uzak.sabit)
+                print(" Kamera penceresinde U tusu: telefonla okutmak icin QR kod")
         except OSError as e:
             print("Web sayfasi baslatilamadi: %s" % e)
 
@@ -2000,6 +2167,8 @@ def main():
                              alan=alan_metni(ptz, derece_adim) if ptz else "",
                              tanima=bool(tani["t"]), kisiler=tani["t"].liste() if tani["t"] else [],
                              tanima_durum=TANIMA_DURUM["metin"],
+                             uzak_url=uzak.url if uzak else None, uzak_sabit=uzak.sabit if uzak else None,
+                             uzak_durum=uzak.durum if uzak else "kapali",
                              mesaj=mesaj["metin"] if simdi - mesaj["zaman"] < 20 else "",
                              ogreniyor=bool(ogren), selam=dict(selam_olay),
                              gorulen=[tanima[i]["ad"] for i, _ in aktif
@@ -2009,6 +2178,18 @@ def main():
         if web and not a.goruntusuz:
             yazi_kutusu(kare, "Kisi kaydi / telefon: http://localhost:%d  PIN %s" % (web.port, web.pin),
                         12, 62 if not ogren else 100, (200, 200, 200), 0.5, 1)
+        if qr_goster and uzak and not a.goruntusuz:
+            q = qr_resmi(uzak.sabit, min(300, h - 120))
+            qy, qx = (h - q.shape[0]) // 2, (w - q.shape[1]) // 2
+            cv2.rectangle(kare, (qx - 20, qy - 50), (qx + q.shape[1] + 20, qy + q.shape[0] + 40), (255, 255, 255), -1)
+            kare[qy:qy + q.shape[0], qx:qx + q.shape[1]] = q
+            cv2.putText(kare, "Telefonla okut, yer imlerine ekle", (qx - 10, qy - 18),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, KOYU, 2, cv2.LINE_AA)
+            cv2.putText(kare, uzak.sabit, (qx - 10, qy + q.shape[0] + 26),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.42, KOYU, 1, cv2.LINE_AA)
+        elif uzak and not a.goruntusuz:
+            yazi_kutusu(kare, ("Internet: hazir  (U: QR kod)" if uzak.url else ascii_ad(uzak.durum)[:70]),
+                        12, 114 if not ogren else 152, (200, 200, 200), 0.5, 1)
         if a.tanima == "acik" and not tani["t"] and not a.goruntusuz:
             yazi_kutusu(kare, ascii_ad(TANIMA_DURUM["metin"])[:90], 12, 88 if not ogren else 126, SARI, 0.5, 1)
 
@@ -2022,7 +2203,9 @@ def main():
             if tus != -1:
                 if tus & 0xFF in (ord("q"), ord("Q"), 27) and tus not in TUS_YON:
                     break
-                if tus in (ord("p"), ord("P")) and ptz:
+                if tus in (ord("u"), ord("U")) and uzak:
+                    qr_goster = not qr_goster
+                elif tus in (ord("p"), ord("P")) and ptz:
                     el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
                     el_birak()
                 elif tus in TUS_YON:
@@ -2047,6 +2230,8 @@ def main():
         cv2.destroyAllWindows()
     if go2rtc_surec is not None:
         go2rtc_surec.terminate()
+    if uzak:
+        uzak.kapat()
 
 
 if __name__ == "__main__":
