@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v13
+title Kamera Hareket Takibi v14
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v13
+echo Kamera Takip v14
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v13"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v14"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -666,6 +666,37 @@ def _windows_sesi(metin):
         print("Ses \u00e7al\u0131namad\u0131:", e)
 
 
+def kamera_ses_kanali():
+    """go2rtc'den kameranin hoparlor kanalini (sendonly ses) okur.
+    Donus: (ffmpeg bicimi, okunabilir ad) | (None, sebep)."""
+    akis = SES_AYAR.get("akis")
+    try:
+        bilgi = json.loads(_api("/api/streams?src=" + urllib.request.quote(akis), "GET", 5) or "{}")
+    except Exception as e:
+        return None, "go2rtc ak\u0131\u015f bilgisi okunamad\u0131: %s" % str(e)[:80]
+    medyalar = []
+    for uretici in (bilgi or {}).get("producers") or []:
+        medyalar += uretici.get("medias") or []
+    if not medyalar:
+        return None, "kamera yay\u0131n\u0131 \u015fu an go2rtc'de etkin de\u011fil"
+    for m in medyalar:
+        parca = [x.strip() for x in m.split(",")]
+        if len(parca) >= 3 and parca[0] == "audio" and parca[1] == "sendonly":
+            kodek = parca[2].upper()  # ornek: PCMA/16000, PCMA, PCMU/8000, OPUS/48000/2
+            ad = kodek.split("/")[0]
+            hiz = kodek.split("/")[1] if "/" in kodek else "8000"
+            if ad in ("PCMA", "PCMU"):
+                return "%s/%s" % (ad.lower(), hiz), kodek
+            if ad == "OPUS":
+                return "opus", kodek
+            return None, "kameran\u0131n hoparl\u00f6r bi\u00e7imi desteklenmiyor: %s" % kodek
+    sesli = any(m.startswith("audio") for m in medyalar)
+    if not sesli:
+        return None, ("kameran\u0131n g\u00f6r\u00fcnt\u00fcs\u00fcnde ses yok, bu y\u00fczden go2rtc hoparl\u00f6r kanal\u0131 a\u00e7m\u0131yor. "
+                      "Xiaomi Home'da kameran\u0131n mikrofonunu/ses kayd\u0131n\u0131 a\u00e7\u0131n")
+    return None, "kamera hoparl\u00f6r kanal\u0131 bildirmiyor (%s)" % "; ".join(medyalar)
+
+
 def kameradan_cal(dosya):
     """Ses dosyasini go2rtc uzerinden kameranin hoparlorunden calar. Basarili ise True."""
     akis = SES_AYAR.get("akis")
@@ -682,22 +713,46 @@ def kameradan_cal(dosya):
         giris = "http://127.0.0.1:%d/ses/%s/%s" % (web.port, web.ses_anahtari, os.path.basename(dosya))
     else:
         giris = os.path.abspath(dosya).replace("\\", "/")
-    hata = ""
-    for kodek in ("pcma", "opus"):  # kamera hangisini kabul ederse
+    # Kameranin hoparloru hangi bicimi bekliyor? go2rtc bicim ve ornekleme hizi BIREBIR
+    # ayni olmazsa sesi baglamaz ("can't find consumer"). Once go2rtc'ye soruyoruz.
+    bicim, aciklama = kamera_ses_kanali()
+    if bicim:
+        denenecek = [bicim]
+    else:
+        print("Kamera hoparl\u00f6r kanal\u0131: %s" % aciklama)
+        denenecek = ["pcma/16000", "pcma/8000", "opus"]
+    hatalar = []
+    for kodek in denenecek:
         src = "ffmpeg:%s#input=file#audio=%s" % (giris, kodek)
         try:
             _api("/api/streams?dst=%s&src=%s" % (urllib.request.quote(akis), urllib.request.quote(src, safe="")),
-                 "POST", 15)
+                 "POST", 20)
             SES_AYAR["son_hata"] = ""
             print("Ses kameran\u0131n hoparl\u00f6r\u00fcne g\u00f6nderildi (%s)." % kodek.upper())
             return True
         except urllib.error.HTTPError as e:
-            hata = e.read().decode("utf-8", "replace")[:120]
+            hatalar.append("%s: %s" % (kodek, e.read().decode("utf-8", "replace").strip()[:80]))
         except Exception as e:
-            hata = str(e)[:120]
-    SES_AYAR["son_hata"] = "go2rtc sesi kameraya g\u00f6nderemedi: %s" % (hata.strip() or "bilinmeyen hata")
-    print("Kamera hoparl\u00f6r\u00fc kullan\u0131lamad\u0131 (%s). Ses bilgisayardan \u00e7al\u0131nacak." % SES_AYAR["son_hata"])
+            hatalar.append("%s: %s" % (kodek, str(e)[:80]))
+    SES_AYAR["son_hata"] = "go2rtc sesi kameraya g\u00f6nderemedi (%s)%s" % (
+        "; ".join(hatalar), "" if bicim else ". " + aciklama)
+    print("Kamera hoparl\u00f6r\u00fc kullan\u0131lamad\u0131: %s. Ses bilgisayardan \u00e7al\u0131nacak." % SES_AYAR["son_hata"])
     return False
+
+
+def ses_kanali_raporu():
+    """Acilista kameranin hoparlor kanalini bir kez raporlar (yayin oturduktan sonra)."""
+    def is_():
+        time.sleep(8)
+        if not SES_AYAR.get("akis"):
+            return
+        bicim, aciklama = kamera_ses_kanali()
+        if bicim:
+            print("Kamera hoparl\u00f6r\u00fc haz\u0131r: ses %s bi\u00e7iminde g\u00f6nderilecek." % aciklama)
+        else:
+            SES_AYAR["son_hata"] = aciklama
+            print("Kamera hoparl\u00f6r\u00fc uyar\u0131s\u0131: %s" % aciklama)
+    threading.Thread(target=is_, daemon=True).start()
 
 
 def sesli_soyle(metin):
@@ -2179,6 +2234,8 @@ def main():
     if a.kaynak == "go2rtc":
         a.kaynak, go2rtc_surec = go2rtc_hazirla(os.path.join(betik_klasor, "go2rtc"))
         SES_AYAR["akis"] = urllib.parse.unquote(a.kaynak.rsplit("/", 1)[-1])
+        if a.hoparlor != "bilgisayar":
+            ses_kanali_raporu()
         print("Kameraya ba\u011flan\u0131l\u0131yor:", a.kaynak)
 
     if a.simulasyon:
