@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal
-title Kamera Hareket Takibi v18
+title Kamera Hareket Takibi v19
 REM ================================================================
 REM  Kamera Hareket Takibi - tek dosyada kurulum ve çalıştırma
 REM  Bu dosyaya çift tıklayın, her şeyi kendisi yapar:
@@ -18,7 +18,7 @@ set "PYTHONIOENCODING=utf-8"
 if not exist "%KLASOR%" mkdir "%KLASOR%"
 
 echo.
-echo Kamera Takip v18
+echo Kamera Takip v19
 echo.
 echo [1/4] Python denetleniyor...
 set "PY="
@@ -98,7 +98,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v18"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v19"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -676,7 +676,7 @@ def selam_metni(ad):
 
 
 SESLER = {"emel": "tr-TR-EmelNeural", "ahmet": "tr-TR-AhmetNeural"}
-SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "kamera", "akis": None, "web": None, "son_hata": "",
+SES_AYAR = {"klasor": ".", "ses": "emel", "hoparlor": "bilgisayar", "akis": None, "web": None, "son_hata": "",
             "uyarlama": False}
 
 
@@ -1810,6 +1810,8 @@ function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(
  document.getElementById("uzakdurum").textContent=d.uzak_durum==="hazir"?"Durum: haz\u0131r":"Durum: "+(d.uzak_durum||"");
  document.getElementById("mesaj").textContent=d.tanima?(d.mesaj||""):(d.tanima_durum||"Y\u00fcz tan\u0131ma haz\u0131rlan\u0131yor...");
  kaydetD.disabled=!d.tanima||d.ogreniyor;kisileriCiz(d);
+ var kh=!!d.kamera_hoparlor;["konus","konusdurum","uyarlama"].forEach(function(id){var e=document.getElementById(id);if(e)e.hidden=!kh;});
+ document.getElementById("sesdene").textContent=kh?"\ud83d\udd08 Kameradan test sesi \u00e7al":"\ud83d\udd08 Test sesi \u00e7al (bilgisayardan)";
  document.getElementById("seshata").textContent=d.ses_hata?("Ses: "+d.ses_hata):"";
  if(d.selam){if(sonSelam!==null&&d.selam.no!==sonSelam&&telses.checked&&window.speechSynthesis){
   var u=new SpeechSynthesisUtterance(d.selam.metin);u.lang="tr-TR";speechSynthesis.speak(u);}sonSelam=d.selam.no;}}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
@@ -2112,6 +2114,9 @@ class WebSunucu:
                 if not self._yetkili():
                     return self._yaz(403, "PIN gerekli")
                 if self.path.startswith("/api/konus"):
+                    if SES_AYAR.get("hoparlor") == "bilgisayar":
+                        return self._yaz(503, json.dumps({"ok": False, "hata": "kamera hoparl\u00f6r\u00fc \u015fimdilik kapal\u0131"},
+                                                         ensure_ascii=False), "application/json")
                     n = int(self.headers.get("Content-Length", 0) or 0)
                     if n <= 0 or n > 8 * 1024 * 1024:
                         return self._yaz(400, "ses kaydi bos ya da cok buyuk")
@@ -2871,7 +2876,7 @@ def main():
     p.add_argument("--goruntusuz", action="store_true", help="Pencere acma (sunucu/headless)")
     p.add_argument("--tanima", choices=["acik", "kapali"], default="acik", help="Kisileri isimleriyle tani")
     p.add_argument("--selam", choices=["acik", "kapali"], default="acik", help="Taninan kisiyi sesli selamla")
-    p.add_argument("--hoparlor", choices=["kamera", "bilgisayar", "ikisi"], default="kamera",
+    p.add_argument("--hoparlor", choices=["kamera", "bilgisayar", "ikisi"], default="bilgisayar",
                    help="Selam nereden duyulsun: kameranin hoparloru (varsayilan), bilgisayar veya ikisi")
     p.add_argument("--hoparlor-uyarlama", choices=["acik", "kapali"], default="kapali",
                    help="16 kHz Xiaomi kameralarda cizirtiyi onleyen 8 kHz uyarlamasi")
@@ -3539,7 +3544,7 @@ def main():
                              saklama={"gun": ayarlar["saklama_gun"], "gb": ayarlar["saklama_gb"]},
                              bolgeler=[{"id": b["id"], "ad": b["ad"], "tur": b["tur"], "nokta": b["nokta"],
                                         "aktif": bolge_aktif(b, ptz)} for b in ayarlar["bolgeler"]],
-                             kisi_sayisi=len(kisiler),
+                             kisi_sayisi=len(kisiler), kamera_hoparlor=SES_AYAR.get("hoparlor") != "bilgisayar",
                              gorulen=[tanima[i]["ad"] for i, _ in aktif
                                       if i in tanima and tanima[i]["ad"] not in (None, "?")])
             web.kare_ver(kare)

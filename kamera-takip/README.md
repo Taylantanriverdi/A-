@@ -108,6 +108,12 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## v19: kamera hoparlörü şimdilik kapalı
+
+Kamera hoparlöründeki cızırtı çözülene kadar selam ve test sesi bilgisayardan
+çalar, bas-konuş düğmesi gizlenir. Hoparlör kodu duruyor; denemek için
+`--hoparlor kamera` ile açılabilir.
+
 ## v18: bildirim, insan algılama, bölgeler, olay geçmişi, bas-konuş
 
 **Telefona fotoğraflı bildirim.** Telefona ücretsiz **ntfy** uygulamasını kur ve web
