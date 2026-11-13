@@ -2,9 +2,13 @@
 
 ## En kolay yol (Windows): tek dosya
 
-**`KameraTakip.bat`** dosyasını bilgisayarına indir ve çift tıkla. Gerisini kendisi yapar:
+**İndir (her zaman en güncel sürüm):**
+https://raw.githubusercontent.com/Taylantanriverdi/A-/claude/ecstatic-fermat-gzzjnm/kamera-takip/KameraTakip.zip
+
+ZIP'i ayıkla, **`KameraTakip.bat`** dosyasına çift tıkla. Gerisini kendisi yapar:
 Python yoksa kurar, kütüphaneleri kurar, go2rtc'yi indirip başlatır, Xiaomi
-girişi için tarayıcıyı açar, kamera eklenince takibi başlatır. Hareket kayıtları
+girişi için tarayıcıyı açar. Giriş yapınca hesaptaki kamerayı bütün bölgelerde
+kendisi arar, go2rtc'ye ekler ve takibi başlatır. Hareket kayıtları
 `Videolar\KameraTakip` klasörüne gider. Sonraki açılışlarda doğrudan takibe geçer.
 
 (`takip.py` değişirse `python bat_olustur.py` ile bat yeniden üretilir.)

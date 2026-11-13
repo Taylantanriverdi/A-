@@ -199,6 +199,46 @@ def _akislar():
         return None  # go2rtc calismiyor
 
 
+XIAOMI_BOLGELER = [("sg", "Singapore"), ("de", "Europe"), ("cn", "China"),
+                   ("ru", "Russia"), ("us", "United States"), ("i2", "India")]
+
+
+def _api(yol, yontem="GET", zaman=15):
+    istek = urllib.request.Request(GO2RTC_API + yol, method=yontem)
+    with urllib.request.urlopen(istek, timeout=zaman) as r:
+        return r.read().decode()
+
+
+def _xiaomi_hesaplari():
+    try:
+        return json.loads(_api("/api/xiaomi", zaman=3) or "[]") or []
+    except Exception:
+        return []
+
+
+def xiaomi_kamera_ekle(kullanici):
+    """Giris yapilmis Xiaomi hesabinda tum bolgeleri tarar, ilk kamerayi
+    go2rtc'ye 'xiaomi' adiyla ekler (go2rtc bunu go2rtc.yaml'a kaydeder)."""
+    print("Xiaomi hesabi bulundu (%s), kamera araniyor..." % kullanici)
+    for kod, ad in XIAOMI_BOLGELER:
+        try:
+            veri = json.loads(_api("/api/xiaomi?id=%s&region=%s" % (kullanici, kod)))
+        except Exception:
+            print("  %-14s kamera yok" % ad)
+            continue
+        kaynaklar = veri.get("sources") or []
+        if not kaynaklar:
+            print("  %-14s kamera yok" % ad)
+            continue
+        k = kaynaklar[0]
+        print("  %-14s BULUNDU: %s (%s)" % (ad, k.get("name"), k.get("info")))
+        _api("/api/streams?name=xiaomi&src=" + urllib.request.quote(k["url"], safe=""), "PUT")
+        print("Kamera go2rtc'ye eklendi.")
+        return True
+    print("Bu hesapta kamera bulunamadi. Kamera baska bir Xiaomi hesabinda olabilir.")
+    return False
+
+
 def go2rtc_hazirla(klasor):
     """go2rtc'yi gerekirse indirir ve baslatir, kamera eklenene kadar bekler.
     Donus: (rtsp adresi, baslatilan surec veya None)"""
@@ -242,15 +282,24 @@ def go2rtc_hazirla(klasor):
         print()
         print("=" * 64)
         print(" Kamera henuz eklenmemis. Tarayicida go2rtc acilacak:")
-        print("   1) Add  ->  Xiaomi")
-        print("   2) Xiaomi Home hesabinla giris yap (kod/captcha isterse doldur)")
-        print("   3) Listeden kamerani sec ve ekle")
-        print(" Kamera eklenince takip KENDILIGINDEN baslar. Bu pencereyi kapatma.")
+        print("   1) Asagida Xiaomi'ye tikla")
+        print("   2) Xiaomi Home hesabinla giris yap (login'e BIR KEZ bas,")
+        print("      gelen kodu yazip send'e bas)")
+        print(" Giris yapinca kamera KENDILIGINDEN bulunup eklenir ve takip")
+        print(" baslar. Bu pencereyi kapatma.")
         print("=" * 64)
-        webbrowser.open("http://localhost:1984/")
+        webbrowser.open("http://localhost:1984/add.html")
+        taranan = set()
         while not akislar:
             time.sleep(3)
             akislar = _akislar() or {}
+            if not akislar:
+                for kullanici in _xiaomi_hesaplari():
+                    if kullanici not in taranan:
+                        taranan.add(kullanici)
+                        if xiaomi_kamera_ekle(kullanici):
+                            akislar = _akislar() or {}
+                            break
     ad = next(iter(akislar))
     print("Kamera akisi bulundu:", ad)
     return "rtsp://127.0.0.1:8554/" + urllib.request.quote(ad), surec
