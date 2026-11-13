@@ -6,4 +6,7 @@ kod = open(os.path.join(d, "takip.py"), encoding="ascii").read()
 metin = sablon.rstrip("\n") + "\n" + kod
 with open(os.path.join(d, "KameraTakip.bat"), "w", encoding="ascii", newline="\r\n") as f:
     f.write(metin)
-print("KameraTakip.bat olusturuldu")
+import zipfile
+with zipfile.ZipFile(os.path.join(d, "KameraTakip.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    z.write(os.path.join(d, "KameraTakip.bat"), "KameraTakip.bat")
+print("KameraTakip.bat ve KameraTakip.zip olusturuldu")
