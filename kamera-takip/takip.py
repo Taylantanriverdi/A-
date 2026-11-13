@@ -19,7 +19,7 @@ Sabit kamerada:
   3) Bulunan yuzler kareden kareye ayni numarayla takip edilir, yeni bir yuz
      yakalaninca fotografi kaydedilir. Yuz kaybolunca tekrar hareket beklenir.
 """
-SURUM = "v3"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
+SURUM = "v4"  # her guncellemede artirilir; kamerada ve pencere basliginda gorunur
 
 import argparse
 import base64
@@ -727,7 +727,78 @@ class PTZ:
         self.gecikme = min(3.0, max(0.4, g[len(g) // 2])) if g else 1.2
         self.gonderilenler = deque()  # (zaman, etki): goruntude henuz gorunmeyen komutlar
         self.yon_baslangic = 0.0      # su anki yone ilk komutun gonderildigi an
+        # Calisma alani: kameranin konumu adim cinsinden (x+ = saga, y+ = yukari bakar)
+        self.x = self.y = 0
+        self.sinir = {"sol": None, "sag": None, "ust": None, "alt": None}
+        self.serbest = False          # elle kontrol: sinirlari yok say
+        self.sinira_dayandi = None    # sinir yuzunden gonderilmeyen son yon
+        self.gecmis = deque(maxlen=400)  # (zaman, etki): konum duzeltmesi icin
+        self.alan_yolu, self.degisti = None, False
         threading.Thread(target=self._isci, daemon=True).start()
+
+    # --- calisma alani ---
+    ETKI_KONUM = {"sol": (1, 0), "sag": (-1, 0), "asagi": (0, 1), "yukari": (0, -1)}
+
+    def izinli(self, etki):
+        """Bu yone bir adim calisma alaninin disina cikarir mi? (Alan disindaysa
+        alana dogru gitmeye izin verilir.)"""
+        dx, dy = self.ETKI_KONUM.get(etki, (0, 0))
+        nx, ny = self.x + dx, self.y + dy
+        s = self.sinir
+        if dx < 0 and s["sol"] is not None and nx < s["sol"]:
+            return False
+        if dx > 0 and s["sag"] is not None and nx > s["sag"]:
+            return False
+        if dy > 0 and s["ust"] is not None and ny > s["ust"]:
+            return False
+        if dy < 0 and s["alt"] is not None and ny < s["alt"]:
+            return False
+        return True
+
+    def _say(self, etki, n=1):
+        dx, dy = self.ETKI_KONUM.get(etki, (0, 0))
+        self.x += dx * n
+        self.y += dy * n
+        self.dikey = -self.y
+        self.degisti = True
+
+    def geri_al(self, t0, t1, etki):
+        """Goruntu kaymadigi halde gonderilmis komutlari (donanim siniri) konumdan dus."""
+        n = sum(1 for t, e in list(self.gecmis) if t0 <= t <= t1 and e == etki)
+        if n:
+            self._say(etki, -n)
+
+    def sinir_ayarla(self, hangi):
+        if hangi == "sil":
+            self.sinir = {"sol": None, "sag": None, "ust": None, "alt": None}
+        elif hangi in ("sol", "sag"):
+            self.sinir[hangi] = self.x
+            if None not in (self.sinir["sol"], self.sinir["sag"]) and self.sinir["sol"] > self.sinir["sag"]:
+                self.sinir["sol"], self.sinir["sag"] = self.sinir["sag"], self.sinir["sol"]
+        elif hangi in ("ust", "alt"):
+            self.sinir[hangi] = self.y
+            if None not in (self.sinir["ust"], self.sinir["alt"]) and self.sinir["alt"] > self.sinir["ust"]:
+                self.sinir["ust"], self.sinir["alt"] = self.sinir["alt"], self.sinir["ust"]
+        self.degisti = True
+        self.kaydet()
+
+    def kaydet(self):
+        if self.alan_yolu and self.degisti:
+            try:
+                json.dump({"x": self.x, "y": self.y, "sinir": self.sinir}, open(self.alan_yolu, "w"))
+                self.degisti = False
+            except OSError:
+                pass
+
+    def yukle(self, yol):
+        self.alan_yolu = yol
+        try:
+            d = json.load(open(yol))
+            self.x, self.y = int(d.get("x", 0)), int(d.get("y", 0))
+            self.sinir.update(d.get("sinir", {}))
+            self.dikey = -self.y
+        except (OSError, ValueError):
+            pass
 
     def var(self, etki):
         return etki in self.e
@@ -759,14 +830,14 @@ class PTZ:
 
     TERS = {"sol": "sag", "sag": "sol", "yukari": "asagi", "asagi": "yukari"}
 
-    def surekli(self, etki, aralik=0.3, paralel=1, zorla=False):
+    def surekli(self, etki, aralik=0.3, paralel=1, zorla=False, serbest=False):
         # Ters yone donmeden once son hareketin goruntuye yansimasini bekle (sallanmayi onler)
         if (not zorla and self.son_etki == self.TERS.get(etki)
                 and time.time() - self.son_gonderim < self.gecikme + 0.3):
             self.yon = None
             return
         if etki in self.e:
-            self.yon, self.aralik, self.paralel = etki, aralik, paralel
+            self.yon, self.aralik, self.paralel, self.serbest = etki, aralik, paralel, serbest
 
     def dur(self):
         self.yon = None
@@ -789,6 +860,9 @@ class PTZ:
             yon = self.yon
             simdi = time.time()
             bekleme = self.aralik + (1.0 if self.hata_sayisi >= 3 else 0.0)  # hata varsa yavasla
+            if yon and not self.serbest and not self.izinli(yon):
+                self.sinira_dayandi, self.yon = yon, None  # calisma alani siniri
+                yon = None
             if yon and self.ucusta < self.paralel and simdi - self.son_gonderim >= bekleme:
                 with self.kilit:
                     self.ucusta += 1
@@ -796,16 +870,23 @@ class PTZ:
                     self.yon_baslangic = simdi
                 self.son_gonderim, self.son_etki = simdi, yon
                 self.gonderilenler.append((simdi, yon))
-                self.dikey += 1 if yon == "yukari" else -1 if yon == "asagi" else 0
+                self.gecmis.append((simdi, yon))
+                self._say(yon)
                 threading.Thread(target=self._tek, args=(yon,), daemon=True).start()
             time.sleep(0.02)
 
-    def hareket(self, etki, adet=1):
+    def hareket(self, etki, adet=1, serbest=False):
         """Tek seferlik birkac adim (surekli hareketten bagimsiz, ornegin dikey seviye degisimi)."""
         if etki not in self.e:
             return False
-        self.dikey += adet if etki == "yukari" else -adet if etki == "asagi" else 0
         for _ in range(adet):
+            if not serbest and not self.izinli(etki):
+                self.sinira_dayandi = etki
+                break
+            simdi = time.time()
+            self.gecmis.append((simdi, etki))
+            self.gonderilenler.append((simdi, etki))
+            self._say(etki)
             with self.kilit:
                 self.ucusta += 1
             threading.Thread(target=self._tek, args=(etki,), daemon=True).start()
@@ -843,7 +924,13 @@ def ptz_hazirla(betik_klasor, son_kare, kalibre_zorla=False):
                 return None
             json.dump(eslesme, open(ayar_yolu, "w", encoding="utf-8"), indent=1)
             print("PTZ ayari kaydedildi:", ", ".join(sorted(eslesme)))
-        return PTZ(gonder, eslesme)
+            alan = os.path.join(betik_klasor, "alan_%s.json" % bilgi["did"])
+            if os.path.exists(alan):
+                os.remove(alan)  # kalibrasyon kamerayi oynatti: eski konum/sinirlar gecersiz
+                print("Calisma alani sinirlari sifirlandi (kalibrasyon yapildi), yeniden belirleyin.")
+        ptz = PTZ(gonder, eslesme)
+        ptz.yukle(os.path.join(betik_klasor, "alan_%s.json" % bilgi["did"]))
+        return ptz
     except Exception as e:
         print("PTZ kullanilamiyor (%s). Sabit kamera modunda devam." % str(e)[:120])
         return None
@@ -878,6 +965,13 @@ h1{font-size:18px;margin:0;font-weight:700}
 #mod.OTO{background:var(--yesil)} #mod.SABIT{background:var(--sari)}
 .not{color:var(--soluk);font-size:13px;text-align:center;margin:0}
 button:focus-visible,.ok:focus-visible{outline:3px solid var(--yesil);outline-offset:2px}
+.alan{background:var(--yuzey);border:1px solid var(--cizgi);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.alan h2{font-size:16px;margin:0}.alan .not{text-align:left}
+.sinirlar{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sinirlar button{min-height:48px;border-radius:10px;border:1px solid var(--cizgi);background:var(--bg);color:var(--yazi);font:600 15px system-ui,sans-serif;cursor:pointer}
+.sinirlar button:active{background:var(--yazi);color:#111}
+.sinirlar .sil{grid-column:1/-1;color:var(--sari)}
+.alanyazi{margin:0;font:13px ui-monospace,Consolas,monospace;color:var(--soluk);overflow-wrap:anywhere}
 </style></head><body><main>
 <header><h1>Kamera Takip</h1><span class="surum" id="surum">__SURUM__</span></header>
 <div class="video"><img id="img" src="video" alt="Canl&#305; kamera g&ouml;r&uuml;nt&uuml;s&uuml;">
@@ -891,6 +985,17 @@ button:focus-visible,.ok:focus-visible{outline:3px solid var(--yesil);outline-of
  <button id="mod" class="OTO" type="button">OTOMAT&#304;K</button>
 </div>
 <p class="not">Oka dokun: bir ad&#305;m &middot; bas&#305;l&#305; tut: s&uuml;rekli d&ouml;n &middot; oka dokununca SAB&#304;T moda ge&ccedil;er</p>
+<section class="alan"><h2>&Ccedil;al&#305;&#351;ma alan&#305;</h2>
+<p class="not">Kameray&#305; oklarla s&#305;n&#305;r olacak yere &ccedil;evir, sonra ilgili d&uuml;&#287;meye bas.
+Tarama ve takip bu alan&#305;n d&#305;&#351;&#305;na &ccedil;&#305;kmaz; oklar her yere gider.</p>
+<div class="sinirlar">
+ <button type="button" data-sinir="sol">&#9664; Sol s&#305;n&#305;r buras&#305;</button>
+ <button type="button" data-sinir="sag">Sa&#287; s&#305;n&#305;r buras&#305; &#9654;</button>
+ <button type="button" data-sinir="ust">&#9650; &Uuml;st s&#305;n&#305;r buras&#305;</button>
+ <button type="button" data-sinir="alt">&#9660; Alt s&#305;n&#305;r buras&#305;</button>
+ <button type="button" data-sinir="sil" class="sil">S&#305;n&#305;rlar&#305; sil</button>
+</div>
+<p id="alan" class="alanyazi"></p></section>
 </main>
 <script>
 function gonder(v){return fetch("api/komut",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(v)}).catch(function(){});}
@@ -904,11 +1009,13 @@ document.querySelectorAll(".ok").forEach(function(el){
  el.addEventListener("contextmenu",function(e){e.preventDefault();});});
 window.addEventListener("blur",birak);document.addEventListener("visibilitychange",birak);
 document.getElementById("mod").addEventListener("click",function(){gonder({islem:"mod"}).then(guncelle);});
+document.querySelectorAll("[data-sinir]").forEach(function(b){b.addEventListener("click",function(){
+ gonder({islem:"sinir",hangi:b.dataset.sinir}).then(function(){setTimeout(guncelle,300);});});});
 var modDugme=document.getElementById("mod");
 function guncelle(){fetch("api/durum").then(function(r){return r.json();}).then(function(d){
  document.getElementById("durum").textContent=d.durum||"";document.getElementById("surum").textContent=d.surum;
  modDugme.className=d.mod;modDugme.textContent=d.mod==="OTO"?"OTOMAT\u0130K":"SAB\u0130T";
- modDugme.disabled=!d.ptz;}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
+ modDugme.disabled=!d.ptz;document.getElementById("alan").textContent=d.alan||"";}).catch(function(){document.getElementById("durum").textContent="Ba\u011flant\u0131 yok";});}
 setInterval(guncelle,1000);guncelle();
 var img=document.getElementById("img");img.onerror=function(){setTimeout(function(){img.src="video?t="+Date.now();},2000);};
 </script></body></html>"""
@@ -1066,9 +1173,64 @@ def web_pin_al(klasor):
 # Ok yonu (kameranin bakacagi yon) -> goruntunun kayacagi yon (kalibrasyon etkisi)
 OK_ETKI = {"sol": "sag", "sag": "sol", "yukari": "asagi", "asagi": "yukari"}
 # Windows'ta cv2.waitKeyEx ok tus kodlari + WASD
+SINIR_TUS = {ord("1"): "sol", ord("2"): "sag", ord("3"): "ust", ord("4"): "alt", ord("0"): "sil"}
 TUS_YON = {2424832: "sol", 2555904: "sag", 2490368: "yukari", 2621440: "asagi",
            ord("a"): "sol", ord("d"): "sag", ord("w"): "yukari", ord("s"): "asagi",
            ord("A"): "sol", ord("D"): "sag", ord("W"): "yukari", ord("S"): "asagi"}
+
+
+def tarama_seviyeleri(ptz):
+    """Taranacak dikey seviyeler (adim): once orta, sonra iki uc; alan sinirlari icinde."""
+    alt, ust = ptz.sinir["alt"], ptz.sinir["ust"]
+    if alt is not None and ust is not None:
+        orta = int(round((alt + ust) / 2.0))
+        sev = [orta, ust, alt]
+    else:
+        sev = [0, 2, -2]
+        if ust is not None:
+            sev = [min(v, ust) for v in sev]
+        if alt is not None:
+            sev = [max(v, alt) for v in sev]
+    sonuc = []
+    for v in sev:
+        if v not in sonuc:
+            sonuc.append(v)
+    return sonuc
+
+
+def alan_metni(ptz, derece):
+    s = ptz.sinir
+    d = lambda v: "%+d (%+.0f\u00b0)" % (v, v * derece)
+    if s["sol"] is None and s["sag"] is None:
+        yatay = "Yatay alan: sinirsiz"
+    else:
+        yatay = "Yatay alan: %s .. %s" % (d(s["sol"]) if s["sol"] is not None else "-",
+                                           d(s["sag"]) if s["sag"] is not None else "-")
+    if s["ust"] is None and s["alt"] is None:
+        dikey = "Dikey: sinirsiz"
+    else:
+        dikey = "Dikey: %s .. %s" % (d(s["alt"]) if s["alt"] is not None else "-",
+                                     d(s["ust"]) if s["ust"] is not None else "-")
+    return "%s | %s | Konum: %s, %s" % (yatay, dikey, d(ptz.x), d(ptz.y))
+
+
+def alan_ciz(kare, ptz):
+    """Alt ortada konum cubugu: yesil = izinli alan, beyaz nokta = kameranin baktigi yer."""
+    h, w = kare.shape[:2]
+    s = ptz.sinir
+    uclar = [v for v in (s["sol"], s["sag"], ptz.x) if v is not None]
+    lo, hi = min(uclar) - 3, max(uclar) + 3
+    bx0, bx1, by = w // 2 - 150, w // 2 + 150, h - 22
+    px = lambda v: int(bx0 + (v - lo) / float(hi - lo) * (bx1 - bx0))
+    cv2.line(kare, (bx0, by), (bx1, by), (90, 90, 90), 4, cv2.LINE_AA)
+    a = px(s["sol"]) if s["sol"] is not None else bx0
+    b = px(s["sag"]) if s["sag"] is not None else bx1
+    cv2.line(kare, (a, by), (b, by), YESIL, 4, cv2.LINE_AA)
+    for v in (s["sol"], s["sag"]):
+        if v is not None:
+            cv2.line(kare, (px(v), by - 9), (px(v), by + 9), (60, 60, 230), 3, cv2.LINE_AA)
+    cv2.circle(kare, (px(ptz.x), by), 7, (255, 255, 255), -1, cv2.LINE_AA)
+    cv2.circle(kare, (px(ptz.x), by), 7, KOYU, 1, cv2.LINE_AA)
 
 
 def panel_dugmeleri(w, h):
@@ -1107,6 +1269,8 @@ def panel_ciz(kare, dugmeler, mod, basili):
     x0, _, _, y1 = dugmeler["sol"]
     cv2.putText(kare, "Oklar/WASD: dondur   P: oto/sabit   Q: cikis",
                 (x0, dugmeler["asagi"][3] + 22), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
+    cv2.putText(kare, "Sinir: 1 sol  2 sag  3 ust  4 alt  0 sil",
+                (x0, dugmeler["yukari"][1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (235, 235, 235), 1, cv2.LINE_AA)
 
 
 def main():
@@ -1207,10 +1371,11 @@ def main():
     HIZ = {1: dict(takip_aralik=0.9, min_aralik=0.45, tarama_aralik=0.5, tarama_paralel=1),
            2: dict(takip_aralik=0.7, min_aralik=0.3, tarama_aralik=0.3, tarama_paralel=2),
            3: dict(takip_aralik=0.55, min_aralik=0.2, tarama_aralik=0.12, tarama_paralel=3)}[a.ptz_hiz]
-    SEVIYELER = [0, 2, -2]   # tarama yapilan dikey seviyeler (adim): orta, yukari, asagi
     seviye_no = 0
     tarama_ref, tarama_ref_zaman, tarama_kontrol, seviye_zamani = None, 0.0, 0.0, time.time()
     tur_suresi = 20.0         # PTZ hazir olunca adim buyuklugunden hesaplanir
+    derece_adim = 10.0
+    son_alan_kayit = 0.0
     if a.yuz_klasor:
         os.makedirs(a.yuz_klasor, exist_ok=True)
 
@@ -1228,7 +1393,7 @@ def main():
         if el["yon"] != yon:
             # Yeni basis: tek adim. Tus basili tutulursa Windows tekrar gonderir -> surekli
             ptz.dur()
-            ptz.hareket(OK_ETKI[yon], 1)
+            ptz.hareket(OK_ETKI[yon], 1, serbest=True)
             el["basla"], el["tekrar"] = simdi, False
             el["bitis"] = simdi + (0.6 if kaynak in ("tus", "web") else 1e9)
         elif kaynak in ("tus", "web"):
@@ -1273,6 +1438,9 @@ def main():
             elif islem == "mod" and ptz:
                 el["mod"] = "SABIT" if el["mod"] == "OTO" else "OTO"
                 el_birak()
+            elif islem == "sinir" and ptz and k.get("hangi") in ("sol", "sag", "ust", "alt", "sil"):
+                ptz.sinir_ayarla(k["hangi"])
+                print("Calisma alani:", alan_metni(ptz, derece_adim))
         h, w = kare.shape[:2]
         temiz = kare.copy()  # fotograf icin cizimsiz kopya
         simdi = time.time()
@@ -1290,6 +1458,7 @@ def main():
                   " (goruntu gecikmesi ~%.1f sn)" % ptz.gecikme)
             print("Tarama: adim ~%.0f derece, tam tur ~%.0f adim, tahmini ~%.1f sn"
                   % (derece_adim, tur_adim, tur_suresi))
+            print("Calisma alani:", alan_metni(ptz, derece_adim))
         if ptz:
             # Doner kamera: hareket algilama yok (kamera donerken her sey hareketli
             # gorunur). Her karede yuz aranir.
@@ -1381,7 +1550,7 @@ def main():
             if el["yon"] and simdi > el["bitis"]:
                 el_birak()  # tus birakildi (tekrar gelmedi)
             elif el["yon"] and (el["tekrar"] if el["kaynak"] in ("tus", "web") else simdi - el["basla"] > 0.35):
-                ptz.surekli(OK_ETKI[el["yon"]], 0.15, 2, zorla=True)  # basili tutuluyor
+                ptz.surekli(OK_ETKI[el["yon"]], 0.15, 2, zorla=True, serbest=True)  # basili tutuluyor
         elif ptz:
             # Tarama sirasinda daha hassas ara, takipte daha secici ol
             dedektor.esik(a.yuz_esik if aktif else max(0.55, a.yuz_esik - 0.15))
@@ -1421,15 +1590,22 @@ def main():
                     if (ptz.son_etki == tarama_yonu
                             and tarama_ref_zaman >= ptz.yon_baslangic + ptz.gecikme + 0.2):
                         dx, _, _ = goruntu_kaymasi(tarama_ref, temiz)
-                        if abs(dx) < 5:  # sinira dayandi
+                        if abs(dx) < 5:  # donanim sinirina dayandi
+                            # kaymayan komutlari konumdan dus (konum sayaci kaymasin)
+                            ptz.geri_al(tarama_ref_zaman - ptz.gecikme, simdi - ptz.gecikme, tarama_yonu)
                             tarama_yonu = "sag" if tarama_yonu == "sol" else "sol"
                             seviye_degis = True
                     tarama_ref, tarama_ref_zaman, tarama_kontrol = temiz, simdi, simdi + 0.5
+                if ptz.sinira_dayandi == tarama_yonu:  # calisma alani siniri
+                    ptz.sinira_dayandi = None
+                    tarama_yonu = "sag" if tarama_yonu == "sol" else "sol"
+                    seviye_degis = True
                 if seviye_degis and (ptz.var("yukari") or ptz.var("asagi")):
-                    seviye_no = (seviye_no + 1) % len(SEVIYELER)
-                    fark = SEVIYELER[seviye_no] - ptz.dikey
+                    sev = tarama_seviyeleri(ptz)
+                    seviye_no = (seviye_no + 1) % len(sev)
+                    fark = sev[seviye_no] - ptz.y          # + ise yukari bakmali
                     if fark:
-                        ptz.hareket("yukari" if fark > 0 else "asagi", abs(fark))
+                        ptz.hareket("asagi" if fark > 0 else "yukari", abs(fark))
                     seviye_zamani = simdi
                 ptz.surekli(tarama_yonu, HIZ["tarama_aralik"], HIZ["tarama_paralel"])
 
@@ -1469,8 +1645,15 @@ def main():
                     yazici = None
                     print("Kayit bitti")
 
+        if ptz:
+            alan_ciz(kare, ptz)
+            if simdi - son_alan_kayit > 2:
+                ptz.kaydet()
+                son_alan_kayit = simdi
+
         if web:
-            web.durum.update(mod=el["mod"], durum=SON_DURUM["metin"], ptz=bool(ptz))
+            web.durum.update(mod=el["mod"], durum=SON_DURUM["metin"], ptz=bool(ptz),
+                             alan=alan_metni(ptz, derece_adim) if ptz else "")
             web.kare_ver(kare)
 
         if ptz:
@@ -1488,6 +1671,9 @@ def main():
                     el_birak()
                 elif tus in TUS_YON:
                     el_basla(TUS_YON[tus], "tus")
+                elif ptz and tus in SINIR_TUS:
+                    ptz.sinir_ayarla(SINIR_TUS[tus])
+                    print("Calisma alani:", alan_metni(ptz, derece_adim))
         elif kare_no % 15 == 0:
             print(f"kare {kare_no}: hareket={hareket} ptz={ptz.son_etki if ptz else '-'} yuzler=" +
                   ", ".join(f"Yuz{i}@{k[:2]}" for i, k in aktif))
@@ -1498,6 +1684,9 @@ def main():
     if yazici is not None:
         yazici.release()
     okuyucu.release()
+    if ptz:
+        ptz.degisti = True
+        ptz.kaydet()
     if not a.goruntusuz:
         cv2.destroyAllWindows()
     if go2rtc_surec is not None:

@@ -108,6 +108,24 @@ Her güncellemede sürüm numarası artar (`v1`, `v2`, ...). Görüntünün sağ
 köşesinde, pencere başlığında ve siyah pencerenin başında görünür; güncellemenin
 geldiğini buradan anlarsın. Sürüm `takip.py` içindeki `SURUM` satırındadır.
 
+## Çalışma alanı / açı sınırları (v4)
+
+Kameranın tarama ve takip yaparken çıkmayacağı açı aralığını belirleyebilirsin.
+
+1. Kamerayı oklarla sol sınır olacak yöne çevir → **1** tuşu (veya web'de
+   "Sol sınır burası"). Sağ sınır → **2**. İstersen üst → **3**, alt → **4**.
+2. **0** (veya "Sınırları sil") hepsini kaldırır.
+3. Tarama sınıra gelince geri döner, dikey seviyeler alan içinde seçilir,
+   takip de sınırın ötesine dönmez. Oklar her yere gider (yeni sınır koymak için).
+4. Görüntünün alt ortasındaki çubuk: yeşil = izinli alan, kırmızı çizgiler =
+   sınırlar, beyaz nokta = kameranın baktığı yer. Siyah pencerede ve web
+   sayfasında adım ve yaklaşık derece yazar.
+
+Konum, kameraya gönderilen adımlar sayılarak tutulur ve `alan_<did>.json`
+dosyasına kaydedilir; program kapanıp açılınca kaldığı yerden devam eder.
+Kamerayı Xiaomi Home uygulamasından çevirirsen veya kamera yeniden başlarsa
+konum kayar: sınırları silip yeniden belirle.
+
 ## Telefondan izleme ve kontrol (v3)
 
 Program çalışırken küçük bir web sayfası açar (port 8765). Siyah pencerede
