@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lazer Taret Simülatörü</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#2a2f3a;
+    --text:#e6e8ec; --muted:#9aa3b2; --accent:#4f8cff; --ok:#3ecf8e; --warn:#ffb020; --bad:#ff5a5f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{padding:14px 16px 8px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline}
+  header h1{font-size:18px;margin:0}
+  header p{margin:0;color:var(--muted);font-size:13px}
+  .warn{background:#3a1d1f;border:1px solid #6b2b2f;color:#ffb3b5;border-radius:8px;padding:6px 10px;font-size:12.5px;margin:0 16px 10px}
+  main{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;padding:0 16px 16px}
+  @media (max-width:980px){main{grid-template-columns:minmax(0,1fr)}}
+  main > section.card{align-self:start}
+  .help{color:var(--muted);font-size:12.5px;margin:10px 0 0;padding-left:18px}
+  .help li{margin:3px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+  #view{width:100%;height:auto;display:block;border-radius:6px;background:#000;image-rendering:auto}
+  .viewwrap{position:relative}
+  .badge{position:absolute;top:8px;left:8px;padding:3px 8px;border-radius:6px;font-weight:600;font-size:12px;background:#000a;border:1px solid #fff3}
+  .row{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:7px 10px;font:inherit;cursor:pointer}
+  button:hover{border-color:#3a4252}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.danger{background:#5a1a1d;border-color:#8a2a2f;color:#ffd6d7;font-weight:700}
+  button.on{outline:2px solid var(--ok)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:4px 0 6px}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  td{padding:2px 0;border-bottom:1px solid #222733}
+  td:last-child{text-align:right;font-weight:600}
+  .toggles label{display:flex;gap:8px;align-items:flex-start;margin:5px 0;cursor:pointer}
+  .toggles small{color:var(--muted);display:block}
+  #log{height:170px;overflow:auto;background:#0b0d11;border:1px solid var(--line);border-radius:6px;padding:6px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#b8d8b8;white-space:pre-wrap}
+  .side{display:flex;flex-direction:column;gap:12px}
+  .legend{color:var(--muted);font-size:12px;margin-top:6px}
+  .legend span{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 4px 0 10px;vertical-align:-1px}
+  select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px}
+  #mini{width:100%;height:auto;background:#0b0d11;border-radius:6px;border:1px solid var(--line)}
+  .v-ok{color:var(--ok)} .v-bad{color:var(--bad)} .v-warn{color:var(--warn)}
+</style>
+</head>
+<body>
+<header>
+  <h1>Otonom Lazer Taret — Tarayıcı Simülatörü</h1>
+  <p>Sanal kamera · durağan hedef tespiti · homografi kalibrasyonu · kusurlu servolar · kapalı çevrim nişan · güvenlik kilitleri</p>
+</header>
+<div class="warn">⚠️ Simülasyondur. Gerçek 2.5 W / 450 nm lazer Sınıf 4'tür: sertifikalı gözlük ve donanım kilitleri olmadan asla enerjilendirmeyin.</div>
+
+<main>
+  <section class="card">
+    <div class="viewwrap">
+      <canvas id="view" width="960" height="540"></canvas>
+      <div class="badge" id="badge">KALİBRASYONSUZ</div>
+    </div>
+    <div class="row">
+      <button class="primary" id="btnStart">▶ Başlat (kalibre et + otonom)</button>
+      <button id="btnCal">Kalibre et</button>
+      <button id="btnAuto" disabled>Otonom: KAPALI</button>
+      <button id="btnFly">+ Sinek kondur</button>
+      <button id="btnPerson">İnsan geçir</button>
+      <button id="btnRef">Referansı yenile</button>
+      <button class="danger" id="btnEstop">E-STOP</button>
+      <label style="display:flex;align-items:center;gap:6px;margin-left:auto">Hız
+        <select id="speed"><option value="1">1×</option><option value="2" selected>2×</option><option value="4">4×</option><option value="8">8×</option></select>
+      </label>
+    </div>
+    <div class="legend">
+      <span style="background:#ffc400"></span>izlenen aday
+      <span style="background:#ff3b3b"></span>onaylı (durağan) hedef
+      <span style="background:#3ecf8e"></span>kalibre edilmiş çalışma zarfı
+      <span style="background:#4f8cff"></span>angajmandaki hedef
+    </div>
+    <ol class="help">
+      <li><b>▶ Başlat</b>: taret kırmızı nişan noktasını 7×5 açı ızgarasında gezdirir, kamera her noktayı ölçer ve piksel→açı homografisi kurulur. Ardından sol alttaki yanmaz karta tek darbe atılarak kırmızı nokta ile mavi ışın arasındaki ofset ölçülür.</li>
+      <li>Duvara konan sinek ~0.4 sn hareketsiz kalınca <span style="color:#ff3b3b">kırmızı</span> (onaylı) olur. Taret nişan alır, kırmızı noktayı ölçüp düzeltir, hata ≤ 2 px ise 40 ms darbe atar ve sonucu doğrular. Uçan sineklere ateş edilmez.</li>
+      <li>Deney anahtarlarını kapatarak her katmanın neden gerekli olduğunu görün: anti-boşluk kapalıyken nişan servo ölü bandına takılır, iki güvenlik kapısı birden kapalıyken insan geçerken atış yapılabilir (güvenlik ihlali sayacı).</li>
+    </ol>
+  </section>
+
+  <aside class="side">
+    <section class="card">
+      <h2>Durum</h2>
+      <table id="stats"></table>
+    </section>
+    <section class="card">
+      <h2>Taret açıları</h2>
+      <canvas id="mini" width="300" height="170"></canvas>
+    </section>
+    <section class="card toggles">
+      <h2>Deney anahtarları</h2>
+      <label><input type="checkbox" id="optApproach" checked><span>Anti-boşluk yaklaşımı<small>Hedefe hep aynı yönden, ölü banttan büyük adımla yaklaş. Kapatınca düzeltmeler servo ölü bandına takılır.</small></span></label>
+      <label><input type="checkbox" id="optClosed" checked><span>Kapalı çevrim nişan (kırmızı nokta)<small>Kapatınca açık çevrim atış: nokta ölçülmeden ateş edilir.</small></span></label>
+      <label><input type="checkbox" id="optMotion" checked><span>Kamera hareket kapısı<small>Karenin %2'sinden fazlası değişirse 10 sn ateş yasağı.</small></span></label>
+      <label><input type="checkbox" id="optPresence" checked><span>Varlık sensörü (LD2410, firmware)<small>İnsan varken firmware ARM'ı ve atışı reddeder.</small></span></label>
+      <label><input type="checkbox" id="optMask"><span>Tespit maskesini göster</span></label>
+    </section>
+    <section class="card">
+      <h2>Olay günlüğü</h2>
+      <div id="log"></div>
+    </section>
+  </aside>
+</main>
+
+<script>
+"use strict";
+/* =====================================================================
+ *  Sabitler ve küçük matematik yardımcıları
+ * ===================================================================== */
+const W = 960, H = 540, FX = 825, CX = W / 2, CY = H / 2;
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const WALL_W = 3000, WALL_H = 2000;          // mm
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const add = (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+const mul = (a, s) => [a[0]*s, a[1]*s, a[2]*s];
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const mv = (M, v) => [dot(M[0], v), dot(M[1], v), dot(M[2], v)];
+const mm = (A, B) => A.map(r => [0,1,2].map(j => r[0]*B[0][j] + r[1]*B[1][j] + r[2]*B[2][j]));
+const rotX = a => { const c=Math.cos(a), s=Math.sin(a); return [[1,0,0],[0,c,-s],[0,s,c]]; };
+const rotY = a => { const c=Math.cos(a), s=Math.sin(a); return [[c,0,s],[0,1,0],[-s,0,c]]; };
+const rotZ = a => { const c=Math.cos(a), s=Math.sin(a); return [[c,-s,0],[s,c,0],[0,0,1]]; };
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+const hyp = Math.hypot;
+
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(12345);
+const uni = (a, b) => a + (b - a) * rand();
+function gauss() { let u = 0, v = 0; while (u === 0) u = rand(); v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const expo = mean => -Math.log(1 - rand()) * mean;
+
+/* Doğrusal sistem çözücü (kısmi pivotlu Gauss eliminasyonu) */
+function solve(A, b) {
+  const n = b.length, M = A.map((r, i) => [...r, b[i]]);
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    [M[c], M[p]] = [M[p], M[c]];
+    if (Math.abs(M[c][c]) < 1e-12) throw new Error("tekil matris");
+    for (let r = 0; r < n; r++) if (r !== c) {
+      const f = M[r][c] / M[c][c];
+      for (let k = c; k <= n; k++) M[r][k] -= f * M[c][k];
+    }
+  }
+  return M.map((r, i) => r[n] / r[i]);
+}
+function lstsq(rows, ys) {
+  const n = rows[0].length, A = Array.from({length: n}, () => new Array(n).fill(0)), b = new Array(n).fill(0);
+  rows.forEach((r, k) => { for (let i = 0; i < n; i++) { b[i] += r[i] * ys[k]; for (let j = 0; j < n; j++) A[i][j] += r[i] * r[j]; } });
+  return solve(A, b);
+}
+
+/* =====================================================================
+ *  KİNEMATİK: piksel -> (pan, tilt)  [kinematics.py'nin portu]
+ *  a = tan(pan), b = tan(tilt)*sqrt(1+a^2);  (a,b) ~ H (u,v,1)
+ * ===================================================================== */
+function anglesToAB(p, t) { const a = Math.tan(p * D2R); return [a, Math.tan(t * D2R) * Math.sqrt(1 + a * a)]; }
+function abToAngles(a, b) { return [Math.atan(a) * R2D, Math.atan(b / Math.sqrt(1 + a * a)) * R2D]; }
+const normU = u => (u - W / 2) / (W / 2), normV = v => (v - H / 2) / (H / 2);
+const poly2 = (x, y) => [1, x, y, x * x, x * y, y * y];
+
+class PixelToTurret {
+  constructor() { this.h = null; this.resP = null; this.resT = null; this.offset = [0, 0]; this.offsetOk = false; this.rmsPx = NaN; this.rmsDeg = NaN; }
+  fit(pix, ang) {
+    // DLT, h33 = 1, normalize piksel
+    const rows = [], ys = [];
+    pix.forEach(([u, v], i) => {
+      const x = normU(u), y = normV(v), [A, B] = anglesToAB(...ang[i]);
+      rows.push([x, y, 1, 0, 0, 0, -A * x, -A * y]); ys.push(A);
+      rows.push([0, 0, 0, x, y, 1, -B * x, -B * y]); ys.push(B);
+    });
+    this.h = [...lstsq(rows, ys), 1];
+    this.resP = this.resT = null;
+    if (pix.length >= 12) {
+      const pr = [], ep = [], et = [];
+      pix.forEach(([u, v], i) => { const q = this.predictH(u, v); pr.push(poly2(normU(u), normV(v))); ep.push(ang[i][0] - q[0]); et.push(ang[i][1] - q[1]); });
+      this.resP = lstsq(pr, ep); this.resT = lstsq(pr, et);
+    }
+    let s2 = 0, s2px = 0;
+    pix.forEach(([u, v], i) => {
+      const q = this.predict(u, v), dp = [q[0] - ang[i][0], q[1] - ang[i][1]];
+      s2 += dp[0] ** 2 + dp[1] ** 2;
+      const J = this.jac(u, v), det = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+      const du = ( J[1][1] * dp[0] - J[0][1] * dp[1]) / det, dv = (-J[1][0] * dp[0] + J[0][0] * dp[1]) / det;
+      s2px += du * du + dv * dv;
+    });
+    this.rmsDeg = Math.sqrt(s2 / pix.length); this.rmsPx = Math.sqrt(s2px / pix.length);
+  }
+  predictH(u, v) {
+    const x = normU(u), y = normV(v), h = this.h;
+    const w = h[6] * x + h[7] * y + h[8];
+    return abToAngles((h[0] * x + h[1] * y + h[2]) / w, (h[3] * x + h[4] * y + h[5]) / w);
+  }
+  predict(u, v) {
+    const q = this.predictH(u, v);
+    if (this.resP) { const t = poly2(normU(u), normV(v)); q[0] += dot6(t, this.resP); q[1] += dot6(t, this.resT); }
+    return q;
+  }
+  jac(u, v, e = 2) {
+    const p0 = this.predict(u, v), pu = this.predict(u + e, v), pv = this.predict(u, v + e);
+    return [[(pu[0] - p0[0]) / e, (pv[0] - p0[0]) / e], [(pu[1] - p0[1]) / e, (pv[1] - p0[1]) / e]];
+  }
+}
+const dot6 = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+
+/* =====================================================================
+ *  SANAL DÜNYA  [world.py'nin portu]
+ * ===================================================================== */
+class Servo {
+  constructor(gain, zero) {
+    this.usPerDeg = 2000 / 180; this.deadband = 3; this.gain = gain; this.zero = zero;
+    this.backlash = 0.12; this.slew = 350; this.jitter = 0.01;
+    this.actual = 0; this.target = 0; this.lastUs = 1500;
+  }
+  command(deg) {
+    const us = Math.round(1500 + deg * this.usPerDeg);
+    if (Math.abs(us - this.lastUs) < this.deadband) return;        // ölü bant
+    const dir = Math.sign(us - this.lastUs); this.lastUs = us;
+    const q = (us - 1500) / this.usPerDeg;
+    this.target = this.gain * q + this.zero + dir * this.backlash / 2;  // kazanç, sıfır, boşluk
+  }
+  update(dt) { const d = this.target - this.actual, s = this.slew * dt; this.actual = Math.abs(d) <= s ? this.target : this.actual + Math.sign(d) * s; }
+  get moving() { return Math.abs(this.target - this.actual) > 1e-3; }
+  read() { return this.actual + gauss() * this.jitter; }
+}
+
+class World {
+  constructor() {
+    this.t = 0;
+    const yaw = 8 * D2R;
+    this.e1 = [Math.cos(yaw), 0, Math.sin(yaw)]; this.e2 = [0, 1, 0]; this.n = cross(this.e1, this.e2);
+    this.O = sub(sub([0, 0, 1.6], mul(this.e1, 1.5)), mul(this.e2, 1.0));
+    this.Tpos = [0.07, -0.05, 0.02];
+    this.Trot = mm(mm(rotZ(0.6 * D2R), rotY(1.5 * D2R)), rotX(-1.0 * D2R));
+    this.pan = new Servo(1.015, 0.4); this.tilt = new Servo(0.985, -0.6);
+    this.pointerOn = false; this.armed = false; this.flash = null;
+    this.flies = []; this.kills = 0; this.scorches = []; this.personX = null; this.violations = 0;
+    this.light = 1; this.nextSpawn = 1; this.spawnEvery = 7; this.maxFlies = 3;
+    this.stains = [];
+    for (let i = 0; i < 25; i++) this.stains.push({x: uni(100, WALL_W - 100), y: uni(100, WALL_H - 100), r: uni(2, 5)});
+    this.waves = Array.from({length: 6}, () => ({kx: uni(-1, 1) / 300, ky: uni(-1, 1) / 300, ph: uni(0, 6.28), a: uni(1, 2.2)}));
+    this.buildBackground();
+    this.noise = new Float32Array(1 << 21);
+    for (let i = 0; i < this.noise.length; i++) this.noise[i] = gauss() * 2.0;
+    this.off = document.createElement("canvas"); this.off.width = W; this.off.height = H;
+    this.octx = this.off.getContext("2d", {willReadFrequently: true});
+  }
+  /* --- geometri --- */
+  project(P) { return [FX * P[0] / P[2] + CX, FX * P[1] / P[2] + CY]; }
+  wallToWorld(x, y) { return add(add(this.O, mul(this.e1, x / 1000)), mul(this.e2, y / 1000)); }
+  wallPx(x, y) { return this.project(this.wallToWorld(x, y)); }
+  beamRay(pointer) {
+    const p = this.pan.read() * D2R, t = this.tilt.read() * D2R;
+    const dl = [Math.sin(p) * Math.cos(t), Math.sin(t), Math.cos(p) * Math.cos(t)];
+    const right = [Math.cos(p), 0, -Math.sin(p)];
+    return [add(this.Tpos, mul(mv(this.Trot, right), pointer ? 0.012 : 0)), mv(this.Trot, dl)];
+  }
+  hitWall(pointer) {
+    const [o, d] = this.beamRay(pointer), den = dot(this.n, d);
+    if (Math.abs(den) < 1e-9) return null;
+    const s = dot(this.n, sub(this.O, o)) / den; if (s <= 0) return null;
+    const X = add(o, mul(d, s)), q = sub(X, this.O);
+    return {x: dot(q, this.e1) * 1000, y: dot(q, this.e2) * 1000, X};
+  }
+  /* --- duvar dokusu (kamera uzayında önceden hesaplanır) --- */
+  texVal(tx, ty) {
+    if (tx < 0 || ty < 0 || tx > WALL_W || ty > WALL_H) return [90, 90, 90];
+    let g = 190;
+    for (const w of this.waves) g += w.a * Math.sin(w.kx * tx * 6.28 + w.ky * ty * 6.28 + w.ph);
+    const hsh = Math.sin(Math.floor(tx) * 12.9898 + Math.floor(ty) * 78.233) * 43758.5453;
+    g += (hsh - Math.floor(hsh) - 0.5) * 4;
+    let c = [g, g, g - 6];
+    const blend = (col, cov) => { if (cov > 0) c = c.map((x, i) => x * (1 - cov) + col[i] * cov); };
+    // tablo çerçevesi ve priz
+    const inR = (x0, y0, x1, y1) => tx >= x0 && tx <= x1 && ty >= y0 && ty <= y1;
+    if (inR(1891, 441, 2509, 909) && !inR(1909, 459, 2491, 891)) c = [45, 50, 60];
+    if (inR(700, 1400, 780, 1480)) { c = [235, 235, 235];
+      if (hyp(tx - 725, ty - 1440) < 6 || hyp(tx - 755, ty - 1440) < 6) c = [40, 40, 40]; }
+    for (const s of this.stains) { const d = hyp(tx - s.x, ty - s.y); if (d < s.r + 1.2) blend([125, 120, 120], clamp(s.r + 1.2 - d, 0, 1)); }
+    for (const s of this.scorches) { const d = hyp(tx - s.x, ty - s.y); if (d < 3.4) blend([125, 115, 105], clamp(3.4 - d, 0, 1)); }
+    return c;
+  }
+  buildBackground() {
+    this.tx = new Float32Array(W * H); this.ty = new Float32Array(W * H);
+    this.bg = new ImageData(W, H); this.vig = new Float32Array(W * H);
+    const nO = dot(this.n, this.O);
+    for (let v = 0; v < H; v++) for (let u = 0; u < W; u++) {
+      const d = [(u - CX) / FX, (v - CY) / FX, 1], s = nO / dot(this.n, d);
+      const q = sub(mul(d, s), this.O), i = v * W + u;
+      this.tx[i] = dot(q, this.e1) * 1000; this.ty[i] = dot(q, this.e2) * 1000;
+      const r = hyp((u - W / 2) / (W / 2), (v - H / 2) / (H / 2));
+      this.vig[i] = 1 - 0.18 * r * r;
+      this.paintPixel(i);
+    }
+  }
+  paintPixel(i) {
+    const c = this.texVal(this.tx[i], this.ty[i]), k = 4 * i, g = this.vig[i];
+    this.bg.data[k] = c[0] * g; this.bg.data[k + 1] = c[1] * g; this.bg.data[k + 2] = c[2] * g; this.bg.data[k + 3] = 255;
+  }
+  addScorch(x, y) {
+    this.scorches.push({x, y});
+    const [u, v] = this.wallPx(x, y);
+    for (let yy = Math.max(0, Math.floor(v) - 6); yy < Math.min(H, Math.floor(v) + 7); yy++)
+      for (let xx = Math.max(0, Math.floor(u) - 6); xx < Math.min(W, Math.floor(u) + 7); xx++) this.paintPixel(yy * W + xx);
+  }
+  /* --- dinamik --- */
+  step(dt) {
+    const n = Math.max(1, Math.ceil(dt / 0.01)), h = dt / n;
+    for (let k = 0; k < n; k++) {
+      this.t += h; this.pan.update(h); this.tilt.update(h); this.updateFlies(h);
+      if (this.personX !== null) { this.personX += 225 * h; if (this.personX > W + 300) this.personX = null; }
+      if (this.flash) { this.flash.left -= h; if (this.flash.left <= 0) this.flash = null; }
+    }
+    this.light = 1 + 0.03 * Math.sin(this.t / 40);
+  }
+  get personVisible() { return this.personX !== null && this.personX > -95 && this.personX < W + 95; }
+  spawnFly(sitting, x, y) {
+    const f = {x: x ?? uni(500, 2500), y: y ?? uni(400, 1600), angle: uni(0, 180), state: "flying", vx: 0, vy: 0, timer: 0, len: uni(6.5, 9)};
+    if (sitting) { f.state = "sitting"; f.timer = uni(8, 30); }
+    else { const sp = uni(300, 700), a = uni(0, 6.283); f.vx = sp * Math.cos(a); f.vy = sp * Math.sin(a); f.timer = uni(0.8, 3); }
+    this.flies.push(f); return f;
+  }
+  updateFlies(h) {
+    if (this.t >= this.nextSpawn) {
+      this.nextSpawn = this.t + expo(this.spawnEvery);
+      if (this.flies.filter(f => f.state === "flying" || f.state === "sitting").length < this.maxFlies && !this.noSpawn) this.spawnFly(false);
+    }
+    for (const f of this.flies) {
+      f.timer -= h;
+      if (f.state === "flying") {
+        f.x += f.vx * h; f.y += f.vy * h;
+        if (rand() < 2 * h) { const a = Math.atan2(f.vy, f.vx) + gauss() * 0.8, sp = hyp(f.vx, f.vy); f.vx = sp * Math.cos(a); f.vy = sp * Math.sin(a); }
+        if (!(f.x > 150 && f.x < WALL_W - 150 && f.y > 150 && f.y < WALL_H - 150)) {
+          f.vx = -f.vx; f.vy = -f.vy; f.x = clamp(f.x, 151, WALL_W - 151); f.y = clamp(f.y, 151, WALL_H - 151);
+        }
+        if (f.timer <= 0) { f.state = "sitting"; f.timer = uni(6, 30); f.angle = uni(0, 180); }
+      } else if (f.state === "sitting") { if (f.timer <= 0) f.state = "gone"; }
+      else if (f.state === "dead") { f.y += 750 * h; if (f.timer <= 0) f.state = "gone"; }
+    }
+    this.flies = this.flies.filter(f => f.state !== "gone");
+  }
+  fire(ms, pwm) {
+    const hit = this.hitWall(false); if (!hit) return;
+    if (this.personVisible) this.violations++;
+    const energy = 2500 * (pwm / 255) * ms / 1000;       // mJ (2.5 W optik varsayımı)
+    let killed = false;
+    for (const f of this.flies) if ((f.state === "sitting" || f.state === "flying") && hyp(f.x - hit.x, f.y - hit.y) < f.len * 0.5 + 0.8 && energy >= 30) {
+      f.state = "dead"; f.timer = 0.3; this.kills++; killed = true;
+    }
+    if (!killed && energy >= 15) this.addScorch(hit.x, hit.y);
+    const [u, v] = this.project(hit.X); this.flash = {u, v, left: 0.05};
+  }
+  /* --- kamera karesi --- */
+  render() {
+    const c = this.octx;
+    c.putImageData(this.bg, 0, 0);
+    for (const f of this.flies) {
+      const [u, v] = this.wallPx(f.x, f.y), L = Math.abs(this.wallPx(f.x + f.len, f.y)[0] - u);
+      c.save(); c.translate(u, v);
+      if (f.state === "flying") {
+        const st = hyp(f.vx, f.vy) / 30 * L / f.len;
+        c.rotate(Math.atan2(f.vy, f.vx)); c.fillStyle = "rgb(155,150,150)";
+        c.beginPath(); c.ellipse(0, 0, L / 2 + st / 2, L * 0.25, 0, 0, 6.2832); c.fill();
+      } else {
+        c.rotate(f.angle * D2R);
+        c.fillStyle = "rgb(170,165,165)"; c.beginPath(); c.ellipse(0, 0, L * 0.55, L * 0.42, 0, 0, 6.2832); c.fill();
+        c.fillStyle = "rgb(40,35,35)"; c.beginPath(); c.ellipse(0, 0, L * 0.5, L * 0.22, 0, 0, 6.2832); c.fill();
+      }
+      c.restore();
+    }
+    if (this.personX !== null) {
+      const x = this.personX;
+      c.fillStyle = "rgb(80,60,70)"; c.fillRect(x - 90, 60, 180, H);
+      c.fillStyle = "rgb(100,80,90)"; c.beginPath(); c.arc(x, 45, 52, 0, 6.2832); c.fill();
+    }
+    const img = c.getImageData(0, 0, W, H), d = img.data, L = this.light, nz = this.noise;
+    let o = (rand() * (nz.length - 3 * W * H)) | 0;
+    for (let k = 0; k < d.length; k += 4) { d[k] = d[k] * L + nz[o++]; d[k + 1] = d[k + 1] * L + nz[o++]; d[k + 2] = d[k + 2] * L + nz[o++]; }
+    if (this.pointerOn) { const h = this.hitWall(true); if (h) { const [u, v] = this.project(h.X); addSpot(d, u, v, 1.6, [178, 24, 7]); } }
+    if (this.flash) addSpot(d, this.flash.u, this.flash.v, 3, [240, 400, 510]);
+    return {data: d, t: this.t};
+  }
+}
+function addSpot(d, u, v, sg, col) {
+  const r = Math.ceil(4 * sg);
+  for (let y = Math.floor(v) - r; y <= Math.floor(v) + r; y++) for (let x = Math.floor(u) - r; x <= Math.floor(u) + r; x++) {
+    if (x < 0 || y < 0 || x >= W || y >= H) continue;
+    const g = Math.exp(-((x - u) ** 2 + (y - v) ** 2) / (2 * sg * sg)), k = 4 * (y * W + x);
+    d[k] += g * col[0]; d[k + 1] += g * col[1]; d[k + 2] += g * col[2];
+  }
+}
+
+/* Sanal firmware: laser_turret.ino'daki kuralları taklit eder */
+class SimTurret {
+  constructor(w) { this.w = w; this.lastFire = -1e9; this.armedAt = -1e9; this.refused = 0; this.estop = false; this.presenceSensor = true; }
+  presence() { return this.presenceSensor && this.w.personVisible; }
+  arm(on) {
+    if (on && (this.estop || this.presence())) { this.w.armed = false; return false; }
+    if (on && !this.w.armed) this.armedAt = this.w.t;
+    this.w.armed = !!on; return true;
+  }
+  move(p, t) { if (this.estop) return false; this.w.pan.command(clamp(p, -60, 60)); this.w.tilt.command(clamp(t, -35, 45)); return true; }
+  pointer(on) { this.w.pointerOn = !!on && !this.estop; return true; }
+  fire(ms, pwm) {
+    const w = this.w;
+    if (this.estop || this.presence()) { w.armed = false; this.refused++; return false; }
+    if (!w.armed || w.t - this.armedAt < 1.5 || ms > 60 || w.pan.moving || w.tilt.moving || w.t - this.lastFire < 1.0) { this.refused++; return false; }
+    this.lastFire = w.t; w.pointerOn = false; w.fire(ms, pwm); return true;
+  }
+}
+
+/* =====================================================================
+ *  SİMÜLASYON SAATİ: Python'daki sleep()/camera.read() yerine async bekleme
+ * ===================================================================== */
+const world = new World();
+const tur = new SimTurret(world);
+const sim = {
+  frame: null, frameWaiters: [], timeWaiters: [],
+  tick() {
+    world.step(1 / 30);
+    this.frame = world.render();
+    const fw = this.frameWaiters; this.frameWaiters = []; fw.forEach(r => r(this.frame));
+    const tw = this.timeWaiters; this.timeWaiters = [];
+    tw.forEach(w => (world.t >= w.at - 1e-9 ? w.r() : this.timeWaiters.push(w)));
+  },
+  nextFrame() { return new Promise(r => this.frameWaiters.push(r)); },
+  wait(s) { return new Promise(r => this.timeWaiters.push({at: world.t + s, r})); },
+};
+async function freshFrame(flush = 2) { let f; for (let i = 0; i <= flush; i++) f = await sim.nextFrame(); return f; }
+async function waitSettled(timeout = 1.0) {
+  const t0 = world.t;
+  while ((world.pan.moving || world.tilt.moving) && world.t - t0 < timeout) await sim.nextFrame();
+  await sim.wait(0.08);                                     // mekanik oturma payı
+}
+
+/* =====================================================================
+ *  GÖRÜNTÜ İŞLEME  [detector.py'nin portu]
+ *  Referans farkı + bağlı bileşenler + yerel kontrast (black-hat eşdeğeri)
+ *  + durağanlık takibi
+ * ===================================================================== */
+function toGray(fr) {
+  const d = fr.data, g = new Float32Array(W * H);
+  for (let i = 0, k = 0; i < g.length; i++, k += 4) g[i] = 0.299 * d[k] + 0.587 * d[k + 1] + 0.114 * d[k + 2];
+  return g;
+}
+const CFG = {diff: 14, contrast: 18, minArea: 3, maxArea: 300, maxAspect: 3.5, maxBox: 24,
+             statFrames: 12, statR: 2.5, maxMiss: 4, lr: 0.02, globalChange: 12, border: 10};
+
+class Detector {
+  constructor() { this.ref = null; this.tracks = []; this.spent = []; this.nextId = 1; this.mask = new Uint8Array(W * H); }
+  setReference(frames) {
+    const gs = frames.map(toGray), ref = new Float32Array(W * H);
+    for (let i = 0; i < ref.length; i++) { const v = gs.map(g => g[i]).sort((a, b) => a - b); ref[i] = v[v.length >> 1]; }
+    this.ref = ref; this.tracks = [];
+  }
+  refreshROI(fr, x, y, r = 12) {
+    const g = toGray(fr);
+    for (let yy = Math.max(0, (y | 0) - r); yy <= Math.min(H - 1, (y | 0) + r); yy++)
+      for (let xx = Math.max(0, (x | 0) - r); xx <= Math.min(W - 1, (x | 0) + r); xx++) this.ref[yy * W + xx] = g[yy * W + xx];
+  }
+  markSpent(x, y, r = 6) { this.spent.push([x, y, r]); this.tracks = this.tracks.filter(t => hyp(t.x - x, t.y - y) > r); }
+  detect(fr) {
+    const g = toGray(fr), ref = this.ref, m = this.mask, B = CFG.border;
+    let mg = 0, mr = 0; for (let i = 0; i < g.length; i += 7) { mg += g[i]; mr += ref[i]; }
+    if (Math.abs(mg - mr) / (g.length / 7) > CFG.globalChange) { this.setReference([fr]); return []; }
+    m.fill(0);
+    for (let y = B; y < H - B; y++) for (let x = B; x < W - B; x++) { const i = y * W + x; if (ref[i] - g[i] > CFG.diff) m[i] = 1; }
+    // bağlı bileşenler (8-komşu)
+    const dets = [], skip = [], stack = [];
+    for (let i0 = 0; i0 < m.length; i0++) {
+      if (m[i0] !== 1) continue;
+      let n = 0, sw = 0, sx = 0, sy = 0, sg = 0, x0 = W, x1 = 0, y0 = H, y1 = 0;
+      stack.push(i0); m[i0] = 2;
+      while (stack.length) {
+        const i = stack.pop(), x = i % W, y = (i / W) | 0, wgt = ref[i] - g[i];
+        n++; sw += wgt; sx += x * wgt; sy += y * wgt; sg += g[i];
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const j = i + dy * W + dx; if (j >= 0 && j < m.length && m[j] === 1) { m[j] = 2; stack.push(j); }
+        }
+      }
+      skip.push([x0 - 4, y0 - 4, x1 + 4, y1 + 4]);
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      if (n < CFG.minArea || n > CFG.maxArea || bw > CFG.maxBox || bh > CFG.maxBox) continue;
+      if (Math.max(bw, bh) / Math.min(bw, bh) > CFG.maxAspect) continue;
+      // yerel kontrast: bileşen çevresindeki halka ile karşılaştır (black-hat eşdeğeri)
+      let rs = 0, rn = 0;
+      for (let y = Math.max(0, y0 - 3); y <= Math.min(H - 1, y1 + 3); y++) for (let x = Math.max(0, x0 - 3); x <= Math.min(W - 1, x1 + 3); x++) {
+        const i = y * W + x; if (m[i] === 0) { rs += g[i]; rn++; }
+      }
+      if (!rn || rs / rn - sg / n < CFG.contrast) continue;
+      const cx = sx / sw, cy = sy / sw;
+      if (this.spent.some(([px, py, r]) => hyp(cx - px, cy - py) < r)) continue;
+      dets.push({x: cx, y: cy, area: n});
+    }
+    // referansı tespit dışı piksellerde yavaşça güncelle
+    for (const [a, b, c, d] of skip) for (let y = Math.max(0, b); y <= Math.min(H - 1, d); y++) for (let x = Math.max(0, a); x <= Math.min(W - 1, c); x++) if (m[y * W + x] === 0) m[y * W + x] = 3;
+    for (let i = 0; i < g.length; i++) if (m[i] === 0) ref[i] += CFG.lr * (g[i] - ref[i]);
+    return dets;
+  }
+  update(fr) {
+    const dets = this.detect(fr), used = new Set();
+    for (const t of this.tracks) {
+      let best = -1, bd = (CFG.statR * 2) ** 2;
+      dets.forEach((d, i) => { if (used.has(i)) return; const dd = (d.x - t.x) ** 2 + (d.y - t.y) ** 2; if (dd < bd) { best = i; bd = dd; } });
+      if (best < 0) { t.miss++; continue; }
+      const d = dets[best]; used.add(best);
+      t.hist.push([d.x, d.y]); if (t.hist.length > CFG.statFrames) t.hist.shift();
+      t.x = t.hist.reduce((s, p) => s + p[0], 0) / t.hist.length; t.y = t.hist.reduce((s, p) => s + p[1], 0) / t.hist.length;
+      t.hits++; t.miss = 0;
+      const spread = Math.max(...t.hist.map(p => hyp(p[0] - t.x, p[1] - t.y)));
+      if (t.hits >= CFG.statFrames && spread <= CFG.statR) t.ok = true; else if (spread > CFG.statR) t.ok = false;
+    }
+    dets.forEach((d, i) => { if (!used.has(i)) this.tracks.push({id: this.nextId++, x: d.x, y: d.y, hits: 1, miss: 0, hist: [[d.x, d.y]], ok: false}); });
+    this.tracks = this.tracks.filter(t => t.miss <= CFG.maxMiss);
+    return this.tracks.filter(t => t.ok);
+  }
+}
+
+/* Nişan lazeri noktası: kromatik fark dR - (dG+dB)/2, 3x3 kutu, alt-piksel ağırlık merkezi */
+function findSpot(on, off, minPeak = 20) {
+  const a = on.data, b = off.data, dd = new Float32Array(W * H);
+  for (let i = 0, k = 0; i < dd.length; i++, k += 4) { const v = (a[k] - b[k]) - 0.5 * ((a[k + 1] - b[k + 1]) + (a[k + 2] - b[k + 2])); dd[i] = v > 0 ? v : 0; }
+  return peakCentroid(dd, minPeak, 6);
+}
+function peakCentroid(dd, minPeak, r) {
+  let best = -1, bi = 0;
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const i = y * W + x; if (dd[i] <= 0) continue;
+    const s = (dd[i - W - 1] + dd[i - W] + dd[i - W + 1] + dd[i - 1] + dd[i] + dd[i + 1] + dd[i + W - 1] + dd[i + W] + dd[i + W + 1]) / 9;
+    if (s > best) { best = s; bi = i; }
+  }
+  if (best < minPeak) return null;
+  const mx = bi % W, my = (bi / W) | 0, pk = dd[bi]; let sw = 0, sx = 0, sy = 0;
+  for (let y = Math.max(0, my - r); y <= Math.min(H - 1, my + r); y++) for (let x = Math.max(0, mx - r); x <= Math.min(W - 1, mx + r); x++) {
+    const w = Math.max(0, dd[y * W + x] - 0.5 * pk); sw += w; sx += x * w; sy += y * w;
+  }
+  return sw > 0 ? [sx / sw, sy / sw] : [mx, my];
+}
+async function captureSpot(settle = 0.25) {
+  tur.pointer(false); await sim.wait(settle);
+  const off = await freshFrame(); tur.pointer(true); await sim.wait(0.05);
+  const on = await freshFrame(); tur.pointer(false);
+  return findSpot(on, off);
+}
+
+/* =====================================================================
+ *  KALİBRASYON + ANGAJMAN  [engage.py'nin portu]
+ * ===================================================================== */
+const opts = {approach: true, closed: true, motion: true};
+const S = {model: null, enabled: false, armed: false, state: "KALİBRASYONSUZ", busy: false, hull: null, target: null,
+           shots: 0, kills: 0, aborted: 0, holdUntil: 0, lastShot: -1e9, prevSmall: null, cmd: [0, 0], grid: null, gridRange: null};
+const det = new Detector();
+
+function log(msg) {
+  const el = document.getElementById("log");
+  el.textContent += `[${world.t.toFixed(1).padStart(6)} s] ${msg}\n`;
+  const lines = el.textContent.split("\n"); if (lines.length > 200) el.textContent = lines.slice(-200).join("\n");
+  el.scrollTop = el.scrollHeight;
+}
+function move(p, t) { S.cmd = [p, t]; tur.move(p, t); }
+async function approach(p, t) {
+  if (opts.approach) { move(p - 0.8, t - 0.8); await waitSettled(1.0); }
+  move(p, t); await waitSettled(1.0);
+}
+function calGrid() {
+  const pts = [], pans = [], tilts = [];
+  for (let i = 0; i < 7; i++) pans.push(-30 + 60 * i / 6);
+  for (let j = 0; j < 5; j++) tilts.push(-17 + 34 * j / 4);
+  tilts.forEach((t, j) => (j % 2 ? [...pans].reverse() : pans).forEach(p => pts.push([p, t, pans.indexOf(p), j])));
+  return pts;
+}
+
+async function calibrate() {
+  if (S.busy) return;
+  S.busy = true; S.enabled = false; await setArmed(false); updateButtons();
+  S.state = "KALİBRASYON"; world.noSpawn = true;
+  const savedFlies = world.flies; world.flies = [];
+  const grid = calGrid(), pix = [], ang = [], border = [];
+  log("Kalibrasyon başladı: 7×5 açı ızgarası, kırmızı nişan noktası ile");
+  for (const [p, t, i, j] of grid) {
+    if (tur.estop) break;
+    await approach(p, t);
+    const s = await captureSpot();
+    if (!s) { log(`  pan=${p.toFixed(1)} tilt=${t.toFixed(1)}: nokta kadraj dışı, atlandı`); continue; }
+    pix.push(s); ang.push([p, t]);
+    if (i === 0 || i === 6 || j === 0 || j === 4) border.push(s);
+  }
+  if (pix.length < 8) { log("Kalibrasyon BAŞARISIZ (yeterli nokta yok)"); S.busy = false; world.noSpawn = false; world.flies = savedFlies; S.state = "KALİBRASYONSUZ"; updateButtons(); return false; }
+  const model = new PixelToTurret(); model.fit(pix, ang);
+  log(`Homografi + 2. derece artık: ${pix.length} nokta, RMS = ${model.rmsDeg.toFixed(3)}° ≈ ${model.rmsPx.toFixed(2)} px`);
+  // nişan–ışın ofseti: yanmaz kalibrasyon kartına (sol alt) düşük güçlü darbe
+  const card = [225, 420];
+  log("Ofset ölçümü: kalibrasyon kartına 10 ms / %78 PWM tek darbe");
+  const [cp, ct] = model.predict(...card);
+  await approach(cp, ct);
+  const dotp = await captureSpot();
+  const before = toGray(await freshFrame());
+  tur.arm(true); await sim.wait(1.6); tur.fire(10, 200); await sim.wait(0.2); tur.arm(false);
+  const after = toGray(await freshFrame()), dd = new Float32Array(W * H);
+  for (let i = 0; i < dd.length; i++) dd[i] = Math.max(0, before[i] - after[i]);
+  const burn = peakCentroid(dd, 10, 4);
+  if (dotp && burn) {
+    model.offset = [dotp[0] - burn[0], dotp[1] - burn[1]]; model.offsetOk = true;
+    log(`Nokta–ışın ofseti = (${model.offset[0].toFixed(1)}, ${model.offset[1].toFixed(1)}) px`);
+  } else log("Ofset ÖLÇÜLEMEDİ — atış yasak kalacak");
+  // çalışma zarfı çokgeni
+  const c = border.reduce((a, p) => [a[0] + p[0] / border.length, a[1] + p[1] / border.length], [0, 0]);
+  S.hull = border.sort((a, b) => Math.atan2(a[1] - c[1], a[0] - c[0]) - Math.atan2(b[1] - c[1], b[0] - c[0]));
+  S.gridRange = {p0: -30 * 0.95, p1: 30 * 0.95, t0: -17 * 0.95, t1: 17 * 0.95};
+  S.grid = ang; S.model = model;
+  world.flies = savedFlies; world.noSpawn = false;
+  move(0, 0); await waitSettled(1.5);
+  const refs = []; for (let i = 0; i < 5; i++) refs.push(await sim.nextFrame());
+  det.setReference(refs);
+  S.state = "IDLE"; S.busy = false; updateButtons();
+  return true;
+}
+
+function motionGate(fr) {
+  const d = fr.data, small = new Float32Array(160 * 90);
+  for (let y = 0; y < 90; y++) for (let x = 0; x < 160; x++) { const k = 4 * ((y * 6 + 3) * W + x * 6 + 3); small[y * 160 + x] = 0.299 * d[k] + 0.587 * d[k + 1] + 0.114 * d[k + 2]; }
+  if (S.prevSmall) {
+    let c = 0; for (let i = 0; i < small.length; i++) if (Math.abs(small[i] - S.prevSmall[i]) > 25) c++;
+    const frac = c / small.length;
+    if (frac > 0.02 && opts.motion) {
+      if (world.t >= S.holdUntil) log(`GÜVENLİK: büyük hareket (%${(frac * 100).toFixed(1)}) → 10 s ateş yasağı`);
+      S.holdUntil = world.t + 10;
+    }
+  }
+  S.prevSmall = small;
+  return !opts.motion || world.t >= S.holdUntil;
+}
+async function setArmed(on) {
+  if (on && !S.armed) { if (!tur.arm(true)) { log("Firmware ARM'ı REDDETTİ (E-stop / varlık sensörü)"); return false; } S.armed = true; await sim.wait(1.6); }
+  else if (!on && S.armed) { tur.arm(false); S.armed = false; }
+  return true;
+}
+function inEnvelope(p, t) { const g = S.gridRange; return p >= g.p0 && p <= g.p1 && t >= g.t0 && t <= g.t1; }
+
+async function engage(tg) {
+  const m = S.model, u = tg.x, v = tg.y;
+  if (!m.offsetOk) { log("Ofset kalibre edilmemiş → ATIŞ YASAK"); S.enabled = false; updateButtons(); return; }
+  const want = [u + m.offset[0], v + m.offset[1]];
+  let [p, t] = m.predict(...want);
+  if (!inEnvelope(p, t)) { log(`#${tg.id} (${u.toFixed(0)},${v.toFixed(0)}) çalışma zarfı dışında → iptal`); det.markSpent(u, v, 8); S.aborted++; return; }
+  S.state = "AIM"; S.target = [u, v];
+  let ok = false;
+  if (opts.closed) {
+    for (let it = 0; it < 4; it++) {
+      await approach(p, t);
+      const s = await captureSpot(0.12);
+      if (!s) break;
+      const e = [s[0] - want[0], s[1] - want[1]];
+      log(`#${tg.id} iter${it}: nişan hatası (${e[0] >= 0 ? "+" : ""}${e[0].toFixed(2)}, ${e[1] >= 0 ? "+" : ""}${e[1].toFixed(2)}) px`);
+      if (hyp(...e) <= 2.0) { ok = true; break; }
+      const a = m.predict(...want), b = m.predict(...s);
+      p += a[0] - b[0]; t += a[1] - b[1];                       // görsel servo düzeltmesi
+      if (!inEnvelope(p, t)) break;
+    }
+  } else { await approach(p, t); ok = true; log(`#${tg.id} açık çevrim nişan (doğrulama yok)`); }
+  if (!ok) { log(`#${tg.id} nişan doğrulanamadı → iptal`); S.aborted++; S.target = null; S.state = "SCAN"; return; }
+  if (!motionGate(await sim.nextFrame())) { S.aborted++; S.target = null; return; }
+  if (!S.armed) {
+    if (!(await setArmed(true))) { S.aborted++; S.target = null; return; }
+    if (!motionGate(await sim.nextFrame())) { await setArmed(false); S.aborted++; S.target = null; return; }
+  }
+  S.state = "FIRE";
+  const fired = tur.fire(40, 255);
+  if (!fired) { log("Firmware atışı REDDETTİ"); S.armed = world.armed; }
+  S.shots += fired ? 1 : 0; S.lastShot = world.t;
+  S.state = "VERIFY"; await sim.wait(0.5);
+  const after = await freshFrame();
+  const still = det.detect(after).filter(d => hyp(d.x - u, d.y - v) < 4);
+  if (fired && !still.length) { S.kills++; log(`#${tg.id} ETKİSİZ ✔ (${u.toFixed(1)}, ${v.toFixed(1)})`); }
+  else if (fired) log(`#${tg.id} hedef hâlâ görünüyor (ıska)`);
+  det.markSpent(u, v, 6); det.refreshROI(after, u, v);
+  S.target = null; S.state = "SCAN";
+}
+
+async function controlLoop() {
+  // başlangıç referansı
+  const refs = []; for (let i = 0; i < 5; i++) refs.push(await sim.nextFrame());
+  det.setReference(refs);
+  for (;;) {
+    const fr = await sim.nextFrame();
+    if (S.busy) continue;
+    const safe = motionGate(fr);
+    const targets = det.update(fr);
+    if (tur.estop) { S.state = "E-STOP"; S.armed = false; continue; }
+    if (!S.model) { S.state = "KALİBRASYONSUZ"; continue; }
+    if (!safe) { S.state = "HOLD"; tur.pointer(false); await setArmed(false); continue; }
+    if (!S.enabled) { S.state = "IDLE"; await setArmed(false); continue; }
+    S.state = "SCAN";
+    if (!targets.length || world.t - S.lastShot < 1.5) continue;
+    const tg = targets.reduce((a, b) => (b.hits > a.hits ? b : a));
+    await engage(tg);
+  }
+}
+
+/* =====================================================================
+ *  ARAYÜZ
+ * ===================================================================== */
+const view = document.getElementById("view"), vctx = view.getContext("2d");
+const mini = document.getElementById("mini"), mctx = mini.getContext("2d");
+const $ = id => document.getElementById(id);
+let showMask = false;
+
+function draw() {
+  const fr = sim.frame; if (!fr) return;
+  const img = new ImageData(new Uint8ClampedArray(fr.data), W, H);
+  if (showMask) { const m = det.mask, d = img.data; for (let i = 0; i < m.length; i++) if (m[i] === 2) { d[4 * i] = 255; d[4 * i + 1] = 220; d[4 * i + 2] = 0; } }
+  vctx.putImageData(img, 0, 0);
+  if (S.hull && S.hull.length > 2) {
+    vctx.strokeStyle = "rgba(62,207,142,.8)"; vctx.lineWidth = 1.5; vctx.setLineDash([6, 4]);
+    vctx.beginPath(); S.hull.forEach((p, i) => (i ? vctx.lineTo(...p) : vctx.moveTo(...p))); vctx.closePath(); vctx.stroke(); vctx.setLineDash([]);
+  }
+  vctx.lineWidth = 1.5; vctx.font = "11px ui-monospace,monospace";
+  for (const t of det.tracks) {
+    vctx.strokeStyle = vctx.fillStyle = t.ok ? "#ff3b3b" : "#ffc400";
+    vctx.beginPath(); vctx.arc(t.x, t.y, 9, 0, 6.2832); vctx.stroke();
+    vctx.fillText(`#${t.id} ${Math.min(t.hits, 99)}`, t.x + 11, t.y - 8);
+  }
+  if (S.target) {
+    const [u, v] = S.target; vctx.strokeStyle = "#4f8cff"; vctx.lineWidth = 2;
+    vctx.beginPath(); vctx.arc(u, v, 16, 0, 6.2832); vctx.moveTo(u - 24, v); vctx.lineTo(u - 8, v); vctx.moveTo(u + 8, v); vctx.lineTo(u + 24, v);
+    vctx.moveTo(u, v - 24); vctx.lineTo(u, v - 8); vctx.moveTo(u, v + 8); vctx.lineTo(u, v + 24); vctx.stroke();
+  }
+  // durum rozeti
+  const b = $("badge"); b.textContent = S.state + (S.armed ? " · ARMED" : "");
+  b.style.color = S.state === "FIRE" || S.armed ? "#ff8a8d" : S.state === "HOLD" || S.state === "E-STOP" ? "#ffb020" : "#e6e8ec";
+  drawMini(); drawStats();
+}
+function drawMini() {
+  const c = mctx, w = mini.width, h = mini.height, px = p => w / 2 + p / 36 * (w / 2 - 10), py = t => h / 2 + t / 22 * (h / 2 - 10);
+  c.fillStyle = "#0b0d11"; c.fillRect(0, 0, w, h);
+  c.strokeStyle = "#2a2f3a"; c.beginPath(); c.moveTo(px(-36), py(0)); c.lineTo(px(36), py(0)); c.moveTo(px(0), py(-22)); c.lineTo(px(0), py(22)); c.stroke();
+  c.fillStyle = "#9aa3b2"; c.font = "10px system-ui"; c.fillText("pan →", w - 40, py(0) - 4); c.fillText("tilt ↓", px(0) + 4, 12);
+  if (S.grid) { c.fillStyle = "#3ecf8e"; S.grid.forEach(([p, t]) => c.fillRect(px(p) - 1, py(t) - 1, 2, 2)); }
+  c.strokeStyle = "#4f8cff"; const [cp, ct] = S.cmd;
+  c.beginPath(); c.moveTo(px(cp) - 5, py(ct)); c.lineTo(px(cp) + 5, py(ct)); c.moveTo(px(cp), py(ct) - 5); c.lineTo(px(cp), py(ct) + 5); c.stroke();
+  c.fillStyle = world.armed ? "#ff3b3b" : "#ffc400"; c.beginPath(); c.arc(px(world.pan.actual), py(world.tilt.actual), 3.5, 0, 6.2832); c.fill();
+  c.fillStyle = "#9aa3b2"; c.fillText(`komut (${cp.toFixed(2)}°, ${ct.toFixed(2)}°)  gerçek (${world.pan.actual.toFixed(2)}°, ${world.tilt.actual.toFixed(2)}°)`, 6, h - 6);
+}
+function drawStats() {
+  const m = S.model, viol = world.violations;
+  const rows = [
+    ["Sim zamanı", world.t.toFixed(1) + " s"],
+    ["Durum", S.state],
+    ["Kalibrasyon RMS", m ? `${m.rmsPx.toFixed(2)} px (${m.rmsDeg.toFixed(3)}°)` : "—"],
+    ["Nokta–ışın ofseti", m && m.offsetOk ? `(${m.offset[0].toFixed(1)}, ${m.offset[1].toFixed(1)}) px` : "—"],
+    ["Atış", S.shots],
+    ["Doğrulanmış etkisiz", `<span class="v-ok">${S.kills}</span> <small style="color:#9aa3b2">(gerçek: ${world.kills})</small>`],
+    ["İptal edilen angajman", S.aborted],
+    ["Duvar yanık izi (ıska)", Math.max(0, world.scorches.length - (m && m.offsetOk ? 1 : 0))],
+    ["Firmware reddi", tur.refused],
+    ["Güvenlik ihlali", `<span class="${viol ? "v-bad" : "v-ok"}">${viol}</span>`],
+    ["Kadrajdaki sinek", world.flies.filter(f => f.state !== "dead").length],
+  ];
+  $("stats").innerHTML = rows.map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
+}
+function updateButtons() {
+  $("btnAuto").disabled = !S.model || S.busy;
+  $("btnAuto").textContent = "Otonom: " + (S.enabled ? "AÇIK" : "KAPALI");
+  $("btnAuto").classList.toggle("on", S.enabled);
+  $("btnCal").disabled = S.busy || tur.estop; $("btnStart").disabled = S.busy || tur.estop;
+  $("btnEstop").textContent = tur.estop ? "E-STOP BASILI (bırak)" : "E-STOP";
+}
+
+$("btnCal").onclick = () => calibrate();
+$("btnStart").onclick = async () => { $("speed").value = "8"; if (await calibrate()) { S.enabled = true; $("speed").value = "2"; updateButtons(); log("Otonom angajman AÇIK"); } };
+$("btnAuto").onclick = () => { S.enabled = !S.enabled; updateButtons(); log("Otonom angajman " + (S.enabled ? "AÇIK" : "KAPALI")); };
+$("btnFly").onclick = () => { world.spawnFly(true); log("Duvara sinek kondu"); };
+$("btnPerson").onclick = () => { world.personX = -250; log("Kadraja insan giriyor"); };
+$("btnRef").onclick = async () => { const r = []; for (let i = 0; i < 5; i++) r.push(await sim.nextFrame()); det.setReference(r); log("Referans yenilendi"); };
+$("btnEstop").onclick = () => {
+  tur.estop = !tur.estop;
+  if (tur.estop) { world.armed = false; world.pointerOn = false; S.armed = false; S.enabled = false; log("E-STOP BASILDI: lazer enerjisi fiziksel olarak kesildi"); }
+  else log("E-STOP bırakıldı (otonom mod kapalı kalır)");
+  updateButtons();
+};
+$("optApproach").onchange = e => { opts.approach = e.target.checked; log("Anti-boşluk yaklaşımı " + (opts.approach ? "AÇIK" : "KAPALI")); };
+$("optClosed").onchange = e => { opts.closed = e.target.checked; log("Kapalı çevrim nişan " + (opts.closed ? "AÇIK" : "KAPALI")); };
+$("optMotion").onchange = e => { opts.motion = e.target.checked; if (!opts.motion) S.holdUntil = 0; log("Kamera hareket kapısı " + (opts.motion ? "AÇIK" : "KAPALI")); };
+$("optPresence").onchange = e => { tur.presenceSensor = e.target.checked; log("Varlık sensörü " + (tur.presenceSensor ? "AÇIK" : "KAPALI")); };
+$("optMask").onchange = e => { showMask = e.target.checked; };
+
+/* Ana döngü: her ekran karesinde (hıza göre) birkaç simülasyon adımı.
+ * Her adımdan sonra bir makro-görev beklenir ki async kontrol kodu araya girebilsin. */
+const ch = new MessageChannel(); const yq = [];
+ch.port1.onmessage = () => yq.shift()();
+const yieldTask = () => new Promise(r => { yq.push(r); ch.port2.postMessage(0); });
+let acc = 0, lastTs = performance.now();
+async function mainLoop() {
+  for (;;) {
+    const ts = await new Promise(r => requestAnimationFrame(r));
+    acc += Math.min(0.1, (ts - lastTs) / 1000) * 30 * Number($("speed").value); lastTs = ts;
+    let n = Math.min(8, Math.floor(acc)); acc -= n;
+    while (n-- > 0) { sim.tick(); await yieldTask(); await yieldTask(); }
+    draw();
+  }
+}
+log("Hazır. '▶ Başlat' ile kalibrasyon + otonom modu başlatın.");
+updateButtons(); controlLoop(); mainLoop();
+</script>
+</body>
+</html>

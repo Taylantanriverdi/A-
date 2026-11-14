@@ -42,7 +42,9 @@ sinek-lazer/
 └── wokwi/diagram.json             ← Wokwi devre simülasyonu
 ```
 
-**Hızlı başlangıç (donanımsız):**
+**En hızlı deneme:** [`simulasyon.html`](simulasyon.html) dosyasını tarayıcıda açın (kurulum gerekmez; Python simülatörünün JavaScript portu).
+
+**Hızlı başlangıç (donanımsız, Python):**
 ```bash
 cd sinek-lazer/software
 pip install -r requirements.txt
