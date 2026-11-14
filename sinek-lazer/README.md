@@ -44,6 +44,8 @@ sinek-lazer/
 
 **En hızlı deneme:** [`simulasyon.html`](simulasyon.html) dosyasını tarayıcıda açın (kurulum gerekmez; Python simülatörünün JavaScript portu).
 
+**Mekanik/elektronik yerleşim:** [`taret-3d.html`](taret-3d.html) — servoların nasıl döndüğünü, kartların kasada nasıl durduğunu, kameranın sabit montajını, kabloları ve angajman döngüsünü 3B gösterir (three.js gömülü, internet gerekmez; kaynak: `taret-3d.src.html`).
+
 **Hızlı başlangıç (donanımsız, Python):**
 ```bash
 cd sinek-lazer/software

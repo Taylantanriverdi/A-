@@ -1,0 +1,902 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lazer Taret Mekaniği</title>
+<style>
+  :root{--bg:#0f1115;--panel:#171a21;--panel2:#1f232c;--line:#2a2f3a;--text:#e6e8ec;--muted:#9aa3b2;--accent:#4f8cff;--ok:#3ecf8e;--warn:#ffb020;--bad:#ff5a5f}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+  #app{display:grid;grid-template-columns:minmax(0,1fr) 360px;height:100%}
+  #stage{position:relative;overflow:hidden;min-height:0}
+  #c{width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+  #labels{position:absolute;inset:0;pointer-events:none}
+  .lbl{position:absolute;transform:translate(8px,-50%);white-space:nowrap;font-size:11.5px;padding:2px 6px;border-radius:5px;background:#0d1016d9;border:1px solid #ffffff22;color:#dfe5ee}
+  .lbl::before{content:"";position:absolute;left:-8px;top:50%;width:6px;height:6px;margin-top:-3px;border-radius:50%;background:var(--accent)}
+  .lbl.sel{border-color:var(--accent);color:#fff}
+  #insetTag{position:absolute;left:12px;bottom:12px;font-size:11px;color:#cfd6e2;background:#000a;padding:2px 6px;border-radius:4px;pointer-events:none}
+  #phaseBig{position:absolute;left:12px;top:12px;max-width:min(560px,70%);background:#0d1016e6;border:1px solid var(--line);border-radius:10px;padding:10px 12px;pointer-events:none}
+  #phaseBig b{font-size:15px}
+  #phaseBig p{margin:4px 0 0;color:#c8d0dc;font-size:13px}
+  #viewbar{position:absolute;right:12px;top:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:52%}
+  aside{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+  h1{font-size:16px;margin:0}
+  h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 6px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+  button{background:#262b36;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font:inherit;font-size:13px;cursor:pointer}
+  button:hover{border-color:#455066}
+  button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  ol#steps{margin:0;padding-left:20px;color:var(--muted);font-size:13px}
+  ol#steps li{padding:1px 0}
+  ol#steps li.cur{color:#fff;font-weight:600}
+  ol#steps li.cur::marker{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:13px}
+  td{padding:2px 0;border-bottom:1px solid #2a2f3a}
+  td:last-child{text-align:right;font-weight:600}
+  #scope{width:100%;height:auto;background:#07090c;border-radius:6px;border:1px solid var(--line)}
+  label.t{display:flex;gap:8px;align-items:center;margin:3px 0;cursor:pointer;font-size:13px}
+  input[type=range]{width:100%}
+  #info{font-size:13px;color:#cfd6e2}
+  #info b{color:#fff}
+  .muted{color:var(--muted);font-size:12px}
+  .pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:12px;font-weight:600;background:#2a2f3a}
+  .pill.r{background:#5a1a1d;color:#ffb3b5}.pill.g{background:#173b2b;color:#9ff0c8}.pill.b{background:#1b2b4d;color:#b8cfff}
+  @media (max-width:900px){
+    html,body{overflow:auto}
+    #app{grid-template-columns:1fr;height:auto}
+    #stage{height:62vh}
+    aside{border-left:0;border-top:1px solid var(--line)}
+    #viewbar{max-width:100%;left:12px;top:auto;bottom:40px;justify-content:flex-start}
+    #phaseBig{max-width:calc(100% - 24px)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="labels"></div>
+    <div id="phaseBig"><b id="phTitle">Hazırlanıyor…</b><p id="phDesc"></p></div>
+    <div id="viewbar">
+      <button data-view="genel" class="on">Genel</button>
+      <button data-view="taret">Taret yakın</button>
+      <button data-view="kutu">Elektronik kutu</button>
+      <button data-view="yan">Yandan (tilt)</button>
+      <button data-view="ust">Üstten (pan)</button>
+      <button data-view="kamera">Kameranın gözü</button>
+    </div>
+    <div id="insetTag">◤ Sabit kameranın gördüğü görüntü</div>
+  </div>
+  <aside>
+    <div>
+      <h1>Lazer Taret — Mekanik ve Elektronik 3B</h1>
+      <div class="muted">Sürükle: döndür · Tekerlek/iki parmak: yakınlaş · Sağ tık/Shift+sürükle: kaydır · Parçaya tıkla: bilgi</div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <button id="btnPlay" class="on">⏸ Duraklat</button>
+        <button id="btnStep">⏭ Sonraki adım</button>
+        <span class="muted">Hız</span>
+        <button data-speed="0.5">0.5×</button><button data-speed="1" class="on">1×</button><button data-speed="2">2×</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Angajman döngüsü</h2>
+      <ol id="steps"></ol>
+    </div>
+    <div class="card">
+      <h2>Canlı sinyaller</h2>
+      <table id="live"></table>
+      <canvas id="scope" width="640" height="250" style="margin-top:8px"></canvas>
+      <div class="muted">Servo PWM: 20 ms periyot, darbe genişliği açıyı belirler (1500 µs = merkez, 11.1 µs/°). Lazer TTL yalnızca atışta HIGH. Şarj pompası yalnızca ARM iken 1 kHz kare dalga üretir.</div>
+    </div>
+    <div class="card">
+      <h2>Görünüm</h2>
+      <label class="t"><input type="checkbox" id="optLabels" checked> Etiketler</label>
+      <label class="t"><input type="checkbox" id="optCase" checked> Kasayı şeffaf göster</label>
+      <label class="t"><input type="checkbox" id="optFov" checked> Kamera görüş alanı (FOV)</label>
+      <label class="t"><input type="checkbox" id="optInset" checked> Kamera görüntüsü penceresi</label>
+      <label class="t"><input type="checkbox" id="optWires" checked> Kablolar ve sinyal akışı</label>
+      <div class="muted" style="margin-top:6px">Patlatılmış görünüm (montaj)</div>
+      <input type="range" id="explode" min="0" max="1" step="0.01" value="0">
+    </div>
+    <div class="card">
+      <h2>Manuel kontrol</h2>
+      <label class="t"><input type="checkbox" id="optManual"> Döngüyü durdur, servoları elle sür</label>
+      <div class="muted">Pan (dikey eksen) <span id="panV">0°</span></div>
+      <input type="range" id="panS" min="-60" max="60" step="0.5" value="0" disabled>
+      <div class="muted">Tilt (yatay eksen, + aşağı) <span id="tiltV">0°</span></div>
+      <input type="range" id="tiltS" min="-35" max="45" step="0.5" value="0" disabled>
+      <label class="t"><input type="checkbox" id="optPointer" disabled> Kırmızı nişan lazeri (&lt;1 mW)</label>
+    </div>
+    <div class="card">
+      <h2>Seçili parça</h2>
+      <div id="info">Bir parçaya tıklayın.</div>
+    </div>
+  </aside>
+</div>
+
+<script>/*THREE_INLINE*/</script>
+<script>
+"use strict";
+/* ======================================================================
+ *  Sahne kurulumu
+ * ====================================================================== */
+const canvas = document.getElementById("c");
+const renderer = new THREE.WebGLRenderer({canvas, antialias: true});
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1a1d24);
+const cam = new THREE.PerspectiveCamera(45, 1, 0.005, 30);
+
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3228, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(-1.5, 3, -1); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, {left: -1.2, right: 1.2, top: 1.2, bottom: -1.2, near: 0.5, far: 6});
+scene.add(sun);
+const fill = new THREE.PointLight(0xffffff, 0.35, 3); fill.position.set(0.4, 1.3, -0.6); scene.add(fill);
+
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+
+const matCache = {};
+function mat(color, o = {}) {
+  const key = color + JSON.stringify(o);
+  if (!o.unique && matCache[key]) return matCache[key];
+  const {unique, ...rest} = o;
+  const m = new THREE.MeshStandardMaterial(Object.assign({color, roughness: 0.6, metalness: 0.1}, rest));
+  if (!o.unique) matCache[key] = m;
+  return m;
+}
+function box(w, h, d, color, o) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, o)); m.castShadow = m.receiveShadow = true; return m; }
+function cyl(rt, rb, h, color, o, seg = 24) { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat(color, o)); m.castShadow = m.receiveShadow = true; return m; }
+function at(obj, x, y, z, parent) { obj.position.set(x, y, z); if (parent) parent.add(obj); return obj; }
+
+/* Parça kaydı: tıklama bilgisi, etiket, patlatma */
+const parts = [];             // {name, obj, info, label, explode:Vector3, base:Vector3}
+function part(obj, name, info, explodeDir, labelOffset) {
+  obj.traverse(o => { if (o.isMesh) o.userData.part = name; });
+  const p = {name, obj, info, explode: explodeDir || V(0, 0, 0), base: obj.position.clone(), labelOffset: labelOffset || V(0, 0, 0)};
+  parts.push(p); return p;
+}
+
+/* ======================================================================
+ *  Oda: zemin, masa, duvar, kalibrasyon kartı
+ * ====================================================================== */
+const WALL_Z = 1.7, TABLE_Y = 0.75;
+{
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), mat(0x3b3f47, {roughness: 0.95}));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(4, 2.8), mat(0xe9e4da, {roughness: 0.9}));
+  wall.position.set(0, 1.4, WALL_Z); wall.rotation.y = Math.PI; wall.receiveShadow = true; wall.name = "wall"; scene.add(wall);
+  const side = new THREE.Mesh(new THREE.PlaneGeometry(4, 2.8), mat(0xd9d3c8, {roughness: 0.95}));
+  side.position.set(-1.6, 1.4, 0); side.rotation.y = Math.PI / 2; side.receiveShadow = true; scene.add(side);
+  // süpürgelik
+  at(box(4, 0.08, 0.015, 0xd8d2c6), 0, 0.04, WALL_Z - 0.008, scene);
+  // tablo
+  const frame = new THREE.Group();
+  at(box(0.62, 0.03, 0.02, 0x3d2f26), 0, 0.22, 0, frame); at(box(0.62, 0.03, 0.02, 0x3d2f26), 0, -0.22, 0, frame);
+  at(box(0.03, 0.47, 0.02, 0x3d2f26), 0.3, 0, 0, frame); at(box(0.03, 0.47, 0.02, 0x3d2f26), -0.3, 0, 0, frame);
+  at(box(0.57, 0.41, 0.005, 0x6f8fa8), 0, 0, 0.004, frame);
+  at(frame, -0.9, 1.55, WALL_Z - 0.012, scene);
+  // masa
+  const table = new THREE.Group();
+  at(box(0.9, 0.03, 0.6, 0x8a6a4a, {roughness: 0.7}), 0, TABLE_Y - 0.015, 0.0, table);
+  for (const [x, z] of [[-0.42, -0.27], [0.42, -0.27], [-0.42, 0.27], [0.42, 0.27]]) at(box(0.04, TABLE_Y - 0.03, 0.04, 0x6b5139), x, (TABLE_Y - 0.03) / 2, z, table);
+  scene.add(table);
+}
+// kalibrasyon kartı (yanmaz levha + kâğıt)
+const calCard = new THREE.Group();
+at(box(0.16, 0.16, 0.008, 0x8d8d88), 0, 0, 0, calCard);
+at(box(0.12, 0.12, 0.002, 0xfafafa), 0, 0, -0.005, calCard);
+at(calCard, 0.55, 0.62, WALL_Z - 0.005, scene);
+part(calCard, "Kalibrasyon kartı", "<b>Yanmaz kalibrasyon kartı</b><br>Fiber-çimento levha + mat beyaz kâğıt. Kırmızı nişan noktası ile mavi güç ışını arasındaki ofset, bu karta atılan tek bir düşük güçlü darbenin yanık izi ölçülerek bulunur. Duvar boyasına değil buraya atış yapılır.", V(0, 0, 0), V(0, 0.09, 0));
+
+/* ======================================================================
+ *  CİHAZ (masa üstünde) — tüm ölçüler metre
+ * ====================================================================== */
+const device = new THREE.Group(); device.position.set(0, TABLE_Y, 0); scene.add(device);
+const BW = 0.24, BH = 0.09, BD = 0.18;
+
+// --- Kasa (şeffaf yapılabilir) ---
+const caseMat = new THREE.MeshStandardMaterial({color: 0x4b5563, transparent: true, opacity: 0.16, roughness: 0.4, metalness: 0.2, depthWrite: false});
+const caseMesh = new THREE.Mesh(new THREE.BoxGeometry(BW, BH, BD), caseMat);
+caseMesh.position.set(0, BH / 2, 0); device.add(caseMesh);
+const caseEdges = new THREE.LineSegments(new THREE.EdgesGeometry(caseMesh.geometry), new THREE.LineBasicMaterial({color: 0x9aa3b2, transparent: true, opacity: 0.6}));
+caseMesh.add(caseEdges);
+caseMesh.userData.part = "Kasa";
+parts.push({name: "Kasa", obj: caseMesh, info: "<b>Kasa</b> (sac veya PETG, ~24×18×9 cm)<br>Tüm elektronik içeride; üst kapakta pan servosu, E-stop, anahtar, ARM LED'i ve buzzer; ön yüzde kamera ve mmWave varlık sensörü. Havalandırma delikleri lazer sürücüsü ve Pi için gerekir.", explode: V(0, 0, 0), base: caseMesh.position.clone(), labelOffset: V(-0.12, 0.0, -0.09)});
+// kauçuk ayaklar
+for (const [x, z] of [[-0.1, -0.07], [0.1, -0.07], [-0.1, 0.07], [0.1, 0.07]]) at(cyl(0.008, 0.008, 0.004, 0x111111), x, -0.002, z, device);
+
+function pcb(w, d, color) { return box(w, 0.0016, d, color, {roughness: 0.5}); }
+function chip(w, d, h = 0.0015) { return box(w, h, d, 0x15171a, {roughness: 0.4}); }
+
+// --- 12 V PSU ---
+const psu = new THREE.Group();
+at(box(0.1, 0.035, 0.06, 0xb8bcc2, {metalness: 0.7, roughness: 0.35}), 0, 0, 0, psu);
+for (let i = 0; i < 7; i++) at(box(0.002, 0.012, 0.03, 0x6b7078), -0.03 + i * 0.006, 0.018, -0.005, psu);
+at(box(0.012, 0.01, 0.05, 0x1d1d1d), 0.056, -0.008, 0, psu); // vida terminal bloğu
+at(psu, -0.06, 0.0185, -0.045, device);
+part(psu, "12 V PSU", "<b>12 V 6 A (72 W) güç kaynağı</b><br>Lazer modülü (~2 A), servo regülatörü (~2.6 A tepe) ve röle/fan için tek ana kaynak. Her dal ayrı sigortalı (F1 3 A lazer, F2 5 A servo, F3 1 A röle). Raspberry Pi bu kaynaktan <b>beslenmez</b>.", V(-0.12, 0.08, -0.05), V(0, 0.03, 0));
+
+// --- Raspberry Pi 5 ---
+const pi = new THREE.Group();
+at(pcb(0.085, 0.056, 0x1f7a3a), 0, 0, 0, pi);
+at(box(0.015, 0.002, 0.015, 0xa9adb3, {metalness: 0.8}), -0.005, 0.0018, 0.002, pi);           // SoC
+at(box(0.032, 0.008, 0.032, 0x111316), -0.005, 0.006, 0.002, pi);                              // aktif soğutucu
+const piFan = at(cyl(0.012, 0.012, 0.002, 0x2a2d33), -0.005, 0.0105, 0.002, pi);
+at(box(0.017, 0.014, 0.013, 0xc4c8ce, {metalness: 0.8}), 0.034, 0.008, -0.018, pi);           // USB
+at(box(0.017, 0.014, 0.013, 0xc4c8ce, {metalness: 0.8}), 0.034, 0.008, 0.0, pi);
+at(box(0.017, 0.013, 0.016, 0xc4c8ce, {metalness: 0.8}), 0.034, 0.0075, 0.019, pi);           // Ethernet
+at(box(0.05, 0.008, 0.005, 0x111111), -0.01, 0.005, -0.025, pi);                              // GPIO başlığı
+at(box(0.012, 0.004, 0.003, 0xe9e2c8), -0.03, 0.0025, 0.016, pi);                             // CSI0
+for (const [x, z] of [[-0.039, -0.024], [0.019, -0.024], [-0.039, 0.024], [0.019, 0.024]]) at(cyl(0.0022, 0.0022, 0.01, 0xc9a227, {metalness: 0.7}), x, -0.005, z, pi);
+at(pi, 0.055, 0.0115, -0.045, device);
+part(pi, "Raspberry Pi 5", "<b>Raspberry Pi 5 (4 GB) + aktif soğutucu</b><br>Algı ve karar birimi: kameradan görüntü alır, OpenCV ile durağan sineği bulur, homografi ile piksel→pan/tilt açısı hesaplar ve USB seri hattan Arduino'ya komut gönderir. Kendi 27 W USB-C adaptöründen beslenir. Güvenlik zinciri Pi'ye <b>bağlı değildir</b>.", V(0.12, 0.09, -0.06), V(0, 0.02, 0));
+
+// --- Arduino Nano ---
+const nano = new THREE.Group();
+at(pcb(0.045, 0.018, 0x1f4fa8), 0, 0, 0, nano);
+at(chip(0.007, 0.007), 0.004, 0.0015, 0, nano);
+at(box(0.008, 0.004, 0.0075, 0xc4c8ce, {metalness: 0.8}), -0.0205, 0.0028, 0, nano);
+for (let i = 0; i < 15; i++) { at(box(0.0012, 0.006, 0.0012, 0xc9a227, {metalness: 0.8}), -0.0175 + i * 0.00254, -0.003, 0.0076, nano); at(box(0.0012, 0.006, 0.0012, 0xc9a227, {metalness: 0.8}), -0.0175 + i * 0.00254, -0.003, -0.0076, nano); }
+const nanoLed = at(box(0.0016, 0.0008, 0.001, 0x330000, {emissive: 0x000000, unique: true}), 0.012, 0.0012, 0.004, nano);
+at(nano, 0.0, 0.009, 0.045, device);
+part(nano, "Arduino Nano", "<b>Arduino Nano (ATmega328P, 5 V)</b><br>Eyleyici ve güvenlik denetleyicisi. D9/D10 servo PWM, D3 lazer TTL (10 kΩ pull-down), D4 nişan lazeri, D12 şarj pompası, D2/D7/D8 E-stop/anahtar/varlık girişleri. Atış süresini (≤60 ms), cooldown'u, heartbeat'i ve watchdog'u <b>Pi'den bağımsız</b> uygular.", V(0, 0.1, 0.1), V(0, 0.01, 0));
+
+// --- Buck 12→6 V ---
+const buck = new THREE.Group();
+at(pcb(0.06, 0.03, 0x1e3f8a), 0, 0, 0, buck);
+at(cyl(0.008, 0.008, 0.008, 0x2b2b2b), -0.008, 0.005, 0, buck);
+at(cyl(0.004, 0.004, 0.01, 0x222a55), 0.016, 0.006, 0.007, buck); at(cyl(0.004, 0.004, 0.01, 0x222a55), 0.016, 0.006, -0.007, buck);
+at(chip(0.01, 0.01, 0.003), 0.004, 0.002, -0.008, buck);
+at(buck, -0.075, 0.009, 0.045, device);
+part(buck, "Buck 12→6 V", "<b>12 V → 6 V, ≥5 A buck regülatör</b><br>İki servoyu besler (çift stall'da ~5 A). Servolar asla Nano/USB 5 V hattından beslenmez; aksi halde akım darbeleri Nano'yu resetler.", V(-0.12, 0.07, 0.08), V(0, 0.012, 0));
+
+// --- Güvenlik rölesi K1 ---
+const relay = new THREE.Group();
+at(pcb(0.05, 0.026, 0x1e3f8a), 0, 0, 0, relay);
+at(box(0.019, 0.015, 0.016, 0x2156c9), -0.006, 0.0085, 0, relay);
+at(box(0.012, 0.008, 0.01, 0x1a7d3c), 0.018, 0.0048, 0, relay);
+const relayLed = at(box(0.002, 0.001, 0.002, 0x330000, {emissive: 0x000000, unique: true}), 0.008, 0.0013, 0.009, relay);
+at(relay, -0.035, 0.009, 0.004, device);
+part(relay, "Güvenlik rölesi K1", "<b>K1 güvenlik rölesi (12 V bobin, 10 A kontak)</b><br>Lazerin 12 V beslemesini fiziksel olarak açıp kapar. Bobini IRLZ44N sürer; MOSFET'in gate'i ise şarj pompasından beslenir — yani röle yalnızca Nano <b>canlıyken ve ARM iken</b> kare dalga ürettiğinde çeker. Nano kilitlenirse ~0.1 s'de düşer.", V(-0.02, 0.1, 0.02), V(0, 0.018, 0));
+
+// --- Şarj pompası (delikli pertinaks) ---
+const pump = new THREE.Group();
+at(pcb(0.03, 0.022, 0x9c6b3a), 0, 0, 0, pump);
+at(box(0.004, 0.006, 0.003, 0xc9a227), -0.008, 0.004, 0.004, pump); at(box(0.004, 0.006, 0.003, 0xc9a227), -0.002, 0.004, 0.004, pump);
+at(cyl(0.0012, 0.0012, 0.005, 0xcc5533), 0.005, 0.003, -0.004, pump); at(cyl(0.0012, 0.0012, 0.005, 0xcc5533), 0.009, 0.003, -0.004, pump);
+at(box(0.01, 0.012, 0.004, 0x111111), 0.008, 0.007, 0.006, pump);                       // IRLZ44N
+at(pump, 0.025, 0.009, 0.0, device);
+part(pump, "Şarj pompası + MOSFET", "<b>Şarj pompası (2× 1N4148, 2× 1 µF, 47 kΩ) + IRLZ44N</b><br>Nano D12 sürekli 1 kHz kare dalga üretirse gate ~3.5 V olur ve röle çeker. Pin HIGH ya da LOW'da takılı kalırsa kondansatör DC geçirmez → röle düşer. 'MCU kilitlendi' arızasına karşı donanımsal kilit.", V(0.04, 0.12, 0.0), V(0, 0.012, 0));
+
+// --- Seviye dönüştürücü ---
+const ls = new THREE.Group(); at(pcb(0.016, 0.014, 0x1e3f8a), 0, 0, 0, ls); at(chip(0.004, 0.004), 0, 0.0012, 0, ls);
+at(ls, -0.07, 0.009, 0.075, device);
+part(ls, "Seviye dönüştürücü", "<b>BSS138 seviye dönüştürücü</b><br>LD2410'un 3.3 V çıkışını Nano'nun 5 V girişine uyarlar. HV tarafındaki 10 kΩ pull-up sayesinde kablo koparsa giriş HIGH = HATA olur (fail-safe).", V(-0.05, 0.09, 0.09), V(0, 0.008, 0));
+
+// --- Yıldız GND barası ---
+const bar = new THREE.Group();
+at(box(0.05, 0.006, 0.008, 0xc9a227, {metalness: 0.85, roughness: 0.3}), 0, 0, 0, bar);
+for (let i = 0; i < 5; i++) at(cyl(0.0022, 0.0022, 0.004, 0xd9dde3, {metalness: 0.9}), -0.02 + i * 0.01, 0.005, 0, bar);
+at(bar, -0.0, 0.004, -0.083, device);
+part(bar, "Yıldız GND barası", "<b>Yıldız (tek nokta) GND barası</b><br>PSU(−), buck(−), servolar, lazer, röle sürücü ve Nano GND'si tek noktada birleşir. Yüksek akım dönüşleri Nano'nun GND pininden geçmez; böylece servo titremesi, Nano reseti ve lazer TTL'sinin yanlışlıkla tetiklenmesi önlenir.", V(0, 0.07, -0.1), V(0, 0.008, 0));
+
+// --- Sigortalar ---
+const fuses = new THREE.Group();
+[0xd9363e, 0x2f6fd6, 0xe0b400].forEach((c, i) => { at(box(0.014, 0.01, 0.009, 0x222222), 0, 0, i * 0.012, fuses); at(box(0.008, 0.006, 0.006, c), 0, 0.007, i * 0.012, fuses); });
+at(fuses, -0.1, 0.006, -0.003, device);
+part(fuses, "Sigortalar F1–F3", "<b>Bıçak sigortalar</b>: F1 3 A (lazer dalı), F2 5 A (servo buck), F3 1 A (röle bobini/fan). Her dal ayrı korunur.", V(-0.1, 0.06, 0.02), V(0, 0.012, 0.012));
+
+// --- Servo kondansatörü ---
+const cap = cyl(0.008, 0.008, 0.025, 0x1b1b1f); at(cap, 0.09, 0.0125, 0.06, device);
+at(cyl(0.0081, 0.0081, 0.004, 0x6d7380), 0, 0.011, 0, cap);
+part(cap, "2200 µF kondansatör", "<b>2200 µF / 16 V low-ESR</b><br>Servo hattında, servolara yakın. Hareket başlangıcındaki akım darbelerini yerel olarak karşılar; hat gerilimi düşmez.", V(0.08, 0.08, 0.06), V(0, 0.016, 0));
+
+// --- Kapak üstü: E-stop, anahtar, LED, buzzer ---
+const estop = new THREE.Group();
+at(cyl(0.017, 0.017, 0.01, 0xf2c200), 0, 0.005, 0, estop);
+const mush = at(cyl(0.016, 0.019, 0.012, 0xd61f26, {roughness: 0.35}), 0, 0.017, 0, estop);
+at(estop, -0.085, BH, 0.045, device);
+part(estop, "E-STOP", "<b>Acil durdurma (2× NC kontak, kilitlemeli)</b><br>NC1 kontağı lazerin 12 V hattını <b>doğrudan</b> keser — yazılım ne yaparsa yapsın. NC2 kontağı Nano D2'ye durumu bildirir; hata mandallanır ve sistem ancak elle temizlenince tekrar kurulabilir.", V(-0.04, 0.08, 0.03), V(0, 0.03, 0));
+const keysw = new THREE.Group();
+at(cyl(0.009, 0.009, 0.008, 0xb8bcc2, {metalness: 0.8}), 0, 0.004, 0, keysw);
+at(box(0.003, 0.02, 0.012, 0xd9b84a, {metalness: 0.8}), 0, 0.018, 0, keysw);
+at(keysw, -0.05, BH, 0.06, device);
+part(keysw, "Anahtarlı şalter", "<b>Anahtarlı şalter (2 kutup)</b><br>Bir kutbu lazer 12 V hattında, diğeri Nano D7'de. Anahtar çıkarılınca sistem kurulamaz (yetkisiz/kaza ile çalıştırmaya karşı).", V(-0.02, 0.07, 0.04), V(0, 0.03, 0));
+const armLed = at(cyl(0.004, 0.004, 0.006, 0x330808, {emissive: 0x000000, unique: true}), -0.022, BH + 0.003, 0.072, device);
+part(armLed, "ARM LED", "<b>ARMED göstergesi (kırmızı LED, D6)</b><br>Lazer kurulduğunda yanar.", V(0, 0.06, 0.04), V(0, 0.01, 0));
+const buzzer = at(cyl(0.006, 0.006, 0.008, 0x111111), -0.022, BH + 0.004, 0.05, device);
+part(buzzer, "Buzzer", "<b>Aktif buzzer (D5)</b><br>ARM sonrası 1.5 s uyarı verir; firmware bu sürede atışı reddeder.", V(0, 0.06, 0.03), V(0, 0.012, 0));
+
+// --- Ön yüz: LD2410 mmWave ---
+const ld = new THREE.Group(); at(box(0.022, 0.016, 0.0016, 0x1f7a3a), 0, 0, 0, ld); at(box(0.012, 0.008, 0.001, 0xc9a227, {metalness: 0.8}), 0, 0, 0.0012, ld);
+at(ld, -0.07, 0.05, BD / 2 + 0.001, device);
+part(ld, "LD2410 varlık sensörü", "<b>HLK-LD2410C 24 GHz mmWave</b><br>Hareket eden <b>ve hareketsiz duran</b> insanı/evcil hayvanı algılar. OUT=HIGH olduğunda Nano ARM'ı ve atışı reddeder (D8).", V(-0.03, 0.02, 0.08), V(0, 0.012, 0));
+
+// --- Kamera (SABİT) ---
+const camMount = new THREE.Group();
+at(box(0.004, 0.03, 0.02, 0x7a828f, {metalness: 0.6}), 0, 0.015, -0.006, camMount);     // L braket
+const camBoard = new THREE.Group();
+at(box(0.025, 0.024, 0.0015, 0x1f7a3a), 0, 0, 0, camBoard);
+at(box(0.0085, 0.0085, 0.004, 0x111111), 0, 0.002, 0.0028, camBoard);
+at(cyl(0.0035, 0.0035, 0.004, 0x0d0f12, {}, 20).rotateX(Math.PI / 2), 0, 0.002, 0.006, camBoard);
+at(cyl(0.0022, 0.0022, 0.0006, 0x2a4b7c, {metalness: 0.9, roughness: 0.1}, 20).rotateX(Math.PI / 2), 0, 0.002, 0.0082, camBoard);
+at(camBoard, 0, 0.022, 0.004, camMount);
+at(camMount, -0.04, BH, 0.072, device);
+part(camMount, "Camera Module 3 (sabit)", "<b>Raspberry Pi Camera Module 3</b> (IMX708, HFOV ≈ 66°)<br>Kasaya <b>sabit</b> monte edilir, taretle birlikte dönmez — duvarın tamamını sürekli görür. Odak, pozlama ve beyaz dengesi kilitlenir. Taret, kameranın ~8 cm sağında ve ~4 cm üstündedir; bu paralaks homografi kalibrasyonuyla yazılımsal olarak çözülür. 15→22 pin CSI kablosuyla Pi 5'e bağlanır.", V(-0.04, 0.05, 0.09), V(0, 0.04, 0));
+const LENS_LOCAL = V(0, 0.024, 0.0125);   // camMount içinde lens merkezi
+
+/* ======================================================================
+ *  TARET: pan servo (kasada) → rulman → U braket (pan) → tilt servo → kafa (tilt)
+ * ====================================================================== */
+const PAN_X = 0.045, PAN_Z = 0.025;
+const panServo = new THREE.Group();
+at(box(0.04, 0.038, 0.02, 0x1b1c20), 0, 0, 0, panServo);
+at(box(0.054, 0.0025, 0.02, 0x1b1c20), 0, 0.012, 0, panServo);                         // kulaklar
+at(cyl(0.006, 0.006, 0.005, 0xd0d4da, {metalness: 0.7}), 0.01, 0.021, 0, panServo);     // çıkış mili
+at(panServo, PAN_X - 0.01, BH - 0.019, PAN_Z, device);
+part(panServo, "Pan servo (DS3218)", "<b>Pan servo — DS3218MG 180°</b><br>Kasaya dikey gömülüdür; çıkış mili yukarı bakar ve tüm üst grubu <b>dikey eksen</b> etrafında sağa-sola döndürür. 500–2500 µs ↔ 0–180°, 11.1 µs/°. 6 V'tan beslenir, D9'dan PWM alır. Üst yük rulmana biner, servonun yatağına değil.", V(0, 0.0, 0), V(0.035, 0, 0));
+const bearing = at(cyl(0.03, 0.03, 0.008, 0xaeb4bd, {metalness: 0.85, roughness: 0.25}), PAN_X, BH + 0.004, PAN_Z, device);
+part(bearing, "Pan rulmanı", "<b>Rulmanlı döner tabla (lazy-susan)</b><br>Taret ağırlığını taşır; pan servosu yalnızca döndürme torku verir. Eksenel sallantıyı (wobble) ve servo yatağının aşınmasını önler. Kablolar ortasındaki delikten geçer.", V(0, 0.03, 0), V(0.035, 0, 0));
+
+const panGroup = new THREE.Group(); panGroup.position.set(PAN_X, BH + 0.008, PAN_Z); device.add(panGroup);
+const horn = new THREE.Group(); at(cyl(0.012, 0.012, 0.003, 0xf2f2f2), 0, 0.0015, 0, horn);
+for (let a = 0; a < 4; a++) { const arm = box(0.032, 0.003, 0.006, 0xf2f2f2); arm.rotation.y = a * Math.PI / 4; at(arm, 0, 0.0015, 0, horn); }
+panGroup.add(horn);
+const ubr = new THREE.Group();
+at(box(0.06, 0.003, 0.034, 0xb9c0ca, {metalness: 0.75, roughness: 0.3}), 0, 0.0045, 0, ubr);
+at(box(0.003, 0.062, 0.034, 0xb9c0ca, {metalness: 0.75, roughness: 0.3}), -0.0285, 0.035, 0, ubr);
+at(box(0.003, 0.062, 0.034, 0xb9c0ca, {metalness: 0.75, roughness: 0.3}), 0.0285, 0.035, 0, ubr);
+panGroup.add(ubr);
+const TILT_Y = 0.05;
+const tiltServo = new THREE.Group();
+at(box(0.02, 0.04, 0.038, 0x1b1c20), 0, 0, 0, tiltServo);
+at(box(0.02, 0.054, 0.0025, 0x1b1c20), 0, 0, 0.0, tiltServo);
+at(tiltServo, 0.041, TILT_Y, 0.0, panGroup);
+const tiltHorn = at(cyl(0.011, 0.011, 0.003, 0xf2f2f2).rotateZ(Math.PI / 2), 0.0315, TILT_Y, 0, panGroup);
+part(tiltServo, "Tilt servo (DS3218)", "<b>Tilt servo — DS3218MG 180°</b><br>U braketin yan plakasına yatay monte edilir ve pan ile birlikte döner. Kafayı <b>yatay eksen</b> etrafında yukarı-aşağı eğer (+ açı = aşağı). D10'dan PWM alır. Pan × tilt kombinasyonu ışını duvardaki herhangi bir noktaya yöneltir.", V(0.04, 0.0, 0), V(0.012, 0.025, 0));
+part(ubr, "U braket", "<b>Alüminyum U braket</b><br>Pan servosunun horn'una vidalanır; iki yan plakası tilt eksenini taşır. Bir tarafta tilt servosu, diğer tarafta karşı rulman/pim vardır.", V(0, 0.0, 0), V(-0.032, 0.06, 0));
+
+const tiltGroup = new THREE.Group(); tiltGroup.position.set(0, TILT_Y, 0); panGroup.add(tiltGroup);
+// lazer kafası
+const head = new THREE.Group();
+at(box(0.033, 0.033, 0.045, 0x15161a, {metalness: 0.5, roughness: 0.45}), 0, 0, 0, head);
+for (let i = 0; i < 5; i++) at(box(0.0015, 0.039, 0.04, 0x202227, {metalness: 0.5}), -0.012 + i * 0.006, 0, -0.001, head);
+const laserFan = at(cyl(0.013, 0.013, 0.003, 0x2d3036).rotateX(Math.PI / 2), 0, 0, -0.024, head);
+at(cyl(0.0065, 0.0065, 0.018, 0xb08d57, {metalness: 0.85, roughness: 0.3}).rotateX(Math.PI / 2), 0, 0, 0.031, head);
+const lensGlass = at(cyl(0.0045, 0.0045, 0.001, 0x6f8dff, {emissive: 0x000000, metalness: 0.2, roughness: 0.05, unique: true}).rotateX(Math.PI / 2), 0, 0, 0.0405, head);
+at(box(0.02, 0.008, 0.015, 0x1e3f8a), 0, -0.02, -0.008, head);   // dahili sürücü kartı
+tiltGroup.add(head);
+part(head, "2.5 W 450 nm lazer modülü", "<b>2.5 W (optik) 450 nm lazer modülü</b><br>Dahili akım sürücülü, fanlı soğutucu, ayarlanabilir odak lensi. 12 V (K1 rölesi üzerinden) ile beslenir; ışını D3'ten gelen TTL sinyali açar (20–60 ms darbe). <b>SINIF 4</b>: doğrudan ve yansıyan ışın kalıcı göz hasarı yapar.", V(0, 0.05, 0), V(-0.02, 0.025, 0));
+const pointerMod = new THREE.Group();
+at(cyl(0.004, 0.004, 0.026, 0x9ea4ad, {metalness: 0.8}).rotateX(Math.PI / 2), 0, 0, 0, pointerMod);
+const pointerTip = at(cyl(0.0025, 0.0025, 0.001, 0x551111, {emissive: 0x000000, unique: true}).rotateX(Math.PI / 2), 0, 0, 0.0135, pointerMod);
+at(pointerMod, 0, 0.0215, 0.012, tiltGroup);
+part(pointerMod, "Nişan lazeri 650 nm", "<b>650 nm, ≤1 mW (Sınıf 2) nişan lazeri</b><br>Güç ışınına <b>paralel</b> monte edilir. Kalibrasyon ve atış öncesi doğrulama bu kırmızı noktayla yapılır; güç lazeri asla 'nişan almak' için yakılmaz. İki ışın paralel olduğundan duvarda sabit bir ofset oluşur — kalibrasyonda ölçülür.", V(0, 0.07, 0), V(0, 0.008, 0));
+
+/* ======================================================================
+ *  Kablolar (renk = işlev) ve sinyal akışı
+ * ====================================================================== */
+const wires = [];
+function wire(parent, pts, color, tag, r = 0.0011) {
+  const curve = new THREE.CatmullRomCurve3(pts.map(p => V(...p)));
+  const m = new THREE.MeshStandardMaterial({color, roughness: 0.5, emissive: color, emissiveIntensity: 0});
+  const mesh = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(16, pts.length * 12), r, 6, false), m);
+  mesh.userData.part = "Kablo: " + tag; parent.add(mesh); wires.push({mesh, tag, m}); return mesh;
+}
+const RED = 0xd8272e, BLK = 0x1a1a1a, ORG = 0xff8a1f, BLU = 0x2f6fff, YEL = 0xf2d21b, GRN = 0x22c55e, GRY = 0x8a929e, WHT = 0xeeeeee, PNK = 0xff5fa2;
+const BX = [PAN_X, BH + 0.002, PAN_Z];
+// 12 V ana
+wire(device, [[-0.02, 0.03, -0.02], [-0.06, 0.03, -0.005], [-0.095, 0.02, -0.003]], RED, "12V");
+wire(device, [[-0.1, 0.012, 0.009], [-0.105, 0.03, 0.03], [-0.1, 0.018, 0.04]], RED, "12V");
+// lazer 12 V: sigorta → E-stop → anahtar → röle → rulman
+wire(device, [[-0.1, 0.012, -0.003], [-0.105, 0.05, 0.02], [-0.085, BH - 0.004, 0.045]], RED, "12V_LZR");
+wire(device, [[-0.085, BH - 0.004, 0.045], [-0.07, BH - 0.01, 0.06], [-0.05, BH - 0.004, 0.06]], RED, "12V_LZR");
+wire(device, [[-0.05, BH - 0.004, 0.06], [-0.045, 0.05, 0.03], [-0.035, 0.02, 0.004]], RED, "12V_LZR");
+wire(device, [[-0.02, 0.02, 0.004], [0.02, 0.06, 0.01], [PAN_X - 0.004, BH - 0.002, PAN_Z - 0.004], [PAN_X - 0.004, BH + 0.01, PAN_Z - 0.004]], RED, "12V_LZR");
+// 6 V servo
+wire(device, [[-0.05, 0.012, 0.05], [0.0, 0.03, 0.068], [0.09, 0.03, 0.06], [PAN_X, 0.06, PAN_Z + 0.01]], PNK, "6V");
+// GND
+wire(device, [[-0.02, 0.03, -0.03], [-0.015, 0.012, -0.075], [-0.01, 0.008, -0.083]], BLK, "GND");
+wire(device, [[-0.06, 0.012, 0.035], [-0.03, 0.006, -0.05], [0.0, 0.008, -0.083]], BLK, "GND");
+wire(device, [[0.0, 0.012, 0.038], [0.01, 0.006, -0.03], [0.01, 0.008, -0.083]], BLK, "GND");
+wire(device, [[0.02, 0.012, 0.0], [0.02, 0.006, -0.06], [0.02, 0.008, -0.083]], BLK, "GND");
+// servo sinyalleri
+wire(device, [[0.008, 0.012, 0.038], [0.02, 0.03, 0.03], [PAN_X - 0.02, 0.05, PAN_Z]], ORG, "SERVO");
+wire(device, [[0.012, 0.012, 0.038], [0.03, 0.06, 0.02], [PAN_X + 0.004, BH - 0.002, PAN_Z - 0.004], [PAN_X + 0.004, BH + 0.01, PAN_Z - 0.004]], ORG, "SERVO");
+// lazer TTL
+wire(device, [[0.004, 0.012, 0.038], [0.02, 0.07, 0.02], [PAN_X, BH - 0.002, PAN_Z + 0.004], [PAN_X, BH + 0.01, PAN_Z + 0.004]], BLU, "TTL");
+// şarj pompası
+wire(device, [[0.016, 0.012, 0.046], [0.03, 0.02, 0.025], [0.025, 0.014, 0.008]], GRN, "PUMP");
+wire(device, [[0.012, 0.014, -0.002], [0.0, 0.02, 0.0], [-0.02, 0.016, 0.004]], GRN, "PUMP");
+// güvenlik girişleri
+wire(device, [[-0.085, BH - 0.004, 0.045], [-0.04, 0.04, 0.05], [-0.006, 0.012, 0.052]], YEL, "SENSE");
+wire(device, [[-0.05, BH - 0.004, 0.06], [-0.03, 0.05, 0.06], [-0.003, 0.012, 0.052]], YEL, "SENSE");
+wire(device, [[-0.07, 0.05, BD / 2 - 0.002], [-0.07, 0.03, 0.08], [-0.07, 0.012, 0.075]], YEL, "SENSE");
+wire(device, [[-0.064, 0.012, 0.075], [-0.03, 0.02, 0.07], [-0.01, 0.012, 0.052]], YEL, "SENSE");
+// USB (Pi ↔ Nano) ve CSI şerit kablo
+wire(device, [[-0.024, 0.012, 0.045], [-0.04, 0.03, 0.02], [0.0, 0.05, -0.01], [0.11, 0.03, -0.02], [0.095, 0.0195, -0.063]], GRY, "USB", 0.0018);
+wire(device, [[-0.04, BH + 0.01, 0.068], [-0.04, BH - 0.01, 0.06], [-0.01, 0.04, 0.0], [0.024, 0.016, -0.03]], WHT, "CSI", 0.0016);
+// dış güç kabloları
+wire(device, [[0.02, 0.016, -0.075], [0.03, 0.03, -0.1], [0.05, 0.01, -0.2], [0.1, 0.0, -0.28]], BLK, "PI_PWR", 0.0022);
+wire(device, [[-0.1, 0.02, -0.07], [-0.11, 0.03, -0.1], [-0.15, 0.005, -0.2], [-0.2, 0.0, -0.28]], BLK, "MAINS", 0.003);
+// pan grubu içi: rulman merkezinden tilt servosuna ve tilt eksenine
+wire(panGroup, [[0.004, 0.0, -0.004], [0.015, 0.02, -0.012], [0.035, TILT_Y - 0.01, -0.014]], ORG, "SERVO");
+wire(panGroup, [[0.0, 0.0, 0.006], [0.018, 0.015, 0.014], [0.034, TILT_Y - 0.012, 0.012]], PNK, "6V");
+wire(panGroup, [[-0.004, 0.0, -0.004], [-0.02, 0.02, -0.02], [-0.022, TILT_Y - 0.002, -0.017]], RED, "12V_LZR");
+wire(panGroup, [[0.0, 0.0, 0.004], [-0.018, 0.02, 0.0], [-0.022, TILT_Y - 0.002, -0.013]], BLU, "TTL");
+// tilt grubu içi: eksenden lazer sürücüsüne
+wire(tiltGroup, [[-0.022, -0.002, -0.017], [-0.02, -0.01, -0.028], [-0.004, -0.02, -0.018]], RED, "12V_LZR");
+wire(tiltGroup, [[-0.022, -0.002, -0.013], [-0.018, -0.014, -0.022], [0.004, -0.02, -0.016]], BLU, "TTL");
+
+/* ======================================================================
+ *  Işınlar, noktalar, kamera FOV, sinek
+ * ====================================================================== */
+function beam(color, radius, opacity) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 1, 10, 1, true),
+    new THREE.MeshBasicMaterial({color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending}));
+  m.visible = false; scene.add(m); return m;
+}
+const redBeam = beam(0xff2020, 0.0009, 0.5), blueBeam = beam(0x2a4dff, 0.002, 0.95), blueGlow = beam(0x1f3cff, 0.008, 0.3);
+function glowSprite(color, size) {
+  const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "#fff"); gr.addColorStop(0.25, color); gr.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending}));
+  s.scale.set(size, size, 1); s.visible = false; scene.add(s); return s;
+}
+const redDot = glowSprite("rgba(255,40,40,1)", 0.03), blueFlash = glowSprite("rgba(90,130,255,1)", 0.14);
+function setBeam(m, a, b) {
+  const d = b.clone().sub(a), L = d.length();
+  m.position.copy(a).add(b).multiplyScalar(0.5); m.scale.set(1, L, 1);
+  m.quaternion.setFromUnitVectors(V(0, 1, 0), d.normalize());
+}
+// hedef halkası ve beklenen nokta işareti
+function ring(color, r, w) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(r - w, r, 48), new THREE.MeshBasicMaterial({color, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false}));
+  m.visible = false; scene.add(m); return m;
+}
+const targetRing = ring(0xffc400, 0.03, 0.004), expectRing = ring(0xff6060, 0.012, 0.002);
+const scorch = new THREE.Mesh(new THREE.CircleGeometry(0.004, 16), new THREE.MeshBasicMaterial({color: 0x3a2a1c}));
+scorch.visible = false; scene.add(scorch);
+
+// kamera FOV (HFOV 66°, 16:9)
+const HFOV = 66, ASPECT = 16 / 9, VFOV = 2 * Math.atan(Math.tan(HFOV / 2 * D2R) / ASPECT) * R2D;
+const devCam = new THREE.PerspectiveCamera(VFOV, ASPECT, 0.01, 10);
+const fovGroup = new THREE.Group(); scene.add(fovGroup);
+const fovLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: 0x3ecf8e, transparent: true, opacity: 0.8}));
+const fovFace = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({color: 0x3ecf8e, transparent: true, opacity: 0.06, side: THREE.DoubleSide, depthWrite: false}));
+const fovRect = new THREE.LineLoop(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color: 0x3ecf8e}));
+fovGroup.add(fovLines, fovFace, fovRect);
+function lensWorld() { return camMount.localToWorld(LENS_LOCAL.clone()); }
+function updateFov() {
+  const o = lensWorld(), tx = Math.tan(HFOV / 2 * D2R), ty = Math.tan(VFOV / 2 * D2R);
+  const corners = [[-tx, -ty], [tx, -ty], [tx, ty], [-tx, ty]].map(([a, b]) => { const d = V(a, b, 1); const s = (WALL_Z - 0.003 - o.z) / d.z; return o.clone().add(d.multiplyScalar(s)); });
+  const seg = []; corners.forEach(c => seg.push(o.x, o.y, o.z, c.x, c.y, c.z));
+  fovLines.geometry.setAttribute("position", new THREE.Float32BufferAttribute(seg, 3));
+  const tri = []; for (let i = 0; i < 4; i++) { const a = corners[i], b = corners[(i + 1) % 4]; tri.push(o.x, o.y, o.z, a.x, a.y, a.z, b.x, b.y, b.z); }
+  fovFace.geometry.setAttribute("position", new THREE.Float32BufferAttribute(tri, 3));
+  fovRect.geometry.setAttribute("position", new THREE.Float32BufferAttribute(corners.flatMap(c => [c.x, c.y, c.z]), 3));
+  devCam.position.copy(o); devCam.lookAt(o.x, o.y, o.z + 1);
+}
+
+// sinek
+const fly = new THREE.Group();
+const flyBody = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), mat(0x141414, {roughness: 0.5}));
+flyBody.scale.set(0.0045, 0.0022, 0.002); fly.add(flyBody);
+const flyHead = new THREE.Mesh(new THREE.SphereGeometry(0.0016, 10, 8), mat(0x5a1010)); flyHead.position.x = 0.0045; fly.add(flyHead);
+const wingMat = new THREE.MeshStandardMaterial({color: 0xcfd8e6, transparent: true, opacity: 0.55, side: THREE.DoubleSide, roughness: 0.2});
+const wingL = new THREE.Mesh(new THREE.CircleGeometry(0.0035, 12), wingMat), wingR = wingL.clone();
+wingL.scale.set(1.2, 0.6, 1); wingR.scale.set(1.2, 0.6, 1);
+wingL.position.set(-0.002, 0.002, 0.0012); wingR.position.set(-0.002, -0.002, 0.0012); fly.add(wingL, wingR);
+fly.scale.setScalar(1.3); scene.add(fly);
+part(fly, "Sinek", "<b>Hedef: duvara konmuş ev sineği</b> (~7–9 mm)<br>Sistem uçan sineğe ateş etmez; ancak N kare boyunca hareketsiz kalınca hedef onaylanır. (Görünürlük için 1.3× büyütülmüş çizilmiştir.)", V(0, 0, 0), V(0, 0.01, 0));
+
+/* ======================================================================
+ *  Servo dinamiği (görselleştirme için yavaşlatılmış)
+ * ====================================================================== */
+const servo = {pan: 0, tilt: 0, tPan: 0, tTilt: 0, slew: 40};
+const servoMoving = () => Math.abs(servo.tPan - servo.pan) > 0.01 || Math.abs(servo.tTilt - servo.tilt) > 0.01;
+function stepServo(dt) {
+  const s = servo.slew * dt;
+  const mv1 = (c, t) => Math.abs(t - c) <= s ? t : c + Math.sign(t - c) * s;
+  servo.pan = mv1(servo.pan, servo.tPan); servo.tilt = mv1(servo.tilt, servo.tTilt);
+  panGroup.rotation.y = servo.pan * D2R; tiltGroup.rotation.x = servo.tilt * D2R;
+}
+function pivotWorld() { return tiltGroup.getWorldPosition(V(0, 0, 0)); }
+function aimAngles(P) {
+  const d = P.clone().sub(pivotWorld());
+  return [Math.atan2(d.x, d.z) * R2D, Math.atan2(-d.y, Math.hypot(d.x, d.z)) * R2D];
+}
+function rayToWall(origin, dir) { const s = (WALL_Z - 0.002 - origin.z) / dir.z; return s > 0 ? origin.clone().add(dir.clone().multiplyScalar(s)) : null; }
+function laserDir() { return V(0, 0, 1).applyQuaternion(tiltGroup.getWorldQuaternion(new THREE.Quaternion())).normalize(); }
+function beamOrigin() { return head.localToWorld(V(0, 0, 0.041)); }
+function pointerOrigin() { return pointerMod.localToWorld(V(0, 0, 0.014)); }
+
+/* ======================================================================
+ *  Angajman senaryosu (adımlar)
+ * ====================================================================== */
+const sig = {pointer: false, fire: false, armed: false, relay: false, buzzer: false, ttl: false, servoSig: false, usb: 0};
+let flyState = {mode: "hidden", p: V(0, 1, 1), from: V(0, 1, 1), land: V(0, 1, WALL_Z), t: 0, vy: 0};
+let aim = {true: [0, 0], cmd: [0, 0], expect: null};
+const POINTER_OFFSET = () => pointerOrigin().sub(beamOrigin());   // paralel ışın → duvarda sabit ofset
+
+const PH = [
+  {k: "scan", title: "1 · Tarama", dur: 1.6, desc: "Kamera kasaya sabit; taretle birlikte dönmez ve duvarın tamamını (yeşil görüş alanı) sürekli izler. Pi her karede yeni beliren koyu lekeleri arar. Taret ev konumunda (pan 0°, tilt 0°)."},
+  {k: "fly", title: "2 · Sinek geliyor ve konuyor", dur: 2.6, desc: "Uçan sinek hareket bulanıklığı ve sürekli konum değişimi nedeniyle hedef sayılmaz. Duvara konduğunda takip başlar."},
+  {k: "detect", title: "3 · Tespit ve durağanlık onayı", dur: 1.8, desc: "Referans farkı + black-hat ile küçük koyu leke bulunur. 12 ardışık karede (≈0.4 s) konum 2.5 pikselden az değişirse hedef ONAYLANIR (sarı → kırmızı halka)."},
+  {k: "compute", title: "4 · Piksel → pan/tilt açısı", dur: 1.6, desc: "Hedefin piksel koordinatı (u,v), kalibrasyonda bulunan 3×3 homografi H ile tan(pan) ve tan(tilt) düzlemine çevrilir. Kamera ile taret arasındaki ~8 cm'lik paralaks bu dönüşümün içinde zaten çözülmüştür."},
+  {k: "approach", title: "5 · Anti-boşluk yaklaşımı", dur: 0, desc: "Pi, Arduino'ya $M komutu gönderir; Nano D9/D10'dan PWM darbe genişliğini değiştirir. Servolar önce hedefin biraz altına/soluna gider, sonra hep AYNI yönden hedefe yaklaşır → dişli boşluğu ve ölü bant tekrarlanabilir olur. (Görsel için adım abartıldı, gerçekte 0.8°.)"},
+  {k: "pointer", title: "6 · Kırmızı nişan noktası ile ölçüm", dur: 1.8, desc: "Güç lazeri DEĞİL, <1 mW kırmızı nişan lazeri yanar. Kamera noktayı alt-piksel hassasiyetle bulur. Içi boş kırmızı halka noktanın olması gereken yer (hedef + paralel ışın ofseti); servo kusurları yüzünden nokta henüz oraya oturmadı."},
+  {k: "correct", title: "7 · Kapalı çevrim düzeltme", dur: 0, desc: "Ölçülen hata açıya çevrilir ve küçük bir düzeltme komutu gönderilir: θ ← θ + f(hedef) − f(ölçülen). Hata ≤ 2 piksel olmadan atış izni verilmez."},
+  {k: "arm", title: "8 · ARM: güvenlik zinciri kapanıyor", dur: 1.8, desc: "Nano ARM olur: ARM LED'i yanar, buzzer 1.5 s uyarır, D12'den 1 kHz kare dalga başlar → şarj pompası MOSFET'i açar → K1 rölesi çeker → lazere 12 V gelir (E-stop ve anahtar kapalıysa). Varlık sensörü ve kamera hareket kapısı temiz olmalı."},
+  {k: "fire", title: "9 · ATEŞ (450 nm darbe)", dur: 0.9, desc: "Nişan lazeri kapanır, Nano D3 TTL hattını HIGH yapar ve süreyi kendisi sayar. Gerçekte 40 ms sürer (burada görülebilmesi için yavaşlatıldı); 60 ms'yi aşamaz, servolar hareket halindeyse firmware reddeder."},
+  {k: "verify", title: "10 · Doğrulama ve DISARM", dur: 1.6, desc: "Kamera hedefin kaybolduğunu doğrular, atış noktası 'harcanmış' olarak işaretlenir ve referans görüntü o bölgede yenilenir. Röle bırakılır, lazer enerjisizdir."},
+  {k: "home", title: "11 · Ev konumuna dönüş", dur: 0, desc: "Taret ev konumuna döner ve tarama yeniden başlar."},
+];
+let phase = 0, phT = 0, playing = true, speed = 1, manual = false, stepReq = false;
+const stepsEl = document.getElementById("steps");
+stepsEl.innerHTML = PH.map(p => `<li>${p.title.replace(/^\d+ · /, "")}</li>`).join("");
+
+function pickLanding() {
+  const cands = [];
+  for (let i = 0; i < 20; i++) {
+    const p = V(-0.45 + Math.random() * 0.8, 0.95 + Math.random() * 0.45, WALL_Z - 0.003);
+    if (Math.abs(p.x - 0.55) < 0.15 && Math.abs(p.y - 0.62) < 0.15) continue;
+    cands.push(p);
+  }
+  return cands[0];
+}
+function enterPhase(i) {
+  phase = i; phT = 0; const k = PH[i].k;
+  [...stepsEl.children].forEach((li, j) => li.classList.toggle("cur", j === i));
+  document.getElementById("phTitle").textContent = PH[i].title;
+  document.getElementById("phDesc").textContent = PH[i].desc;
+  if (k === "scan") { targetRing.visible = false; expectRing.visible = false; sig.armed = sig.relay = false; flyState.mode = "hidden"; fly.visible = false; }
+  if (k === "fly") {
+    flyState.land = pickLanding();
+    flyState.from = V(flyState.land.x + (Math.random() < 0.5 ? -0.7 : 0.7), flyState.land.y + 0.25, 0.7);
+    flyState.mode = "flying"; flyState.t = 0; fly.visible = true;
+  }
+  if (k === "detect") { targetRing.visible = true; targetRing.material.color.set(0xffc400); targetRing.position.copy(flyState.land).setZ(WALL_Z - 0.004); targetRing.rotation.y = Math.PI; }
+  if (k === "compute") { aim.true = aimAngles(flyState.land); sig.usb = 1; }
+  if (k === "approach") {
+    // servo kusuru: komut doğru olsa da ~1° sapma (kazanç/sıfır/ölü bant)
+    aim.err = [(Math.random() < 0.5 ? -1 : 1) * (0.7 + Math.random() * 0.5), (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.4)];
+    aim.stage = 0; servo.tPan = aim.true[0] - 4; servo.tTilt = aim.true[1] - 4; sig.servoSig = true; sig.usb = 1;
+  }
+  if (k === "pointer") {
+    sig.pointer = true;
+    aim.expect = flyState.land.clone().add(POINTER_OFFSET()); aim.expect.z = WALL_Z - 0.004;
+    expectRing.position.copy(aim.expect); expectRing.rotation.y = Math.PI; expectRing.visible = true;
+  }
+  if (k === "correct") { servo.tPan = aim.true[0]; servo.tTilt = aim.true[1]; sig.servoSig = true; sig.usb = 1; }
+  if (k === "arm") { sig.armed = true; sig.relay = true; sig.buzzer = true; }
+  if (k === "fire") { sig.pointer = false; sig.fire = true; sig.ttl = true; expectRing.visible = false; }
+  if (k === "verify") { sig.fire = sig.ttl = false; flyState.mode = "falling"; flyState.vy = 0; sig.armed = false; sig.relay = false; targetRing.material.color.set(0x3ecf8e); }
+  if (k === "home") { targetRing.visible = false; servo.tPan = 0; servo.tTilt = 0; sig.servoSig = true; }
+}
+function updatePhase(dt) {
+  phT += dt; const p = PH[phase];
+  if (p.k === "fly") {
+    const u = Math.min(1, phT / (p.dur * 0.85)), e = 1 - Math.pow(1 - u, 2);
+    const ctrl = flyState.from.clone().lerp(flyState.land, 0.5).add(V(0, 0.2, -0.1));
+    const a = flyState.from.clone().lerp(ctrl, e), b = ctrl.clone().lerp(flyState.land, e);
+    flyState.p = a.lerp(b, e).add(V(Math.sin(phT * 23) * 0.01 * (1 - u), Math.cos(phT * 17) * 0.01 * (1 - u), 0));
+    if (u >= 1) { flyState.mode = "sitting"; flyState.p.copy(flyState.land); }
+  }
+  if (p.k === "detect" && phT > 1.1) targetRing.material.color.set(0xff3b3b);
+  if (p.k === "approach") {
+    if (!servoMoving()) {
+      if (aim.stage === 0) { aim.stage = 1; servo.tPan = aim.true[0] + aim.err[0]; servo.tTilt = aim.true[1] + aim.err[1]; }
+      else { sig.servoSig = false; return next(); }
+    }
+    return;
+  }
+  if (p.k === "correct" || p.k === "home") { if (!servoMoving() && phT > 1.2) { sig.servoSig = false; if (p.k === "correct") sig.pointer = true; return next(); } return; }
+  if (p.k === "arm" && phT > 1.5) sig.buzzer = false;
+  if (p.k === "verify") { sig.usb = 0; }
+  if (p.dur && phT >= p.dur) next();
+}
+function next() {
+  const k = PH[phase].k;
+  if (k === "correct") { setTimeout(() => {}, 0); }
+  enterPhase((phase + 1) % PH.length);
+}
+
+/* ======================================================================
+ *  Etiketler
+ * ====================================================================== */
+const labelsEl = document.getElementById("labels");
+for (const p of parts) {
+  const el = document.createElement("div"); el.className = "lbl"; el.textContent = p.name; labelsEl.appendChild(el); p.el = el;
+}
+const tmpV = V(0, 0, 0);
+function updateLabels(w, h) {
+  const show = document.getElementById("optLabels").checked && currentView !== "kamera";
+  const camPos = cam.position;
+  for (const p of parts) {
+    if (!show || !p.obj.visible || (p.name === "Sinek" && (!fly.visible || flyState.mode === "falling" || flyState.mode === "hidden"))) { p.el.style.display = "none"; continue; }
+    p.obj.getWorldPosition(tmpV); tmpV.add(p.labelOffset);
+    const dist = tmpV.distanceTo(camPos);
+    // uzak görünümde küçük parçaların etiketlerini gizle (kalabalığı önler)
+    const small = !["Kasa", "Kalibrasyon kartı", "Sinek", "Camera Module 3 (sabit)", "2.5 W 450 nm lazer modülü", "Pan servo (DS3218)", "Tilt servo (DS3218)", "E-STOP", "Raspberry Pi 5", "12 V PSU", "Arduino Nano"].includes(p.name);
+    const far = !["Sinek", "Kalibrasyon kartı", "Camera Module 3 (sabit)", "2.5 W 450 nm lazer modülü", "Kasa", "Pan servo (DS3218)"].includes(p.name);
+    if ((small && dist > 0.75) || (far && dist > 1.1) || dist > 4) { p.el.style.display = "none"; continue; }
+    tmpV.project(cam);
+    if (tmpV.z > 1 || tmpV.x < -1.1 || tmpV.x > 1.1 || tmpV.y < -1.1 || tmpV.y > 1.1) { p.el.style.display = "none"; continue; }
+    p.el.style.display = "block"; p.el.style.left = ((tmpV.x + 1) / 2 * w) + "px"; p.el.style.top = ((1 - tmpV.y) / 2 * h) + "px";
+  }
+}
+
+/* ======================================================================
+ *  Kamera kontrolü (orbit) ve görünüm ön ayarları
+ * ====================================================================== */
+const orbit = {target: V(0, 0.9, 0.5), r: 2.2, theta: -2.6, phi: 1.15};
+let tween = null, currentView = "genel";
+const VIEWS = {
+  genel: {target: V(0.05, 0.98, 0.7), r: 1.75, theta: -2.05, phi: 1.2},
+  taret: {target: V(PAN_X, TABLE_Y + 0.12, PAN_Z), r: 0.32, theta: -2.35, phi: 1.12},
+  kutu: {target: V(0, TABLE_Y + 0.04, 0), r: 0.42, theta: -2.75, phi: 0.72},
+  yan: {target: V(PAN_X, TABLE_Y + 0.14, PAN_Z + 0.02), r: 0.36, theta: -1.5708, phi: 1.5},
+  ust: {target: V(PAN_X, TABLE_Y + 0.12, PAN_Z), r: 0.34, theta: -3.1, phi: 0.06},
+};
+function setView(name) {
+  currentView = name;
+  document.querySelectorAll("[data-view]").forEach(b => b.classList.toggle("on", b.dataset.view === name));
+  if (name === "kamera") return;
+  const v = VIEWS[name];
+  tween = {from: {target: orbit.target.clone(), r: orbit.r, theta: orbit.theta, phi: orbit.phi}, to: v, t: 0};
+}
+function applyOrbit() {
+  const {target, r, theta, phi} = orbit;
+  cam.position.set(target.x + r * Math.sin(phi) * Math.cos(theta), target.y + r * Math.cos(phi), target.z + r * Math.sin(phi) * Math.sin(theta));
+  cam.lookAt(target);
+}
+let drag = null; const pointers = new Map();
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  drag = {x: e.clientX, y: e.clientY, pan: e.button === 2 || e.shiftKey, moved: 0};
+  canvas.style.cursor = "grabbing";
+});
+canvas.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId); pointers.set(e.pointerId, {x: e.clientX, y: e.clientY});
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()], old = [...pointers.entries()].map(([id, p]) => id === e.pointerId ? prev : p);
+    const d1 = Math.hypot(old[0].x - old[1].x, old[0].y - old[1].y), d2 = Math.hypot(a.x - b.x, a.y - b.y);
+    if (d1 > 0) orbit.r = Math.min(6, Math.max(0.08, orbit.r * d1 / d2));
+    drag && (drag.moved += 10); return;
+  }
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+  if (currentView === "kamera") setView("genel");
+  tween = null;
+  if (drag.pan) {
+    const right = V(0, 0, 0).setFromMatrixColumn(cam.matrix, 0), up = V(0, 0, 0).setFromMatrixColumn(cam.matrix, 1), k = orbit.r * 0.0015;
+    orbit.target.add(right.multiplyScalar(-dx * k)).add(up.multiplyScalar(dy * k));
+  } else { orbit.theta += dx * 0.006; orbit.phi = Math.min(3.1, Math.max(0.03, orbit.phi - dy * 0.006)); }
+});
+const endPtr = e => {
+  pointers.delete(e.pointerId); canvas.style.cursor = "grab";
+  if (drag && drag.moved < 4 && pointers.size === 0) pick(e);
+  if (pointers.size === 0) drag = null;
+};
+canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", endPtr);
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+canvas.addEventListener("wheel", e => { e.preventDefault(); if (currentView === "kamera") setView("genel"); tween = null; orbit.r = Math.min(6, Math.max(0.08, orbit.r * Math.exp(e.deltaY * 0.001))); }, {passive: false});
+document.querySelectorAll("[data-view]").forEach(b => b.onclick = () => setView(b.dataset.view));
+
+/* Parça seçimi */
+const ray = new THREE.Raycaster(); let selected = null;
+function pick(e) {
+  const r = canvas.getBoundingClientRect();
+  ray.setFromCamera({x: ((e.clientX - r.left) / r.width) * 2 - 1, y: -((e.clientY - r.top) / r.height) * 2 + 1}, cam);
+  const hits = ray.intersectObjects(scene.children, true).filter(h => h.object.userData.part && h.object.visible);
+  // kasa kapalı değilse içini tıklanabilir bırak
+  const hit = hits.find(h => h.object.userData.part !== "Kasa" || !document.getElementById("optCase").checked) || null;
+  select(hit ? hit.object.userData.part : null);
+}
+const WIRE_INFO = {
+  "12V": "<b>Kırmızı — 12 V ana dağıtım</b><br>PSU'dan sigortalara ve buck regülatöre.",
+  "12V_LZR": "<b>Kırmızı — Lazer 12 V hattı</b><br>Sigorta F1 → E-stop NC1 → anahtar → K1 röle kontağı → rulman merkezinden yukarı → lazer modülü. Zincirdeki herhangi bir eleman açılırsa lazer fiziksel olarak enerjisizdir.",
+  "6V": "<b>Pembe — 6 V servo beslemesi</b><br>Buck çıkışı → 2200 µF → pan ve tilt servoları.",
+  "GND": "<b>Siyah — GND</b><br>Her dal kendi kablosuyla yıldız baraya döner.",
+  "SERVO": "<b>Turuncu — Servo PWM sinyali</b><br>Nano D9 → pan, D10 → tilt (220 Ω seri direnç). 20 ms'de bir 500–2500 µs darbe. Taret hareket ederken parlar.",
+  "TTL": "<b>Mavi — Lazer TTL/PWM</b><br>Nano D3 → 100 Ω → lazer sürücü girişi, 10 kΩ pull-down ile varsayılan KAPALI. Yalnızca atış anında HIGH.",
+  "PUMP": "<b>Yeşil — Şarj pompası</b><br>D12 kare dalga → pompa → MOSFET → röle bobini. ARM iken parlar.",
+  "SENSE": "<b>Sarı — Güvenlik girişleri</b><br>E-stop NC2 → D2, anahtar → D7, LD2410 → seviye dönüştürücü → D8. Hepsi fail-safe: kablo koparsa HATA.",
+  "USB": "<b>Gri — USB seri (Pi ↔ Nano)</b><br>115200 baud; $M/$P/$F/$A/$H komutları ve her 100 ms heartbeat. Ayrıca Nano'yu besler.",
+  "CSI": "<b>Beyaz — CSI şerit kablo</b><br>Kamera → Pi 5 (15→22 pin). Sürekli görüntü akışı.",
+  "PI_PWR": "<b>Siyah — Pi güç kablosu</b><br>Resmi 27 W USB-C adaptör (servo/lazer kaynağından ayrı).",
+  "MAINS": "<b>Siyah — PSU şebeke girişi</b>",
+};
+function select(name) {
+  selected = name;
+  for (const p of parts) p.el && p.el.classList.toggle("sel", p.name === name);
+  const info = document.getElementById("info");
+  if (!name) { info.textContent = "Bir parçaya tıklayın."; return; }
+  if (name.startsWith("Kablo: ")) { info.innerHTML = WIRE_INFO[name.slice(7)] || name; return; }
+  const p = parts.find(q => q.name === name); info.innerHTML = p ? p.info : name;
+}
+
+/* ======================================================================
+ *  Arayüz bağlantıları
+ * ====================================================================== */
+const $ = id => document.getElementById(id);
+$("btnPlay").onclick = () => { playing = !playing; $("btnPlay").textContent = playing ? "⏸ Duraklat" : "▶ Oynat"; $("btnPlay").classList.toggle("on", playing); };
+$("btnStep").onclick = () => { if (!manual) { if (PH[phase].dur === 0) { servo.pan = servo.tPan; servo.tilt = servo.tTilt; } next(); } };
+document.querySelectorAll("[data-speed]").forEach(b => b.onclick = () => { speed = +b.dataset.speed; document.querySelectorAll("[data-speed]").forEach(x => x.classList.toggle("on", x === b)); });
+$("optCase").onchange = e => { caseMat.opacity = e.target.checked ? 0.16 : 0.97; caseMat.depthWrite = !e.target.checked; caseEdges.visible = true; };
+$("optFov").onchange = e => { fovGroup.visible = e.target.checked; };
+$("optWires").onchange = e => { wires.forEach(w => w.mesh.visible = e.target.checked); };
+$("explode").oninput = e => {
+  const k = +e.target.value;
+  for (const p of parts) if (p.explode.lengthSq() > 0) p.obj.position.copy(p.base).addScaledVector(p.explode, k);
+  // taret grubu yukarı ayrılır
+  panGroup.position.y = BH + 0.008 + 0.06 * k; tiltGroup.position.y = TILT_Y + 0.05 * k;
+  head.position.y = 0.0; pointerMod.position.y = 0.0215 + 0.03 * k;
+  $("optWires").checked = k < 0.02; wires.forEach(w => w.mesh.visible = k < 0.02);
+};
+$("optManual").onchange = e => {
+  manual = e.target.checked;
+  ["panS", "tiltS", "optPointer"].forEach(id => $(id).disabled = !manual);
+  if (manual) {
+    sig.fire = sig.ttl = sig.armed = sig.relay = sig.buzzer = false; expectRing.visible = false;
+    $("panS").value = servo.pan.toFixed(1); $("tiltS").value = servo.tilt.toFixed(1);
+    $("phTitle").textContent = "Manuel kontrol"; $("phDesc").textContent = "Kaydırıcılarla PWM darbe genişliğini değiştirin: pan servosu tüm üst grubu dikey eksende, tilt servosu lazer kafasını yatay eksende döndürür. Güç lazeri manuel modda kilitlidir; yalnızca kırmızı nişan noktası açılabilir.";
+  } else enterPhase(0);
+};
+$("panS").oninput = e => { servo.tPan = +e.target.value; };
+$("tiltS").oninput = e => { servo.tTilt = +e.target.value; };
+$("optPointer").onchange = e => { sig.pointer = e.target.checked; };
+
+/* ======================================================================
+ *  Canlı sinyaller + osiloskop
+ * ====================================================================== */
+const scope = $("scope"), sc = scope.getContext("2d");
+const usOf = deg => Math.round(1500 + deg * 2000 / 180);
+let scopeT = 0;
+function drawScope(dt) {
+  scopeT += dt * (sig.fire ? 0.06 : 0.25);          // görsel zaman tabanı
+  const w = scope.width, h = scope.height, rows = [["PAN PWM (D9)", ORG], ["TILT PWM (D10)", ORG], ["LAZER TTL (D3)", BLU], ["ŞARJ POMPASI (D12)", GRN]];
+  sc.fillStyle = "#07090c"; sc.fillRect(0, 0, w, h);
+  sc.strokeStyle = "#1a2029"; sc.lineWidth = 1;
+  for (let x = 0; x < w; x += 40) { sc.beginPath(); sc.moveTo(x, 0); sc.lineTo(x, h); sc.stroke(); }
+  const rh = h / rows.length, period = 160;                  // 20 ms = 160 px
+  rows.forEach(([name, col], i) => {
+    const y0 = i * rh + rh - 12, hi = rh - 30;
+    sc.fillStyle = "#9aa3b2"; sc.font = "13px system-ui"; sc.fillText(name, 6, i * rh + 15);
+    sc.strokeStyle = "#" + col.toString(16).padStart(6, "0"); sc.lineWidth = 2; sc.beginPath();
+    const off = (scopeT * period * 50) % period;
+    if (i < 2) {
+      const us = usOf(i === 0 ? servo.pan : servo.tilt), pw = us / 20000 * period;
+      sc.moveTo(0, y0);
+      for (let x0 = -off; x0 < w; x0 += period) { const a = Math.max(0, x0), b = Math.max(0, x0 + pw); sc.lineTo(a, y0); sc.lineTo(a, y0 - hi); sc.lineTo(b, y0 - hi); sc.lineTo(b, y0); }
+      sc.lineTo(w, y0);
+      sc.fillStyle = "#e6e8ec"; sc.fillText(`${us} µs  (${(i === 0 ? servo.pan : servo.tilt).toFixed(1)}°)`, w - 175, i * rh + 15);
+    } else if (i === 2) {
+      const y = sig.ttl ? y0 - hi : y0; sc.moveTo(0, y); sc.lineTo(w, y);
+      sc.fillStyle = sig.ttl ? "#8fb0ff" : "#e6e8ec"; sc.fillText(sig.ttl ? "HIGH — 40 ms darbe" : "LOW (pull-down)", w - 175, i * rh + 15);
+    } else {
+      if (sig.armed) { const p = 14, o2 = (scopeT * 900) % (2 * p); sc.moveTo(0, y0); for (let x = -o2; x < w; x += 2 * p) { sc.lineTo(Math.max(0, x), y0); sc.lineTo(Math.max(0, x), y0 - hi); sc.lineTo(Math.max(0, x + p), y0 - hi); sc.lineTo(Math.max(0, x + p), y0); } }
+      else { sc.moveTo(0, y0); sc.lineTo(w, y0); }
+      sc.fillStyle = "#e6e8ec"; sc.fillText(sig.armed ? "1 kHz → röle ÇEKİLİ" : "yok → röle BIRAKIK", w - 175, i * rh + 15);
+    }
+    sc.stroke();
+  });
+}
+const pill = (on, txt, cls) => `<span class="pill ${on ? cls : ""}">${txt}</span>`;
+function updateLive() {
+  $("live").innerHTML = [
+    ["Pan açısı / PWM", `${servo.pan.toFixed(2)}° · ${usOf(servo.pan)} µs`],
+    ["Tilt açısı / PWM", `${servo.tilt.toFixed(2)}° · ${usOf(servo.tilt)} µs`],
+    ["Servolar", pill(servoMoving(), servoMoving() ? "HAREKET" : "DURUYOR", "b")],
+    ["Nişan lazeri (D4)", pill(sig.pointer, sig.pointer ? "AÇIK" : "KAPALI", "r")],
+    ["ARM / buzzer", pill(sig.armed, sig.armed ? "ARMED" : "DISARM", "r") + " " + pill(sig.buzzer, "♪", "r")],
+    ["K1 rölesi → lazer 12 V", pill(sig.relay, sig.relay ? "ENERJİLİ" : "KESİK", "r")],
+    ["Güç lazeri TTL (D3)", pill(sig.ttl, sig.ttl ? "ATEŞ" : "LOW", "b")],
+  ].map(([a, b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join("");
+}
+
+/* ======================================================================
+ *  Ana döngü
+ * ====================================================================== */
+let last = performance.now(), liveT = 0;
+function resize() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false); cam.aspect = r.width / r.height; cam.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+function frame(now) {
+  const rdt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = playing ? rdt * speed : 0;
+  if (!manual && playing) updatePhase(dt);
+  stepServo(manual ? rdt : dt);
+
+  // sinek
+  if (flyState.mode === "flying") {
+    fly.position.copy(flyState.p); fly.rotation.set(0, Math.PI / 2, Math.sin(now * 0.01) * 0.3);
+    const f = Math.sin(now * 0.12) * 0.9; wingL.rotation.x = f; wingR.rotation.x = -f;
+  } else if (flyState.mode === "sitting") {
+    fly.position.copy(flyState.land); fly.rotation.set(0, Math.PI, 0.4); wingL.rotation.x = wingR.rotation.x = 0;
+  } else if (flyState.mode === "falling") {
+    flyState.vy -= 3 * dt; flyState.p = fly.position.clone(); fly.position.y = Math.max(0.01, fly.position.y + flyState.vy * dt); fly.position.z = WALL_Z - 0.03; fly.rotation.z += dt * 8;
+    if (fly.position.y <= 0.011) fly.visible = false;
+  }
+
+  // ışınlar
+  const pOrig = pointerOrigin(), bOrig = beamOrigin(), dir = laserDir();
+  if (sig.pointer) { const hit = rayToWall(pOrig, dir); if (hit) { redBeam.visible = redDot.visible = true; setBeam(redBeam, pOrig, hit); redDot.position.copy(hit); } }
+  else redBeam.visible = redDot.visible = false;
+  if (sig.fire) {
+    const hit = rayToWall(bOrig, dir);
+    if (hit) { blueBeam.visible = blueGlow.visible = blueFlash.visible = true; setBeam(blueBeam, bOrig, hit); setBeam(blueGlow, bOrig, hit); blueFlash.position.copy(hit); blueFlash.scale.setScalar(0.1 + Math.random() * 0.06); scorch.position.copy(hit).setZ(WALL_Z - 0.0025); scorch.rotation.y = Math.PI; }
+  } else blueBeam.visible = blueGlow.visible = blueFlash.visible = false;
+  lensGlass.material.emissive.set(sig.fire ? 0x4f7bff : 0x000000); lensGlass.material.emissiveIntensity = sig.fire ? 3 : 0;
+  pointerTip.material.emissive.set(sig.pointer ? 0xff2020 : 0x000000);
+  armLed.material.emissive.set(sig.armed ? 0xff2020 : 0x000000); armLed.material.emissiveIntensity = sig.armed ? 2 : 0;
+  relayLed.material.emissive.set(sig.relay ? 0xff3030 : 0x000000);
+  nanoLed.material.emissive.set((now / 250 | 0) % 2 ? 0xffaa00 : 0x000000);
+  piFan.rotation.y += rdt * 25; laserFan.rotation.y += rdt * (sig.relay ? 40 : 0);
+  mush.position.y = 0.017;
+
+  // kablo sinyal parlaması
+  const pulse = 0.6 + 0.4 * Math.sin(now * 0.02);
+  for (const w of wires) {
+    let on = 0;
+    if (w.tag === "SERVO" && servoMoving()) on = pulse;
+    if (w.tag === "TTL" && sig.ttl) on = 1.2;
+    if (w.tag === "12V_LZR" && sig.relay) on = 0.7;
+    if (w.tag === "PUMP" && sig.armed) on = pulse;
+    if (w.tag === "USB" && (sig.usb || servoMoving())) on = 0.35 * pulse;
+    if (w.tag === "CSI") on = 0.25 + 0.15 * Math.sin(now * 0.05);
+    if (w.tag === "SENSE" && sig.armed) on = 0.3;
+    w.m.emissiveIntensity = on;
+  }
+
+  // görünüm
+  if (tween) {
+    tween.t = Math.min(1, tween.t + rdt * 1.6); const e = tween.t < 0.5 ? 2 * tween.t * tween.t : 1 - Math.pow(-2 * tween.t + 2, 2) / 2;
+    orbit.target.lerpVectors(tween.from.target, tween.to.target, e);
+    orbit.r = tween.from.r + (tween.to.r - tween.from.r) * e;
+    let dth = tween.to.theta - tween.from.theta; dth = Math.atan2(Math.sin(dth), Math.cos(dth));
+    orbit.theta = tween.from.theta + dth * e; orbit.phi = tween.from.phi + (tween.to.phi - tween.from.phi) * e;
+    if (tween.t >= 1) tween = null;
+  }
+  updateFov();
+  const W = renderer.domElement.clientWidth, H = renderer.domElement.clientHeight;
+  if (currentView === "kamera") { cam.position.copy(devCam.position); cam.fov = VFOV; cam.lookAt(devCam.position.x, devCam.position.y, devCam.position.z + 1); }
+  else { cam.fov = 45; applyOrbit(); }
+  cam.updateProjectionMatrix();
+
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, W, H);
+  renderer.render(scene, cam);
+  const inset = $("optInset").checked && currentView !== "kamera" && W >= 600;
+  $("insetTag").style.display = inset ? "block" : "none";
+  if (inset) {
+    const iw = Math.min(300, W * 0.38), ih = iw / ASPECT;
+    renderer.setScissorTest(true); renderer.setScissor(12, 30, iw, ih); renderer.setViewport(12, 30, iw, ih);
+    const fv = fovGroup.visible; fovGroup.visible = false;
+    renderer.render(scene, devCam); fovGroup.visible = fv; renderer.setScissorTest(false);
+    $("insetTag").style.bottom = (30 + ih + 4) + "px";
+  }
+  updateLabels(W, H);
+  drawScope(manual ? rdt : dt);
+  liveT += rdt; if (liveT > 0.1) { liveT = 0; updateLive(); if (manual) { $("panV").textContent = servo.pan.toFixed(1) + "°"; $("tiltV").textContent = servo.tilt.toFixed(1) + "°"; } }
+  requestAnimationFrame(frame);
+}
+resize(); setView("genel"); orbit.target.copy(VIEWS.genel.target); Object.assign(orbit, {r: VIEWS.genel.r, theta: VIEWS.genel.theta, phi: VIEWS.genel.phi}); tween = null;
+enterPhase(0); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
