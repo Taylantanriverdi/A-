@@ -1,0 +1,6 @@
+numpy>=1.26
+opencv-python>=4.9        # Raspberry Pi'de: sudo apt install python3-opencv da olur
+pyserial>=3.5
+pygame>=2.5               # yalnızca simülatör için
+pytest>=8                 # testler
+# Raspberry Pi kamera: picamera2 (sudo apt install python3-picamera2)

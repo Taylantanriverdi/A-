@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "author": "Lazer Sinek Tareti",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-arduino-nano",
+      "id": "nano",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "pan",
+      "top": -160,
+      "left": 250,
+      "attrs": {
+        "hornColor": "#0060ff"
+      }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "tilt",
+      "top": -40,
+      "left": 250,
+      "attrs": {
+        "hornColor": "#ff6000"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "laser",
+      "top": 140,
+      "left": 260,
+      "attrs": {
+        "color": "blue",
+        "label": "LAZER TTL"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_laser",
+      "top": 190,
+      "left": 200,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "pointer",
+      "top": 140,
+      "left": 320,
+      "attrs": {
+        "color": "red",
+        "label": "NİŞAN"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_ptr",
+      "top": 220,
+      "left": 260,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "pump",
+      "top": 140,
+      "left": 380,
+      "attrs": {
+        "color": "green",
+        "label": "RÖLE/POMPA"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_pump",
+      "top": 250,
+      "left": 320,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "armled",
+      "top": 140,
+      "left": 440,
+      "attrs": {
+        "color": "orange",
+        "label": "ARM"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_arm",
+      "top": 280,
+      "left": 380,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": 140,
+      "left": 500,
+      "attrs": {
+        "volume": "0.1"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "estop",
+      "top": 260,
+      "left": -160,
+      "attrs": {
+        "label": "E-STOP NC (sol=normal)"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "key",
+      "top": 330,
+      "left": -150,
+      "attrs": {
+        "label": "ANAHTAR"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "presence",
+      "top": 400,
+      "left": -150,
+      "attrs": {
+        "label": "VARLIK (LD2410)"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "pan:V+",
+      "nano:5V",
+      "red",
+      []
+    ],
+    [
+      "pan:GND",
+      "nano:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pan:PWM",
+      "nano:9",
+      "orange",
+      []
+    ],
+    [
+      "tilt:V+",
+      "nano:5V",
+      "red",
+      []
+    ],
+    [
+      "tilt:GND",
+      "nano:GND.1",
+      "black",
+      []
+    ],
+    [
+      "tilt:PWM",
+      "nano:10",
+      "orange",
+      []
+    ],
+    [
+      "nano:3",
+      "r_laser:1",
+      "blue",
+      []
+    ],
+    [
+      "r_laser:2",
+      "laser:A",
+      "blue",
+      []
+    ],
+    [
+      "laser:C",
+      "nano:GND.2",
+      "black",
+      []
+    ],
+    [
+      "nano:4",
+      "r_ptr:1",
+      "red",
+      []
+    ],
+    [
+      "r_ptr:2",
+      "pointer:A",
+      "red",
+      []
+    ],
+    [
+      "pointer:C",
+      "nano:GND.2",
+      "black",
+      []
+    ],
+    [
+      "nano:12",
+      "r_pump:1",
+      "green",
+      []
+    ],
+    [
+      "r_pump:2",
+      "pump:A",
+      "green",
+      []
+    ],
+    [
+      "pump:C",
+      "nano:GND.2",
+      "black",
+      []
+    ],
+    [
+      "nano:6",
+      "r_arm:1",
+      "orange",
+      []
+    ],
+    [
+      "r_arm:2",
+      "armled:A",
+      "orange",
+      []
+    ],
+    [
+      "armled:C",
+      "nano:GND.2",
+      "black",
+      []
+    ],
+    [
+      "nano:5",
+      "bz:2",
+      "purple",
+      []
+    ],
+    [
+      "bz:1",
+      "nano:GND.2",
+      "black",
+      []
+    ],
+    [
+      "key:2",
+      "nano:7",
+      "yellow",
+      []
+    ],
+    [
+      "key:1",
+      "nano:GND.1",
+      "black",
+      []
+    ],
+    [
+      "presence:2",
+      "nano:8",
+      "yellow",
+      []
+    ],
+    [
+      "presence:1",
+      "nano:GND.1",
+      "black",
+      []
+    ],
+    [
+      "presence:3",
+      "nano:5V",
+      "red",
+      []
+    ],
+    [
+      "estop:2",
+      "nano:2",
+      "yellow",
+      []
+    ],
+    [
+      "estop:1",
+      "nano:GND.1",
+      "black",
+      []
+    ],
+    [
+      "estop:3",
+      "nano:5V",
+      "red",
+      []
+    ],
+    [
+      "key:3",
+      "nano:5V",
+      "red",
+      []
+    ]
+  ],
+  "dependencies": {}
+}
