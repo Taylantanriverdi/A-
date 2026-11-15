@@ -1,5 +1,18 @@
 [
   {
+    "v": 9,
+    "tarih": "2026-11-16",
+    "baslik": "Sade görünüm",
+    "degisiklikler": [
+      "Tek ana ekran 'İşler': Sizi bekleyen / Devam eden / Biten sekmeleri",
+      "Menü sadeleşti: İşler, Hastalar, Ayarlar (lab için ayrıca Ekip & hekimler)",
+      "İş sayfasında üstte 'Sıradaki adım' kutusu ve tek büyük düğme; ayrıntılar kapalı bölümde",
+      "Süreç 5 adıma indi: Gönderildi → Üretimde → Prova → Teslim → Tamamlandı ('Kabul et' işi doğrudan üretime alır)",
+      "Yeni iş formu kısaldı: başlık ve öncelik listesi yerine tek 'Acil iş' kutusu",
+      "Mesajlarda dosya kayıtları gösterilmez (dosyalar kendi bölümünde); Enter ile mesaj gönderilir"
+    ]
+  },
+  {
     "v": 8,
     "tarih": "2026-11-16",
     "baslik": "Tek laboratuvar: DIGICAD",

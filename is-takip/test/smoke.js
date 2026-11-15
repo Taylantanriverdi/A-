@@ -43,7 +43,7 @@ server.listen(0, async () => {
     const tc = (await T('GET', '/cases/' + c.id)).data;
     assert.equal(tc.direction, 'incoming');
     assert.ok(tc.unread >= 2);
-    assert.deepEqual(tc.actions.map((a) => a.to), ['kabul', 'reddedildi']);
+    assert.deepEqual(tc.actions.map((a) => a.to), ['uretimde', 'reddedildi']);
     // Tek laboratuvar: lab ekibinin herkesi isi gorur; baska hekim goremez
     assert.equal((await T2('GET', '/cases/' + c.id)).status, 200);
     assert.equal((await T2('GET', '/patients/' + p.id)).status, 200);
@@ -56,7 +56,7 @@ server.listen(0, async () => {
     assert.equal((await T('PATCH', '/cases/' + c.id, { status: 'reddedildi' })).status, 400); // not zorunlu
 
     // Tam akış
-    const flow = [[T, 'kabul'], [T, 'uretimde'], [T, 'prova'], [K, 'revizyon', 'Kontakt sıkı'], [T, 'uretimde'], [T, 'prova'], [K, 'uretimde'], [T, 'hazir'], [T, 'teslim'], [K, 'tamamlandi']];
+    const flow = [[T, 'uretimde'], [T, 'prova'], [K, 'revizyon', 'Kontakt sıkı'], [T, 'uretimde'], [T, 'prova'], [K, 'uretimde'], [T, 'teslim'], [K, 'revizyon', 'Renk koyu'], [T, 'uretimde'], [T, 'teslim'], [K, 'tamamlandi']];
     for (const [who, st, note] of flow) {
       const r = await who('PATCH', '/cases/' + c.id, { status: st, note });
       assert.equal(r.status, 200, `${st}: ${JSON.stringify(r.data)}`);
