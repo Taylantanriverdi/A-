@@ -18,6 +18,13 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_UPLOAD = 300 * 1024 * 1024; // 300 MB
 const SESSION_DAYS = 30;
 
+// Surum: git commit kisaltmasi (yoksa sunucunun baslama zamani). Tarayicilar bunu
+// karsilastirip sunucu guncellendiginde acik sekmeleri kendiliginden yeniler.
+const VERSION = (() => {
+  try { return require('child_process').execSync('git rev-parse --short HEAD', { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); }
+  catch { return 'b' + Date.now().toString(36); }
+})();
+
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 /* ------------------------------------------------------------------ */
@@ -296,6 +303,9 @@ function currentUser(req) {
 function requireUser(req) {
   const u = currentUser(req);
   if (!u) fail(401, 'Oturum açmanız gerekiyor');
+  // Sekme kimin adina islem yaptigini bildirir; sunucudaki oturum farkliysa islem yapilmaz
+  const want = req.headers['x-user-id'];
+  if (want && want !== u.id) fail(409, 'Bu sekmedeki oturum değişmiş. Sayfa yenileniyor…');
   return u;
 }
 function getCaseFor(id, user) {
@@ -368,7 +378,7 @@ route('GET', '/api/me', async (req, res) => {
   const u = requireUser(req);
   // Cerezle acilan yeni sekmeye kendi anahtari verilir; sonra baska sekmedeki girislerden etkilenmez
   const tabToken = requestToken(req).via === 'cookie' ? newSessionToken(u) : undefined;
-  send(res, 200, { user: publicUser(u), statuses: STATUS, priorities: PRIORITIES, tabToken });
+  send(res, 200, { user: publicUser(u), statuses: STATUS, priorities: PRIORITIES, tabToken, version: VERSION });
 });
 
 route('PATCH', '/api/me', async (req, res) => {
@@ -668,6 +678,7 @@ route('GET', '/api/stream', async (req, res) => {
   const u = requireUser(req);
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
   res.write('retry: 3000\n\n');
+  res.write(`data: ${JSON.stringify({ kind: 'hello', version: VERSION })}\n\n`);
   if (!streams.has(u.id)) streams.set(u.id, new Set());
   streams.get(u.id).add(res);
   req.on('close', () => streams.get(u.id)?.delete(res));
@@ -722,7 +733,7 @@ const server = http.createServer(async (req, res) => {
 loadDb();
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\n  Klinik ⇄ Teknisyen İş Takip çalışıyor:  http://localhost:${PORT}\n`);
+    console.log(`\n  Klinik ⇄ Teknisyen İş Takip çalışıyor:  http://localhost:${PORT}   (sürüm ${VERSION})\n`);
     console.log('  Demo hesaplar (şifre: 1234):');
     console.log('    Klinik     → klinik@demo.com');
     console.log('    Teknisyen  → teknisyen@demo.com\n');

@@ -15,13 +15,14 @@ const setToken = (t) => { try { t ? sessionStorage.setItem(TOKEN_KEY, t) : sessi
 const authHeaders = () => { const t = getToken(); return t ? { Authorization: 'Bearer ' + t } : {}; };
 
 async function api(path, opts = {}) {
-  const init = { method: opts.method || 'GET', headers: authHeaders(), credentials: 'same-origin' };
+  const init = { method: opts.method || 'GET', headers: { ...authHeaders(), ...(state.me ? { 'X-User-Id': state.me.id } : {}) }, credentials: 'same-origin' };
   if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
   const res = await fetch('/api' + path, init);
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text();
   if (!res.ok) {
     const err = new Error((data && data.error) || 'İşlem başarısız');
     err.status = res.status;
+    if (res.status === 409 && state.me) { toast(err.message, { type: 'bad' }); setToken(null); setTimeout(() => location.reload(), 1200); }
     if (res.status === 401) { setToken(null); if (state.me) { state.me = null; renderAuth(); } }
     throw err;
   }
@@ -228,6 +229,7 @@ function renderShell() {
         <a href="#/profil" data-nav="profil">${icon('user')}Profil & ayarlar</a>
       </nav>
       <div class="side-foot">
+        <div class="small" style="opacity:.55;margin-bottom:8px">Sürüm ${esc(state.version || '')}</div>
         <div class="side-user">${avatar(me.name, 'sm')}<div style="min-width:0"><b style="font-size:13px">${esc(me.name)}</b><small>${esc(me.org || roleName(me.role))}</small></div></div>
       </div>
     </aside>
@@ -773,6 +775,7 @@ function uploadOne(caseId, file, onProgress) {
     xhr.open('PUT', `/api/cases/${caseId}/files?name=${encodeURIComponent(file.name)}`);
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
     const tk = getToken(); if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
+    if (state.me) xhr.setRequestHeader('X-User-Id', state.me.id);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
       if (xhr.status < 300) resolve(JSON.parse(xhr.responseText));
@@ -1107,6 +1110,8 @@ function connectStream() {
   state.es = es;
   es.onmessage = (ev) => {
     let d; try { d = JSON.parse(ev.data); } catch { return; }
+    // Sunucu guncellendiyse (bat ile) acik sekmeyi yeni surume yenile
+    if (d.kind === 'hello') { if (state.version && d.version !== state.version) location.reload(); return; }
     const { parts } = parseHash();
     const onThisCase = parts[0] === 'is' && parts[1] === d.caseId;
     if (d.kind === 'read') { if (onThisCase) route({ soft: true }); return; }
@@ -1137,6 +1142,7 @@ async function boot() {
     if (r.tabToken) setToken(r.tabToken);
     state.me = r.user;
     state.statuses = r.statuses;
+    state.version = r.version;
   } catch {
     state.me = null;
     return renderAuth();
