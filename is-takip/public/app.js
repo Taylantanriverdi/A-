@@ -93,6 +93,7 @@ const PRIO = { dusuk: 'Düşük', normal: 'Normal', yuksek: 'Yüksek', acil: 'AC
 const prioBadge = (p) => p && p !== 'normal' ? `<span class="badge plain pr-${p}">${PRIO[p]}</span>` : '';
 const dirTag = (c) => c.direction === 'incoming'
   ? `<span class="dir incoming">← Gelen</span>` : `<span class="dir outgoing">Giden →</span>`;
+const isClinic = () => state.me?.role === 'clinic';
 const roleName = (r) => r === 'clinic' ? 'Klinik' : 'Teknisyen';
 const partnerWord = () => state.me.role === 'clinic' ? 'Teknisyen / Laboratuvar' : 'Klinik';
 
@@ -148,7 +149,7 @@ function renderAuth(mode = 'login') {
     <div class="auth-hero">
       <div class="brand-logo" style="width:52px;height:52px">${toothSvg(30)}</div>
       <h1>Klinik ⇄ Teknisyen<br>İş Takip Sistemi</h1>
-      <p style="margin:0;color:#dbe8fb;max-width:460px">Hastanın adının altında tüm işleri tek ekranda yönetin. Klinik ile laboratuvar arasında iş gönderin, kabul edin, not bırakın, STL yükleyin ve her aşamanın zamanını takip edin.</p>
+      <p style="margin:0;color:#dbe8fb;max-width:460px">Hasta hekime gelir, muayene edilir; hekim işi hastanın adının altında laboratuvara gönderir. Teknisyen işi kabul eder, üretir ve teslim eder. Notlar, STL dosyaları ve her aşamanın zamanı iki taraf için de aynı ekranda.</p>
       <ul>
         <li>Hasta bazlı iş kartları ve iş numaraları</li>
         <li>Gönder → Kabul → Üretim → Prova → Teslim akışı</li>
@@ -223,8 +224,9 @@ function renderShell() {
       <nav class="nav">
         <a href="#/" data-nav="pano">${icon('home')}Pano</a>
         <a href="#/hastalar" data-nav="hastalar">${icon('users')}Hastalar</a>
-        <a href="#/isler?tab=gelen" data-nav="gelen">${icon('inbox')}Gelen işler<span class="count" id="cnt-in"></span></a>
-        <a href="#/isler?tab=giden" data-nav="giden">${icon('send')}Gönderdiğim işler</a>
+        ${me.role === 'clinic'
+          ? `<a href="#/isler?tab=giden" data-nav="giden">${icon('send')}Laba gönderdiğim işler</a>`
+          : `<a href="#/isler?tab=gelen" data-nav="gelen">${icon('inbox')}Gelen işler<span class="count" id="cnt-in"></span></a>`}
         <a href="#/isler?tab=aktif" data-nav="isler">${icon('box')}Tüm işler<span class="count" id="cnt-unread"></span></a>
         <a href="#/profil" data-nav="profil">${icon('user')}Profil & ayarlar</a>
       </nav>
@@ -238,7 +240,7 @@ function renderShell() {
         <button class="btn icon ghost menu-btn" id="menu" aria-label="Menü">${icon('menu')}</button>
         <form class="search" id="search"><input name="q" placeholder="Hasta, iş no, iş türü ara…" autocomplete="off">${icon('search')}</form>
         <div class="spacer"></div>
-        <button class="btn primary" id="new-case">${icon('plus')}<span class="lbl">Yeni iş gönder</span></button>
+        ${me.role === 'clinic' ? `<button class="btn primary" id="new-case">${icon('plus')}<span class="lbl">Laba iş gönder</span></button>` : ''}
         <button class="btn icon ghost" id="theme" title="Tema">${icon('moon')}</button>
         <button class="btn icon ghost" id="logout" title="Çıkış">${icon('logout')}</button>
       </header>
@@ -247,7 +249,7 @@ function renderShell() {
   </div>`;
   $('#menu').onclick = () => $('#sidebar').classList.toggle('open');
   $('#sidebar').addEventListener('click', (e) => { if (e.target.closest('a')) $('#sidebar').classList.remove('open'); });
-  $('#new-case').onclick = () => openNewCase();
+  $('#new-case')?.addEventListener('click', () => openNewCase());
   $('#logout').onclick = async () => { await api('/logout', { method: 'POST' }).catch(() => {}); setToken(null); state.me = null; state.partners = null; renderAuth(); };
   $('#theme').onclick = toggleTheme;
   $('#search').onsubmit = (e) => { e.preventDefault(); const q = e.target.q.value.trim(); location.hash = '#/ara?q=' + encodeURIComponent(q); };
@@ -355,10 +357,12 @@ async function viewDashboard() {
   <div class="page-head">
     <div><h1>${hello}, ${esc(state.me.name.split(' ').slice(0, 2).join(' '))}</h1>
     <p class="muted">${new Date().toLocaleDateString(TR, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${esc(state.me.org || '')}</p></div>
-    <button class="btn" onclick="location.hash='#/hastalar?new=1'">${icon('plus')}Yeni hasta</button>
+    ${isClinic() ? `<button class="btn" onclick="location.hash='#/hastalar?new=1'">${icon('plus')}Yeni hasta</button>` : ''}
   </div>
   <div class="stats">
-    <div class="card stat primary" onclick="location.hash='#/isler?tab=gelen'"><span class="label">Yeni gelen iş</span><span class="value">${s.incomingNew}</span><span class="small muted">Kabul bekliyor</span></div>
+    ${isClinic()
+      ? `<div class="card stat primary" onclick="location.hash='#/isler?tab=aktif&status=gonderildi'"><span class="label">Lab onayı bekleyen</span><span class="value">${s.byStatus.gonderildi}</span><span class="small muted">Laboratuvara gönderildi</span></div>`
+      : `<div class="card stat primary" onclick="location.hash='#/isler?tab=gelen'"><span class="label">Yeni gelen iş</span><span class="value">${s.incomingNew}</span><span class="small muted">Kabul bekliyor</span></div>`}
     <div class="card stat warn" onclick="location.hash='#/isler?tab=aktif'"><span class="label">Sizden işlem bekleyen</span><span class="value">${s.waitingMe}</span><span class="small muted">Aksiyon gerekli</span></div>
     <div class="card stat" onclick="location.hash='#/isler?tab=aktif'"><span class="label">Aktif işler</span><span class="value">${s.active}</span><span class="small muted">Toplam ${s.total} iş</span></div>
     <div class="card stat bad" onclick="location.hash='#/isler?tab=aktif&sort=due'"><span class="label">Geciken</span><span class="value">${s.overdue}</span><span class="small muted">Bugün teslim: ${s.dueToday}</span></div>
@@ -399,11 +403,11 @@ async function viewPatients(query) {
   const list = await api('/patients?q=' + encodeURIComponent(q));
   return `
   <div class="page-head">
-    <div><h1>Hastalar</h1><p class="muted">Her hastanın altında o hastaya ait tüm işler listelenir.</p></div>
-    <button class="btn primary" id="add-patient">${icon('plus')}Yeni hasta</button>
+    <div><h1>Hastalar</h1><p class="muted">${isClinic() ? 'Her hastanın altında o hastaya ait tüm işler listelenir.' : 'Hekimlerin size iş gönderdiği hastalar ve işleri.'}</p></div>
+    ${isClinic() ? `<button class="btn primary" id="add-patient">${icon('plus')}Yeni hasta</button>` : ''}
   </div>
   <div class="toolbar"><input id="pq" placeholder="Hasta adı veya telefon ile filtrele" value="${esc(q)}" style="max-width:360px"></div>
-  ${list.length ? list.map(patientCard).join('') : `<div class="card empty">${q ? 'Eşleşen hasta yok.' : 'Henüz hasta yok. “Yeni hasta” ile başlayın.'}</div>`}`;
+  ${list.length ? list.map(patientCard).join('') : `<div class="card empty">${q ? 'Eşleşen hasta yok.' : isClinic() ? 'Henüz hasta yok. “Yeni hasta” ile başlayın.' : 'Henüz size iş gönderilmiş hasta yok. Hekim iş gönderdiğinde burada görünür.'}</div>`}`;
 }
 function patientCard(p) {
   const active = p.cases.filter((c) => !['tamamlandi', 'iptal'].includes(c.status)).length;
@@ -412,17 +416,18 @@ function patientCard(p) {
       ${avatar(p.name)}
       <div class="grow"><a class="name" href="#/hasta/${p.id}">${esc(p.name)}</a>
         <div class="small muted">${[p.phone, p.birthDate && 'Doğum: ' + fmtDate(p.birthDate), state.me.role === 'technician' && p.clinic ? p.clinic.org : '', `${p.cases.length} iş, ${active} aktif`].filter(Boolean).map(esc).join(' · ')}</div></div>
-      <button class="btn sm" data-new-for="${p.id}">${icon('plus')}İş gönder</button>
+      ${isClinic() ? `<button class="btn sm" data-new-for="${p.id}">${icon('plus')}Laba iş gönder</button>` : ''}
     </div>
     <div class="list">${p.cases.length ? p.cases.map((c) => caseRow(c, { showPatient: false })).join('') : '<div class="empty" style="padding:16px">Bu hastaya ait iş yok.</div>'}</div>
   </div>`;
 }
 afterRender.hastalar = (parts, query) => {
-  $('#add-patient').onclick = () => openPatientForm(null, (p) => { location.hash = '#/hasta/' + p.id; });
+  const addBtn = $('#add-patient');
+  if (addBtn) addBtn.onclick = () => openPatientForm(null, (p) => { location.hash = '#/hasta/' + p.id; });
   $$('[data-new-for]').forEach((b) => b.onclick = () => openNewCase({ patientId: b.dataset.newFor }));
   const pq = $('#pq');
   pq.oninput = debounce(() => { history.replaceState(null, '', '#/hastalar?q=' + encodeURIComponent(pq.value)); route({ soft: true }).then(() => { const el = $('#pq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }); }, 250);
-  if (query.get('new') === '1') { history.replaceState(null, '', '#/hastalar'); $('#add-patient').click(); }
+  if (query.get('new') === '1') { history.replaceState(null, '', '#/hastalar'); addBtn?.click(); }
 };
 
 async function viewPatient(id) {
@@ -437,7 +442,7 @@ async function viewPatient(id) {
       <h1>${esc(p.name)}</h1></div></div>
     <div class="row">
       ${p.canEdit ? `<button class="btn" id="edit-p">${icon('edit')}Düzenle</button>` : ''}
-      <button class="btn primary" id="new-for">${icon('plus')}Bu hastaya iş gönder</button>
+      ${isClinic() ? `<button class="btn primary" id="new-for">${icon('plus')}Bu hastaya laba iş gönder</button>` : ''}
     </div>
   </div>
   <div class="two-col">
@@ -461,7 +466,7 @@ async function viewPatient(id) {
   </div>`;
 }
 afterRender.hasta = (parts) => {
-  $('#new-for').onclick = () => openNewCase({ patientId: parts[1] });
+  $('#new-for')?.addEventListener('click', () => openNewCase({ patientId: parts[1] }));
   $('#edit-p')?.addEventListener('click', async () => {
     const p = await api('/patients/' + parts[1]);
     openPatientForm(p, () => route({ soft: true }));
@@ -493,13 +498,13 @@ async function viewCases(query) {
   const link = (k, v) => { const p = new URLSearchParams(query); p.set(k, v); return '#/isler?' + p; };
   return `
   <div class="page-head">
-    <div><h1>${tab === 'gelen' ? 'Gelen işler' : tab === 'giden' ? 'Gönderdiğim işler' : 'İşler'}</h1>
+    <div><h1>${tab === 'gelen' ? 'Gelen işler' : tab === 'giden' ? 'Laba gönderdiğim işler' : 'İşler'}</h1>
       <p class="muted">${list.length} iş listeleniyor</p></div>
     <div class="row"><button class="btn" id="csv">${icon('csv')}CSV indir</button>
-      <button class="btn primary" onclick="document.getElementById('new-case').click()">${icon('plus')}Yeni iş</button></div>
+      ${isClinic() ? `<button class="btn primary" onclick="document.getElementById('new-case').click()">${icon('plus')}Laba iş gönder</button>` : ''}</div>
   </div>
   <div class="toolbar">
-    <div class="tabs">${Object.entries(TABS).map(([k, v]) => `<button class="${k === tab ? 'active' : ''}" onclick="location.hash='${link('tab', k).replace(/'/g, '')}'">${v}</button>`).join('')}</div>
+    <div class="tabs">${Object.entries(TABS).filter(([k]) => k !== (isClinic() ? 'gelen' : 'giden')).map(([k, v]) => `<button class="${k === tab ? 'active' : ''}" onclick="location.hash='${link('tab', k).replace(/'/g, '')}'">${v}</button>`).join('')}</div>
     <select id="f-status"><option value="">Tüm aşamalar</option>${Object.entries(state.statuses).map(([k, v]) => `<option value="${k}" ${k === st ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
     <select id="f-sort">
       <option value="updated" ${sort === 'updated' ? 'selected' : ''}>Son güncellenen</option>
@@ -568,7 +573,7 @@ async function viewCase(id) {
   for (const sg of segs) totals[sg.s] = (totals[sg.s] || 0) + sg.ms;
   const totalMs = (terminal ? new Date(c.completedAt || c.updatedAt) : new Date()) - new Date(c.createdAt);
 
-  const canEdit = c.from?.id === state.me.id || state.me.role === 'clinic';
+  const canEdit = state.me.role === 'clinic';
   const other = state.me.role === 'clinic' ? c.technician : c.clinic;
   return `
   <div class="page-head case-title">
@@ -873,6 +878,7 @@ function bindTeeth(root) {
 }
 
 function openPatientForm(p, onSaved) {
+  if (!p && !isClinic()) return toast('Hasta kaydını yalnızca hekim açabilir', { type: 'bad' });
   const isTech = state.me.role === 'technician';
   const m = modal({
     title: p ? 'Hastayı düzenle' : 'Yeni hasta',
@@ -903,6 +909,7 @@ function openPatientForm(p, onSaved) {
 }
 
 async function openNewCase(pre = {}) {
+  if (!isClinic()) return toast('İş kaydını yalnızca hekim açabilir', { type: 'bad' });
   let [patients, partners] = await Promise.all([api('/patients'), getPartners(true)]).catch((e) => { toastErr(e); return []; });
   if (!patients) return;
   const isTech = state.me.role === 'technician';

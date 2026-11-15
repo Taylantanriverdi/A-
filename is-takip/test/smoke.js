@@ -80,20 +80,20 @@ server.listen(0, async () => {
     const trav = await T('PUT', `/cases/${c.id}/files?name=${encodeURIComponent('../../evil.js')}`, null, Buffer.from('x'));
     assert.equal(trav.data.name, 'evil.js');
 
-    // Teknisyen klinik adına hasta açıp kliniğe iş gönderir
+    // Teknisyen hasta ve is kaydi acamaz; hekimin gonderdigi hastayi gorur
     const clinics = (await T('GET', '/partners')).data;
     const kl = clinics.find((u) => u.email === 'klinik@demo.com');
-    const p2 = (await T('POST', '/patients', { name: 'Lab Hastası', clinicId: kl.id })).data;
-    const c2 = (await T('POST', '/cases', { patientId: p2.id, toId: kl.id, workType: 'Model' })).data;
-    assert.equal(c2.clinicId, kl.id);
-    const kc2 = (await K('GET', '/cases/' + c2.id)).data;
-    assert.equal(kc2.direction, 'incoming');
-    assert.ok(kc2.actions.some((a) => a.to === 'kabul'));
+    assert.equal((await T('POST', '/patients', { name: 'Lab Hastası', clinicId: kl.id })).status, 403);
+    assert.equal((await T('POST', '/cases', { patientId: p.id, toId: kl.id, workType: 'Model' })).status, 403);
+    assert.ok((await T('GET', '/patients')).data.some((x) => x.id === p.id), 'teknisyen hekimin gonderdigi hastayi gorur');
+    // Hekim isi baska bir hekime gonderemez
+    const k2 = (await K('GET', '/partners')).data;
+    assert.ok(k2.every((u) => u.role === 'technician'));
+    assert.equal((await K('POST', '/cases', { patientId: p.id, toId: kl.id, workType: 'Kron' })).status, 400);
 
     // Hastalar listesinde işler hastanın altında
     const plist = (await K('GET', '/patients')).data;
     assert.ok(plist.find((x) => x.id === p.id).cases.some((x) => x.id === c.id));
-    assert.ok(plist.find((x) => x.id === p2.id), 'teknisyenin açtığı hasta klinikte görünür');
 
     const stats = (await K('GET', '/stats')).data;
     assert.ok(stats.total >= 3 && stats.avgDays !== null);

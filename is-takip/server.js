@@ -418,16 +418,14 @@ route('GET', '/api/patients', async (req, res, { query }) => {
   send(res, 200, list);
 });
 
+// Is akisi: hasta hekime gelir, hekim muayene eder, isi laboratuvara gonderir.
+// Bu yuzden hasta ve is kaydini yalnizca hekim/klinik acar.
 route('POST', '/api/patients', async (req, res) => {
   const u = requireUser(req);
+  if (u.role !== 'clinic') fail(403, 'Hasta kaydını yalnızca hekim açabilir');
   const b = await readJson(req);
   if (!String(b.name || '').trim()) fail(400, 'Hasta adı zorunlu');
-  let clinicId = u.id;
-  if (u.role === 'technician') {
-    const cl = userById(b.clinicId);
-    if (!cl || cl.role !== 'clinic') fail(400, 'Hastanın bağlı olduğu kliniği seçin');
-    clinicId = cl.id;
-  }
+  const clinicId = u.id;
   const p = {
     id: uid('p'), name: String(b.name).trim(), clinicId, createdBy: u.id,
     phone: String(b.phone || ''), birthDate: b.birthDate || '', gender: b.gender || '', notes: String(b.notes || ''), createdAt: now()
@@ -474,13 +472,13 @@ route('GET', '/api/cases', async (req, res, { query }) => {
 
 route('POST', '/api/cases', async (req, res) => {
   const u = requireUser(req);
+  if (u.role !== 'clinic') fail(403, 'İş kaydını yalnızca hekim açıp laboratuvara gönderebilir');
   const b = await readJson(req);
   const p = db.patients.find((x) => x.id === b.patientId);
   if (!p || !canSeePatient(p, u)) fail(400, 'Hasta seçin');
   const to = userById(b.toId);
-  if (!to || to.role === u.role) fail(400, u.role === 'clinic' ? 'Teknisyen seçin' : 'Klinik seçin');
-  if (u.role === 'technician' && p.clinicId !== to.id) fail(400, 'Hasta seçilen kliniğe ait değil');
-  if (u.role === 'clinic' && p.clinicId !== u.id) fail(400, 'Hasta kliniğinize ait değil');
+  if (!to || to.role !== 'technician') fail(400, 'Laboratuvar / teknisyen seçin');
+  if (p.clinicId !== u.id) fail(400, 'Hasta kliniğinize ait değil');
   if (!String(b.title || b.workType || '').trim()) fail(400, 'İş başlığı veya türü zorunlu');
   const c = newCase({ ...b, from: u, to });
   if (b.note && String(b.note).trim()) addEvent(c, u.id, 'note', b.note);
@@ -527,7 +525,7 @@ route('PATCH', '/api/cases/:id', async (req, res, { params }) => {
   }
   const editable = ['title', 'workType', 'shade', 'material', 'description'];
   const changes = [];
-  if (c.fromId === u.id || u.role === 'clinic') {
+  if (u.role === 'clinic') {
     for (const k of editable) if (b[k] !== undefined && b[k] !== c[k]) { c[k] = String(b[k]); changes.push(k); }
     if (Array.isArray(b.teeth)) { c.teeth = b.teeth.map(Number).filter((t) => t >= 11 && t <= 48); changes.push('teeth'); }
   }

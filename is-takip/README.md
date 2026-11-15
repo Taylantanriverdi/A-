@@ -36,7 +36,7 @@ Ağdaki diğer bilgisayarlar `http://SUNUCU-IP:3000` adresinden bağlanır. Port
 ## Özellikler
 
 - **Hasta merkezli yapı:** her hastanın adının altında o hastaya ait tüm işler (aktif / geçmiş)
-- **İki yönlü iş gönderme:** klinik → teknisyen ya da teknisyen → klinik; alıcı işi kabul eder veya gerekçeyle reddeder
+- **İş akışı kuralı:** hasta hekime gelir, muayene edilir; hasta ve iş kaydını yalnızca hekim açar ve laboratuvara gönderir. Teknisyen kayıt açamaz; gelen işi kabul eder (ya da gerekçeyle reddeder), üretir, not yazar, dosya yükler ve teslim eder
 - **İş akışı:** Gönderildi → Kabul → Üretimde → Provada (⇄ Revizyon) → Hazır → Teslim → Tamamlandı (+ Reddedildi, İptal).
   Her rol yalnızca kendine düşen adımları görür, sunucu da yetkiyi denetler
 - **Notlar / mesajlaşma:** iş bazında sohbet, durum değişiklikleri ve dosya olayları aynı zaman çizelgesinde, "Görüldü" bilgisi
