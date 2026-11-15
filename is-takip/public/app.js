@@ -88,7 +88,11 @@ function avatar(name, cls = '') {
   let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return `<span class="avatar ${cls}" style="background:${COLORS[h % COLORS.length]}">${esc(ini)}</span>`;
 }
-const statusBadge = (s) => `<span class="badge st-${s}">${esc(state.statuses[s] || s)}</span>`;
+// Durum rozeti: is nesnesi verilirse numarali etiket (orn. "2. Duzenleme isteniyor") gosterilir
+const statusBadge = (x) => typeof x === 'object'
+  ? `<span class="badge st-${x.status}">${esc(x.statusLabel || state.statuses[x.status])}</span>`
+  : `<span class="badge st-${x}">${esc(state.statuses[x] || x)}</span>`;
+const revChip = (c) => c.revisions ? `<span class="badge plain rev-chip" title="Hekimin istediği düzenleme sayısı">${c.revisions} düzenleme</span>` : '';
 const PRIO = { dusuk: 'Düşük', normal: 'Normal', yuksek: 'Yüksek', acil: 'ACİL' };
 const prioBadge = (p) => p && p !== 'normal' ? `<span class="badge plain pr-${p}">${PRIO[p]}</span>` : '';
 const dirTag = (c) => c.direction === 'incoming'
@@ -125,7 +129,7 @@ const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const WORK_TYPES = ['Kron', 'Köprü', 'İmplant üstü kron', 'İmplant üstü köprü', 'İnley / Onley', 'Laminate veneer', 'Geçici kron/köprü', 'Total protez', 'Parsiyel protez', 'Hareketli protez tamiri', 'Plak / Splint', 'Ortodontik aparey', 'Şeffaf plak (aligner)', 'Cerrahi rehber', 'Model / Dijital model', 'Diğer'];
 const MATERIALS = ['Zirkonyum', 'Monolitik zirkonyum', 'E.max (lityum disilikat)', 'Metal destekli porselen', 'PMMA', 'Kompozit', 'Akrilik', 'Şeffaf akrilik', 'Krom-kobalt', 'Titanyum', 'Diğer'];
 const SHADES = ['', 'A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4', 'D2', 'D3', 'D4', 'BL1', 'BL2', 'BL3', 'BL4', 'OM1', 'OM2', 'OM3'];
-const FLOW = ['gonderildi', 'kabul', 'uretimde', 'prova', 'hazir', 'teslim', 'tamamlandi'];
+const FLOW = ['gonderildi', 'kabul', 'uretimde', 'prova', 'bitim', 'hazir', 'teslim', 'tamamlandi'];
 const UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
@@ -333,7 +337,7 @@ function caseRow(c, { showPatient = true } = {}) {
     <span class="t"><b>${showPatient ? esc(c.patientName) + ' · ' : ''}${esc(c.title)}</b>
       <small>${dirTag(c)} ${esc(other?.org || other?.name || '')} · ${esc(c.workType)}${c.teeth?.length ? ' · Diş ' + c.teeth.join(', ') : ''} · ${rel(c.updatedAt)}</small></span>
     <span class="meta extra">${prioBadge(c.priority)}<span class="due ${d.cls}">${icon('clock').replace('<svg', '<svg width="13" height="13" style="vertical-align:-2px"')} ${d.text}</span></span>
-    <span class="meta">${c.unread ? `<span class="dot-unread" title="Okunmamış">${c.unread}</span>` : ''}${statusBadge(c.status)}</span>
+    <span class="meta">${c.unread ? `<span class="dot-unread" title="Okunmamış">${c.unread}</span>` : ''}${statusBadge(c)}</span>
   </a>`;
 }
 function feedItem(e) {
@@ -581,7 +585,7 @@ async function viewCase(id) {
     <div style="flex:1;min-width:260px">
       <div class="crumb"><a href="#/hastalar">Hastalar</a> / <a href="#/hasta/${c.patientId}">${esc(c.patientName)}</a> / İş #${esc(c.no)}</div>
       <h1>${esc(c.patientName)} — ${esc(c.title)}</h1>
-      <div class="row" style="margin-top:8px">${statusBadge(c.status)} ${prioBadge(c.priority)} ${dirTag(c)}
+      <div class="row" style="margin-top:8px">${statusBadge(c)} ${revChip(c)} ${prioBadge(c.priority)} ${dirTag(c)}
         <span class="due ${d.cls}">${icon('clock').replace('<svg', '<svg width="13" height="13" style="vertical-align:-2px"')} ${d.text}${c.dueDate ? ' · ' + fmtDate(c.dueDate) : ''}</span></div>
     </div>
     <div class="row">${canEdit ? `<button class="btn" id="edit-case">${icon('edit')}Düzenle</button>` : ''}
@@ -591,7 +595,7 @@ async function viewCase(id) {
     <div class="stack" style="gap:18px">
       <div class="card">
         <div class="stepper">${steps}</div>
-        ${['reddedildi', 'iptal', 'revizyon'].includes(c.status) ? `<div style="padding:0 18px 14px">${statusBadge(c.status)} <span class="small muted">${esc(lastStatusNote(c))}</span></div>` : ''}
+        ${['reddedildi', 'iptal', 'revizyon'].includes(c.status) ? `<div style="padding:0 18px 14px">${statusBadge(c)} <span class="small muted">${esc(lastStatusNote(c))}</span></div>` : ''}
         <div class="card-body" style="border-top:1px solid var(--border)">
           <div class="kv">
             <div><small>Hasta</small><b><a href="#/hasta/${c.patientId}">${esc(c.patientName)}</a></b></div>
@@ -615,6 +619,7 @@ async function viewCase(id) {
           : `<span class="muted small">${terminal ? 'Bu iş kapandı.' : `Şu an ${esc(other?.name || 'karşı taraf')} tarafında işlem bekleniyor.`}</span>`}</div>
       </div>
 
+      ${revisionCard(c)}
       <div class="card">
         <div class="card-head"><h2>Dosyalar & STL (${c.files.length})</h2><span class="small muted">STL ve PLY 3D açılır · fotoğraf, PDF, ZIP · en fazla 300 MB</span></div>
         <div class="card-body">
@@ -630,7 +635,7 @@ async function viewCase(id) {
         <div class="card-body durations">
           ${Object.entries(totals).map(([s, ms]) => `<div class="d"><span>${statusBadge(s)}</span><b class="mono">${dur(ms)}${s === c.status && !terminal ? ' <span class="small muted">(devam ediyor)</span>' : ''}</b></div>`).join('')}
           <div class="d"><span class="muted">Durum geçmişi</span><span></span></div>
-          ${statusEvents.map((e) => `<div class="d small"><span>${fmtDateTime(e.at)} · ${esc(e.user?.name)}</span><span>${e.meta?.to ? esc(state.statuses[e.meta.to]) : 'Oluşturuldu'}</span></div>`).join('')}
+          ${statusEvents.map((e) => `<div class="d small"><span>${fmtDateTime(e.at)} · ${esc(e.user?.name)}</span><span>${e.meta?.to ? esc(e.meta.label || state.statuses[e.meta.to]) : 'Oluşturuldu'}</span></div>`).join('')}
         </div>
       </div>
     </div>
@@ -645,6 +650,31 @@ async function viewCase(id) {
       </form>
     </div>
   </div>`;
+}
+// Hekimin istedigi her duzenleme: ne istendi, ne zaman, ne zaman provaya geldi
+function revisionCard(c) {
+  const st = c.events.filter((e) => e.type === 'status');
+  const revs = [];
+  st.forEach((e, i) => {
+    if (e.meta?.to !== 'revizyon') return;
+    const after = st.slice(i + 1);
+    const started = after.find((x) => x.meta?.from === 'revizyon');
+    const back = after.find((x) => ['prova', 'bitim', 'hazir', 'teslim'].includes(x.meta?.to));
+    revs.push({ n: revs.length + 1, e, started, back });
+  });
+  const bitim = st.find((e) => e.meta?.to === 'bitim');
+  if (!revs.length && !bitim) return '';
+  const rows = revs.map((r) => {
+    const state = r.back ? `<span class="badge st-hazir">Tamamlandı · ${fmtDateTime(r.back.at)}</span>`
+      : r.started ? `<span class="badge st-uretimde">Yapılıyor</span>` : `<span class="badge st-revizyon">Bekliyor</span>`;
+    return `<div class="rev"><div class="rev-n">${r.n}</div>
+      <div class="grow"><b>${r.n}. Düzenleme</b> <span class="small muted">· ${fmtDateTime(r.e.at)} · ${esc(r.e.user?.name)}</span>
+        <div class="rev-note">${esc(r.e.meta?.note || '')}</div></div>${state}</div>`;
+  }).join('');
+  const done = bitim ? `<div class="rev done"><div class="rev-n">✓</div><div class="grow"><b>Düzenlemeler bitti — bitim bekleniyor</b>
+      <span class="small muted">· ${fmtDateTime(bitim.at)} · ${esc(bitim.user?.name)}</span>${bitim.meta?.note ? `<div class="rev-note">${esc(bitim.meta.note)}</div>` : ''}</div></div>` : '';
+  return `<div class="card"><div class="card-head"><h2>Düzenlemeler (${revs.length})</h2><span class="small muted">Hekimin provada istediği düzeltmeler</span></div>
+    <div class="list">${rows}${done}</div></div>`;
 }
 function lastStatusNote(c) {
   const e = [...c.events].reverse().find((x) => x.type === 'status' && x.meta?.to === c.status);
@@ -1035,7 +1065,7 @@ function openAction(c, a) {
   const m = modal({
     title: esc(a.label),
     body: `<div class="stack">
-      <div>${statusBadge(c.status)} → ${statusBadge(a.to)}</div>
+      <div>${statusBadge(c)} → ${a.to === 'revizyon' ? `<span class="badge st-revizyon">${(c.revisions || 0) + 1}. Düzenleme isteniyor</span>` : statusBadge(a.to)}</div>
       ${resend ? `<div class="small muted">İş yeniden ${esc(LAB())}'a gönderilecek.</div>` : ''}
       <label class="field">${a.needNote ? 'Açıklama (zorunlu)' : 'Not (isteğe bağlı)'}<textarea id="ac-note" placeholder="${a.needNote ? 'Neden? Ne değişmeli?' : 'Karşı tarafa iletmek istediğiniz not'}"></textarea></label>
     </div>`,
@@ -1045,8 +1075,8 @@ function openAction(c, a) {
     const note = $('#ac-note', m.el).value.trim();
     if (a.needNote && !note) { toast('Lütfen açıklama yazın', { type: 'bad' }); return; }
     try {
-      await api('/cases/' + c.id, { method: 'PATCH', body: { status: a.to, note } });
-      m.close(); toast(`Durum: ${state.statuses[a.to]}`, { type: 'ok' }); route({ soft: true }); refreshBadges();
+      const r = await api('/cases/' + c.id, { method: 'PATCH', body: { status: a.to, note } });
+      m.close(); toast(`Durum: ${r.statusLabel || state.statuses[a.to]}`, { type: 'ok' }); route({ soft: true }); refreshBadges();
     } catch (e) { toastErr(e); }
   };
 }

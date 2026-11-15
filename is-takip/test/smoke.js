@@ -63,6 +63,22 @@ server.listen(0, async () => {
       assert.equal(r.data.status, st);
     }
 
+    // Numarali duzenlemeler ve bitim
+    const c3 = (await K('POST', '/cases', { patientId: p.id, workType: 'Köprü' })).data;
+    const go = async (who, st, note) => { const r = await who('PATCH', '/cases/' + c3.id, { status: st, note }); assert.equal(r.status, 200, st + JSON.stringify(r.data)); return r.data; };
+    await go(T, 'kabul'); await go(T, 'uretimde'); await go(T, 'prova');
+    let kc = (await K('GET', '/cases/' + c3.id)).data;
+    assert.ok(kc.actions.some((a) => a.label === '1. düzenlemeyi iste'));
+    assert.equal((await go(K, 'revizyon', 'Kontak sıkı')).statusLabel, '1. Düzenleme isteniyor');
+    assert.equal((await go(T, 'uretimde')).statusLabel, '1. Düzenleme yapılıyor');
+    assert.equal((await go(T, 'prova')).statusLabel, '1. Düzenleme provada');
+    assert.equal((await go(K, 'revizyon', 'Renk koyu')).statusLabel, '2. Düzenleme isteniyor');
+    await go(T, 'uretimde'); await go(T, 'prova');
+    const bt = await go(K, 'bitim');
+    assert.equal(bt.statusLabel, 'Bitim bekleniyor');
+    assert.equal(bt.revisions, 2);
+    await go(T, 'teslim'); await go(K, 'tamamlandi');
+
     // Notlar ve okundu
     assert.equal((await T('POST', `/cases/${c.id}/notes`, { text: 'Hazır, kargoda' })).status, 201);
     assert.equal((await T('POST', `/cases/${c.id}/notes`, { text: '  ' })).status, 400);

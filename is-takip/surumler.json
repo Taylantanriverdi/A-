@@ -1,5 +1,18 @@
 [
   {
+    "v": 11,
+    "tarih": "2026-11-16",
+    "baslik": "Numaralı düzenlemeler ve 'Bitim bekleniyor'",
+    "degisiklikler": [
+      "Hekimin provada istediği her düzeltme numaralanır: 1. Düzenleme isteniyor, 2. Düzenleme isteniyor…",
+      "Lab tarafında durum '2. Düzenleme yapılıyor', provaya gelince '2. Düzenleme provada' olarak görünür",
+      "Hekim provada 'Düzenlemeler bitti, bitime gönder' düğmesiyle laboratuvara bildirir; iş 'Bitim bekleniyor' olur",
+      "İş sayfasında 'Düzenlemeler' kartı: her düzenlemenin numarası, tarihi, hekimin notu ve tamamlanma zamanı",
+      "Listelerde ve iş başlığında düzenleme sayısı rozeti (örn. '2 düzenleme')",
+      "Eski işlerdeki revizyonlar da otomatik numaralanır"
+    ]
+  },
+  {
     "v": 10,
     "tarih": "2026-11-16",
     "baslik": "Siyah pencere gizlendi",

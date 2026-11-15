@@ -164,6 +164,14 @@ label.field > span { text-transform: none; }
 .st-prova, .st-revizyon { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .st-hazir, .st-teslim { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
 .st-tamamlandi { background: var(--ok); color: #fff; border-color: transparent; }
+.st-bitim { background: var(--info-soft); color: var(--info); border-color: transparent; font-weight: 700; }
+.rev-chip { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+.rev { display: flex; gap: 12px; align-items: flex-start; padding: 12px 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.rev:first-child { border-top: 0; }
+.rev .grow { flex: 1; min-width: 200px; }
+.rev-n { width: 28px; height: 28px; border-radius: 50%; background: var(--warn-soft); color: var(--warn); display: grid; place-items: center; font-weight: 700; flex: none; }
+.rev.done .rev-n { background: var(--info-soft); color: var(--info); }
+.rev-note { margin-top: 4px; white-space: pre-wrap; }
 .st-reddedildi, .st-iptal { background: var(--bad-soft); color: var(--bad); border-color: transparent; }
 .pr-acil { background: var(--bad); color: #fff; border-color: transparent; }
 .pr-yuksek { background: var(--warn-soft); color: var(--warn); border-color: transparent; }

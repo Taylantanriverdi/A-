@@ -74,6 +74,12 @@ function loadDb() {
 // Eski veriyi tek-laboratuvar yapisina uyarlar (her acilista guvenle calisir)
 function migrate() {
   db.meta = db.meta || {};
+  // Eski islere duzenleme sayisi ve onceki durum bilgisi eklenir
+  for (const c of db.cases) {
+    const st = db.events.filter((e) => e.caseId === c.id && e.type === 'status');
+    if (c.revisions === undefined) c.revisions = st.filter((e) => e.meta && e.meta.to === 'revizyon').length;
+    if (c.prevStatus === undefined) { const last = st[st.length - 1]; c.prevStatus = last && last.meta ? last.meta.from : null; }
+  }
   for (const u of db.users) if (u.role === 'technician') u.org = LAB_NAME;
   disableDemoIfReal();
 }
@@ -147,7 +153,8 @@ const STATUS = {
   reddedildi: 'Reddedildi',
   uretimde: 'Üretimde',
   prova: 'Provada',
-  revizyon: 'Revizyon',
+  revizyon: 'Düzenleme isteniyor',
+  bitim: 'Bitim bekleniyor',
   hazir: 'Hazır',
   teslim: 'Teslim edildi',
   tamamlandi: 'Tamamlandı',
@@ -169,18 +176,23 @@ const TRANSITIONS = {
     { to: 'hazir', who: 'technician', label: 'Hazır olarak işaretle' }
   ],
   prova: [
-    { to: 'uretimde', who: 'clinic', label: 'Prova onaylandı, devam' },
-    { to: 'revizyon', who: 'clinic', label: 'Revizyon iste', needNote: true }
+    { to: 'bitim', who: 'clinic', label: 'Düzenlemeler bitti, bitime gönder' },
+    { to: 'revizyon', who: 'clinic', label: 'Düzenleme iste', needNote: true },
+    { to: 'uretimde', who: 'clinic', label: 'Prova uygun, yeni prova gelecek' }
   ],
   revizyon: [
-    { to: 'uretimde', who: 'technician', label: 'Revizyona başla' }
+    { to: 'uretimde', who: 'technician', label: 'Düzenlemeye başla' }
+  ],
+  bitim: [
+    { to: 'hazir', who: 'technician', label: 'Bitim tamamlandı, hazır' },
+    { to: 'teslim', who: 'technician', label: 'Bitim tamamlandı, teslim et' }
   ],
   hazir: [
     { to: 'teslim', who: 'technician', label: 'Teslim et / kargoya ver' }
   ],
   teslim: [
     { to: 'tamamlandi', who: 'clinic', label: 'Teslim alındı, tamamla' },
-    { to: 'revizyon', who: 'clinic', label: 'Revizyon iste', needNote: true }
+    { to: 'revizyon', who: 'clinic', label: 'Düzenleme iste', needNote: true }
   ],
   reddedildi: [
     { to: 'gonderildi', who: 'sender', label: 'Yeniden gönder' },
@@ -230,9 +242,24 @@ function roleIn(c, user) {
   if (c.toId === user.id || (user.role === 'technician' && (!to || to.role === 'technician'))) r.add('receiver');
   return r;
 }
+// Duzenlemeler numaralanir: 1. Duzenleme, 2. Duzenleme...
+const revCount = (c) => c.revisions || 0;
+function statusLabel(c) {
+  const n = revCount(c);
+  if (c.status === 'revizyon') return `${n}. Düzenleme isteniyor`;
+  if (c.status === 'uretimde' && c.prevStatus === 'revizyon') return `${n}. Düzenleme yapılıyor`;
+  if (c.status === 'prova' && n > 0) return `${n}. Düzenleme provada`;
+  return STATUS[c.status];
+}
 function allowedActions(c, user) {
   const roles = roleIn(c, user);
-  return (TRANSITIONS[c.status] || []).filter((t) => roles.has(t.who));
+  const n = revCount(c);
+  return (TRANSITIONS[c.status] || []).filter((t) => roles.has(t.who)).map((t) => {
+    if (t.to === 'revizyon') return { ...t, label: `${n + 1}. düzenlemeyi iste` };
+    if (c.status === 'revizyon' && t.to === 'uretimde') return { ...t, label: `${n}. düzenlemeye başla` };
+    if (c.status === 'uretimde' && c.prevStatus === 'revizyon' && t.to === 'prova') return { ...t, label: `${n}. düzenlemeyi provaya gönder` };
+    return t;
+  });
 }
 // Hekim kendi islerini, laboratuvar ekibi tum isleri gorur (devre disi hekimlerinki haric)
 function canSeeCase(c, user) {
@@ -261,7 +288,8 @@ function caseSummary(c, user) {
   const p = db.patients.find((x) => x.id === c.patientId);
   return {
     ...c,
-    statusLabel: STATUS[c.status],
+    statusLabel: statusLabel(c),
+    revisions: revCount(c),
     patientName: p ? p.name : '—',
     clinic: publicUser(userById(c.clinicId)),
     technician: publicUser(userById(c.technicianId)),
@@ -597,11 +625,14 @@ route('PATCH', '/api/cases/:id', async (req, res, { params }) => {
     if (t.needNote && !String(b.note || '').trim()) fail(400, 'Bu işlem için açıklama yazmalısınız');
     const prev = c.status;
     c.status = b.status;
+    c.prevStatus = prev;
+    if (b.status === 'revizyon') c.revisions = revCount(c) + 1;
     // Isi kabul eden (ya da ilk isleyen) teknisyen sorumlu olur
     if (u.role === 'technician' && (b.status === 'kabul' || !c.technicianId)) c.technicianId = u.id;
     if (b.status === 'tamamlandi') c.completedAt = now();
-    addEvent(c, u.id, 'status', t.label + (b.note ? ` — ${b.note}` : ''), { from: prev, to: b.status, note: b.note || '' });
-    notifyCase(c, u, 'status', `${c.no}: ${STATUS[prev]} → ${STATUS[c.status]}`);
+    addEvent(c, u.id, 'status', t.label + (b.note ? ` — ${b.note}` : ''), { from: prev, to: b.status, note: b.note || '', rev: revCount(c), label: statusLabel(c) });
+    const p = db.patients.find((x) => x.id === c.patientId);
+    notifyCase(c, u, 'status', `${p ? p.name : c.no}: ${statusLabel(c)}`);
   }
   const editable = ['title', 'workType', 'shade', 'material', 'description'];
   const changes = [];
