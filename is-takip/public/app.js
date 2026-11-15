@@ -8,15 +8,21 @@ const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
 
+/* --- Sekmeye ozel oturum anahtari --- */
+const TOKEN_KEY = 'istakip_token';
+const getToken = () => { try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; } };
+const setToken = (t) => { try { t ? sessionStorage.setItem(TOKEN_KEY, t) : sessionStorage.removeItem(TOKEN_KEY); } catch {} };
+const authHeaders = () => { const t = getToken(); return t ? { Authorization: 'Bearer ' + t } : {}; };
+
 async function api(path, opts = {}) {
-  const init = { method: opts.method || 'GET', headers: {}, credentials: 'same-origin' };
+  const init = { method: opts.method || 'GET', headers: authHeaders(), credentials: 'same-origin' };
   if (opts.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body); }
   const res = await fetch('/api' + path, init);
   const data = res.headers.get('content-type')?.includes('json') ? await res.json() : await res.text();
   if (!res.ok) {
     const err = new Error((data && data.error) || 'İşlem başarısız');
     err.status = res.status;
-    if (res.status === 401 && state.me) { state.me = null; renderAuth(); }
+    if (res.status === 401) { setToken(null); if (state.me) { state.me = null; renderAuth(); } }
     throw err;
   }
   return data;
@@ -189,14 +195,14 @@ function renderAuth(mode = 'login') {
   $('#to-reg')?.addEventListener('click', (e) => { e.preventDefault(); renderAuth('register'); });
   $('#to-login')?.addEventListener('click', (e) => { e.preventDefault(); renderAuth('login'); });
   const doLogin = async (body) => {
-    try { await api('/login', { method: 'POST', body }); await boot(); }
+    try { const r = await api('/login', { method: 'POST', body }); setToken(r.token); await boot(); }
     catch (e) { $('#err').textContent = e.message; }
   };
   $('#f-login')?.addEventListener('submit', (e) => { e.preventDefault(); doLogin(Object.fromEntries(new FormData(e.target))); });
   $$('[data-demo]').forEach((b) => b.onclick = () => doLogin({ email: b.dataset.demo, password: '1234' }));
   $('#f-reg')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    try { await api('/register', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); await boot(); }
+    try { const r = await api('/register', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) }); setToken(r.token); await boot(); }
     catch (err) { $('#err').textContent = err.message; }
   });
 }
@@ -240,7 +246,7 @@ function renderShell() {
   $('#menu').onclick = () => $('#sidebar').classList.toggle('open');
   $('#sidebar').addEventListener('click', (e) => { if (e.target.closest('a')) $('#sidebar').classList.remove('open'); });
   $('#new-case').onclick = () => openNewCase();
-  $('#logout').onclick = async () => { await api('/logout', { method: 'POST' }).catch(() => {}); state.me = null; state.partners = null; renderAuth(); };
+  $('#logout').onclick = async () => { await api('/logout', { method: 'POST' }).catch(() => {}); setToken(null); state.me = null; state.partners = null; renderAuth(); };
   $('#theme').onclick = toggleTheme;
   $('#search').onsubmit = (e) => { e.preventDefault(); const q = e.target.q.value.trim(); location.hash = '#/ara?q=' + encodeURIComponent(q); };
 }
@@ -651,7 +657,7 @@ function chatHtml(c) {
       if (lastMine && e.id === lastMine.id && c.otherRead && c.otherRead >= e.at) html += `<span class="seen">✓✓ Görüldü</span>`;
     } else {
       const fileLink = e.meta?.fileId && c.files.some((f) => f.id === e.meta.fileId)
-        ? ` · <a href="/api/files/${e.meta.fileId}">indir</a>` : '';
+        ? ` · <a href="#" data-dl="${e.meta.fileId}">indir</a>` : '';
       html += `<div class="sys ${e.type}"><b>${esc(e.user?.name)}</b> ${esc(e.text)}${fileLink} · ${fmtTime(e.at)}</div>`;
     }
   }
@@ -665,18 +671,19 @@ function fileCard(f) {
   const isImg = /^(png|jpe?g|gif|webp|bmp)$/.test(ext);
   const mine = f.uploadedBy === state.me.id;
   return `<div class="file">
-    <div class="ico ${isStl ? 'stl' : ''}">${isImg ? `<img src="/api/files/${f.id}?inline=1" alt="" loading="lazy">` : esc(ext.toUpperCase().slice(0, 4) || 'DOSYA')}</div>
+    <div class="ico ${isStl ? 'stl' : ''}">${isImg ? `<img data-img="${f.id}" alt="">` : esc(ext.toUpperCase().slice(0, 4) || 'DOSYA')}</div>
     <div class="info"><b title="${esc(f.name)}">${esc(f.name)}</b><small>${fmtSize(f.size)} · ${esc(f.user?.name?.split(' ').slice(0, 2).join(' '))} · ${rel(f.at)}</small></div>
     <div class="fa">
       ${isStl ? `<button class="btn icon sm ghost" data-view="${f.id}" title="3D görüntüle">${icon('cube')}</button>` : ''}
-      ${isImg ? `<a class="btn icon sm ghost" href="/api/files/${f.id}?inline=1" target="_blank" title="Aç">${icon('search')}</a>` : ''}
-      <a class="btn icon sm ghost" href="/api/files/${f.id}" title="İndir">${icon('download')}</a>
+      ${isImg ? `<a class="btn icon sm ghost" href="#" data-open="${f.id}" title="Aç">${icon('search')}</a>` : ''}
+      <a class="btn icon sm ghost" href="#" data-dl="${f.id}" title="İndir">${icon('download')}</a>
       ${mine ? `<button class="btn icon sm ghost danger" data-del="${f.id}" title="Sil">${icon('trash')}</button>` : ''}
     </div></div>`;
 }
 
 afterRender.is = (parts, query, opts) => {
   const c = state.caseCache;
+  $$('img[data-img]').forEach(async (img) => { try { img.src = await fileBlobUrl(img.dataset.img, true); } catch {} });
   const id = parts[1];
   const chat = $('#chat');
   if (chat) chat.scrollTop = chat.scrollHeight;
@@ -715,6 +722,33 @@ afterRender.is = (parts, query, opts) => {
   $('#due-case').onclick = () => openDue(c);
 };
 
+/* --- Dosya indirme / acma (oturum anahtari baslikla gonderilir) --- */
+const blobCache = new Map();
+async function fileBlobUrl(id, inline) {
+  const key = id + (inline ? ':i' : '');
+  if (blobCache.has(key)) return blobCache.get(key);
+  const res = await fetch(`/api/files/${id}${inline ? '?inline=1' : ''}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error('Dosya alınamadı');
+  const url = URL.createObjectURL(await res.blob());
+  blobCache.set(key, url);
+  return url;
+}
+const fileName = (id) => state.caseCache?.files.find((f) => f.id === id)?.name || 'dosya';
+document.addEventListener('click', async (e) => {
+  const dl = e.target.closest('[data-dl]');
+  const op = e.target.closest('[data-open]');
+  if (!dl && !op) return;
+  e.preventDefault();
+  try {
+    if (dl) {
+      const a = document.createElement('a');
+      a.href = await fileBlobUrl(dl.dataset.dl, false); a.download = fileName(dl.dataset.dl); a.click();
+    } else {
+      window.open(await fileBlobUrl(op.dataset.open, true), '_blank');
+    }
+  } catch (err) { toastErr(err); }
+});
+
 function uploadFiles(caseId, files) {
   if (!files.length) return;
   const box = $('#uploads');
@@ -738,6 +772,7 @@ function uploadOne(caseId, file, onProgress) {
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', `/api/cases/${caseId}/files?name=${encodeURIComponent(file.name)}`);
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    const tk = getToken(); if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
       if (xhr.status < 300) resolve(JSON.parse(xhr.responseText));
@@ -1032,14 +1067,14 @@ async function openStl(f) {
         <button class="btn sm" data-col="#c9b79c">Alçı</button>
         <button class="btn sm" data-col="#9fb7d6">Mavi</button>
         <button class="btn sm" id="vw-shot">Ekran görüntüsü</button>
-        <a class="btn sm" href="/api/files/${f.id}">İndir</a>
+        <a class="btn sm" href="#" data-dl="${f.id}">İndir</a>
       </div>
       <div class="viewer-info hidden" id="vw-info"></div></div>`,
     onClose: () => viewer?.dispose()
   });
   $('.modal-body', m.el).style.cssText = 'padding:0;display:flex';
   try {
-    const res = await fetch(`/api/files/${f.id}`);
+    const res = await fetch(`/api/files/${f.id}`, { headers: authHeaders() });
     if (!res.ok) throw new Error('Dosya indirilemedi');
     const buf = await res.arrayBuffer();
     if (!m.el.isConnected) return;
@@ -1067,7 +1102,8 @@ async function openStl(f) {
 /* ================================================================== */
 function connectStream() {
   state.es?.close();
-  const es = new EventSource('/api/stream');
+  const tk = getToken();
+  const es = new EventSource('/api/stream' + (tk ? '?sid=' + encodeURIComponent(tk) : ''));
   state.es = es;
   es.onmessage = (ev) => {
     let d; try { d = JSON.parse(ev.data); } catch { return; }
@@ -1098,6 +1134,7 @@ setInterval(() => { if (state.me && !$('.modal-back') && !document.activeElement
 async function boot() {
   try {
     const r = await api('/me');
+    if (r.tabToken) setToken(r.tabToken);
     state.me = r.user;
     state.statuses = r.statuses;
   } catch {

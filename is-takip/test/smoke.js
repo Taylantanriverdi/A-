@@ -107,6 +107,15 @@ server.listen(0, async () => {
     const bad = await fetch(base + '/logout', { method: 'POST', headers: { origin: 'http://evil.com' } });
     assert.equal(bad.status, 403);
 
+    // Ayni tarayicida iki sekme: her sekme kendi anahtariyla calisir
+    const tokA = (await (await fetch(base + '/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'klinik@demo.com', password: '1234' }) })).json()).token;
+    const tokB = (await (await fetch(base + '/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'teknisyen@demo.com', password: '1234' }) })).json()).token;
+    const meA = await (await fetch(base + '/me', { headers: { authorization: 'Bearer ' + tokA } })).json();
+    assert.equal(meA.user.role, 'clinic');
+    const pA = await fetch(base + '/patients', { method: 'POST', headers: { authorization: 'Bearer ' + tokA, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Sekme Hasta' }) });
+    assert.equal(pA.status, 201, 'klinik sekmesi, teknisyen girisinden sonra da hasta acabilmeli');
+    assert.ok((await K('GET', '/me')).data.tabToken, 'cerezle gelen sekmeye anahtar verilir');
+
     console.log('✓ Tüm testler geçti');
   } catch (e) {
     console.error('✗ Test başarısız:', e);

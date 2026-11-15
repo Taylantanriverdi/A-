@@ -268,8 +268,26 @@ function parseCookies(req) {
   });
   return out;
 }
+// Her sekme kendi oturum anahtarini "Authorization: Bearer" basligiyla gonderir;
+// boylece ayni tarayicida bir sekmede klinik, digerinde teknisyen olarak calisilabilir.
+// EventSource baslik gonderemedigi icin canli akista ?sid= kullanilir; cerez yedek yontemdir.
+function requestToken(req) {
+  const h = req.headers.authorization || '';
+  if (h.startsWith('Bearer ')) return { token: h.slice(7).trim(), via: 'header' };
+  const q = new URL(req.url, 'http://x').searchParams.get('sid');
+  if (q) return { token: q, via: 'query' };
+  const c = parseCookies(req).sid;
+  return c ? { token: c, via: 'cookie' } : { token: null, via: null };
+}
+function newSessionToken(u) {
+  const token = crypto.randomBytes(32).toString('hex');
+  db.sessions = db.sessions.filter((s) => new Date(s.expiresAt) > new Date());
+  db.sessions.push({ token, userId: u.id, expiresAt: new Date(Date.now() + SESSION_DAYS * 864e5).toISOString() });
+  save();
+  return token;
+}
 function currentUser(req) {
-  const token = parseCookies(req).sid;
+  const { token } = requestToken(req);
   if (!token) return null;
   const s = db.sessions.find((x) => x.token === token);
   if (!s || new Date(s.expiresAt) < new Date()) return null;
@@ -324,11 +342,8 @@ route('POST', '/api/register', async (req, res) => {
 });
 
 function startSession(res, u) {
-  const token = crypto.randomBytes(32).toString('hex');
-  db.sessions = db.sessions.filter((s) => new Date(s.expiresAt) > new Date());
-  db.sessions.push({ token, userId: u.id, expiresAt: new Date(Date.now() + SESSION_DAYS * 864e5).toISOString() });
-  save();
-  send(res, 200, { user: publicUser(u) }, {
+  const token = newSessionToken(u);
+  send(res, 200, { user: publicUser(u), token }, {
     'Set-Cookie': `sid=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_DAYS * 86400}`
   });
 }
@@ -341,15 +356,19 @@ route('POST', '/api/login', async (req, res) => {
 });
 
 route('POST', '/api/logout', async (req, res) => {
-  const token = parseCookies(req).sid;
+  const { token } = requestToken(req);
   db.sessions = db.sessions.filter((s) => s.token !== token);
   save();
-  send(res, 200, { ok: true }, { 'Set-Cookie': 'sid=; HttpOnly; Path=/; Max-Age=0' });
+  // Cerez yalnizca bu sekmenin oturumuna aitse silinir (diger sekmeler etkilenmesin)
+  const headers = parseCookies(req).sid === token ? { 'Set-Cookie': 'sid=; HttpOnly; Path=/; Max-Age=0' } : {};
+  send(res, 200, { ok: true }, headers);
 });
 
 route('GET', '/api/me', async (req, res) => {
   const u = requireUser(req);
-  send(res, 200, { user: publicUser(u), statuses: STATUS, priorities: PRIORITIES });
+  // Cerezle acilan yeni sekmeye kendi anahtari verilir; sonra baska sekmedeki girislerden etkilenmez
+  const tabToken = requestToken(req).via === 'cookie' ? newSessionToken(u) : undefined;
+  send(res, 200, { user: publicUser(u), statuses: STATUS, priorities: PRIORITIES, tabToken });
 });
 
 route('PATCH', '/api/me', async (req, res) => {
