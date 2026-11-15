@@ -616,13 +616,12 @@ async function viewCase(id) {
       </div>
 
       <div class="card">
-        <div class="card-head"><h2>Dosyalar & STL (${c.files.length})</h2><span class="small muted">STL, PLY, OBJ, fotoğraf, PDF, ZIP · en fazla 300 MB</span></div>
+        <div class="card-head"><h2>Dosyalar & STL (${c.files.length})</h2><span class="small muted">STL ve PLY 3D açılır · fotoğraf, PDF, ZIP · en fazla 300 MB</span></div>
         <div class="card-body">
           <div class="dropzone" id="drop">${icon('upload').replace('<svg', '<svg width="22" height="22"')}<div><b>Dosyaları sürükleyip bırakın</b> veya tıklayıp seçin</div></div>
           <input type="file" id="file-in" multiple hidden>
           <div id="uploads"></div>
-          <div class="files">${c.files.map(fileCard).join('') || ''}</div>
-          ${c.files.length ? '' : '<div class="small muted" style="margin-top:10px">Henüz dosya yok.</div>'}
+          ${fileGroups(c.files)}
         </div>
       </div>
 
@@ -673,18 +672,50 @@ function chatHtml(c) {
 }
 const linkify = (s) => s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
 
-function fileCard(f) {
-  const ext = (f.name.split('.').pop() || '').toLowerCase();
-  const isStl = ext === 'stl';
+/* --- Dosyalar: yukleme partilerine gore gruplu liste --- */
+const VIEW3D = /^(stl|ply)$/;
+const fileExt = (n) => (String(n).split('.').pop() || '').toLowerCase();
+function fileGroups(files) {
+  if (!files.length) return '<div class="small muted" style="margin-top:12px">Henüz dosya yok.</div>';
+  // Ayni kisinin 10 dakika icinde yukledigi dosyalar tek parti sayilir
+  const sorted = [...files].sort((a, b) => a.at.localeCompare(b.at));
+  const groups = [];
+  for (const f of sorted) {
+    const g = groups[groups.length - 1];
+    const last = g && g.files[g.files.length - 1];
+    if (g && g.by === f.uploadedBy && new Date(f.at) - new Date(last.at) < 10 * 60000) g.files.push(f);
+    else groups.push({ by: f.uploadedBy, user: f.user, at: f.at, files: [f] });
+  }
+  groups.reverse();
+  return `<div class="fgroups">${groups.map((g, i) => {
+    const side = g.user?.role === 'clinic' ? 'Hekim' : 'Lab';
+    const total = g.files.reduce((n, f) => n + f.size, 0);
+    return `<div class="fgroup">
+      <div class="fgroup-head">
+        ${avatar(g.user?.name, 'sm')}
+        <div class="grow">
+          <div><b>${esc(g.user?.name || '—')}</b> <span class="side-tag ${g.user?.role === 'clinic' ? 'hekim' : 'lab'}">${side}</span>
+            ${i === 0 ? '<span class="side-tag yeni">En son</span>' : ''}</div>
+          <div class="small muted">${new Date(g.at).toLocaleDateString(TR, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}, saat ${fmtTime(g.at)} · ${rel(g.at)}</div>
+        </div>
+        <span class="small muted" style="white-space:nowrap">${g.files.length} dosya · ${fmtSize(total)}</span>
+      </div>
+      ${g.files.map(fileRow).join('')}
+    </div>`;
+  }).join('')}</div>`;
+}
+function fileRow(f) {
+  const ext = fileExt(f.name);
+  const is3d = VIEW3D.test(ext);
   const isImg = /^(png|jpe?g|gif|webp|bmp)$/.test(ext);
   const mine = f.uploadedBy === state.me.id;
-  return `<div class="file">
-    <div class="ico ${isStl ? 'stl' : ''}">${isImg ? `<img data-img="${f.id}" alt="">` : esc(ext.toUpperCase().slice(0, 4) || 'DOSYA')}</div>
-    <div class="info"><b title="${esc(f.name)}">${esc(f.name)}</b><small>${fmtSize(f.size)} · ${esc(f.user?.name?.split(' ').slice(0, 2).join(' '))} · ${rel(f.at)}</small></div>
+  return `<div class="frow">
+    <div class="ico ${is3d ? 'stl' : ''}">${isImg ? `<img data-img="${f.id}" alt="">` : esc(ext.toUpperCase().slice(0, 4) || 'DOSYA')}</div>
+    <div class="info"><b>${esc(f.name)}</b><small>${fmtSize(f.size)} · ${fmtDateTime(f.at)}</small></div>
     <div class="fa">
-      ${isStl ? `<button class="btn icon sm ghost" data-view="${f.id}" title="3D görüntüle">${icon('cube')}</button>` : ''}
-      ${isImg ? `<a class="btn icon sm ghost" href="#" data-open="${f.id}" title="Aç">${icon('search')}</a>` : ''}
-      <a class="btn icon sm ghost" href="#" data-dl="${f.id}" title="İndir">${icon('download')}</a>
+      ${is3d ? `<button class="btn sm" data-view="${f.id}" title="3D görüntüle">${icon('cube')}<span class="lbl">3D aç</span></button>` : ''}
+      ${isImg ? `<a class="btn sm" href="#" data-open="${f.id}" title="Aç">${icon('search')}<span class="lbl">Aç</span></a>` : ''}
+      <a class="btn sm" href="#" data-dl="${f.id}" title="İndir">${icon('download')}<span class="lbl">İndir</span></a>
       ${mine ? `<button class="btn icon sm ghost danger" data-del="${f.id}" title="Sil">${icon('trash')}</button>` : ''}
     </div></div>`;
 }
@@ -1098,6 +1129,7 @@ async function openStl(f) {
       <div class="viewer-tools hidden" id="vw-tools">
         <button class="btn sm" id="vw-reset">Görünümü sıfırla</button>
         <button class="btn sm" id="vw-wire">Tel kafes</button>
+        <button class="btn sm" data-col="orig">Orijinal</button>
         <button class="btn sm" data-col="#f1e9dc">Diş</button>
         <button class="btn sm" data-col="#c9b79c">Alçı</button>
         <button class="btn sm" data-col="#9fb7d6">Mavi</button>
@@ -1113,19 +1145,19 @@ async function openStl(f) {
     if (!res.ok) throw new Error('Dosya indirilemedi');
     const buf = await res.arrayBuffer();
     if (!m.el.isConnected) return;
-    viewer = await import('./stl-viewer.js').then((mod) => mod.mountViewer($('#vw', m.el), buf));
+    viewer = await import('./stl-viewer.js').then((mod) => mod.mountViewer($('#vw', m.el), buf, fileExt(f.name)));
     if (!m.el.isConnected) { viewer.dispose(); return; }
     $('#vw-msg', m.el).remove();
     $('#vw-tools', m.el).classList.remove('hidden');
     const s = viewer.info.size;
     const info = $('#vw-info', m.el);
     info.classList.remove('hidden');
-    info.textContent = `${viewer.info.triangles.toLocaleString(TR)} üçgen · ${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm · Döndür: sol tık · Kaydır: sağ tık · Yakınlaştır: tekerlek`;
+    info.textContent = `${viewer.info.triangles ? viewer.info.triangles.toLocaleString(TR) + ' üçgen' : viewer.info.points.toLocaleString(TR) + ' nokta'} · ${s.x.toFixed(1)} × ${s.y.toFixed(1)} × ${s.z.toFixed(1)} mm · Döndür: sol tık · Kaydır: sağ tık · Yakınlaştır: tekerlek`;
     let wire = false;
     $('#vw-wire', m.el).onclick = () => viewer.setWire((wire = !wire));
     $('#vw-reset', m.el).onclick = () => viewer.reset();
     $$('[data-col]', m.el).forEach((b) => b.onclick = () => viewer.setColor(b.dataset.col));
-    $('#vw-shot', m.el).onclick = () => { const a = document.createElement('a'); a.href = viewer.snapshot(); a.download = f.name.replace(/\.stl$/i, '') + '.png'; a.click(); };
+    $('#vw-shot', m.el).onclick = () => { const a = document.createElement('a'); a.href = viewer.snapshot(); a.download = f.name.replace(/\.(stl|ply)$/i, '') + '.png'; a.click(); };
   } catch (e) {
     const msg = $('#vw-msg', m.el);
     if (msg) msg.textContent = 'Model açılamadı: ' + e.message;

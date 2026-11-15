@@ -1,5 +1,16 @@
 [
   {
+    "v": 7,
+    "tarih": "2026-11-16",
+    "baslik": "Dosyalar yükleme tarihine göre ayrı ayrı",
+    "degisiklikler": [
+      "Dosyalar yükleme partilerine göre gruplanır: her grubun üstünde yükleyen kişi (Hekim / Lab), tarih ve saat",
+      "En son yüklenen grup en üstte ve 'En son' etiketiyle görünür",
+      "Dosya adları kesilmeden tam olarak yazılır; her dosyada boyut ve yükleme saati var",
+      "Ağız içi tarama PLY dosyaları da 3D açılır (renkli taramalar kendi renkleriyle)"
+    ]
+  },
+  {
     "v": 6,
     "tarih": "2026-11-15",
     "baslik": "Sürüm numaraları ve güncelleme geçmişi",

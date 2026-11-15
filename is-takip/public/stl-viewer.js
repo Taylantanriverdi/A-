@@ -41,14 +41,23 @@ export function parseSTL(buffer) {
  * Bir kapsayıcıya STL görüntüleyici yerleştirir.
  * @returns {Promise<{dispose: Function, setWire: Function, setColor: Function, reset: Function, snapshot: Function, info: object}>}
  */
-export async function mountViewer(container, buffer) {
+export async function mountViewer(container, buffer, ext = 'stl') {
   await loadThree();
-  const positions = parseSTL(buffer);
-  if (!positions.length) throw new Error('STL içinde üçgen bulunamadı');
-
-  const geom = new THREE.BufferGeometry();
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geom.computeVertexNormals();
+  let geom;
+  if (ext === 'ply') {
+    // Agiz ici tarayici PLY dosyalari (renkli olabilir)
+    const { PLYLoader } = await import('./vendor/PLYLoader.js');
+    geom = new PLYLoader().parse(buffer);
+    if (!geom.attributes.position || !geom.attributes.position.count) throw new Error('PLY içinde nokta bulunamadı');
+  } else {
+    const positions = parseSTL(buffer);
+    if (!positions.length) throw new Error('STL içinde üçgen bulunamadı');
+    geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  }
+  const hasFaces = ext !== 'ply' || !!geom.index;
+  const hasColor = !!geom.attributes.color;
+  if (hasFaces) geom.computeVertexNormals();
   geom.computeBoundingBox();
   const box = geom.boundingBox;
   const size = new THREE.Vector3(); box.getSize(size);
@@ -67,8 +76,10 @@ export async function mountViewer(container, buffer) {
   const fill = new THREE.DirectionalLight(0xffffff, 0.5); fill.position.set(-2, -1, 1); camera.add(fill);
   scene.add(camera);
 
-  const material = new THREE.MeshStandardMaterial({ color: 0xf1e9dc, roughness: 0.45, metalness: 0.05, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(geom, material);
+  const material = hasFaces
+    ? new THREE.MeshStandardMaterial({ color: hasColor ? 0xffffff : 0xf1e9dc, vertexColors: hasColor, roughness: 0.45, metalness: 0.05, side: THREE.DoubleSide })
+    : new THREE.PointsMaterial({ size: radius / 300, vertexColors: hasColor, color: hasColor ? 0xffffff : 0xf1e9dc });
+  const mesh = hasFaces ? new THREE.Mesh(geom, material) : new THREE.Points(geom, material);
   scene.add(mesh);
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -97,9 +108,10 @@ export async function mountViewer(container, buffer) {
   loop();
 
   return {
-    info: { triangles: positions.length / 9, size: { x: size.x, y: size.y, z: size.z } },
+    info: { triangles: hasFaces ? (geom.index ? geom.index.count : geom.attributes.position.count) / 3 : 0, points: geom.attributes.position.count, size: { x: size.x, y: size.y, z: size.z } },
     setWire: (on) => { material.wireframe = on; },
-    setColor: (hex) => { material.color.set(hex); },
+    // Renk secilince taramanin kendi renkleri kapatilir; "Orijinal" ile geri gelir
+    setColor: (hex) => { if (hex === 'orig') { material.vertexColors = hasColor; material.color.set(hasColor ? 0xffffff : 0xf1e9dc); } else { material.vertexColors = false; material.color.set(hex); } material.needsUpdate = true; },
     reset,
     snapshot: () => renderer.domElement.toDataURL('image/png'),
     dispose: () => {
