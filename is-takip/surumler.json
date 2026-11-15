@@ -1,0 +1,63 @@
+[
+  {
+    "v": 6,
+    "tarih": "2026-11-15",
+    "baslik": "Sürüm numaraları ve güncelleme geçmişi",
+    "degisiklikler": [
+      "Her güncelleme v1, v2, v3… şeklinde numaralanır; sürüm sol alt köşede görünür",
+      "Sürüm numarasına tıklayınca tüm güncellemelerin listesi açılır",
+      "Yeni sürüme geçildiğinde ekranda bilgi mesajı çıkar",
+      "Bat dosyası güncellemede eski ve yeni sürümü yazar (örn. v5 -> v6)"
+    ]
+  },
+  {
+    "v": 5,
+    "tarih": "2026-11-15",
+    "baslik": "Hasta ve iş kaydını yalnızca hekim açar",
+    "degisiklikler": [
+      "Hasta hekime gelir, muayene edilir, hekim işi laboratuvara gönderir",
+      "Teknisyen hasta veya iş kaydı açamaz; yalnızca gelen işleri yürütür",
+      "Menü rollere göre düzenlendi: hekimde 'Laba gönderdiğim işler', teknisyende 'Gelen işler'"
+    ]
+  },
+  {
+    "v": 4,
+    "tarih": "2026-11-15",
+    "baslik": "Açık sekmeler güncellemede kendiliğinden yenilenir",
+    "degisiklikler": [
+      "Bat ile güncelleme sonrası açık sekmeler otomatik olarak yeni sürüme geçer",
+      "Sekme ile sunucudaki oturum uyuşmazsa işlem yapılmaz, sekme yenilenir"
+    ]
+  },
+  {
+    "v": 3,
+    "tarih": "2026-11-15",
+    "baslik": "Her sekmeye ayrı oturum",
+    "degisiklikler": [
+      "Aynı tarayıcıda bir sekmede hekim, diğerinde teknisyen olarak çalışılabilir",
+      "'Hastanın bağlı olduğu kliniği seçin' hatası giderildi"
+    ]
+  },
+  {
+    "v": 2,
+    "tarih": "2026-11-15",
+    "baslik": "Tek tıkla güncelleme ve başlatma",
+    "degisiklikler": [
+      "IsTakip-Baslat.bat: Git ve Node.js kurar, son sürümü indirir, verileri yedekler, programı başlatır",
+      "Ağdaki diğer cihazların bağlanacağı adres pencerede gösterilir"
+    ]
+  },
+  {
+    "v": 1,
+    "tarih": "2026-11-15",
+    "baslik": "İlk sürüm",
+    "degisiklikler": [
+      "Hasta bazlı iş takibi ve otomatik iş numarası",
+      "Gönderildi → Kabul → Üretim → Prova → Hazır → Teslim → Tamamlandı akışı",
+      "İş bazında notlar/mesajlar ve 'Görüldü' bilgisi",
+      "STL, fotoğraf, PDF yükleme ve tarayıcıda 3D STL görüntüleme",
+      "Aşama süreleri, teslim tarihi takibi, geciken iş uyarısı",
+      "Anlık bildirimler, arama, CSV dışa aktarma, açık/koyu tema, mobil uyum"
+    ]
+  }
+]

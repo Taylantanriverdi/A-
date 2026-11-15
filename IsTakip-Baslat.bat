@@ -28,6 +28,7 @@ exit /b
 
 :asama2
 set "KAYNAK=%~f2"
+set "ESKI_SURUM=-"
 set "PATH=%PATH%;%ProgramFiles%\Git\cmd;%ProgramFiles%\nodejs;%LOCALAPPDATA%\Programs\Git\cmd"
 
 echo.
@@ -94,14 +95,26 @@ if exist "is-takip\data\db.json" (
   echo  Veriler yedeklendi: is-takip\data\yedek
 )
 rem Kodu sunucudaki son surumle esitle (data klasoru korunur)
+if exist "is-takip\surum.js" for /f %%v in ('node "is-takip\surum.js"') do set "ESKI_SURUM=%%v"
 git checkout -f -B "%BRANCH%" "origin/%BRANCH%" >nul 2>&1
 if errorlevel 1 (echo  HATA: Guncelleme uygulanamadi. & popd & goto hata)
 popd
 
 :guncel
 pushd "%REPO%"
-for /f "delims=" %%l in ('git log -1 --format^="%%h  %%s  (%%cr)"') do echo  Surum: %%l
+set "YENI_SURUM=?"
+if exist "is-takip\surum.js" for /f %%v in ('node "is-takip\surum.js"') do set "YENI_SURUM=%%v"
 popd
+title Is Takip %YENI_SURUM%
+echo.
+if "%ESKI_SURUM%"=="-" (
+  echo  *** Kurulu surum: %YENI_SURUM% ***
+) else if "%ESKI_SURUM%"=="%YENI_SURUM%" (
+  echo  *** Surum: %YENI_SURUM% - zaten en guncel ***
+) else (
+  echo  *** GUNCELLENDI: %ESKI_SURUM% --^> %YENI_SURUM% ***
+)
+echo  Yenilikleri gormek icin programda sol alttaki surum numarasina tiklayin.
 
 rem ---------- 4) Bagimliliklar ----------
 echo.

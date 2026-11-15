@@ -33,7 +33,7 @@ function toast(text, opts = {}) {
   const el = document.createElement('div');
   el.className = 'toast ' + (opts.type || '');
   el.innerHTML = `${esc(text)}${opts.sub ? `<small>${esc(opts.sub)}</small>` : ''}`;
-  el.onclick = () => { if (opts.href) location.hash = opts.href; el.remove(); };
+  el.onclick = () => { if (opts.href) location.hash = opts.href; opts.onClick?.(); el.remove(); };
   $('#toasts').appendChild(el);
   setTimeout(() => el.remove(), opts.ms || 4500);
 }
@@ -231,7 +231,7 @@ function renderShell() {
         <a href="#/profil" data-nav="profil">${icon('user')}Profil & ayarlar</a>
       </nav>
       <div class="side-foot">
-        <div class="small" style="opacity:.55;margin-bottom:8px">Sürüm ${esc(state.version || '')}</div>
+        <a href="#" id="ver" class="small" style="display:inline-block;color:var(--side-text);margin-bottom:8px" title="Güncelleme geçmişi">Sürüm <b style="color:#fff">${esc(state.version || '')}</b> · Yenilikler</a>
         <div class="side-user">${avatar(me.name, 'sm')}<div style="min-width:0"><b style="font-size:13px">${esc(me.name)}</b><small>${esc(me.org || roleName(me.role))}</small></div></div>
       </div>
     </aside>
@@ -252,6 +252,7 @@ function renderShell() {
   $('#new-case')?.addEventListener('click', () => openNewCase());
   $('#logout').onclick = async () => { await api('/logout', { method: 'POST' }).catch(() => {}); setToken(null); state.me = null; state.partners = null; renderAuth(); };
   $('#theme').onclick = toggleTheme;
+  $('#ver').onclick = (e) => { e.preventDefault(); openChangelog(); };
   $('#search').onsubmit = (e) => { e.preventDefault(); const q = e.target.q.value.trim(); location.hash = '#/ara?q=' + encodeURIComponent(q); };
 }
 
@@ -1065,6 +1066,30 @@ function openDue(c) {
   $('#due-clear', m.el).onclick = () => saveDue(null);
 }
 
+/* --- Surum gecmisi --- */
+async function openChangelog() {
+  let list;
+  try { list = await api('/surumler'); } catch (e) { return toastErr(e); }
+  modal({
+    title: 'Güncelleme geçmişi',
+    body: list.map((s, i) => `
+      <div style="padding:${i ? '14px 0 0' : '0'};margin-top:${i ? '14px' : '0'};border-top:${i ? '1px solid var(--border)' : '0'}">
+        <div class="row" style="justify-content:space-between">
+          <div class="row"><span class="badge plain ${i ? '' : 'st-tamamlandi'}" style="font-size:13px">v${s.v}</span><h3>${esc(s.baslik)}</h3></div>
+          <span class="small muted">${fmtDate(s.tarih)}${i ? '' : ' · şu an kullanılan'}</span>
+        </div>
+        <ul style="margin:8px 0 0;padding-left:20px;line-height:1.7">${s.degisiklikler.map((d) => `<li>${esc(d)}</li>`).join('')}</ul>
+      </div>`).join('') || '<div class="empty">Kayıt yok.</div>'
+  });
+}
+function announceVersion() {
+  let seen = null;
+  try { seen = localStorage.getItem('istakip_surum'); localStorage.setItem('istakip_surum', state.version); } catch {}
+  if (seen && seen !== state.version) {
+    toast(`Yeni sürüm yüklendi: ${state.version}`, { type: 'ok', sub: 'Neler değişti? Görmek için tıklayın', ms: 10000, onClick: openChangelog });
+  }
+}
+
 async function openStl(f) {
   let viewer = null;
   const m = modal({
@@ -1118,7 +1143,7 @@ function connectStream() {
   es.onmessage = (ev) => {
     let d; try { d = JSON.parse(ev.data); } catch { return; }
     // Sunucu guncellendiyse (bat ile) acik sekmeyi yeni surume yenile
-    if (d.kind === 'hello') { if (state.version && d.version !== state.version) location.reload(); return; }
+    if (d.kind === 'hello') { if (state.build && d.build !== state.build) location.reload(); return; }
     const { parts } = parseHash();
     const onThisCase = parts[0] === 'is' && parts[1] === d.caseId;
     if (d.kind === 'read') { if (onThisCase) route({ soft: true }); return; }
@@ -1150,11 +1175,13 @@ async function boot() {
     state.me = r.user;
     state.statuses = r.statuses;
     state.version = r.version;
+    state.build = r.build;
   } catch {
     state.me = null;
     return renderAuth();
   }
   renderShell();
+  announceVersion();
   connectStream();
   refreshBadges();
   await route();

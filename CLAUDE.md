@@ -13,3 +13,10 @@ Kullanıcı Windows'ta tüm güncellemeleri yalnızca kök dizindeki `IsTakip-Ba
 4. Çalışma dalı değişirse bat içindeki `BRANCH` ayarı güncellenmeli.
 5. `.bat` dosyaları CRLF satır sonuyla ve yalnızca ASCII karakterlerle yazılmalı (bkz. `.gitattributes`).
 6. Değişiklikler commit edilip ilgili dala push edilmeli; push edilmeyen değişiklik kullanıcıya ulaşmaz.
+
+## Kural: Her güncelleme bir sürüm numarası alır (v1, v2, v3…)
+
+Kullanıcıya ulaşan her güncellemede `is-takip/surumler.json` dosyasının **en üstüne** yeni bir kayıt eklenir:
+numara bir öncekinin bir fazlası (`"v": 7`), tarih, kısa başlık ve kullanıcının anlayacağı dille Türkçe
+değişiklik maddeleri. Program ve bat dosyası sürümü buradan okur; kullanıcı sol alttaki sürüme tıklayarak
+geçmişi görür. Kullanıcıya verilen yanıtta yeni sürüm numarası belirtilir.
