@@ -1,0 +1,12 @@
+{
+  "name": "klinik-teknisyen-is-takip",
+  "version": "1.0.0",
+  "description": "Klinik ve dental teknisyen arasında hasta bazlı iş takip sistemi",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}
