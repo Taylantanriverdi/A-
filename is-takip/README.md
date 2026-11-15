@@ -5,6 +5,15 @@ Diş kliniği ile dental teknisyen/laboratuvar arasındaki işleri **hasta bazl�
 
 ## Kurulum ve çalıştırma
 
+### Windows: tek tıkla (önerilen)
+
+Deponun kökündeki **`IsTakip-Baslat.bat`** dosyasına çift tıklayın. Dosya Git ve Node.js yoksa kurar,
+programı indirir ya da en son sürüme günceller, verileri `data/yedek` içine yedekler, eski sunucuyu kapatıp
+yenisini başlatır ve tarayıcıyı açar. Güncelleme almak için her seferinde aynı dosyaya çift tıklamanız yeterli.
+Bat dosyasını tek başına (ör. Masaüstüne) indirip çalıştırırsanız program `%USERPROFILE%\IsTakip\a-` klasörüne kurulur.
+
+### Elle
+
 Gereken tek şey **Node.js 18+**. Ek paket kurulmaz.
 
 ```bash
