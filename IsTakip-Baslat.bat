@@ -121,7 +121,7 @@ echo [5/5] Program baslatiliyor...
 echo.
 echo  ----------------------------------------------------------
 echo   Adres (bu bilgisayar) : http://localhost:%PORT%
-for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr /c:"IPv4"') do echo   Agdaki diger cihazlar : http:/%%i:%PORT%
+for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr /c:"IPv4"') do for /f "tokens=*" %%j in ("%%i") do echo   Agdaki diger cihazlar : http://%%j:%PORT%
 echo   Demo: klinik@demo.com / teknisyen@demo.com  sifre 1234
 echo   KAPATMAK icin bu pencereyi kapatin.
 echo  ----------------------------------------------------------
