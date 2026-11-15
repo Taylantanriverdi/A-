@@ -125,11 +125,7 @@ const icon = (n) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 const WORK_TYPES = ['Kron', 'Köprü', 'İmplant üstü kron', 'İmplant üstü köprü', 'İnley / Onley', 'Laminate veneer', 'Geçici kron/köprü', 'Total protez', 'Parsiyel protez', 'Hareketli protez tamiri', 'Plak / Splint', 'Ortodontik aparey', 'Şeffaf plak (aligner)', 'Cerrahi rehber', 'Model / Dijital model', 'Diğer'];
 const MATERIALS = ['Zirkonyum', 'Monolitik zirkonyum', 'E.max (lityum disilikat)', 'Metal destekli porselen', 'PMMA', 'Kompozit', 'Akrilik', 'Şeffaf akrilik', 'Krom-kobalt', 'Titanyum', 'Diğer'];
 const SHADES = ['', 'A1', 'A2', 'A3', 'A3.5', 'A4', 'B1', 'B2', 'B3', 'B4', 'C1', 'C2', 'C3', 'C4', 'D2', 'D3', 'D4', 'BL1', 'BL2', 'BL3', 'BL4', 'OM1', 'OM2', 'OM3'];
-const FLOW = ['gonderildi', 'uretimde', 'prova', 'teslim', 'tamamlandi'];
-const FLOW_LABEL = ['Gönderildi', 'Üretimde', 'Prova', 'Teslim', 'Tamamlandı'];
-// Her durumun 5 adimlik cubukta hangi adima denk geldigi (eski 'kabul'/'hazir' dahil)
-const STAGE = { gonderildi: 0, reddedildi: 0, kabul: 1, uretimde: 1, prova: 2, revizyon: 2, hazir: 3, teslim: 3, tamamlandi: 4, iptal: -1 };
-const DONE = ['tamamlandi', 'iptal'];
+const FLOW = ['gonderildi', 'kabul', 'uretimde', 'prova', 'hazir', 'teslim', 'tamamlandi'];
 const UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
@@ -222,25 +218,29 @@ function renderShell() {
   $('#app').innerHTML = `
   <div class="layout">
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><div class="brand-logo">${toothSvg()}</div><div><b>${esc(LAB())}</b><span>${me.role === 'clinic' ? 'Hekim' : 'Laboratuvar'}</span></div></div>
+      <div class="brand"><div class="brand-logo">${toothSvg()}</div><div><b>${esc(LAB())}</b><span>${me.role === 'clinic' ? 'Hekim paneli' : 'Laboratuvar paneli'}</span></div></div>
       <nav class="nav">
-        <a href="#/" data-nav="home">${icon('box')}İşler<span class="count" id="cnt-home"></span></a>
+        <a href="#/" data-nav="pano">${icon('home')}Pano</a>
         <a href="#/hastalar" data-nav="hastalar">${icon('users')}Hastalar</a>
-        ${me.role === 'technician' ? `<a href="#/ekip" data-nav="ekip">${icon('user')}Ekip & hekimler</a>` : ''}
-        <a href="#/profil" data-nav="profil">${icon('edit')}Ayarlar</a>
+        ${me.role === 'clinic'
+          ? `<a href="#/isler?tab=giden" data-nav="giden">${icon('send')}Laba gönderdiğim işler</a>`
+          : `<a href="#/isler?tab=gelen" data-nav="gelen">${icon('inbox')}Gelen işler<span class="count" id="cnt-in"></span></a>`}
+        <a href="#/isler?tab=aktif" data-nav="isler">${icon('box')}Tüm işler<span class="count" id="cnt-unread"></span></a>
+        ${me.role === 'technician' ? `<a href="#/ekip" data-nav="ekip">${icon('users')}Ekip & hekimler</a>` : ''}
+        <a href="#/profil" data-nav="profil">${icon('user')}Profil & ayarlar</a>
       </nav>
       <div class="side-foot">
         <a href="#" id="ver" class="small" style="display:inline-block;color:var(--side-text);margin-bottom:8px" title="Güncelleme geçmişi">Sürüm <b style="color:#fff">${esc(state.version || '')}</b> · Yenilikler</a>
-        <div class="side-user">${avatar(me.name, 'sm')}<div style="min-width:0"><b style="font-size:13px">${esc(me.name)}</b><small>${esc(me.role === 'clinic' ? (me.org || 'Hekim') : 'Laboratuvar')}</small></div></div>
+        <div class="side-user">${avatar(me.name, 'sm')}<div style="min-width:0"><b style="font-size:13px">${esc(me.name)}</b><small>${esc(me.org || roleName(me.role))}</small></div></div>
       </div>
     </aside>
     <div class="main">
       <header class="topbar">
         <button class="btn icon ghost menu-btn" id="menu" aria-label="Menü">${icon('menu')}</button>
-        <form class="search" id="search"><input name="q" placeholder="Hasta ara…" autocomplete="off">${icon('search')}</form>
+        <form class="search" id="search"><input name="q" placeholder="Hasta, iş no, iş türü ara…" autocomplete="off">${icon('search')}</form>
         <div class="spacer"></div>
-        ${me.role === 'clinic' ? `<button class="btn primary" id="new-case">${icon('plus')}<span class="lbl">Yeni iş gönder</span></button>` : ''}
-        <button class="btn icon ghost" id="theme" title="Açık / koyu tema">${icon('moon')}</button>
+        ${me.role === 'clinic' ? `<button class="btn primary" id="new-case">${icon('plus')}<span class="lbl">Laba iş gönder</span></button>` : ''}
+        <button class="btn icon ghost" id="theme" title="Tema">${icon('moon')}</button>
         <button class="btn icon ghost" id="logout" title="Çıkış">${icon('logout')}</button>
       </header>
       <main class="content" id="view"></main>
@@ -268,7 +268,8 @@ async function refreshBadges() {
   try {
     state.stats = await api('/stats');
     const set = (id, n) => { const el = $(id); if (el) el.textContent = n ? n : ''; };
-    set('#cnt-home', state.stats.waitingMe);
+    set('#cnt-in', state.stats.incomingNew);
+    set('#cnt-unread', state.stats.unread);
     document.title = (state.stats.unread ? `(${state.stats.unread}) ` : '') + LAB() + ' İş Takip';
   } catch {}
 }
@@ -287,7 +288,8 @@ async function route(opts = {}) {
   const { parts, query } = parseHash();
   const seq = ++renderSeq;
   const view = $('#view');
-  const navKey = !parts[0] || parts[0] === 'isler' || parts[0] === 'is' ? 'home' : parts[0] === 'hasta' ? 'hastalar' : parts[0];
+  const navKey = parts[0] === 'isler' ? ({ gelen: 'gelen', giden: 'giden' }[query.get('tab')] || 'isler')
+    : parts[0] === 'hasta' ? 'hastalar' : parts[0] === 'is' ? '' : (parts[0] || 'pano');
   $$('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === navKey));
   // Canlı yenilemede yazılmakta olan metinleri koru
   const keep = {};
@@ -296,15 +298,15 @@ async function route(opts = {}) {
   try {
     let html;
     switch (parts[0] || '') {
-      case '': html = await viewHome(query); break;
+      case '': html = await viewDashboard(); break;
       case 'hastalar': html = await viewPatients(query); break;
       case 'hasta': html = await viewPatient(parts[1]); break;
-      case 'isler': html = await viewHome(query); break;
+      case 'isler': html = await viewCases(query); break;
       case 'is': html = await viewCase(parts[1], opts); break;
       case 'ara': html = await viewSearch(query); break;
       case 'profil': html = viewProfile(); break;
       case 'ekip': html = await viewTeam(); break;
-      default: html = `<div class="empty">Sayfa bulunamadı. <a href="#/">İşlere dön</a></div>`;
+      default: html = `<div class="empty">Sayfa bulunamadı. <a href="#/">Panoya dön</a></div>`;
     }
     if (seq !== renderSeq) return;
     if (typeof html === 'string') view.innerHTML = html;
@@ -314,7 +316,7 @@ async function route(opts = {}) {
     if (!opts.soft) window.scrollTo(0, 0);
   } catch (e) {
     if (seq !== renderSeq) return;
-    view.innerHTML = `<div class="card empty">${esc(e.message)}<br><br><a href="#/">İşlere dön</a></div>`;
+    view.innerHTML = `<div class="card empty">${esc(e.message)}<br><br><a href="#/">Panoya dön</a></div>`;
   }
 }
 const afterRender = {};
@@ -325,59 +327,74 @@ window.addEventListener('hashchange', () => route());
 /* ================================================================== */
 function caseRow(c, { showPatient = true } = {}) {
   const d = dueInfo(c);
-  const who = isClinic() ? '' : (c.clinic?.org || c.clinic?.name || '');
-  const head = showPatient ? c.patientName : (c.workType || c.title);
-  const info = [showPatient ? c.workType : '', c.teeth?.length ? 'Diş ' + c.teeth.join(', ') : '', c.shade, who].filter(Boolean).join(' · ');
-  return `<a class="crow" href="#/is/${c.id}" data-search="${esc([c.no, c.patientName, c.workType, who].join(' ').toLocaleLowerCase(TR))}">
-    ${showPatient ? avatar(c.patientName, 'sm') : ''}
-    <span class="t"><b>${esc(head)}${c.priority === 'acil' ? ' <span class="badge plain pr-acil">ACİL</span>' : ''}</b><small>${esc(info)}</small></span>
-    ${DONE.includes(c.status) ? `<span class="due">${fmtDate(c.updatedAt)}</span>` : `<span class="due ${d.cls}">${d.text}</span>`}
-    ${c.unread ? `<span class="dot-unread" title="Yeni mesaj">${c.unread}</span>` : ''}
-    ${statusBadge(c.status)}
+  const other = isClinic() ? { org: LAB() } : c.clinic;
+  return `<a class="case-row" href="#/is/${c.id}">
+    <span class="no mono">#${esc(c.no)}</span>
+    <span class="t"><b>${showPatient ? esc(c.patientName) + ' · ' : ''}${esc(c.title)}</b>
+      <small>${dirTag(c)} ${esc(other?.org || other?.name || '')} · ${esc(c.workType)}${c.teeth?.length ? ' · Diş ' + c.teeth.join(', ') : ''} · ${rel(c.updatedAt)}</small></span>
+    <span class="meta extra">${prioBadge(c.priority)}<span class="due ${d.cls}">${icon('clock').replace('<svg', '<svg width="13" height="13" style="vertical-align:-2px"')} ${d.text}</span></span>
+    <span class="meta">${c.unread ? `<span class="dot-unread" title="Okunmamış">${c.unread}</span>` : ''}${statusBadge(c.status)}</span>
   </a>`;
+}
+function feedItem(e) {
+  const verb = { note: 'not yazdı', status: 'durumu güncelledi', file: 'dosya işlemi', created: 'yeni iş', due: 'tarih değiştirdi', edit: 'bilgileri düzenledi' }[e.type] || '';
+  return `<a class="feed-item" href="#/is/${e.caseId}" style="color:inherit;text-decoration:none">
+    ${avatar(e.user?.name, 'sm')}
+    <div class="txt"><b>${esc(e.user?.name)}</b> <span class="muted small">${verb} · ${rel(e.at)}</span>
+      <p>#${esc(e.caseNo)} ${esc(e.patientName)} — ${esc(e.text)}</p></div></a>`;
 }
 
 /* ================================================================== */
-/* Ana ekran: Isler                                                    */
+/* Pano                                                                */
 /* ================================================================== */
-async function viewHome(query) {
-  const all = await api('/cases');
-  const waiting = all.filter((c) => !DONE.includes(c.status) && c.actions.some((a) => a.to !== 'iptal'));
-  const active = all.filter((c) => !DONE.includes(c.status));
-  const done = all.filter((c) => DONE.includes(c.status));
-  const late = active.filter((c) => c.dueDate && c.dueDate < todayStr()).length;
-  let tab = query.get('tab');
-  if (!['bekleyen', 'devam', 'biten'].includes(tab)) tab = waiting.length ? 'bekleyen' : 'devam';
-  const byDue = (a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999') || b.updatedAt.localeCompare(a.updatedAt);
-  const list = { bekleyen: [...waiting].sort(byDue), devam: [...active].sort(byDue), biten: done }[tab];
-  state.lastList = list;
-  const empty = {
-    bekleyen: 'Sizden işlem bekleyen iş yok.',
-    devam: isClinic() ? 'Devam eden iş yok. “Yeni iş gönder” ile başlayın.' : 'Şu an devam eden iş yok.',
-    biten: 'Henüz biten iş yok.'
-  }[tab];
-  const tabBtn = (k, label, n) => `<button class="${k === tab ? 'active' : ''}" data-tab="${k}">${label}${n ? ` <span class="tcnt">${n}</span>` : ''}</button>`;
+async function viewDashboard() {
+  const [s, cases] = await Promise.all([api('/stats'), api('/cases?status=active')]);
+  state.stats = s;
+  const waiting = cases.filter((c) => c.actions.length);
+  const upcoming = cases.filter((c) => c.dueDate).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).slice(0, 8);
+  const max = Math.max(1, ...Object.values(s.byStatus));
+  const hello = new Date().getHours() < 12 ? 'Günaydın' : new Date().getHours() < 18 ? 'İyi günler' : 'İyi akşamlar';
   return `
   <div class="page-head">
-    <div><h1>İşler</h1>
-      <p class="muted">${waiting.length ? `<b>${waiting.length}</b> iş sizden işlem bekliyor` : 'Sizden işlem bekleyen iş yok'}${late ? ` · <span style="color:var(--bad);font-weight:600">${late} iş gecikti</span>` : ''}</p></div>
+    <div><h1>${hello}, ${esc(state.me.name.split(' ').slice(0, 2).join(' '))}</h1>
+    <p class="muted">${new Date().toLocaleDateString(TR, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${esc(state.me.org || '')}</p></div>
+    ${isClinic() ? `<button class="btn" onclick="location.hash='#/hastalar?new=1'">${icon('plus')}Yeni hasta</button>` : ''}
   </div>
-  <div class="toolbar">
-    <div class="tabs">${tabBtn('bekleyen', 'Sizi bekleyen', waiting.length)}${tabBtn('devam', 'Devam eden', active.length)}${tabBtn('biten', 'Biten', 0)}</div>
-    <input id="hq" placeholder="Bu listede hasta ara" autocomplete="off">
+  <div class="stats">
+    ${isClinic()
+      ? `<div class="card stat primary" onclick="location.hash='#/isler?tab=aktif&status=gonderildi'"><span class="label">Lab onayı bekleyen</span><span class="value">${s.byStatus.gonderildi}</span><span class="small muted">Laboratuvara gönderildi</span></div>`
+      : `<div class="card stat primary" onclick="location.hash='#/isler?tab=gelen'"><span class="label">Yeni gelen iş</span><span class="value">${s.incomingNew}</span><span class="small muted">Kabul bekliyor</span></div>`}
+    <div class="card stat warn" onclick="location.hash='#/isler?tab=aktif'"><span class="label">Sizden işlem bekleyen</span><span class="value">${s.waitingMe}</span><span class="small muted">Aksiyon gerekli</span></div>
+    <div class="card stat" onclick="location.hash='#/isler?tab=aktif'"><span class="label">Aktif işler</span><span class="value">${s.active}</span><span class="small muted">Toplam ${s.total} iş</span></div>
+    <div class="card stat bad" onclick="location.hash='#/isler?tab=aktif&sort=due'"><span class="label">Geciken</span><span class="value">${s.overdue}</span><span class="small muted">Bugün teslim: ${s.dueToday}</span></div>
+    <div class="card stat ok"><span class="label">Ort. tamamlanma</span><span class="value">${s.avgDays == null ? '—' : s.avgDays.toFixed(1)}</span><span class="small muted">gün / iş</span></div>
+    <div class="card stat" onclick="location.hash='#/hastalar'"><span class="label">Hasta</span><span class="value">${s.patients}</span><span class="small muted">Okunmamış: ${s.unread}</span></div>
   </div>
-  <div class="card"><div class="list" id="hlist">${list.length ? list.map((c) => caseRow(c)).join('') : `<div class="empty">${empty}</div>`}</div></div>
-  ${list.length ? `<div class="small" style="margin-top:10px;text-align:right"><a href="#" id="csv">Listeyi Excel'e aktar</a></div>` : ''}`;
+  <div class="two-col">
+    <div class="stack" style="gap:18px">
+      <div class="card">
+        <div class="card-head"><h2>Sizden işlem bekleyen işler</h2><a href="#/isler?tab=aktif" class="small">Tümü →</a></div>
+        <div class="list">${waiting.length ? waiting.slice(0, 10).map((c) => caseRow(c)).join('') : '<div class="empty">Harika! Şu an sizden işlem bekleyen iş yok.</div>'}</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Yaklaşan teslimler</h2><a href="#/isler?tab=aktif&sort=due" class="small">Takvime göre →</a></div>
+        <div class="list">${upcoming.length ? upcoming.map((c) => caseRow(c)).join('') : '<div class="empty">Teslim tarihi girilmiş aktif iş yok.</div>'}</div>
+      </div>
+    </div>
+    <div class="stack" style="gap:18px">
+      <div class="card">
+        <div class="card-head"><h2>Aşamalara göre işler</h2></div>
+        <div class="card-body bars">${Object.entries(s.byStatus).map(([k, v]) => `
+          <div class="bar"><span>${esc(state.statuses[k])}</span><div class="track"><div class="fill" style="width:${(v / max) * 100}%"></div></div><b class="mono">${v}</b></div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h2>Son hareketler</h2></div>
+        <div class="list">${s.recent.length ? s.recent.slice(0, 12).map(feedItem).join('') : '<div class="empty">Henüz hareket yok.</div>'}</div>
+      </div>
+    </div>
+  </div>`;
 }
-afterRender[''] = afterRender.isler = () => {
-  $$('[data-tab]').forEach((b) => b.onclick = () => { location.hash = '#/?tab=' + b.dataset.tab; });
-  $('[data-new]')?.addEventListener('click', () => openNewCase());
-  $('#csv')?.addEventListener('click', (e) => { e.preventDefault(); exportCsv(state.lastList || []); });
-  $('#hq').oninput = (e) => {
-    const q = e.target.value.trim().toLocaleLowerCase(TR);
-    $$('#hlist .crow').forEach((r) => { r.style.display = !q || r.dataset.search.includes(q) ? '' : 'none'; });
-  };
-};
 
 /* ================================================================== */
 /* Hastalar                                                            */
@@ -387,7 +404,7 @@ async function viewPatients(query) {
   const list = await api('/patients?q=' + encodeURIComponent(q));
   return `
   <div class="page-head">
-    <div><h1>Hastalar</h1><p class="muted">Her hastanın altında devam eden işleri görünür.</p></div>
+    <div><h1>Hastalar</h1><p class="muted">${isClinic() ? 'Her hastanın altında o hastaya ait tüm işler listelenir.' : 'Hekimlerin size iş gönderdiği hastalar ve işleri.'}</p></div>
     ${isClinic() ? `<button class="btn primary" id="add-patient">${icon('plus')}Yeni hasta</button>` : ''}
   </div>
   <div class="toolbar"><input id="pq" placeholder="Hasta adı veya telefon ile filtrele" value="${esc(q)}" style="max-width:360px"></div>
@@ -399,10 +416,10 @@ function patientCard(p) {
     <div class="patient-head">
       ${avatar(p.name)}
       <div class="grow"><a class="name" href="#/hasta/${p.id}">${esc(p.name)}</a>
-        <div class="small muted">${[state.me.role === 'technician' && p.clinic ? p.clinic.org : '', `${p.cases.length} iş`].filter(Boolean).map(esc).join(' · ')}</div></div>
-      ${isClinic() ? `<button class="btn sm" data-new-for="${p.id}">${icon('plus')}İş gönder</button>` : ''}
+        <div class="small muted">${[p.phone, p.birthDate && 'Doğum: ' + fmtDate(p.birthDate), state.me.role === 'technician' && p.clinic ? p.clinic.org : '', `${p.cases.length} iş, ${active} aktif`].filter(Boolean).map(esc).join(' · ')}</div></div>
+      ${isClinic() ? `<button class="btn sm" data-new-for="${p.id}">${icon('plus')}Laba iş gönder</button>` : ''}
     </div>
-    <div class="list">${p.cases.filter((c) => !DONE.includes(c.status)).map((c) => caseRow(c, { showPatient: false })).join('') || `<div class="empty" style="padding:14px">${p.cases.length ? 'Devam eden iş yok' : 'Henüz iş yok'}</div>`}</div>
+    <div class="list">${p.cases.length ? p.cases.map((c) => caseRow(c, { showPatient: false })).join('') : '<div class="empty" style="padding:16px">Bu hastaya ait iş yok.</div>'}</div>
   </div>`;
 }
 afterRender.hastalar = (parts, query) => {
@@ -426,7 +443,7 @@ async function viewPatient(id) {
       <h1>${esc(p.name)}</h1></div></div>
     <div class="row">
       ${p.canEdit ? `<button class="btn" id="edit-p">${icon('edit')}Düzenle</button>` : ''}
-      ${isClinic() ? `<button class="btn primary" id="new-for">${icon('plus')}Bu hastaya iş gönder</button>` : ''}
+      ${isClinic() ? `<button class="btn primary" id="new-for">${icon('plus')}Bu hastaya laba iş gönder</button>` : ''}
     </div>
   </div>
   <div class="two-col">
@@ -457,6 +474,56 @@ afterRender.hasta = (parts) => {
   });
 };
 
+/* ================================================================== */
+/* İş listesi                                                          */
+/* ================================================================== */
+const TABS = { aktif: 'Aktif', gelen: 'Gelen', giden: 'Gönderilen', tamam: 'Tamamlanan', tumu: 'Tümü' };
+async function viewCases(query) {
+  const tab = TABS[query.get('tab')] ? query.get('tab') : 'aktif';
+  const st = query.get('status') || '';
+  const q = query.get('q') || '';
+  const sort = query.get('sort') || 'updated';
+  const params = new URLSearchParams();
+  if (tab === 'aktif') params.set('status', 'active');
+  if (tab === 'tamam') params.set('status', 'tamamlandi');
+  if (tab === 'gelen') params.set('dir', 'incoming');
+  if (tab === 'giden') params.set('dir', 'outgoing');
+  if (st) params.set('status', st);
+  if (q) params.set('q', q);
+  let list = await api('/cases?' + params);
+  const pr = { acil: 0, yuksek: 1, normal: 2, dusuk: 3 };
+  if (sort === 'due') list.sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+  if (sort === 'prio') list.sort((a, b) => pr[a.priority] - pr[b.priority]);
+  if (sort === 'created') list.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  state.lastList = list;
+  const link = (k, v) => { const p = new URLSearchParams(query); p.set(k, v); return '#/isler?' + p; };
+  return `
+  <div class="page-head">
+    <div><h1>${tab === 'gelen' ? 'Gelen işler' : tab === 'giden' ? 'Laba gönderdiğim işler' : 'İşler'}</h1>
+      <p class="muted">${list.length} iş listeleniyor</p></div>
+    <div class="row"><button class="btn" id="csv">${icon('csv')}CSV indir</button>
+      ${isClinic() ? `<button class="btn primary" onclick="document.getElementById('new-case').click()">${icon('plus')}Laba iş gönder</button>` : ''}</div>
+  </div>
+  <div class="toolbar">
+    <div class="tabs">${Object.entries(TABS).filter(([k]) => k !== (isClinic() ? 'gelen' : 'giden')).map(([k, v]) => `<button class="${k === tab ? 'active' : ''}" onclick="location.hash='${link('tab', k).replace(/'/g, '')}'">${v}</button>`).join('')}</div>
+    <select id="f-status"><option value="">Tüm aşamalar</option>${Object.entries(state.statuses).map(([k, v]) => `<option value="${k}" ${k === st ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+    <select id="f-sort">
+      <option value="updated" ${sort === 'updated' ? 'selected' : ''}>Son güncellenen</option>
+      <option value="due" ${sort === 'due' ? 'selected' : ''}>Teslim tarihi</option>
+      <option value="prio" ${sort === 'prio' ? 'selected' : ''}>Öncelik</option>
+      <option value="created" ${sort === 'created' ? 'selected' : ''}>Oluşturma</option>
+    </select>
+    <input id="f-q" placeholder="Bu listede ara" value="${esc(q)}">
+  </div>
+  <div class="card"><div class="list">${list.length ? list.map((c) => caseRow(c)).join('') : '<div class="empty">Bu filtrede iş yok.</div>'}</div></div>`;
+}
+afterRender.isler = (parts, query) => {
+  const go = (k, v) => { const p = new URLSearchParams(query); v ? p.set(k, v) : p.delete(k); location.hash = '#/isler?' + p; };
+  $('#f-status').onchange = (e) => go('status', e.target.value);
+  $('#f-sort').onchange = (e) => go('sort', e.target.value);
+  $('#f-q').onkeydown = (e) => { if (e.key === 'Enter') go('q', e.target.value.trim()); };
+  $('#csv').onclick = () => exportCsv(state.lastList || []);
+};
 function exportCsv(list) {
   const cols = [['İş No', 'no'], ['Hasta', 'patientName'], ['Başlık', 'title'], ['İş türü', 'workType'], ['Dişler', (c) => c.teeth.join(' ')], ['Renk', 'shade'], ['Materyal', 'material'],
     ['Durum', 'statusLabel'], ['Öncelik', (c) => PRIO[c.priority]], ['Klinik', (c) => c.clinic?.org || c.clinic?.name], ['Sorumlu teknisyen', (c) => c.technician?.name || ''],
@@ -487,108 +554,94 @@ async function viewCase(id) {
   state.caseCache = c;
   if (c.unread) api(`/cases/${id}/read`, { method: 'POST' }).then(refreshBadges).catch(() => {});
   const d = dueInfo(c);
-  const terminal = DONE.includes(c.status);
   const statusEvents = c.events.filter((e) => e.type === 'created' || e.type === 'status');
   const reachedAt = { gonderildi: c.createdAt };
   for (const e of statusEvents) if (e.meta?.to && !reachedAt[e.meta.to]) reachedAt[e.meta.to] = e.at;
-  const stageAt = [c.createdAt, reachedAt.kabul || reachedAt.uretimde, reachedAt.prova, reachedAt.hazir || reachedAt.teslim, reachedAt.tamamlandi];
-  const cur = STAGE[c.status] ?? -1;
+  let curIdx = FLOW.indexOf(c.status);
+  if (c.status === 'revizyon') curIdx = FLOW.indexOf('prova');
   const steps = FLOW.map((s, i) => {
-    const cls = cur < 0 ? '' : i < cur || (i === cur && s === 'tamamlandi') ? 'done' : i === cur ? 'current' : '';
-    return `<div class="step ${cls}"><div class="c">${cls === 'done' ? '✓' : i + 1}</div>${FLOW_LABEL[i]}<span class="when">${stageAt[i] && cls ? fmtDate(stageAt[i]) : ''}</span></div>`;
+    const cls = curIdx < 0 ? (reachedAt[s] ? 'done' : '') : i < curIdx || (i === curIdx && s === 'tamamlandi') ? 'done' : i === curIdx ? 'current' : '';
+    return `<div class="step ${cls}"><div class="c">${cls === 'done' ? '✓' : i + 1}</div>${esc(state.statuses[s])}<span class="when">${reachedAt[s] ? rel(reachedAt[s]) : ''}</span></div>`;
   }).join('');
 
-  // Siradaki adim
-  const main = c.actions.filter((a) => a.to !== 'iptal');
-  const cancel = c.actions.find((a) => a.to === 'iptal');
-  const HINT = {
-    gonderildi: 'Yeni iş geldi. Kabul edip üretime başlayın.',
-    kabul: 'İş kabul edildi, üretime başlayabilirsiniz.',
-    uretimde: 'İş bittiyse teslim edin. Prova gerekiyorsa provaya gönderin.',
-    prova: 'Provayı kontrol edin.',
-    revizyon: 'Hekim düzeltme istedi.',
-    hazir: 'İş hazır, teslim edebilirsiniz.',
-    teslim: 'İş size teslim edildi. Kontrol edip tamamlayın.',
-    reddedildi: 'Laboratuvar işi geri çevirdi. Düzeltip yeniden gönderebilirsiniz.'
-  };
-  const btnCls = (a) => /reddedildi/.test(a.to) ? 'danger' : /revizyon/.test(a.to) ? '' : 'primary';
-  const waitText = terminal ? (c.status === 'iptal' ? 'Bu iş iptal edildi.' : '✓ Bu iş tamamlandı.')
-    : isClinic() ? 'İş laboratuvarda. Sizden şu an bir işlem beklenmiyor.' : 'Hekimin onayı bekleniyor.';
-  const note = ['reddedildi', 'revizyon'].includes(c.status) ? lastStatusNote(c) : '';
-  const next = main.length
-    ? `<div class="next"><div class="grow"><b>Sıradaki adım</b><div class="small muted">${esc(HINT[c.status] || '')}</div></div>
-        <div class="row">${main.map((a) => `<button class="btn lg ${btnCls(a)}" data-act="${a.to}">${esc(a.label)}</button>`).join('')}</div></div>`
-    : `<div class="next wait"><span class="grow">${waitText}</span>${cancel ? `<button class="btn sm ghost danger" data-act="iptal">${esc(cancel.label)}</button>` : ''}</div>`;
-
-  // Ayrintilar (kapali)
+  // Aşama süreleri
   const segs = [];
-  let seg = { s: 'gonderildi', at: c.createdAt };
-  for (const e of statusEvents) if (e.type === 'status') { segs.push({ s: seg.s, ms: new Date(e.at) - new Date(seg.at) }); seg = { s: e.meta.to, at: e.at }; }
-  if (!terminal) segs.push({ s: seg.s, ms: Date.now() - new Date(seg.at) });
+  let cur = { s: 'gonderildi', at: c.createdAt };
+  for (const e of statusEvents) if (e.type === 'status') { segs.push({ s: cur.s, ms: new Date(e.at) - new Date(cur.at) }); cur = { s: e.meta.to, at: e.at }; }
+  const terminal = ['tamamlandi', 'iptal'].includes(c.status);
+  if (!terminal) segs.push({ s: cur.s, ms: Date.now() - new Date(cur.at), live: true });
   const totals = {};
   for (const sg of segs) totals[sg.s] = (totals[sg.s] || 0) + sg.ms;
   const totalMs = (terminal ? new Date(c.completedAt || c.updatedAt) : new Date()) - new Date(c.createdAt);
-  const specs = [c.workType, c.teeth?.length ? 'Diş ' + c.teeth.join(', ') : '', c.shade && 'Renk ' + c.shade, c.material].filter(Boolean).join(' · ');
-  const other = isClinic() ? LAB() : (c.clinic?.org || c.clinic?.name || '');
 
+  const canEdit = state.me.role === 'clinic';
+  const other = state.me.role === 'clinic' ? { name: c.technician?.name || 'Laboratuvar ekibi', org: LAB() } : c.clinic;
   return `
-  <a class="back" href="#/">${icon('back')}İşler</a>
-  <div class="page-head">
-    <div style="min-width:0">
-      <h1>${esc(c.patientName)} ${c.priority === 'acil' ? '<span class="badge plain pr-acil">ACİL</span>' : ''}</h1>
-      <div class="specs">${esc(specs || c.title)}</div>
-      <div class="row" style="margin-top:8px">${statusBadge(c.status)}
-        <span class="due ${d.cls}">${icon('clock').replace('<svg', '<svg width="13" height="13" style="vertical-align:-2px"')} ${terminal ? 'Teslim: ' + (c.dueDate ? fmtDate(c.dueDate) : '—') : d.text + (c.dueDate ? ' · ' + fmtDate(c.dueDate) : '')}</span>
-        <span class="small muted">${isClinic() ? (c.technician ? 'Sorumlu: ' + esc(c.technician.name) : esc(LAB())) : esc(other)}</span></div>
+  <div class="page-head case-title">
+    <div style="flex:1;min-width:260px">
+      <div class="crumb"><a href="#/hastalar">Hastalar</a> / <a href="#/hasta/${c.patientId}">${esc(c.patientName)}</a> / İş #${esc(c.no)}</div>
+      <h1>${esc(c.patientName)} — ${esc(c.title)}</h1>
+      <div class="row" style="margin-top:8px">${statusBadge(c.status)} ${prioBadge(c.priority)} ${dirTag(c)}
+        <span class="due ${d.cls}">${icon('clock').replace('<svg', '<svg width="13" height="13" style="vertical-align:-2px"')} ${d.text}${c.dueDate ? ' · ' + fmtDate(c.dueDate) : ''}</span></div>
     </div>
-  </div>
-  <div class="card" style="margin-bottom:18px">
-    <div class="stepper">${steps}</div>
-    ${note ? `<div class="alert">${esc(note)}</div>` : ''}
-    ${next}
+    <div class="row">${canEdit ? `<button class="btn" id="edit-case">${icon('edit')}Düzenle</button>` : ''}
+      <button class="btn" id="due-case">${icon('clock')}Teslim tarihi</button></div>
   </div>
   <div class="case-layout">
     <div class="stack" style="gap:18px">
-      ${c.description ? `<div class="card card-body"><div class="small muted" style="font-weight:600;margin-bottom:4px">Hekimin notu</div><div style="white-space:pre-wrap">${esc(c.description)}</div></div>` : ''}
       <div class="card">
-        <div class="card-head"><h2>Dosyalar (${c.files.length})</h2></div>
+        <div class="stepper">${steps}</div>
+        ${['reddedildi', 'iptal', 'revizyon'].includes(c.status) ? `<div style="padding:0 18px 14px">${statusBadge(c.status)} <span class="small muted">${esc(lastStatusNote(c))}</span></div>` : ''}
+        <div class="card-body" style="border-top:1px solid var(--border)">
+          <div class="kv">
+            <div><small>Hasta</small><b><a href="#/hasta/${c.patientId}">${esc(c.patientName)}</a></b></div>
+            <div><small>Hekim / Klinik</small><b>${esc(c.clinic?.org || '—')}</b><div class="small muted">${esc(c.clinic?.name)} ${c.clinic?.phone ? '· ' + esc(c.clinic.phone) : ''}</div></div>
+            <div><small>Laboratuvar</small><b>${esc(LAB())}</b><div class="small muted">${c.technician ? 'Sorumlu: ' + esc(c.technician.name) : 'Henüz teknisyen üstlenmedi'}</div></div>
+            <div><small>İş türü</small><b>${esc(c.workType || '—')}</b></div>
+            <div><small>Renk</small><b>${esc(c.shade || '—')}</b></div>
+            <div><small>Materyal</small><b>${esc(c.material || '—')}</b></div>
+            <div><small>Öncelik</small><b>${PRIO[c.priority]}</b></div>
+            <div><small>Teslim tarihi</small><b>${c.dueDate ? fmtDate(c.dueDate) : '—'}</b></div>
+            <div><small>Gönderen → Alan</small><b>${esc(c.from?.name)} → ${esc(c.to?.name || LAB())}</b></div>
+            <div><small>Oluşturulma</small><b>${fmtDateTime(c.createdAt)}</b></div>
+            <div><small>Son güncelleme</small><b>${fmtDateTime(c.updatedAt)}</b><div class="small muted">${rel(c.updatedAt)}</div></div>
+            <div><small>${terminal ? 'Toplam süre' : 'Geçen süre'}</small><b>${dur(totalMs)}</b></div>
+          </div>
+          <div style="margin-top:16px"><small class="muted" style="font-weight:600">Dişler (FDI)</small>${teethChart(c.teeth, true)}</div>
+          ${c.description ? `<div class="desc">${esc(c.description)}</div>` : ''}
+        </div>
+        <div class="actions-bar">${c.actions.length
+          ? c.actions.map((a) => `<button class="btn ${/iptal|Reddet/.test(a.to + a.label) ? 'danger' : /revizyon/.test(a.to) ? '' : 'primary'}" data-act="${a.to}">${esc(a.label)}</button>`).join('')
+          : `<span class="muted small">${terminal ? 'Bu iş kapandı.' : `Şu an ${esc(other?.name || 'karşı taraf')} tarafında işlem bekleniyor.`}</span>`}</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Dosyalar & STL (${c.files.length})</h2><span class="small muted">STL ve PLY 3D açılır · fotoğraf, PDF, ZIP · en fazla 300 MB</span></div>
         <div class="card-body">
-          <div class="dropzone" id="drop">${icon('upload').replace('<svg', '<svg width="20" height="20"')}<div>Dosya eklemek için <b>tıklayın</b> veya sürükleyin <span class="small">(STL, PLY, fotoğraf, PDF)</span></div></div>
+          <div class="dropzone" id="drop">${icon('upload').replace('<svg', '<svg width="22" height="22"')}<div><b>Dosyaları sürükleyip bırakın</b> veya tıklayıp seçin</div></div>
           <input type="file" id="file-in" multiple hidden>
           <div id="uploads"></div>
           ${fileGroups(c.files)}
         </div>
       </div>
-      <details class="card more">
-        <summary>Ayrıntılar ve zaman bilgisi</summary>
-        <div class="card-body">
-          <div class="kv">
-            <div><small>İş no</small><b>#${esc(c.no)}</b></div>
-            <div><small>Hekim</small><b>${esc(c.clinic?.name || '—')}</b><div class="small muted">${esc(c.clinic?.org || '')}${c.clinic?.phone ? ' · ' + esc(c.clinic.phone) : ''}</div></div>
-            <div><small>Laboratuvar</small><b>${esc(LAB())}</b><div class="small muted">${c.technician ? 'Sorumlu: ' + esc(c.technician.name) : 'Henüz üstlenilmedi'}</div></div>
-            <div><small>Gönderildi</small><b>${fmtDateTime(c.createdAt)}</b></div>
-            <div><small>${terminal ? 'Toplam süre' : 'Geçen süre'}</small><b>${dur(totalMs)}</b></div>
-          </div>
-          <div style="margin-top:16px"><small class="muted" style="font-weight:600">Dişler</small>${teethChart(c.teeth, true)}</div>
-          <div class="durations" style="margin-top:16px">
-            ${Object.entries(totals).map(([s, ms]) => `<div class="d"><span>${statusBadge(s)}</span><b class="mono">${dur(ms)}</b></div>`).join('')}
-            ${statusEvents.map((e) => `<div class="d small"><span>${fmtDateTime(e.at)} · ${esc(e.user?.name)}</span><span>${e.meta?.to ? esc(state.statuses[e.meta.to]) : 'Gönderildi'}</span></div>`).join('')}
-          </div>
-          <div class="row" style="margin-top:14px">
-            ${isClinic() && !terminal ? `<button class="btn sm" id="edit-case">${icon('edit')}İşi düzenle</button>` : ''}
-            ${!terminal ? `<button class="btn sm" id="due-case">${icon('clock')}Teslim tarihini değiştir</button>` : ''}
-          </div>
+
+      <div class="card">
+        <div class="card-head"><h2>Zaman bilgisi</h2><span class="small muted">Aşamalarda geçen süre</span></div>
+        <div class="card-body durations">
+          ${Object.entries(totals).map(([s, ms]) => `<div class="d"><span>${statusBadge(s)}</span><b class="mono">${dur(ms)}${s === c.status && !terminal ? ' <span class="small muted">(devam ediyor)</span>' : ''}</b></div>`).join('')}
+          <div class="d"><span class="muted">Durum geçmişi</span><span></span></div>
+          ${statusEvents.map((e) => `<div class="d small"><span>${fmtDateTime(e.at)} · ${esc(e.user?.name)}</span><span>${e.meta?.to ? esc(state.statuses[e.meta.to]) : 'Oluşturuldu'}</span></div>`).join('')}
         </div>
-      </details>
+      </div>
     </div>
 
     <div class="card chat">
-      <div class="card-head"><div><h2>Mesajlar</h2><div class="small muted">${esc(other)}</div></div></div>
+      <div class="card-head"><div><h2>Notlar & mesajlar</h2><div class="small muted">${esc(other?.name || '')} · ${esc(other?.org || '')}</div></div></div>
       <div class="chat-body" id="chat">${chatHtml(c)}</div>
       <form class="chat-foot" id="note-form">
-        <textarea name="text" data-keep="note-${c.id}" placeholder="Mesaj yazın…" rows="1"></textarea>
+        <textarea name="text" data-keep="note-${c.id}" placeholder="Not yazın… (Ctrl+Enter ile gönder)" rows="1"></textarea>
         <button class="btn icon" type="button" id="attach" title="Dosya ekle">${icon('upload')}</button>
-        <button class="btn primary" type="submit" title="Gönder">${icon('send')}</button>
+        <button class="btn primary" type="submit">${icon('send')}</button>
       </form>
     </div>
   </div>`;
@@ -603,7 +656,6 @@ function chatHtml(c) {
   const mine = c.events.filter((e) => e.type === 'note' && e.userId === state.me.id);
   const lastMine = mine[mine.length - 1];
   for (const e of c.events) {
-    if (e.type === 'file' || e.type === 'edit') continue;
     const dk = dayKey(e.at);
     if (dk !== lastDay) { html += `<div class="day-sep">${new Date(e.at).toLocaleDateString(TR, { weekday: 'long', day: 'numeric', month: 'long' })}</div>`; lastDay = dk; }
     if (e.type === 'note') {
@@ -616,7 +668,7 @@ function chatHtml(c) {
       html += `<div class="sys ${e.type}"><b>${esc(e.user?.name)}</b> ${esc(e.text)}${fileLink} · ${fmtTime(e.at)}</div>`;
     }
   }
-  return html || '<div class="empty">Henüz mesaj yok.</div>';
+  return html || '<div class="empty">Henüz not yok.</div>';
 }
 const linkify = (s) => s.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
 
@@ -679,8 +731,7 @@ afterRender.is = (parts, query, opts) => {
   const ta = form.text;
   const autoSize = () => { ta.style.height = 'auto'; ta.style.height = Math.min(160, ta.scrollHeight + 2) + 'px'; };
   ta.oninput = autoSize; autoSize();
-  // Enter gonderir, Shift+Enter yeni satir
-  ta.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } };
+  ta.onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.requestSubmit(); } };
   form.onsubmit = async (e) => {
     e.preventDefault();
     const text = ta.value.trim();
@@ -707,7 +758,7 @@ afterRender.is = (parts, query, opts) => {
   });
   $$('[data-act]').forEach((b) => b.onclick = () => openAction(c, c.actions.find((a) => a.to === b.dataset.act)));
   $('#edit-case')?.addEventListener('click', () => openEditCase(c));
-  $('#due-case')?.addEventListener('click', () => openDue(c));
+  $('#due-case').onclick = () => openDue(c);
 };
 
 /* --- Dosya indirme / acma (oturum anahtari baslikla gonderilir) --- */
@@ -779,7 +830,7 @@ function viewProfile() {
   const me = state.me;
   const perm = 'Notification' in window ? Notification.permission : 'unsupported';
   return `
-  <div class="page-head"><div><h1>Ayarlar</h1><p class="muted">${roleName(me.role)} hesabı · ${esc(me.email)}</p></div></div>
+  <div class="page-head"><div><h1>Profil & ayarlar</h1><p class="muted">${roleName(me.role)} hesabı · ${esc(me.email)}</p></div></div>
   <div class="two-col">
     <div class="card"><div class="card-head"><h2>Bilgilerim</h2></div>
       <form class="card-body stack" id="f-prof">
@@ -891,43 +942,61 @@ function openPatientForm(p, onSaved) {
 
 async function openNewCase(pre = {}) {
   if (!isClinic()) return toast('İş kaydını yalnızca hekim açabilir', { type: 'bad' });
-  const patients = await api('/patients').catch((e) => { toastErr(e); return null; });
+  let patients = await api('/patients').catch((e) => { toastErr(e); return null; });
   if (!patients) return;
+  const isTech = state.me.role === 'technician';
   const files = [];
   const m = modal({
     size: 'wide',
-    title: 'Yeni iş gönder',
+    title: `${esc(LAB())}'a yeni iş gönder`,
     body: `<form id="nc" class="stack">
       <div class="grid-2">
-        <label class="field">Hasta<div class="row" style="flex-wrap:nowrap">
-          <select name="patientId" required id="nc-patient"><option value="">Seçin</option>${patients.map((p) => `<option value="${p.id}" ${p.id === pre.patientId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
-          <button type="button" class="btn" id="nc-addp" title="Yeni hasta ekle">${icon('plus')}</button></div></label>
-        <label class="field">İş türü<select name="workType" required><option value="">Seçin</option>${WORK_TYPES.map((w) => `<option>${w}</option>`).join('')}</select></label>
+        <label class="field">Hasta *<div class="row" style="flex-wrap:nowrap">
+          <select name="patientId" required id="nc-patient"><option value="">Hasta seçin</option>${patients.map((p) => `<option value="${p.id}" data-clinic="${p.clinicId}" ${p.id === pre.patientId ? 'selected' : ''}>${esc(p.name)}${isTech ? ' — ' + esc(p.clinic?.org || '') : ''}</option>`).join('')}</select>
+          <button type="button" class="btn" id="nc-addp" title="Yeni hasta">${icon('plus')}</button></div></label>
+        <label class="field">Gönderilecek laboratuvar<input value="${esc(LAB())}" disabled></label>
       </div>
-      <div><small class="muted" style="font-weight:600">Dişler</small>${teethChart([])}</div>
       <div class="grid-2">
-        <label class="field">Renk<select name="shade">${SHADES.map((s) => `<option value="${s}">${s || '—'}</option>`).join('')}</select></label>
+        <label class="field">İş türü *<select name="workType" required><option value="">Seçin</option>${WORK_TYPES.map((w) => `<option>${w}</option>`).join('')}</select></label>
+        <label class="field">Başlık<input name="title" placeholder="Örn. Üst çene 3'lü zirkonyum köprü"></label>
+      </div>
+      <div><small class="muted" style="font-weight:600">Dişleri seçin (FDI numaralandırma)</small>${teethChart([])}</div>
+      <div class="grid-3">
+        <label class="field">Renk (Vita)<select name="shade">${SHADES.map((s) => `<option value="${s}">${s || '—'}</option>`).join('')}</select></label>
         <label class="field">Materyal<select name="material"><option value="">—</option>${MATERIALS.map((x) => `<option>${x}</option>`).join('')}</select></label>
+        <label class="field">Öncelik<select name="priority">${Object.entries(PRIO).map(([k, v]) => `<option value="${k}" ${k === 'normal' ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       </div>
       <div class="grid-2">
-        <label class="field">Teslim tarihi<input name="dueDate" type="date" min="${todayStr()}"></label>
-        <label class="check"><input type="checkbox" name="acil"> Acil iş</label>
+        <label class="field">İstenen teslim tarihi<input name="dueDate" type="date" min="${todayStr()}"></label>
+        <label class="field">Hızlı seçim<div class="row">${[2, 3, 5, 7, 10].map((d) => `<button type="button" class="btn sm" data-days="${d}">+${d} gün</button>`).join('')}</div></label>
       </div>
-      <label class="field">Not<textarea name="description" rows="3" placeholder="Laboratuvara iletmek istedikleriniz"></textarea></label>
+      <label class="field">Açıklama / talimatlar<textarea name="description" rows="3" placeholder="Hazırlık, okluzyon, özel istekler…"></textarea></label>
+      <label class="field">İlk not (isteğe bağlı)<input name="note" placeholder="Karşı tarafa kısa mesaj"></label>
       <div>
-        <div class="dropzone" id="nc-drop">${icon('upload').replace('<svg', '<svg width="20" height="20"')}<div><b>Dosya ekle</b> (STL, PLY, fotoğraf, PDF)</div></div>
+        <div class="dropzone" id="nc-drop">${icon('upload').replace('<svg', '<svg width="20" height="20"')}<div><b>STL / fotoğraf / PDF ekleyin</b> — sürükleyin veya tıklayın</div></div>
         <input type="file" id="nc-file" multiple hidden>
         <div id="nc-files" class="small" style="margin-top:8px"></div>
       </div>
     </form>`,
-    foot: `<button class="btn" data-close>Vazgeç</button><button class="btn primary" id="nc-send">${icon('send')}Laboratuvara gönder</button>`
+    foot: `<button class="btn" data-close>Vazgeç</button><button class="btn primary" id="nc-send">${icon('send')}İşi gönder</button>`
   });
   const el = m.el;
   const getTeeth = bindTeeth(el);
-  $('#nc-addp', el).onclick = () => openPatientForm(null, (p) => {
+  const syncClinic = () => {
+    if (!isTech) return;
+    const opt = $('#nc-patient', el).selectedOptions[0];
+    if (opt?.dataset.clinic) { $('#nc-to', el).value = opt.dataset.clinic; }
+  };
+  $('#nc-patient', el).onchange = syncClinic; syncClinic();
+  $('#nc-addp', el).onclick = () => openPatientForm(null, async (p) => {
+    patients = await api('/patients');
     const sel = $('#nc-patient', el);
-    sel.insertAdjacentHTML('beforeend', `<option value="${p.id}">${esc(p.name)}</option>`);
-    sel.value = p.id;
+    sel.insertAdjacentHTML('beforeend', `<option value="${p.id}" data-clinic="${p.clinicId}">${esc(p.name)}</option>`);
+    sel.value = p.id; syncClinic();
+  });
+  $$('[data-days]', el).forEach((b) => b.onclick = () => {
+    const d = new Date(); d.setDate(d.getDate() + Number(b.dataset.days));
+    $('[name=dueDate]', el).value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   });
   const listFiles = () => { $('#nc-files', el).innerHTML = files.map((f, i) => `<div>📎 ${esc(f.name)} <span class="muted">(${fmtSize(f.size)})</span> <a href="#" data-rm="${i}">kaldır</a></div>`).join('');
     $$('[data-rm]', el).forEach((a) => a.onclick = (e) => { e.preventDefault(); files.splice(Number(a.dataset.rm), 1); listFiles(); }); };
@@ -944,21 +1013,20 @@ async function openNewCase(pre = {}) {
     if (!f.reportValidity()) return;
     const body = Object.fromEntries(new FormData(f));
     body.teeth = getTeeth();
-    body.priority = body.acil ? 'acil' : 'normal';
-    delete body.acil;
-    body.title = body.workType + (body.teeth.length ? ' (' + body.teeth.join(', ') + ')' : '');
+    if (!body.title) body.title = body.workType + (body.teeth.length ? ' (' + body.teeth.join(', ') + ')' : '');
     const btn = $('#nc-send', el);
     btn.disabled = true; btn.textContent = 'Gönderiliyor…';
     try {
       const c = await api('/cases', { method: 'POST', body });
       for (let i = 0; i < files.length; i++) {
+        btn.textContent = `Dosya yükleniyor ${i + 1}/${files.length}…`;
         await uploadOne(c.id, files[i], (p) => { btn.textContent = `Dosya ${i + 1}/${files.length} · %${p}`; });
       }
       m.close();
-      toast('İş laboratuvara gönderildi', { type: 'ok', sub: `${c.patientName} · ${c.workType}` });
+      toast(`İş #${c.no} gönderildi`, { type: 'ok', sub: `${c.patientName} → ${LAB()}` });
       location.hash = '#/is/' + c.id;
       refreshBadges();
-    } catch (e) { toastErr(e); btn.disabled = false; btn.innerHTML = `${icon('send')}Laboratuvara gönder`; }
+    } catch (e) { toastErr(e); btn.disabled = false; btn.innerHTML = `${icon('send')}İşi gönder`; }
   };
 }
 
@@ -967,8 +1035,9 @@ function openAction(c, a) {
   const m = modal({
     title: esc(a.label),
     body: `<div class="stack">
+      <div>${statusBadge(c.status)} → ${statusBadge(a.to)}</div>
       ${resend ? `<div class="small muted">İş yeniden ${esc(LAB())}'a gönderilecek.</div>` : ''}
-      <label class="field">${a.needNote ? 'Açıklama (zorunlu)' : 'Not (isteğe bağlı)'}<textarea id="ac-note" placeholder="${a.needNote ? 'Ne değişmeli? Kısaca yazın.' : 'İsterseniz kısa bir not ekleyin'}"></textarea></label>
+      <label class="field">${a.needNote ? 'Açıklama (zorunlu)' : 'Not (isteğe bağlı)'}<textarea id="ac-note" placeholder="${a.needNote ? 'Neden? Ne değişmeli?' : 'Karşı tarafa iletmek istediğiniz not'}"></textarea></label>
     </div>`,
     foot: `<button class="btn" data-close>Vazgeç</button><button class="btn ${/iptal|reddedildi/.test(a.to) ? 'danger solid' : 'primary'}" id="ac-ok">${esc(a.label)}</button>`
   });
@@ -977,23 +1046,26 @@ function openAction(c, a) {
     if (a.needNote && !note) { toast('Lütfen açıklama yazın', { type: 'bad' }); return; }
     try {
       await api('/cases/' + c.id, { method: 'PATCH', body: { status: a.to, note } });
-      m.close(); toast(`${state.statuses[a.to]}`, { type: 'ok' }); route({ soft: true }); refreshBadges();
+      m.close(); toast(`Durum: ${state.statuses[a.to]}`, { type: 'ok' }); route({ soft: true }); refreshBadges();
     } catch (e) { toastErr(e); }
   };
 }
 
 function openEditCase(c) {
   const m = modal({
-    size: 'wide', title: 'İşi düzenle',
+    size: 'wide', title: `İş #${esc(c.no)} — düzenle`,
     body: `<form id="ec" class="stack">
-      <label class="field">İş türü<select name="workType">${[...new Set([c.workType, ...WORK_TYPES])].filter(Boolean).map((w) => `<option ${w === c.workType ? 'selected' : ''}>${esc(w)}</option>`).join('')}</select></label>
-      <div><small class="muted" style="font-weight:600">Dişler</small>${teethChart(c.teeth)}</div>
       <div class="grid-2">
+        <label class="field">Başlık<input name="title" value="${esc(c.title)}"></label>
+        <label class="field">İş türü<select name="workType">${[...new Set([c.workType, ...WORK_TYPES])].filter(Boolean).map((w) => `<option ${w === c.workType ? 'selected' : ''}>${esc(w)}</option>`).join('')}</select></label>
+      </div>
+      <div>${teethChart(c.teeth)}</div>
+      <div class="grid-3">
         <label class="field">Renk<select name="shade">${SHADES.map((s) => `<option value="${s}" ${s === c.shade ? 'selected' : ''}>${s || '—'}</option>`).join('')}</select></label>
         <label class="field">Materyal<select name="material"><option value="">—</option>${[...new Set([c.material, ...MATERIALS])].filter(Boolean).map((x) => `<option ${x === c.material ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></label>
+        <label class="field">Öncelik<select name="priority">${Object.entries(PRIO).map(([k, v]) => `<option value="${k}" ${k === c.priority ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
       </div>
-      <label class="check"><input type="checkbox" name="acil" ${c.priority === 'acil' ? 'checked' : ''}> Acil iş</label>
-      <label class="field">Not<textarea name="description" rows="4">${esc(c.description)}</textarea></label>
+      <label class="field">Açıklama<textarea name="description" rows="4">${esc(c.description)}</textarea></label>
     </form>`,
     foot: `<button class="btn" data-close>Vazgeç</button><button class="btn primary" id="ec-save">Kaydet</button>`
   });
@@ -1001,10 +1073,7 @@ function openEditCase(c) {
   $('#ec-save', m.el).onclick = async () => {
     const body = Object.fromEntries(new FormData($('#ec', m.el)));
     body.teeth = getTeeth();
-    body.priority = body.acil ? 'acil' : 'normal';
-    delete body.acil;
-    body.title = body.workType + (body.teeth.length ? ' (' + body.teeth.join(', ') + ')' : '');
-    try { await api('/cases/' + c.id, { method: 'PATCH', body }); m.close(); toast('Kaydedildi', { type: 'ok' }); route({ soft: true }); }
+    try { await api('/cases/' + c.id, { method: 'PATCH', body }); m.close(); toast('İş güncellendi', { type: 'ok' }); route({ soft: true }); }
     catch (e) { toastErr(e); }
   };
 }
@@ -1196,5 +1265,9 @@ async function boot() {
   connectStream();
   refreshBadges();
   await route();
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => toast('Anlık bildirimler için tıklayın', { sub: 'Yeni iş ve mesajlarda masaüstü bildirimi alın', ms: 8000 }), 1500);
+    $('#toasts').addEventListener('click', () => Notification.requestPermission(), { once: true });
+  }
 }
 boot();

@@ -124,8 +124,8 @@ function seed() {
     dueDate: new Date(Date.now() + 5 * day).toISOString().slice(0, 10),
     description: 'Ağız içi tarama STL dosyaları ekte. Okluzyon kontrolü önemli.'
   });
-  addEvent(c1, t1.id, 'status', 'Kabul et, üretime başla', { from: 'gonderildi', to: 'uretimde' });
-  c1.status = 'uretimde';
+  addEvent(c1, t1.id, 'status', 'İş kabul edildi', { from: 'gonderildi', to: 'kabul' });
+  c1.status = 'kabul';
   c1.technicianId = t1.id;
   addEvent(c1, t1.id, 'note', 'Merhaba hocam, dosyalar ulaştı. Cuma provaya gönderebiliriz.');
   addEvent(c1, k1.id, 'note', 'Teşekkürler, hasta cuma 14:00 için randevulu.');
@@ -144,49 +144,47 @@ function seed() {
 const STATUS = {
   gonderildi: 'Gönderildi',
   kabul: 'Kabul edildi',
-  reddedildi: 'Geri çevrildi',
+  reddedildi: 'Reddedildi',
   uretimde: 'Üretimde',
   prova: 'Provada',
-  revizyon: 'Düzeltme',
+  revizyon: 'Revizyon',
   hazir: 'Hazır',
   teslim: 'Teslim edildi',
   tamamlandi: 'Tamamlandı',
   iptal: 'İptal'
 };
 // who: clinic | technician | sender | receiver
-// Sade akis: Gonderildi -> Uretimde -> (Prova <-> Revizyon) -> Teslim -> Tamamlandi
-// 'kabul' ve 'hazir' eski kayitlar icin gecerli kalir, yeni islerde kullanilmaz.
 const TRANSITIONS = {
   gonderildi: [
-    { to: 'uretimde', who: 'receiver', label: 'Kabul et, üretime başla' },
-    { to: 'reddedildi', who: 'receiver', label: 'Geri çevir', needNote: true },
-    { to: 'iptal', who: 'sender', label: 'İşi iptal et' }
+    { to: 'kabul', who: 'receiver', label: 'İşi kabul et' },
+    { to: 'reddedildi', who: 'receiver', label: 'Reddet', needNote: true },
+    { to: 'iptal', who: 'sender', label: 'İptal et' }
   ],
   kabul: [
     { to: 'uretimde', who: 'technician', label: 'Üretime başla' },
-    { to: 'iptal', who: 'clinic', label: 'İşi iptal et' }
+    { to: 'iptal', who: 'clinic', label: 'İptal et' }
   ],
   uretimde: [
-    { to: 'teslim', who: 'technician', label: 'Bitti, teslim et' },
-    { to: 'prova', who: 'technician', label: 'Provaya gönder' }
+    { to: 'prova', who: 'technician', label: 'Provaya gönder' },
+    { to: 'hazir', who: 'technician', label: 'Hazır olarak işaretle' }
   ],
   prova: [
-    { to: 'uretimde', who: 'clinic', label: 'Prova uygun, devam' },
-    { to: 'revizyon', who: 'clinic', label: 'Düzeltme iste', needNote: true }
+    { to: 'uretimde', who: 'clinic', label: 'Prova onaylandı, devam' },
+    { to: 'revizyon', who: 'clinic', label: 'Revizyon iste', needNote: true }
   ],
   revizyon: [
-    { to: 'uretimde', who: 'technician', label: 'Düzeltmeye başla' }
+    { to: 'uretimde', who: 'technician', label: 'Revizyona başla' }
   ],
   hazir: [
-    { to: 'teslim', who: 'technician', label: 'Teslim et' }
+    { to: 'teslim', who: 'technician', label: 'Teslim et / kargoya ver' }
   ],
   teslim: [
-    { to: 'tamamlandi', who: 'clinic', label: 'Teslim aldım, tamamla' },
-    { to: 'revizyon', who: 'clinic', label: 'Düzeltme iste', needNote: true }
+    { to: 'tamamlandi', who: 'clinic', label: 'Teslim alındı, tamamla' },
+    { to: 'revizyon', who: 'clinic', label: 'Revizyon iste', needNote: true }
   ],
   reddedildi: [
     { to: 'gonderildi', who: 'sender', label: 'Yeniden gönder' },
-    { to: 'iptal', who: 'sender', label: 'İşi iptal et' }
+    { to: 'iptal', who: 'sender', label: 'İptal et' }
   ],
   tamamlandi: [],
   iptal: []
@@ -600,7 +598,7 @@ route('PATCH', '/api/cases/:id', async (req, res, { params }) => {
     const prev = c.status;
     c.status = b.status;
     // Isi kabul eden (ya da ilk isleyen) teknisyen sorumlu olur
-    if (u.role === 'technician' && (prev === 'gonderildi' || !c.technicianId)) c.technicianId = u.id;
+    if (u.role === 'technician' && (b.status === 'kabul' || !c.technicianId)) c.technicianId = u.id;
     if (b.status === 'tamamlandi') c.completedAt = now();
     addEvent(c, u.id, 'status', t.label + (b.note ? ` — ${b.note}` : ''), { from: prev, to: b.status, note: b.note || '' });
     notifyCase(c, u, 'status', `${c.no}: ${STATUS[prev]} → ${STATUS[c.status]}`);
@@ -743,7 +741,7 @@ route('GET', '/api/stats', async (req, res) => {
   send(res, 200, {
     total: mine.length,
     active: active.length,
-    waitingMe: active.filter((c) => allowedActions(c, u).some((a) => a.to !== 'iptal')).length,
+    waitingMe: active.filter((c) => allowedActions(c, u).length > 0).length,
     incomingNew: u.role === 'technician' ? mine.filter((c) => c.status === 'gonderildi').length : 0,
     overdue: active.filter((c) => c.dueDate && c.dueDate < today).length,
     dueToday: active.filter((c) => c.dueDate === today).length,
