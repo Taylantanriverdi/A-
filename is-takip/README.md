@@ -12,7 +12,8 @@ Hekimler giriş ekranından kayıt olur; teknisyen hesaplarını laboratuvar "Ek
 
 Deponun kökündeki **`IsTakip-Baslat.bat`** dosyasına çift tıklayın. Dosya Git ve Node.js yoksa kurar,
 programı indirir ya da en son sürüme günceller, verileri `data/yedek` içine yedekler, eski sunucuyu kapatıp
-yenisini başlatır ve tarayıcıyı açar. Güncelleme almak için her seferinde aynı dosyaya çift tıklamanız yeterli.
+yenisini arka planda (pencere olmadan) başlatır ve tarayıcıyı açar. Güncelleme almak için her seferinde aynı dosyaya çift tıklamanız yeterli.
+Programı kapatmak için **`IsTakip-Durdur.bat`** dosyasına çift tıklayın. Sunucu kayıtları `is-takip/data/sunucu.log` içindedir.
 Bat dosyasını tek başına (ör. Masaüstüne) indirip çalıştırırsanız program `%USERPROFILE%\IsTakip\a-` klasörüne kurulur.
 
 ### Elle

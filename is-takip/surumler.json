@@ -1,5 +1,24 @@
 [
   {
+    "v": 10,
+    "tarih": "2026-11-16",
+    "baslik": "Siyah pencere gizlendi",
+    "degisiklikler": [
+      "Program açıldıktan sonra siyah (cmd) pencere kendiliğinden kapanır, program arka planda çalışır",
+      "Tarayıcı otomatik açılır; tarayıcıyı kapatsanız da program çalışmaya devam eder",
+      "Programı kapatmak için yeni IsTakip-Durdur.bat dosyası",
+      "Program açılamazsa pencere kapanmaz ve hata mesajını gösterir"
+    ]
+  },
+  {
+    "v": 9,
+    "tarih": "2026-11-16",
+    "baslik": "Sade görünüm (denendi, geri alındı)",
+    "degisiklikler": [
+      "Sade görünüm denendi; istek üzerine v8 görünümüne geri dönüldü"
+    ]
+  },
+  {
     "v": 8,
     "tarih": "2026-11-16",
     "baslik": "Tek laboratuvar: DIGICAD",

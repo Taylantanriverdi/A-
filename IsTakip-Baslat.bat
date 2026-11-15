@@ -131,19 +131,41 @@ if errorlevel 1 (
 rem ---------- 5) Baslat ----------
 echo.
 echo [5/5] Program baslatiliyor...
+rem Durdurma dosyasini bu bat dosyasinin yanina da koy (orn. Masaustu)
+if /i not "%KAYNAK%"=="%REPO%" if exist "%REPO%\IsTakip-Durdur.bat" copy /y "%REPO%\IsTakip-Durdur.bat" "%KAYNAK%\IsTakip-Durdur.bat" >nul 2>&1
+rem Sunucu gizli (penceresiz) calisir; ciktisi data\sunucu.log dosyasina yazilir.
+if not exist "data" mkdir "data"
+set "LOG=%CD%\data\sunucu.log"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath 'node' -ArgumentList 'server.js' -WorkingDirectory (Get-Location).Path -WindowStyle Hidden -RedirectStandardOutput $env:LOG -RedirectStandardError ($env:LOG + '.hata')"
+if errorlevel 1 (echo  HATA: Program baslatilamadi. & goto hata)
+
+rem Sunucu acilana kadar en fazla 20 saniye bekle
+set /a DENEME=0
+:bekle
+ping -n 2 127.0.0.1 >nul
+netstat -ano | findstr /r /c:":%PORT% .*LISTENING" >nul && goto calisti
+set /a DENEME+=1
+if %DENEME% LSS 20 goto bekle
+echo.
+echo  HATA: Program 20 saniye icinde acilmadi. Hata kaydi:
+if exist "%LOG%.hata" type "%LOG%.hata"
+goto hata
+
+:calisti
+start "" http://localhost:%PORT%
 echo.
 echo  ----------------------------------------------------------
+echo   PROGRAM ARKA PLANDA CALISIYOR  (%YENI_SURUM%)
 echo   Adres (bu bilgisayar) : http://localhost:%PORT%
 for /f "tokens=2 delims=:" %%i in ('ipconfig ^| findstr /c:"IPv4"') do for /f "tokens=*" %%j in ("%%i") do echo   Agdaki diger cihazlar : http://%%j:%PORT%
-echo   Demo: klinik@demo.com / teknisyen@demo.com  sifre 1234
-echo   KAPATMAK icin bu pencereyi kapatin.
+echo.
+echo   Tarayiciyi kapatsaniz da program calismaya devam eder.
+echo   Durdurmak icin: IsTakip-Durdur.bat
 echo  ----------------------------------------------------------
 echo.
-start "" /min cmd /c "ping -n 3 127.0.0.1 >nul & start http://localhost:%PORT%"
-node server.js
-echo.
-echo  Sunucu durdu.
-goto hata
+echo  Bu pencere 5 saniye icinde kapanacak...
+ping -n 6 127.0.0.1 >nul
+exit
 
 rem ==================================================================
 :kur
