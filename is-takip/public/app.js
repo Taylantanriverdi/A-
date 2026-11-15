@@ -1,4 +1,4 @@
-/* Klinik ⇄ Teknisyen İş Takip — istemci uygulaması (tek sayfa, framework yok) */
+/* DIGICAD Dental Laboratuvar İş Takip — istemci uygulaması (tek sayfa, framework yok) */
 
 /* ================================================================== */
 /* Yardımcılar                                                         */
@@ -95,7 +95,7 @@ const dirTag = (c) => c.direction === 'incoming'
   ? `<span class="dir incoming">← Gelen</span>` : `<span class="dir outgoing">Giden →</span>`;
 const isClinic = () => state.me?.role === 'clinic';
 const roleName = (r) => r === 'clinic' ? 'Klinik' : 'Teknisyen';
-const partnerWord = () => state.me.role === 'clinic' ? 'Teknisyen / Laboratuvar' : 'Klinik';
+const LAB = () => state.config.lab;
 
 const ICON = {
   home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -132,7 +132,7 @@ const LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 /* ================================================================== */
 /* Durum                                                               */
 /* ================================================================== */
-const state = { me: null, statuses: {}, partners: null, stats: null, es: null, caseCache: null };
+const state = { me: null, statuses: {}, partners: null, stats: null, es: null, caseCache: null, config: { lab: 'DIGICAD Dental Laboratuvar', demo: false } };
 
 async function getPartners(force) {
   if (!state.partners || force) state.partners = await api('/partners');
@@ -148,8 +148,8 @@ function renderAuth(mode = 'login') {
   <div class="auth">
     <div class="auth-hero">
       <div class="brand-logo" style="width:52px;height:52px">${toothSvg(30)}</div>
-      <h1>Klinik ⇄ Teknisyen<br>İş Takip Sistemi</h1>
-      <p style="margin:0;color:#dbe8fb;max-width:460px">Hasta hekime gelir, muayene edilir; hekim işi hastanın adının altında laboratuvara gönderir. Teknisyen işi kabul eder, üretir ve teslim eder. Notlar, STL dosyaları ve her aşamanın zamanı iki taraf için de aynı ekranda.</p>
+      <h1>${esc(LAB())}<br>İş Takip Sistemi</h1>
+      <p style="margin:0;color:#dbe8fb;max-width:460px">Hasta hekime gelir, muayene edilir; hekim işi hastanın adının altında ${esc(LAB())}'a gönderir. Laboratuvar ekibi işi kabul eder, üretir ve teslim eder. Notlar, STL dosyaları ve her aşamanın zamanı iki taraf için de aynı ekranda.</p>
       <ul>
         <li>Hasta bazlı iş kartları ve iş numaraları</li>
         <li>Gönder → Kabul → Üretim → Prova → Teslim akışı</li>
@@ -162,7 +162,7 @@ function renderAuth(mode = 'login') {
       <div class="card">
         ${mode === 'login' ? `
           <h2>Giriş yap</h2>
-          <p class="muted small" style="margin:4px 0 18px">Hesabınız yok mu? <a href="#" id="to-reg">Kayıt olun</a></p>
+          <p class="muted small" style="margin:4px 0 18px">Hekim misiniz, hesabınız yok mu? <a href="#" id="to-reg">Kayıt olun</a></p>
           <form id="f-login" class="stack">
             <label class="field">E-posta<input name="email" type="email" required autocomplete="email"></label>
             <label class="field">Şifre<input name="password" type="password" required autocomplete="current-password"></label>
@@ -176,15 +176,12 @@ function renderAuth(mode = 'login') {
               <button class="btn" data-demo="teknisyen@demo.com">🦷 Teknisyen</button>
             </div>
           </div>` : `
-          <h2>Kayıt ol</h2>
+          <h2>Hekim kaydı</h2>
           <p class="muted small" style="margin:4px 0 18px">Zaten hesabınız var mı? <a href="#" id="to-login">Giriş yapın</a></p>
           <form id="f-reg" class="stack">
-            <div class="role-pick">
-              <label><input type="radio" name="role" value="clinic" checked>🏥 Klinik / Hekim</label>
-              <label><input type="radio" name="role" value="technician">🦷 Teknisyen / Lab</label>
-            </div>
+            <div class="small muted">İşlerinizi doğrudan ${esc(LAB())}'a gönderirsiniz. Laboratuvar ekibi hesapları laboratuvar tarafından açılır.</div>
             <label class="field">Ad Soyad<input name="name" required placeholder="Dt. Ad Soyad"></label>
-            <label class="field">Klinik / Laboratuvar adı<input name="org" placeholder="Örn. Gülüş Diş Kliniği"></label>
+            <label class="field">Klinik adı<input name="org" placeholder="Örn. Gülüş Diş Kliniği"></label>
             <label class="field">Telefon<input name="phone" type="tel"></label>
             <label class="field">E-posta<input name="email" type="email" required></label>
             <label class="field">Şifre<input name="password" type="password" required minlength="4"></label>
@@ -194,6 +191,7 @@ function renderAuth(mode = 'login') {
       </div>
     </div>
   </div>`;
+  if (!state.config.demo) $('.demo')?.remove();
   $('#to-reg')?.addEventListener('click', (e) => { e.preventDefault(); renderAuth('register'); });
   $('#to-login')?.addEventListener('click', (e) => { e.preventDefault(); renderAuth('login'); });
   const doLogin = async (body) => {
@@ -220,7 +218,7 @@ function renderShell() {
   $('#app').innerHTML = `
   <div class="layout">
     <aside class="sidebar" id="sidebar">
-      <div class="brand"><div class="brand-logo">${toothSvg()}</div><div><b>İş Takip</b><span>${me.role === 'clinic' ? 'Klinik paneli' : 'Teknisyen paneli'}</span></div></div>
+      <div class="brand"><div class="brand-logo">${toothSvg()}</div><div><b>${esc(LAB())}</b><span>${me.role === 'clinic' ? 'Hekim paneli' : 'Laboratuvar paneli'}</span></div></div>
       <nav class="nav">
         <a href="#/" data-nav="pano">${icon('home')}Pano</a>
         <a href="#/hastalar" data-nav="hastalar">${icon('users')}Hastalar</a>
@@ -228,6 +226,7 @@ function renderShell() {
           ? `<a href="#/isler?tab=giden" data-nav="giden">${icon('send')}Laba gönderdiğim işler</a>`
           : `<a href="#/isler?tab=gelen" data-nav="gelen">${icon('inbox')}Gelen işler<span class="count" id="cnt-in"></span></a>`}
         <a href="#/isler?tab=aktif" data-nav="isler">${icon('box')}Tüm işler<span class="count" id="cnt-unread"></span></a>
+        ${me.role === 'technician' ? `<a href="#/ekip" data-nav="ekip">${icon('users')}Ekip & hekimler</a>` : ''}
         <a href="#/profil" data-nav="profil">${icon('user')}Profil & ayarlar</a>
       </nav>
       <div class="side-foot">
@@ -271,7 +270,7 @@ async function refreshBadges() {
     const set = (id, n) => { const el = $(id); if (el) el.textContent = n ? n : ''; };
     set('#cnt-in', state.stats.incomingNew);
     set('#cnt-unread', state.stats.unread);
-    document.title = (state.stats.unread ? `(${state.stats.unread}) ` : '') + 'Klinik ⇄ Teknisyen İş Takip';
+    document.title = (state.stats.unread ? `(${state.stats.unread}) ` : '') + LAB() + ' İş Takip';
   } catch {}
 }
 
@@ -306,6 +305,7 @@ async function route(opts = {}) {
       case 'is': html = await viewCase(parts[1], opts); break;
       case 'ara': html = await viewSearch(query); break;
       case 'profil': html = viewProfile(); break;
+      case 'ekip': html = await viewTeam(); break;
       default: html = `<div class="empty">Sayfa bulunamadı. <a href="#/">Panoya dön</a></div>`;
     }
     if (seq !== renderSeq) return;
@@ -327,7 +327,7 @@ window.addEventListener('hashchange', () => route());
 /* ================================================================== */
 function caseRow(c, { showPatient = true } = {}) {
   const d = dueInfo(c);
-  const other = c.direction === 'incoming' ? c.from : c.to;
+  const other = isClinic() ? { org: LAB() } : c.clinic;
   return `<a class="case-row" href="#/is/${c.id}">
     <span class="no mono">#${esc(c.no)}</span>
     <span class="t"><b>${showPatient ? esc(c.patientName) + ' · ' : ''}${esc(c.title)}</b>
@@ -526,7 +526,7 @@ afterRender.isler = (parts, query) => {
 };
 function exportCsv(list) {
   const cols = [['İş No', 'no'], ['Hasta', 'patientName'], ['Başlık', 'title'], ['İş türü', 'workType'], ['Dişler', (c) => c.teeth.join(' ')], ['Renk', 'shade'], ['Materyal', 'material'],
-    ['Durum', 'statusLabel'], ['Öncelik', (c) => PRIO[c.priority]], ['Klinik', (c) => c.clinic?.org || c.clinic?.name], ['Teknisyen', (c) => c.technician?.org || c.technician?.name],
+    ['Durum', 'statusLabel'], ['Öncelik', (c) => PRIO[c.priority]], ['Klinik', (c) => c.clinic?.org || c.clinic?.name], ['Sorumlu teknisyen', (c) => c.technician?.name || ''],
     ['Teslim tarihi', 'dueDate'], ['Oluşturma', (c) => fmtDateTime(c.createdAt)], ['Son güncelleme', (c) => fmtDateTime(c.updatedAt)]];
   const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = [cols.map((c) => cell(c[0])).join(';'), ...list.map((c) => cols.map(([, k]) => cell(typeof k === 'function' ? k(c) : c[k])).join(';'))];
@@ -575,7 +575,7 @@ async function viewCase(id) {
   const totalMs = (terminal ? new Date(c.completedAt || c.updatedAt) : new Date()) - new Date(c.createdAt);
 
   const canEdit = state.me.role === 'clinic';
-  const other = state.me.role === 'clinic' ? c.technician : c.clinic;
+  const other = state.me.role === 'clinic' ? { name: c.technician?.name || 'Laboratuvar ekibi', org: LAB() } : c.clinic;
   return `
   <div class="page-head case-title">
     <div style="flex:1;min-width:260px">
@@ -595,14 +595,14 @@ async function viewCase(id) {
         <div class="card-body" style="border-top:1px solid var(--border)">
           <div class="kv">
             <div><small>Hasta</small><b><a href="#/hasta/${c.patientId}">${esc(c.patientName)}</a></b></div>
-            <div><small>Klinik</small><b>${esc(c.clinic?.org || '—')}</b><div class="small muted">${esc(c.clinic?.name)} ${c.clinic?.phone ? '· ' + esc(c.clinic.phone) : ''}</div></div>
-            <div><small>Teknisyen / Lab</small><b>${esc(c.technician?.org || '—')}</b><div class="small muted">${esc(c.technician?.name)} ${c.technician?.phone ? '· ' + esc(c.technician.phone) : ''}</div></div>
+            <div><small>Hekim / Klinik</small><b>${esc(c.clinic?.org || '—')}</b><div class="small muted">${esc(c.clinic?.name)} ${c.clinic?.phone ? '· ' + esc(c.clinic.phone) : ''}</div></div>
+            <div><small>Laboratuvar</small><b>${esc(LAB())}</b><div class="small muted">${c.technician ? 'Sorumlu: ' + esc(c.technician.name) : 'Henüz teknisyen üstlenmedi'}</div></div>
             <div><small>İş türü</small><b>${esc(c.workType || '—')}</b></div>
             <div><small>Renk</small><b>${esc(c.shade || '—')}</b></div>
             <div><small>Materyal</small><b>${esc(c.material || '—')}</b></div>
             <div><small>Öncelik</small><b>${PRIO[c.priority]}</b></div>
             <div><small>Teslim tarihi</small><b>${c.dueDate ? fmtDate(c.dueDate) : '—'}</b></div>
-            <div><small>Gönderen → Alan</small><b>${esc(c.from?.name)} → ${esc(c.to?.name)}</b></div>
+            <div><small>Gönderen → Alan</small><b>${esc(c.from?.name)} → ${esc(c.to?.name || LAB())}</b></div>
             <div><small>Oluşturulma</small><b>${fmtDateTime(c.createdAt)}</b></div>
             <div><small>Son güncelleme</small><b>${fmtDateTime(c.updatedAt)}</b><div class="small muted">${rel(c.updatedAt)}</div></div>
             <div><small>${terminal ? 'Toplam süre' : 'Geçen süre'}</small><b>${dur(totalMs)}</b></div>
@@ -835,7 +835,7 @@ function viewProfile() {
     <div class="card"><div class="card-head"><h2>Bilgilerim</h2></div>
       <form class="card-body stack" id="f-prof">
         <label class="field">Ad Soyad<input name="name" value="${esc(me.name)}" required></label>
-        <label class="field">${me.role === 'clinic' ? 'Klinik' : 'Laboratuvar'} adı<input name="org" value="${esc(me.org)}"></label>
+        ${me.role === 'clinic' ? `<label class="field">Klinik adı<input name="org" value="${esc(me.org)}"></label>` : `<div class="small muted">Laboratuvar: <b>${esc(LAB())}</b></div>`}
         <label class="field">Telefon<input name="phone" value="${esc(me.phone)}"></label>
         <div><button class="btn primary">Kaydet</button></div>
       </form>
@@ -942,20 +942,19 @@ function openPatientForm(p, onSaved) {
 
 async function openNewCase(pre = {}) {
   if (!isClinic()) return toast('İş kaydını yalnızca hekim açabilir', { type: 'bad' });
-  let [patients, partners] = await Promise.all([api('/patients'), getPartners(true)]).catch((e) => { toastErr(e); return []; });
+  let patients = await api('/patients').catch((e) => { toastErr(e); return null; });
   if (!patients) return;
   const isTech = state.me.role === 'technician';
   const files = [];
   const m = modal({
     size: 'wide',
-    title: 'Yeni iş gönder',
+    title: `${esc(LAB())}'a yeni iş gönder`,
     body: `<form id="nc" class="stack">
       <div class="grid-2">
         <label class="field">Hasta *<div class="row" style="flex-wrap:nowrap">
           <select name="patientId" required id="nc-patient"><option value="">Hasta seçin</option>${patients.map((p) => `<option value="${p.id}" data-clinic="${p.clinicId}" ${p.id === pre.patientId ? 'selected' : ''}>${esc(p.name)}${isTech ? ' — ' + esc(p.clinic?.org || '') : ''}</option>`).join('')}</select>
           <button type="button" class="btn" id="nc-addp" title="Yeni hasta">${icon('plus')}</button></div></label>
-        <label class="field">Gönderilecek ${partnerWord()} *<select name="toId" required id="nc-to">
-          <option value="">Seçin</option>${partners.map((u) => `<option value="${u.id}">${esc(u.org || u.name)} — ${esc(u.name)}</option>`).join('')}</select></label>
+        <label class="field">Gönderilecek laboratuvar<input value="${esc(LAB())}" disabled></label>
       </div>
       <div class="grid-2">
         <label class="field">İş türü *<select name="workType" required><option value="">Seçin</option>${WORK_TYPES.map((w) => `<option>${w}</option>`).join('')}</select></label>
@@ -1024,7 +1023,7 @@ async function openNewCase(pre = {}) {
         await uploadOne(c.id, files[i], (p) => { btn.textContent = `Dosya ${i + 1}/${files.length} · %${p}`; });
       }
       m.close();
-      toast(`İş #${c.no} gönderildi`, { type: 'ok', sub: `${c.patientName} → ${c.to.name}` });
+      toast(`İş #${c.no} gönderildi`, { type: 'ok', sub: `${c.patientName} → ${LAB()}` });
       location.hash = '#/is/' + c.id;
       refreshBadges();
     } catch (e) { toastErr(e); btn.disabled = false; btn.innerHTML = `${icon('send')}İşi gönder`; }
@@ -1037,19 +1036,16 @@ function openAction(c, a) {
     title: esc(a.label),
     body: `<div class="stack">
       <div>${statusBadge(c.status)} → ${statusBadge(a.to)}</div>
-      ${resend ? `<label class="field">Gönderilecek ${partnerWord()}<select id="ac-to"><option value="">Aynı kişiye (${esc(c.to?.name)})</option></select></label>` : ''}
+      ${resend ? `<div class="small muted">İş yeniden ${esc(LAB())}'a gönderilecek.</div>` : ''}
       <label class="field">${a.needNote ? 'Açıklama (zorunlu)' : 'Not (isteğe bağlı)'}<textarea id="ac-note" placeholder="${a.needNote ? 'Neden? Ne değişmeli?' : 'Karşı tarafa iletmek istediğiniz not'}"></textarea></label>
     </div>`,
     foot: `<button class="btn" data-close>Vazgeç</button><button class="btn ${/iptal|reddedildi/.test(a.to) ? 'danger solid' : 'primary'}" id="ac-ok">${esc(a.label)}</button>`
-  });
-  if (resend && c.from?.id === state.me.id) getPartners().then((list) => {
-    $('#ac-to', m.el).insertAdjacentHTML('beforeend', list.filter((u) => u.id !== c.to?.id && (state.me.role === 'clinic' || u.id === c.clinicId)).map((u) => `<option value="${u.id}">${esc(u.org || u.name)} — ${esc(u.name)}</option>`).join(''));
   });
   $('#ac-ok', m.el).onclick = async () => {
     const note = $('#ac-note', m.el).value.trim();
     if (a.needNote && !note) { toast('Lütfen açıklama yazın', { type: 'bad' }); return; }
     try {
-      await api('/cases/' + c.id, { method: 'PATCH', body: { status: a.to, note, toId: $('#ac-to', m.el)?.value || undefined } });
+      await api('/cases/' + c.id, { method: 'PATCH', body: { status: a.to, note } });
       m.close(); toast(`Durum: ${state.statuses[a.to]}`, { type: 'ok' }); route({ soft: true }); refreshBadges();
     } catch (e) { toastErr(e); }
   };
@@ -1096,6 +1092,56 @@ function openDue(c) {
   $('#due-ok', m.el).onclick = () => saveDue($('#due-in', m.el).value || null);
   $('#due-clear', m.el).onclick = () => saveDue(null);
 }
+
+/* --- Ekip & hekimler (yalnizca laboratuvar) --- */
+async function viewTeam() {
+  if (isClinic()) return '<div class="card empty">Bu bölüm yalnızca laboratuvar ekibi içindir.</div>';
+  const users = await api('/users');
+  const staff = users.filter((u) => u.role === 'technician');
+  const clinics = users.filter((u) => u.role === 'clinic');
+  const row = (u) => `<div class="urow">
+    ${avatar(u.name, 'sm')}
+    <span class="t"><b>${esc(u.name)}</b><small>${esc([u.role === 'clinic' ? u.org : '', u.email, u.phone].filter(Boolean).join(' · '))}</small></span>
+    <span class="small muted">${u.caseCount} iş</span>
+    ${u.disabled ? '<span class="badge st-iptal">Devre dışı</span>' : '<span class="badge st-hazir">Aktif</span>'}
+    ${u.id === state.me.id ? '<span class="small muted">Siz</span>' : `<button class="btn sm" data-toggle="${u.id}" data-off="${u.disabled ? 0 : 1}">${u.disabled ? 'Etkinleştir' : 'Devre dışı bırak'}</button>`}
+  </div>`;
+  return `<div class="page-head"><div><h1>Ekip & hekimler</h1><p class="muted">${esc(LAB())} laboratuvar ekibi ve sisteme kayıtlı hekimler</p></div></div>
+  <div class="two-col">
+    <div class="card"><div class="card-head"><h2>Hekimler (${clinics.length})</h2><span class="small muted">Hekimler giriş ekranından kendileri kayıt olur</span></div>
+      <div class="list">${clinics.map(row).join('') || '<div class="empty">Henüz kayıtlı hekim yok.</div>'}</div>
+      <div class="card-body small muted" style="border-top:1px solid var(--border)">Devre dışı bırakılan hekim giriş yapamaz ve işleri laboratuvar ekranında gizlenir. Tekrar etkinleştirince her şey geri gelir.</div>
+    </div>
+    <div class="stack" style="gap:18px">
+      <div class="card"><div class="card-head"><h2>Laboratuvar ekibi (${staff.length})</h2></div><div class="list">${staff.map(row).join('')}</div></div>
+      <div class="card"><div class="card-head"><h2>Ekibe teknisyen ekle</h2></div>
+        <form class="card-body stack" id="f-staff">
+          <label class="field">Ad Soyad<input name="name" required></label>
+          <div class="grid-2"><label class="field">E-posta<input name="email" type="email" required></label><label class="field">Telefon<input name="phone"></label></div>
+          <label class="field">Şifre<input name="password" required minlength="4"></label>
+          <div><button class="btn primary">${icon('plus')}Ekle</button></div>
+        </form>
+      </div>
+    </div>
+  </div>`;
+}
+afterRender.ekip = () => {
+  $('#f-staff')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api('/users', { method: 'POST', body: Object.fromEntries(new FormData(e.target)) });
+      if (r.demoDisabled) {
+        toast('Teknisyen eklendi. Demo hesaplar güvenlik için kapatıldı.', { type: 'ok', sub: 'Yeni hesabınızla giriş yapın', ms: 8000 });
+        setTimeout(() => location.reload(), 2500);
+      } else { toast('Teknisyen eklendi', { type: 'ok' }); route({ soft: true }); }
+    } catch (err) { toastErr(err); }
+  });
+  $$('[data-toggle]').forEach((b) => b.onclick = async () => {
+    const off = b.dataset.off === '1';
+    if (off && !(await confirmBox('Bu hesap devre dışı bırakılsın mı? Kişi artık giriş yapamaz.', 'Devre dışı bırak', true))) return;
+    try { await api('/users/' + b.dataset.toggle, { method: 'PATCH', body: { disabled: off } }); route({ soft: true }); } catch (err) { toastErr(err); }
+  });
+};
 
 /* --- Surum gecmisi --- */
 async function openChangelog() {
@@ -1201,6 +1247,8 @@ setInterval(() => { if (state.me && !$('.modal-back') && !document.activeElement
 /* Başlat                                                              */
 /* ================================================================== */
 async function boot() {
+  try { state.config = await api('/config'); } catch {}
+  document.title = LAB() + ' İş Takip';
   try {
     const r = await api('/me');
     if (r.tabToken) setToken(r.tabToken);

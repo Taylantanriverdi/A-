@@ -17,6 +17,10 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_UPLOAD = 300 * 1024 * 1024; // 300 MB
 const SESSION_DAYS = 30;
+// Tek laboratuvar: tum teknisyen hesaplari bu laboratuvarin ekibidir.
+// Hekimler isi dogrudan laboratuvara gonderir; teknisyen secilmez.
+const LAB_NAME = process.env.LAB_NAME || 'DIGICAD Dental Laboratuvar';
+const isDemo = (u) => /@demo\.com$/i.test((u && u.email) || '');
 
 // Gorunen surum (v1, v2, v3...) surumler.json dosyasindan gelir.
 // BUILD ise her kod degisikliginde farklidir; tarayicilar bunu karsilastirip
@@ -52,19 +56,39 @@ function checkPassword(pw, stored) {
 }
 
 function emptyDb() {
-  return { users: [], sessions: [], patients: [], cases: [], events: [], files: [], reads: {} };
+  return { users: [], sessions: [], patients: [], cases: [], events: [], files: [], reads: {}, meta: {} };
 }
 
 let db;
 function loadDb() {
   if (fs.existsSync(DB_FILE)) {
     db = Object.assign(emptyDb(), JSON.parse(fs.readFileSync(DB_FILE, 'utf8')));
+    migrate();
+    saveNow();
   } else {
     db = emptyDb();
     seed();
     saveNow();
   }
 }
+// Eski veriyi tek-laboratuvar yapisina uyarlar (her acilista guvenle calisir)
+function migrate() {
+  db.meta = db.meta || {};
+  for (const u of db.users) if (u.role === 'technician') u.org = LAB_NAME;
+  disableDemoIfReal();
+}
+// Gercek bir lab hesabi varsa sifresi herkesce bilinen demo hesaplar bir kez kapatilir
+function disableDemoIfReal() {
+  if (db.meta.demoDisabled) return false;
+  if (!db.users.some((u) => u.role === 'technician' && !isDemo(u) && !u.disabled)) return false;
+  const ids = new Set(db.users.filter(isDemo).map((u) => u.id));
+  for (const u of db.users) if (ids.has(u.id)) u.disabled = true;
+  db.sessions = db.sessions.filter((s) => !ids.has(s.userId));
+  db.meta.demoDisabled = true;
+  return true;
+}
+const labStaff = () => db.users.filter((u) => u.role === 'technician' && !u.disabled);
+
 let saveTimer = null;
 function saveNow() {
   const tmp = DB_FILE + '.tmp';
@@ -86,8 +110,8 @@ function seed() {
   };
   const k1 = mk('Dt. Ayşe Yılmaz', 'klinik@demo.com', 'clinic', 'Gülüş Ağız ve Diş Sağlığı Kliniği', '0212 555 10 10');
   mk('Dt. Mehmet Kaya', 'klinik2@demo.com', 'clinic', 'Kaya Dental', '0216 555 20 20');
-  const t1 = mk('Tekn. Can Demir', 'teknisyen@demo.com', 'technician', 'Demir Dental Laboratuvarı', '0532 555 30 30');
-  mk('Tekn. Elif Şahin', 'teknisyen2@demo.com', 'technician', 'Şahin CAD/CAM Lab', '0533 555 40 40');
+  const t1 = mk('Tekn. Can Demir', 'teknisyen@demo.com', 'technician', LAB_NAME, '0532 555 30 30');
+  mk('Tekn. Elif Şahin', 'teknisyen2@demo.com', 'technician', LAB_NAME, '0533 555 40 40');
 
   const p1 = { id: uid('p'), name: 'Ali Veli', clinicId: k1.id, createdBy: k1.id, phone: '0505 111 22 33', birthDate: '1980-04-12', gender: 'E', notes: 'Penisilin alerjisi var.', createdAt: now() };
   const p2 = { id: uid('p'), name: 'Zeynep Arslan', clinicId: k1.id, createdBy: k1.id, phone: '', birthDate: '1992-09-03', gender: 'K', notes: '', createdAt: now() };
@@ -102,6 +126,7 @@ function seed() {
   });
   addEvent(c1, t1.id, 'status', 'İş kabul edildi', { from: 'gonderildi', to: 'kabul' });
   c1.status = 'kabul';
+  c1.technicianId = t1.id;
   addEvent(c1, t1.id, 'note', 'Merhaba hocam, dosyalar ulaştı. Cuma provaya gönderebiliriz.');
   addEvent(c1, k1.id, 'note', 'Teşekkürler, hasta cuma 14:00 için randevulu.');
 
@@ -172,12 +197,11 @@ function nextCaseNo() {
   return `${year}-${String(n).padStart(4, '0')}`;
 }
 
-function newCase({ patientId, from, to, title, workType, teeth, shade, material, priority, dueDate, description }) {
-  const clinic = from.role === 'clinic' ? from : to;
-  const tech = from.role === 'technician' ? from : to;
+function newCase({ patientId, from, title, workType, teeth, shade, material, priority, dueDate, description }) {
+  // Is hekimden laboratuvara gider; sorumlu teknisyen isi kabul eden kisidir
   const c = {
     id: uid('c'), no: nextCaseNo(), patientId,
-    clinicId: clinic.id, technicianId: tech.id, fromId: from.id, toId: to.id,
+    clinicId: from.id, technicianId: null, fromId: from.id, toId: null,
     title: String(title || workType || 'İş').slice(0, 200), workType: workType || '',
     teeth: Array.isArray(teeth) ? teeth.map(Number).filter((t) => t >= 11 && t <= 48) : [],
     shade: shade || '', material: material || '',
@@ -186,7 +210,7 @@ function newCase({ patientId, from, to, title, workType, teeth, shade, material,
     status: 'gonderildi', createdAt: now(), updatedAt: now()
   };
   db.cases.push(c);
-  addEvent(c, from.id, 'created', `İş oluşturuldu ve ${to.name} (${to.org}) kişisine gönderildi`);
+  addEvent(c, from.id, 'created', `İş oluşturuldu ve ${LAB_NAME} laboratuvarına gönderildi`);
   return c;
 }
 
@@ -200,16 +224,23 @@ function addEvent(c, userId, type, text, meta) {
 function roleIn(c, user) {
   const r = new Set();
   if (c.clinicId === user.id) r.add('clinic');
-  if (c.technicianId === user.id) r.add('technician');
+  if (user.role === 'technician') r.add('technician');
   if (c.fromId === user.id) r.add('sender');
-  if (c.toId === user.id) r.add('receiver');
+  const to = c.toId ? userById(c.toId) : null;
+  if (c.toId === user.id || (user.role === 'technician' && (!to || to.role === 'technician'))) r.add('receiver');
   return r;
 }
 function allowedActions(c, user) {
   const roles = roleIn(c, user);
   return (TRANSITIONS[c.status] || []).filter((t) => roles.has(t.who));
 }
-const canSeeCase = (c, user) => c.clinicId === user.id || c.technicianId === user.id;
+// Hekim kendi islerini, laboratuvar ekibi tum isleri gorur (devre disi hekimlerinki haric)
+function canSeeCase(c, user) {
+  if (c.clinicId === user.id) return true;
+  if (user.role !== 'technician') return false;
+  const cl = userById(c.clinicId);
+  return !!cl && !cl.disabled;
+}
 function canSeePatient(p, user) {
   if (p.clinicId === user.id || p.createdBy === user.id) return true;
   return db.cases.some((c) => c.patientId === p.id && canSeeCase(c, user));
@@ -236,7 +267,8 @@ function caseSummary(c, user) {
     technician: publicUser(userById(c.technicianId)),
     from: publicUser(userById(c.fromId)),
     to: publicUser(userById(c.toId)),
-    direction: c.toId === user.id ? 'incoming' : 'outgoing',
+    direction: user.role === 'technician' ? 'incoming' : 'outgoing',
+    lab: LAB_NAME,
     fileCount: db.files.filter((f) => f.caseId === c.id).length,
     noteCount: db.events.filter((e) => e.caseId === c.id && e.type === 'note').length,
     unread: unreadCount(c, user),
@@ -304,7 +336,8 @@ function currentUser(req) {
   if (!token) return null;
   const s = db.sessions.find((x) => x.token === token);
   if (!s || new Date(s.expiresAt) < new Date()) return null;
-  return userById(s.userId) || null;
+  const u = userById(s.userId);
+  return u && !u.disabled ? u : null;
 }
 function requireUser(req) {
   const u = currentUser(req);
@@ -331,7 +364,7 @@ function notify(userIds, payload) {
   }
 }
 const notifyCase = (c, actor, kind, text) =>
-  notify([c.clinicId, c.technicianId], { kind, caseId: c.id, patientId: c.patientId, caseNo: c.no, actorId: actor.id, actorName: actor.name, text });
+  notify([c.clinicId, ...labStaff().map((x) => x.id)], { kind, caseId: c.id, patientId: c.patientId, caseNo: c.no, actorId: actor.id, actorName: actor.name, text });
 setInterval(() => { for (const set of streams.values()) for (const r of set) r.write(': ping\n\n'); }, 25000).unref();
 
 /* ------------------------------------------------------------------ */
@@ -349,9 +382,9 @@ route('POST', '/api/register', async (req, res) => {
   const email = String(b.email || '').trim().toLowerCase();
   if (!b.name || !email || !b.password) fail(400, 'Ad, e-posta ve şifre zorunlu');
   if (String(b.password).length < 4) fail(400, 'Şifre en az 4 karakter olmalı');
-  if (!['clinic', 'technician'].includes(b.role)) fail(400, 'Rol klinik veya teknisyen olmalı');
   if (db.users.some((u) => u.email === email)) fail(409, 'Bu e-posta zaten kayıtlı');
-  const u = { id: uid('u'), name: String(b.name).trim(), email, role: b.role, org: String(b.org || '').trim(), phone: String(b.phone || ''), password: hashPassword(b.password), createdAt: now() };
+  // Disaridan yalnizca hekim kaydolur; lab ekibini laboratuvar kendisi ekler
+  const u = { id: uid('u'), name: String(b.name).trim(), email, role: 'clinic', org: String(b.org || '').trim(), phone: String(b.phone || ''), password: hashPassword(b.password), createdAt: now() };
   db.users.push(u);
   save();
   startSession(res, u);
@@ -368,6 +401,7 @@ route('POST', '/api/login', async (req, res) => {
   const b = await readJson(req);
   const u = db.users.find((x) => x.email === String(b.email || '').trim().toLowerCase());
   if (!u || !checkPassword(b.password, u.password)) fail(401, 'E-posta veya şifre hatalı');
+  if (u.disabled) fail(403, `Hesabınız devre dışı. ${LAB_NAME} ile iletişime geçin.`);
   startSession(res, u);
 });
 
@@ -396,7 +430,7 @@ route('PATCH', '/api/me', async (req, res) => {
   const u = requireUser(req);
   const b = await readJson(req);
   if (b.name) u.name = String(b.name).trim();
-  if (b.org !== undefined) u.org = String(b.org).trim();
+  if (b.org !== undefined && u.role === 'clinic') u.org = String(b.org).trim();
   if (b.phone !== undefined) u.phone = String(b.phone).trim();
   if (b.newPassword) {
     if (!checkPassword(b.currentPassword, u.password)) fail(400, 'Mevcut şifre hatalı');
@@ -406,10 +440,52 @@ route('PATCH', '/api/me', async (req, res) => {
   send(res, 200, { user: publicUser(u) });
 });
 
-route('GET', '/api/partners', async (req, res) => {
+route('GET', '/api/config', async (req, res) => {
+  send(res, 200, { lab: LAB_NAME, demo: db.users.some((u) => isDemo(u) && !u.disabled) });
+});
+
+/* --- Laboratuvar ekibi ve hekim yonetimi (yalnizca lab) --- */
+function requireLab(req) {
   const u = requireUser(req);
-  const want = u.role === 'clinic' ? 'technician' : 'clinic';
-  send(res, 200, db.users.filter((x) => x.role === want).map(publicUser));
+  if (u.role !== 'technician') fail(403, 'Bu bölüm yalnızca laboratuvar ekibi içindir');
+  return u;
+}
+route('GET', '/api/users', async (req, res) => {
+  requireLab(req);
+  send(res, 200, db.users.map((u) => ({
+    ...publicUser(u), disabled: !!u.disabled, createdAt: u.createdAt,
+    caseCount: db.cases.filter((c) => c.clinicId === u.id || c.technicianId === u.id).length
+  })));
+});
+route('POST', '/api/users', async (req, res) => {
+  requireLab(req);
+  const b = await readJson(req);
+  const email = String(b.email || '').trim().toLowerCase();
+  if (!String(b.name || '').trim() || !email || !b.password) fail(400, 'Ad, e-posta ve şifre zorunlu');
+  if (String(b.password).length < 4) fail(400, 'Şifre en az 4 karakter olmalı');
+  if (db.users.some((u) => u.email === email)) fail(409, 'Bu e-posta zaten kayıtlı');
+  const u = { id: uid('u'), name: String(b.name).trim(), email, role: 'technician', org: LAB_NAME, phone: String(b.phone || ''), password: hashPassword(b.password), createdAt: now() };
+  db.users.push(u);
+  const demoDisabled = disableDemoIfReal();
+  save();
+  send(res, 201, { user: publicUser(u), demoDisabled });
+});
+route('PATCH', '/api/users/:id', async (req, res, { params }) => {
+  const me = requireLab(req);
+  const u = userById(params.id);
+  if (!u) fail(404, 'Kullanıcı bulunamadı');
+  const b = await readJson(req);
+  if (b.disabled !== undefined) {
+    if (u.id === me.id) fail(400, 'Kendi hesabınızı devre dışı bırakamazsınız');
+    u.disabled = !!b.disabled;
+    if (u.disabled) db.sessions = db.sessions.filter((s) => s.userId !== u.id);
+  }
+  if (b.newPassword) {
+    if (String(b.newPassword).length < 4) fail(400, 'Şifre en az 4 karakter olmalı');
+    u.password = hashPassword(b.newPassword);
+  }
+  save();
+  send(res, 200, { ok: true });
 });
 
 /* --- Hastalar --- */
@@ -487,11 +563,9 @@ route('POST', '/api/cases', async (req, res) => {
   const b = await readJson(req);
   const p = db.patients.find((x) => x.id === b.patientId);
   if (!p || !canSeePatient(p, u)) fail(400, 'Hasta seçin');
-  const to = userById(b.toId);
-  if (!to || to.role !== 'technician') fail(400, 'Laboratuvar / teknisyen seçin');
   if (p.clinicId !== u.id) fail(400, 'Hasta kliniğinize ait değil');
   if (!String(b.title || b.workType || '').trim()) fail(400, 'İş başlığı veya türü zorunlu');
-  const c = newCase({ ...b, from: u, to });
+  const c = newCase({ ...b, from: u });
   if (b.note && String(b.note).trim()) addEvent(c, u.id, 'note', b.note);
   markRead(c, u);
   save();
@@ -507,8 +581,9 @@ route('GET', '/api/cases/:id', async (req, res, { params }) => {
     .map((e) => ({ ...e, user: publicUser(userById(e.userId)) }));
   const files = db.files.filter((f) => f.caseId === c.id).map(fileOut);
   const lastRead = (db.reads[u.id] || {})[c.id] || '';
-  const otherId = c.clinicId === u.id ? c.technicianId : c.clinicId;
-  const otherRead = (db.reads[otherId] || {})[c.id] || '';
+  // "Gorüldü": hekim icin lab ekibinden herhangi biri, lab icin hekim okuduysa
+  const otherIds = u.role === 'technician' ? [c.clinicId] : labStaff().map((x) => x.id);
+  const otherRead = otherIds.map((id) => (db.reads[id] || {})[c.id] || '').sort().pop() || '';
   send(res, 200, { ...caseSummary(c, u), patient: p, events, files, lastRead, otherRead, transitions: TRANSITIONS, statusLabels: STATUS });
 });
 
@@ -522,14 +597,8 @@ route('PATCH', '/api/cases/:id', async (req, res, { params }) => {
     if (t.needNote && !String(b.note || '').trim()) fail(400, 'Bu işlem için açıklama yazmalısınız');
     const prev = c.status;
     c.status = b.status;
-    if (b.status === 'gonderildi') {
-      // reddedilen iş yeniden gönderildiğinde başka birine yönlendirilebilir
-      const to = b.toId && userById(b.toId);
-      if (to && to.role !== u.role) {
-        c.toId = to.id;
-        if (to.role === 'clinic') c.clinicId = to.id; else c.technicianId = to.id;
-      }
-    }
+    // Isi kabul eden (ya da ilk isleyen) teknisyen sorumlu olur
+    if (u.role === 'technician' && (b.status === 'kabul' || !c.technicianId)) c.technicianId = u.id;
     if (b.status === 'tamamlandi') c.completedAt = now();
     addEvent(c, u.id, 'status', t.label + (b.note ? ` — ${b.note}` : ''), { from: prev, to: b.status, note: b.note || '' });
     notifyCase(c, u, 'status', `${c.no}: ${STATUS[prev]} → ${STATUS[c.status]}`);
@@ -578,8 +647,7 @@ route('POST', '/api/cases/:id/read', async (req, res, { params }) => {
   const c = getCaseFor(params.id, u);
   markRead(c, u);
   save();
-  const otherId = c.clinicId === u.id ? c.technicianId : c.clinicId;
-  notify([otherId], { kind: 'read', caseId: c.id });
+  notify(u.role === 'technician' ? [c.clinicId] : labStaff().map((x) => x.id), { kind: 'read', caseId: c.id });
   send(res, 200, { ok: true });
 });
 
@@ -674,7 +742,7 @@ route('GET', '/api/stats', async (req, res) => {
     total: mine.length,
     active: active.length,
     waitingMe: active.filter((c) => allowedActions(c, u).length > 0).length,
-    incomingNew: mine.filter((c) => c.status === 'gonderildi' && c.toId === u.id).length,
+    incomingNew: u.role === 'technician' ? mine.filter((c) => c.status === 'gonderildi').length : 0,
     overdue: active.filter((c) => c.dueDate && c.dueDate < today).length,
     dueToday: active.filter((c) => c.dueDate === today).length,
     unread: mine.reduce((s, c) => s + unreadCount(c, u), 0),
@@ -742,10 +810,11 @@ const server = http.createServer(async (req, res) => {
 loadDb();
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`\n  Klinik ⇄ Teknisyen İş Takip çalışıyor:  http://localhost:${PORT}   (sürüm ${VERSION} · ${BUILD})\n`);
-    console.log('  Demo hesaplar (şifre: 1234):');
-    console.log('    Klinik     → klinik@demo.com');
-    console.log('    Teknisyen  → teknisyen@demo.com\n');
+    console.log(`\n  ${LAB_NAME} İş Takip çalışıyor:  http://localhost:${PORT}   (sürüm ${VERSION} · ${BUILD})\n`);
+    if (db.users.some((u) => isDemo(u) && !u.disabled)) {
+      console.log('  Demo hesaplar (şifre: 1234): hekim → klinik@demo.com, lab → teknisyen@demo.com');
+      console.log('  İlk gerçek lab hesabını "Ekip & hekimler" sayfasından ekleyince demo hesaplar kapanır.\n');
+    }
   });
 }
 module.exports = { server };

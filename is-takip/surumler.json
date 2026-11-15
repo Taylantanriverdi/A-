@@ -1,5 +1,18 @@
 [
   {
+    "v": 8,
+    "tarih": "2026-11-16",
+    "baslik": "Tek laboratuvar: DIGICAD",
+    "degisiklikler": [
+      "Program DIGICAD Dental Laboratuvar için düzenlendi; tek laboratuvar DIGICAD",
+      "Hekim iş gönderirken teknisyen/laboratuvar seçmez, iş doğrudan DIGICAD'a gider",
+      "DIGICAD ekibindeki tüm teknisyenler gelen bütün işleri görür; işi kabul eden teknisyen 'sorumlu' olur",
+      "Giriş ekranından yalnızca hekimler kayıt olur; teknisyen hesaplarını laboratuvar açar",
+      "Yeni 'Ekip & hekimler' sayfası (yalnızca lab): teknisyen ekleme, hekim ve teknisyen hesaplarını devre dışı bırakma",
+      "İlk gerçek lab hesabı varken şifresi herkesçe bilinen demo hesaplar güvenlik için otomatik kapatılır"
+    ]
+  },
+  {
     "v": 7,
     "tarih": "2026-11-16",
     "baslik": "Dosyalar yükleme tarihine göre ayrı ayrı",

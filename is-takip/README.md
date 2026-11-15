@@ -1,6 +1,9 @@
-# Klinik ⇄ Teknisyen İş Takip Sistemi
+# DIGICAD Dental Laboratuvar — İş Takip Sistemi
 
-Diş kliniği ile dental teknisyen/laboratuvar arasındaki işleri **hasta bazlı** takip eden web uygulaması.
+Hekimler ile **DIGICAD Dental Laboratuvar** arasındaki işleri **hasta bazlı** takip eden web uygulaması.
+Tek laboratuvar DIGICAD'dır: hekim işi gönderirken laboratuvar/teknisyen seçmez, iş doğrudan DIGICAD'a gider;
+DIGICAD ekibindeki tüm teknisyenler gelen işleri görür, işi kabul eden teknisyen sorumlu olur.
+Hekimler giriş ekranından kayıt olur; teknisyen hesaplarını laboratuvar "Ekip & hekimler" sayfasından açar.
 İki taraf da aynı işi gerçek zamanlı görür: iş gönderir, iş alır, not bırakır, STL yükler ve her aşamanın zamanını izler.
 
 ## Kurulum ve çalıştırma

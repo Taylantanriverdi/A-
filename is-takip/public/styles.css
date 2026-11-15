@@ -189,6 +189,11 @@ label.field > span { text-transform: none; }
 .case-row .t b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .case-row .t small { color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .case-row .meta { display: flex; gap: 6px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.urow { display: flex; align-items: center; gap: 10px; padding: 11px 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+.urow:first-child { border-top: 0; }
+.urow .t { flex: 1; min-width: 160px; }
+.urow .t b { display: block; }
+.urow .t small { color: var(--muted); overflow-wrap: anywhere; }
 .empty { padding: 34px 18px; text-align: center; color: var(--muted); }
 
 .patient-card { margin-bottom: 14px; overflow: hidden; }
