@@ -1,0 +1,480 @@
+# PLAN.md — "Altın Saat Çiftliği" (Sinematik 2D Çiftlik Simülasyonu)
+
+> Bu dosya projenin tek doğru kaynağıdır. Mimari kararlar, veri sözleşmeleri, ekonomi değerleri ve ilerleme burada tutulur.
+> Sahibi: Beyin (baş mimar / sanat yönetmeni / proje yöneticisi). İşçiler bu dosyaya aykırı karar veremez; öneriyi raporla iletir.
+
+---
+
+## 0. İlerleme Durumu
+
+| Aşama | Konu | Durum |
+|---|---|---|
+| 0 | İşçi ajanları + PLAN.md | ✅ Tamamlandı — onay bekleniyor |
+| 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ⏳ Onaydan sonra |
+| 2 | Tarım ve toprak mekaniği | — |
+| 3 | Envanter, mağaza, pazar | — |
+| 4 | Hayvancılık | — |
+| 5 | Üretim binaları ve zincirleri | — |
+| 6 | Ekonomi, banka, giderler, finans paneli | — |
+| 7 | Hava durumu, mevsimler, rastgele olaylar | — |
+| 8 | İşçiler, makineler, arazi genişletme | — |
+| 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
+
+### İşçi kadrosu (`.claude/agents/`, hepsi `model: opus`)
+| Ajan | Alan |
+|---|---|
+| engine-dev | Phaser yapılandırması, sahneler, ana döngü, EventBus, GameState, SaveSystem, kamera |
+| visual-dev | Gökyüzü, paralaks, ışık/color grading, gölgeler, hava FX, parçacıklar, post-process, prosedürel dokular |
+| gameplay-dev | Tarım, toprak, hayvanlar, üretim zincirleri, işçiler, makineler, envanter, ilerleme |
+| economy-dev | Pazar, dinamik fiyat, satış kanalları, mağaza, giderler, banka, finans defteri |
+| ui-dev | DOM tabanlı HUD/paneller, dokunmatik kontroller, grafikler, bildirimler |
+| qa-tester | Derleme, Playwright ile masaüstü+mobil test, FPS/bellek ölçümü, hata raporu (kod düzeltmez) |
+
+---
+
+## 1. Teknik Altyapı
+
+- **Vite + Phaser 3 (3.80.x) + JavaScript (ES modülleri)**. TypeScript yerine JS + JSDoc tip yorumları: işçiler arası hız ve sade derleme için.
+- Proje klasörü: **`ciftlik/`** (depo kökündeki eski HTML oyunlarından ayrı tutulur).
+- Harici görsel/ses dosyası yok. Grafik: Phaser `Graphics` → `generateTexture`, `CanvasTexture`, gürültü fonksiyonları, GLSL PostFX. Ses: Web Audio API.
+- Renderer: WebGL (PostFX için). Canvas'a düşerse efektler kapanır, oyun çalışmaya devam eder.
+- Hedef: 60 FPS. Mobilde DPR en fazla 2, kalite seviyesi otomatik (high / medium / low).
+
+### Klasör yapısı
+```
+ciftlik/
+  index.html            # #game (canvas) + #ui (DOM katmanı)
+  vite.config.js
+  src/
+    main.js             # Phaser.Game yapılandırması, sistemlerin kaydı, window.__game
+    core/
+      EventBus.js       # on/off/emit, tek global örnek
+      GameState.js      # createInitialState(), state şeması, sürüm
+      SaveSystem.js     # localStorage, sürüm göçü, otomatik kayıt
+      SystemRegistry.js # sistemlerin sıralı update'i (sabit adım)
+      Rng.js            # tohumlu rastgele (mulberry32), state.rngSeed
+      constants.js      # TILE_W, TILE_H, MIN_PER_DAY, vb.
+    systems/            # SİMÜLASYON — Phaser'a bağımlı değil (Node'da test edilebilir)
+      TimeSystem.js  WeatherSystem.js  FarmSystem.js  AnimalSystem.js
+      ProductionSystem.js  InventorySystem.js  MarketSystem.js  ContractSystem.js
+      EconomySystem.js  BankSystem.js  WorkerSystem.js  EventSystem.js  ProgressionSystem.js
+    data/               # TÜM denge değerleri
+      crops.js animals.js recipes.js items.js buildings.js machines.js
+      prices.js shop.js economy.js events.js workers.js land.js palette.js
+    scenes/
+      BootScene.js      # prosedürel dokuların üretimi, yükleme ekranı
+      WorldScene.js     # dünya render + giriş
+      UIScene.js        # (yalnızca canvas tarafı gereken UI efektleri; asıl UI DOM'da)
+    render/             # GÖRSEL — state'i okur, asla yazmaz
+      Renderer.js       # katmanların kurulumu ve güncellenmesi
+      CameraDirector.js # takip, zoom, sinematik çekimler
+      SkyLayer.js ParallaxLayer.js GroundLayer.js ShadowSystem.js
+      Lighting.js       # color grading + ışık kaynakları
+      WeatherFX.js Particles.js
+      postfx/  GradePipeline.js BloomPipeline.js CinematicPipeline.js (vinyet+gren+letterbox)
+      textures/ noise.js terrain.js plants.js animals.js buildings.js props.js
+    world/              # oyun nesnelerinin görsel temsilleri (CropView, AnimalView, BuildingView)
+    ui/                 # DOM UI: hud, panels, toast, touch, charts, strings.js, styles.css
+    audio/              # AudioEngine.js + prosedürel ses üreticileri (Aşama 9)
+  tools/
+    sim-economy.mjs     # Node ile ekonomi simülasyonu
+  qa/                   # qa-tester ekran görüntüleri ve raporları
+```
+
+### Katman kuralı (en önemli mimari karar)
+```
+ data/  ──►  systems/ (saf simülasyon, GameState'i değiştirir)  ──emit──►  EventBus
+                ▲                                                         │
+                │ komut olayları (ui:*, input:*)                          ▼
+             ui/ (DOM)  ◄────────── okur ───────────  GameState  ◄── okur ── render/, world/
+```
+- **Simülasyon (systems/) Phaser'ı import etmez.** Bu sayede ekonomi ve tarım Node'da hızlı simüle edilip dengelenebilir.
+- **Render ve UI state'e yazmaz.** Oyuncu eylemleri komut olayı olarak gider, ilgili sistem işler.
+- Tüm para hareketleri `EconomySystem.transact()` üzerinden geçer → `finance.ledger`.
+
+### Ana döngü
+- Phaser `update(time, delta)` → `SystemRegistry.tick(delta)`.
+- Oyun zamanı **sabit adımla** ilerler: 1 simülasyon adımı = 1 oyun dakikası. Gerçek süre: 600 sn / 1440 dk = **0,4167 sn/oyun dakikası** (1x).
+- Hız: ⏸ 0x, ▶ 1x, ⏩ 2x, ⏭ 4x; "Sabaha geç" (gece 22:00'den sonra uyku → 06:00).
+- Kare başına en fazla 240 simülasyon adımı (kare atlama koruması).
+- Sistem sırası: Time → Weather → Event → Farm → Animal → Production → Worker → Market → Contract → Bank → Economy → Progression.
+- Render her karede, interpolasyonla (`time.minuteFraction`).
+
+### Sistem arayüzü (sözleşme)
+```js
+// Her sistem bu şekli uygular
+export default {
+  id: 'farm',
+  init(state, bus) {},            // olay aboneliği
+  tickMinute(state, bus, ctx) {}, // her oyun dakikası (hafif tutulmalı)
+  onHour(state, bus, ctx) {},     // her oyun saati
+  onDay(state, bus, ctx) {},      // her gün 00:00
+  onSeason(state, bus, ctx) {},   // mevsim değişimi
+};
+// ctx = { rng, data, now: {day, hour, minute, season, year} }
+```
+
+### EventBus olay sözleşmesi (çekirdek)
+| Olay | Yük (payload) | Yayan |
+|---|---|---|
+| `time:minute` / `time:hour` / `time:day` / `time:season` | `{day, hour, season, year}` | TimeSystem |
+| `time:speed` | `{speed}` | UI → TimeSystem |
+| `weather:changed` | `{type, intensity, wind}` | WeatherSystem |
+| `farm:action` | `{type:'plow'|'plant'|'water'|'fertilize'|'treat'|'weed'|'harvest', tileId, itemId?}` | UI/giriş → FarmSystem |
+| `farm:changed` | `{tileIds}` | FarmSystem |
+| `inventory:changed` | `{itemId, delta}` | InventorySystem |
+| `market:sell` | `{itemId, quality, qty, channel}` | UI → MarketSystem |
+| `shop:buy` | `{itemId, qty}` | UI → MarketSystem |
+| `money:changed` | `{amount, balance, category}` | EconomySystem |
+| `event:started` / `event:ended` | `{id, title, text, effects}` | EventSystem |
+| `camera:cinematic` | `{target:{x,y}, zoom, duration, letterbox:boolean, reason}` | herkes → CameraDirector |
+| `toast` | `{text, kind:'info'|'good'|'bad'|'event'}` | herkes → UI |
+| `save:request` / `save:done` | `{}` | herkes / SaveSystem |
+
+### GameState şeması (JSON-serileştirilebilir, `version` alanlı)
+```js
+{
+  version: 1,
+  rngSeed: 123456,
+  time: { totalMinutes: 360, speed: 1 },         // gün/saat/mevsim türetilir
+  weather: { type: 'clear', intensity: 0, wind: 0.2, forecast: [...3 gün], puddles: 0, snowCover: 0 },
+  player: { name: 'Çiftçi', level: 1, xp: 0, reputation: 10 },
+  finance: { money: 5000, ledger: [], loans: [], dailySummary: [] },
+  inventory: { capacity: 60, items: { 'seed_potato': [{q:'B', qty:10, age:0}] } },
+  land: { parcels: [{ id:'P1', owned:true }, ...] },
+  tiles: { 'x,y': { state:'grass'|'plowed'|'planted', moisture, n, p, k, ph,
+                    history:['potato', ...], crop:{ id, plantedAt, stage, growth, health,
+                    careScore, pest, disease, weeds, watered } } },
+  animals: [{ id, type, name, ageDays, hunger, thirst, health, happiness, productTimer, buildingId }],
+  buildings: [{ id, type, x, y, condition, queue: [...] }],
+  machines: [{ id, type, condition, fuel }],
+  workers: [{ id, name, skills:{farm, animal, machine}, wage, speed, task }],
+  market: { prices: { itemId: { mult, saturation } }, activeEvents: [] },
+  contracts: [{ id, itemId, qty, minQuality, reward, deadlineDay, penalty }],
+  stats: { harvested:{}, sold:{}, earned:0, spent:0 },
+  settings: { quality: 'auto', sound: 0.8, music: 0.5 },
+}
+```
+
+### Kayıt sistemi
+- Anahtar: `altin-saat-ciftligi:save:v1` (+ `:backup` önceki kayıt).
+- Otomatik kayıt: her oyun saatinde, `visibilitychange` (hidden) ve `pagehide`'da.
+- Yükleme: JSON parse + `version` kontrol + `migrations[v]()` zinciri; hata olursa yedeğe, o da bozuksa yeni oyun (ve toast ile bildir).
+
+### Hata ayıklama kancası (qa-tester için)
+`window.__game = { state, bus, debug: { setTime(hour), skip(minutes), setSpeed(x), setWeather(type), addMoney(n), cinematic(), quality(level) } }` — yalnızca `import.meta.env.DEV` veya `?debug=1` iken.
+
+---
+
+## 2. Sanat Yönetimi — "Sinematik 2D"
+
+### Bakış açısı ve dünya
+- **Diyorama tarzı 3/4 eğik görünüm** (izometrik değil): düz dikdörtgen ızgara, üstte ufuk çizgisi. Ufkun gerisinde paralaks katmanlar, önde zemin düzlemi ve tarlalar, en önde rüzgârda sallanan çimler.
+- Karo: **64 × 44 px** (basık oran derinlik hissi verir). Nesneler **y değerine göre sıralanır**.
+- Dünya: 80 × 24 karo (5120 × 1056 px). Başlangıç parseli P1: 16 × 12 karo; 24 karo sürülmüş hâlde başlar.
+- Şekil dili: yumuşak, yuvarlak hatlar; düz renk + gradyan + hafif doku gürültüsü; ince koyu kontur yok (animasyon filmi hissi), bunun yerine kenar ışığı (rim light) ve gölge ile hacim.
+
+### Katman sırası (depth) ve paralaks faktörü
+| Depth | Katman | Paralaks |
+|---|---|---|
+| 0 | Gökyüzü gradyanı (shader veya büyük gradyan doku) | 0 |
+| 5 | Yıldızlar, ay, güneş, güneş halesi | 0.02 |
+| 10 | Uzak dağlar (2 ton, atmosferik perspektif: uzak = maviye yakın, düşük kontrast) | 0.10 |
+| 15 | Bulutlar (yavaş kayar, rüzgârla) | 0.18 |
+| 20 | Tepeler | 0.30 |
+| 25 | Orman şeridi (ağaçlar rüzgârda salınır) | 0.55 |
+| 30 | Sis bandı (sabah yoğun) | 0.70 |
+| 40 | Zemin: çim/toprak dokusu, yollar, tarla karoları, ıslaklık | 1.0 |
+| 45 | Gölgeler (güneşe göre) + bulut gölgeleri (kayan yumuşak lekeler) | 1.0 |
+| 50 | Ekinler, hayvanlar, binalar, ağaçlar (y-sıralı) | 1.0 |
+| 70 | Hava parçacıkları (yağmur, kar), toz, ateş böcekleri | 1.0 |
+| 80 | Ön plan çimleri ve çiçekler (kenarlarda) | 1.15 |
+| 90 | Işık katmanı: ambient tint (MULTIPLY) + nokta ışıkları (ADD: pencere, fener) | — |
+| PostFX | Grade → Bloom → Vinyet + Film greni + Letterbox | — |
+
+### Gün içi renk paleti (color grading anahtar kareleri, aralar yumuşak interpolasyon)
+| Saat | An | Gök üst | Gök alt (ufuk) | Ambient tint | Güneş/Işık | Sis | Gölge |
+|---|---|---|---|---|---|---|---|
+| 04:30 | Gece sonu | `#0b1026` | `#2a2f55` | `#3a4470` | ay `#9fb4ff` | 0.30 | ay, çok zayıf |
+| 06:30 | Gün doğumu | `#3b4a8a` | `#ff9e6b` | `#d9a48e` | `#ffb37a` | **0.70** | çok uzun, 0.20 |
+| 09:00 | Sabah | `#6fa8dc` | `#d6ecf7` | `#f4f0e6` | `#fff1d6` | 0.15 | uzun, 0.30 |
+| 13:00 | Öğle | `#4f95e0` | `#c4e3ff` | `#ffffff` | `#ffffff` | 0 | kısa, 0.38 |
+| 17:30 | Altın saat | `#5b7fc4` | `#ffc27a` | `#ffdca6` | `#ffb347` | 0.10 | uzun, 0.32, sıcak |
+| 19:30 | Gün batımı | `#2c2f6b` | `#ff6f61` | `#d98c7c` | `#ff7a4d` | 0.20 | çok uzun, 0.18 |
+| 21:00 | Alacakaranlık | `#141a3d` | `#4a3a6b` | `#6c6ca6` | — | 0.25 | yok |
+| 00:00 | Gece | `#050816` | `#121a3a` | `#2f3b6e` | ay `#9fb4ff` | 0.30 | ay, 0.10 |
+
+**Mevsim grading'i** (gün paletinin üstüne): İlkbahar: yeşiller +%10 doygunluk, taze; Yaz: sıcak (+kırmızı), yüksek kontrast; Sonbahar: ton turuncuya kayar, ağaçlar turuncu/kızıl; Kış: doygunluk −%35, mavi gölgeler, kar örtüsü.
+
+### Gölge kuralı
+- Güneş açısı saate göre: doğu (06:00) → tepe (13:00) → batı (20:00).
+- Gölge = nesne silüetinin yumuşatılmış (blur'lu) koyu kopyası, tabandan **güneşin tersi yönde** eğilir (skew) ve uzar: `length = clamp(1 / tan(elevation), 0.3, 4)`; `alpha = 0.38 × güneşYoğunluğu × (1 − bulutluluk×0.6)`.
+- Bulutlu/yağmurlu havada gölgeler neredeyse kaybolur; gece ay gölgesi çok zayıf ve mavimsi.
+
+### Atmosfer ve parçacıklar
+- Sabah sisi: 05:30–09:00 arası, alçak katmanlarda yatay kayan yumuşak sis bantları.
+- Toz/polen zerreleri: gündüz, ışık huzmesinde parlayan (ADD) yavaş zerreler.
+- Ateş böcekleri: yaz ve ilkbahar geceleri, 20:30–04:00, bloom ile parlar.
+- Rüzgâr: global `wind` (0–1) → ekin/ağaç/çim salınım genliği ve frekansı, bulut hızı, yağmur eğimi.
+- Yağmur: eğik çizgi parçacıkları + zeminde sıçrama halkaları + birikinti dokusu + ıslak zemin parlaması (zemin koyulaşır, ışık kaynaklarında speküler yansıma).
+- Fırtına: yoğun yağmur + şimşek (ekran flaşı + 0,5–2 sn gecikmeli gök gürültüsü) + güçlü rüzgâr.
+- Kar: yavaş, salınımlı tanecikler; zeminde birikim (`snowCover`), çatılarda beyaz örtü.
+
+### Kamera dili
+- Yumuşak takip (lerp 0.08), zoom 0.5x–2x (tekerlek/pinch), yumuşak zoom geçişi.
+- Sinematik anlar (`camera:cinematic`): hasat, yeni bina açılışı, ilk hayvan, mevsim geçişi, olaylar → letterbox bantları (ekran yüksekliğinin %10'u) kayarak girer, kamera yavaş pan + hafif zoom-in, 2–4 sn sonra geri döner.
+- Açılış sahnesi: siyah bantlarla, ufuktan tarlaya yavaş inen kamera (gün doğumunda), başlık yazısı solarak belirir.
+
+### Post-process
+- **Bloom**: parlak alanlar (güneş, ateş böceği, pencere ışığı) — eşik 0.75, yumuşak.
+- **Vinyet**: 0.25–0.35 (gece daha güçlü).
+- **Film greni**: çok hafif (0.04), zamanla değişen gürültü.
+- **Letterbox**: açılış ve ara sahnelerde.
+- Mobil "low" kalitede bloom kapalı, gren kapalı, parçacık sayısı %40.
+
+### UI stili
+- Yarı saydam koyu cam paneller (`rgba(18,20,28,0.55)` + `backdrop-filter: blur(10px)`), 14px yuvarlatma, sıcak krem metin `#f5ecd9`, vurgu rengi altın `#f2b84b`, pozitif `#7fd18b`, negatif `#ff7a6b`.
+- Yazı tipi: sistem sans-serif (harici font yok). Paneller kaydırma + solma ile 220 ms'de açılır.
+- HUD minimal: sol üst saat/gün/mevsim/hava, sağ üst para, alt orta araç çubuğu; geri kalan her şey açılıp kapanan panellerde.
+
+---
+
+## 3. Oyun Mekanikleri — Sistem Tasarımı
+
+### Zaman ve takvim
+- 1 gün = 600 gerçek saniye (1x). 1 mevsim = 28 gün. 1 yıl = 4 mevsim = 112 gün.
+- **Finansal "ay" = 1 mevsim (28 gün)**. Hafta = 7 gün (kredi taksitleri, toptancı ödemeleri).
+- Mevsimler: İlkbahar → Yaz → Sonbahar → Kış.
+
+### Toprak modeli (her karo)
+| Değer | Aralık | Not |
+|---|---|---|
+| `moisture` | 0–100 | Sulama +60 (en fazla 100), saatte −0,6 (yaz −1,0, yağmur +4/saat). <20 kuraklık stresi, >90 uzun süre → kök çürüğü riski |
+| `n`, `p`, `k` | 0–100 | Başlangıç 55/50/50. Her hasat ürüne göre tüketir. Gübre ekler |
+| `ph` | 4.5–8.5 | Başlangıç 6,5. İdeal 6,0–7,0. Kireç +0,4; NPK −0,1 |
+| `history` | son 3 ürün | Aynı ürün art arda: verimlilik çarpanı ×0,85 (2. kez), ×0,70 (3. kez). Baklagil (fasulye) sonrası N +15 |
+
+**Büyüme formülü (her oyun saati):**
+`growth += (1 / büyümeSaati) × nemFaktörü × besinFaktörü × phFaktörü × mevsimFaktörü × sağlık`
+- nemFaktörü: 40–85 → 1,0; 20–40 → 0,6; <20 → 0,2 (+sağlık kaybı)
+- besinFaktörü: ürünün NPK ihtiyacına göre ortalama karşılanma oranı (0,5–1,1)
+- Görsel aşamalar: **tohum → filiz → genç bitki → olgunlaşan → hasada hazır** (+ solgun/ölü varyantlar). Hasattan 3 gün sonra çürüme başlar.
+- Don: kış dışında ani don olayı veya mevsim dışı kalan ürün → sağlık −40. Kuraklık: nem <20 iken saatte sağlık −1.
+- Zararlı / hastalık / yabani ot: günlük olasılık (nem, sıcaklık, ekim nöbeti ihlali artırır). Kimyasal ilaç: %95 etkili, "organik" etiketi düşer. Organik sprey: %65 etkili, organik ürün pazarda +%15.
+- **Kalite (A/B/C):** `careScore` (sulama düzeni, besin, sağlık, zararlı süresi ortalaması, 0–100). ≥80 → A, 55–79 → B, <55 → C.
+
+### Hayvan modeli
+- Değerler 0–100: açlık, susuzluk, sağlık, mutluluk. Açlık/susuzluk saatte azalır; 0'a yakınsa sağlık düşer.
+- Mutluluk: temiz ahır, yeterli alan, beslenme, mevsim (kışın ısıtma), okşama. Üretim miktarı ve kalitesi mutluluğa bağlı.
+- Ahır kirliliği günlük artar; >60 hastalık riski. Veteriner: muayene/tedavi.
+- Yaşam: yavru → yetişkin (üretken) → yaşlı (üretim azalır). Yeterli mutlulukta çift varsa üreme şansı; kapasite sınırlı.
+
+### Üretim makineleri
+- Her makinede: kuyruk (en fazla 3 iş), süre, elektrik tüketimi (kWh/iş), `condition` (her iş −2; <50 → %30 yavaş, <20 → durur). Bakım = satın alma fiyatının %4'ü, condition'ı 100 yapar.
+
+---
+
+## 4. Ekonomi Dengesi (Taslak v0.1)
+
+> Para birimi: **₺**. Tüm değerler `src/data/*.js` içinde tutulacak ve Node simülasyonuyla ayarlanacak. Hedef his: ilk mevsim dar ama umutlu; ilk yılın sonunda mandıra + kümes + ahır; 2. yılda makineleşme.
+
+### Başlangıç
+| Kalem | Değer |
+|---|---|
+| Başlangıç parası | **5.000 ₺** |
+| Arazi | P1 parseli (16×12 karo), 24 karo sürülmüş |
+| Envanter | 10 marul tohumu, 6 patates tohumu, 10 kompost |
+| Aletler | Çapa, sulama kovası, el tırpanı (ücretsiz) |
+| Binalar | Küçük ev, kuyu (ücretsiz manuel sulama) |
+| İtibar / Seviye | 10 / 1 |
+
+### Ürünler (1 karo başına; satış fiyatı B kalite, pazar yeri baz fiyatı)
+| Ürün | Mevsim | Tohum ₺ | Süre (gün) | Verim | Birim satış ₺ | Karo başı brüt ₺ | ₺/gün/karo | Not |
+|---|---|---|---|---|---|---|---|---|
+| Marul | İlkbahar | 15 | 4 | 1 | 45 | 45 | 7,5 | Başlangıç ürünü, hızlı |
+| Patates | İlkbahar | 25 | 6 | 2 | 50 | 100 | 12,5 | Güvenilir |
+| Çilek | İlkbahar | 60 | 8 → her 3 gün | 3 | 18 | 54/hasat | ~14 | Tekrar verir, reçel girdisi |
+| Buğday | İlkbahar, Sonbahar | 8 | 7 | 4 | 12 | 48 | 5,7 | Düşük emek, un zinciri, biçerdöverle ×1,25 |
+| Fasulye | İlkbahar, Yaz | 20 | 6 | 2 | 32 | 64 | 7,3 | Baklagil: toprağa N +15 |
+| Domates | Yaz | 40 | 8 → her 3 gün | 3 | 20 | 60/hasat | ~16 | Kuraklık olaylarına duyarlı fiyat |
+| Mısır | Yaz | 30 | 10 | 2 | 55 | 110 | 8 | Hayvan yemi (1 mısır = 2 porsiyon) |
+| Karpuz | Yaz | 80 | 12 | 1 | 320 | 320 | 20 | Yüksek su ihtiyacı, riskli |
+| Ayçiçeği | Yaz | 20 | 8 | 1 | 90 | 90 | 8,75 | Arı kovanına bal bonusu |
+| Kabak | Sonbahar | 60 | 11 | 1 | 260 | 260 | 18 | Festival yarışma ürünü |
+| Havuç | Sonbahar | 12 | 5 | 2 | 28 | 56 | 8,8 | Ucuz, hızlı |
+| Üzüm | Sonbahar | 70 | 10 → her 4 gün | 3 | 25 | 75/hasat | ~15 | Reçel / meyve suyu |
+| Ispanak | Kış (açık alan) | 18 | 6 | 2 | 30 | 60 | 7 | Soğuğa dayanıklı tek açık alan ürünü |
+
+**Kalite çarpanı:** A ×1,40 · B ×1,00 · C ×0,65. Organik etiketi +%15.
+
+### Tarım girdileri (mağaza)
+| Ürün | Fiyat ₺ | Etki |
+|---|---|---|
+| Kompost (organik) | 10 | N+10 P+6 K+6, yavaş (3 günde) |
+| NPK gübre | 35 | N+25 P+20 K+20, anında, pH −0,1 |
+| Kireç | 25 | pH +0,4 |
+| Kimyasal ilaç | 45 | Zararlı/hastalık %95, organik etiketi düşer |
+| Organik sprey (neem) | 25 | %65 etkili |
+| Gelişmiş sulama kovası | 600 | 3×3 alan tek seferde |
+
+### Hayvanlar
+| Hayvan | Fiyat ₺ | Yem/gün ₺ | Ürün | Sıklık | Birim ₺ (B) | Net ₺/gün | Bina |
+|---|---|---|---|---|---|---|---|
+| Tavuk | 350 | 4 | Yumurta | 1/gün | 18 | ~14 | Kümes |
+| Keçi | 1.800 | 15 | Keçi sütü | 1/gün | 70 | ~55 | Ahır |
+| Koyun | 2.200 | 15 | Yün | 3 günde 1 | 200 | ~52 | Ahır |
+| İnek | 4.000 | 31 | Süt | 1/gün | 130 | ~99 | Ahır |
+| Arı kovanı | 1.200 | 3 (bakım) | Bal | 5 günde 1 (kış yok) | 280 | ~53 | Açık alan |
+
+- Yem: Tavuk yemi çuvalı (10 porsiyon) 40 ₺; Saman balyası (10 porsiyon) 220 ₺. İnek 1,4, koyun/keçi 0,7, tavuk 1 (tavuk porsiyonu) porsiyon/gün. Kendi mısırını yedirerek yem gideri ~%60 düşer.
+- Veteriner: muayene 150 ₺, tedavi 300 ₺. Ahır temizliği: elle ücretsiz veya işçiyle.
+- Ömür: tavuk 4 yıl, keçi/koyun 6, inek 8 (oyun yılı). Yaşlılıkta üretim %50.
+
+### Üretim zincirleri
+| Makine (bina) | Fiyat ₺ | Tarif | Süre (saat) | Enerji kWh | Girdi değeri → Çıktı değeri |
+|---|---|---|---|---|---|
+| Mandıra | 9.000 | 3 süt → 1 peynir | 6 | 4 | 390 → **650** |
+|  |  | 2 süt → 1 tereyağı | 3 | 2 | 260 → 360 |
+|  |  | 1 süt → 1 yoğurt | 4 | 1 | 130 → 200 |
+| Değirmen | 7.000 | 4 buğday → 1 un | 2 | 3 | 48 → 85 |
+| Fırın | 5.000 | 1 un → 2 ekmek | 3 | 5 | 85 → 140 |
+| Konserve atölyesi | 4.500 | 3 çilek → 1 çilek reçeli | 4 | 2 | 54 → 130 |
+|  |  | 3 üzüm → 1 üzüm reçeli | 4 | 2 | 75 → 160 |
+|  |  | 4 domates/üzüm → 2 meyve suyu | 2 | 2 | 80–100 → 2×70 |
+| İplikhane | 6.000 | 2 yün → 1 iplik | 4 | 3 | 400 → 520 |
+| Dokuma tezgâhı | 9.000 | 2 iplik → 1 kumaş | 8 | 6 | 1.040 → **1.450** |
+
+Elektrik: **2,5 ₺/kWh**. Zincir uzadıkça marj artar ama makine yatırımı, süre ve bakım gerekir.
+
+### Binalar ve genişleme
+| Bina | Fiyat ₺ | Etki |
+|---|---|---|
+| Kümes | 1.500 | 8 tavuk |
+| Ahır | 6.000 | 6 büyükbaş/küçükbaş; kışın ısıtma 6 kWh/gün |
+| Silo | 4.000 | 300 porsiyon yem / tahıl, bozulma yok |
+| Depo | 3.000 | Envanter +100 yuva |
+| Soğuk hava deposu | 10.000 | Bozulmayı %80 yavaşlatır; 8 kWh/gün |
+| Sera | 15.000 | 24 karo, mevsimsiz ekim, don/dolu yok; 5 kWh/gün kışın |
+| Sulama sistemi | 5.000 / parsel | Otomatik sulama, şebeke suyu 0,8 ₺/karo/gün |
+| Arazi P2 / P3 / P4 / P5 | 12.000 / 25.000 / 45.000 / 80.000 | Her biri 16×12 karo, seviye kilidi 3/6/10/14 |
+
+### Makineler
+| Makine | Fiyat ₺ | Etki | İşletme |
+|---|---|---|---|
+| Küçük traktör | 28.000 | Sürme/ekme 3×3 alan, hız ×4 | Yakıt 15 ₺/saat kullanım |
+| Ekim makinesi (traktör eki) | 14.000 | Ekimi otomatikleştirir | — |
+| Biçerdöver | 65.000 | Tahıl hasadı ×1,25 verim, çok hızlı | Yakıt 25 ₺/saat |
+| Sağım makinesi | 12.000 | İnek/keçi sütü otomatik, süt kalitesi +1 sınıf şansı | 3 kWh/gün |
+
+### İşçiler
+| Kademe | Günlük maaş ₺ | Hız | Yetenek (1–5) | Not |
+|---|---|---|---|---|
+| Çırak | 90 | 0,6 | 1–2 | %10 hata (ör. sulamayı atlama) |
+| Deneyimli | 170 | 1,0 | 2–4 | Bir uzmanlık alanı (tarım/hayvan/makine) |
+| Usta | 300 | 1,5 | 4–5 | Bakım kalitesine +%10 (A kalite şansı) |
+Her işçinin rastgele adı, yetenek dağılımı ve maaşı ±%15 değişir. Görev öncelikleri oyuncu tarafından atanır (sula / hasat / hayvan bakımı / makine).
+
+### Pazar ve dinamik fiyat
+```
+fiyat = baz × mevsimÇarpanı[ürün][mevsim] × olayÇarpanı × doygunluk × gürültü × kalite × kanal
+```
+- **mevsimÇarpanı:** kendi mevsiminde 1,0; mevsim dışı (sera/depo ürünü) 1,35–1,6.
+- **doygunluk:** pazar yerinde satılan her birim ×(1 − 0,004); toptancıda etkisi yarı. Her gün açığın %15'i kapanır (1'e döner). Alt sınır 0,50.
+- **gürültü:** günlük ±%4 rastgele yürüyüş, 0,85–1,15 arasında sınırlı.
+- **olayÇarpanı:** ör. "Bölgede kuraklık: domates +%40" (5–10 gün), "Fiyat çöküşü: patates −%35".
+- **Kanallar:**
+  | Kanal | Çarpan | Kural |
+  |---|---|---|
+  | Pazar yeri | ×0,85 | Anında nakit, her ürün için günlük 40 birim sınırı |
+  | Toptancı | ×1,00 | En az 50 birim; ödeme 1 gün sonra; doygunluk etkisi yarı |
+  | Sözleşme | ×1,35–1,70 | Miktar + min. kalite + süre (3–10 gün). Gecikme/eksik → sözleşme değerinin %30'u ceza + itibar −5. İtibar arttıkça daha büyük/kârlı sözleşmeler |
+- **Bozulma:** her ürünün tazelik süresi (gün): marul 4, çilek 3, domates 6, süt 2, yumurta 10, ekmek 3, yoğurt 7, peynir 30, un 60, reçel 120, tahıl (siloda) ∞. Süre dolunca kalite bir sınıf düşer, C'den sonra çürür. Soğuk hava deposu süreyi ×5 uzatır.
+
+### Giderler
+| Gider | Kural |
+|---|---|
+| Elektrik | 2,5 ₺/kWh (makine işleri + binaların günlük tüketimi) |
+| Su | Kuyu ücretsiz (elle); sulama sistemi 0,8 ₺/karo/gün |
+| Gelir vergisi | Her "ay" (mevsim) sonunda pozitif net kârın **%10'u** |
+| Emlak vergisi | Her mevsim sonunda sahip olunan arazi değerinin %1'i (P1 hariç) |
+| İşçi maaşı | Her gün 20:00'de |
+| Makine bakımı | Satın alma fiyatının %4'ü (isteğe bağlı ama bozulma riski) |
+| Bozulma | Kalite/ürün kaybı olarak (deftere "fire" kalemi) |
+
+### Banka
+- **Kredi limiti** = 5.000 + net varlığın %40'ı (arazi + bina + makine + hayvan değeri − mevcut borç).
+- **Faiz:** mevsimlik %6 (≈ yıllık %26), vade 1–4 mevsim, **haftalık eşit taksit** (otomatik çekilir).
+- Gecikme: taksit tutarının %3'ü ceza + itibar −3; 3 gecikmeden sonra yeni kredi kapalı.
+- Erken kapama: kalan anapara + %1.
+
+### Seviye ve itibar
+- XP: hasat (ürün değeri / 10), satış, sözleşme tamamlama (+50–300), bina açma (+100).
+- Seviye eşiği: `100 × seviye^1.6`. Seviye kilitleri: 2 → kümes, 3 → P2 + toptancı, 4 → ahır, 5 → mandıra/değirmen, 7 → sera, 8 → traktör, 10 → dokuma, 12 → biçerdöver.
+- İtibar (0–100): sözleşmeler, festival ödülleri, kaliteli satış ile artar; gecikme ve hastalıklı hayvan ile düşer. Sözleşme ödül çarpanını ve teklif sıklığını belirler.
+
+### Rastgele olaylar (günlük olasılık, mevsime göre ağırlıklı)
+| Olay | Olasılık | Etki |
+|---|---|---|
+| Bölgesel kuraklık | %3 (yaz %6) | İlgili ürün fiyatı +%30–50, toprak nemi kaybı ×1,5 |
+| Dolu | %1,5 (ilkbahar/yaz) | Açık alan ekinlerine sağlık −30 (sera korur) |
+| Ani don | %2 (ilkbahar başı, sonbahar sonu) | Dayanıksız ekinlere sağlık −40 |
+| Hayvan hastalığı salgını | %1 | Temizlik <60 olan ahırlarda hastalık; veteriner gerekir |
+| Festival (ürün yarışması) | Her mevsimin 21. günü | En iyi ürün yarışır; ödül 500–3.000 ₺ + itibar |
+| Fiyat çöküşü | %2 | Bir ürün −%30–40 (5–8 gün) |
+| Devlet teşviki | %1,5 | Makine/sera alımında %20 indirim veya hibe 2.000 ₺ |
+| Zararlı istilası | %2 (yaz) | Bölgede zararlı olasılığı ×3 (3 gün) |
+
+### İlk mevsim denge kontrolü (kaba hesap — Node simülasyonuyla doğrulanacak)
+- 1. gün: 12 patates + 8 marul + 4 çilek = 660 ₺ tohum, 14 kompost ≈ 140 ₺ → kasa ≈ 4.200 ₺.
+- 5. gün marul: +360 ₺; 7. gün patates: +1.200 ₺; 9. günden itibaren çilek: +216 ₺/3 gün.
+- ~10. gün kümes + 4 tavuk (2.900 ₺) alınabilir; mevsim sonunda beklenen kasa **≈ 7.000–9.000 ₺**, net varlık ≈ 11.000 ₺.
+- Hedef: 1. yıl sonu net varlık **60.000–100.000 ₺** (mandıra + ahır + 2 inek + sera); 2. yıl traktör ve P2–P3.
+- Risk payı: kredi ile hızlanmak mümkün ama haftalık taksitler kötü hava olaylarında baskı yaratmalı.
+
+---
+
+## 5. Aşama Planı ve Görev Dağılımı
+
+### Aşama 1 — Temel motor + sinematik görsel altyapı + gün-gece (ONAY SONRASI)
+**Paralel görevler:**
+1. **engine-dev:** Vite+Phaser iskeleti (`ciftlik/`), `core/*` (EventBus, GameState, SaveSystem, SystemRegistry, Rng, constants), `TimeSystem`, `scenes/*`, `CameraDirector` (takip/zoom/pan/pinch/sinematik), `window.__game` debug kancası, otomatik kayıt.
+2. **visual-dev:** `render/*`: gökyüzü + güneş/ay/yıldızlar, 4 paralaks katman (dağ/bulut/tepe/orman), zemin dokusu, ön plan çimleri, gün-gece color grading (yukarıdaki tablo), güneşe bağlı gölge sistemi (birkaç örnek ağaç/çit/ev ile), sabah sisi, toz zerreleri, ateş böcekleri, PostFX (bloom, vinyet, gren, letterbox), kalite seviyeleri.
+3. **ui-dev:** DOM UI kökü, HUD (saat/gün/mevsim, para, hız düğmeleri), toast sistemi, kalite/ses ayar paneli iskeleti, mobil dokunmatik uyumu.
+4. **qa-tester:** derleme, masaüstü+mobil ekran görüntüleri (06:30 / 13:00 / 17:30 / 19:30 / 00:00), FPS, kayıt/yükleme testi.
+
+**Kabul kriterleri:**
+- `npm run dev` ve `npm run build` hatasız; konsolda hata yok.
+- Gün döngüsü 10 dakikada tamamlanır; hız 0/1/2/4x çalışır; palet geçişleri kesintisiz ve yumuşak.
+- 5 anahtar anın her biri belirgin biçimde farklı görünür (qa ekran görüntüleri).
+- Gölgeler güneş konumuyla yön ve uzunluk değiştirir; gece kaybolur/zayıflar.
+- Paralaks kamera kaydırıldığında derinlik hissi verir; zoom 0,5x–2x; mobilde pinch ve sürükleme çalışır.
+- `__game.debug.cinematic()` letterbox'lı sinematik çekimi oynatır.
+- Sayfa yenilenince zaman ve kamera durumu geri gelir; bozuk kayıtta oyun çökmez.
+- Masaüstü (headless Chromium) ortalama ≥55 FPS hedef; mobil emülasyonda kalite otomatik düşer.
+
+### Aşama 2–9 (özet; her aşama başında ayrıntılı görev kartları buraya yazılacak)
+| Aşama | engine-dev | visual-dev | gameplay-dev | economy-dev | ui-dev |
+|---|---|---|---|---|---|
+| 2 Tarım | karo seçimi/girdi | ekin büyüme aşamaları, ıslak toprak | FarmSystem, toprak, kalite, zararlı | — | araç çubuğu, karo bilgi kartı |
+| 3 Envanter/Pazar | — | hasat sinematiği parçacıkları | InventorySystem, bozulma | MarketSystem, mağaza, kanallar | envanter, mağaza, pazar panelleri |
+| 4 Hayvan | — | hayvan çizimleri/animasyonları | AnimalSystem | yem/hayvan fiyatları | hayvan paneli |
+| 5 Üretim | — | bina çizimleri, duman/ışık | ProductionSystem | tarif değerleri | üretim kuyruğu paneli |
+| 6 Ekonomi | — | — | — | Economy/Bank/Contract, defter, sim betiği | finans paneli, grafikler |
+| 7 Hava/Olay | — | yağmur, fırtına, kar, birikinti, bulut gölgesi | hava etkileri (don, kuraklık) | olay → fiyat | olay bildirimleri, tahmin |
+| 8 İşçi/Makine/Arazi | yol bulma (ızgara A*) | işçi/traktör çizimleri | WorkerSystem, makineler, arazi | maaş, yakıt, arazi fiyatı | işçi ve arazi panelleri |
+| 9 Cilalama | açılış sahnesi, kayıt yuvaları | sinematik geçişler, son rötuş | denge | denge simülasyonu | menü, ayarlar | 
+| Ses (9) | AudioEngine (engine-dev): kuş, rüzgâr, yağmur, hayvan, UI sesleri — prosedürel |
+
+Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıcıya rapor → onay**.
+
+---
+
+## 6. Karar Günlüğü
+| # | Karar | Gerekçe |
+|---|---|---|
+| K1 | JS + JSDoc (TS değil) | Çok işçili hızlı geliştirme, derleme sadeliği |
+| K2 | Simülasyon Phaser'dan bağımsız | Node'da ekonomi/denge simülasyonu, test edilebilirlik |
+| K3 | UI DOM katmanında | Keskin metin, kolay erişilebilirlik ve dokunmatik, backdrop-blur ile sinematik cam paneller |
+| K4 | 3/4 eğik diyorama görünüm (izometrik değil) | Paralaks ve gün-gece ışığı ile "film karesi" etkisi; çizim maliyeti düşük |
+| K5 | 1 finansal ay = 1 mevsim (28 gün) | Takvimle tutarlı; haftalık taksitler ritim sağlar |
+| K6 | Oyun projesi `ciftlik/` alt klasöründe | Depo kökündeki mevcut HTML oyunlarına dokunmamak |
