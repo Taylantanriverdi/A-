@@ -122,7 +122,7 @@ export default class CameraDirector {
 
   // ---------------------------------------------------------------- kare güncellemesi
   update(delta) {
-    const dt = delta > 100 ? 100 : delta > 0 ? delta : 0;
+    const dt = delta > 250 ? 250 : delta > 0 ? delta : 0;
     if (this.cine) {
       this._updateCinematic(dt);
     } else {

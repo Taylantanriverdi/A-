@@ -478,6 +478,9 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K4 | 3/4 eğik diyorama görünüm (izometrik değil) | Paralaks ve gün-gece ışığı ile "film karesi" etkisi; çizim maliyeti düşük |
 | K5 | 1 finansal ay = 1 mevsim (28 gün) | Takvimle tutarlı; haftalık taksitler ritim sağlar |
 | K6 | Oyun projesi `ciftlik/` alt klasöründe | Depo kökündeki mevcut HTML oyunlarına dokunmamak |
+| K7 | Oyun zamanı `game.loop.rawDelta` ile ilerler | Phaser'ın yumuşatılmış delta'sı düşük FPS'te zamanı yavaşlatıyordu |
+| K8 | DPR kaliteye bağlı (2 / 1.5 / 1) | Mobilde dolgu oranı maliyetini sınırlamak |
+| K9 | Uyku sırasında dakikalar sessiz modda tek tek simüle edilir | Determinizm; ağır sistemler gelirse toplu "catch-up" fonksiyonu eklenecek |
 
 ---
 
@@ -529,6 +532,12 @@ window.__game = { state, bus, debug: {...} }                  // DEV veya ?debug
 | `toast` | `{text, kind}` | herkes → UI |
 | `save:request` / `save:done` / `save:reset` | `{}` | herkes ↔ SaveSystem/main |
 | `fps` | `{fps}` (saniyede bir) | Renderer → UI (debug) |
+| `time:slept` | `{from, to}` | TimeSystem → Renderer (kararma geçişi) |
+| `save:before` | `{}` | SaveSystem → herkes (kayıttan hemen önce state tazele) |
+| `camera:cinematicStart` / `camera:cinematicDone` | `{reason}` | CameraDirector → herkes |
+| `input:tap` | `{x, y, screenX, screenY, button, touch}` (dünya koordinatı) | CameraDirector → gameplay (Aşama 2 karo seçimi) |
+
+**Onaylanan ekler (K7–K9):** `state.rngState` kayda girer; sistem `init(state, bus, registry)` 3. argümanı alır; `frame` nesnesi yeniden kullanılır ve `zoom` (kullanıcı zoom'u) ile `dpr` içerir. Kamera `cam.zoom = zoom × dpr`; canvas aygıt pikseliyle çizilir (DPR üst sınırı: high 2, medium 1.5, low 1).
 
 ### Renderer API (visual-dev)
 ```js

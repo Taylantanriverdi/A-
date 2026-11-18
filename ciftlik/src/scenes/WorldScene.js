@@ -60,11 +60,15 @@ export default class WorldScene extends Phaser.Scene {
 
   update(time, delta) {
     const { state, registry } = this.app;
-    registry.tick(delta);
-    this.camera.update(delta);
+    // Phaser'ın `delta`sı yumuşatılmış/kırpılmış olabilir (düşük FPS'te 16.6 ms'ye sabitlenir);
+    // oyun zamanı gerçek süreye bağlı kalsın diye ham kare süresi kullanılır (registry 250 ms'de kırpar).
+    const raw = this.game.loop.rawDelta;
+    const real = raw > 0 && raw < 5000 ? raw : delta;
+    registry.tick(real);
+    this.camera.update(real);
     const f = this.frame;
     f.time = time;
-    f.delta = delta;
+    f.delta = real;
     f.totalMinutes = state.time.totalMinutes + registry.fraction;
     calendarInto(f.cal, f.totalMinutes);
     f.zoom = this.camera.zoom;
