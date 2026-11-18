@@ -34,8 +34,12 @@ export default class SkyLayer {
     this.moon = s.add.image(0, 0, 'sky_moon_4');
     this.sunHaloWide = s.add.image(0, 0, 'fx_glow').setBlendMode('ADD');
     this.sunHalo = s.add.image(0, 0, 'fx_glow').setBlendMode('ADD');
-    this.sun = s.add.image(0, 0, 'sky_sun').setBlendMode('ADD');
-    this.cCel.add([...this.stars, this.horizonWide, this.horizonGlow, this.moonHalo, this.moon, this.sunHaloWide, this.sunHalo, this.sun]);
+    this.sun = s.add.image(0, 0, 'sky_sun'); // normal karışım: parlak gökte de disk okunur
+    this.cSun = screenContainer(s, DEPTH.MOUNTAINS + 0.3); // uzak (puslu) sıranın önünde, yakın sıranın arkasında
+    this.cLeak = screenContainer(s, DEPTH.LIGHT + 3);
+    this.sunLeak = s.add.image(0, 0, 'fx_glow').setBlendMode('ADD'); this.cLeak.add(this.sunLeak);
+    this.cCel.add([...this.stars, this.horizonWide, this.horizonGlow, this.moonHalo, this.moon]);
+    this.cSun.add([this.sunHaloWide, this.sunHalo, this.sun]);
   }
 
   _paintGradient(top, bot, sunCol, glow) {
@@ -73,9 +77,10 @@ export default class SkyLayer {
   layout(v, env) {
     const W = v.W, H = v.H, d = v.dpr, hY = v.hY;
     const visible = hY > -40 * d;
-    this.cSky.setVisible(visible); this.cCel.setVisible(visible);
+    this.cSky.setVisible(visible); this.cCel.setVisible(visible); this.cSun.setVisible(visible);
+    this._leak(v, env);
     if (!visible) { this.sunScreenVisible = false; return; }
-    v.fit(this.cSky); v.fit(this.cCel);
+    v.fit(this.cSky); v.fit(this.cCel); v.fit(this.cSun);
     const gradH = Math.max(H * 0.95, 500 * d);
     this.top.setSize(W, Math.max(1, hY - gradH + 4)); this.top.setPosition(0, 0);
     this.top.setVisible(hY - gradH > 0);
@@ -101,8 +106,10 @@ export default class SkyLayer {
     // güneş
     const sun = env.sun;
     const elevN = Math.sin(sun.elevationDeg * Math.PI / 180) / Math.sin(SUN.maxElevationDeg * Math.PI / 180);
-    const sx = W / 2 + sun.dir * W * 0.34 + px;
-    const sy = hY - (0.07 + elevN * 0.85) * skyH;
+    const sx = W / 2 + sun.dir * W * 0.3 + px;
+    // Alçak güneş ufka yakın, görünür kalsın (altın saat / doğuş); yükseldikçe hızla tepeye çıkar.
+    const en = Math.max(0, elevN);
+    const sy = hY - (0.18 * clamp((sun.elevationDeg + 4) / 4, 0, 1) + 0.82 * Math.pow(en, 6)) * skyH;
     const low = 1 - smoothstep(2, 22, sun.elevationDeg);
     this.sunX = sx; this.sunY = sy; this.sunScreenVisible = sun.visible && sy > -60 * d;
     mixRgb(SUN_HOT, env.day.sun, 0.45, tmpA); mixRgb(tmpA, SUN_LOW, low * 0.8, tmpA);
@@ -121,7 +128,7 @@ export default class SkyLayer {
     const g = env.twilight;
     this.horizonGlow.setVisible(g > 0.01); this.horizonWide.setVisible(g > 0.01);
     if (g > 0.01) {
-      const gx = W / 2 + sun.dir * W * 0.34 + px;
+      const gx = W / 2 + sun.dir * W * 0.3 + px;
       this.horizonGlow.setPosition(gx, hY).setDisplaySize(W * 1.1, H * 0.55).setTint(rgbToInt(env.day.sun)).setAlpha(g * 0.75);
       mixRgb(env.day.sun, env.day.skyBottom, 0.5, tmpB);
       this.horizonWide.setPosition(W / 2, hY + 10 * d).setDisplaySize(W * 2.6, H * 0.35).setTint(rgbToInt(tmpB)).setAlpha(g * 0.4);
@@ -141,5 +148,18 @@ export default class SkyLayer {
     }
   }
 
-  destroy() { this.cSky?.destroy(); this.cCel?.destroy(); }
+  /** Alçak güneşin sıcak ışık sızması: güneş kadrajda olmasa bile doğu/batı kenarından ekrana taşar. */
+  _leak(v, env) {
+    const sun = env.sun, W = v.W, H = v.H;
+    const k = sun.intensity * (1 - smoothstep(14, 42, sun.elevationDeg)) * (1 - env.cloud * 0.8);
+    this.cLeak.setVisible(k > 0.01);
+    if (k <= 0.01) return;
+    v.fit(this.cLeak);
+    const sx = W / 2 + sun.dir * W * 0.3 - (v.midX - WORLD_W / 2) * 0.02 * v.zoom;
+    const lx = clamp(this.sunScreenVisible ? this.sunX : sx + sun.dir * W * 0.25, -0.05 * W, 1.05 * W);
+    const ly = clamp(this.sunScreenVisible ? this.sunY : v.hY - H * 0.2, -0.1 * H, H * 0.6);
+    this.sunLeak.setPosition(lx, ly).setDisplaySize(W * 1.2, H * 1.0).setTint(rgbToInt(env.day.sun)).setAlpha(k * 0.3);
+  }
+
+  destroy() { this.cSky?.destroy(); this.cCel?.destroy(); this.cLeak?.destroy(); this.cSun?.destroy(); }
 }

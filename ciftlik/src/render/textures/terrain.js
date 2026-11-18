@@ -290,7 +290,76 @@ function foreground(scene) {
   }
 }
 
+/** Ufuk dibi: düzensiz çalı/gövde kümeleri (dalgalı alt kenar, zemine farklı yüksekliklerde oturur). Gri tonlu. meta.groundY */
+function treeline(scene, canvasMode) {
+  const key = 'env_treeline'; if (scene.textures.exists(key)) return;
+  const w = LAYER_W, h = 110, groundY = 84; const { canvas, ctx } = makeCanvas(w, h); const r = mulberry32(81);
+  const wrapDraw = (fn) => { for (const off of [-w, 0, w]) fn(off); };
+  // arka sıra: koyu yumuşak çalı kütlesi, tabanı dalgalı (bazıları zemine taşar)
+  for (let x = -30; x < w + 30; x += 8 + r() * 14) {
+    const rad = 6 + r() * 13, foot = groundY - 3 + r() * 7, g = 105 + Math.round(r() * 25);
+    wrapDraw((o) => { ctx.fillStyle = `rgb(${g},${g},${g})`; ctx.beginPath(); ctx.ellipse(x + o, foot - rad * 0.55, rad * 1.25, rad * 0.8, 0, 0, Math.PI * 2); ctx.fill(); });
+  }
+  // gövdeler ve küçük ağaçlar (farklı yükseklik)
+  for (let i = 0; i < 55; i++) {
+    const x = r() * w, foot = groundY - 2 + r() * 10, th = 8 + r() * 16, g = 90 + Math.round(r() * 20);
+    wrapDraw((o) => {
+      ctx.fillStyle = `rgb(${g},${g},${g})`; ctx.fillRect(x + o - 1.2, foot - th, 2.4, th);
+      const cg = g + 22; ctx.fillStyle = `rgb(${cg},${cg},${cg})`; ctx.beginPath(); ctx.ellipse(x + o, foot - th - 4, 4 + r() * 4, 5 + r() * 4, 0, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+  // ön sıra: ufak açık tonlu çalılar, zemine taşan
+  for (let x = 0; x < w; x += 30 + r() * 60) {
+    const rad = 4 + r() * 6, foot = groundY + 2 + r() * 5, g = 112 + Math.round(r() * 20);
+    wrapDraw((o) => { ctx.fillStyle = `rgb(${g},${g},${g})`; ctx.beginPath(); ctx.ellipse(x + o, foot - rad * 0.5, rad * 1.4, rad * 0.75, 0, 0, Math.PI * 2); ctx.fill(); });
+  }
+  // üst kenar yumuşak (uzak, sise karışır)
+  const g = ctx.createLinearGradient(0, 0, 0, 40); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = g; ctx.fillRect(0, 0, w, 40); ctx.globalCompositeOperation = 'source-over';
+  if (canvasMode) bakeTint(canvas, WORLD.forest);
+  register(scene, key, canvas, { groundY });
+}
+
+/** Uzak tarla şeritleri: ufka doğru incelen yama bantları, ince çit/çalı çizgileri, küçülen ağaç noktaları (renkli, düşük kontrast). */
+function farFields(scene) {
+  const key = 'env_farfields'; if (scene.textures.exists(key)) return;
+  const w = LAYER_W, h = 170; const { canvas, ctx } = makeCanvas(w, h); const r = mulberry32(91);
+  const tones = ['#86ad5c', '#9cb766', '#7a9f52', '#b5b46a', '#8fb062', '#a7a35e', '#6f9a4e'];
+  // perspektif: y=0 ufuk, bantlar aşağı doğru kalınlaşır
+  let y = 0, band = 0;
+  while (y < h) {
+    const th = 3 + Math.pow(y / h, 1.4) * 34 + r() * 3;
+    let x = -r() * 200;
+    while (x < w) {
+      const pw = 120 + r() * 380; const col = tones[Math.floor(r() * tones.length)];
+      ctx.fillStyle = col; ctx.fillRect(x, y, pw + 1, th + 1);
+      for (const o of [-w, w]) ctx.fillRect(x + o, y, pw + 1, th + 1);
+      // tarla içi sıra çizgileri
+      if (r() < 0.5) { ctx.fillStyle = 'rgba(60,80,40,0.12)'; for (let k = 0; k < th; k += Math.max(1.5, th / 6)) ctx.fillRect(x, y + k, pw, 0.7); }
+      // çit/çalı sınırı (dikey)
+      ctx.fillStyle = 'rgba(52,72,40,0.35)'; ctx.fillRect(x, y, Math.max(0.8, th * 0.08), th);
+      x += pw;
+    }
+    // yatay çit/çalı çizgisi
+    ctx.fillStyle = 'rgba(52,72,40,0.4)'; ctx.fillRect(0, y + th - Math.max(0.6, th * 0.06), w, Math.max(0.6, th * 0.06));
+    y += th; band++;
+  }
+  // küçülen tek tük ağaçlar
+  for (let i = 0; i < 140; i++) {
+    const ty = Math.pow(r(), 1.3) * h; const s = 1 + (ty / h) * 6; const x = r() * w;
+    for (const o of [0, -w, w]) {
+      ctx.fillStyle = 'rgba(46,70,38,0.75)'; ctx.beginPath(); ctx.ellipse(x + o, ty - s, s * 0.8, s, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(30,40,30,0.25)'; ctx.fillRect(x + o - s, ty, s * 2, Math.max(0.6, s * 0.3));
+    }
+  }
+  // alt kenarda yakın çime kaybolsun
+  const g = ctx.createLinearGradient(0, h * 0.45, 0, h); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+  ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); ctx.globalCompositeOperation = 'source-over';
+  register(scene, key, canvas);
+}
+
 export function genTerrain(scene, canvasMode, step) {
+  treeline(scene, canvasMode); farFields(scene);
   mountain(scene, 'env_mtn_far', 1001, 510, 300, 70, 0.55, canvasMode, WORLD.mountainFar); step();
   mountain(scene, 'env_mtn_near', 2002, 420, 200, 70, 0.3, canvasMode, WORLD.mountainNear); step();
   hills(scene, canvasMode); forest(scene, canvasMode); step();

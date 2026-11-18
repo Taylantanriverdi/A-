@@ -4,7 +4,6 @@ import { DEPTH, TILE_W, TILE_H, WORLD_W, WORLD_H } from '../core/constants.js';
 import { genPath } from './textures/terrain.js';
 import { mulberry32 } from './textures/noise.js';
 import { rgbToInt } from './util.js';
-import { RAMP_H } from './Lighting.js';
 
 const EXT = 1024; // dünya dışına taşma (zoom 0.5'te boşluk görünmesin)
 const SEASON_TINT = { spring: 0xffffff, summer: 0xf4f0d6, autumn: 0xffdca0, winter: 0xd2d8d6 };
@@ -43,14 +42,15 @@ export default class GroundLayer {
       for (const [px, py] of MAIN_PATH) if (Math.abs(x - px) < 60 && Math.abs(y - py) < 60) return true;
       return false;
     };
+    const persp = (y) => Math.min(1, Math.max(0, (y - 20) / 380)); // 0 ufuk .. 1 yakın
     const place = (keyFn, n, depth, yMin = 30) => {
       for (let i = 0; i < n; i++) {
         let x, y, tries = 0;
         do { x = r() * WORLD_W; y = yMin + r() * (WORLD_H + 200 - yMin); tries++; } while (blocked(x, y) && tries < 10);
         if (blocked(x, y)) continue;
-        // kümelenme: çiçekler öbek öbek
+        const far = persp(y); if (r() > 0.25 + 0.75 * far) continue; // ufka doğru seyrek
         const im = s.add.image(x, y, keyFn(r)).setOrigin(0.5, 1).setDepth(depth);
-        const sc = 0.8 + r() * 0.5; im.setScale(sc * (y < 200 ? 0.8 : 1));
+        const sc = 0.8 + r() * 0.5; im.setScale(sc * (0.4 + 0.6 * far)); // ufka doğru küçük
         this.smalls.push(im);
       }
     };
@@ -61,14 +61,13 @@ export default class GroundLayer {
       const cx = r() * WORLD_W, cy = 60 + r() * (WORLD_H + 100); const col = Math.floor(r() * 5);
       for (let i = 0; i < 6 + r() * 8; i++) {
         const x = cx + (r() - 0.5) * 120, y = cy + (r() - 0.5) * 60; if (blocked(x, y)) continue;
-        this.smalls.push(s.add.image(x, y, 'env_flower_' + (r() < 0.8 ? col : Math.floor(r() * 5))).setOrigin(0.5, 1).setDepth(DEPTH.GROUND + 0.25).setScale(0.8 + r() * 0.4));
+        const far = persp(y); if (r() > 0.2 + 0.8 * far) continue;
+        this.smalls.push(s.add.image(x, y, 'env_flower_' + (r() < 0.8 ? col : Math.floor(r() * 5))).setOrigin(0.5, 1).setDepth(DEPTH.GROUND + 0.25).setScale((0.8 + r() * 0.4) * (0.35 + 0.65 * far)));
       }
     }
-    // ufuk puslanması (ambient rampasıyla eşleşir)
-    this.haze = s.add.image(-EXT, 0, 'fx_ramp_down').setOrigin(0, 0).setDepth(DEPTH.GROUND + 0.6).setDisplaySize(WORLD_W + EXT * 2, RAMP_H + 20);
   }
 
-  update(env, hazeColor) {
+  update(env) {
     if (env.season !== this.season) {
       this.season = env.season;
       const t = SEASON_TINT[env.season] ?? 0xffffff;
@@ -78,13 +77,8 @@ export default class GroundLayer {
       const showFlowers = env.season !== 'winter';
       for (const im of this.smalls) if (im.texture.key.startsWith('env_flower')) im.setVisible(showFlowers && !(env.season === 'autumn' && Math.random() < 0.5));
     }
-    // Ambient katmanı bu bandı da çarpacağı için rengi önceden ambient'e bölünür → ufuk çizgisinde orman tabanıyla eşleşir.
-    const a = env.ambient, h = this._hz || (this._hz = [0, 0, 0]);
-    for (let i = 0; i < 3; i++) h[i] = Math.min(1, hazeColor[i] / Math.max(0.05, a[i]));
-    this.haze.setTint(rgbToInt(h));
-    this.haze.setAlpha(this.canvasMode ? 0.3 : 0.82); // Canvas'ta tint yok → beyaz bant hafif tutulur
   }
 
-  destroy() { for (const im of [...this.tiles, ...this.smalls, this.macro, this.path, this.path2, this.field, this.haze]) im?.destroy(); }
+  destroy() { for (const im of [...this.tiles, ...this.smalls, this.macro, this.path, this.path2, this.field]) im?.destroy(); }
 }
 

@@ -83,7 +83,8 @@ export default class ParallaxLayer {
       hill: hexToRgb(WORLD.hill), forest: hexToRgb(WORLD.forest),
     };
     this.t1 = [0, 0, 0]; this.t2 = [0, 0, 0]; this.t3 = [0, 0, 0]; this.t4 = [0, 0, 0];
-    this.hazeColor = [0.5, 0.5, 0.5]; // zemin ufuk puslanması için (GroundLayer okur)
+    this.hazeColor = [0.5, 0.5, 0.5];
+    this.forestBottom = [0.3, 0.4, 0.3]; // HorizonLayer ufuk dibi şeridi için
     this.season = null; this.cloudDrift = 0; this.fogDrift = 0;
   }
 
@@ -95,7 +96,8 @@ export default class ParallaxLayer {
     this.cForest = screenContainer(s, DEPTH.FOREST);
     this.cFog = screenContainer(s, DEPTH.FOG);
     this.far = new Strip(s, this.cMtn, 'env_mtn_far', 0.08);
-    this.near = new Strip(s, this.cMtn, 'env_mtn_near', 0.12);
+    this.cMtnNear = screenContainer(s, DEPTH.MOUNTAINS + 0.6);
+    this.near = new Strip(s, this.cMtnNear, 'env_mtn_near', 0.12);
     this.hills = new Strip(s, this.cHill, 'env_hills', 0.30);
     this.forest = new Strip(s, this.cForest, 'env_forest', 0.55);
     this.fog = new Strip(s, this.cFog, 'fx_fogband', 0.70, 5);
@@ -136,6 +138,7 @@ export default class ParallaxLayer {
     this.hills.tint(this.t2, this.t3);
     lit(this.cols.forest, this.t1); mixRgb(this.t1, sky, 0.16, this.t2); mixRgb(this.t1, sky, 0.38 + day.fog * 0.3, this.t3);
     this.forest.tint(this.t2, this.t3);
+    this.forestBottom[0] = this.t3[0]; this.forestBottom[1] = this.t3[1]; this.forestBottom[2] = this.t3[2];
     const ft = rgbToInt(this.t2), fb = rgbToInt(this.t3);
     for (const it of this.crowns.items) it.im.setTint(ft, ft, fb, fb);
     // sis bandı rengi: ışık + gök karışımı
@@ -148,7 +151,7 @@ export default class ParallaxLayer {
     mixRgb(day.skyTop, sky, 0.6, this.t2); mixRgb(this.t1, this.t2, 0.32, this.t2);
     const ct = rgbToInt(this.t1), cb = rgbToInt(this.t2);
     const ca = 0.4 + 0.45 * day.light;
-    for (const it of this.clouds.items) { it.im.setTint(ct, ct, cb, cb); it.im.setAlpha(ca * it.a); }
+    for (const it of this.clouds.items) { it.im.setTint(ct, ct, cb, cb); it.baseA = ca * it.a; }
     // rüzgâr: bulut kayması ve sis bandı akışı
     const dt = env.dt;
     this.cloudDrift += dt * (4 + env.wind * 26);
@@ -158,15 +161,21 @@ export default class ParallaxLayer {
 
   layout(v, env) {
     const vis = v.hY > -40 * v.dpr;
-    for (const c of [this.cMtn, this.cCloud, this.cHill, this.cForest, this.cFog]) { c.setVisible(vis); if (vis) v.fit(c); }
+    for (const c of [this.cMtn, this.cMtnNear, this.cCloud, this.cHill, this.cForest, this.cFog]) { c.setVisible(vis); if (vis) v.fit(c); }
     if (!vis) return;
     this.far.layout(v, -10); this.near.layout(v, 0); this.hills.layout(v, 0);
     this.forest.layout(v, 0); this.fog.layout(v, 18);
-    this.clouds.layout(v, this.cloudDrift);
+    // güneşin önündeki bulut incelir (disk ve hale okunur kalsın, "bulutun içinden yanan güneş")
+    const sky = env.skyLayer, sunOn = sky && sky.sunScreenVisible, R = 300 * v.dpr;
+    this.clouds.layout(v, this.cloudDrift, (it) => {
+      let a = it.baseA ?? 0.8;
+      if (sunOn) { const dx = it.im.x - sky.sunX, dy = (it.im.y - sky.sunY) * 1.6; a *= clamp(Math.sqrt(dx * dx + dy * dy) / R, 0.25, 1); }
+      it.im.setAlpha(a);
+    });
     const t = env.t, w = env.wind;
     const amp = 0.012 + w * 0.06, f = 1.1 + w * 1.6;
     this.crowns.layout(v, 0, (it) => { it.im.rotation = Math.sin(t * f + it.ph + it.u * 0.004) * amp + Math.sin(t * 0.37 + it.ph) * amp * 0.4; });
   }
 
-  destroy() { for (const c of [this.cMtn, this.cCloud, this.cHill, this.cForest, this.cFog]) c?.destroy(); }
+  destroy() { for (const c of [this.cMtn, this.cMtnNear, this.cCloud, this.cHill, this.cForest, this.cFog]) c?.destroy(); }
 }

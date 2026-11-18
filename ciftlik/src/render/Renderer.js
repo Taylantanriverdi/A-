@@ -12,6 +12,7 @@ import GroundLayer from './GroundLayer.js';
 import ShadowSystem from './ShadowSystem.js';
 import Lighting from './Lighting.js';
 import Decor from './Decor.js';
+import HorizonLayer from './HorizonLayer.js';
 import Particles from './Particles.js';
 import GradePipeline from './postfx/GradePipeline.js';
 import BloomPipeline from './postfx/BloomPipeline.js';
@@ -54,6 +55,7 @@ export default class Renderer {
     this.sky = new SkyLayer(s); this.sky.create(); this.env.skyLayer = this.sky;
     this.parallax = new ParallaxLayer(s); this.parallax.create();
     this.ground = new GroundLayer(s); this.ground.create();
+    this.horizon = new HorizonLayer(s); this.horizon.create();
     this.lighting.create();
     this.decor = new Decor(s, this.shadows, this.lighting); this.decor.create();
     this.particles = new Particles(s); this.particles.create();
@@ -154,7 +156,8 @@ export default class Renderer {
 
     this.sky.update(env);
     this.parallax.update(env);
-    this.ground.update(env, this.parallax.hazeColor);
+    this.ground.update(env);
+    this.horizon.update(env, this.parallax.forestBottom);
     this.lighting.update(env);
     this.shadowSystem.update(env);
     this.decor.update(env);
@@ -223,7 +226,7 @@ export default class Renderer {
     for (const off of this._offs) off(); this._offs.length = 0;
     if (this._cam && this._origPreRender) { delete this._cam.preRender; if (this._cam.preRender !== this._origPreRender) this._cam.preRender = this._origPreRender; }
     try { if (this.fx && this.fx.pipe) this._cam.removePostPipeline(this.fx.pipe); } catch { /* yok say */ }
-    for (const m of [this.particles, this.decor, this.shadowSystem, this.lighting, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
+    for (const m of [this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
     this.cTop?.destroy();
   }
 }
