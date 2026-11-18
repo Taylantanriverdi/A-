@@ -15,8 +15,8 @@
 | 3 | Envanter, mağaza, pazar | ✅ Onaylandı |
 | 4 | Hayvancılık | ✅ Onaylandı |
 | 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
-| 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Tamamlandı (sim: yerleştirme, çalışan 19/19, üretim 29/29; beyin birleşik duman testi) — onay bekleniyor |
-| 6 | Ekonomi, banka, giderler, finans paneli | — |
+| 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Onaylandı |
+| 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | 🔨 Devam ediyor |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
 | 8 | İşçiler, makineler, arazi genişletme | — |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
@@ -858,3 +858,37 @@ state.buildings[i].placedId / state.machines[i].placedId // lotId yerine (eski k
 ### UI (ui-dev)
 - HUD'a **İnşa** düğmesi (B). İnşa modu: alt kenarda kategori sekmeli katalog (BUILD_CATS; kartta ikon, ad, fiyat, ayak izi), üstte mod çubuğu: **Yerleştir / Taşı / Kaldır / Temizle (ağaç)** ve Bitti. Seçili nesne → `tool:select {tool:'build'}` (CameraDirector boyama semantiği) ve `tile:hover`/`tile:tap` → `build:ghost` (+ `canPlace`) → masaüstünde tık = yerleştir; mobilde ilk dokunuş hayaleti koyar, "Onayla" düğmesi yerleştirir; çit/patika sürükleyerek boyanır (her karo bir `build:place`). Taşı: nesneye dokun → hayalet → hedef → onay. Kaldır: dokun → iade tutarıyla onay. Temizle: ağaç/çalıya dokun → bedelle onay. `build:result ok:false` → toast (darbe başına bir). Esc/Bitti → çıkış, alet İncele'ye döner.
 - Seviye artıkları: mağaza/pazar/çalışan/bina/makine panellerindeki seviye kilidi metinleri ve level:up kartı kaldırılır (veriler zaten level 1).
+
+---
+
+## 13. Aşama 6 Sözleşmesi — Banka, Giderler, Vergiler, Sözleşmeler, Finans Paneli (bağlayıcı, kısa)
+
+Beyin dosyası: `data/economy.js` (BANK, VALUATION, TAX, UPKEEP_KWH, CONTRACTS, yeni defter kategorileri). Seviye yok (K20): itibar yalnızca sözleşme ödül çarpanını etkiler.
+
+| İşçi | Dosyalar |
+|---|---|
+| economy-dev | `systems/BankSystem.js`, `systems/ContractSystem.js`, `systems/EconomySystem.js` (vergi, günlük sabit giderler, net varlık), `systems/economy/*` (saf: valuation.js, loans.js), `tools/sim-economy.mjs` güncellemesi, main.js kaydı |
+| ui-dev | `ui/financePanel.js` (sekmeler: Özet · Grafikler · Defter · Banka · Sözleşmeler), `ui/charts.js` (canvas 2D), HUD **Finans** düğmesi (F), sözleşme bildirimleri |
+
+### State
+```js
+state.finance.loans = [{ id, principal, remaining, rate, termSeasons, installment, nextDueMin, paidCount, totalCount, lates }]
+state.finance.bankLates = 0
+state.finance.seasonSummary = [{ year, season, income, expense, profit, tax, byCategory }]   // son 8 mevsim
+state.contracts = { offers: [{ id, itemId, qty, minQ, reward, deadlineDays, expiresMin }],
+                    active: [{ id, itemId, qty, delivered, minQ, reward, dueMin, penalty }], history: [...son 20] }
+state.player.reputation (0..100)
+```
+### Kurallar
+- **Banka:** `bank:borrow {amount, termSeasons}` → limit kontrolü (`loanLimit(state)` = base + netWorth×0.4 − kalan borç; `bankLates ≥ 3` → kapalı) → `transact(+amount,'loan')`. Taksit = eşit ödeme (anapara + mevsimlik faiz, vade × 4 hafta); her 7 günde 09:00 `transact(-installment, 'interest' faiz kısmı + 'loan' anapara kısmı)`; yetmezse taksit + %3 ceza ertelenir (`lates++`, `bankLates++`, toast). `bank:repay {loanId}` erken kapama (kalan + %1).
+- **Net varlık** (`netWorth(state)`): para + yapılar (inşa bedeli × 0.6) + hayvanlar (fiyat × 0.7) + envanter (pazar fiyatı × 0.8) − kalan borç. Günlük özetle birlikte saklanır (grafik için `dailySummary[i].netWorth`).
+- **Vergi:** mevsimin son günü 23:00: o mevsimin `profit > 0` ise `profit × 0.10` (`tax`); ilk mevsim muaf. Emlak vergisi P1 için 0 (Aşama 8'de ek parseller). Mevsim özeti yazılır, `finance:seasonClosed` olayı + toast "Mevsim kapandı: kâr X ₺, vergi Y ₺".
+- **Sabit giderler:** her gün 20:00 ev 2 kWh + kışın ahır 6, kümes 2 kWh (yerleştirilmiş bina sayısına göre) × 2.5 ₺ → 'electricity'.
+- **Sözleşmeler:** her sabah 07:00 1–2 teklif (pano ≤ 4; yalnızca oyuncunun bildiği ürünler — `stats.harvested`/`sold`/üretilenler; hiç yoksa marul/patates). Ödül = B pazar fiyatı × adet × çarpan (itibarla 1.35→1.7). `contract:accept {id}` → aktif; `contract:deliver {id, qty?}` → envanterden min kalite ve üstü düşer (önce en düşük uygun kalite), tamamlanınca `transact(+reward,'contracts')`, itibar +4; süre dolarsa ceza `transact(-penalty,'penalty')` (para yetmezse 0'a kadar, kalan borç değil), itibar −6. Olaylar: `contracts:changed`, `contract:result {ok, reason?}`, `contract:completed`, `contract:failed`.
+- Tüm para hareketleri `transact` ile; defter kategorileri `LEDGER_CATEGORIES`.
+### Finans paneli (ui-dev)
+- **Özet:** para, net varlık, bugünkü/bu mevsimki gelir-gider-kâr, kalan borç, itibar; son 7 günün mini grafiği.
+- **Grafikler:** günlük gelir (yeşil) / gider (kırmızı) çubukları + net varlık çizgisi (son 28 gün, kaydırılabilir 112 gün); mevsim kâr-zarar tablosu (kategori satırları × son 4 mevsim, vergi satırı).
+- **Defter:** son kayıtlar (filtre: kategori), tarih-saat, tutar renkli.
+- **Banka:** limit, aktif krediler (kalan, taksit, sonraki ödeme tarihi, ilerleme), yeni kredi (tutar kaydırıcısı + vade seçimi + toplam geri ödeme önizlemesi), erken kapama.
+- **Sözleşmeler:** teklifler (ürün ikonu, adet, min kalite rozeti, ödül, birim ödül vs pazar fiyatı farkı %, süre, "Kabul et"), aktifler (teslim edilen/gereken, kalan süre, envanterde uygun adet, "Teslim et"). HUD rozeti: yeni teklif / süresi yaklaşan sözleşme sayısı.
