@@ -228,7 +228,7 @@ export default class BuildingView {
           b.a += dt * b.sp;
           const x = lv.fx + Math.cos(b.a) * b.rx + Math.sin(b.a * 2.3 + b.ph) * 5;
           const y = lv.fy - 26 + Math.sin(b.a * 1.7 + b.ph) * b.ry + Math.sin(b.a * 0.5) * 6;
-          im.setVisible(true).setPosition(x, y).setFlipX(Math.cos(b.a) * b.sp * -1 < 0).setScale(0.9, 0.75 + 0.35 * Math.abs(Math.sin(t * 38 + b.ph)));
+          im.setVisible(true).setPosition(x, y).setFlipX(Math.sin(b.a) > 0).setScale(0.9, 0.75 + 0.35 * Math.abs(Math.sin(t * 38 + b.ph)));
         }
       }
     }
