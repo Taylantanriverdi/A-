@@ -12,7 +12,7 @@ import { XP_RULES, INVENTORY } from '../data/progression.js';
 import { MIN_PER_DAY } from '../core/constants.js';
 import { calendar } from '../core/timeUtils.js';
 import { isPlainObject } from '../core/GameState.js';
-import { quote, currentPrice, saturationAfter, isSellable } from './market/pricing.js';
+import { quote, currentPrice, saturationAfter, isSellable, numLoc } from './market/pricing.js';
 
 const { add, count } = Inventory;
 
@@ -25,7 +25,7 @@ const BUY_CATEGORY = { seed: 'seeds', fertilizer: 'fertilizer', chemical: 'chemi
 export const SHOP_REASONS = {
   notInShop: 'Bu ürün mağazada yok',
   badQty: 'Geçersiz adet',
-  locked: (lvl) => `Seviye ${lvl}'de açılır`,
+  locked: (lvl) => `Seviye ${numLoc(lvl)} açılır`,
   noMoney: 'Yeterli paran yok',
   full: 'Envanter dolu',
   partial: (n) => `Envanterde yalnızca ${n} birimlik yer var`,

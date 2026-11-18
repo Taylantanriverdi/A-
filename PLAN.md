@@ -491,6 +491,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K14 | Dekorla kaplı karolar `data/land.js` P1_BLOCKED'de (zemin izi + görsel silüet arkası: çatı, kuyu çatısı, ağaç tacı); ekilemez, kart açılmaz | QA: evin arkasına ekin ekilebiliyordu |
 | K15 | Hastalık yayılma 0.08; başlangıçta 4 organik sprey | QA: bakımsız salgın 10 günde tarlayı siliyordu, mağaza yokken çaresizlik |
 | K16 | Sinematik, boyama darbesi bitene kadar ertelenir | QA: ilk hasat sinematiği boyamalı hasatı yarıda kesiyordu |
+| K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 
 ---
 

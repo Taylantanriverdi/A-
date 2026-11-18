@@ -12,6 +12,16 @@ import { CHANNELS, SATURATION, seasonMult } from '../../data/economy.js';
 import { calendar } from '../../core/timeUtils.js';
 import { count } from '../InventorySystem.js';
 
+const LOC_DIGIT = ['', 'de', 'de', 'te', 'te', 'te', 'da', 'de', 'de', 'da'];
+const LOC_TENS = ['', 'da', 'de', 'da', 'ta', 'de', 'ta', 'te', 'de', 'da'];
+/** Sayıya Türkçe bulunma eki: 1'de, 3'te, 6'da, 10'da, 20'de. */
+export function numLoc(n) {
+  const v = Math.abs(Math.floor(n));
+  const d = v % 10;
+  const suf = d ? LOC_DIGIT[d] : v % 100 ? LOC_TENS[(v % 100) / 10] : v ? 'de' : 'da';
+  return `${v}'${suf}`;
+}
+
 export const REASONS = {
   notSellable: 'Bu ürün satılamaz',
   badQty: 'Geçersiz adet',
@@ -20,7 +30,7 @@ export const REASONS = {
   limitReached: (lim) => `Bugünkü pazar limiti doldu (${lim})`,
   limitLeft: (left) => `Bugün bu üründen en fazla ${left} birim daha satabilirsin`,
   minLot: (n) => `Toptancı en az ${n} birim alır`,
-  channelLocked: (name, lvl) => `${name} Seviye ${lvl}'te açılır`,
+  channelLocked: (name, lvl) => `${name} Seviye ${numLoc(lvl)} açılır`,
 };
 
 const DEFAULT_ENTRY = Object.freeze({ saturation: 1, noise: 1, soldToday: 0 });

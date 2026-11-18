@@ -10,7 +10,13 @@ import { createSettings } from './settings.js';
 import { createToasts } from './toast.js';
 import { createToolbar } from './toolbar.js';
 import { createTileCard } from './tileCard.js';
-import { createHarvestNotes, createXp, createCelebration } from './notes.js';
+import { createHarvestNotes, createXp, createCelebration, createLevelUp } from './notes.js';
+import { createPanelHost } from './panels.js';
+import { createInventoryPanel } from './inventoryPanel.js';
+import { createMarketPanel } from './marketPanel.js';
+import { createShopPanel } from './shopPanel.js';
+import { formatMoney } from './hud.js';
+import { ITEMS } from '../data/items.js';
 import { blockedKind, BLOCK_LABELS_TR } from '../data/land.js';
 
 const STROKE_GAP_MS = 400; // parmak/fare basılı değilken son tile:tap'ten bu kadar sonra yeni fırça darbesi
@@ -55,9 +61,26 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   const card = createTileCard(root, ctx);
   const notes = createHarvestNotes(bottom);
   const celebrate = createCelebration(root); // HUD katmanı dışında: sinematikte de görünür
-  const toasts = createToasts(root); // panelden önce: açık modal toast'ların üstünde kalır
+  const toasts = createToasts(root); // z-index ile büyük panelin de üstünde kalır (styles.css)
   const settings = createSettings(root, ctx, money.el);
   toolbar.onToolChange = (t) => { if (t !== 'hand') card.close(); };
+
+  // ---- Aşama 3: Envanter / Pazar / Mağaza (tek büyük panel) + seviye kutlaması ----
+  const panels = createPanelHost(root, ctx, money.el);
+  const openPanel = (id, arg) => panels.open(id, arg);
+  const invPanel = createInventoryPanel(ctx, { openPanel });
+  const mktPanel = createMarketPanel(ctx);
+  const shopPanel = createShopPanel(ctx);
+  panels.register(invPanel);
+  panels.register(mktPanel);
+  panels.register(shopPanel);
+  panels.onChange((id) => {
+    if (!id) return;
+    if (toolbar.isPickerOpen) toolbar.closePicker();
+    if (card.isOpen) card.close();
+    if (settings.isOpen) settings.close();
+  });
+  const levelUp = createLevelUp(root);
 
   // FPS (debug)
   let fpsEl = null, fpsVal = null, fpsPending = -1, fpsCls = '';
@@ -122,6 +145,54 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
     celebrate.arm(h0 || { cropId: p.cropId, itemId: p.cropId }); // sinematik başlayınca görünür
   });
   on('xp:gained', xp.onGained);
+
+  // ---- Aşama 3 olayları (yalnızca kirli işaretler; DOM işi panel açıkken rAF'ta) ----
+  const markAll = () => { invPanel.markDirty(); mktPanel.markDirty(); shopPanel.markDirty(); };
+  const itemName = (id) => (ITEMS[id] && ITEMS[id].name) || String(id || '');
+  on('ui:open', (p) => {
+    const id = p && p.panel;
+    if (id === 'inventory' || id === 'market' || id === 'shop') openPanel(id, p);
+  });
+  on('inventory:changed', markAll);
+  on('market:pricesUpdated', () => mktPanel.markDirty());
+  on('money:changed', () => shopPanel.markDirty());
+  on('time:day', markAll);
+  on('level:up', (p) => { levelUp.push(p); xp.onLevelUp(); markAll(); });
+  on('market:result', (p) => {
+    mktPanel.onResult(p);
+    if (!p) return;
+    if (p.ok) {
+      const amt = formatMoney(Number(p.total) || 0);
+      const later = p.paidNow === false || p.channel === 'wholesale' && p.paidNow !== true;
+      toasts.push({ text: later ? STR.soldLater(amt, p.qty, itemName(p.itemId)) : STR.sold(amt, p.qty, itemName(p.itemId)), kind: 'good' });
+    } else if (p.reason) toasts.push({ text: String(p.reason), kind: 'bad' });
+  });
+  on('shop:result', (p) => {
+    shopPanel.onResult(p);
+    if (!p) return;
+    if (p.ok) toasts.push({ text: STR.bought(formatMoney(Number(p.total) || 0), p.qty, itemName(p.itemId)), kind: 'info' });
+    else if (p.reason) toasts.push({ text: String(p.reason), kind: 'bad' });
+  });
+  // Dolu envanter: spam yok (gerçek zamanda 5 sn'de bir)
+  let fullAt = -1e9;
+  on('inventory:full', () => {
+    const t = performance.now();
+    if (t - fullAt < 5000) return;
+    fullAt = t;
+    toasts.push({ text: STR.invFull, kind: 'bad' });
+  });
+  // Bozulma: aynı gün gelen olaylar tek özet bildirimde birleşir
+  const spoil = { stale: 0, rotten: 0, timer: 0 };
+  on('inventory:spoiled', (p) => {
+    if (!p) return;
+    if (p.toQ == null) spoil.rotten++; else spoil.stale++;
+    clearTimeout(spoil.timer);
+    spoil.timer = setTimeout(() => {
+      const text = STR.spoiled(spoil.stale, spoil.rotten);
+      spoil.stale = spoil.rotten = 0;
+      if (text) toasts.push({ text, kind: 'bad' });
+    }, 350);
+  });
   on('farm:result', (p) => {
     if (!p || p.ok !== false || !p.reason) return;
     const r = String(p.reason);
@@ -165,6 +236,8 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   loop.add(notes.render);
   loop.add(celebrate.render);
   loop.add(xp.render);
+  loop.add(panels.render);
+  loop.add(levelUp.render);
   loop.add(() => {
     if (letterboxPending) {
       const p = letterboxPending; letterboxPending = null;
@@ -187,10 +260,12 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   // Klavye
   const onKey = (e) => {
     if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (isTypingTarget(e.target)) return;
+    if (isTypingTarget(e.target) && !(e.key === 'Escape' && e.target.type === 'range')) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       if (settings.isOpen) settings.close();
+      else if (levelUp.isOpen) levelUp.hide();
+      else if (panels.isOpen) panels.close();
       else if (toolbar.isPickerOpen) toolbar.closePicker();
       else if (card.isOpen) card.close();
       else toolbar.select('hand');
@@ -203,6 +278,9 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
       return;
     }
     if (e.repeat) return;
+    // Paneller: I / P / M (fiziksel tuş; TR klavyede de aynı yer)
+    const pk = ({ KeyI: 'inventory', KeyP: 'market', KeyM: 'shop' })[e.code];
+    if (pk && !e.shiftKey) { e.preventDefault(); panels.toggle(pk); return; }
     const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code || '');
     const d = m ? Number(m[1]) : 0;
     if (!d) return;
@@ -210,7 +288,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
       // Hız: Shift+1/2/3
       const s = ({ 1: 1, 2: 2, 3: 4 })[d];
       if (s) { e.preventDefault(); speed.setSpeed(s); }
-    } else if (d <= 8) {
+    } else if (d <= 8 && !panels.isOpen) { // panel açıkken alet kısayolları kapalı
       e.preventDefault();
       toolbar.selectIndex(d - 1);
     }
@@ -233,7 +311,9 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointercancel', onCancel, true);
       clearTimeout(outsideTimer);
+      clearTimeout(spoil.timer);
       toolbar.destroy(); notes.destroy(); xp.destroy(); celebrate.destroy();
+      levelUp.destroy(); shopPanel.destroy(); panels.destroy();
       money.destroy(); settings.destroy(); toasts.destroy();
       root.innerHTML = '';
       root.classList.remove('cinematic');

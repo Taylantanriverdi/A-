@@ -15,6 +15,8 @@ import Decor from './Decor.js';
 import HorizonLayer from './HorizonLayer.js';
 import Particles from './Particles.js';
 import FieldView from '../world/FieldView.js';
+import MarketStall from '../world/MarketStall.js';
+import SaleFX from './SaleFX.js';
 import GradePipeline from './postfx/GradePipeline.js';
 import BloomPipeline from './postfx/BloomPipeline.js';
 import { createLook } from './postfx/CinematicPipeline.js';
@@ -62,6 +64,9 @@ export default class Renderer {
     this.particles = new Particles(s); this.particles.create();
     // tarla karoları + ekinler + imleç + tarım efektleri (state.tiles'tan; yalnızca okur)
     try { this.field = new FieldView(s, this.state, this.bus, this); } catch (e) { console.error('[render] FieldView', e); this.field = null; }
+    // pazar tezgâhı + satış/alış/seviye efektleri (Aşama 3)
+    try { this.stall = new MarketStall(s, this.state, this.bus, this); this.stall.create(); } catch (e) { console.error('[render] MarketStall', e); this.stall = null; }
+    try { this.saleFx = new SaleFX(s, this.bus, this.webgl); this.saleFx.create(); } catch (e) { console.error('[render] SaleFX', e); this.saleFx = null; }
     // kararma katmanı (uyku geçişi) + Canvas letterbox
     this.cTop = s.add.container(0, 0).setScrollFactor(0).setDepth(1000);
     this.fadeRect = s.add.rectangle(0, 0, 10, 10, 0x05060c).setOrigin(0, 0).setAlpha(0).setVisible(false);
@@ -128,6 +133,7 @@ export default class Renderer {
     this.particles.setQuality(level);
     this.shadowSystem.setQuality(level);
     this.field?.setQuality(level);
+    this.saleFx?.setQuality(level);
     this._applyPostFX(q.bloom);
     if (this.fx && this.fx.bloom) { this.fx.bloom.strength = q.bloomStrength; this.fx.bloom.passes = q.bloomPasses; }
     this.look.grain = q.grain;
@@ -166,6 +172,8 @@ export default class Renderer {
     this.shadowSystem.update(env);
     this.decor.update(env);
     if (this.field) { try { this.field.update(frame); } catch (e) { if (!this._fieldErr) { this._fieldErr = true; console.error('[render] FieldView.update', e); } } }
+    if (this.stall) { try { this.stall.update(env); } catch (e) { if (!this._stallErr) { this._stallErr = true; console.error('[render] MarketStall.update', e); } } }
+    this.saleFx?.update(env);
     this.particles.update(env);
     this._updateFX(env, dt);
     this._fps(frame.delta || 16.7);
@@ -215,6 +223,7 @@ export default class Renderer {
     this.parallax.layout(v, env);
     this.lighting.layout(v);
     this.particles.layout(v, env);
+    this.saleFx?.layout(v);
     // üst katman: kararma + Canvas letterbox
     v.fit(this.cTop);
     const F = this.fade;
@@ -231,7 +240,7 @@ export default class Renderer {
     for (const off of this._offs) off(); this._offs.length = 0;
     if (this._cam && this._origPreRender) { delete this._cam.preRender; if (this._cam.preRender !== this._origPreRender) this._cam.preRender = this._origPreRender; }
     try { if (this.fx && this.fx.pipe) this._cam.removePostPipeline(this.fx.pipe); } catch { /* yok say */ }
-    for (const m of [this.field, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
+    for (const m of [this.saleFx, this.stall, this.field, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
     this.cTop?.destroy();
   }
 }
