@@ -1,4 +1,4 @@
-// Eşya tanımları. category: 'seed' | 'fertilizer' | 'chemical' | 'crop' | 'tool'.
+// Eşya tanımları. category: 'seed' | 'fertilizer' | 'chemical' | 'crop' | 'feed' | 'animal' | 'tool'.
 // price: mağaza alış fiyatı (Aşama 3). Ürünlerin satış fiyatı crops.js basePrice'tan gelir.
 import { CROPS } from './crops.js';
 
@@ -7,6 +7,8 @@ export const ITEMS = {
   npk:            { name: 'NPK Gübre',        category: 'fertilizer', price: 35, effect: { n: 25, p: 20, k: 20, ph: -0.1, slowDays: 0 }, organic: false, color: '#5b8fd1' },
   lime:           { name: 'Kireç',            category: 'fertilizer', price: 25, effect: { n: 0, p: 0, k: 0, ph: 0.4, slowDays: 0 }, organic: true, color: '#e8e4d8' },
   pesticide:      { name: 'Zirai İlaç',       category: 'chemical',   price: 45, effect: { efficacy: 0.95, targets: ['pest', 'disease'] }, organic: false, color: '#d14b4b' },
+  chicken_feed:   { name: 'Tavuk Yemi',       category: 'feed',       price: 4,  effect: { portions: 1 }, organic: false, color: '#d9b26a' },
+  hay:            { name: 'Saman',            category: 'feed',       price: 22, effect: { portions: 1 }, organic: true,  color: '#d8c27a' },
   organic_spray:  { name: 'Organik Sprey',    category: 'chemical',   price: 25, effect: { efficacy: 0.65, targets: ['pest', 'disease'] }, organic: true,  color: '#6fbf6a' },
 };
 
@@ -14,6 +16,11 @@ export const ITEMS = {
 for (const [id, c] of Object.entries(CROPS)) {
   ITEMS[`seed_${id}`] = { name: `${c.name} Tohumu`, category: 'seed', price: c.seedPrice, crop: id, color: c.accent };
   ITEMS[id] = { name: c.name, category: 'crop', basePrice: c.basePrice, crop: id, color: c.accent };
+}
+
+import { ANIMAL_PRODUCTS } from './animals.js';
+for (const [id, p] of Object.entries(ANIMAL_PRODUCTS)) {
+  ITEMS[id] = { name: p.name, category: 'animal', basePrice: p.basePrice, freshDays: p.freshDays, color: p.color };
 }
 
 // Aletler (envanterde değil, araç çubuğunda her zaman var)

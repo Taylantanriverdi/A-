@@ -38,7 +38,7 @@ const DEFAULT_ENTRY = Object.freeze({ saturation: 1, noise: 1, soldToday: 0 });
 /** Satılabilir mi? (Aşama 3: yalnızca category 'crop') */
 export function isSellable(itemId) {
   const it = ITEMS[itemId];
-  return !!it && it.category === 'crop' && !!CROPS[it.crop];
+  return !!it && ((it.category === 'crop' && !!CROPS[it.crop]) || it.category === 'animal'); // Aşama 4: hayvan ürünleri
 }
 
 /** Ürünün pazar durumu (yoksa varsayılan, salt okunur). */
@@ -70,12 +70,14 @@ export function unitBeforeSaturation(state, itemId, q = 'B', organic = false, ch
   const it = ITEMS[itemId];
   const crop = it && CROPS[it.crop];
   const ch = CHANNELS[channel];
-  if (!crop || !ch) return 0;
+  if (!ch || !isSellable(itemId)) return 0;
+  const base = crop ? crop.basePrice : it.basePrice;              // hayvan ürünleri: ITEMS basePrice
+  const sm = crop ? seasonMult(it.crop, nowOf(state, now).season) : 1; // hayvan ürünlerinde mevsim çarpanı yok
   const n = nowOf(state, now);
   const e = priceEntry(state, itemId);
   const qm = QUALITY.priceMult[q] ?? QUALITY.priceMult.B;
   const om = organic === true ? 1 + QUALITY.organicBonus : 1;
-  return crop.basePrice * seasonMult(it.crop, n.season) * eventMult(state, itemId) * e.noise * qm * om * ch.mult;
+  return base * sm * eventMult(state, itemId) * e.noise * qm * om * ch.mult;
 }
 
 /** Şu anki B kalite, organik olmayan, pazar yeri birim fiyatı (tam ₺). */

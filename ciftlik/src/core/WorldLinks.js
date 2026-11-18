@@ -1,6 +1,7 @@
 // WorldLinks — dünyadaki tıklanabilir yapıları (karo bölgeleri) UI eylemlerine bağlayan küçük kural tablosu.
 // Cinematics gibi: bus'ı dinler, yalnızca olay yayar; sistemleri veya UI'yi doğrudan çağırmaz.
 // Yeni bağlantı (ör. Aşama 5 bina tıklaması) için LINKS'e satır ekle.
+import { BUILDINGS } from '../data/buildings.js';
 
 /**
  * Bağlantı: { id, area: {x0, x1, y0, y1} (karo, uçlar dahil), emit: [olay, yük] , tools?: ['hand', ...] }
@@ -13,6 +14,13 @@ export const LINKS = [
     event: 'ui:open',
     payload: { panel: 'market', source: 'marketStall' },
   },
+  // Aşama 4: bina arsaları (data/buildings.js lots) → bina paneli (boşsa inşa teklifi)
+  ...Object.entries(BUILDINGS).flatMap(([type, b]) => b.lots.map((l) => ({
+    id: l.id,
+    area: { x0: l.x0, x1: l.x1, y0: l.y0, y1: l.y1 },
+    event: 'ui:open',
+    payload: { panel: 'building', buildingType: type, lotId: l.id, source: 'lot' },
+  }))),
 ];
 
 const STROKE_GAP_MS = 400; // bundan kısa aralıkla gelen tile:tap'ler boyama darbesi sayılır

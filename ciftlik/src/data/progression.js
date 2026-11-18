@@ -12,9 +12,9 @@ export const XP_RULES = {
 // Seviye açılımları (UI'da "Seviye N: …" olarak gösterilir). Aşama 3'te mağaza ürünleri ve toptancı etkin;
 // diğerleri ilgili aşamada devreye girer.
 export const UNLOCKS = {
-  2: ['Çilek ve ayçiçeği tohumu', 'Zirai ilaç', 'Kümes (Aşama 4)'],
-  3: ['Toptancı', 'Kabak ve üzüm tohumu', 'Yeni arazi P2 (Aşama 8)'],
-  4: ['Karpuz tohumu', 'Ahır (Aşama 4)'],
+  2: ['Çilek ve ayçiçeği tohumu', 'Zirai ilaç', 'Kümes ve tavuk'],
+  3: ['Toptancı', 'Kabak ve üzüm tohumu', 'Arı kovanı', 'Yeni arazi P2 (Aşama 8)'],
+  4: ['Karpuz tohumu', 'Ahır, inek, koyun, keçi, saman'],
   5: ['Mandıra ve değirmen (Aşama 5)'],
   7: ['Sera (Aşama 8)'],
   8: ['Traktör (Aşama 8)'],

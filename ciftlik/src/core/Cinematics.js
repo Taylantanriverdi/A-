@@ -20,6 +20,14 @@ export const RULES = [
     shot: { zoom: 1.5, duration: 2200, letterbox: true },
     reason: 'firstHarvest',
   },
+  {
+    // Aşama 4: yeni bina açılışı (PLAN §10) — yük { type, lotId, tx, ty } (arsanın merkezi)
+    event: 'building:built',
+    when: (p) => !!p,
+    target: (p) => (Number.isFinite(p.tx) && Number.isFinite(p.ty) ? tileCenter(p.tx, p.ty) : null),
+    shot: { zoom: 1.3, duration: 3200, letterbox: true },
+    reason: 'buildingOpened',
+  },
 ];
 
 export default class Cinematics {

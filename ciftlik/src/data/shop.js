@@ -3,6 +3,9 @@ export const SHOP_TABS = [
   { id: 'seeds', name: 'Tohumlar' },
   { id: 'soil', name: 'Gübre' },
   { id: 'care', name: 'Bakım' },
+  { id: 'feed', name: 'Yem' },
+  { id: 'animals', name: 'Hayvanlar' },
+  { id: 'buildings', name: 'Binalar' },
 ];
 
 export const SHOP = [
@@ -24,5 +27,9 @@ export const SHOP = [
   { itemId: 'lime',            tab: 'soil',  level: 1 },
   { itemId: 'organic_spray',   tab: 'care',  level: 1 },
   { itemId: 'pesticide',       tab: 'care',  level: 2 },
+  { itemId: 'chicken_feed',    tab: 'feed',  level: 2 },
+  { itemId: 'hay',             tab: 'feed',  level: 4 },
 ];
+// Hayvan ve bina alımları envantere girmez: MarketSystem `shop:buyAnimal {animal}` / `shop:build {building, lotId}`
+// komutlarını AnimalSystem'e yönlendirir (fiyat ve seviye data/animals.js, data/buildings.js).
 export const MAX_BUY_QTY = 99;

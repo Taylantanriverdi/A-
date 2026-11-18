@@ -12,8 +12,8 @@
 | 0 | İşçi ajanları + PLAN.md | ✅ Onaylandı |
 | 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Onaylandı |
 | 2 | Tarım ve toprak mekaniği | ✅ Onaylandı |
-| 3 | Envanter, mağaza, pazar | ✅ Tamamlandı (beyin duman testi; tam QA ekonomik mod gereği atlandı) — onay bekleniyor |
-| 4 | Hayvancılık | — |
+| 3 | Envanter, mağaza, pazar | ✅ Onaylandı |
+| 4 | Hayvancılık | 🔨 Devam ediyor |
 | 5 | Üretim binaları ve zincirleri | — |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
@@ -750,3 +750,36 @@ birim = crops.basePrice × seasonMult(crop, season) × olay (activeEvents; şimd
 - **Mağaza paneli**: sekmeler (Tohumlar / Gübre / Bakım), kartlarda ikon, ad, fiyat, mevsim etiketi (tohumlar), kilitliyse "Seviye N", adet seçici, toplam, "Satın al"; bakiye yetmezse düğme pasif.
 - **Seviye**: XP göstergesi gerçek ilerlemeyi gösterir (`xp / toNext`); `level:up` → zarif kutlama kartı + açılımlar listesi.
 - Bozulma ve dolu envanter bildirimleri (toast; spam yok).
+
+---
+
+## 10. Aşama 4 Sözleşmesi — Hayvancılık (bağlayıcı, kısa)
+
+Beyin dosyaları: `data/animals.js` (ANIMALS, CARE, VET, ANIMAL_PRODUCTS), `data/buildings.js` (BUILDINGS + sabit arsalar, TROUGH), `items.js` (chicken_feed, hay, hayvan ürünleri category 'animal'), `shop.js` (Yem/Hayvanlar/Binalar sekmeleri). Beyin ayrıca: pricing/MarketSystem hayvan ürünlerini satar; `WorldLinks` arsalara dokununca `ui:open {panel:'building', buildingType, lotId}`; `Cinematics` `building:built {type, lotId, tx, ty}` → sinematik.
+
+| İşçi | Dosyalar |
+|---|---|
+| gameplay-dev | `systems/AnimalSystem.js` (+ `systems/animals/*`), InventorySystem bozulmasının `ITEMS[id].freshDays`'e genellenmesi, `ui/buildingPanel.js` (+ shopPanel'e Hayvanlar/Binalar sekme kartları), main.js'e kayıt (tek satır) |
+| visual-dev | `world/BuildingView.js`, `world/AnimalView.js`, `render/textures/animals.js`, `render/textures/buildings.js`; arsalardaki dekoru (layout.js, P1 dışı) temizleme |
+
+### State
+```js
+state.buildings = [{ id, type: 'coop'|'barn'|'hive', lotId, builtDay, dirt: 0..100,
+                     trough: { feed: porsiyon, water: gün }, box: { [itemId]: [{ q, qty }] } }]
+state.animals = [{ id, type, name, buildingId, ageDays, hunger, thirst, health, happiness /*0..100*/,
+                   sick: false, pettedDay: -1, productTimer: 0 /*gün*/ }]
+```
+### Komutlar / olaylar
+| Olay | Yük | Yön |
+|---|---|---|
+| `shop:build` | `{ building, lotId }` | UI → AnimalSystem (seviye, bakiye `transact` 'other', arsa boş) → `building:built {type, lotId, tx, ty}` |
+| `shop:buyAnimal` | `{ animal, buildingId? }` | UI → AnimalSystem (bina kapasitesi; arı için boş kovan yeri = bina 'hive' oluşturur) → `animal:born {animal, reason:'bought'|'bred'}` |
+| `animal:action` | `{ type: 'feed'|'water'|'clean'|'collect'|'pet'|'vet', buildingId, animalId?, itemId? }` | UI → AnimalSystem → `animal:result {ok, reason?, ...}` |
+| `animals:changed` | `{ buildingIds }` | AnimalSystem → görsel/UI |
+- **feed**: bina hayvanları için 1 günlük ihtiyacı envanterden yemliğe (TROUGH.feedDaysMax'a kadar); `itemId` yem ya da altFeed ekin (porsiyon değeriyle). **water**: kuyudan ücretsiz, suluk dolar. **clean**: dirt 0. **collect**: kutudaki ürünler envantere (`canAdd`). **pet**: günde bir, mutluluk +10. **vet**: `transact` −300, hasta → iyileşir.
+- **onHour**: yemlik/suluktan tüketim (perDay/24), açlık/susuzluk/sağlık (CARE). **onDay**: kir, hastalık şansı (ctx.rng), yaş, mutluluk (beslenme, su, temizlik, sevme, sağlık ortalaması), üretim (timer ≥ intervalDays ve eşikler; kalite mutluluğa göre; yaşlı %50; arı kışın yok, 4+ ayçiçeğinde ×1.3), üreme (aynı türden 2+, mutluluk > 80, yer var, breedChance). Ürünler binanın kutusuna gider, oyuncu toplar.
+- Hayvan ürünleri `category 'animal'`, bozulma `ITEMS[id].freshDays` ile (InventorySystem genellenir). XP: toplama `xp:add` (B değer × 0.1).
+- Bina paneli (arsaya dokununca): boş arsa → fiyat/seviye/"İnşa et"; dolu → hayvan listesi (durum çubukları, Sev/Veteriner), yemlik/suluk/kir göstergeleri, Yem koy (yem seçici), Su doldur, Temizle, Ürünleri topla (kutudaki adetler), "Hayvan al" (kapasite).
+### Görsel
+- Kümes (sevimli ahşap, kırmızı çatı, rampa), ahır (büyük kırmızı-ahşap, çift kapı), kovan (beyaz ahşap kutu, arılar). Boş arsa: ince işaretli kazık/ip çevrili toprak + tabela. Gece pencere ışığı. Gölge, `depthForY`.
+- Hayvanlar pen alanında dolaşır (basit durum makinesi: yürü/otla/dur), yetişkin/yavru boyutu, hasta (soluk, yavaş), mutlu (zıplama). Tavuklar gagalar, inekler kuyruk sallar, arılar kovan çevresinde uçar. Gece hayvanlar binaya girer (görünmez). `building:built` → inşa "pop" + toz/parıltı.
