@@ -15,7 +15,7 @@ const dim = 'rgba(245,236,217,0.55)';
 const grid = 'rgba(245,236,217,0.1)';
 const FONT = '11px system-ui, -apple-system, "Segoe UI", sans-serif';
 const nf = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
-const short = (n) => { const a = Math.abs(n); return a >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : a >= 1e4 ? `${Math.round(n / 1e3)}B` : a >= 1e3 ? `${(n / 1e3).toFixed(1)}B` : String(Math.round(n)); };
+const short = (n) => { const a = Math.abs(n); return a >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : a >= 1e4 ? `${Math.round(n / 1e3)}k` : a >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(Math.round(n)); };
 
 /** Canvas'ı CSS boyutuna ve DPR'ye göre ayarlar; {g,w,h} döner (w/h CSS px). */
 export function fit(canvas, cssH) {
