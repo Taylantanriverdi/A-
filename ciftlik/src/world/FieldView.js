@@ -345,6 +345,7 @@ export default class FieldView {
 
   // ------------------------------------------------------------------ imleç
   _cursorTarget() {
+    if (this.tool === 'build') return null; // inşa modunda tarla imleci yok (hayalet gösterilir)
     const t = this.hover || (this.hadHover ? null : this.tap);
     // tezgâh karolarında genel imleç yok — orada yalnızca MarketStall'un kendi vurgusu
     if (t) { const S = STALL.tiles; if (t.tx >= S.x0 && t.tx <= S.x1 && t.ty >= S.y0 && t.ty <= S.y1) return null; }

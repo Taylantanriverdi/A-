@@ -103,7 +103,7 @@ export function genPathAtlas(scene) {
 function genFootprint(scene, ok, w, h) {
   const key = ghostFpKey(ok, w, h); if (scene.textures.exists(key)) return;
   const { canvas, ctx } = makeCanvas(w * TW, h * TH);
-  const fill = ok ? 'rgba(130,236,150,0.30)' : 'rgba(255,96,84,0.34)';
+  const fill = ok ? 'rgba(120,240,140,0.42)' : 'rgba(255,90,78,0.44)';
   const line = ok ? 'rgba(190,255,200,0.85)' : 'rgba(255,170,160,0.9)';
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const px = x * TW + 2.5, py = y * TH + 2.5, pw = TW - 5, ph = TH - 5;

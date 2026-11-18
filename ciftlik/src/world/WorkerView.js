@@ -4,6 +4,7 @@
 // Görevde ikon baloncuğu; worker:did ok → parıltı. Gece fener ışığı. depthForY + gölge. update'te bellek ayrılmaz; ekran dışı atlanır.
 import { depthForY, DEPTH, TILE_W, TILE_H } from '../core/constants.js';
 import { DONKEY } from '../data/workers.js';
+import { firstPlacedOfType } from './placedUtil.js';
 import { genWorker, KID, DK, WALK_N, kidKey, dkKey, bubbleKey } from '../render/textures/worker.js';
 
 const WALK_KEYS = []; for (let i = 0; i < WALK_N; i++) WALK_KEYS.push(kidKey('walk' + i));
@@ -12,7 +13,7 @@ const K = { idle0: kidKey('idle0'), idle1: kidKey('idle1'), b0: kidKey('bucket0'
 const ICON = { water: 'water', waterAnimals: 'water', harvest: 'basket', collect: 'basket', machineCollect: 'basket', feed: 'feed', animals: 'feed', clean: 'gear', machineLoad: 'gear', machines: 'gear' };
 const BUCKET = { water: 1, waterAnimals: 1 };
 const KID_STRIDE = 40, DK_STRIDE = 52;     // bir tam adım döngüsünün px uzunluğu
-const HOME_X = (DONKEY.homeTile.tx + 0.5) * TILE_W, HOME_Y = (DONKEY.homeTile.ty + 0.5) * TILE_H + 6;
+let HOME_X = (DONKEY.homeTile.tx + 0.5) * TILE_W, HOME_Y = (DONKEY.homeTile.ty + 0.5) * TILE_H + 6; // sundurma placed'e göre güncellenir
 
 function chase(e, tx, ty, dt, t) {
   // hedef değişince hız tahmini; görünüm hız + oransal düzeltmeyle kovalar
@@ -39,6 +40,7 @@ export default class WorkerView {
     this._mkDonkey();
     const on = (n, f) => this._offs.push(this.bus.on(n, f, this));
     on('workers:changed', () => { this.dirty = true; });
+    on('placed:changed', () => { this.dirty = true; });
     on('worker:state', () => { this.dirty = true; });
     on('save:loaded', () => { this.dirty = true; });
     on('worker:did', (p) => this._did(p));
@@ -77,6 +79,8 @@ export default class WorkerView {
   }
 
   sync() {
+    const sp = firstPlacedOfType(this.state, 'shed'); // eşeğin evi: sundurmanın sağ-alt karosu
+    if (sp) { HOME_X = (sp.tx + 1.5) * TILE_W; HOME_Y = (sp.ty + 1.5) * TILE_H + 6; }
     this.dirty = false;
     const ws = Array.isArray(this.state?.workers) ? this.state.workers : [];
     for (const e of this.list) e.seen = false;

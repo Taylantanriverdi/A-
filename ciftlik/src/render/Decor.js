@@ -1,12 +1,17 @@
 // Faz 1 dekor ve gölge demosu: çiftlik evi (gece pencereleri yanar), ağaçlar (rüzgârda salınan tepe),
 // çalılar, P1 çiti, kuyu, fener. Tümü y-sıralı (depthForY).
-import { TILE_W, TILE_H, P1 } from '../core/constants.js';
+import { TILE_W, TILE_H } from '../core/constants.js';
 import { TREE_VARIANTS } from './textures/props.js';
-import { HOUSE, WELL, LAMP, TREES, BUSHES } from './layout.js';
+import { HOUSE, LAMP, TREES, BUSHES } from './layout.js';
+import { firstPlacedOfType, footOf, SLIDE_TIME } from '../world/placedUtil.js';
 import { depthForY } from './util.js';
 
 export default class Decor {
-  constructor(scene, shadows, lights) { this.scene = scene; this.shadows = shadows; this.lights = lights; this.trees = []; this.bushes = []; this.objs = []; this.season = null; }
+  constructor(scene, shadows, lights, state, bus, renderer) {
+    this.scene = scene; this.shadows = shadows; this.lights = lights; this.state = state; this.bus = bus; this.renderer = renderer;
+    this.trees = []; this.bushes = []; this.objs = []; this.season = null; this._offs = []; this.removing = [];
+    this.well = null; this.wellShadow = null; this.wellPlaced = null; this._foot = { x: 0, y: 0 }; this.liftId = null; this.dirty = false; this._init = true;
+  }
 
   _img(x, y, key) {
     const tex = this.scene.textures.get(key); const m = tex.customData || {};
@@ -30,9 +35,10 @@ export default class Decor {
     this.shadows.register(lamp, { footX: LAMP.x, footY: LAMP.y, height: 104, width: 18 });
     this.lights.addPoint({ x: LAMP.x, y: LAMP.y - 92, radius: 46, color: 0xffe0a0, intensity: 0.95, nightOnly: true, flicker: 0.08 });
     this.lights.addPoint({ x: LAMP.x, y: LAMP.y - 30, radius: 170, color: 0xffb060, intensity: 0.5, nightOnly: true, flicker: 0.06 });
-    // kuyu
-    const well = this._img(WELL.x, WELL.y, 'prop_well');
-    this.shadows.register(well, { footX: WELL.x, footY: WELL.y - 4, height: 118, width: 90 });
+    // kuyu: state.placed'ten (sync)
+    this.well = this._img(0, 0, 'prop_well').setVisible(false);
+    this.well.sl = { t: -1, sx: 0, sy: 0, tx: 0, ty: 0, lift: 0 };
+    this.wellShadow = this.shadows.register(this.well, { footX: 0, footY: 0, height: 118, width: 90 });
     // ağaçlar: Container(gövde + salınan tepe)
     TREES.forEach(([x, y, k, sc], i) => {
       const v = TREE_VARIANTS[k];
@@ -44,26 +50,71 @@ export default class Decor {
       const h = (v.trunkH + v.ch) * sc;
       this.shadows.register(c, { footX: x, footY: y, height: h, width: v.cw * sc * 0.55, shadowKey: `prop_tree${k}`, sway: canopy });
       c.scaleX = sc;
-      this.trees.push({ c, canopy, k, ph: i * 1.7 + x * 0.001, amp: k === 1 ? 1.4 : 1 });
+      this.trees.push({ c, sc0: sc, canopy, k, ph: i * 1.7 + x * 0.001, amp: k === 1 ? 1.4 : 1 });
     });
     BUSHES.forEach(([x, y, k]) => {
       const im = this._img(x, y, `prop_bush${k}_spring`);
       this.shadows.register(im, { footX: x, footY: y, height: 50, width: 80, shadowKey: `prop_bush${k}` });
-      this.bushes.push({ im, k });
+      this.bushes.push({ im, c: im, sc0: 1, k });
     });
-    // P1 çiti (kapı boşluğu yol üzerinde)
-    const x0 = P1.x * TILE_W, y0 = P1.y * TILE_H, x1 = (P1.x + P1.w) * TILE_W, y1 = (P1.y + P1.h) * TILE_H;
-    const fence = (x, y, key) => { const im = this._img(x, y, key); this.shadows.register(im, { footX: x, footY: y, height: 40, width: key === 'prop_fence_h' ? 64 : 12 }); };
-    for (let x = x0; x < x1; x += TILE_W) {
-      fence(x + 32, y0, 'prop_fence_h');
-      if (x >= 2560 && x < 2624) continue; // kapı
-      fence(x + 32, y1, 'prop_fence_h');
+    if (this.bus) {
+      this._offs.push(this.bus.on('placed:changed', () => { this.dirty = true; }, this));
+      this._offs.push(this.bus.on('decor:changed', () => { this.dirty = true; }, this));
+      this._offs.push(this.bus.on('save:loaded', () => { this.dirty = true; this._init = true; }, this));
+      this._offs.push(this.bus.on('build:ghost', (p) => { this.liftId = p && p.moving != null ? p.moving : null; }, this));
     }
-    fence(x1 + 2, y0, 'prop_fence_post'); fence(x1 + 2, y1, 'prop_fence_post'); fence(2624 + 2, y1, 'prop_fence_post');
-    for (let y = y0 + TILE_H; y <= y1; y += TILE_H) { fence(x0 + 2, y, 'prop_fence_v'); fence(x1 + 2, y, 'prop_fence_v'); }
+    this.sync();
+  }
+
+  _setVis(o, vis, id, now) {
+    if (o.hidden === !vis) return;
+    o.hidden = !vis;
+    if (vis) { o.c.setVisible(true).setAlpha(1).setScale(o.sc0 ?? 1); return; }
+    if (now) { o.c.setVisible(false); return; }
+    o.rm = 0; this.removing.push(o); // küçülerek kaybol
+  }
+
+  /** removedDecor + kuyu (state.placed). */
+  sync() {
+    this.dirty = false;
+    const init = this._init; this._init = false;
+    const rd = this.state && Array.isArray(this.state.removedDecor) ? this.state.removedDecor : [];
+    for (let i = 0; i < this.trees.length; i++) { const o = this.trees[i]; this._setVis(o, !rd.includes('tree_' + i), i, init); }
+    for (let i = 0; i < this.bushes.length; i++) { const o = this.bushes[i]; this._setVis(o, !rd.includes('bush_' + i), i, init); }
+    const w = this.well; if (!w) return;
+    const pl = this.state && this.state.placed;
+    if (!Array.isArray(pl)) { w.setVisible(false); return; }
+    const p = firstPlacedOfType(this.state, 'well');
+    if (!p) { w.setVisible(false); this.wellPlaced = null; return; }
+    const f = footOf('well', p.tx, p.ty, this._foot); this.wellPlaced = p.id;
+    const sl = w.sl;
+    if (!w.visible) { w.setVisible(true); sl.tx = f.x; sl.ty = f.y; this._wellPos(f.x, f.y); if (!init) { const fx = this.renderer?.buildings?.fx; if (fx) fx.dust(f.x, f.y, 40, 8); } }
+    else if (f.x !== sl.tx || f.y !== sl.ty) { sl.sx = w.x; sl.sy = w.y + sl.lift * 6; sl.tx = f.x; sl.ty = f.y; sl.t = 0; }
+  }
+
+  _wellPos(x, y) {
+    const w = this.well; w.setPosition(x, y - w.sl.lift * 6).setDepth(depthForY(y));
+    this.wellShadow?.set({ footX: x, footY: y - 4 });
   }
 
   update(env) {
+    if (this.dirty) this.sync();
+    const dt = env.dt;
+    for (let i = this.removing.length - 1; i >= 0; i--) {
+      const o = this.removing[i];
+      if (!o.hidden) { this.removing.splice(i, 1); continue; }
+      o.rm += dt / 0.3;
+      if (o.rm >= 1) { o.c.setVisible(false).setScale(o.sc0 ?? 1); this.removing.splice(i, 1); }
+      else o.c.setScale((o.sc0 ?? 1) * (1 - o.rm * o.rm)).setAlpha(1 - o.rm);
+    }
+    const wl = this.well;
+    if (wl && wl.visible) {
+      const sl = wl.sl; let mv = false;
+      if (sl.t >= 0) { sl.t += dt / SLIDE_TIME; const k = Math.min(1, sl.t), e = k * k * (3 - 2 * k); wl.x = sl.sx + (sl.tx - sl.sx) * e; wl.y = sl.sy + (sl.ty - sl.sy) * e; if (k >= 1) sl.t = -1; mv = true; }
+      const lt = this.liftId != null && this.liftId === this.wellPlaced ? 1 : 0;
+      if (lt !== sl.lift) { sl.lift += (lt - sl.lift) * Math.min(1, dt * 12); if (Math.abs(lt - sl.lift) < 0.01) sl.lift = lt; mv = true; wl.setAlpha(1 - 0.45 * sl.lift); }
+      if (mv) this._wellPos(sl.t >= 0 ? wl.x : sl.tx, sl.t >= 0 ? wl.y : sl.ty);
+    }
     if (env.season !== this.season) {
       this.season = env.season;
       for (const t of this.trees) t.canopy.setTexture(`prop_tree${t.k}_canopy_${env.season}`);
@@ -76,5 +127,5 @@ export default class Decor {
     }
   }
 
-  destroy() { for (const o of this.objs) o.destroy(); for (const t of this.trees) t.c.destroy(); }
+  destroy() { for (const off of this._offs) off(); this._offs.length = 0; for (const o of this.objs) o.destroy(); for (const t of this.trees) t.c.destroy(); }
 }
