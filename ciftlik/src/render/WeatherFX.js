@@ -12,7 +12,7 @@ import { HOUSE } from './layout.js';
 import { clamp, smoothstep, mixRgb, rgbToInt } from './util.js';
 
 const EXT = 1024;
-const MAX = { rain: 260, snow: 170, hail: 44, leaf: 30, ring: 40, puddle: 28, shade: 7, cap: 170, drip: 10 };
+const MAX = { rain: 260, snow: 170, hail: 44, leaf: 30, ring: 40, puddle: 28, shade: 7, cap: 260, drip: 10 };
 const QMUL = { high: 1, medium: 0.62, low: 0.34 };
 const GREY_TOP = [0.5, 0.56, 0.66], WHITE = [1, 1, 1];
 const approach = (cur, tgt, rate, dt) => cur + (tgt - cur) * Math.min(1, rate * dt);
@@ -207,6 +207,8 @@ export default class WeatherFX {
       if (c.type !== 'fence' || !c.im || !c.im.visible) continue;
       this._cap(c.im.x, c.im.y - FENCE.footY + 42, TILE_W * 0.95, 0.16, c.im.depth + 0.003);
     }
+    const lf = R.land?.fenceCells;
+    if (lf) for (let i = 0; i < lf.length; i++) { const c = lf[i]; if (!c.im.visible) continue; this._cap(c.im.x, c.im.y - FENCE.footY + 42, TILE_W * 0.95, 0.16, c.im.depth + 0.003); }
     for (let i = this.capN; i < MAX.cap; i++) this.capP[i].im.setVisible(false);
   }
 

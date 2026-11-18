@@ -109,7 +109,7 @@ export default class MarketStall {
     this.absent = !p;
     this.c.setVisible(!!p); this.glow.setVisible(!!p);
     this.lights[0].set({ intensity: p ? 0.9 : 0 }); this.lights[1].set({ intensity: p ? 0.5 : 0 });
-    if (!p) return;
+    if (!p) { const T = this.tiles; T.x0 = T.y0 = -99; T.x1 = T.y1 = -98; return; } // yok: tıklama/imleç engeli de yok
     this.placedId = p.id;
     const f = footOf('stall', p.tx, p.ty, this._foot);
     if (initial) { this._setPos(f.x, f.y); return; }
