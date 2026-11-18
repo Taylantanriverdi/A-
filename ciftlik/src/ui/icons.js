@@ -54,6 +54,7 @@ export const ICON = {
   minus: svg('<path d="M6 12h12" stroke-width="2.2"/>'),
   plus: svg('<path d="M6 12h12M12 6v12" stroke-width="2.2"/>'),
   trophy: svg('<path d="M8 4.5h8v5a4 4 0 0 1-8 0z" fill="currentColor" fill-opacity=".25"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/>'),
+  chart: svg('<path d="M4 20V4M4 20h16"/><path d="M8 16v-4M12.5 16V8M17 16v-6" stroke-width="2.4"/><path d="M7 8.5l4-3 3 2 5-4" stroke-width="1.5"/>'),
   check: svg('<path d="M5 12.5l4.2 4.2L19 7"/>'),
 };
 

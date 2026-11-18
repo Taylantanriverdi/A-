@@ -1,11 +1,16 @@
 // EconomySystem — tüm para hareketlerinin TEK giriş noktası (PLAN.md §9 "Para"). Phaser import ETMEZ.
 // transact → state.finance.money, ledger (en fazla LEDGER_MAX_ENTRIES), dailySummary (son 112 gün),
 // stats.earned/spent, `money:changed {amount, balance, category}`.
-import { LEDGER_CATEGORIES, LEDGER_MAX_ENTRIES } from '../data/economy.js';
-import { MIN_PER_DAY } from '../core/constants.js';
+import { LEDGER_CATEGORIES, LEDGER_MAX_ENTRIES, TAX, UPKEEP_KWH } from '../data/economy.js';
+import { MACHINE_RULES } from '../data/recipes.js';
+import { MIN_PER_DAY, DAYS_PER_SEASON } from '../core/constants.js';
+import { calendar } from '../core/timeUtils.js';
 import { isPlainObject } from '../core/GameState.js';
+import { netWorth } from './economy/valuation.js';
 
 export const SUMMARY_DAYS = 112;
+export const SEASON_SUMMARY_MAX = 8;
+const fmt = (n) => Math.round(n).toLocaleString('tr-TR');
 
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -17,6 +22,7 @@ function ensureFinance(state) {
   if (!Array.isArray(f.dailySummary)) f.dailySummary = [];
   if (!Array.isArray(f.receivables)) f.receivables = [];
   if (!Array.isArray(f.loans)) f.loans = [];
+  if (!Array.isArray(f.seasonSummary)) f.seasonSummary = [];
   return f;
 }
 
@@ -94,7 +100,9 @@ export function validate(state, onFix = () => {}) {
     if (!(isPlainObject(s) && isNum(s.day) && isNum(s.income) && isNum(s.expense))) { badDs = true; continue; }
     if (!isPlainObject(s.byCategory)) { badDs = true; s.byCategory = {}; }
     for (const k of Object.keys(s.byCategory)) if (!isNum(s.byCategory[k])) { badDs = true; delete s.byCategory[k]; }
-    ds.push({ day: s.day, income: s.income, expense: s.expense, byCategory: s.byCategory });
+    const e = { day: s.day, income: s.income, expense: s.expense, byCategory: s.byCategory };
+    if (isNum(s.netWorth)) e.netWorth = s.netWorth;
+    ds.push(e);
   }
   if (badDs) onFix('finance.dailySummary');
   if (ds.length > SUMMARY_DAYS) ds.splice(0, ds.length - SUMMARY_DAYS);
@@ -104,7 +112,58 @@ export function validate(state, onFix = () => {}) {
     && isNum(r.amount) && r.amount > 0 && typeof r.label === 'string');
   if (rc.length !== f.receivables.length) onFix('finance.receivables');
   f.receivables = rc;
+  // seasonSummary
+  if (!Array.isArray(f.seasonSummary)) { if ('seasonSummary' in f) onFix('finance.seasonSummary'); f.seasonSummary = []; }
+  const ss = f.seasonSummary.filter((x) => isPlainObject(x) && isNum(x.year) && typeof x.season === 'string' && isNum(x.income)
+    && isNum(x.expense) && isNum(x.profit) && isNum(x.tax) && isPlainObject(x.byCategory));
+  if (ss.length !== f.seasonSummary.length) onFix('finance.seasonSummary');
+  if (ss.length > SEASON_SUMMARY_MAX) ss.splice(0, ss.length - SEASON_SUMMARY_MAX);
+  f.seasonSummary = ss;
   return state;
+}
+
+/** Günlük sabit elektrik (20:00): ev her zaman, ahır/kümes yerleştirilmiş sayıya göre mevsim kurallarıyla. */
+export function dailyUpkeep(state, bus) {
+  const season = calendar(state.time.totalMinutes).season;
+  const per = (type) => { const u = UPKEEP_KWH[type]; return u ? (u[season] ?? u.all ?? 0) : 0; };
+  let kwh = per('house');
+  for (const p of state.placed || []) if (p && (p.type === 'barn' || p.type === 'coop')) kwh += per(p.type);
+  const cost = Math.round(kwh * MACHINE_RULES.kwhPrice);
+  if (cost > 0) transact(state, bus, { amount: -cost, category: 'electricity', label: `Sabit elektrik (${kwh} kWh)` });
+  return cost;
+}
+
+/** Mevsim sonu (28. gün 23:00): özet, vergi (ilk mevsim muaf), olay + toast. Para yetmezse eldeki kadar tahsil edilir. */
+export function closeSeason(state, bus) {
+  const f = ensureFinance(state);
+  const cal = calendar(state.time.totalMinutes);
+  const seasonAbs = Math.floor((cal.day - 1) / DAYS_PER_SEASON);
+  const d0 = seasonAbs * DAYS_PER_SEASON + 1;
+  let income = 0, expense = 0;
+  const byCategory = {};
+  for (const d of f.dailySummary) {
+    if (d.day < d0 || d.day >= d0 + DAYS_PER_SEASON) continue;
+    for (const [k, v] of Object.entries(d.byCategory)) {
+      byCategory[k] = (byCategory[k] || 0) + v;
+      if (k === 'loan') continue; // kredi anaparası kâr/zarar değildir
+      if (v > 0) income += v; else expense += -v;
+    }
+  }
+  const profit = income - expense;
+  let tax = 0;
+  if (seasonAbs >= TAX.graceSeasons && profit > 0) tax = Math.min(Math.round(profit * TAX.incomeRate), Math.max(0, f.money));
+  if (tax > 0) transact(state, bus, { amount: -tax, category: 'tax', label: 'Gelir vergisi' });
+  const entry = { year: cal.year, season: cal.season, income, expense, profit, tax, byCategory };
+  f.seasonSummary.push(entry);
+  if (f.seasonSummary.length > SEASON_SUMMARY_MAX) f.seasonSummary.splice(0, f.seasonSummary.length - SEASON_SUMMARY_MAX);
+  bus.emit('finance:seasonClosed', entry);
+  bus.emit('toast', { text: `Mevsim kapandı: kâr ${fmt(profit)} ₺, vergi ${fmt(tax)} ₺`, kind: profit >= 0 ? 'info' : 'bad' });
+  return entry;
+}
+
+function stampNetWorth(state) {
+  const f = ensureFinance(state);
+  summaryFor(f, dayOf(state).day).netWorth = Math.round(netWorth(state));
 }
 
 const EconomySystem = {
@@ -120,6 +179,16 @@ const EconomySystem = {
   onDay(state) {
     const f = ensureFinance(state);
     summaryFor(f, dayOf(state).day);
+    stampNetWorth(state);
+  },
+
+  onHour(state, bus) {
+    const cal = calendar(state.time.totalMinutes);
+    if (cal.hour === 20) dailyUpkeep(state, bus);
+    if (cal.hour === 23) {
+      if (cal.dayOfSeason === DAYS_PER_SEASON) closeSeason(state, bus);
+      stampNetWorth(state);
+    }
   },
 };
 

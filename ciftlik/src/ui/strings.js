@@ -90,9 +90,9 @@ export const STR = {
   harvestNote: (qty, name, q) => (q ? `+${qty} ${name} · ${q}` : `+${qty} ${name}`),
 
   // ---- Aşama 3: envanter / pazar / mağaza / seviye ----
-  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', worker: 'Çalışan' },
+  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', worker: 'Çalışan', finance: 'Finans' },
   navKey: (name, k) => `${name} (${k})`,
-  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası', machine: 'Atölye', worker: 'Çalışan' },
+  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası', machine: 'Atölye', worker: 'Çalışan', finance: 'Finans' },
   slotsUsed: (u, c) => `${u}/${c} yuva`,
   invFilters: { all: 'Tümü', crop: 'Ürün', animal: 'Hayvansal', processed: 'İşlenmiş', seed: 'Tohum', fertilizer: 'Gübre', chemical: 'Bakım', feed: 'Yem' },
   invEmpty: 'Bu bölümde eşya yok',
@@ -243,6 +243,32 @@ export const STR = {
     nothing: 'Burada bir şey yok',
     invalid: 'Buraya yerleştirilemez',
   },
-  panelShortcuts: 'I envanter · P pazar · M mağaza · Esc kapat',
+
+  // ---- Aşama 6: finans paneli ----
+  fin: {
+    tabs: { summary: 'Özet', charts: 'Grafikler', ledger: 'Defter', bank: 'Banka', contracts: 'Sözleşmeler' },
+    money: 'Para', netWorth: 'Net varlık', today: 'Bugün', season: 'Bu mevsim', income: 'Gelir', expense: 'Gider', profit: 'Kâr',
+    debt: 'Kalan borç', noDebt: 'Borç yok', reputation: 'İtibar', assets: 'Varlık dağılımı', last7: 'Son 7 gün (net)',
+    asset: { money: 'Para', buildings: 'Yapılar', animals: 'Hayvanlar', inventory: 'Envanter', debt: 'Borç' },
+    daily: 'Günlük gelir / gider', days: (n) => `${n} gün`, netLine: 'Net varlık', byCat: 'Bu mevsim kategori kırılımı',
+    seasonTable: 'Mevsim kâr-zarar', tax: 'Vergi', net: 'Net', noData: 'Henüz veri yok',
+    dayTip: (d, i, e) => `${d}. gün · gelir ${i} · gider ${e}`,
+    ledgerAll: 'Tümü', ledgerEmpty: 'Henüz kayıt yok', ledgerTime: (d, h, m) => `${d}. gün ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+    limit: 'Kredi limiti', frozen: 'Gecikmeler yüzünden yeni kredi kapalı. Taksitleri öde.', active: 'Aktif krediler', none: 'Aktif kredi yok',
+    left: 'Kalan', installment: 'Taksit', nextPay: 'Sonraki ödeme', nextAt: (d, h) => `${d}. gün ${String(h).padStart(2, '0')}:00`,
+    earlyClose: (amt) => `Erken kapat · ${amt}`, newLoan: 'Yeni kredi', amount: 'Tutar', term: 'Vade',
+    termOpt: (n) => `${n} mevsim`, perWeek: 'Haftalık taksit', times: (n) => `${n} taksit`, totalRepay: 'Toplam geri ödeme', borrow: 'Krediyi al',
+    limitLow: 'Şu an alınabilir kredi yok', paid: (a, b) => `${a}/${b} taksit`, lates: (n) => `${n} gecikme`,
+    offers: 'Teklifler', actives: 'Aktif sözleşmeler', history: 'Geçmiş', noOffers: 'Şu an teklif yok. Her sabah yenileri gelir.',
+    noActive: 'Aktif sözleşme yok', accept: 'Kabul et', deliver: 'Teslim et', minQ: (q) => `${q}+`, expiresIn: (t) => `Teklif ${t} içinde kalkar`,
+    due: (t) => `Kalan ${t}`, premium: (p) => `Pazara göre ${p >= 0 ? '+' : '−'}%${Math.abs(p)}`, inStock: (n) => `Envanterde uygun: ${n}`,
+    done: 'Tamamlandı', failed: 'Başarısız', dur: (d, h) => (d > 0 ? `${d} g ${h} sa` : `${h} sa`), delivered: (a, b) => `${a}/${b} teslim`,
+    closed: 'Mevsim kapandı', closedTap: 'Kapatmak için dokun', bestCat: 'En iyi kategori',
+    t: { loanTaken: (a) => `Kredi alındı: +${a}`, loanClosed: 'Kredi kapatıldı', contractDone: (r) => `Sözleşme tamamlandı! +${r}`,
+         contractFail: (p) => `Sözleşme süresi doldu${p ? `: ${p} ceza` : ''}`, accepted: 'Sözleşme kabul edildi', delivered: 'Teslim edildi' },
+    deadline: (d) => `Teslim süresi ${d} gün`,
+    badge: (n) => `${n} bildirim`,
+  },
+  panelShortcuts: 'I envanter · P pazar · M mağaza · F finans · Esc kapat',
 };
 export default STR;

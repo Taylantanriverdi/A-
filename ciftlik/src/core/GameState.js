@@ -25,7 +25,7 @@ export function createInitialState(seed = randomSeed()) {
     weather: { type: 'clear', intensity: 0, wind: 0.2, forecast: [], puddles: 0, snowCover: 0 },
     // PLAN §9: xp = mevcut seviyedeki XP, totalXp = toplam
     player: { name: 'Çiftçi', level: 1, xp: 0, totalXp: 0, reputation: 10 },
-    finance: { money: START_MONEY, ledger: [], loans: [], dailySummary: [], receivables: [] },
+    finance: { money: START_MONEY, ledger: [], loans: [], dailySummary: [], receivables: [], bankLates: 0, seasonSummary: [] },
     inventory: { capacity: INVENTORY.startSlots, items: {} }, // kapasite = yığın sayısı
     land: { parcels: PARCEL_IDS.map((id) => ({ id, owned: id === 'P1' })) },
     tiles: {},
@@ -37,7 +37,7 @@ export function createInitialState(seed = randomSeed()) {
     workers: [],
     donkey: { x: (DONKEY.homeTile.tx + 0.5) * TILE_W, y: (DONKEY.homeTile.ty + 0.5) * TILE_H, mode: 'home' }, // PLAN §11
     market: { prices: {}, history: {}, activeEvents: [] },
-    contracts: [],
+    contracts: { offers: [], active: [], history: [] }, // PLAN §13
     stats: { harvested: {}, sold: {}, earned: 0, spent: 0 },
     settings: { quality: 'auto', sound: 0.8, music: 0.5 },
     flags: {}, // tek seferlik bayraklar (ör. farmInitialized, firstHarvest:{potato:true}) — sistemler yazar

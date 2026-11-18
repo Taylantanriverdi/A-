@@ -46,6 +46,18 @@ export function createPanelHost(root, ctx, navParent) {
   tap(wbtn, () => api.toggle('worker'));
   nav.appendChild(wbtn);
   navBtns.worker = wbtn;
+  // Aşama 6: Finans düğmesi (panel 'finance' ui/financePanel.js'te kayıtlıdır) + rozet
+  const fbtn = h('button', 'nav-btn finance-btn glass interactive', `<span class="ic">${ICON.chart}</span><span class="lbl">${STR.nav.finance}</span><kbd class="key">F</kbd><i class="nbadge" hidden></i>`);
+  fbtn.type = 'button';
+  fbtn.dataset.panel = 'finance';
+  fbtn.title = STR.navKey(STR.nav.finance, 'F');
+  fbtn.setAttribute('aria-label', STR.nav.finance);
+  fbtn.setAttribute('aria-haspopup', 'dialog');
+  shield(fbtn);
+  tap(fbtn, () => api.toggle('finance'));
+  nav.appendChild(fbtn);
+  navBtns.finance = fbtn;
+  const fbadge = fbtn.querySelector('.nbadge');
   navParent.insertBefore(nav, navParent.firstChild);
 
   // ---- Panel ----
@@ -100,6 +112,12 @@ export function createPanelHost(root, ctx, navParent) {
     /** HUD portre düğmesinin içeriğini yazar (workerPanel.hudPortrait). */
     setWorkerPortrait(html) { const c = wbtn.querySelector('.wpic'); if (c) c.innerHTML = html; },
     nav,
+    /** Finans düğmesi rozeti: n>0 sayı gösterir, urgent → amber. */
+    setFinanceBadge(n, urgent) {
+      const t = n > 0 ? String(n > 9 ? '9+' : n) : '';
+      if (fbadge.__t !== t) { fbadge.__t = t; fbadge.textContent = t; fbadge.hidden = !t; fbtn.setAttribute('aria-label', t ? `${STR.nav.finance} (${STR.fin.badge(n)})` : STR.nav.finance); }
+      fbadge.classList.toggle('urgent', !!urgent);
+    },
     get isOpen() { return current != null; },
     get current() { return current; },
     /** Panel açılıp kapanınca çağrılır: fn(id|null) */

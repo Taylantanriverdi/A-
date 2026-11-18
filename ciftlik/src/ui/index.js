@@ -18,6 +18,7 @@ import { createShopPanel } from './shopPanel.js';
 import { createBuildingPanel } from './buildingPanel.js';
 import { createWorkerPanel, hudPortrait } from './workerPanel.js';
 import { createMachinePanel } from './machinePanel.js';
+import { createFinancePanel, createSeasonCard, financeBadge } from './financePanel.js';
 import { createBuildMode } from './buildMode.js';
 import { formatMoney } from './hud.js';
 import { ITEMS } from '../data/items.js';
@@ -84,6 +85,9 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   panels.setWorkerPortrait(hudPortrait(30));
   const machPanel = createMachinePanel(ctx);
   panels.register(machPanel);
+  const finPanel = createFinancePanel(ctx);
+  panels.register(finPanel);
+  const seasonCard = createSeasonCard(root);
   const build = createBuildMode(root, ctx, {
     nav: panels.nav,
     closeAll: () => { panels.close(); if (toolbar.isPickerOpen) toolbar.closePicker(); if (card.isOpen) card.close(); if (settings.isOpen) settings.close(); toolbar.select('hand'); },
@@ -173,7 +177,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   on('ui:open', (p) => {
     const id = p && p.panel;
     if (build.active) build.exit();
-    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building' || id === 'worker' || id === 'machine') openPanel(id, p);
+    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building' || id === 'worker' || id === 'machine' || id === 'finance') openPanel(id, p);
   });
   on('workers:changed', () => wrkPanel.markDirty());
   on('worker:result', (p) => { wrkPanel.markDirty(); if (p && p.ok === false && p.reason) toasts.push({ text: String(p.reason), kind: 'bad' }); });
@@ -192,6 +196,21 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
     else if (p.ok && p.text) toasts.push({ text: p.text, kind: 'info' });
   });
   on('animal:born', (p) => { if (p && p.reason === 'bred' && p.animal) toasts.push({ text: STR.bld.born(p.animal.name), kind: 'good' }); });
+  // ---- Aşama 6: finans / banka / sözleşmeler ----
+  const refreshBadge = () => { const b = financeBadge(state, state.time.totalMinutes); panels.setFinanceBadge(b.count, b.urgent); };
+  for (const n of ['money:changed', 'time:day', 'finance:changed', 'loans:changed']) on(n, () => finPanel.markDirty());
+  on('inventory:changed', () => finPanel.markDirty());
+  on('time:hour', () => { finPanel.markDirty(); refreshBadge(); });
+  on('contracts:changed', () => { finPanel.markDirty(); refreshBadge(); });
+  on('time:day', refreshBadge);
+  on('finance:seasonClosed', (p) => { finPanel.markDirty(); seasonCard.show(p); });
+  // Sistemler başarı/kapanış/ceza tostlarını kendisi yollar; burada yalnızca reddedilen komutların nedeni gösterilir.
+  const refuse = (p) => { if (p && p.ok === false && p.reason) toasts.push({ text: String(p.reason), kind: 'bad' }); };
+  on('bank:result', (p) => { finPanel.onResult(); refuse(p); });
+  on('contract:result', (p) => { finPanel.onResult(); refuse(p); });
+  on('contract:completed', () => { finPanel.markDirty(); refreshBadge(); });
+  on('contract:failed', () => { finPanel.markDirty(); refreshBadge(); });
+  refreshBadge();
   // ---- Aşama 5: atölyeler ----
   on('machines:changed', () => { machPanel.markDirty(); shopPanel.markDirty(); });
   on('time:hour', () => machPanel.markDirty());
@@ -326,7 +345,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
     if (e.repeat) return;
     // Paneller: I / P / M (fiziksel tuş; TR klavyede de aynı yer)
     if (e.code === 'KeyB' && !e.shiftKey) { e.preventDefault(); build.toggle(); return; }
-    const pk = ({ KeyI: 'inventory', KeyP: 'market', KeyM: 'shop' })[e.code];
+    const pk = ({ KeyI: 'inventory', KeyP: 'market', KeyM: 'shop', KeyF: 'finance' })[e.code];
     if (pk && !e.shiftKey) { e.preventDefault(); panels.toggle(pk); return; }
     const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code || '');
     const d = m ? Number(m[1]) : 0;
@@ -359,7 +378,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
       window.removeEventListener('pointercancel', onCancel, true);
       clearTimeout(outsideTimer);
       clearTimeout(spoil.timer);
-      build.destroy(); toolbar.destroy(); notes.destroy(); celebrate.destroy();
+      seasonCard.destroy(); build.destroy(); toolbar.destroy(); notes.destroy(); celebrate.destroy();
       shopPanel.destroy(); panels.destroy();
       money.destroy(); settings.destroy(); toasts.destroy();
       root.innerHTML = '';

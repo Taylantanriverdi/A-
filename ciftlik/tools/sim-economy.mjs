@@ -9,6 +9,11 @@ import InventorySystem, { count, freeSlots } from '../src/systems/InventorySyste
 import FarmSystem from '../src/systems/FarmSystem.js';
 import MarketSystem, { SELLABLE_IDS } from '../src/systems/MarketSystem.js';
 import EconomySystem, { transact } from '../src/systems/EconomySystem.js';
+import BankSystem from '../src/systems/BankSystem.js';
+import ContractSystem from '../src/systems/ContractSystem.js';
+import { assetBreakdown, netWorth as netWorthV } from '../src/systems/economy/valuation.js';
+import { loanLimit, previewLoan } from '../src/systems/economy/loans.js';
+import { BANK, CONTRACTS } from '../src/data/economy.js';
 import { quote, currentPrice, priceEntry, saturationAfter } from '../src/systems/market/pricing.js';
 import { rotationMult, inSeason } from '../src/systems/farm/growth.js';
 import { canApply } from '../src/systems/farm/rules.js';
@@ -69,14 +74,15 @@ function makeWorld(seed = SEED) {
   const bus = makeBus();
   const reg = new SystemRegistry(state, bus);
   // Kayıt sırası PLAN §9: Time → Inventory → Farm → Market → Economy → Progression
-  reg.register(TimeSystem).register(InventorySystem).register(FarmSystem).register(MarketSystem).register(EconomySystem);
+  reg.register(TimeSystem).register(InventorySystem).register(FarmSystem).register(MarketSystem).register(EconomySystem).register(BankSystem).register(ContractSystem);
   reg.register(ProgressionSystem ?? makeLevelShim());
-  const log = { farm: [], market: [], shop: [], levelUps: [], full: 0, spoiled: [] };
+  const log = { bank: [], contract: [], events: [], farm: [], market: [], shop: [], levelUps: [], full: 0, spoiled: [] };
   bus.on('farm:result', (r) => log.farm.push(r));
   bus.on('market:result', (r) => log.market.push(r));
   bus.on('shop:result', (r) => log.shop.push(r));
   bus.on('level:up', (e) => log.levelUps.push({ day: calendar(state.time.totalMinutes).day, level: e.level }));
   bus.on('inventory:full', () => log.full++);
+  for (const n of ['bank:result', 'bank:late', 'contract:result', 'contract:completed', 'contract:failed', 'finance:seasonClosed']) bus.on(n, (e) => log.events.push({ n, ...e }));
   bus.on('inventory:spoiled', (e) => log.spoiled.push({ day: calendar(state.time.totalMinutes).day, ...e }));
   return {
     state, bus, reg, log,
@@ -400,8 +406,8 @@ for (const r of runs) {
   const fails = r.w.log.shop.filter((x) => !x.ok).map((x) => x.reason); const mf = r.w.log.market.filter((x) => !x.ok).map((x) => x.reason);
   console.log(`Ret: mağaza ${fails.length} (${[...new Set(fails)].join(' | ') || '—'}), pazar ${mf.length} (${[...new Set(mf)].join(' | ') || '—'})`);
 }
-const end = runs[0].rows[runs[0].rows.length - 1];
-console.log(`\nHEDEF (PLAN §4): ilk mevsim sonu kasa ≈ 7.000–9.000 ₺ → 24 karo: ${fmt(end.money)} ₺ ${end.money >= 7000 && end.money <= 9000 ? '(TUTUYOR)' : '(TUTMUYOR)'}; 48 karo: ${fmt(runs[1].rows[runs[1].rows.length - 1].money)} ₺`);
+const end = { money: runs[0].w.state.finance.money }; // mevsim kapanışı (vergi muaf + sabit gider) sonrası, gün 29 07:00
+console.log(`\nHEDEF (PLAN §4): ilk mevsim sonu kasa (vergi/sabit gider dahil) ≈ 7.000–9.000 ₺ → 24 karo: ${fmt(end.money)} ₺ ${end.money >= 7000 && end.money <= 9000 ? '(TUTUYOR)' : '(TUTMUYOR)'}; 48 karo: ${fmt(runs[1].rows[runs[1].rows.length - 1].money)} ₺`);
 
 const sd = saturationDemo();
 console.log('\n=== Doygunluk: aynı gün 40 patates (B, pazar yeri, 1. gün) ===');
@@ -428,6 +434,123 @@ console.log(`finance=3, market yok: onarılan ${vc.nb.join(', ')}; yapı tamam: 
 const a = JSON.stringify(runStrategy({ maxTiles: 24, days: 10 }).w.state);
 const b = JSON.stringify(runStrategy({ maxTiles: 24, days: 10 }).w.state);
 console.log(`\nDeterminizm (aynı tohum, 10 gün, state JSON eşit): ${a === b ? 'EVET' : 'HAYIR'}`);
+
+// ================================================================== Aşama 6: banka, vergi, giderler, sözleşmeler
+const dayMin = (d, h = 0) => (d - 1) * MIN_PER_DAY + h * 60;
+const sumCat = (st, c) => st.finance.ledger.filter((e) => e.category === c).reduce((a, e) => a + e.amount, 0);
+function richWorld(extra = 20000) {
+  const w = makeWorld();
+  transact(w.state, w.bus, { amount: extra, category: 'other', label: 'test' });
+  return w;
+}
+console.log('\n=== Aşama 6: banka ===');
+{
+  const w = richWorld(); const st = w.state;
+  const pv = previewLoan(10000, 2);
+  console.log(`limit (kasa ${fmt(st.finance.money)}): ${fmt(loanLimit(st))} ₺ | önizleme 10.000 ₺ / 2 mevsim: ${pv.count} taksit × ${fmt(pv.installment)} ₺, toplam ${fmt(pv.totalRepay)} ₺, faiz ${fmt(pv.totalInterest)} ₺`);
+  w.bus.emit('bank:borrow', { amount: 99999, termSeasons: 2 });
+  w.bus.emit('bank:borrow', { amount: 500, termSeasons: 2 });
+  console.log(`ret: "${w.log.events.filter((e) => e.n === 'bank:result').map((e) => e.reason).join('" | "')}"`);
+  const m0 = st.finance.money;
+  w.bus.emit('bank:borrow', { amount: 10000, termSeasons: 2 });
+  const L = st.finance.loans[0];
+  console.log(`kredi çekildi: +${st.finance.money - m0} ₺, ilk taksit gün ${Math.floor(L.nextDueMin / MIN_PER_DAY) + 1} 09:00, taksit ${L.installment}, sayı ${L.totalCount}; limit şimdi ${fmt(loanLimit(st))}`);
+  const money1 = st.finance.money;
+  w.reg.advance(dayMin(60, 12) - st.time.totalMinutes, true);
+  console.log(`56 gün sonra: kredi ${st.finance.loans.length} adet, ödenen anapara ${fmt(-sumCat(st, 'loan') + 10000 - 0)} (loan net ${fmt(sumCat(st, 'loan'))}), faiz toplamı ${fmt(-sumCat(st, 'interest'))} ₺, ceza ${fmt(-sumCat(st, 'penalty'))}, bankLates ${st.finance.bankLates}`);
+  void money1;
+}
+{
+  const w = richWorld(); const st = w.state;
+  w.bus.emit('bank:borrow', { amount: 10000, termSeasons: 2 });
+  const id = st.finance.loans[0].id;
+  transact(st, w.bus, { amount: -st.finance.money, category: 'other', label: 'iflas' }); // parasız
+  const out = [];
+  for (let wk = 1; wk <= 3; wk++) {
+    w.reg.advance(dayMin(1 + 7 * wk + 1, 10) - st.time.totalMinutes, true);
+    const l = st.finance.loans[0];
+    out.push(`hafta ${wk}: lates ${l.lates}, borç cezası ${l.arrears}, bankLates ${st.finance.bankLates}`);
+  }
+  console.log(`parasızlık: ${out.join(' | ')}`);
+  transact(st, w.bus, { amount: 30000, category: 'other', label: 'test' });
+  w.bus.emit('bank:borrow', { amount: 1000, termSeasons: 1 });
+  console.log(`dondurma: yeni kredi → "${w.log.events.filter((e) => e.n === 'bank:result').pop().reason}"`);
+  const m = st.finance.money;
+  w.bus.emit('bank:repay', { loanId: id });
+  console.log(`erken kapama: kasa ${fmt(m)} → ${fmt(st.finance.money)} (anapara ${fmt(10000)} + %1 + ceza), kredi kaldı ${st.finance.loans.length}, bankLates ${st.finance.bankLates}`);
+}
+console.log('\n=== Aşama 6: vergi, sabit gider, net varlık ===');
+{
+  const w = makeWorld(); const st = w.state;
+  // 1. mevsim: 2.000 ₺ kâr (vergisiz), 2. mevsim: 5.000 ₺ kâr → %10
+  transact(st, w.bus, { amount: 2000, category: 'sales', label: 'test' });
+  w.reg.advance(dayMin(29, 1) - st.time.totalMinutes, true);
+  const s1 = st.finance.seasonSummary[0];
+  transact(st, w.bus, { amount: 5000, category: 'sales', label: 'test' });
+  w.reg.advance(dayMin(57, 1) - st.time.totalMinutes, true);
+  const s2 = st.finance.seasonSummary[1];
+  console.log(`1. mevsim (${s1.season}): gelir ${s1.income}, gider ${s1.expense}, kâr ${s1.profit}, vergi ${s1.tax} | 2. mevsim (${s2.season}): gelir ${s2.income}, gider ${s2.expense}, kâr ${s2.profit}, vergi ${s2.tax} | olay ${w.log.events.filter((e) => e.n === 'finance:seasonClosed').length}`);
+  const el = st.finance.ledger.filter((e) => e.category === 'electricity');
+  const w2 = makeWorld(); const st2 = w2.state;
+  w2.reg.advance(dayMin(1, 21) - st2.time.totalMinutes, true); const dayCost = -sumCat(st2, 'electricity');
+  w2.state.placed.push({ id: 'p1', type: 'barn', tx: 0, ty: 0 }, { id: 'p2', type: 'coop', tx: 5, ty: 0 });
+  w2.reg.advance(dayMin(2, 21) - st2.time.totalMinutes, true); const d2 = -sumCat(st2, 'electricity') - dayCost;
+  w2.reg.advance(dayMin(85 + 1, 21) - st2.time.totalMinutes, true); // kış (3. mevsim sonrası = gün 85+)
+  const lastW = st2.finance.ledger.filter((e) => e.category === 'electricity').pop();
+  console.log(`elektrik: 1 gün ev ${dayCost} ₺; +ahır+kümes (bahar) ${d2} ₺; kışta (gün ${lastW.day}) ${-lastW.amount} ₺/gün | ilk mevsim toplam ${-el.filter((e) => e.day <= 28).reduce((a, e) => a + e.amount, 0)} ₺`);
+  const w3 = makeWorld(); const s3 = w3.state;
+  s3.placed.push({ id: 'p1', type: 'barn', tx: 0, ty: 0 }, { id: 'p2', type: 'coop', tx: 5, ty: 0 });
+  s3.animals.push({ id: 'a1', type: 'cow' }, { id: 'a2', type: 'chicken' });
+  InventorySystem.add(s3, 'potato', 10, 'B'); InventorySystem.add(s3, 'wheat', 20, 'A');
+  w3.bus.emit('bank:borrow', { amount: 3000, termSeasons: 1 });
+  console.log(`net varlık: ${JSON.stringify(assetBreakdown(s3))} → ${fmt(netWorthV(s3))} ₺; dailySummary.netWorth son: ${st2.finance.dailySummary[st2.finance.dailySummary.length - 1].netWorth}`);
+}
+console.log('\n=== Aşama 6: sözleşmeler ===');
+{
+  const w = makeWorld(); const st = w.state; const ctxRng = w.reg.ctx.rng;
+  let offered = 0; const seen = new Set();
+  w.bus.on('contracts:changed', () => { for (const o of st.contracts.offers) seen.add(o.id); });
+  w.reg.advance(dayMin(1, 8) - st.time.totalMinutes, true);
+  const first = st.contracts.offers.map((o) => `${o.itemId}×${o.qty}/${o.minQ}/${o.reward}₺/${o.deadlineDays}g`);
+  for (let d = 2; d <= 28; d++) w.reg.advance(dayMin(d, 8) - st.time.totalMinutes, true);
+  offered = seen.size;
+  console.log(`28 günde üretilen teklif: ${offered} (pano ≤ ${CONTRACTS.boardSize}, şu an ${st.contracts.offers.length}); ilk gün: ${first.join(', ')}`);
+  void ctxRng;
+}
+{
+  const w = makeWorld(); const st = w.state;
+  st.stats.harvested.potato = 5; transact(st, w.bus, { amount: 3000, category: 'other', label: 'test' });
+  w.reg.advance(dayMin(1, 8) - st.time.totalMinutes, true);
+  const o = st.contracts.offers[0];
+  const rep0 = st.player.reputation;
+  w.bus.emit('contract:accept', { id: o.id });
+  const a = st.contracts.active[0];
+  InventorySystem.add(st, a.itemId, a.qty, 'C');
+  w.bus.emit('contract:deliver', { id: a.id });
+  const r1 = w.log.events.filter((e) => e.n === 'contract:result').pop();
+  const need = a.minQ;
+  InventorySystem.add(st, a.itemId, Math.ceil(a.qty / 2), 'A');
+  const m0 = st.finance.money;
+  w.bus.emit('contract:deliver', { id: a.id, qty: Math.ceil(a.qty / 2) });
+  InventorySystem.add(st, a.itemId, a.qty, 'A');
+  w.bus.emit('contract:deliver', { id: a.id });
+  console.log(`sözleşme ${o.itemId}×${o.qty} min ${need} ${o.reward} ₺: C kaliteyle teslim → ${r1.ok ? 'kabul (min C)' : `"${r1.reason}"`}; tamamlandı: ${st.contracts.active.length === 0}, kasa +${st.finance.money - m0} ₺, itibar ${rep0} → ${st.player.reputation}, geçmiş ${st.contracts.history.length}`);
+  // kaçırma
+  w.reg.advance(dayMin(2, 8) - st.time.totalMinutes, true);
+  const o2 = st.contracts.offers[0];
+  if (o2) {
+    w.bus.emit('contract:accept', { id: o2.id });
+    const b = st.contracts.active[0]; const mm = st.finance.money; const rp = st.player.reputation;
+    w.reg.advance(dayMin(2 + b.dueMin / MIN_PER_DAY - st.time.totalMinutes / MIN_PER_DAY + 1, 12) - st.time.totalMinutes + 0, true);
+    console.log(`kaçırılan sözleşme: ceza ${mm - st.finance.money} ₺ (beklenen ${b.penalty}), itibar ${rp} → ${st.player.reputation}, aktif ${st.contracts.active.length}, defter 'penalty' ${-sumCat(st, 'penalty')}`);
+  }
+}
+{
+  const st = createInitialState(1); const bus = makeBus();
+  const rep = []; for (const [k, v] of [['bozuk', { contracts: [1, 2], player: { reputation: 'x' } }]]) { Object.assign(st, v); ContractSystem.validate(st, (p) => rep.push(p)); BankSystem.validate(st, (p) => rep.push(p)); void k; }
+  console.log(`validate: bozuk contracts/reputation onarıldı → ${rep.join(', ')}; şekil ${Object.keys(st.contracts)}`);
+  void bus;
+}
 
 // Performans: onDay (tüm ürünler) ve teklif hesabı
 {

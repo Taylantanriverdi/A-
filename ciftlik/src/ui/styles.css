@@ -1790,3 +1790,97 @@
 @media (prefers-reduced-motion: reduce) {
   #ui .bm-modes, #ui .bm-dock { animation: none; }
 }
+
+/* ---------- Aşama 6: Finans paneli ---------- */
+#ui .bigpanel[data-panel='finance'] .bp-tabs { display: none; }
+#ui .bigpanel[data-panel='finance'] .bp-title { display: block; }
+#ui.building .hud-nav .finance-btn { display: none; }
+#ui .finance-btn { position: relative; }
+#ui .nbadge {
+  position: absolute; top: -5px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px;
+  background: var(--event); color: #10131c; font: 700 11px/19px system-ui, sans-serif; font-style: normal; text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4); pointer-events: none;
+}
+#ui .nbadge.urgent { background: var(--accent); color: #1b1408; }
+#ui .nbadge[hidden] { display: none; }
+#ui .fin-tabs { padding-bottom: 4px; }
+#ui .fin-tabs .seg.chips { width: 100%; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; display: flex; }
+#ui .fin-tabs .seg.chips::-webkit-scrollbar { display: none; }
+#ui .fin-tabs .seg.chips button { flex: 1 0 auto; padding: 0 14px; position: relative; white-space: nowrap; }
+#ui .fdot { position: absolute; top: 8px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--event); }
+#ui .fdot[hidden] { display: none; }
+#ui .fin-body section[hidden] { display: none; }
+#ui .fin-body section { display: flex; flex-direction: column; gap: 10px; }
+#ui .fin-card { background: rgba(255, 244, 220, 0.05); border: 1px solid rgba(255, 244, 220, 0.08); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+#ui .fin-card small { color: var(--text-dim); font-size: 12px; }
+#ui .fin-card .big { font-size: 21px; font-weight: 700; }
+#ui .fin-lab { margin-top: 6px; font-size: 13px; color: var(--text-dim); }
+#ui .fin-lab b { color: var(--text); font-weight: 650; }
+#ui .fin-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+#ui .fin-row .seg.chips { flex-wrap: nowrap; }
+#ui .fin-row .seg.chips button { min-height: 36px; padding: 0 12px; }
+#ui .pos { color: var(--good); } #ui .neg { color: var(--bad); } #ui .amber { color: var(--accent); }
+#ui .fin-line { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 14px; }
+#ui .fin-line > span { color: var(--text-dim); } #ui .fin-line.sm { font-size: 12px; }
+#ui .fin-empty { padding: 18px 8px; text-align: center; color: var(--text-dim); font-size: 13px; }
+#ui .fin-warn { padding: 8px 10px; border-radius: 9px; background: rgba(255, 122, 107, 0.14); color: var(--bad); font-size: 13px; }
+#ui .fin-cv { display: block; width: 100%; touch-action: pan-y; }
+#ui .fin-read { font-size: 12.5px; color: var(--text-dim); min-height: 16px; }
+#ui .fin-leg { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-dim); flex-wrap: wrap; }
+#ui .fin-leg i { width: 10px; height: 10px; border-radius: 3px; margin-left: 8px; } #ui .fin-leg i:first-child { margin-left: 0; }
+#ui .fin-leg .g { background: var(--good); } #ui .fin-leg .b { background: var(--bad); } #ui .fin-leg .a { background: var(--accent); height: 3px; }
+#ui .fs-top { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#ui .fs-head, #ui .fs-col { display: grid; grid-template-columns: 0.9fr 1fr 1fr 1fr; gap: 6px; font-size: 13px; align-items: baseline; }
+#ui .fs-head { color: var(--text-dim); font-size: 12px; } #ui .fs-col b { font-weight: 600; } #ui .fs-col em { font-style: normal; font-weight: 700; }
+#ui .fin-bar { height: 8px; border-radius: 4px; background: rgba(255, 244, 220, 0.12); overflow: hidden; }
+#ui .fin-bar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width 0.3s var(--ease); }
+#ui .fin-bar.rep i { background: linear-gradient(90deg, #e9a93a, var(--good)); }
+#ui .fin-stack { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; background: rgba(255, 244, 220, 0.08); }
+#ui .fin-stack i { min-width: 0; } 
+#ui .s-money { background: var(--accent); } #ui .s-buildings { background: #8aa4d8; } #ui .s-animals { background: #d89a7a; } #ui .s-inventory { background: var(--good); } #ui .s-debt { background: var(--bad); }
+#ui .fin-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--text-dim); }
+#ui .fin-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 5px; }
+#ui .fin-legend b { color: var(--text); font-weight: 600; }
+#ui .fin-tbl { overflow-x: auto; touch-action: pan-x pan-y; }
+#ui .fin-tbl table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 340px; }
+#ui .fin-tbl th, #ui .fin-tbl td { padding: 6px 6px; text-align: right; border-bottom: 1px solid rgba(255, 244, 220, 0.07); white-space: nowrap; }
+#ui .fin-tbl th:first-child { text-align: left; font-weight: 500; color: var(--text); }
+#ui .fin-tbl thead th { color: var(--text-dim); font-weight: 600; } #ui .fin-tbl thead small { display: block; font-weight: 400; opacity: 0.7; }
+#ui .fin-tbl tr.sum th, #ui .fin-tbl tr.sum td { font-weight: 700; } #ui .fin-tbl tr.total td { border-top: 1px solid var(--edge-strong); }
+#ui .lg-chips { display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+#ui .lg-chips::-webkit-scrollbar { display: none; } #ui .lg-chips button { flex: none; padding: 0 12px; }
+#ui .lg-list { display: flex; flex-direction: column; }
+#ui .lg-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 9px 2px; border-bottom: 1px solid rgba(255, 244, 220, 0.07); font-size: 13px; }
+#ui .lg-t { color: var(--text-dim); font-size: 12px; } #ui .lg-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#ui .lg-c { font-size: 11.5px; padding: 2px 8px; border-radius: 9px; background: rgba(255, 244, 220, 0.09); color: var(--text-dim); white-space: nowrap; }
+#ui .lg-c.pos, #ui .lg-c.neg { background: transparent; } #ui .lg-a { min-width: 82px; text-align: right; }
+#ui .bk-ctl { display: flex; flex-direction: column; gap: 8px; } #ui .bk-ctl[hidden], #ui .bk-off[hidden] { display: none; }
+#ui .bk-off { color: var(--text-dim); font-size: 13px; padding: 6px 0; }
+#ui .bk-prev { font-size: 13px; color: var(--text-dim); line-height: 1.4; }
+#ui .bk-go { min-height: var(--hit); width: 100%; }
+#ui .ln .ghost { width: 100%; min-height: var(--hit); }
+#ui .ct { flex-direction: row; align-items: center; gap: 12px; }
+#ui .ct-i { width: 44px; height: 44px; flex: none; } #ui .ct-i svg { width: 100%; height: 100%; }
+#ui .ct-m { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; }
+#ui .ct-m b { font-weight: 650; } #ui .ct-m small { font-size: 12px; }
+#ui .ct .solid-gold { flex: none; min-height: var(--hit); padding: 0 14px; }
+#ui .ct .qb { display: inline-block; font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 7px; margin-left: 4px; background: rgba(255, 244, 220, 0.14); vertical-align: 1px; }
+#ui .ct .qb.q-A { background: #f2b84b; color: #1b1408; } #ui .ct .qb.q-B { background: #9bb7ff; color: #10131c; }
+#ui .season-card {
+  position: absolute; z-index: 60; left: 50%; top: 22%; width: min(320px, calc(100vw - 32px)); transform: translate(-50%, -14px); opacity: 0;
+  padding: 16px 18px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; cursor: pointer;
+  background: var(--glass-strong); transition: opacity 240ms ease, transform 240ms var(--ease);
+}
+#ui .season-card.show { opacity: 1; transform: translate(-50%, 0); }
+#ui .season-card[hidden] { display: none; }
+#ui .season-card small { color: var(--accent); font-weight: 650; font-size: 13px; }
+#ui .season-card em { font-size: 12px; color: var(--text-dim); font-style: normal; text-align: center; }
+#ui .sc-row { display: flex; justify-content: space-between; gap: 10px; font-size: 15px; } #ui .sc-row span { color: var(--text-dim); }
+@media (max-width: 600px), (max-height: 500px) {
+  #ui .fin-tabs { padding: 6px 12px 4px; }
+  #ui .fin-tabs .seg.chips button { padding: 0 12px; }
+  #ui .fs-top { grid-template-columns: 1fr; }
+  #ui .lg-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 't a' 'l c'; gap: 2px 8px; }
+  #ui .lg-t { grid-area: t; } #ui .lg-a { grid-area: a; } #ui .lg-l { grid-area: l; } #ui .lg-c { grid-area: c; justify-self: end; }
+  #ui .ct { flex-wrap: wrap; } #ui .ct .solid-gold { width: 100%; }
+}
