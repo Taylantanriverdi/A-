@@ -21,6 +21,7 @@ const CINE_DEFER_MS = 250;     // basılı işaretçi bırakıldıktan sonra ert
 const CINE_DEFER_MAX_MS = 60000; // takılı kalmış işaretçiye karşı emniyet
 const GLIDE_MS = 400;          // camera:ensureVisible kayması
 const VIS_MARGIN_CSS = 40;     // ensureVisible kenar payı
+const SLACK_TAU_MS = 140;      // aşma payının (inset) normal sınıra yumuşak dönüşü
 // Yeni oyunda ilk kadraj: başlangıç tarlası + ev (karo, kapsayıcı)
 const START_FRAME = { x0: 34, x1: 45, y0: 7, y1: 12 };
 const START_FIT_PAD_CSS = { x: 16, y: 140 }; // HUD/araç çubuğu için toplam pay
@@ -60,6 +61,10 @@ export default class CameraDirector {
     this._deferAt = 0;           // >0: işaretçiler bırakıldı, bu zamanda oynat
     this._deferSince = 0;
     this.glide = null;           // {fx, fy, tx, ty, t, dur} ensureVisible kayması
+    // Sınır aşma payı (CSS px): açık kart karoyu örtmesin diye kamera dünya sınırını bu kadar aşabilir.
+    this.insetTarget = { top: 0, bottom: 0, left: 0, right: 0 };
+    this.slack = { top: 0, bottom: 0, left: 0, right: 0 };
+    this._b = { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     this.drag = null;
     this.pinch = null;
     this.pointers = new Map();   // id → {x, y}
@@ -80,6 +85,7 @@ export default class CameraDirector {
     this._offs.push(
       bus.on('camera:cinematic', (p) => this.requestCinematic(p)),
       bus.on('camera:ensureVisible', (p) => this.ensureVisible(p)),
+      bus.on('camera:releaseInsets', () => this.releaseInsets()),
       bus.on('save:before', () => this.persist()),
       bus.on('tool:select', (p) => this.setTool(p && p.tool)),
     );
@@ -151,22 +157,29 @@ export default class CameraDirector {
   _userCam() { this._autoFit = false; this.glide = null; }
 
   /**
-   * camera:ensureVisible {x, y, insetBottom, insetTop} — inset'ler CSS px.
+   * camera:ensureVisible {x, y, insetBottom, insetTop, insetLeft?, insetRight?} — inset'ler CSS px.
    * Dünya noktası serbest alanın (kenar payıyla) dışındaysa GLIDE_MS içinde yumuşakça kayar.
+   * Inset'ler, kart açık kaldığı sürece dünya sınırını o kadar aşma payı verir; hepsi 0 → releaseInsets.
    */
   ensureVisible(p) {
     if (this.cine || this.locked || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+    const num = (v) => { const n = Number(v); return n > 0 && Number.isFinite(n) ? n : 0; };
+    const insT = num(p.insetTop), insB = num(p.insetBottom), insL = num(p.insetLeft), insR = num(p.insetRight);
+    this._setInsets(insT, insB, insL, insR);
     const dpr = this.dpr, z = this.zoom;
     const W = this.cam.width / dpr, H = this.cam.height / dpr;
-    const insT = Math.max(0, Number(p.insetTop) || 0), insB = Math.max(0, Number(p.insetBottom) || 0);
     const m = VIS_MARGIN_CSS;
     let top = insT + m, bot = H - insB - m;
     if (bot < top) { const mid = (insT + H - insB) / 2; top = bot = mid; }
-    const left = Math.min(m, W / 2), right = Math.max(W - m, W / 2);
+    let left = insL + m, right = W - insR - m;
+    if (right < left) { const mid = (insL + W - insR) / 2; left = right = mid; }
     // noktanın şimdiki ekran konumu (CSS px)
     const sx = (p.x - this.cx) * z + W / 2, sy = (p.y - this.cy) * z + H / 2;
     let dx = 0, dy = 0;
-    if (sx < left) dx = sx - left; else if (sx > right) dx = sx - right;
+    if (sx < left || sx > right) {
+      if (insL || insR) dx = sx - (left + right) / 2; // yan kart: serbest alanın ortasına
+      else dx = sx < left ? sx - left : sx - right;
+    }
     if (sy < top || sy > bot) dy = sy - (top + bot) / 2; // dikeyde serbest alanın ortasına
     if (!dx && !dy) return;
     const to = { x: this.cx + dx / z, y: this.cy + dy / z, z };
@@ -174,6 +187,37 @@ export default class CameraDirector {
     if (Math.abs(to.x - this.cx) < 0.5 && Math.abs(to.y - this.cy) < 0.5) return;
     this.vx = this.vy = 0; this.followTarget = null; this._autoFit = false;
     this.glide = { fx: this.cx, fy: this.cy, tx: to.x, ty: to.y, t: 0, dur: GLIDE_MS };
+  }
+
+  /** camera:releaseInsets — aşma payı kalkar; kamera yumuşakça normal sınırlara döner. */
+  releaseInsets() { this._setInsets(0, 0, 0, 0); }
+
+  /** Hedef payı ayarla: artış hemen uygulanır (kayma hedefi kesilmesin), azalış update'te yumuşar. */
+  _setInsets(top, bottom, left, right) {
+    const t = this.insetTarget, s = this.slack;
+    t.top = top; t.bottom = bottom; t.left = left; t.right = right;
+    if (top > s.top) s.top = top;
+    if (bottom > s.bottom) s.bottom = bottom;
+    if (left > s.left) s.left = left;
+    if (right > s.right) s.right = right;
+  }
+
+  _updateSlack(dt) {
+    const t = this.insetTarget, s = this.slack;
+    if (s.top === t.top && s.bottom === t.bottom && s.left === t.left && s.right === t.right) return;
+    const a = 1 - Math.exp(-dt / SLACK_TAU_MS);
+    for (const k of ['top', 'bottom', 'left', 'right']) {
+      const v = s[k] + (t[k] - s[k]) * a;
+      s[k] = Math.abs(v - t[k]) < 0.5 ? t[k] : v;
+    }
+  }
+
+  /** Aşma payıyla genişletilmiş dünya sınırları (zoom: kullanıcı zoom'u; CSS px → dünya = /zoom). */
+  _bounds(zoom) {
+    const b = this._b, s = this.slack;
+    b.minX = BOUNDS.minX - s.left / zoom; b.maxX = BOUNDS.maxX + s.right / zoom;
+    b.minY = BOUNDS.minY - s.top / zoom; b.maxY = BOUNDS.maxY + s.bottom / zoom;
+    return b;
   }
 
   /** Bus girişi: basılı işaretçi (boyama darbesi, sürükleme, pinch) varken sinematik ertelenir (K16). */
@@ -229,6 +273,7 @@ export default class CameraDirector {
   update(delta) {
     const dt = delta > 250 ? 250 : delta > 0 ? delta : 0;
     if (this.deferred.length) this._pumpDeferred(performance.now());
+    this._updateSlack(dt);
     if (this.cine) {
       this._updateCinematic(dt);
     } else {
@@ -342,10 +387,11 @@ export default class CameraDirector {
   // ---------------------------------------------------------------- sınırlar / uygulama
   _clampPoint(p) {
     const z = p.z * this.dpr;
+    const B = this._bounds(p.z);
     const hw = this.cam.width / (2 * z), hh = this.cam.height / (2 * z);
-    const bw = BOUNDS.maxX - BOUNDS.minX, bh = BOUNDS.maxY - BOUNDS.minY;
-    p.x = hw * 2 >= bw ? (BOUNDS.minX + BOUNDS.maxX) / 2 : clamp(p.x, BOUNDS.minX + hw, BOUNDS.maxX - hw);
-    p.y = hh * 2 >= bh ? (BOUNDS.minY + BOUNDS.maxY) / 2 : clamp(p.y, BOUNDS.minY + hh, BOUNDS.maxY - hh);
+    const bw = B.maxX - B.minX, bh = B.maxY - B.minY;
+    p.x = hw * 2 >= bw ? (B.minX + B.maxX) / 2 : clamp(p.x, B.minX + hw, B.maxX - hw);
+    p.y = hh * 2 >= bh ? (B.minY + B.maxY) / 2 : clamp(p.y, B.minY + hh, B.maxY - hh);
   }
 
   _clamp() {
@@ -354,11 +400,12 @@ export default class CameraDirector {
     }
     if (!(this.zoom > 0)) this.zoom = 1;
     const z = this.zoom * this.dpr;
+    const B = this._bounds(this.zoom);
     const hw = this.cam.width / (2 * z), hh = this.cam.height / (2 * z);
-    const bw = BOUNDS.maxX - BOUNDS.minX, bh = BOUNDS.maxY - BOUNDS.minY;
+    const bw = B.maxX - B.minX, bh = B.maxY - B.minY;
     let nx, ny;
-    if (hw * 2 >= bw) nx = (BOUNDS.minX + BOUNDS.maxX) / 2; else nx = clamp(this.cx, BOUNDS.minX + hw, BOUNDS.maxX - hw);
-    if (hh * 2 >= bh) ny = (BOUNDS.minY + BOUNDS.maxY) / 2; else ny = clamp(this.cy, BOUNDS.minY + hh, BOUNDS.maxY - hh);
+    if (hw * 2 >= bw) nx = (B.minX + B.maxX) / 2; else nx = clamp(this.cx, B.minX + hw, B.maxX - hw);
+    if (hh * 2 >= bh) ny = (B.minY + B.maxY) / 2; else ny = clamp(this.cy, B.minY + hh, B.maxY - hh);
     if (nx !== this.cx) this.vx = 0;
     if (ny !== this.cy) this.vy = 0;
     this.cx = nx; this.cy = ny;
@@ -553,6 +600,7 @@ export default class CameraDirector {
       if (this.pinch) {
         if (this.pointers.size < 2) {
           this.pinch = null;
+          this.releaseInsets();
           this.vx = this.vy = 0;
           // Boyama modunda kalan parmak ne kaydırır ne boyar (iki parmak hareketinin artığı).
           const it = this.pointers.entries().next();
@@ -571,6 +619,7 @@ export default class CameraDirector {
       const d = this.drag;
       if (!d || d.id !== p.id) return;
       this.drag = null;
+      if (d.moved) this.releaseInsets(); // kullanıcı sürükleyip bıraktı → normal sınırlar
       const now = performance.now();
       if (!d.moved && now - d.t0 < TAP_MAX_MS) {
         this.vx = this.vy = 0;
