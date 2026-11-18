@@ -157,7 +157,7 @@ export default class LandView {
     }
     for (const g of this.signs.values()) {
       if (g.a < 1 && !g.leaving) { g.a = Math.min(1, g.a + dt * 1.2); this._applySign(g); }
-      if (g.a > 0) g.sign.setRotation(Math.sin(env.t * 1.3 + g.ph) * 0.015 * (0.4 + env.wind));
+      if (g.a > 0) g.sign.setRotation(Math.sin((env.wt ?? env.t) * 1.3 + g.ph) * 0.015 * (0.4 + env.wind));
     }
     for (let i = this.fading.length - 1; i >= 0; i--) {
       const g = this.fading[i]; g.a -= dt * 0.7;

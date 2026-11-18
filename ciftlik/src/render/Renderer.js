@@ -28,6 +28,9 @@ import LandView from '../world/LandView.js';
 import SaleFX from './SaleFX.js';
 import GradePipeline from './postfx/GradePipeline.js';
 import BloomPipeline from './postfx/BloomPipeline.js';
+
+// K28: rüzgâr salınımı hızı (1 = gerçek zaman). Kullanıcı geri bildirimi: salınım çok hızlı görünüyordu.
+export const WIND_TIME_SCALE = 0.42;
 import { createLook } from './postfx/CinematicPipeline.js';
 
 const CLOUDINESS = { clear: 0, sunny: 0, partly: 0.3, cloudy: 0.65, overcast: 0.8, rain: 0.9, storm: 1, snow: 0.8, fog: 0.7 };
@@ -167,6 +170,8 @@ export default class Renderer {
     const env = this.env;
     const dt = clamp((frame.delta || 16.7) / 1000, 0, 0.25);
     env.t = (frame.time || 0) / 1000; env.dt = dt;
+    // K28: rüzgâr salınımı için yavaşlatılmış saat (ekin/ağaç/çim/orman/tente); yağış ve yürüyüş env.t kullanır
+    env.wt = (env.wt || 0) + dt * WIND_TIME_SCALE;
     this._dpr = frame.dpr > 0 ? frame.dpr : (this.scene.registry.get('dpr') || 1);
     const cal = frame.cal; env.cal = cal; env.season = cal?.season || 'spring';
     const hour = (((frame.totalMinutes || 0) % 1440) + 1440) % 1440 / 60;

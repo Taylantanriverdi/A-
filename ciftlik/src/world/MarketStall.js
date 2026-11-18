@@ -191,7 +191,7 @@ export default class MarketStall {
     const v = this.scene.cameras.main.worldView;
     if (this.x + 180 < v.x || this.x - 180 > v.right || this.y + 40 < v.y || this.y - 260 > v.bottom) return;
     // tente saçağı: şeritler boyunca ilerleyen dalga (pivot üst kenar)
-    const amp = 0.02 + w * 0.12, fr = 1.6 + w * 2.6, gust = 0.6 + 0.4 * Math.sin(t * 0.7);
+    const amp = 0.02 + w * 0.12, fr = 1.6 + w * 2.6, gust = 0.6 + 0.4 * Math.sin((env.wt ?? t) * 0.7);
     for (let i = 0; i < STRIPES; i++) {
       const ph = t * fr - i * 0.55;
       const s1 = Math.sin(ph), s2 = Math.sin(ph * 1.9 + 1.3);
@@ -199,7 +199,7 @@ export default class MarketStall {
       im.rotation = (s1 * 0.7 + s2 * 0.3) * amp * gust - w * 0.05;
       im.scaleY = 1 - (0.5 + 0.5 * s1) * (0.05 + w * 0.12) * gust;
     }
-    this.awning.scaleY = 1 + Math.sin(t * fr * 0.5) * 0.006 * (0.3 + w);
+    this.awning.scaleY = 1 + Math.sin((env.wt ?? t) * fr * 0.5) * 0.006 * (0.3 + w);
     // fener salınımı + emisif çekirdeği takip
     const rot = Math.sin(t * 1.7) * (0.02 + w * 0.1) + Math.sin(t * 3.1 + 1) * w * 0.03;
     this.lantern.rotation = rot;

@@ -120,7 +120,7 @@ export default class Decor {
       for (const t of this.trees) t.canopy.setTexture(`prop_tree${t.k}_canopy_${env.season}`);
       for (const b of this.bushes) b.im.setTexture(`prop_bush${b.k}_${env.season}`);
     }
-    const w = env.wind, t = env.t;
+    const w = env.wind, t = env.wt ?? env.t;
     const amp = 0.008 + w * 0.045, f = 0.9 + w * 1.4;
     for (const tr of this.trees) {
       tr.canopy.rotation = (Math.sin(t * f + tr.ph) * 0.7 + Math.sin(t * f * 2.3 + tr.ph * 1.3) * 0.3) * amp * tr.amp + w * 0.02 * tr.amp;

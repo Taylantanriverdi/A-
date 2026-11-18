@@ -178,7 +178,7 @@ export default class ParallaxLayer {
       if (sunOn) { const dx = it.im.x - sky.sunX, dy = (it.im.y - sky.sunY) * 1.6; a *= clamp(Math.sqrt(dx * dx + dy * dy) / R, 0.25, 1); }
       it.im.setAlpha(a);
     });
-    const t = env.t, w = env.wind;
+    const t = env.wt ?? env.t, w = env.wind;
     const amp = 0.012 + w * 0.06, f = 1.1 + w * 1.6;
     this.crowns.layout(v, 0, (it) => { it.im.rotation = Math.sin(t * f + it.ph + it.u * 0.004) * amp + Math.sin(t * 0.37 + it.ph) * amp * 0.4; });
   }

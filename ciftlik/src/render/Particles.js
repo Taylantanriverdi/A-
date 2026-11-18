@@ -123,7 +123,7 @@ export default class Particles {
       const edge = Math.abs(x / v.W - 0.5) * 2; // kenarlarda daha uzun
       const sc = g.sc * k * (0.35 + 0.75 * edge * edge);
       g.im.setPosition(x, v.H + 8 * v.dpr).setScale(g.flip ? -sc : sc, sc);
-      g.im.rotation = Math.sin(t * fr + g.ph + u * 0.003) * amp + wind * 0.05;
+      g.im.rotation = Math.sin((env.wt ?? t) * fr + g.ph + u * 0.003) * amp + wind * 0.05;
     }
     // güneş huzmeleri (ekran)
     v.fit(this.cRay);

@@ -304,6 +304,7 @@ export default class FieldView {
   update(frame) {
     const env = this.renderer && this.renderer.env;
     this.t = env ? env.t : (frame && frame.time ? frame.time / 1000 : 0);
+    this.wt = env && env.wt != null ? env.wt : this.t; // K28: rüzgâr saati
     const dt = env ? env.dt : 0.016;
     if (this.state.tiles !== this._tilesRef) { this._tilesRef = this.state.tiles; this._full = true; }
     if (this._full) { this._full = false; this._fullPass = true; this._rebuild(); this._processDirty(); this._fullPass = false; this._checkCursor(); }
@@ -330,7 +331,7 @@ export default class FieldView {
       if (!vis) continue;
       let rot = 0;
       if (c.flex > 0) {
-        const a = t * f - c.ph;
+        const a = this.wt * f - c.ph;
         rot = ((Math.sin(a) * 0.72 + Math.sin(a * 2.27 + c.ph * 1.7) * 0.28) * amp + lean) * c.flex;
       }
       c.im.rotation = rot;
