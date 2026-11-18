@@ -15,7 +15,7 @@
 | 3 | Envanter, mağaza, pazar | ✅ Onaylandı |
 | 4 | Hayvancılık | ✅ Onaylandı |
 | 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
-| 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | 🔨 Devam ediyor |
+| 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Tamamlandı (sim: yerleştirme, çalışan 19/19, üretim 29/29; beyin birleşik duman testi) — onay bekleniyor |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
 | 8 | İşçiler, makineler, arazi genişletme | — |
