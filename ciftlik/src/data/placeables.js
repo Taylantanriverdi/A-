@@ -25,11 +25,11 @@ export const PLACEABLES = {
   garage:       { name: 'Garaj', cat: 'farm', w: 4, h: 3, price: 2500, refund: 0.5, link: { panel: 'machines' } },   // traktör/biçerdöver burada durur
   fence:  { name: 'Ahşap çit', cat: 'fences', w: 1, h: 1, price: 5, refund: 1, paint: true },
   path:   { name: 'Taş patika', cat: 'fences', w: 1, h: 1, price: 3, refund: 1, paint: true, walkable: true },
-  stall:  { name: 'Pazar tezgâhı', cat: 'farm', w: 3, h: 2, price: 0, refund: 0, unique: true, required: true, link: { panel: 'market' } },
-  well:   { name: 'Kuyu', cat: 'farm', w: 2, h: 2, price: 0, refund: 0, unique: true, required: true },
-  shed:   { name: 'Eşek sundurması', cat: 'farm', w: 2, h: 2, price: 0, refund: 0, unique: true, required: true, link: { panel: 'worker' } },
+  stall:  { name: 'Pazar tezgâhı', cat: 'farm', w: 3, h: 2, price: 600, refund: 0.5, unique: true, link: { panel: 'market' } },
+  well:   { name: 'Kuyu', cat: 'farm', w: 2, h: 2, price: 400, refund: 0.5, unique: true },
+  shed:   { name: 'Eşek sundurması', cat: 'farm', w: 2, h: 2, price: 500, refund: 0.5, unique: true, link: { panel: 'worker' } },
 };
-// unique+required: tek tane vardır, taşınabilir ama kaldırılamaz. Çiftlik evi sabittir (taşınamaz).
+// unique: tek tane kurulabilir. Çiftlik evi sabittir (taşınamaz).
 
 // Dekor temizleme (ağaç/çalı; render/layout.js TREES/BUSHES dizinleri → 'tree_i' / 'bush_i')
 // Araçlar ve ekipman (mağaza → 'Makineler' sekmesi; garaj gerekir). Yakıt ₺/karo.
@@ -42,11 +42,8 @@ export const VEHICLES = {
 export const CLEAR_COST = { tree: 40, bush: 10 };
 
 // Yeni oyunun başlangıç yerleşimi (eski sabit yerleşimle aynı görünüm)
-export const START_LAYOUT = [
-  { type: 'stall', tx: 42, ty: 18 },
-  { type: 'well',  tx: 38, ty: 14 },
-  { type: 'shed',  tx: 48, ty: 16 },
-  // eski P1 çiti: karo 32..47 × 6..17 çevresi, patika geçidi (40–41, 17) açık
-];
+// K27: yeni oyun bomboş arazide başlar (yalnızca çiftlik evi ve köy yolu sabit). Tezgâh/kuyu/sundurma oyuncu kurar;
+// pazar ve çalışan panelleri HUD'dan her zaman açılır.
+export const START_LAYOUT = [];
 // K26: dikdörtgen başlangıç çiti kaldırıldı — arazinin organik dış sınırı LandView'da ahşap çitle çizilir.
 export const START_FENCE = null;

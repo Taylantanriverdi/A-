@@ -24,7 +24,7 @@ import { damageCrops } from './farm/hazards.js';
 import { evMult } from './events/mods.js';
 
 /** Başlangıçta sürülmüş 24 karo (PLAN §8). */
-const START_PLOWED = { x0: 34, x1: 39, y0: 8, y1: 11 };
+const START_PLOWED = { x0: 0, x1: -1, y0: 0, y1: -1 }; // K27: başlangıçta sürülmüş tarla yok (bomboş arazi)
 const WITHER = HEALTH.witherBelow;
 
 // ---- Karo önbelleği (state dışı; onHour/onDay bellek ayırmasın diye) ----

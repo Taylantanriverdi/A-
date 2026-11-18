@@ -29,9 +29,9 @@ const last = (bus, n) => [...bus.log].reverse().find((e) => e[0] === n)?.[1];
 
 // 1) yeni oyun
 let { state, bus } = world();
-ok(['stall', 'well', 'shed'].every((t) => state.placed.some((p) => p.type === t)), 'yeni oyun: tezgah/kuyu/sundurma var');
+ok(!['stall', 'well', 'shed'].some((t) => state.placed.some((p) => p.type === t)), 'yeni oyun: bomboş başlangıç — tezgâh/kuyu/sundurma yok (K27)');
 const fences = state.placed.filter((p) => p.type === 'fence').length;
-ok(fences > 30, `yeni oyun: çit yazıldı (${fences})`);
+ok(fences === 0, `yeni oyun: dikdörtgen başlangıç çiti yok (K26) (${fences})`);
 ok(!state.placed.some((p) => p.type === 'fence' && p.tx === 40 && p.ty === 17), 'çit geçidi açık');
 state.finance.money = 20000;
 // 2) kümes yerleştir
