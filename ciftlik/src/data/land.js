@@ -5,6 +5,10 @@
 export const PARCELS = {
   // K21: başlangıç arazisi genişletildi (serbest yerleşim için) — eski P1 (32,6,16×12) bunun içinde
   P1: { tx: 20, ty: 5, w: 49, h: 17, price: 0, level: 1 },
+  // Aşama 8 (PLAN §15): satın alınabilir komşu parseller (emlak vergisi TAX.propertyRate × fiyat / mevsim)
+  P2: { tx: 69, ty: 5, w: 11, h: 17, price: 12000, name: 'Doğu tarlası' },
+  P3: { tx: 8,  ty: 5, w: 12, h: 17, price: 15000, name: 'Batı çayırı' },
+  P4: { tx: 0,  ty: 5, w: 8,  h: 17, price: 9000,  name: 'Dere kenarı' },
 };
 
 export const BLOCK_LABELS_TR = {

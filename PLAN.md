@@ -17,7 +17,7 @@
 | 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
 | 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Onaylandı |
 | 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | ✅ Onaylandı |
-| 7 | Hava durumu, mevsimler, rastgele olaylar | ✅ Tamamlandı (sim-weather + beyin duman testi) — onay bekleniyor |
+| 7 | Hava durumu, mevsimler, rastgele olaylar | ✅ Onaylandı |
 | 8 | İşçiler, makineler, arazi genişletme | — |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
 
@@ -926,3 +926,21 @@ state.events = { active: [{ id, kind, startMin, untilMin, data }], history: [...
 - Mevsim: sonbaharda düşen yapraklar parçacığı; kışın kar örtüsü (yağış olmasa da snowCover > 0 iken).
 - Olay ipuçları: kuraklıkta zemin hafif sararır, dolu (fırtına + beyaz dolu taneleri), don: sabah zemin ve ekinlerde beyaz kırağı tonu (gün içinde erir).
 - Performans: parçacık havuzları, kaliteye göre sayı, update'te bellek ayırma yok.
+
+---
+
+## 15. Aşama 8 Sözleşmesi — Çalışanlar, Makineler, Arazi, Depolama (bağlayıcı, kısa)
+
+Beyin dosyaları: `data/workers.js` (WORKER_TYPES apprentice/experienced/master, MAX_WORKERS, WORKER_NAMES, HIRING), `data/land.js` (PARCELS P2–P4), `data/placeables.js` (greenhouse, coldStorage, warehouse, silo, garage; VEHICLES tractor/harvester/milker), economy.js (fuel, land, vehicles kategorileri).
+
+| İşçi | Dosyalar |
+|---|---|
+| gameplay-dev | `systems/LandSystem.js` (arazi alımı), `systems/VehicleSystem.js` (traktör/biçerdöver/sağım), Farm (sera karoları: `covered`), Inventory (depo/silo kapasitesi, soğuk hava + silo bozulma çarpanı), Placement (yeni yapıların kuralları), ilgili UI: `ui/landPanel.js`, mağazada 'Makineler' sekmesi, araç çubuğuna traktör/biçerdöver modu |
+| engine-dev | WorkerSystem çoklu çalışan: türler, iş ilanı panosu, yetenek/hız/kalite, `plow`/`plant` görevleri, araçla iş (traktör/biçerdöver garajdan alınır), çalışan paneli (liste + tekil kart + ilan panosu) |
+| visual-dev | sera (cam, içi görünür ekinler), soğuk hava deposu, depo, silo, garaj; traktör ve biçerdöver (sürüş animasyonu, 3×3 geçiş, egzoz/toz), yetişkin çalışan figürleri (3–4 kıyafet/ten/saç varyantı), satılık parsel tabelaları ve parsel sınırı |
+### Kurallar
+- **Arazi:** `land:buy {parcelId}` → `transact(-price,'land')` → `state.land.parcels[id].owned = true` → `ensureParcelTiles` + occupancy yenilenir → `land:changed`. Satılık parselde yerleştirme/çapa yapılamaz ("Bu arazi senin değil — satın al"). Emlak vergisi: mevsim sonu `TAX.propertyRate × price` (sahip olunan P2+).
+- **Sera:** `covered` yapı; ayak izi içindeki karolar ekilebilir (yapı engeli farm için değil, diğer yerleştirmeler için), bu karolarda mevsim kısıtı yok, don/dolu/fırtına/kar etkilemez, yağmur sulamaz. Kışın 5 kWh/gün.
+- **Depolama:** depo +24, silo +12 envanter yuvası (yerleştirilince `inventory.capacity` artar; kaldırma yalnızca dolu yuva sayısı yeni kapasiteye sığıyorsa). Soğuk hava deposu varken tüm bozulma ×0.2 (8 kWh/gün); silo varken `noSpoil` eşyalar bozulmaz.
+- **Araçlar:** `shop:buyVehicle {vehicle}` (garaj gerekir; sağım makinesi ahır gerekir) → `state.vehicles = [{ id, type, garageId, condition }]`. Oyuncu araç çubuğunda Traktör seçerse çapa/ekim (seçili tohum) 3×3 alana uygulanır (her karo `farm:action`; yakıt `fuelPerTile` 'fuel'); Biçerdöver: 3×3 içindeki `crops` hasat ×1.25 verim. Sağım makinesi: her sabah 07:00 ahırdaki süt/keçi sütünü envantere taşır, %15 ihtimalle bir kalite üstü; 3 kWh/gün. Görsel için `vehicle:run {type, tiles:[...], driverId?}`.
+- **Çalışanlar:** iş ilanı panosu her 7 günde 3 aday (`HIRING`; tür, isim, yetenekler farm/animal/machine 1–5, maaş ±%15). `worker:hire {candidateId}` → `hireCost` 'wages' → çalışan. En fazla `MAX_WORKERS`. Çırak benzersiz ve eşekli kalır. Eylem süresi = `actionMinutes × (1.25 − 0.1 × yetenek) / speedMult`. Usta: hasat ettiği/baktığı ekinin careScore'una +10. Yeni görevler: `plow` (işaretli karo yok → oyuncunun işaretlediği "sürülecek" alan: araç çubuğunda yeni **İşaretle** aleti `farm:mark {tileId, plan:'plow'|'plant', itemId?}`), `plant` (işaretli karo + envanterde tohum). Traktör garajdaysa ve çalışanın makine yeteneği ≥ 3 ise 3×3 iş için traktörü alır. Çalışanlar birbirinin rezerve ettiği işi almaz.

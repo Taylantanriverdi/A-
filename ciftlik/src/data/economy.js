@@ -31,7 +31,7 @@ export const PRICE_HISTORY_DAYS = 28;
 export const LEDGER_CATEGORIES = {
   sales: 'Satış', wholesale: 'Toptan satış', seeds: 'Tohum', fertilizer: 'Gübre', chemicals: 'İlaç',
   buildings: 'Bina', animals: 'Hayvan', electricity: 'Elektrik', maintenance: 'Bakım', wages: 'Maaş',
-  contracts: 'Sözleşme', loan: 'Kredi', interest: 'Faiz', tax: 'Vergi', penalty: 'Ceza', refund: 'İade', other: 'Diğer',
+  contracts: 'Sözleşme', fuel: 'Yakıt', land: 'Arazi', vehicles: 'Makine', loan: 'Kredi', interest: 'Faiz', tax: 'Vergi', penalty: 'Ceza', refund: 'İade', other: 'Diğer',
 };
 export const LEDGER_MAX_ENTRIES = 500;
 
