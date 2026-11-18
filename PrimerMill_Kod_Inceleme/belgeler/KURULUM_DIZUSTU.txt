@@ -1,0 +1,35 @@
+PrimerMill - ARIZALI X5'i DIZUSTU BILGISAYARLA CALISTIRMA
+=========================================================
+
+Dizustunde Eding klasoru:  C:\CNC_X5
+(Bu yol PrimerMill\eding_yolu.txt dosyasinda yazili; baska bir klasor kullanacaksan sadece o satiri degistir.)
+
+1) MAKINENIN SIMDIKI BILGISAYARINDAN KLASORU AL
+   - O bilgisayarda EdingKapat.bat ile Eding'i KAPAT. Kapanirken G54, frez yuvalari, sensor ve
+     kalibrasyon degerleri dosyaya kaydedilir; kapatmadan kopyalarsan son ayarlar eksik kalabilir.
+   - P:\CNC klasorunun TAMAMINI bir USB bellege kopyala.
+     Icinde: cnc.exe, cncapi.dll, cnc.ini (eksen/IO ayarlari), macro.cnc, degisken/ofset dosyalari, isler klasoru.
+
+2) DIZUSTUNE KOY
+   - USB bellekteki klasoru dizustunde  C:\CNC_X5  olarak kopyala
+     (yani C:\CNC_X5\cnc.exe ve C:\CNC_X5\macro.cnc olacak).
+   - macro.cnc: o klasorde zaten makinenin PrimerMill makrosu var, DOKUNMA.
+     (Yoksa ya da emin degilsen bu paketteki P_CNC_icin\macro.cnc'yi C:\CNC_X5\macro.cnc olarak koy.)
+   - Dizustundeki C:\CNC4.03 (simulasyon) oldugu gibi kalabilir; panel C:\CNC_X5'i kullanir.
+
+3) PRIMERMILL'I KUR
+   - Bu paketteki PrimerMill klasorunu dizustune kopyala (or. Masaustu\PrimerMill).
+   - PrimerMill\YoneticiKurulum.bat'a bir kez cift tikla (yonetici izni).
+     Dizustu her acilista paneli acmasin istiyorsan: Ayarlar > PANEL > "Windows acilinca PrimerMill kendiliginden baslasin" isaretini kaldir.
+
+4) MAKINEYE BAGLA
+   - Makinenin kontrol kartina giden kabloyu (USB ya da ag kablosu) eski bilgisayardan cikarip dizustune tak.
+   - Ag kablosuysa: dizustunun kablolu ag kartina, eski bilgisayardaki ag ayarlarinin AYNISINI ver
+     (eski bilgisayarda: Denetim Masasi > Ag baglantilari > Ethernet > IPv4 ozelliklerindeki IP adresi).
+   - USB ise: Eding'in USB surucusu ilk takista yuklenir; Eding kartla baglanamazsa C:\CNC_X5 icindeki
+     surucu klasorunden (driver) kurulum gerekebilir.
+
+5) PANELI AC
+   - PrimerMill\KazimaBaslat.bat. Ayarlar > PANEL > BILGI'de "Eding klasoru: C:\CNC_X5" yazmali.
+   - "Frez degisimi MANUEL" isaretli olmali (kayitli ayarlar dizustunde yeni oldugu icin bir kez isaretle).
+   - Ilk iste: home al, frez boyunu olc, kalibrasyon degerlerini (Ayarlar > KALIBRASYON) eski bilgisayardakiyle karsilastir.

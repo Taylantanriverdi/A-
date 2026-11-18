@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrimerMill Portal</title>
+<style>
+:root{--zemin:#0e0f12;--kart:#17191e;--cizgi:#2a2e36;--yazi:#e8e8e8;--soluk:#8a9099;--altin:#d9b968;--altinAc:#f0dc96;--kirmizi:#e46a5e;--yesil:#5fd38d}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--zemin);color:var(--yazi);font:14px "Segoe UI",system-ui,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid var(--cizgi)}
+header h1{margin:0;font-size:17px;letter-spacing:.2em;color:var(--altinAc);font-weight:600}
+button{font:inherit;background:#22252b;color:var(--yazi);border:1px solid #3a3f47;border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:var(--altin)}
+.sari{color:var(--altinAc);border-color:var(--altin)}
+main{padding:14px;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(440px,1fr))}
+@media(max-width:520px){main{grid-template-columns:1fr}}
+.kart{background:var(--kart);border:1px solid var(--cizgi);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.ust{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.ad{font-weight:600;font-size:15px}
+.nokta{width:10px;height:10px;border-radius:50%;background:var(--soluk);flex:none}
+.durum{color:var(--soluk);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.yuzde{color:var(--altinAc);font-weight:600}
+.ekran{position:relative;background:#000;aspect-ratio:16/10;cursor:pointer}
+.ekran img{width:100%;height:100%;object-fit:contain;display:block}
+.ekran .bilgi{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--soluk);text-align:center;padding:10px}
+.bar{height:4px;background:#22252b}.bar i{display:block;height:100%;width:0;background:var(--altin);transition:width .6s}
+.alt{display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap}
+.alt .dosyaAd{color:var(--soluk);flex:1;align-self:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tam{position:fixed;inset:0;background:var(--zemin);display:none;flex-direction:column}
+#tam .ust{border-bottom:1px solid var(--cizgi)}
+#tamSahne{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+#tamImg{max-width:100%;max-height:100%;cursor:pointer;user-select:none;-webkit-user-drag:none}
+#halka{position:fixed;width:34px;height:34px;margin:-17px 0 0 -17px;border:2px solid var(--altin);border-radius:50%;pointer-events:none;opacity:0}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#22252b;border:1px solid var(--altin);padding:10px 16px;border-radius:8px;display:none;max-width:90%;z-index:9}
+.modal{position:fixed;inset:0;background:rgba(8,9,11,.92);display:none;align-items:center;justify-content:center;z-index:5}
+.modal>div{background:#1b1e23;border:1px solid var(--cizgi);border-radius:10px;padding:20px;width:360px}
+.modal label{display:block;color:var(--soluk);font-size:13px;margin:10px 0 4px}
+.modal input{width:100%;font:inherit;padding:9px;background:#111317;color:var(--yazi);border:1px solid var(--cizgi);border-radius:6px}
+.modal .tuslar{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.yuk{height:3px;background:var(--altin);width:0;transition:width .2s}
+</style>
+</head>
+<body>
+<header><h1>PRIMERMILL</h1><button class="sari" id="bEkle">+ Cihaz ekle</button></header>
+<main id="izgara"></main>
+
+<div id="tam">
+  <div class="ust"><button id="bGeri">← Tüm cihazlar</button><span class="nokta" id="tNokta"></span><span class="ad" id="tAd"></span><span class="durum" id="tDurum"></span><span class="yuzde" id="tYuzde"></span><button id="tYukle">⬆ Dosya yükle</button></div>
+  <div class="yuk" id="tYuk"></div>
+  <div id="tamSahne"><img id="tamImg" alt=""></div>
+</div>
+<div id="halka"></div>
+<div id="toast"></div>
+<input type="file" id="dosya" accept=".nc" style="display:none">
+
+<div class="modal" id="mCihaz"><div>
+  <b id="mBaslik">Cihaz ekle</b>
+  <label>Adres (makinedeki Ayarlar › PANEL › Uzaktan erişim)</label><input id="mAdres" placeholder="192.168.1.102:8080">
+  <label>PIN (yoksa boş bırak)</label><input id="mPin" type="password" inputmode="numeric">
+  <div class="tuslar"><button id="mSil" style="margin-right:auto;color:var(--kirmizi)">Kaldır</button><button id="mVazgec">Vazgeç</button><button class="sari" id="mKaydet">Kaydet</button></div>
+</div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let cihazlar = [];
+try { cihazlar = JSON.parse(localStorage.getItem('pm_cihazlar') || '[]'); } catch (e) {}
+if (!cihazlar.length) cihazlar = [{ adres: location.origin, pin: '' }];
+function kaydet() { try { localStorage.setItem('pm_cihazlar', JSON.stringify(cihazlar)); } catch (e) {} }
+function adresDuzelt(a) { a = (a || '').trim().replace(/\/+$/, ''); if (!/^https?:\/\//i.test(a)) a = 'http://' + a; if (!/:\d+$/.test(a.replace(/^https?:\/\//, ''))) a += ':8080'; return a.replace(/^https:/i, 'http:'); }
+function url(c, yol, ek) { return c.adres + yol + '?pin=' + encodeURIComponent(c.pin || '') + (ek || '') + '&t=' + Date.now(); }
+function toast(t, hata) { const e = $('toast'); e.textContent = t; e.style.borderColor = hata ? 'var(--kirmizi)' : 'var(--altin)'; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = 'none', 5000); }
+function esc(t) { return String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+let tamIndex = -1;
+function ciz() {
+  $('izgara').innerHTML = cihazlar.map((c, i) => `
+    <section class="kart" data-i="${i}">
+      <div class="ust"><span class="nokta"></span><span class="ad">${esc(c.ad || c.adres.replace(/^http:\/\//, ''))}</span><span class="durum">bağlanıyor…</span><span class="yuzde"></span><button class="ayar" title="Ayarla">⚙</button></div>
+      <div class="ekran"><img alt=""><div class="bilgi">Ekran yükleniyor…</div></div>
+      <div class="bar"><i></i></div>
+      <div class="alt"><span class="dosyaAd"></span><button class="yukle">⬆ Dosya yükle</button><button class="sari ac">Aç / kontrol et</button></div>
+    </section>`).join('');
+  document.querySelectorAll('.kart').forEach(k => {
+    const i = +k.dataset.i;
+    k.querySelector('.ac').onclick = () => tamAc(i);
+    k.querySelector('.ekran').onclick = () => tamAc(i);
+    k.querySelector('.yukle').onclick = () => yukleBaslat(i);
+    k.querySelector('.ayar').onclick = () => cihazDuzenle(i);
+    kucukKare(i);
+  });
+}
+function kart(i) { return document.querySelector('.kart[data-i="' + i + '"]'); }
+function kucukKare(i) {
+  const k = kart(i); if (!k) return;
+  const c = cihazlar[i], img = k.querySelector('img'), bilgi = k.querySelector('.bilgi');
+  const sonraki = ms => setTimeout(() => { if (kart(i) === k) kucukKare(i); }, ms);
+  if (tamIndex >= 0 || document.hidden) return sonraki(1000);
+  const yeni = new Image();
+  yeni.onload = () => { img.src = yeni.src; bilgi.style.display = 'none'; sonraki(1200); };
+  yeni.onerror = () => { bilgi.style.display = 'flex'; bilgi.textContent = 'Ekran alınamıyor (panel kapalı, adres ya da PIN yanlış)'; sonraki(3000); };
+  yeni.src = url(c, '/api/ekran');
+}
+async function durumlar() {
+  for (let i = 0; i < cihazlar.length; i++) {
+    const c = cihazlar[i], k = kart(i);
+    try {
+      const r = await fetch(url(c, '/api/durum'));
+      if (r.status === 401) { durumYaz(i, null, 'PIN yanlış · ⚙ ile gir'); continue; }
+      const d = await r.json();
+      if (d.ad && d.ad !== c.ad) { c.ad = d.ad; kaydet(); if (k) k.querySelector('.ad').textContent = d.ad; }
+      durumYaz(i, d);
+    } catch (e) { durumYaz(i, null, 'bağlantı yok'); }
+  }
+}
+function durumYaz(i, d, hata) {
+  const renk = !d ? 'var(--kirmizi)' : d.acil ? 'var(--kirmizi)' : d.calisiyor ? 'var(--yesil)' : d.durakli ? 'var(--altinAc)' : 'var(--soluk)';
+  const metin = d ? (d.durumMetin || d.durum) + (d.mod ? '  ·  ' + (d.mod === 'MANUEL' ? 'manuel frez' : 'otomatik frez') : '') : hata;
+  const k = kart(i);
+  if (k) {
+    k.querySelector('.nokta').style.background = renk;
+    k.querySelector('.durum').textContent = metin;
+    k.querySelector('.yuzde').textContent = d && (d.calisiyor || d.durakli) ? '%' + d.yuzde : '';
+    k.querySelector('.bar i').style.width = (d ? d.yuzde || 0 : 0) + '%';
+    k.querySelector('.dosyaAd').textContent = d && d.dosya ? d.dosya : '';
+  }
+  if (i === tamIndex) {
+    $('tNokta').style.background = renk; $('tDurum').textContent = metin + (d && d.sure ? '  ·  ' + d.sure : '');
+    $('tYuzde').textContent = d && (d.calisiyor || d.durakli) ? '%' + d.yuzde : '';
+  }
+}
+
+// --- tam ekran kontrol ---
+let tamHizli = 0;
+function tamAc(i) {
+  tamIndex = i; const c = cihazlar[i];
+  $('tAd').textContent = c.ad || c.adres; $('tam').style.display = 'flex'; tamKare();
+}
+$('bGeri').onclick = () => { tamIndex = -1; $('tam').style.display = 'none'; };
+function tamKare() {
+  if (tamIndex < 0) return;
+  const i = tamIndex, c = cihazlar[i], yeni = new Image();
+  yeni.onload = () => { if (tamIndex !== i) return; $('tamImg').src = yeni.src; setTimeout(tamKare, tamHizli > 0 ? (tamHizli--, 80) : 300); };
+  yeni.onerror = () => { if (tamIndex === i) setTimeout(tamKare, 2000); };
+  yeni.src = url(c, '/api/ekran');
+}
+function gonder(c, yol, ek) { fetch(url(c, yol, ek), { method: 'POST' }).catch(() => toast('Komut gönderilemedi', true)); tamHizli = 12; }
+$('tamImg').addEventListener('click', e => {
+  if (tamIndex < 0) return;
+  const k = $('tamImg').getBoundingClientRect();
+  const x = (e.clientX - k.left) / k.width, y = (e.clientY - k.top) / k.height;
+  const h = $('halka'); h.style.left = e.clientX + 'px'; h.style.top = e.clientY + 'px';
+  h.animate([{ opacity: 1, transform: 'scale(.5)' }, { opacity: 0, transform: 'scale(1.4)' }], { duration: 450 });
+  gonder(cihazlar[tamIndex], '/api/tikla', '&x=' + x.toFixed(5) + '&y=' + y.toFixed(5));
+});
+document.addEventListener('keydown', e => {
+  if (tamIndex < 0 || $('mCihaz').style.display === 'flex' || e.ctrlKey || e.altKey || e.metaKey) return;
+  const ozel = ['Enter', 'Backspace', 'Escape', 'Tab', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  if (ozel.includes(e.key)) { e.preventDefault(); gonder(cihazlar[tamIndex], '/api/tus', '&k=' + e.key); }
+  else if (e.key.length === 1) { e.preventDefault(); gonder(cihazlar[tamIndex], '/api/tus', '&t=' + encodeURIComponent(e.key)); }
+});
+
+// --- dosya yükleme ---
+let yukleIndex = -1;
+function yukleBaslat(i) { yukleIndex = i; $('dosya').click(); }
+$('tYukle').onclick = () => yukleBaslat(tamIndex);
+$('dosya').onchange = () => {
+  const f = $('dosya').files[0], c = cihazlar[yukleIndex]; $('dosya').value = '';
+  if (!f || !c) return;
+  const x = new XMLHttpRequest();
+  x.open('POST', url(c, '/api/yukle', '&ad=' + encodeURIComponent(f.name)));
+  x.upload.onprogress = e => { if (e.lengthComputable) $('tYuk').style.width = (100 * e.loaded / e.total) + '%'; };
+  x.onload = async () => {
+    $('tYuk').style.width = '0';
+    let r = {}; try { r = JSON.parse(x.responseText); } catch (e) {}
+    if (x.status === 401) { toast('PIN yanlış', true); return; }
+    if (r.hata) { toast(r.hata, true); return; }
+    toast(f.name + ' yüklendi, seçiliyor…');
+    try { const s = await (await fetch(url(c, '/api/komut', '&ad=sec&arg=' + encodeURIComponent(r.ad)), { method: 'POST' })).json(); toast((c.ad || '') + ': ' + (s.sonuc || ''), !s.sonuc || s.sonuc.startsWith('HATA')); }
+    catch (e) { toast('Dosya yüklendi ama seçilemedi', true); }
+  };
+  x.onerror = () => { $('tYuk').style.width = '0'; toast('Yükleme başarısız', true); };
+  x.send(f);
+};
+
+// --- cihaz ekle / düzenle ---
+let duzenIndex = -1;
+function cihazDuzenle(i) {
+  duzenIndex = i; const c = i >= 0 ? cihazlar[i] : { adres: '', pin: '' };
+  $('mBaslik').textContent = i >= 0 ? 'Cihazı düzenle' : 'Cihaz ekle';
+  $('mAdres').value = c.adres.replace(/^http:\/\//, ''); $('mPin').value = c.pin || '';
+  $('mSil').style.visibility = i >= 0 && cihazlar.length > 1 ? 'visible' : 'hidden';
+  $('mCihaz').style.display = 'flex'; $('mAdres').focus();
+}
+$('bEkle').onclick = () => cihazDuzenle(-1);
+$('mVazgec').onclick = () => $('mCihaz').style.display = 'none';
+$('mSil').onclick = () => { cihazlar.splice(duzenIndex, 1); kaydet(); $('mCihaz').style.display = 'none'; ciz(); };
+$('mKaydet').onclick = () => {
+  const a = $('mAdres').value.trim(); if (!a) { toast('Adres yaz', true); return; }
+  const c = { adres: adresDuzelt(a), pin: $('mPin').value.trim() };
+  if (duzenIndex >= 0) { c.ad = cihazlar[duzenIndex].ad; cihazlar[duzenIndex] = c; } else cihazlar.push(c);
+  kaydet(); $('mCihaz').style.display = 'none'; ciz(); durumlar();
+};
+$('mPin').onkeydown = e => { if (e.key === 'Enter') $('mKaydet').click(); };
+
+ciz(); durumlar(); setInterval(durumlar, 2000);
+</script>
+</body>
+</html>

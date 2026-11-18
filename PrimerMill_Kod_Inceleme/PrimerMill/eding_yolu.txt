@@ -1,0 +1,2 @@
+# Eding klasoru (arizali X5 makinesinin P:\CNC klasorunun dizustundeki kopyasi)
+C:\CNC_X5

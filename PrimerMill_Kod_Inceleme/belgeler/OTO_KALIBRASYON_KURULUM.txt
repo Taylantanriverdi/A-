@@ -1,0 +1,130 @@
+﻿PRIMERMILL OTOMATIK KALIBRASYON (X Y Z A B) - ILETKEN TEMAS DUZENEGI
+=====================================================================
+Sirona inLab MC X5'in kalibrasyon mantigi: makine bilinen bir govdeye
+elektriksel temasla dokunur, eksenlerin gercek yerini hesaplar, kendi
+ayarlarina yazar. Burada kalibrasyon govdesi = titanyum disk.
+
+Ne olculuyor, nereye yaziliyor
+------------------------------
+  G54 X  = B (cevirme) ekseninin X'i      <- B +-15 derece egik dokunuslar
+  G54 Y  = A (egme) ekseninin Y'si        <- A +-15 derece egik dokunuslar
+  #4002  = Z sifiri (B ekseni)            <- ust yuz + B180'de alt yuz + kalinlik
+  G54 A  = ust yuz B0'da tam duz          <- 5 nokta yuz duzlemi
+  G54 B  = ust ve alt yuz simetrik duz    <- B0 + B180 yuz egimleri
+  Ayrica: A/B aci olcegi, tekrarlanabilirlik, disk ortasi kacikligi,
+  yuzler arasi aci. 18 nokta, her biri 2 kez yavas (F10) olculur;
+  sonuclar 10 bilinmeyenli makine modeline uydurulur.
+  Benzetimde 0.003 mm temas gurultusuyle hata: X Y Z ~0.003 mm, A B ~0.003 derece.
+
+
+1. MALZEME
+----------
+  - Titanyum disk: 98.5 mm, 10 / 12 / 18 / 20 mm (hangisi olursa).
+    Kalinligi MIKROMETREYLE kenardan 4 yerde olc, ortalamasini yaz.
+    (Kalinlik hatasinin yarisi Z hatasina gider.)
+  - Kalibrasyon pimi: 3 mm sertlestirilmis duz uclu pim (DIN 6325, 3x40)
+    ya da karbur cubuk 3 mm h6. Pens 3 mm ise dogrudan oturur.
+    Pimin en az 20 mm'si pensten disari ciksin (A/B 15 derece egikken
+    disk kenari yukselir).
+    Pim yoksa T1 kuresel freze de olur (ekranda "Kuresel frez", cap 2.00).
+  - Kapton (poliimid) bant, 0.05 mm.
+  - Iletken yapiskanli bakir bant (10 mm) + ince silikon kablo (0.25 mm2),
+    1 m, ucuna kucuk timsah pens.
+  - Multimetre.
+
+
+2. IZOLASYON (en onemli adim)
+-----------------------------
+Disk normalde tutucu ve makine gövdesi uzerinden is miline zaten bagli.
+Temasin "olcum" olabilmesi icin diskin tutucudan elektriksel olarak
+ayrilmasi gerekir:
+
+  - Diskin tutucuya degen basamak/kenar yuzeylerine tek kat Kapton
+    bant yapistir (alt ve ust basamak, cevre). Kirisiksiz, tek kat.
+  - Diski tutucuya tak, vidalari normal sik.
+  - MULTIMETRE: disk ile tutucu arasi direnc -> "acik devre / OL" olmali.
+    Degilse bant bir yerde delinmis: tekrar bantla.
+
+Bakir bant + kablo:
+  - Diskin UST yuzune, kenara yakin (yaricap 42-47 mm) bir yere 15 mm
+    bakir bant yapistir. Olcum noktalari merkezde ve 25 mm yaricapta,
+    banda dokunulmaz.
+  - Kabloyu bakir banda lehimle (titanyum lehim tutmaz, banda lehimlenir).
+  - Kabloyu tutucunun koluna bir parca bantla sabitle, 30 cm gevsek
+    birak: disk B180 donecek ve A/B 15 derece egilecek.
+
+
+3. PROB GIRISINE BAGLANTI
+-------------------------
+Makinenin frez boyu sensoru zaten Eding'in PROB girisine bagli
+(macro: G38.2, #5067). Disk kablosu ayni girise paralel baglanir.
+
+Once multimetreyle olc (makine acik):
+  a) Sensor kablosunun sinyal ucu ile sase arasi gerilim:
+     - 5 / 12 / 24 V gorunuyorsa: giris "pull-up"; dokununca 0 V'a
+       cekiliyor. Iletken temas DOGRUDAN calisir. -> 3A
+     - 0 V gorunuyor ve sensore basinca gerilim geliyorsa: giris PNP.
+       Dogrudan calismaz: NPN->PNP cevirici modul (24 V) gerekir.
+       -> 3B
+  b) Is mili ile sase arasi direnc (is mili duruk, pens kapali, pim takili):
+     < 10 ohm olmali. Seramik rulmanli is milinde acik devre olabilir;
+     o zaman pime / pense degen ince bakir orgu seridi is mili
+     govdesine baglayip sase yap (pim donmuyor, sorun degil).
+
+3A) Pull-up giris (en sik):
+     disk kablosu ---- sensor SINYAL ucu (paralel, ayni klemens)
+     sase (GND)  ---- zaten sensorun ortak ucu; ek kablo gerekmez
+     Sensor normalde ACIK tip olmali (dokununca kapanan).
+     Normalde KAPALI (NC) sensorde paralel baglanti calismaz:
+     kalibrasyon sirasinda sensor kablosunu cikar, disk kablosunu
+     tak; frez boyu olcumu kalibrasyondan once ve sonra yapilir.
+
+3B) PNP giris: cevirici modulun girisine disk kablosu, cikisini
+     prob girisine bagla (modulun aciklamasindaki gibi).
+
+Kalibrasyon bitince disk kablosunu sok (normal iste baglı kalmasin).
+
+
+4. PRIMERMILL'DE
+----------------
+Ayarlar > OTO KALIBRASYON
+
+  1 KURULUM   Disk kalinligi (mikrometre), temas ucu (duz pim 3.00 /
+              kuresel frez 2.00).
+  2 PROB TESTI  "Prob testini baslat" -> kablonun ucunu pime degdir.
+              Ekranda TEMAS VAR / TEMAS YOK degismeli. Program hangi
+              girisin degistigini kendisi ogrenir.
+              Disk takili, pim diske degmiyorken TEMAS YOK olmali.
+              (TEMAS VAR ise izolasyon bozuk: 2. adima don.)
+  3 OLCUM     "Olcum programini hazirla" -> ana ekranda BASLAT.
+              Manuel modda "T1 tak" denince PIMI tak.
+              Is mili DONMEZ. ~10 dakika. Ilk calistirmada elin
+              ACIL STOP'ta olsun, ilerleme hizini %50'ye indir.
+  4 SONUCLARI OKU   Duzeltmeler, olcum kalitesi, uyarilar.
+  5 UYGULA VE KAYDET   Once otomatik yedek alir; G54 ve #4002'yi
+              yazar, G92'yi sifirlar.
+  Sonra olcumu BIR KEZ DAHA calistir: butun satirlarda isaret
+  gorulmeli (X Y Z <= 0.01 mm, A B <= 0.02 derece).
+
+Program hata verirse (Eding mesaji):
+  "temas yok"          -> kablo kopuk / pim diske ulasmadi / kalinlik yanlis
+  "baslangicta aktif"  -> disk saseye degiyor (izolasyon) ya da kablo kisa devre
+  Ilk dokunus 6 mm asagiya kadar arar; mevcut kalibrasyon cok bozuksa
+  once DISK KALIBRASYONU > "Uretici degerlerine don".
+
+Kayitlar:
+  oto_kalibrasyon_gecmisi.csv  (PrimerMill klasoru) - her kayit, 18 ham Z dahil
+  Eski haline donmek: KALIBRASYON > Yedekten yukle
+
+
+5. SINIRLAR (durust olmak gerekirse)
+------------------------------------
+  - A ve B eksenlerinin AYNI Z'de kesistigi varsayilir (dental makinelerde
+    tasarim boyle). Kesismiyorsa A egik islerde kucuk Z hatasi kalir;
+    bunu olcmek icin daha buyuk aci gerekir (carpma riski).
+  - Aci olcegi (adim/derece) sadece RAPORLANIR; G54 ile duzelmez,
+    cnc.ini'den ayarlanir.
+  - Takim boyu sensorunun kendisi (#4020/#4021, #4004) bu olcumle
+    degismez; Z sifiri #4002 uzerinden sensore baglidir.
+  - Ilk denemeyi her zaman eski yontemle (DISK KALIBRASYONU test kesimi)
+    karsilastir: iki yontem ayni sonucu veriyorsa bu duzenege guvenebilirsin.

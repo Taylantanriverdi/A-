@@ -1,0 +1,49 @@
+PRIMERMILL - ORIJINAL MAKINE (P:\CNC) KURULUMU
+==============================================
+
+1) PANEL
+   PrimerMill klasorunu makinenin bilgisayarinda istedigin yere kopyala
+   (ornek: C:\PrimerMill). Paneli KazimaBaslat.bat ile ac.
+   Bu surum sadece P:\CNC klasorundeki Eding'e baglanir.
+   Ilk acilista kendini Windows baslangicina ekler ve tam ekran acilir
+   (Ayarlar > PANEL'den kapatilabilir).
+
+2) MACRO.CNC
+   a) PrimerMill\EdingKapat.bat ile Eding'i ve paneli tamamen kapat.
+   b) P:\CNC\macro.cnc dosyasinin yedegini al (ornek: macro_yedek_2026-10-22.cnc).
+   c) P_CNC_icin\macro.cnc dosyasini P:\CNC\ icine kopyala.
+   d) Eding'i / paneli ac.
+   Frez yuvalari artik Eding'in kalici degiskenlerinde (G53 makine koordinati):
+     #4010 yuva X, #4011-#4016 T1-T6 Y, #4017 A, #4018 B, #4000 alma Z
+   Panel ilk acilista bunlar bossa dogrulanmis T1 noktasini yazar:
+     X-125.557  T1 Y-89.166 (T2..T6: +12/+24/+54/+66/+78)  A23  B0  alma Z-45
+   Frez boyu sensoru: #4020 X, #4021 Y. Bossa bugunku yeri (G54 X-72.25, G54 Y) yazilir.
+   Kalibrasyon: Ayarlar > YUVA AYARI sekmesi (bastan basla > git > ortala > al > KAYDET).
+   Eding'i yeniden baslatmak gerekmez. G54 degisse de yuvalar kaymaz.
+   M100: frez boyu #4005 sinirindan fazla degismisse is durur.
+
+3) cnc.ini'ye DOKUNMA. Makinedeki kendi cnc.ini'si kullanilir.
+   (Dizustundeki cnc.ini makineye kopyalanmamali.)
+
+4) MANUEL FREZ DEGISIMI (istege bagli)
+   BASLAT'a basinca panel sorar: OTOMATIK (magazin) / MANUEL (elle).
+   Manuelde her frez degisiminde is mili degisim noktasina gelir (varsayilan: makinenin
+   ortasi, en ustte; Ayarlar > YUVA AYARI > Degisim ile degistirilir) ve panel
+   hangi frezi takacagini soyler. Onaydan sonra pens kapanir, frez sensorde olculur.
+   Ana ekrandaki 'Frez: ...' yazisina tiklayarak da degistirilir. Ilk once dizustu
+   simulasyonda dene.
+
+5) DISK KALIBRASYONU (X Y Z A B): Ayarlar > DISK KALIBRASYONU.
+   Test programini hazirla > BASLAT > kumpasla 9 olcum > HESAPLA > UYGULA VE KAYDET.
+   Her uygulamadan sonra yeni diskte tekrarla; gecmis: kalibrasyon_gecmisi.csv
+
+5b) ACIL STOP (yazilim): sag ustteki kirmizi buton ya da klavyede Esc.
+   Isi keser, is milini ve havayi kapatir, paneli kilitler. Kaldirmak: RESET.
+   Bu bir guvenlik rolesi DEGILDIR; fiziksel acil stop butonu taktirilmasi onerilir.
+
+6) ILK CALISTIRMA: frezsiz ve bloksuz kuru deneme yap, el E-stop'ta olsun.
+   Ayarlar > TAKIM: her yuvanin ustune git (T1...T6), ortalanmis mi bak;
+   kaymissa ortala ve KALIBRASYON'dan o yuvayi kaydet.
+   Sonra Kazima hizi %30 ile T2 M6 / T0 M6, sirayla T3...T6.
+
+[22.10.2026] PENS AC -> T0: Bu surumde macro.cnc da degisti. P_CNC_icin\macro.cnc dosyasini P:\CNC\macro.cnc uzerine kopyala (eskisini yedekle), sonra Edingi kapatip ac.
