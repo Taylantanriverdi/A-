@@ -12,6 +12,7 @@ import { canApply, cropVisual } from '../systems/farm/rules.js';
 import { genSoil, SOIL_ATLAS, SOIL_MISC, SOIL_ERASE, SOIL_BLEED, soilFrame, bleedFrame, N, E, S, W, WEED_FRAMES, BIT_FRAMES } from '../render/textures/soil.js';
 import { genCrops, CROP_ATLAS, CROP_CELL, CROP_SCALE, SHAPE_META, cropFrame } from '../render/textures/crops.js';
 import { genFieldFx } from '../render/textures/fieldfx.js';
+import { STALL } from '../render/layout.js';
 
 const CHUNK_TX = 16, CHUNK_TY = 12;
 const CW = CHUNK_TX * TILE_W, CH = CHUNK_TY * TILE_H;
@@ -343,7 +344,12 @@ export default class FieldView {
   }
 
   // ------------------------------------------------------------------ imleç
-  _cursorTarget() { return this.hover || (this.hadHover ? null : this.tap); }
+  _cursorTarget() {
+    const t = this.hover || (this.hadHover ? null : this.tap);
+    // tezgâh karolarında genel imleç yok — orada yalnızca MarketStall'un kendi vurgusu
+    if (t) { const S = STALL.tiles; if (t.tx >= S.x0 && t.tx <= S.x1 && t.ty >= S.y0 && t.ty <= S.y1) return null; }
+    return t;
+  }
 
   _checkCursor() {
     const tgt = this._cursorTarget();
