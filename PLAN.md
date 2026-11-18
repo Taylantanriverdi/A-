@@ -14,7 +14,7 @@
 | 2 | Tarım ve toprak mekaniği | ✅ Onaylandı |
 | 3 | Envanter, mağaza, pazar | ✅ Onaylandı |
 | 4 | Hayvancılık | ✅ Onaylandı |
-| 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | 🔨 Devam ediyor |
+| 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Tamamlandı (sim 28/28 + 19/19, beyin birleşik duman testi) — onay bekleniyor |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
 | 8 | İşçiler, makineler, arazi genişletme | — |
@@ -497,6 +497,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K14 | Dekorla kaplı karolar `data/land.js` P1_BLOCKED'de (zemin izi + görsel silüet arkası: çatı, kuyu çatısı, ağaç tacı); ekilemez, kart açılmaz | QA: evin arkasına ekin ekilebiliyordu |
 | K15 | Hastalık yayılma 0.08; başlangıçta 4 organik sprey | QA: bakımsız salgın 10 günde tarlayı siliyordu, mağaza yokken çaresizlik |
 | K16 | Sinematik, boyama darbesi bitene kadar ertelenir | QA: ilk hasat sinematiği boyamalı hasatı yarıda kesiyordu |
+| K19 | Meyve suları 3 meyve → 2 şişe | sim-production: üzüm suyu zarardaydı |
 | K18 | Hayvan ürününde A için mutluluk ≥ 90 (sevme gerekir); tavuk 400 ₺, yumurta 15 ₺ | sim-animals: kümes ve ahır yatırımı ~47 günde geri döner |
 | K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 
