@@ -130,7 +130,7 @@ function archDoor(ctx, x, y, w, h, col, r, o = {}) {
 }
 function plaque(ctx, cx, cy, r0, fill) {
   ell(ctx, cx, cy + 1.5, r0 + 2, r0 + 2, rgba('#1a0c08', 0.25)); ell(ctx, cx, cy, r0 + 2, r0 + 2, '#7a5236'); ell(ctx, cx, cy, r0, r0, fill);
-  ell(ctx, cx - r0 * 0.3, cy - r0 * 0.35, r0 * 0.4, r0 * 0.28, rgba('#fff', 0.35), -0.5);
+  ell(ctx, cx - r0 * 0.3, cy - r0 * 0.35, r0 * 0.4, r0 * 0.28, rgba('#ffffff', 0.35), -0.5);
 }
 function foundation(ctx, x0, x1, F, r) {
   for (let x = x0; x < x1; x += 15) ell(ctx, x + 7.5, F - 3, 8.4, 4.6, shade('#8d8a84', (r() - 0.5) * 0.22));
@@ -155,7 +155,7 @@ function genDairy(scene) {
   siding(ctx, 48, 138, 164, F - 138, '#f3f0e8', r, 9);
   planks(ctx, 48, 200, 164, F - 200, '#86aed0', r, 9);
   rimLeft(ctx, 48, 138, F, 0.55); foundation(ctx, 46, 212, F, r);
-  ctx.fillStyle = rgba('#fff', 0.5); ctx.fillRect(48, 199, 164, 1.6);
+  ctx.fillStyle = rgba('#ffffff', 0.5); ctx.fillRect(48, 199, 164, 1.6);
   // çatı + kubbe/pencere
   hipRoof(ctx, 34, 226, 148, 66, 194, 82, '#4d7cab', r, 5, 14);
   ctx.fillStyle = '#f3f0e8'; poly(ctx, [[112, 100], [148, 100], [152, 84], [108, 84]]); ctx.fill();
@@ -165,14 +165,14 @@ function genDairy(scene) {
   archDoor(ctx, 111, 172, 38, 60, '#3f6f9e', r, { double: true });
   plaque(ctx, 130, 160, 10, '#f6f8fa');
   ctx.fillStyle = '#4f8fcf'; ctx.beginPath(); ctx.moveTo(130, 153); ctx.bezierCurveTo(124, 161, 125, 167, 130, 167); ctx.bezierCurveTo(135, 167, 136, 161, 130, 153); ctx.fill();
-  ell(ctx, 128, 160, 1.4, 2.4, rgba('#fff', 0.7), 0.3);
+  ell(ctx, 128, 160, 1.4, 2.4, rgba('#ffffff', 0.7), 0.3);
   windowBox(ctx, 66, 164, 30, 28, { shutter: '#5a86b0', box: true });
   windowBox(ctx, 164, 164, 30, 28, { shutter: '#5a86b0', box: ['#f5f0e0', '#f08fb0', '#f2c94c'] });
   // süt bidonları
   for (const [x, s] of [[224, 1], [240, 0.9]]) {
     const y = F - 2; ctx.fillStyle = lg(ctx, x - 8, 0, x + 8, 0, [[0, '#f4f6f8'], [0.5, '#c4ccd4'], [1, '#7d8794']]);
     rrect(ctx, x - 7 * s, y - 28 * s, 14 * s, 26 * s, 4 * s); ctx.fill(); ell(ctx, x, y - 29 * s, 5 * s, 3 * s, '#9aa4b0'); ell(ctx, x, y - 32 * s, 3 * s, 2 * s, '#5d6672');
-    ctx.fillStyle = '#3f6f9e'; ctx.fillRect(x - 7 * s, y - 16 * s, 14 * s, 3 * s); ell(ctx, x + 2 * s, y - 22 * s, 4 * s, 1.6 * s, rgba('#fff', 0.55), -0.5);
+    ctx.fillStyle = '#3f6f9e'; ctx.fillRect(x - 7 * s, y - 16 * s, 14 * s, 3 * s); ell(ctx, x + 2 * s, y - 22 * s, 4 * s, 1.6 * s, rgba('#ffffff', 0.55), -0.5);
   }
   ctx.fillStyle = rgba('#fff0d0', 0.4); ctx.fillRect(34, 146, 100, 1.4);
   register(scene, L.key, canvas, { w: L.w, h: L.h }); registerShadow(scene, L.key, canvas, L.ox, L.oy);
@@ -221,7 +221,7 @@ function genMill(scene) {
     c2.strokeStyle = '#6b4a30'; c2.lineWidth = 1.8; c2.strokeRect(18, 2.6, 62, 17);
     for (let x = 28; x < 80; x += 10) { c2.beginPath(); c2.moveTo(x, 2.6); c2.lineTo(x, 19.6); c2.stroke(); }
     c2.beginPath(); c2.moveTo(18, 11); c2.lineTo(80, 11); c2.stroke();
-    c2.fillStyle = rgba('#fff', 0.35); c2.fillRect(19, 3.6, 60, 1.4);
+    c2.fillStyle = rgba('#ffffff', 0.35); c2.fillRect(19, 3.6, 60, 1.4);
     c2.restore();
   }
   c2.fillStyle = lg(c2, -9, -9, 9, 9, [[0, '#a07850'], [1, '#4a2e1a']]); c2.beginPath(); c2.arc(0, 0, 9, 0, TAU); c2.fill();
@@ -268,7 +268,7 @@ function genCannery(scene) {
   groundAO(ctx, 130, F, 114, 14, 0.42);
   // teneke baca (çatının arkasında)
   ctx.fillStyle = lg(ctx, 66, 0, 88, 0, [[0, '#c4ccd0'], [0.5, '#8d979c'], [1, '#515a60']]); ctx.fillRect(68, 74, 20, 56);
-  ell(ctx, 78, 74, 12, 4.4, '#6a747a'); ell(ctx, 78, 73.5, 8.6, 2.6, '#1c2226'); ctx.fillStyle = rgba('#fff', 0.35); ctx.fillRect(69, 76, 2, 50);
+  ell(ctx, 78, 74, 12, 4.4, '#6a747a'); ell(ctx, 78, 73.5, 8.6, 2.6, '#1c2226'); ctx.fillStyle = rgba('#ffffff', 0.35); ctx.fillRect(69, 76, 2, 50);
   siding(ctx, 56, 148, 148, F - 148, '#ead9a4', r, 9); rimLeft(ctx, 56, 148, F, 0.55); foundation(ctx, 54, 204, F, r);
   // oluklu teneke çatı
   hipRoof(ctx, 42, 218, 156, 70, 190, 104, '#5f8f7a', r, 4, 12);
@@ -285,7 +285,7 @@ function genCannery(scene) {
     for (const [j, c] of [[3, '#c8303a'], [10, '#7a3d8f'], [17, '#e8902a']]) { ctx.fillStyle = c; rrect(ctx, x + j, 174, 6, 12, 2); ctx.fill(); ctx.fillStyle = '#c9ced2'; ctx.fillRect(x + j, 172.4, 6, 2.6); }
   }
   plaque(ctx, 130, 160, 9, '#f6f2e6');
-  ctx.fillStyle = '#c93a3f'; rrect(ctx, 125, 156, 10, 11, 2); ctx.fill(); ctx.fillStyle = '#c9ced2'; ctx.fillRect(125, 154.4, 10, 3); ctx.fillStyle = rgba('#fff', 0.5); ctx.fillRect(127, 158, 1.8, 7);
+  ctx.fillStyle = '#c93a3f'; rrect(ctx, 125, 156, 10, 11, 2); ctx.fill(); ctx.fillStyle = '#c9ced2'; ctx.fillRect(125, 154.4, 10, 3); ctx.fillStyle = rgba('#ffffff', 0.5); ctx.fillRect(127, 158, 1.8, 7);
   barrel(ctx, 218, F - 1, 0.95); crateBox(ctx, 226, F - 1, 22, 15); crateBox(ctx, 229, F - 16, 18, 13, '#a87648');
   for (const [x, c] of [[231, '#c8303a'], [238, '#7a3d8f'], [244, '#e8902a']]) { ctx.fillStyle = c; rrect(ctx, x - 3, F - 34, 6, 10, 2); ctx.fill(); ctx.fillStyle = '#c9ced2'; ctx.fillRect(x - 3, F - 35.5, 6, 2.4); }
   register(scene, L.key, canvas, { w: L.w, h: L.h }); registerShadow(scene, L.key, canvas, L.ox, L.oy);
@@ -315,7 +315,7 @@ function genSpinning(scene) {
     ctx.strokeStyle = shade(c, 0.35); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(x - 4, 172); ctx.quadraticCurveTo(x - 7, 186, x - 2, 191); ctx.stroke();
   }
   // yün balyası
-  ell(ctx, 50, F - 7, 14, 9, '#f2ecdf'); ell(ctx, 46, F - 10, 8, 4.6, rgba('#fff', 0.7)); ell(ctx, 56, F - 4, 9, 4, rgba('#b8a888', 0.5));
+  ell(ctx, 50, F - 7, 14, 9, '#f2ecdf'); ell(ctx, 46, F - 10, 8, 4.6, rgba('#ffffff', 0.7)); ell(ctx, 56, F - 4, 9, 4, rgba('#b8a888', 0.5));
   // çark sehpası (çark ayrı sprite)
   ctx.fillStyle = '#6b4a30'; poly(ctx, [[176, F - 1], [180, F - 24], [184, F - 24], [182, F - 1]]); ctx.fill(); poly(ctx, [[196, F - 1], [192, F - 24], [188, F - 24], [192, F - 1]]); ctx.fill();
   ctx.fillRect(172, F - 3, 28, 3);
@@ -359,7 +359,7 @@ function genLoom(scene) {
   cols.forEach((c, i) => {
     const x = 178 + i * 9.4, len = 38 + (i % 2) * 8;
     ctx.fillStyle = lg(ctx, x, 0, x + 8, 0, [[0, shade(c, 0.22)], [1, shade(c, -0.2)]]); poly(ctx, [[x, 164], [x + 8.6, 164], [x + 8.6, 164 + len], [x + 4.3, 164 + len - 5], [x, 164 + len]]); ctx.fill();
-    ctx.fillStyle = rgba('#fff', 0.28); for (let y = 172; y < 164 + len - 6; y += 8) ctx.fillRect(x, y, 8.6, 1.6);
+    ctx.fillStyle = rgba('#ffffff', 0.28); for (let y = 172; y < 164 + len - 6; y += 8) ctx.fillRect(x, y, 8.6, 1.6);
   });
   plaque(ctx, 130, 160, 9, '#f4eaff');
   ctx.strokeStyle = '#7a5aa8'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath(); ctx.moveTo(123, 160); for (let i = 1; i <= 5; i++) ctx.lineTo(123 + i * 2.8, 160 + (i % 2 ? -4 : 4)); ctx.stroke();
@@ -442,11 +442,11 @@ function genSigns(scene) {
     const bx = 3, by = 4, bw = 32, bh = 26, cx = 19, cy = 17;
     ctx.fillStyle = '#7a5236'; rrect(ctx, bx - 2, by - 2, bw + 4, bh + 4, 5); ctx.fill();
     ctx.fillStyle = lg(ctx, 0, by, 0, by + bh, [[0, '#f3e6c4'], [1, '#d7c294']]); rrect(ctx, bx, by, bw, bh, 4); ctx.fill();
-    ctx.fillStyle = rgba('#fff', 0.5); ctx.fillRect(bx + 2, by + 1, bw - 4, 1.4);
-    if (type === 'dairy') { ctx.fillStyle = '#4f8fcf'; ctx.beginPath(); ctx.moveTo(cx, cy - 10); ctx.bezierCurveTo(cx - 9, cy + 1, cx - 8, cy + 9, cx, cy + 9); ctx.bezierCurveTo(cx + 8, cy + 9, cx + 9, cy + 1, cx, cy - 10); ctx.fill(); ell(ctx, cx - 3, cy + 1, 1.8, 3.4, rgba('#fff', 0.7), 0.3); }
+    ctx.fillStyle = rgba('#ffffff', 0.5); ctx.fillRect(bx + 2, by + 1, bw - 4, 1.4);
+    if (type === 'dairy') { ctx.fillStyle = '#4f8fcf'; ctx.beginPath(); ctx.moveTo(cx, cy - 10); ctx.bezierCurveTo(cx - 9, cy + 1, cx - 8, cy + 9, cx, cy + 9); ctx.bezierCurveTo(cx + 8, cy + 9, cx + 9, cy + 1, cx, cy - 10); ctx.fill(); ell(ctx, cx - 3, cy + 1, 1.8, 3.4, rgba('#ffffff', 0.7), 0.3); }
     else if (type === 'mill') { ctx.strokeStyle = '#8a4b32'; ctx.lineWidth = 2.6; ctx.lineCap = 'round'; for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * 10, cy + Math.sin(a) * 10); ctx.stroke(); } ell(ctx, cx, cy, 2.6, 2.6, '#5d3d22'); }
     else if (type === 'bakery') { ell(ctx, cx, cy + 1, 11, 7, '#c98a4a'); ell(ctx, cx - 2, cy - 1, 6, 2.6, '#e8b574'); ctx.strokeStyle = '#8a5a2a'; ctx.lineWidth = 1.4; for (const x of [-4, 1, 6]) { ctx.beginPath(); ctx.moveTo(cx + x - 1.5, cy - 3); ctx.lineTo(cx + x + 1.5, cy + 3); ctx.stroke(); } }
-    else if (type === 'cannery') { ctx.fillStyle = '#c8303a'; rrect(ctx, cx - 6, cy - 6, 12, 15, 3); ctx.fill(); ctx.fillStyle = '#c9ced2'; ctx.fillRect(cx - 6, cy - 9, 12, 4); ctx.fillStyle = rgba('#fff', 0.55); ctx.fillRect(cx - 3.5, cy - 4, 2, 11); ell(ctx, cx + 1, cy + 2, 3, 3.6, '#f6e8c0'); }
+    else if (type === 'cannery') { ctx.fillStyle = '#c8303a'; rrect(ctx, cx - 6, cy - 6, 12, 15, 3); ctx.fill(); ctx.fillStyle = '#c9ced2'; ctx.fillRect(cx - 6, cy - 9, 12, 4); ctx.fillStyle = rgba('#ffffff', 0.55); ctx.fillRect(cx - 3.5, cy - 4, 2, 11); ell(ctx, cx + 1, cy + 2, 3, 3.6, '#f6e8c0'); }
     else if (type === 'spinning') { ell(ctx, cx, cy, 9, 9, '#efe6d2'); ctx.strokeStyle = '#b9a98a'; ctx.lineWidth = 1.2; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.ellipse(cx, cy, 9, 4 + k * 1.5, k * 0.7, 0, TAU); ctx.stroke(); } ctx.strokeStyle = '#efe6d2'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(cx + 7, cy + 6); ctx.quadraticCurveTo(cx + 13, cy + 8, cx + 11, cy + 4); ctx.stroke(); }
     else { ctx.fillStyle = '#7a5aa8'; ctx.fillRect(cx - 10, cy - 8, 20, 16); ctx.strokeStyle = '#2fa39a'; ctx.lineWidth = 2; ctx.beginPath(); for (let x = -10; x <= 10; x += 4) { ctx.lineTo(cx + x, cy + ((x / 4) % 2 ? -3 : 3)); } ctx.stroke(); ctx.strokeStyle = '#e8902a'; ctx.beginPath(); for (let x = -10; x <= 10; x += 4) { ctx.lineTo(cx + x, cy + 5 + ((x / 4) % 2 ? -2 : 2)); } ctx.stroke(); }
     register(scene, key, canvas);

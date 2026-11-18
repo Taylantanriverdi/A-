@@ -26,8 +26,8 @@ let camoCache = null;
 function camo(ctx) {
   if (!camoCache) {
     const T = 44, { canvas, ctx: c } = makeCanvas(T, T), r = mulberry32(77);
-    c.fillStyle = '#6f7b96'; c.fillRect(0, 0, T, T);
-    const cols = ['#2b3558', '#9d8ec9', '#aeb3c2', '#202846', '#586385', '#9d8ec9'];
+    c.fillStyle = '#7d869b'; c.fillRect(0, 0, T, T);
+    const cols = ['#27325a', '#a99bd6', '#c5c9d4', '#1d2548', '#4d5a86', '#27325a', '#c5c9d4'];
     for (let i = 0; i < 30; i++) {
       const x = r() * T, y = r() * T, rx = 3 + r() * 5, ry = 2 + r() * 3.2, rot = r() * Math.PI, col = cols[i % cols.length];
       for (const ox of [-T, 0, T]) for (const oy of [-T, 0, T]) { c.fillStyle = col; c.beginPath(); c.ellipse(x + ox, y + oy, rx, ry, rot, 0, TAU); c.fill(); }
@@ -53,7 +53,7 @@ function leg(ctx, hx, hy, fx, fy, shoe, back) {
   const sc = back ? '#b4b7c2' : '#e9e9ee';
   ell(ctx, fx + 1.8, fy - 1.4, 5.4, 2.9, lg(ctx, 0, fy - 4, 0, fy, [[0, sc], [1, shade(sc, -0.18)]]), shoe || 0);
   ctx.fillStyle = back ? '#8a8d99' : '#f6f4ee'; ctx.beginPath(); ctx.ellipse(fx + 1.8, fy - 0.2, 5.6, 1.5, 0, 0, TAU); ctx.fill();
-  if (!back) { ell(ctx, fx + 0.2, fy - 2.2, 2.6, 1.1, '#2e3a5c', -0.2); ell(ctx, fx + 4.6, fy - 1.8, 1.6, 1.2, rgba('#fff', 0.8)); }
+  if (!back) { ell(ctx, fx + 0.2, fy - 2.2, 2.6, 1.1, '#3a4466', -0.2); ell(ctx, fx + 4.6, fy - 1.8, 1.6, 1.2, rgba('#ffffff', 0.8)); }
 }
 
 function arm(ctx, sx, sy, hx, hy, far) {
@@ -68,7 +68,7 @@ function arm(ctx, sx, sy, hx, hy, far) {
   const a = Math.atan2(dy, dx);
   ctx.save(); ctx.translate(hx - dx / len * 2.2, hy - dy / len * 2.2); ctx.rotate(a); ctx.fillStyle = far ? '#4a5470' : '#8a93ad'; ctx.beginPath(); ctx.ellipse(0, 0, 1.6, 3.2, 0, 0, TAU); ctx.fill(); ctx.restore();
   ell(ctx, hx, hy, 2.5, 2.4, far ? SKIN_D : SKIN);
-  if (!far) ell(ctx, hx - 0.6, hy - 0.7, 1.2, 0.9, rgba('#fff', 0.35));
+  if (!far) ell(ctx, hx - 0.6, hy - 0.7, 1.2, 0.9, rgba('#ffffff', 0.35));
 }
 
 function torso(ctx, hy, sit) {
@@ -80,7 +80,7 @@ function torso(ctx, hy, sit) {
   ctx.beginPath(); ctx.moveTo(22.4, 25.6); ctx.quadraticCurveTo(30, 22.2, 38.4, 25.4); ctx.quadraticCurveTo(40, 33, 38.2, bot - 1); ctx.quadraticCurveTo(30.4, bot + 1.2, 22.6, bot - 1); ctx.quadraticCurveTo(20.6, 33, 22.4, 25.6); ctx.closePath();
   ctx.fillStyle = camo(ctx); ctx.fill();
   ctx.save(); ctx.clip();
-  ctx.fillStyle = lg(ctx, 21, 0, 40, 0, [[0, 'rgba(255,244,220,0.22)'], [0.18, 'rgba(255,244,220,0)'], [0.6, 'rgba(10,12,28,0.1)'], [1, 'rgba(10,12,28,0.38)']]); ctx.fillRect(18, 20, 26, 30);
+  ctx.fillStyle = lg(ctx, 21, 0, 40, 0, [[0, 'rgba(255,244,220,0.2)'], [0.18, 'rgba(255,244,220,0)'], [0.6, 'rgba(10,12,28,0.05)'], [1, 'rgba(10,12,28,0.28)']]); ctx.fillRect(18, 20, 26, 30);
   // kanguru cep + etek bandı
   ctx.fillStyle = 'rgba(10,12,28,0.22)'; ctx.beginPath(); ctx.moveTo(24.4, bot - 7.2); ctx.quadraticCurveTo(30.6, bot - 9.4, 37, bot - 7.2); ctx.lineTo(38.6, bot); ctx.lineTo(22.6, bot); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#566083'; ctx.fillRect(21, bot - 2.2, 20, 3.6); ctx.fillStyle = 'rgba(255,244,220,0.22)'; ctx.fillRect(21, bot - 2.2, 20, 0.9);
@@ -118,7 +118,7 @@ function head(ctx, o) {
   ell(ctx, 37.2, 15.8, 1.4, 1.1, rgba('#b9754e', 0.55)); ell(ctx, 36.8, 15.2, 0.7, 0.5, rgba('#fff4dc', 0.4));
   // gözler
   const blink = o.blink;
-  for (const [ex, ey, rx, ry, far] of [[28.6, 12.2, 2.3, 2.9, true], [35.2, 12.0, 2.6, 3.2, false]]) {
+  for (const [ex, ey, rx, ry, far] of [[28.8, 12.4, 2.0, 2.6, true], [35.0, 12.2, 2.2, 2.8, false]]) {
     if (blink) {
       ctx.strokeStyle = '#2a1810'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(ex - rx, ey + 0.4); ctx.quadraticCurveTo(ex, ey + 2.3, ex + rx, ey + 0.4); ctx.stroke();
     } else {
@@ -129,7 +129,7 @@ function head(ctx, o) {
       ell(ctx, ix + 0.2, iy + 0.1, 1.15, 1.5, '#140a06');
       ctx.fillStyle = 'rgba(40,20,10,0.35)'; ctx.fillRect(ex - 4, ey - 4, 8, 2.3);   // üst kapak gölgesi
       ctx.restore();
-      ell(ctx, ex - 0.2 + (o.gx || 0), ey - 1.2, 0.95, 0.95, '#fff'); ell(ctx, ex + 1.5 + (o.gx || 0), ey + 1.1, 0.5, 0.5, rgba('#fff', 0.8));
+      ell(ctx, ex - 0.2 + (o.gx || 0), ey - 1.2, 0.95, 0.95, '#fff'); ell(ctx, ex + 1.5 + (o.gx || 0), ey + 1.1, 0.5, 0.5, rgba('#ffffff', 0.8));
       ctx.strokeStyle = '#2a1810'; ctx.lineWidth = 1; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(ex, ey, ry + 0.4, Math.PI * 1.12, Math.PI * 1.9); ctx.stroke(); // üst kirpik
     }
   }
@@ -162,7 +162,7 @@ function bucket(ctx, x, y, rot, water) {
   ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
   ctx.fillStyle = lg(ctx, -5, 0, 5, 0, [[0, '#93abc6'], [0.5, '#6f87a3'], [1, '#42566e']]);
   ctx.beginPath(); ctx.moveTo(-5, -8); ctx.lineTo(5, -8); ctx.lineTo(4, 0); ctx.lineTo(-4, 0); ctx.closePath(); ctx.fill();
-  ell(ctx, 0, -8, 5, 1.6, water ? '#6fb4e8' : '#2e3e52'); ctx.fillStyle = rgba('#fff', 0.35); ctx.fillRect(-4, -7, 1.2, 6);
+  ell(ctx, 0, -8, 5, 1.6, water ? '#6fb4e8' : '#2e3e52'); ctx.fillStyle = rgba('#ffffff', 0.35); ctx.fillRect(-4, -7, 1.2, 6);
   ctx.strokeStyle = '#4a5666'; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.arc(0, -8, 5.6, Math.PI, 0); ctx.stroke();
   ctx.restore();
 }
@@ -267,7 +267,7 @@ function drawDonkey(ctx, pose) {
   ctx.save(); ctx.translate(hx, hy); ctx.rotate(eat ? 1.25 : 0.62);
   ctx.fillStyle = lg(ctx, 0, -6, 0, 6, [[0, '#a3917f'], [1, '#76675a']]); ctx.beginPath(); ctx.ellipse(0, 0, 10.4, 6.4, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = DKC.muzzle; ctx.beginPath(); ctx.ellipse(7.6, 1.6, 5.4, 4.5, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = rgba('#fff', 0.35); ctx.beginPath(); ctx.ellipse(6.4, -0.6, 3, 1.4, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = rgba('#ffffff', 0.35); ctx.beginPath(); ctx.ellipse(6.4, -0.6, 3, 1.4, 0, 0, TAU); ctx.fill();
   ell(ctx, 10.6, 0.2, 1.1, 1.5, '#5a463a'); ell(ctx, 6.4, 4.6, 2.6, 1, rgba('#7a5a4a', 0.5));
   ctx.restore();
   // göz (başın dönük çerçevesi dışında, sahne koordinatında)
@@ -299,7 +299,7 @@ function drawBubble(ctx, kind) {
   ctx.fillStyle = 'rgba(30,20,10,0.22)'; ctx.beginPath(); ctx.ellipse(14, 14.8, 12.4, 12.4, 0, 0, TAU); ctx.fill();
   ctx.fillStyle = '#fbf4e2'; ctx.beginPath(); ctx.moveTo(10.4, 22); ctx.lineTo(14, 29.6); ctx.lineTo(17.6, 22); ctx.fill();
   ell(ctx, 14, 13.6, 12.4, 12.4, lg(ctx, 0, 1, 0, 26, [['0', '#fffaf0'], ['1', '#efe2c4']]));
-  if (kind === 'water') { ctx.fillStyle = '#4f9bd8'; ctx.beginPath(); ctx.moveTo(14, 5); ctx.bezierCurveTo(8, 12.4, 8.4, 19.8, 14, 19.8); ctx.bezierCurveTo(19.6, 19.8, 20, 12.4, 14, 5); ctx.fill(); ell(ctx, 11.8, 14, 1.4, 2.8, rgba('#fff', 0.7), 0.3); }
+  if (kind === 'water') { ctx.fillStyle = '#4f9bd8'; ctx.beginPath(); ctx.moveTo(14, 5); ctx.bezierCurveTo(8, 12.4, 8.4, 19.8, 14, 19.8); ctx.bezierCurveTo(19.6, 19.8, 20, 12.4, 14, 5); ctx.fill(); ell(ctx, 11.8, 14, 1.4, 2.8, rgba('#ffffff', 0.7), 0.3); }
   else if (kind === 'basket') { basket(ctx, 14, 21, true); }
   else if (kind === 'feed') {
     ctx.strokeStyle = '#d9a63c'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
@@ -307,7 +307,7 @@ function drawBubble(ctx, kind) {
     ctx.fillStyle = '#8a5a34'; ctx.fillRect(9.6, 14.4, 8.8, 2.4);
   } else {
     ctx.fillStyle = '#7a8594'; ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i * TAU / 16, r = i % 2 ? 6 : 8; ctx.lineTo(14 + Math.cos(a) * r, 13.6 + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
-    ell(ctx, 14, 13.6, 3.2, 3.2, '#fbf4e2'); ell(ctx, 12, 11, 2, 1.2, rgba('#fff', 0.4), -0.6);
+    ell(ctx, 14, 13.6, 3.2, 3.2, '#fbf4e2'); ell(ctx, 12, 11, 2, 1.2, rgba('#ffffff', 0.4), -0.6);
   }
 }
 
