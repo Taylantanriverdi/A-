@@ -61,7 +61,7 @@ function build(state, bus, p = {}, rng) {
     : def.lots.find((l) => !state.buildings.some((b) => b.lotId === l.id));
   if (!lot) return fail(p.lotId ? REASONS.badBuilding : REASONS.noFreeLot);
   if (state.buildings.some((b) => b.lotId === lot.id)) return fail(REASONS.lotTaken);
-  if (def.price > 0 && !transact(state, bus, { amount: -def.price, category: 'other', label: `İnşaat: ${def.name}` })) return fail(REASONS.noMoney);
+  if (def.price > 0 && !transact(state, bus, { amount: -def.price, category: 'buildings', label: `İnşaat: ${def.name}` })) return fail(REASONS.noMoney);
   const b = newBuilding(type, lot.id, dayOf(state));
   state.buildings.push(b);
   const c = lotCenter(lot);
@@ -94,7 +94,7 @@ function buyAnimal(state, bus, p = {}, rng) {
     b = cands.find((x) => animalsIn(state, x.id).length < bdef.capacity);
     if (!b) return fail(REASONS.full);
   }
-  if (!transact(state, bus, { amount: -def.price, category: 'other', label: `Hayvan: ${def.name}` })) return fail(REASONS.noMoney);
+  if (!transact(state, bus, { amount: -def.price, category: 'animals', label: `Hayvan: ${def.name}` })) return fail(REASONS.noMoney);
   if (makeLot) {
     b = newBuilding('hive', makeLot.id, dayOf(state));
     state.buildings.push(b);
