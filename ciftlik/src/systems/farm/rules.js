@@ -3,7 +3,7 @@ import { CROPS, STAGE_NAMES_TR, ROT_AFTER_DAYS } from '../../data/crops.js';
 import { ITEMS } from '../../data/items.js';
 import { HEALTH, SOIL } from '../../data/farming.js';
 import { isBlocked as occBlocked, objectAt, labelOf, isCovered, NOT_OWNED } from '../world/occupancy.js';
-import { PARCELS } from '../../data/land.js';
+import { PARCELS, parcelAt } from '../../data/land.js';
 import { DAYS_PER_SEASON, SEASONS } from '../../core/constants.js';
 import { calendar } from '../../core/timeUtils.js';
 import { count } from '../InventorySystem.js';
@@ -52,11 +52,8 @@ function forSale(tileId) {
   const i = typeof tileId === 'string' ? tileId.indexOf(',') : -1;
   if (i <= 0) return false;
   const x = Number(tileId.slice(0, i)), y = Number(tileId.slice(i + 1));
-  for (const id in PARCELS) {
-    const r = PARCELS[id];
-    if (id !== 'P1' && x >= r.tx && y >= r.ty && x < r.tx + r.w && y < r.ty + r.h) return true;
-  }
-  return false;
+  const id = parcelAt(x, y); // K26
+  return !!id && id !== 'P1';
 }
 
 const NO = (reason) => ({ ok: false, reason });

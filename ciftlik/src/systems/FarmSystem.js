@@ -7,7 +7,7 @@ import { HEALTH, SOIL } from '../data/farming.js';
 import { EFFECTS } from '../data/weather.js';
 import { XP_RULES } from '../data/progression.js';
 import { ITEMS, STARTING_INVENTORY } from '../data/items.js';
-import { PARCELS, blockedKind } from '../data/land.js';
+import { PARCELS, blockedKind, tilesOfParcel } from '../data/land.js';
 import { calendar } from '../core/timeUtils.js';
 import { createRng } from '../core/Rng.js';
 import { isPlainObject } from '../core/GameState.js';
@@ -108,9 +108,8 @@ export function ensureParcelTiles(state, startPlowed = false) {
   if (!isPlainObject(state.tiles)) state.tiles = {};
   const added = [];
   for (const pid of ownedParcelIds(state)) {
-    const r = PARCELS[pid];
-    for (let ty = r.ty; ty < r.ty + r.h; ty++) {
-      for (let tx = r.tx; tx < r.tx + r.w; tx++) {
+    for (const [tx, ty] of tilesOfParcel(pid)) { // K26: organik parsel karoları
+      {
         const key = tileKey(tx, ty);
         if (isPlainObject(state.tiles[key])) continue;
         const plowed = startPlowed && !blockedKind(key) && isStartPlowed(tx, ty);

@@ -1,6 +1,6 @@
 // Toprak yardımcıları — saf fonksiyonlar (PLAN.md §3, §8). Değerler data/farming.js'ten.
 import { SOIL, THREATS } from '../../data/farming.js';
-import { PARCELS, blockedKind } from '../../data/land.js';
+import { PARCELS, blockedKind, parcelAt } from '../../data/land.js';
 
 export const TILE_STATES = ['grass', 'plowed'];
 
@@ -19,11 +19,7 @@ export function parseKey(id) {
 
 /** Parsel geometrisi data/land.js PARCELS'tan ({tx, ty, w, h}). */
 export function parcelOf(tx, ty) {
-  for (const id in PARCELS) {
-    const r = PARCELS[id];
-    if (tx >= r.tx && tx < r.tx + r.w && ty >= r.ty && ty < r.ty + r.h) return id;
-  }
-  return null;
+  return parcelAt(tx, ty); // K26: organik parsel haritası
 }
 
 /** state.land.parcels içinde sahip olunan parsel kimlikleri (PARCELS'te tanımlı olanlar). */

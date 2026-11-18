@@ -113,6 +113,7 @@ function freeSpot(state, type, tx, ty) {
 }
 
 function seedFence(state) {
+  if (!START_FENCE) return; // K26: yeni oyunda dikdörtgen başlangıç çiti yok (organik arazi çiti var)
   const f = START_FENCE, gaps = new Set(f.gaps || []);
   const add = (x, y) => {
     if (gaps.has(`${x},${y}`)) return;

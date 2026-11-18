@@ -48,4 +48,5 @@ export const START_LAYOUT = [
   { type: 'shed',  tx: 48, ty: 16 },
   // eski P1 çiti: karo 32..47 × 6..17 çevresi, patika geçidi (40–41, 17) açık
 ];
-export const START_FENCE = { x0: 32, x1: 47, y0: 6, y1: 17, gaps: ['40,17', '41,17'] };
+// K26: dikdörtgen başlangıç çiti kaldırıldı — arazinin organik dış sınırı LandView'da ahşap çitle çizilir.
+export const START_FENCE = null;

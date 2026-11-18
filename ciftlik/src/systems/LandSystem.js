@@ -1,7 +1,7 @@
 // LandSystem — arazi alımı (PLAN §15). Phaser import ETMEZ.
 // Komut: land:buy {parcelId}. Olaylar: land:changed {parcelId}, land:result {ok, parcelId?, reason?, text?}, farm:changed (yeni karolar), toast.
 // Emlak vergisi EconomySystem.closeSeason'da (TAX.propertyRate × price); burada yalnızca saf yardımcılar (propertyTaxOf).
-import { PARCELS } from '../data/land.js';
+import { PARCELS, parcelInfo } from '../data/land.js';
 import { TAX } from '../data/economy.js';
 import { isPlainObject } from '../core/GameState.js';
 import { transact } from './EconomySystem.js';
@@ -32,7 +32,7 @@ export function listParcels(state) {
   for (const id in PARCELS) {
     if (id === 'P1') continue;
     const r = PARCELS[id];
-    out.push({ id, name: r.name || id, w: r.w, h: r.h, area: r.w * r.h, price: r.price, tax: Math.round(r.price * TAX.propertyRate), owned: isOwned(state, id) });
+    out.push({ id, name: r.name || id, w: r.w, h: r.h, area: parcelInfo(id).area, price: r.price, tax: Math.round(r.price * TAX.propertyRate), owned: isOwned(state, id) });
   }
   return out;
 }

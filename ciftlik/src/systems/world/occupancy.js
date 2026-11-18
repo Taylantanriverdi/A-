@@ -1,7 +1,7 @@
 // Doluluk ızgarası — PLAN.md §12 (Aşama 5b). Saf: Phaser/bus yok. Önbellek state nesnesine (WeakMap) bağlıdır;
 // PlacementSystem değişiklikte `invalidate(state)` çağırır (placed:changed ile aynı anda).
 import { WORLD_TILES_X as GW, WORLD_TILES_Y as GH, TILE_W, TILE_H } from '../../core/constants.js';
-import { P1_BLOCKED, PARCELS, BLOCK_LABELS_TR } from '../../data/land.js';
+import { P1_BLOCKED, PARCELS, BLOCK_LABELS_TR, parcelAt } from '../../data/land.js';
 import { PLACEABLES } from '../../data/placeables.js';
 import { TREES, BUSHES } from '../../render/layout.js';
 
@@ -105,23 +105,14 @@ export function labelOf(obj) {
 }
 
 function inOwnedParcel(state, tx, ty) {
-  for (const id in PARCELS) {
-    const r = PARCELS[id];
-    if (tx < r.tx || ty < r.ty || tx >= r.tx + r.w || ty >= r.ty + r.h) continue;
-    const owned = (state.land?.parcels || []).find((p) => p.id === id);
-    if (owned && owned.owned) return true;
-  }
-  return false;
+  const id = parcelAt(tx, ty); // K26: organik parsel haritası
+  if (!id) return false;
+  if (id === 'P1') return true;
+  const owned = (state.land?.parcels || []).find((p) => p.id === id);
+  return !!(owned && owned.owned);
 }
 
 export const NOT_OWNED = 'Bu arazi senin değil — satın al';
-function parcelAt(tx, ty) {
-  for (const id in PARCELS) {
-    const r = PARCELS[id];
-    if (tx >= r.tx && ty >= r.ty && tx < r.tx + r.w && ty < r.ty + r.h) return id;
-  }
-  return null;
-}
 
 export function canPlace(state, type, tx, ty, ignoreId) {
   const def = PLACEABLES[type];
