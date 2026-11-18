@@ -224,7 +224,7 @@ export function createToolbar(root, ctx) {
       } else if (n <= 0) sub = STR.noneLeft;
       else if (pickerFor === 'seed') {
         const w = seedWarn(state, ITEMS[id].crop, now);
-        if (w) { late = true; sub = STR.lateInSeason; r.lateText = w.text || STR.lateInSeason; }
+        if (w) { late = true; sub = STR.lateShort; r.lateText = w.text || STR.lateInSeason; }
       }
       const subKey = (late ? '!' : '') + sub;
       if (subKey !== r.shownSub) {

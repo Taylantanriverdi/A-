@@ -195,10 +195,18 @@ export function createTileCard(root, ctx) {
     }
     const left = root.querySelector('.hud-left');
     const insetTop = left ? Math.round(left.getBoundingClientRect().bottom + 8) : 0;
-    ctx.bus.emit('camera:ensureVisible', {
+    const ev = {
       x: (tile.tx + 0.5) * 64, y: (tile.ty + 0.5) * 44,
       insetBottom: Math.max(0, Math.round(insetBottom)), insetTop,
-    });
+    };
+    if (!isSheet()) {
+      // Yan kart: sağdaysa insetRight, soldaysa insetLeft (kart genişliği + 16, dönüşümden bağımsız ölçü)
+      const vw = window.innerWidth || 0;
+      const l = el.offsetLeft, w = el.offsetWidth;
+      if (l + w / 2 > vw / 2) ev.insetRight = Math.max(0, Math.round(vw - l + 16));
+      else ev.insetLeft = Math.max(0, Math.round(l + w + 16));
+    }
+    ctx.bus.emit('camera:ensureVisible', ev);
   }
 
   function paint() {
@@ -388,6 +396,7 @@ export function createTileCard(root, ctx) {
     },
     close() {
       if (!open) return;
+      ctx.bus.emit('camera:releaseInsets', {});
       open = false;
       openId = null;
       el.classList.remove('open', 'swap');

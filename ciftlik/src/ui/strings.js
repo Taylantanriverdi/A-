@@ -70,6 +70,7 @@ export const STR = {
   expand: 'Ayrıntılar',
   collapse: 'Daha az',
   lateInSeason: 'Mevsim bitmeden yetişmez',
+  lateShort: 'Geç kalındı',
   willNotMature: (d) => `Mevsim bitmeden yetişmez · mevsimin bitmesine ${d} gün`,
   seasonLeft: (d) => `Mevsimin bitmesine ${d} gün`,
   // tileInfo uyarı kodu → metin (kod gelip metin gelmezse)
