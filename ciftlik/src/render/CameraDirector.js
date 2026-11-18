@@ -18,7 +18,7 @@ const TAP_MAX_MS = 400;
 const PERSIST_MS = 1000;
 const LETTERBOX_MS = 600;
 const CINE_DEFER_MS = 250;     // basılı işaretçi bırakıldıktan sonra ertelenen sinematiğin gecikmesi (K16)
-const CINE_DEFER_MAX_MS = 20000; // takılı kalmış işaretçiye karşı emniyet
+const CINE_DEFER_MAX_MS = 60000; // takılı kalmış işaretçiye karşı emniyet
 const GLIDE_MS = 400;          // camera:ensureVisible kayması
 const VIS_MARGIN_CSS = 40;     // ensureVisible kenar payı
 // Yeni oyunda ilk kadraj: başlangıç tarlası + ev (karo, kapsayıcı)

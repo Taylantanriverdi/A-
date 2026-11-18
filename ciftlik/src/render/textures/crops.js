@@ -524,17 +524,22 @@ function deriveWither(ctx, src, sx, sy, dx, dy, r) {
   const squash = () => { t.save(); t.translate(footX, footY); t.transform(1.08, 0, -0.16, 0.72, 0, 0); t.drawImage(src, sx, sy, w, h, -footX, -footY, w, h); t.restore(); };
   squash();
   // doygunluğu düşür (ışıklılık korunur), sonra özgün alfaya geri kırp
-  t.globalCompositeOperation = 'saturation'; t.fillStyle = 'rgba(128,128,128,0.7)'; t.fillRect(0, 0, w, h);
+  t.globalCompositeOperation = 'saturation'; t.fillStyle = 'rgba(128,128,128,0.92)'; t.fillRect(0, 0, w, h);
   t.globalCompositeOperation = 'destination-in'; squash();
   t.globalCompositeOperation = 'source-atop';
   const g = t.createLinearGradient(0, 20, 0, footY);
-  g.addColorStop(0, 'rgba(196,140,52,0.72)'); g.addColorStop(0.65, 'rgba(204,170,64,0.6)'); g.addColorStop(1, 'rgba(150,118,52,0.5)');
+  g.addColorStop(0, 'rgba(192,132,48,0.8)'); g.addColorStop(0.65, 'rgba(206,166,60,0.72)'); g.addColorStop(1, 'rgba(150,112,48,0.6)');
   t.fillStyle = g; t.fillRect(0, 0, w, h);
   for (let i = 0; i < 26; i++) { // kurumuş kahverengi uçlar
     const x = 10 + r() * (w - 20), y = 8 + r() * (footY - 14), rr = 1.5 + r() * 2.5;
     const rg = t.createRadialGradient(x, y, 0, x, y, rr); rg.addColorStop(0, 'rgba(112,72,34,0.75)'); rg.addColorStop(1, 'rgba(112,72,34,0)');
     t.fillStyle = rg; t.beginPath(); t.arc(x, y, rr, 0, Math.PI * 2); t.fill();
   }
+  // altına hafif kuruyan toprak lekesi (ölününkinden açık ve küçük)
+  ctx.save(); ctx.translate(dx + footX, dy + footY + 1); ctx.scale(1, 0.36);
+  const R = 20; const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+  rg.addColorStop(0, 'rgba(44,30,18,0.55)'); rg.addColorStop(0.7, 'rgba(60,42,24,0.3)'); rg.addColorStop(1, 'rgba(60,42,24,0)');
+  ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   ctx.drawImage(tc, dx, dy);
 }
 
@@ -557,8 +562,8 @@ function deriveSick(ctx, src, sx, sy, dx, dy, r) {
   ctx.drawImage(tc, dx, dy);
 }
 
-const DRY = ['#a58e6c', '#b49d7a', '#8d775b', '#c2ad89', '#9a7f5e'];
-const DRY_STALK = '#7d6a52';
+const DRY = ['#957d5e', '#a28a68', '#7f6a52', '#ad9775', '#8a7258'];
+const DRY_STALK = '#6e5c48';
 /** Ölü: her aşamada okunur silüet — koyu kuru toprak halkası, sarkık/devrilmiş saman-gri saplar, kıvrık kuru yapraklar. */
 function drawDead(ctx, cx, fy, s, shape, r) {
   const meta = SHAPE_META[shape] || SHAPE_META.bush;
@@ -567,9 +572,9 @@ function drawDead(ctx, cx, fy, s, shape, r) {
   const dcol = () => DRY[(r() * DRY.length) | 0];
   // kuru, çatlak toprak halkası
   ctx.save(); ctx.translate(cx, fy + 1); ctx.scale(1, 0.36);
-  const R = W * 0.62 + 5;
+  const R = W * 0.72 + 7;
   const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-  g.addColorStop(0, 'rgba(34,22,14,0.78)'); g.addColorStop(0.62, 'rgba(40,27,17,0.6)'); g.addColorStop(0.85, 'rgba(58,40,26,0.3)'); g.addColorStop(1, 'rgba(58,40,26,0)');
+  g.addColorStop(0, 'rgba(26,16,10,0.85)'); g.addColorStop(0.6, 'rgba(32,21,13,0.72)'); g.addColorStop(0.85, 'rgba(50,34,22,0.35)'); g.addColorStop(1, 'rgba(58,40,26,0)');
   ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = 'rgba(160,136,104,0.5)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
   for (let i = 0; i < 5; i++) {
