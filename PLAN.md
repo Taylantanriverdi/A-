@@ -9,8 +9,8 @@
 
 | Aşama | Konu | Durum |
 |---|---|---|
-| 0 | İşçi ajanları + PLAN.md | ✅ Tamamlandı — onay bekleniyor |
-| 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ⏳ Onaydan sonra |
+| 0 | İşçi ajanları + PLAN.md | ✅ Onaylandı |
+| 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | 🔨 Devam ediyor |
 | 2 | Tarım ve toprak mekaniği | — |
 | 3 | Envanter, mağaza, pazar | — |
 | 4 | Hayvancılık | — |
@@ -478,3 +478,82 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K4 | 3/4 eğik diyorama görünüm (izometrik değil) | Paralaks ve gün-gece ışığı ile "film karesi" etkisi; çizim maliyeti düşük |
 | K5 | 1 finansal ay = 1 mevsim (28 gün) | Takvimle tutarlı; haftalık taksitler ritim sağlar |
 | K6 | Oyun projesi `ciftlik/` alt klasöründe | Depo kökündeki mevcut HTML oyunlarına dokunmamak |
+
+---
+
+## 7. Aşama 1 Entegrasyon Sözleşmesi (bağlayıcı)
+
+Beyin tarafından yazılan ortak dosyalar (işçiler DEĞİŞTİRMEZ, gerekirse önerir):
+`src/core/constants.js`, `src/core/EventBus.js`, `src/core/timeUtils.js`, `src/data/palette.js`.
+`src/main.js`, `src/render/Renderer.js`, `src/render/textures/index.js`, `src/ui/index.js` şu an **stub**; sahibi olan işçi değiştirir.
+
+### Dosya sahipliği
+| İşçi | Dosyalar |
+|---|---|
+| engine-dev | `src/main.js`, `src/core/GameState.js`, `SaveSystem.js`, `SystemRegistry.js`, `Rng.js`, `src/systems/TimeSystem.js`, `src/scenes/BootScene.js`, `src/scenes/WorldScene.js`, `src/render/CameraDirector.js` |
+| visual-dev | `src/render/**` (CameraDirector hariç) |
+| ui-dev | `src/ui/**` |
+
+### Dünya koordinatları
+- Zemin düzlemi: dünya `y ∈ [0, WORLD_H=1056]`, `x ∈ [0, WORLD_W=5120]`. Ufuk çizgisi `y = 0`. Gökyüzü ve arka plan katmanları `y ∈ [-SKY_H=-700, 0]`.
+- Karo `(tx, ty)` → dünya `x = tx*64`, `y = ty*44`. P1 parseli karo `(32,6)`'dan `16×12`. Faz 1'de P1 içinde 6×4 sürülmüş karo alanı ve çiftlik evi dekor olarak çizilir (visual-dev).
+- Kamera sınırları: `x 0..WORLD_W`, `y -SKY_H..WORLD_H`. Açılış kamerası P1 merkezine bakar.
+
+### Main / sahneler (engine-dev)
+```js
+// main.js
+const state = SaveSystem.load() ?? createInitialState();   // state.camera = {x,y,zoom}|null eklenir
+registry.register(TimeSystem);
+new Phaser.Game({ type: Phaser.AUTO (WebGL tercih), scale: RESIZE, scene: [BootScene, WorldScene] });
+mountUI({ state, bus, calendar, debug });                     // ui-dev
+window.__game = { state, bus, debug: {...} }                  // DEV veya ?debug=1
+// BootScene.create(): generateTextures(this, p => ...) → this.scene.start('World')
+// WorldScene.create(): renderer = new Renderer(this, state, bus); renderer.create(); camera = new CameraDirector(this, state, bus)
+// WorldScene.update(time, delta): registry.tick(delta) → camera.update(delta) → renderer.update(frame)
+// frame = { time, delta, totalMinutes /* kesirli, interpolasyonlu */, cal: calendar(totalMinutes) }
+```
+- Kalite: açılışta `state.settings.quality === 'auto'` ise engine çözer (dokunmatik + kısa kenar < 900px → `medium`, aksi `high`) ve `settings:quality {level}` yayar. UI'dan `settings:set {key, value}` gelir → engine state.settings'i günceller, `quality` ise yeniden `settings:quality` yayar, `save:request`.
+- `save:reset` → localStorage temizlenir, sayfa yenilenir.
+
+### Olaylar (Aşama 1)
+| Olay | Yük | Yayan → Dinleyen |
+|---|---|---|
+| `time:minute` `time:hour` `time:day` `time:season` | `calendar()` çıktısı | TimeSystem → herkes |
+| `time:speed` | `{speed: 0|1|2|4}` | UI → TimeSystem |
+| `time:speedChanged` | `{speed}` | TimeSystem → UI |
+| `time:sleep` | `{}` (yalnız 22:00–05:59 geçerli → ertesi 06:00) | UI → TimeSystem |
+| `settings:set` | `{key, value}` | UI → main |
+| `settings:quality` | `{level:'high'|'medium'|'low'}` | main → Renderer, UI |
+| `camera:cinematic` | `{target:{x,y}, zoom, duration, letterbox, reason}` | herkes → CameraDirector |
+| `cinematic:letterbox` | `{amount: 0..1, duration: ms}` | CameraDirector → Renderer |
+| `toast` | `{text, kind}` | herkes → UI |
+| `save:request` / `save:done` / `save:reset` | `{}` | herkes ↔ SaveSystem/main |
+| `fps` | `{fps}` (saniyede bir) | Renderer → UI (debug) |
+
+### Renderer API (visual-dev)
+```js
+export default class Renderer {
+  constructor(scene, state, bus)
+  create()                 // katmanlar, dekor, PostFX
+  update(frame)            // her kare; state'e YAZMAZ
+  setQuality(level)        // 'high'|'medium'|'low'
+  destroy()
+  // Sonraki aşamalar için açık uçlar:
+  shadows.register(obj, { footX, footY, height, width }) → handle; handle.remove()
+  lights.addPoint({ x, y, radius, color, intensity, nightOnly }) → handle
+}
+// render/sunModel.js
+export function getSun(hourFloat)  → { visible, dir /* -1 doğu .. +1 batı */, elevationDeg, intensity /* 0..1 */ }
+export function getMoon(hourFloat) → aynı şekil
+// render/textures/index.js
+export function generateTextures(scene, onProgress) // senkron, bir kez; scene.textures'a anahtarla kaydeder
+```
+
+### UI API (ui-dev)
+```js
+export function mountUI({ state, bus, calendar, debug }) → { destroy() }
+```
+- HUD: sol üst saat (`HH:MM`), "İlkbahar · 1. Gün · Yıl 1", hava ikonu (`state.weather.type`), sağ üst para (`state.finance.money`, `money:changed` ile animasyonlu sayaç), alt/sağ hız kontrolleri (⏸ ▶ ⏩ ⏭), 22:00–06:00 arası "Sabaha geç" düğmesi, ayarlar düğmesi.
+- Ayarlar paneli: kalite (Otomatik/Yüksek/Orta/Düşük), ses ve müzik kaydırıcıları (değer kaydedilir, ses Aşama 9), "Yeni oyun" (onaylı → `save:reset`).
+- Toast kuyruğu (`toast` olayı). Debug iken FPS göstergesi (`fps` olayı).
+- Klavye: Boşluk = duraklat/devam, 1/2/3 = hız, Esc = paneli kapat.
