@@ -89,10 +89,33 @@ export function createToolbar(root, ctx) {
   let toolDirty = true;
   let needToastStroke = -1; // "önce eşya seç" toast'ı fırça darbesi başına bir kez
 
+  let emitting = false; // kendi yaydığımız tool:select'i dış olay sanmayalım
   const emitSelect = () => {
     const itemId = tool in selected ? selected[tool] : undefined;
-    bus.emit('tool:select', itemId ? { tool, itemId } : { tool });
+    emitting = true;
+    try { bus.emit('tool:select', itemId ? { tool, itemId } : { tool }); } finally { emitting = false; }
   };
+  /** Dışarıdan gelen tool:select {tool, itemId?} (ör. debug.tool) → seçili aleti/eşyayı senkronla. */
+  function onExternalSelect(p) {
+    if (emitting || !p || !TOOLS.includes(p.tool)) return;
+    const t = p.tool;
+    if (t in selected && p.itemId && ITEMS[p.itemId]) selected[t] = p.itemId;
+    const changed = t !== tool;
+    if (changed) {
+      tool = t;
+      if (t in selected) {
+        if (invDirty) { refreshCounts(); invDirty = false; }
+        if (seasonDirty) { refreshSeason(); seasonDirty = false; }
+        autoPick(t);
+      }
+      if (pickerFor && pickerFor !== t) closePicker();
+      if (api.onToolChange) api.onToolChange(t);
+    }
+    toolDirty = true;
+    // autoPick ile eşya değiştiyse diğer sistemler de bilsin
+    if (t in selected && selected[t] && selected[t] !== p.itemId) emitSelect();
+  }
+  const offSelect = bus.on('tool:select', onExternalSelect);
 
   function refreshCounts() {
     for (const id of SEED_IDS) counts[id] = countItem(state, id);
@@ -326,6 +349,7 @@ export function createToolbar(root, ctx) {
     /** Açılış: 'hand' yayınla. */
     init() { emitSelect(); },
     destroy() {
+      if (typeof offSelect === 'function') offSelect();
       window.removeEventListener('pointerdown', onDownOutside, true);
       window.removeEventListener('resize', onResize);
     },

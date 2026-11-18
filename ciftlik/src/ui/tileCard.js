@@ -153,7 +153,7 @@ export function createTileCard(root, ctx) {
   let open = false;
   let compact = true;
   let ensurePending = false;
-  let chipsKey = '', warnKey = '', histKey = '', icKey = '', topKey = '', hintKey = '';
+  let chipsKey = null, warnKey = null, histKey = null, icKey = null, topKey = null, hintKey = null;
 
   function setCompact(v) {
     compact = !!v;
@@ -188,7 +188,7 @@ export function createTileCard(root, ctx) {
   function ensureVisible(tile) {
     const vh = window.innerHeight || 0;
     let insetBottom = 0;
-    if (isSheet()) insetBottom = vh - el.offsetTop + 16;
+    if (isSheet()) insetBottom = vh - el.offsetTop + 16; // = kartın gerçek yüksekliği + alt boşluk + 16
     else {
       const tools = root.querySelector('.hud-tools');
       if (tools) insetBottom = vh - tools.getBoundingClientRect().top + 16;
@@ -406,8 +406,13 @@ export function createTileCard(root, ctx) {
       paint();
       if (ensurePending && open) {
         ensurePending = false;
-        const t = state.tiles && state.tiles[openId];
-        if (t) ensureVisible(t);
+        const id0 = openId;
+        // Kart çizildikten sonraki karede gerçek ölçülen yükseklikle (offsetTop dönüşümden etkilenmez)
+        requestAnimationFrame(() => {
+          if (!open || openId !== id0) return;
+          const t = state.tiles && state.tiles[id0];
+          if (t) ensureVisible(t);
+        });
       }
     },
   };

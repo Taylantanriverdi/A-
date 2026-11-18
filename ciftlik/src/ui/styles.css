@@ -1064,3 +1064,7 @@
 @media (prefers-reduced-motion: reduce) {
   #ui *, #ui *::before, #ui *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 }
+
+/* Kart: sağlık bloğu sarmalandı → aralık; gizli ipucundan sonraki ilk bölümde üst çizgi yok */
+#ui .tc-hpwrap { margin-top: 8px; }
+#ui .tc-body .tc-hint[hidden] + section, #ui .tc-body .tc-hint + section { border-top: 0; }
