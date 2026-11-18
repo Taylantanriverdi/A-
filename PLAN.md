@@ -17,7 +17,7 @@
 | 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
 | 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Onaylandı |
 | 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | ✅ Onaylandı |
-| 7 | Hava durumu, mevsimler, rastgele olaylar | 🔨 Devam ediyor |
+| 7 | Hava durumu, mevsimler, rastgele olaylar | ✅ Tamamlandı (sim-weather + beyin duman testi) — onay bekleniyor |
 | 8 | İşçiler, makineler, arazi genişletme | — |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
 
