@@ -8,10 +8,14 @@ import FarmSystem from '../src/systems/FarmSystem.js';
 import { tileInfo, canApply } from '../src/systems/farm/rules.js';
 import { MIN_PER_DAY } from '../src/core/constants.js';
 import { calendar } from '../src/core/timeUtils.js';
-import { SOIL } from '../src/data/farming.js';
+import { SOIL, QUALITY } from '../src/data/farming.js';
 import { CROPS } from '../src/data/crops.js';
 
-const SEED = Number(process.argv[2]) || 20261118;
+const ARGS = process.argv.slice(2);
+const SEED = Number(ARGS.find((a) => /^\d+$/.test(a))) || 20261118;
+// Öneri denemesi (yalnızca bu süreçte, veri dosyası değişmez): --qa=90 → QUALITY.thresholds.A
+const QA = ARGS.find((a) => a.startsWith('--qa='));
+if (QA) QUALITY.thresholds.A = Number(QA.slice(5));
 
 function makeBus() {
   const map = new Map();
@@ -68,14 +72,15 @@ const qdist = (hs) => { const d = { A: 0, B: 0, C: 0 }; for (const h of hs) d[h.
 const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
 const f1 = (v) => (Math.round(v * 10) / 10).toFixed(1);
 
-/** Bakım: mode 'daily' | 'need' | 'none'; weed/treat bayrakları */
-function care(w, tiles, { watering = 'need', weed = true, treat = true } = {}) {
+/** Bakım: watering 'daily' (günde 1) | 'alt' (iki günde bir) | 'none'; weed/treat bayrakları */
+function care(w, tiles, { watering = 'daily', weed = true, treat = true } = {}) {
+  const odd = w.now().day % 2 === 1;
   for (const id of tiles) {
     const t = w.state.tiles[id];
     if (t.crop && t.crop.dead) { w.act('harvest', id); continue; }
     if (t.crop && t.crop.stage >= 4) w.act('harvest', id);
     if (watering === 'daily') w.act('water', id);
-    else if (watering === 'need' && t.moisture < 45) w.act('water', id);
+    else if (watering === 'alt' && odd) w.act('water', id);
     if (weed && t.weeds > 0) w.act('weed', id);
     if (treat && t.crop && !t.crop.dead && (t.crop.pest > 0 || t.crop.disease > 0)) w.act('treat', id, 'organic_spray');
   }
@@ -90,14 +95,14 @@ function scenarioA(watering) {
   const healths = [];
   for (let d = 0; d < 14 && w.harvests.length < 24; d++) {
     care(w, PLOT, { watering });
-    w.toHour(19); if (watering === 'need') care(w, PLOT, { watering });
+    w.toHour(19); care(w, PLOT, { watering: 'none' });
     for (const id of PLOT) { const c = w.state.tiles[id].crop; if (c) healths.push(c.health); }
     w.nextDayAt(7);
     // hazır olanları sabah 07:00'de değil, hazır olduğu anda say: gün içinde de kontrol
   }
   const days = w.harvests.map((h) => h.day);
   return {
-    label: `(a) ${watering === 'daily' ? 'her gün sula' : 'nem<45 ise sula'} + kompost`,
+    label: `(a) ${watering === 'daily' ? 'her gün 1 kez sula' : 'iki günde bir sula'} + kompost`,
     readyDay: `${Math.min(...days)}–${Math.max(...days)}`,
     yield: w.harvests.reduce((s, h) => s + h.qty, 0),
     q: qdist(w.harvests),
@@ -117,7 +122,7 @@ function readyHourProbe() {
   const start = w.state.tiles[id].crop.plantedDay;
   while (w.state.tiles[id].crop.stage < 4) {
     const t = w.state.tiles[id];
-    if (t.moisture < 45) w.act('water', id);
+    if (w.now().hour === 7) w.act('water', id);
     if (t.weeds > 0) w.act('weed', id);
     if (t.crop.pest > 0 || t.crop.disease > 0) w.act('treat', id, 'organic_spray');
     w.reg.advance(60, true);
@@ -155,8 +160,9 @@ function scenarioC() {
     const h0 = w.harvests.length;
     const rot = w.state.tiles[PLOT[0]].crop.rot;
     while (w.harvests.length - h0 < 24 && w.now().day < startDay + 15) {
-      care(w, PLOT, { watering: 'need' });
-      w.reg.advance(60 * 6, true);
+      care(w, PLOT, { watering: 'daily' });
+      w.toHour(19); care(w, PLOT, { watering: 'none' });
+      w.nextDayAt(7);
     }
     // ölüleri temizle
     for (const id of PLOT) if (w.state.tiles[id].crop?.dead) w.act('harvest', id);
@@ -178,7 +184,7 @@ function scenarioD() {
   for (const [id, s] of Object.entries(plan)) { w.act('plow', id); w.act('plant', id, s); }
   const rows = [];
   for (let d = 0; d < 8; d++) {
-    for (const id of Object.keys(plan)) if (w.state.tiles[id].moisture < 45) w.act('water', id);
+    for (const id of Object.keys(plan)) w.act('water', id);
     const n = w.now();
     rows.push([`${n.day} (${n.season})`, ...Object.keys(plan).map((id) => { const c = w.state.tiles[id].crop; return c ? `${c.dead ? 'ÖLÜ' : Math.round(c.health)} g%${Math.round(c.growth * 100)}${c.pest > 0 ? ' z' + c.pest.toFixed(1) : ''}${c.disease > 0 ? ' h' + c.disease.toFixed(1) : ''}` : '—'; })]);
     w.nextDayAt(7);
@@ -210,7 +216,7 @@ function scenarioE(managed) {
       if (t.crop?.dead) { dead++; w.act('harvest', id); }
       if (t.crop?.stage >= 4) w.act('harvest', id);
       if (!t.crop && t.state === 'plowed') w.act('plant', id, 'seed_potato');
-      if (t.moisture < 45) w.act('water', id);
+      w.act('water', id);
       if (managed) { if (t.weeds > 0) w.act('weed', id); if (t.crop && (t.crop.pest > 0 || t.crop.disease > 0)) w.act('treat', id, 'organic_spray'); }
       if (t.weeds > 0 || (t.crop && (t.crop.pest > 0 || t.crop.disease > 0))) threatHours++;
     }
@@ -243,13 +249,13 @@ function perf() {
 
 // ---------- determinizm + kayıt ----------
 function determinism() {
-  const run = () => { const r = scenarioA('need'); return JSON.stringify(r.w.state); };
+  const run = () => { const r = scenarioA('daily'); return JSON.stringify(r.w.state); };
   const a = run(), b = run();
   return a === b;
 }
 
 function saveRoundTrip() {
-  const { w } = scenarioA('need');
+  const { w } = scenarioA('daily');
   const s = JSON.parse(JSON.stringify(w.state));
   const fixes = [];
   FarmSystem.validate(s, (p) => fixes.push(p));
@@ -286,21 +292,22 @@ function newGame() {
 }
 
 // ================= ÇIKTI =================
-console.log(`sim-farm — tohum ${SEED}`);
+console.log(`sim-farm — tohum ${SEED}${QA ? ` (DENEME: A eşiği ${QUALITY.thresholds.A})` : ''}`);
 const ng = newGame();
 console.log(`\nYeni oyun: ${ng.tiles} karo, ${ng.plowed} sürülmüş; envanter: ${ng.inv}`);
 console.log('Ret mesajları:', ng.reasons.join(' | '));
 console.log('tileInfo(34,8):', JSON.stringify({ crop: ng.info.crop && { name: ng.info.crop.name, readyIn: ng.info.crop.readyIn, q: ng.info.crop.qualityEstimate }, warnings: ng.info.warnings }));
 
 const a1 = scenarioA('daily');
-const a2 = scenarioA('need');
+const a2 = scenarioA('alt');
 const b = scenarioB();
 table('Patates, 24 karo (a, b)', ['senaryo', 'hasat günü', 'verim', 'kalite (adet)', 'min sağlık', 'ölü'],
   [a1, a2, b].map((r) => [r.label, r.readyDay, r.yield, r.q, r.health, r.dead]));
-console.log('Hazır olma (tek karo, nem<45 sulama):', readyHourProbe());
+console.log('Envanter patates yığınları (a1):', JSON.stringify(a1.w.state.inventory.items.potato));
+console.log('Hazır olma (tek karo, her gün 07:00 sulama):', readyHourProbe());
 console.log('(b) iz:', b.trace.slice(0, 9).join(' · '));
 
-table('(c) Aynı karoda patates ×3 (gübresiz, nem<45 sulama)', ['döngü', 'rotasyon', 'ort. süre (gün)', 'verim', 'kalite', 'N/P/K sonra'], scenarioC());
+table('(c) Aynı karoda patates ×3 (gübresiz, her gün sulama)', ['döngü', 'rotasyon', 'ort. süre (gün)', 'verim', 'kalite', 'N/P/K sonra'], scenarioC());
 
 const d = scenarioD();
 table('(d) 25. günde ekim → mevsim geçişi (sağlık, büyüme%)', ['gün', 'patates', 'buğday (frostHardy)', 'marul'], d.rows);
@@ -313,4 +320,4 @@ console.log(`\nPerformans: ${p.tiles} karo — onHour ${p.hourMs.toFixed(3)} ms,
 console.log(`Determinizm (aynı tohum iki koşu, state JSON eşit): ${determinism() ? 'EVET' : 'HAYIR'}`);
 const sr = saveRoundTrip();
 console.log(`Kayıt gidiş-dönüş: temiz kayıtta onarım ${sr.cleanFixes}; bozuk kayıtta onarılan: ${sr.badFixes.join(', ')}`);
-console.log(`\nNot: SOIL.waterAmount=${SOIL.waterAmount}, ilkbahar kaybı ${SOIL.moistureLossPerHour.spring}/saat (${(SOIL.moistureLossPerHour.spring * 24).toFixed(1)}/gün), patates bandı ${CROPS.potato.water}.`);
+console.log(`\nNot: SOIL.waterTarget=${SOIL.waterTarget}, ilkbahar kaybı ${SOIL.moistureLossPerHour.spring}/saat (${(SOIL.moistureLossPerHour.spring * 24).toFixed(1)}/gün), patates bandı ${CROPS.potato.water}.`);

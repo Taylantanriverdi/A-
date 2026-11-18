@@ -186,7 +186,7 @@ export function applyAction(state, bus, p) {
       const quality = gradeFor(careScore(c, careSample(t, c, def)));
       const organic = t.organic;
       const first = c.harvests === 0;
-      add(state, c.id, qty, quality);
+      add(state, c.id, qty, quality, organic);
       harvestSoil(t, c.id, def, first);
       if (def.regrowDays) {
         c.harvests += 1;

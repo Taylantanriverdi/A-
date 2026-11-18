@@ -47,7 +47,7 @@ export const THREATS = {
 
 // Kalite: careScore (0..100) → sınıf. Fiyat çarpanları Aşama 3 pazar tarafından kullanılır.
 export const QUALITY = {
-  thresholds: { A: 80, B: 55 },
+  thresholds: { A: 90, B: 55 },   // K13: günlük bakım → A, iki günde bir → B
   priceMult: { A: 1.4, B: 1.0, C: 0.65 },
   organicBonus: 0.15,
 };

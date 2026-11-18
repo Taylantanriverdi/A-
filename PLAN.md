@@ -264,7 +264,7 @@ export default {
 - Görsel aşamalar: **tohum → filiz → genç bitki → olgunlaşan → hasada hazır** (+ solgun/ölü varyantlar). Hasattan 3 gün sonra çürüme başlar.
 - Don: kış dışında ani don olayı veya mevsim dışı kalan ürün → sağlık −40. Kuraklık: nem <20 iken saatte sağlık −1.
 - Zararlı / hastalık / yabani ot: günlük olasılık (nem, sıcaklık, ekim nöbeti ihlali artırır). Kimyasal ilaç: %95 etkili, "organik" etiketi düşer. Organik sprey: %65 etkili, organik ürün pazarda +%15.
-- **Kalite (A/B/C):** `careScore` (sulama düzeni, besin, sağlık, zararlı süresi ortalaması, 0–100). ≥80 → A, 55–79 → B, <55 → C.
+- **Kalite (A/B/C):** `careScore` (sulama düzeni, besin, sağlık, zararlı süresi ortalaması, 0–100). ≥90 → A, 55–89 → B, <55 → C.
 
 ### Hayvan modeli
 - Değerler 0–100: açlık, susuzluk, sağlık, mutluluk. Açlık/susuzluk saatte azalır; 0'a yakınsa sağlık düşer.
@@ -487,6 +487,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K10 | Sulama nemi hedefe (80) doldurur, toplamaz; nem kaybı ilkbahar 1.2/saat | "Her gün sula" doğal ritmi cezalandırılmamalı; atlanan gün stres yaratmalı (sim-farm bulgusu) |
 | K11 | Alet seçiliyken tek parmak sürükleme = boyama, kamera iki parmak/sağ tık | 24+ karoyu tek tek dokunmak mobilde yorucu |
 | K12 | Envanter yığını (kalite, organik) çiftiyle anahtarlanır | Aşama 3 organik pazar bonusu |
+| K13 | A kalite eşiği careScore 90 | Günlük bakım A, iki günde bir sulama B olmalı (sim-farm) |
 
 ---
 
