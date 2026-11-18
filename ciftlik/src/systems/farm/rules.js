@@ -72,7 +72,7 @@ export function canApply(state, action, season) {
     }
     case 'water':
       if (t.state !== 'plowed') return NO(REASONS.notPlowed);
-      if (t.moisture > SOIL.waterlogAbove) return NO(REASONS.tooWet);
+      if (t.moisture > SOIL.wetEnoughAbove) return NO(REASONS.tooWet);
       return OK;
     case 'fertilize':
       if (!item || item.category !== 'fertilizer') return NO(REASONS.pickFert);

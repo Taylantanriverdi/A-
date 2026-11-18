@@ -1,5 +1,5 @@
 // Toprak yardımcıları — saf fonksiyonlar (PLAN.md §3, §8). Değerler data/farming.js'ten.
-import { SOIL } from '../../data/farming.js';
+import { SOIL, THREATS } from '../../data/farming.js';
 import { P1 } from '../../core/constants.js';
 
 export const TILE_STATES = ['grass', 'plowed'];
@@ -64,7 +64,8 @@ export function moistureHour(t, season, weatherType) {
 }
 
 export function water(t) {
-  t.moisture = clamp(t.moisture + SOIL.waterAmount, 0, 100);
+  // "Doldurma" semantiği: nemi hedefe çıkarır, asla üstüne çıkarmaz.
+  if (t.moisture < SOIL.waterTarget) t.moisture = SOIL.waterTarget;
 }
 
 /** Gübre/kireç uygular. item = ITEMS[...] (category 'fertilizer'). */
@@ -97,12 +98,19 @@ export function releasePending(t) {
   return true;
 }
 
-/** Hasat sonrası besin tüketimi + baklagil bonusu + geçmiş (yalnızca ilk hasatta). */
+/** Yabani ot besin çalar (günlük): ot yoğunluğu × THREATS.weedNutrientPerDay. */
+export function weedSteal(t) {
+  if (!(t.weeds > 0)) return;
+  const d = t.weeds * THREATS.weedNutrientPerDay;
+  t.n = t.n > d ? t.n - d : 0;
+  t.p = t.p > d ? t.p - d : 0;
+  t.k = t.k > d ? t.k - d : 0;
+}
+
+/** Hasat sonrası besin tüketimi (baklagilde negatif uptake.n N ekler) + geçmiş (yalnızca ilk hasatta). */
 export function harvestSoil(t, cropId, def, firstHarvest) {
   const u = def.uptake;
   t.n -= u.n; t.p -= u.p; t.k -= u.k;
-  // Baklagil: uptake.n negatifse (veri N ekliyor) bonus ayrıca eklenmez — çift sayım olmasın.
-  if (def.legume && u.n >= 0) t.n += SOIL.legumeNBonus;
   clampSoil(t);
   if (firstHarvest) {
     t.history.push(cropId);

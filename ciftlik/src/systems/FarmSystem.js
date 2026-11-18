@@ -11,7 +11,7 @@ import { createRng } from '../core/Rng.js';
 import { isPlainObject } from '../core/GameState.js';
 import { add, remove } from './InventorySystem.js';
 import {
-  TILE_STATES, clamp, tileKey, parseKey, createTile, moistureHour, water, applyFertilizer, releasePending, harvestSoil,
+  TILE_STATES, clamp, tileKey, parseKey, createTile, moistureHour, water, applyFertilizer, releasePending, harvestSoil, weedSteal,
 } from './farm/soil.js';
 import { REGROW_GROWTH, inSeason, growthRatePerHour, stageFor, rotationMult } from './farm/growth.js';
 import { healthDeltaHour, dailyWeeds, dailyPestDisease, spreadTo, applyTreatment } from './farm/threats.js';
@@ -267,6 +267,7 @@ function onDay(state, bus, ctx) {
     const t = list[i];
     let ch = false;
     releasePending(t);
+    weedSteal(t);
     if (t.state === 'plowed' && t.crop === null) {
       t.idleDays += 1;
       if (t.idleDays >= SOIL.grassRecoverDays) {
