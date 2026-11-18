@@ -11,8 +11,8 @@
 |---|---|---|
 | 0 | İşçi ajanları + PLAN.md | ✅ Onaylandı |
 | 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Onaylandı |
-| 2 | Tarım ve toprak mekaniği | ✅ Tamamlandı (QA 2 tur + son düzeltmeler, 0 açık hata) — onay bekleniyor |
-| 3 | Envanter, mağaza, pazar | — |
+| 2 | Tarım ve toprak mekaniği | ✅ Onaylandı |
+| 3 | Envanter, mağaza, pazar | 🔨 Devam ediyor |
 | 4 | Hayvancılık | — |
 | 5 | Üretim binaları ve zincirleri | — |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
@@ -665,3 +665,81 @@ InventorySystem dışa açık: `add(state, itemId, qty, q)`, `remove(state, item
 - `tile:tap` + seçili alet → `farm:action`. İncele modunda **karo bilgi kartı** (cam panel): nem çubuğu, N/P/K çubukları, pH, ekin adı/aşama/ilerleme %, kalan gün, sağlık, tahmini kalite (A/B/C rozet), zararlı/hastalık/ot uyarıları, son ekilen ürünler. `farm:changed` ile canlı güncellenir.
 - `farm:result ok:false` → toast (reason). `farm:harvested` → küçük "+2 Patates (A)" bildirimi. `xp:gained` göstergesi (ince).
 - Ürün/tohum/gübre ikonları SVG, `crops.js` / `items.js` renklerinden.
+
+---
+
+## 9. Aşama 3 Entegrasyon Sözleşmesi — Envanter, Mağaza, Pazar (bağlayıcı)
+
+Beyin veri dosyaları (DEĞİŞTİRME, öner): `src/data/economy.js` (fiyat formülü parametreleri, kanallar), `src/data/shop.js` (katalog + seviye kilidi), `src/data/progression.js` (XP eğrisi, açılımlar, envanter yuvası), `crops.js` `freshDays`.
+
+### Dosya sahipliği
+| İşçi | Dosyalar |
+|---|---|
+| economy-dev | `src/systems/MarketSystem.js`, `src/systems/EconomySystem.js`, `src/systems/market/*` (pricing.js — saf), `tools/sim-economy.mjs` |
+| gameplay-dev | `src/systems/InventorySystem.js` (kapasite, bozulma), yeni `src/systems/ProgressionSystem.js`, FarmSystem'de XP refaktörü |
+| ui-dev | `src/ui/inventoryPanel.js`, `shopPanel.js`, `marketPanel.js`, `sparkline.js`, HUD düğmeleri, seviye atlama kutlaması |
+| visual-dev | `src/world/MarketStall.js` (pazar tezgâhı), satış/alış efektleri, `src/render/textures/*` |
+| engine-dev | `src/main.js` (sistem/validator kaydı, debug), tezgâh tıklaması → `ui:open`, `tools/make-play.mjs` (oynanabilir sürüm paketi) |
+
+### State
+```js
+state.finance = { money, ledger: [{ day, min, amount, category, label, itemId?, qty? }],   // en fazla LEDGER_MAX_ENTRIES (eskiler atılır)
+                  dailySummary: [{ day, income, expense, byCategory: { sales: 120, seeds: -60 } }],   // son 112 gün
+                  receivables: [{ dueMinute, amount, label }] }                             // toptancı ödemeleri
+state.market = { prices: { [itemId]: { saturation: 1, noise: 1, soldToday: 0 } },
+                 history: { [itemId]: [B-kalite pazar yeri fiyatı, … son 28 gün] },
+                 activeEvents: [] }                                                          // Aşama 7
+state.inventory = { capacity: 24 /* yuva = yığın */, items: { [itemId]: [{ q, organic, qty /* ≤ 99 */, age }] } }
+state.player = { level: 1, xp: 0 /* mevcut seviyedeki XP */, totalXp: 0, reputation: 10 }
+```
+
+### Fiyat formülü (economy-dev, `systems/market/pricing.js` — saf, UI import eder)
+```
+birim = crops.basePrice × seasonMult(crop, season) × olay (activeEvents; şimdilik 1) × doygunluk × gürültü
+        × QUALITY.priceMult[q] × (organic ? 1 + QUALITY.organicBonus : 1) × CHANNELS[kanal].mult
+```
+- Bir satışta her birim doygunluğu `×(1 − perUnit[kanal])` düşürür → toplam = birimlerin sırayla toplamı (ilk birim en pahalı). Yuvarlama: toplam tam ₺'ye.
+- `quote(state, { itemId, q, organic, qty, channel }, now) → { ok, reason?, unit, total, avg, limitLeft, minLot }`
+- `currentPrice(state, itemId, now) → B kalite pazar yeri birim fiyatı` ; `trend(state, itemId) → { change: -0.12 .. +0.2, history: [...] }`
+- onDay: doygunluk açığın %15'i kapanır; gürültü ±%4 rastgele yürüyüş (0.85–1.15, `ctx.rng`); `soldToday = 0`; history'ye günün fiyatı eklenir.
+- onHour: vadesi gelen `receivables` ödenir (`transact`, kategori `wholesale`).
+
+### Para (economy-dev, EconomySystem)
+- **Tek giriş noktası:** `transact(state, bus, { amount, category, label, itemId?, qty? }) → boolean` (negatif tutar bakiye yetmezse `false`, hiçbir şey değişmez). Defter + günlük özet günceller, `money:changed {amount, balance, category}` yayar. Debug addMoney de bunu kullanır (kategori `other`).
+- Dışa açık: default nesne `EconomySystem` üzerinde `transact`, `validate`.
+
+### Komutlar ve olaylar
+| Olay | Yük | Yön |
+|---|---|---|
+| `market:sell` | `{ itemId, q, organic, qty, channel }` | UI → MarketSystem |
+| `market:result` | `{ ok, reason?, itemId, qty, total, channel, paidNow }` | MarketSystem → UI, MarketStall (efekt) |
+| `shop:buy` | `{ itemId, qty }` | UI → MarketSystem |
+| `shop:result` | `{ ok, reason?, itemId, qty, total }` | MarketSystem → UI |
+| `market:pricesUpdated` | `{}` (günlük) | MarketSystem → UI |
+| `xp:add` | `{ amount, reason }` | Farm/Market → ProgressionSystem |
+| `xp:gained` | `{ amount, reason, level, xp, toNext }` | ProgressionSystem → UI |
+| `level:up` | `{ level, unlocks: [...] }` | ProgressionSystem → UI, Cinematics |
+| `inventory:full` | `{ itemId }` | InventorySystem → UI |
+| `inventory:spoiled` | `{ itemId, fromQ, toQ /* null = çürüdü */, qty }` | InventorySystem → UI |
+| `ui:open` | `{ panel: 'market'|'shop'|'inventory' }` | herkes → UI |
+
+- Satış kuralları: envanterde yeterli adet; pazar yerinde ürün başına günlük 40 birim (`soldToday`); toptancı seviye ≥ 3 ve en az 50 birim, ödeme ertesi gün 08:00. Yalnızca `category: 'crop'` eşyalar satılır (Aşama 5'te işlenmiş ürünler eklenecek).
+- Mağaza kuralları: seviye kilidi (`shop.js`), bakiye (`transact` false → "Yeterli paran yok"), envanter yeri (yoksa "Envanter dolu"); alınan eşyanın organikliği `ITEMS[id].organic`.
+- XP: hasat (FarmSystem → `xp:add`, değer = B pazar değeri × 0.1), satış (MarketSystem → `xp:add`, hasılat × 0.02), çapa/ekim 1. FarmSystem artık `state.player.xp`'ye doğrudan yazmaz.
+
+### Envanter (gameplay-dev)
+- Kapasite = yığın sayısı (`state.inventory.capacity`, başlangıç `INVENTORY.startSlots` = 24); yığın en fazla 99 adet. Yeni yığın gerekiyor ve yer yoksa `add` eklenebildiği kadar ekler, kalanı döndürür → FarmSystem hasatta yer yoksa hasat etmez ("Envanter dolu"), `inventory:full`.
+- `add(state, itemId, qty, q, organic) → eklenen`, `remove`, `count`, `freeSlots(state)`, `canAdd(state, itemId, qty, q, organic) → number`.
+- Bozulma (onDay): yalnızca `crop` kategorisi; yığın `age++`; `age ≥ freshDays` → bir kalite düşer (A→B→C), `age = 0`, aynı (q, organic) yığını varsa birleşir (age = max); C'den sonra yığın yok olur ("çürüdü"). `inventory:spoiled` yayar (gün başına ürün başına bir olay).
+
+### Görsel (visual-dev)
+- **Pazar tezgâhı**: P1 dışında, patikanın çıktığı yolun yanında, dünya ≈ (2770, 860) ayak noktası (karo ~43,19). Tenteli ahşap tezgâh, sandıklarda envanterdeki en çok bulunan 3 ürünün ikonları; gece fener. `depthForY`, gölge. Tıklanınca (engine `tile:tap` ile tezgâh karoları 42–44 × 18–19) `ui:open {panel:'market'}`.
+- **Efektler**: `market:result ok` → tezgâhtan altın sikke parçacıkları ve kısa parıltı; `level:up` → ekran ortasında ince altın ışık dalgası (post-process'e yük bindirmeden).
+
+### UI (ui-dev)
+- HUD'a üç düğme (masaüstünde etiketli, mobilde ikon): **Envanter (I)**, **Pazar (P)**, **Mağaza (M)**; `ui:open` olayıyla da açılır. Aynı anda tek büyük panel.
+- **Envanter paneli**: yuva ızgarası (kullanılan/kapasite), her yığında ikon, adet, kalite rozeti, organik yaprağı, tazelik çubuğu (age / freshDays), kategori filtreleri.
+- **Pazar paneli**: satılabilir yığınlar listesi; her satırda birim fiyat (o yığının kalite/organik değeriyle), 28 günlük sparkline + değişim yüzdesi, doygunluk göstergesi, kanal seçimi (Pazar yeri / Toptancı — kilitliyse "Seviye 3"), adet kaydırıcısı (limit ve minLot'a göre), anlık `quote` toplamı, "Sat" düğmesi. Satış sonrası para sayacı ve kısa bildirim.
+- **Mağaza paneli**: sekmeler (Tohumlar / Gübre / Bakım), kartlarda ikon, ad, fiyat, mevsim etiketi (tohumlar), kilitliyse "Seviye N", adet seçici, toplam, "Satın al"; bakiye yetmezse düğme pasif.
+- **Seviye**: XP göstergesi gerçek ilerlemeyi gösterir (`xp / toNext`); `level:up` → zarif kutlama kartı + açılımlar listesi.
+- Bozulma ve dolu envanter bildirimleri (toast; spam yok).
