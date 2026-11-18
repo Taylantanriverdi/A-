@@ -33,7 +33,7 @@ const MarketSystem = optionalSystem('MarketSystem.js', 'market');
 const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
 const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
 // Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
-const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, ProgressionSystem, WorkerSystem].filter(Boolean);
+const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ WorkerSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);

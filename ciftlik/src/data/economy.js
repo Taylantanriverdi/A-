@@ -22,7 +22,7 @@ export const NOISE = { dailyStep: 0.04, min: 0.85, max: 1.15 }; // günlük rast
 
 export const CHANNELS = {
   market:    { name: 'Pazar yeri', mult: 0.85, dailyLimitPerItem: 40, minLot: 1,  payDelayDays: 0, level: 1 },
-  wholesale: { name: 'Toptancı',   mult: 0.95, dailyLimitPerItem: Infinity, minLot: 50, payDelayDays: 1, payHour: 8, level: 3 },
+  wholesale: { name: 'Toptancı',   mult: 0.95, dailyLimitPerItem: Infinity, minLot: 50, payDelayDays: 1, payHour: 8, level: 1 },
 };
 
 export const PRICE_HISTORY_DAYS = 28;

@@ -2,12 +2,12 @@
 // Makine binaları sabit arsalarda (P1'in doğusu, karo 53–66). hours: oyun saati. kwh: iş başına elektrik.
 // Çıktı kalitesi = girdilerin en düşük kalitesi; organik = tüm girdiler organikse.
 export const MACHINES = {
-  dairy:    { name: 'Mandıra',          price: 9000, level: 5,  lot: { x0: 53, x1: 56, y0: 6,  y1: 8 },  color: '#f2efe9' },
-  mill:     { name: 'Değirmen',         price: 7000, level: 5,  lot: { x0: 58, x1: 61, y0: 6,  y1: 8 },  color: '#d8c27a' },
-  bakery:   { name: 'Fırın',            price: 5000, level: 6,  lot: { x0: 63, x1: 66, y0: 6,  y1: 8 },  color: '#c96a3a' },
-  cannery:  { name: 'Konserve Atölyesi', price: 4500, level: 4,  lot: { x0: 53, x1: 56, y0: 11, y1: 13 }, color: '#e8404a' },
-  spinning: { name: 'İplikhane',        price: 6000, level: 6,  lot: { x0: 58, x1: 61, y0: 11, y1: 13 }, color: '#f1ece2' },
-  loom:     { name: 'Dokuma Tezgâhı',   price: 9000, level: 10, lot: { x0: 63, x1: 66, y0: 11, y1: 13 }, color: '#7a5aa8' },
+  dairy:    { name: 'Mandıra',          price: 9000, level: 1,  lot: { x0: 53, x1: 56, y0: 6,  y1: 8 },  color: '#f2efe9' },
+  mill:     { name: 'Değirmen',         price: 7000, level: 1,  lot: { x0: 58, x1: 61, y0: 6,  y1: 8 },  color: '#d8c27a' },
+  bakery:   { name: 'Fırın',            price: 5000, level: 1,  lot: { x0: 63, x1: 66, y0: 6,  y1: 8 },  color: '#c96a3a' },
+  cannery:  { name: 'Konserve Atölyesi', price: 4500, level: 1,  lot: { x0: 53, x1: 56, y0: 11, y1: 13 }, color: '#e8404a' },
+  spinning: { name: 'İplikhane',        price: 6000, level: 1,  lot: { x0: 58, x1: 61, y0: 11, y1: 13 }, color: '#f1ece2' },
+  loom:     { name: 'Dokuma Tezgâhı',   price: 9000, level: 1, lot: { x0: 63, x1: 66, y0: 11, y1: 13 }, color: '#7a5aa8' },
 };
 
 export const MACHINE_RULES = {
