@@ -95,7 +95,7 @@ export const STR = {
   // ---- Aşama 3: envanter / pazar / mağaza / seviye ----
   nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza' },
   navKey: (name, k) => `${name} (${k})`,
-  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası' },
+  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası', machine: 'Atölye' },
   slotsUsed: (u, c) => `${u}/${c} yuva`,
   invFilters: { all: 'Tümü', crop: 'Ürün', animal: 'Hayvansal', processed: 'İşlenmiş', seed: 'Tohum', fertilizer: 'Gübre', chemical: 'Bakım', feed: 'Yem' },
   invEmpty: 'Bu bölümde eşya yok',
@@ -184,6 +184,22 @@ export const STR = {
     collected: (got, nameOf) => 'Toplandı: ' + Object.keys(got).map((id) => `${got[id]} ${nameOf(id)}`).join(', '),
     born: (name) => `${name} adında yeni bir yavru doğdu!`,
     name: { coop: 'Kümes', barn: 'Ahır', hive: 'Arı kovanı' },
+  },
+  // ---- Aşama 5: atölyeler ----
+  mach: {
+    tab: 'Atölyeler',
+    builtShort: 'Kurulu',
+    emptyLot: 'Boş atölye arsası',
+    emptyHint: 'Burada atölyeyi kurup ürünleri işleyebilirsin.',
+    makes: (type) => ({ dairy: 'Peynir, tereyağı, yoğurt', mill: 'Un', bakery: 'Ekmek', cannery: 'Reçel, meyve suyu', spinning: 'İplik', loom: 'Kumaş' })[type] || '',
+    recipes: 'Tarifler', queue: 'Kuyruk', output: 'Çıktı kutusu', outputEmpty: 'Kutu boş', queueEmpty: 'Kuyruk boş',
+    condition: 'Durum', repair: 'Bakım', collect: 'Topla', add: 'Kuyruğa ekle',
+    auto: 'Otomatik', autoOff: 'Kapalı', autoHint: 'Kuyruk boşalınca tarifi kendisi ekler.',
+    time: (h) => `${h} sa`, kwh: (n) => `${n} kWh`, hours: (m) => `${Math.floor(m / 60)}sa ${m % 60}dk`,
+    profit: (n) => `${n >= 0 ? '+' : '−'}${Math.abs(n).toLocaleString('tr-TR')} ₺/iş`,
+    have: 'Girdi var', missing: 'Girdi yok', stopped: 'Makine bakım istiyor', slow: 'Yıpranmış: iş %30 yavaş',
+    waiting: 'Bekliyor', done: (name, qty) => `${qty} ${name} hazır`,
+    collected: (got, nameOf) => 'Toplandı: ' + Object.keys(got).map((id) => `${got[id]} ${nameOf(id)}`).join(', '),
   },
   panelShortcuts: 'I envanter · P pazar · M mağaza · Esc kapat',
 };

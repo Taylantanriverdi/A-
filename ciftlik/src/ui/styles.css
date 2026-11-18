@@ -1594,3 +1594,22 @@
   #ui .gauges { grid-template-columns: 1fr 1fr; }
 }
 #ui .bld [hidden], #ui .bld-card[hidden], #ui .gauge[hidden], #ui .feed-pick[hidden] { display: none; }
+
+/* ---- Aşama 5: atölye paneli ---- */
+#ui .bigpanel[data-panel='machine'] .bp-tabs { display: none; }
+#ui .bigpanel[data-panel='machine'] .bp-title { display: block; }
+#ui .mach .m-recipes { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+#ui .mach .m-rec .ah { gap: 8px; }
+#ui .mach .m-rec .ri { width: 28px; height: 28px; flex: none; }
+#ui .mach .m-rec .ri svg { width: 100%; height: 100%; }
+#ui .mach .m-rec .rprofit { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--good); }
+#ui .mach .m-rec .rprofit.neg { color: var(--bad); }
+#ui .mach .m-rec .rmeta.none { color: var(--accent); }
+#ui .mach .m-rec .ab button { min-height: var(--hit); width: 100%; }
+#ui .mach .m-rec .ab button:disabled { opacity: 0.4; }
+#ui .mach .m-note { margin: 0; font-size: 12.5px; color: var(--text-dim); line-height: 1.35; }
+#ui .mach .m-note[hidden] { display: none; }
+#ui .mach .qrow { display: flex; flex-direction: column; gap: 4px; }
+#ui .mach .qrow + .qrow { margin-top: 6px; }
+#ui .mach .qrow .gl { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text); }
+#ui .mach .bld-card[hidden], #ui .mach .bld-empty[hidden] { display: none; }

@@ -30,8 +30,8 @@ export const RECIPES = {
   bread:        { machine: 'bakery',   in: { flour: 1 },      out: { bread: 2 },        hours: 3, kwh: 5 },
   strawberry_jam: { machine: 'cannery', in: { strawberry: 3 }, out: { strawberry_jam: 1 }, hours: 4, kwh: 2 },
   grape_jam:    { machine: 'cannery',  in: { grape: 3 },      out: { grape_jam: 1 },    hours: 4, kwh: 2 },
-  tomato_juice: { machine: 'cannery',  in: { tomato: 4 },     out: { tomato_juice: 2 }, hours: 2, kwh: 2 },
-  grape_juice:  { machine: 'cannery',  in: { grape: 4 },      out: { grape_juice: 2 },  hours: 2, kwh: 2 },
+  tomato_juice: { machine: 'cannery',  in: { tomato: 3 },     out: { tomato_juice: 2 }, hours: 2, kwh: 2 },
+  grape_juice:  { machine: 'cannery',  in: { grape: 3 },      out: { grape_juice: 2 },  hours: 2, kwh: 2 },
   yarn:         { machine: 'spinning', in: { wool: 2 },       out: { yarn: 1 },         hours: 4, kwh: 3 },
   fabric:       { machine: 'loom',     in: { yarn: 2 },       out: { fabric: 1 },       hours: 8, kwh: 6 },
 };
