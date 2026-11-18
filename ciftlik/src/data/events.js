@@ -12,7 +12,7 @@ export const EVENTS = {
                  effect: { sickChanceMult: 5 }, text: () => 'Bölgede hayvan hastalığı salgını var. Ahırları temiz tut!' },
   priceCrash:  { title: 'Fiyat çöküşü', chance: 0.02, seasons: null, days: [5, 8],
                  effect: { priceMult: [0.6, 0.7], priceItems: 'randomSellable1' }, text: (e) => `${e.itemNames} fiyatları %${e.pct} düştü.` },
-  subsidy:     { title: 'Devlet teşviki', chance: 0.015, seasons: null, days: [7, 7],
+  subsidy:     { title: 'Devlet teşviki', chance: 0.007, seasons: null, days: [7, 7],
                  effect: { buildDiscount: 0.2, grant: 2000 }, text: () => 'Devlet teşviki: 2.000 ₺ hibe ve 7 gün boyunca inşaatlarda %20 indirim!' },
   pestWave:    { title: 'Zararlı istilası', chance: 0.02, seasons: ['summer'], days: [3, 3],
                  effect: { pestChanceMult: 3 }, text: () => 'Zararlı istilası: önümüzdeki 3 gün ekinlerini ilaçla.' },
