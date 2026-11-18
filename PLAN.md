@@ -16,7 +16,7 @@
 | 4 | Hayvancılık | ✅ Onaylandı |
 | 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
 | 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Onaylandı |
-| 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | 🔨 Devam ediyor |
+| 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | ✅ Tamamlandı (sim-economy + beyin birleşik duman testi) — onay bekleniyor |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
 | 8 | İşçiler, makineler, arazi genişletme | — |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
@@ -502,6 +502,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K20 | Seviye/XP sistemi kaldırıldı; tüm içerik baştan açık, tek koşul para | Kullanıcı isteği |
 | K21 | Serbest yerleşim; başlangıç arazisi karo 20..68 × 5..21; sabit yalnızca çiftlik evi ve köy yolu | Kullanıcı kendi çiftlik düzenini kurmak istiyor |
 | K22 | Kredi limiti = 5.000 + brüt varlık × 0.4 − borç (borç bir kez düşülür); vergi matrahı yatırımları gider sayar | Oyuncu dostu, sade |
+| K23 | Kredi anaparası günlük gelir/gider ve kâr-zararda sayılmaz | Grafikte kredi gelir gibi görünüyordu |
 | K18 | Hayvan ürününde A için mutluluk ≥ 90 (sevme gerekir); tavuk 400 ₺, yumurta 15 ₺ | sim-animals: kümes ve ahır yatırımı ~47 günde geri döner |
 | K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 

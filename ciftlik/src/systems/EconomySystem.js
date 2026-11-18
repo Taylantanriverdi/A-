@@ -65,7 +65,7 @@ export function transact(state, bus, { amount, category, label, itemId, qty } = 
   f.ledger.push(entry);
   if (f.ledger.length > LEDGER_MAX_ENTRIES) f.ledger.splice(0, f.ledger.length - LEDGER_MAX_ENTRIES);
   const s = summaryFor(f, day);
-  if (a > 0) s.income += a; else s.expense += -a;
+  if (cat !== 'loan') { if (a > 0) s.income += a; else s.expense += -a; } // K23: kredi anaparası gelir/gider sayılmaz (defterde ve byCategory'de görünür)
   s.byCategory[cat] = (s.byCategory[cat] || 0) + a;
   if (isPlainObject(state.stats)) {
     if (a > 0) state.stats.earned = (Number(state.stats.earned) || 0) + a;
