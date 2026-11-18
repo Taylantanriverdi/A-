@@ -42,17 +42,37 @@ function isPlainObject(v) {
 }
 
 /**
- * Eksik alanları varsayılanlarla tamamlar (yüklenen/migrate edilen kayıt için).
- * Yalnızca düz nesnelerde derine iner; dizilere ve mevcut değerlere dokunmaz.
+ * Eksik ve tipi bozuk alanları varsayılanlarla onarır (yüklenen/migrate edilen kayıt için).
+ * Kurallar (varsayılanın tipine göre):
+ *  - düz nesne → hedef düz nesne değilse varsayılanla değiştirilir, değilse derine inilir;
+ *  - dizi → hedef dizi değilse varsayılan;
+ *  - sayı → sonlu sayı değilse varsayılan; string/boolean → aynı tip değilse varsayılan;
+ *  - null varsayılan (ör. camera) → olduğu gibi bırakılır (özel doğrulama çağıranın işi).
+ * Varsayılanda olmayan ek anahtarlara dokunulmaz.
+ * @param {object} target
+ * @param {object} defaults
+ * @param {(path:string)=>void} [onFix] onarılan her alan için çağrılır
+ * @param {string} [path]
  */
-export function fillDefaults(target, defaults) {
+export function fillDefaults(target, defaults, onFix, path = '') {
   for (const k of Object.keys(defaults)) {
     const d = defaults[k];
-    if (!(k in target) || target[k] === undefined) {
+    const v = target[k];
+    const p = path ? `${path}.${k}` : k;
+    let ok;
+    if (d === null) ok = true;
+    else if (isPlainObject(d)) ok = isPlainObject(v);
+    else if (Array.isArray(d)) ok = Array.isArray(v);
+    else if (typeof d === 'number') ok = typeof v === 'number' && Number.isFinite(v);
+    else ok = typeof v === typeof d;
+    if (!ok) {
+      if (k in target && onFix) onFix(p);
       target[k] = d;
-    } else if (isPlainObject(d) && isPlainObject(target[k])) {
-      fillDefaults(target[k], d);
+    } else if (isPlainObject(d)) {
+      fillDefaults(v, d, onFix, p);
     }
   }
   return target;
 }
+
+export { isPlainObject };
