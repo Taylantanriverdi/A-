@@ -2,9 +2,12 @@
 // Her kayıt: Container (ayak noktasında, scaleY = zemin kısaltması) içinde döndürülmüş + uzatılmış silüet.
 // length = clamp(1/tan(elev), 0.3, 4); alpha = paletGölge × yoğunluk × (1 − bulut×0.6). Gece ay gölgesi zayıf.
 import { DEPTH } from '../core/constants.js';
-import { clamp } from './util.js';
+import { clamp, smoothstep } from './util.js';
 
 const FORESHORTEN = 0.56; // zemin düzleminde derinlik ekseni basıklığı
+const MAX_LEN = 3.4;       // alçak güneşte gölge boyu üst sınırı (yükseklik katı)
+const MIN_SUN_ALPHA = 0.2; // güneş ufkun üstündeyken gölge alfasının tabanı (sis/bulut öncesi)
+const FOOT_LIFT = 3;       // gölge pivotu ayağın biraz içinde başlar (silüet tabanıyla örtüşür, boşluk kalmaz)
 
 export default class ShadowSystem {
   constructor(scene) {
@@ -22,7 +25,7 @@ export default class ShadowSystem {
     const key = opts.shadowKey || obj?.texture?.key;
     let tex = null;
     if (key && s.textures.exists(key + '__sh')) tex = key + '__sh';
-    const c = s.add.container(opts.footX ?? obj?.x ?? 0, opts.footY ?? obj?.y ?? 0).setDepth(DEPTH.SHADOW);
+    const c = s.add.container(opts.footX ?? obj?.x ?? 0, (opts.footY ?? obj?.y ?? 0) - FOOT_LIFT).setDepth(DEPTH.SHADOW);
     const it = { obj, opts, c, img: null, ao: null, base: key, meta: null, removed: false };
     if (tex) {
       it.meta = s.textures.get(tex).customData;
@@ -38,7 +41,7 @@ export default class ShadowSystem {
     const self = this;
     return {
       remove() { if (it.removed) return; it.removed = true; it.c.destroy(); const i = self.items.indexOf(it); if (i >= 0) self.items.splice(i, 1); },
-      set(p) { Object.assign(it.opts, p); if (p.footX !== undefined || p.footY !== undefined) it.c.setPosition(it.opts.footX, it.opts.footY); if (p.width !== undefined) it.ao.setDisplaySize(p.width * 1.15, Math.max(10, p.width * 0.32)); },
+      set(p) { Object.assign(it.opts, p); if (p.footX !== undefined || p.footY !== undefined) it.c.setPosition(it.opts.footX, it.opts.footY - FOOT_LIFT); if (p.width !== undefined) it.ao.setDisplaySize(p.width * 1.15, Math.max(10, p.width * 0.32)); },
     };
   }
 
@@ -53,16 +56,25 @@ export default class ShadowSystem {
   /** env.sun / env.moon / env.day.shadowAlpha / env.cloud */
   update(env) {
     const sun = env.sun, moon = env.moon;
-    let src = sun, k = sun.intensity;
+    let src = sun, k = sun.intensity, floor = 0;
     if (sun.elevationDeg <= 0.5 && moon.elevationDeg > 0) { src = moon; k = moon.intensity * 0.9; }
     else if (sun.elevationDeg <= 0.5) k = 0;
+    else {
+      // Güneş doğar doğmaz gölge vardır (alçak güneş = en uzun gölge); yoğunluk rampası gölgeyi silmesin.
+      const up = smoothstep(0.5, 4, sun.elevationDeg);
+      k = Math.max(k, up * 0.85);
+      floor = MIN_SUN_ALPHA * up;
+    }
     const elev = Math.max(2, src.elevationDeg) * Math.PI / 180;
-    this.len = clamp(1 / Math.tan(elev), 0.3, 4);
+    this.len = clamp(1 / Math.tan(elev), 0.3, MAX_LEN);
     // zemin yönü: güneşin tersine yatay, izleyiciye doğru (güneş ufkun gerisinde)
     const d = clamp(src.dir, -1, 1);
     const gx = -d * 0.95, gy = 0.3 + 0.7 * Math.sqrt(Math.max(0, 1 - d * d));
     this.rot = Math.atan2(gx, -gy);
-    this.alpha = clamp(env.day.shadowAlpha * k * (1 - env.cloud * 0.6) * 1.15, 0, 0.5);
+    // Sis parçacıkları gölgenin üstünde çizilir: sis yoğunluğunu kısmen telafi et (tamamen yutulmasın).
+    const fogComp = 1 + env.day.fog * 0.55;
+    const cloudK = 1 - env.cloud * 0.6;
+    this.alpha = clamp(Math.max(env.day.shadowAlpha * k * 1.15 * fogComp, floor) * cloudK, 0, 0.5);
     this.aoAlpha = 0.18 + 0.22 * env.day.light;
     for (let i = 0; i < this.items.length; i++) this._apply(this.items[i]);
   }

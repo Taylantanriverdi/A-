@@ -290,71 +290,95 @@ function foreground(scene) {
   }
 }
 
-/** Ufuk dibi: düzensiz çalı/gövde kümeleri (dalgalı alt kenar, zemine farklı yüksekliklerde oturur). Gri tonlu. meta.groundY */
+/** Ufuk dibi: düzensiz çalı/gövde kümeleri (dalgalı alt kenar, zemine farklı yüksekliklerde oturur).
+ * Açık gri tonlu, tepeden ışıklı (tint ile yeşil + atmosfer rengi alır; öğlende düz koyu bant okunmasın). meta.groundY */
 function treeline(scene, canvasMode) {
   const key = 'env_treeline'; if (scene.textures.exists(key)) return;
   const w = LAYER_W, h = 110, groundY = 84; const { canvas, ctx } = makeCanvas(w, h); const r = mulberry32(81);
   const wrapDraw = (fn) => { for (const off of [-w, 0, w]) fn(off); };
-  // arka sıra: koyu yumuşak çalı kütlesi, tabanı dalgalı (bazıları zemine taşar)
-  for (let x = -30; x < w + 30; x += 8 + r() * 14) {
-    const rad = 6 + r() * 13, foot = groundY - 3 + r() * 7, g = 105 + Math.round(r() * 25);
-    wrapDraw((o) => { ctx.fillStyle = `rgb(${g},${g},${g})`; ctx.beginPath(); ctx.ellipse(x + o, foot - rad * 0.55, rad * 1.25, rad * 0.8, 0, 0, Math.PI * 2); ctx.fill(); });
-  }
-  // gövdeler ve küçük ağaçlar (farklı yükseklik)
-  for (let i = 0; i < 55; i++) {
-    const x = r() * w, foot = groundY - 2 + r() * 10, th = 8 + r() * 16, g = 90 + Math.round(r() * 20);
+  const blob = (x, y, rx, ry, lo, hi) => {
     wrapDraw((o) => {
-      ctx.fillStyle = `rgb(${g},${g},${g})`; ctx.fillRect(x + o - 1.2, foot - th, 2.4, th);
-      const cg = g + 22; ctx.fillStyle = `rgb(${cg},${cg},${cg})`; ctx.beginPath(); ctx.ellipse(x + o, foot - th - 4, 4 + r() * 4, 5 + r() * 4, 0, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(x + o - rx * 0.35, y - ry * 0.55, Math.max(1, ry * 0.15), x + o, y, Math.max(rx, ry) * 1.1);
+      g.addColorStop(0, `rgb(${hi},${hi},${hi})`); g.addColorStop(0.55, `rgb(${(hi + lo) >> 1},${(hi + lo) >> 1},${(hi + lo) >> 1})`); g.addColorStop(1, `rgb(${lo},${lo},${lo})`);
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x + o, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
     });
+  };
+  // arka sıra: yumuşak çalı kütlesi, tabanı dalgalı (bazıları zemine taşar)
+  for (let x = -30; x < w + 30; x += 8 + r() * 14) {
+    const rad = 6 + r() * 13, foot = groundY - 3 + r() * 7, v = r();
+    blob(x, foot - rad * 0.55, rad * 1.25, rad * 0.8, 150 + Math.round(v * 20), 215 + Math.round(v * 30));
+  }
+  // küçük ağaçlar (farklı yükseklik): ince açık gövde + tepeden ışıklı taç
+  for (let i = 0; i < 55; i++) {
+    const x = r() * w, foot = groundY - 2 + r() * 10, th = 8 + r() * 16, v = r();
+    const rx = 4 + r() * 4, ry = 5 + r() * 4;
+    wrapDraw((o) => { ctx.fillStyle = 'rgb(150,150,150)'; ctx.fillRect(x + o - 1, foot - th, 2, th); });
+    blob(x, foot - th - 4, rx, ry, 165 + Math.round(v * 20), 235 + Math.round(v * 20));
   }
   // ön sıra: ufak açık tonlu çalılar, zemine taşan
   for (let x = 0; x < w; x += 30 + r() * 60) {
-    const rad = 4 + r() * 6, foot = groundY + 2 + r() * 5, g = 112 + Math.round(r() * 20);
-    wrapDraw((o) => { ctx.fillStyle = `rgb(${g},${g},${g})`; ctx.beginPath(); ctx.ellipse(x + o, foot - rad * 0.5, rad * 1.4, rad * 0.75, 0, 0, Math.PI * 2); ctx.fill(); });
+    const rad = 4 + r() * 6, foot = groundY + 2 + r() * 5;
+    blob(x, foot - rad * 0.5, rad * 1.4, rad * 0.75, 175, 240);
   }
+  softenCanvas(canvas, 0.8);
   // üst kenar yumuşak (uzak, sise karışır)
   const g = ctx.createLinearGradient(0, 0, 0, 40); g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = g; ctx.fillRect(0, 0, w, 40); ctx.globalCompositeOperation = 'source-over';
-  if (canvasMode) bakeTint(canvas, WORLD.forest);
+  if (canvasMode) bakeTint(canvas, mixHex(mixHex(WORLD.forest, WORLD.hill, 0.4), '#c4dcd0', 0.3));
   register(scene, key, canvas, { groundY });
 }
 
-/** Uzak tarla şeritleri: ufka doğru incelen yama bantları, ince çit/çalı çizgileri, küçülen ağaç noktaları (renkli, düşük kontrast). */
+const ihash = (a, b) => { let h = Math.imul(a | 0, 374761393) + Math.imul(b | 0, 668265263); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+const hexRgb = (hex) => { const n = parseInt(hex.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
+/** Uzak tarla şeritleri (piksel bazlı, organik): perspektifle ufka doğru incelen, gürültüyle dalgalanan yumuşak
+ * sınırlı bantlar; yamalar arası yumuşak renk geçişi, hafif çit/çalı izleri, ufka doğru atmosfer rengine karışma. */
 function farFields(scene) {
   const key = 'env_farfields'; if (scene.textures.exists(key)) return;
-  const w = LAYER_W, h = 170; const { canvas, ctx } = makeCanvas(w, h); const r = mulberry32(91);
-  const tones = ['#86ad5c', '#9cb766', '#7a9f52', '#b5b46a', '#8fb062', '#a7a35e', '#6f9a4e'];
-  // perspektif: y=0 ufuk, bantlar aşağı doğru kalınlaşır
-  let y = 0, band = 0;
-  while (y < h) {
-    const th = 3 + Math.pow(y / h, 1.4) * 34 + r() * 3;
-    let x = -r() * 200;
-    while (x < w) {
-      const pw = 120 + r() * 380; const col = tones[Math.floor(r() * tones.length)];
-      ctx.fillStyle = col; ctx.fillRect(x, y, pw + 1, th + 1);
-      for (const o of [-w, w]) ctx.fillRect(x + o, y, pw + 1, th + 1);
-      // tarla içi sıra çizgileri
-      if (r() < 0.5) { ctx.fillStyle = 'rgba(60,80,40,0.12)'; for (let k = 0; k < th; k += Math.max(1.5, th / 6)) ctx.fillRect(x, y + k, pw, 0.7); }
-      // çit/çalı sınırı (dikey)
-      ctx.fillStyle = 'rgba(52,72,40,0.35)'; ctx.fillRect(x, y, Math.max(0.8, th * 0.08), th);
-      x += pw;
+  const w = LAYER_W, h = 170; const { canvas, ctx } = makeCanvas(w, h);
+  const tones = ['#86ad5c', '#9cb766', '#7a9f52', '#b5b46a', '#8fb062', '#a7a35e', '#7fa656'].map(hexRgb);
+  const haze = hexRgb('#c6d8bc');
+  const nWarp = new TileNoise(92, 24, 6), nCol = new TileNoise(93, 96, 12), nX = new TileNoise(94, 48, 8);
+  const BANDS = 11;
+  const pn = (bi) => 3 + Math.floor(ihash(bi, 7) * 6);          // bant başına yama sayısı (tamsayı → döşenebilir)
+  const col = (bi, pi, out) => { const c = tones[Math.floor(ihash(bi, ((pi % pn(bi)) + pn(bi)) % pn(bi)) * tones.length)]; out[0] = c[0]; out[1] = c[1]; out[2] = c[2]; return out; };
+  const A = [0, 0, 0], B = [0, 0, 0], C = [0, 0, 0], D = [0, 0, 0];
+  // bandın x yönündeki yamaları (komşu yama ile yumuşak geçiş)
+  const rowCol = (bi, u, p, out) => {
+    const n = pn(bi); const pc = u * n + ihash(bi, 3) * n + (nX.sample(u * 48, bi * 1.7) - 0.5) * 0.35;
+    const pi = Math.floor(pc), fp = pc - pi;
+    col(bi, pi, C); col(bi, pi - 1, D);
+    const e = fp < 0.08 ? (fp / 0.08) : 1; const k = e * e * (3 - 2 * e);
+    out[0] = D[0] + (C[0] - D[0]) * k; out[1] = D[1] + (C[1] - D[1]) * k; out[2] = D[2] + (C[2] - D[2]) * k;
+    return out;
+  };
+  const img = ctx.createImageData(w, h); const d = img.data;
+  for (let y = 0; y < h; y++) {
+    const p = (y + 0.5) / h;                           // 0 ufuk .. 1 yakın
+    const bv = Math.pow(p, 0.62) * BANDS;              // ufka yakın bantlar sıkışır (perspektif)
+    const atm = Math.pow(1 - p, 2.2) * 0.7;
+    const alpha = 1 - Math.min(1, Math.max(0, (p - 0.45) / 0.55));
+    for (let x = 0; x < w; x++) {
+      const u = x / w;
+      const warp = (nWarp.fbm(u, p, 3) - 0.5) * (0.5 + 0.9 * p);
+      const b = bv + warp; const bi = Math.floor(b), fb = b - bi;
+      rowCol(bi, u, p, A); rowCol(bi - 1, u, p, B);
+      const e = fb < 0.3 ? fb / 0.3 : 1; const k = e * e * (3 - 2 * e);
+      let r = B[0] + (A[0] - B[0]) * k, g = B[1] + (A[1] - B[1]) * k, bl = B[2] + (A[2] - B[2]) * k;
+      // tarla içi gürültü + hafif sıra dokusu
+      const nv = 0.9 + nCol.fbm(u, p, 3) * 0.2;
+      const rows = ihash(bi, 11) < 0.5 ? 1 - 0.035 * (0.5 + 0.5 * Math.sin(b * 40)) * p : 1;
+      // bant sınırında yumuşak çit/çalı izi (uzakta zayıf)
+      const hedge = 1 - 0.13 * Math.exp(-((fb - 0.03) * (fb - 0.03)) / 0.0025) * (0.3 + 0.7 * p);
+      const m = nv * rows * hedge;
+      r *= m; g *= m; bl *= m;
+      r += (haze[0] - r) * atm; g += (haze[1] - g) * atm; bl += (haze[2] - bl) * atm;
+      const i = (y * w + x) * 4;
+      d[i] = r; d[i + 1] = g; d[i + 2] = bl; d[i + 3] = alpha * 255;
     }
-    // yatay çit/çalı çizgisi
-    ctx.fillStyle = 'rgba(52,72,40,0.4)'; ctx.fillRect(0, y + th - Math.max(0.6, th * 0.06), w, Math.max(0.6, th * 0.06));
-    y += th; band++;
   }
-  // küçülen tek tük ağaçlar
-  for (let i = 0; i < 140; i++) {
-    const ty = Math.pow(r(), 1.3) * h; const s = 1 + (ty / h) * 6; const x = r() * w;
-    for (const o of [0, -w, w]) {
-      ctx.fillStyle = 'rgba(46,70,38,0.75)'; ctx.beginPath(); ctx.ellipse(x + o, ty - s, s * 0.8, s, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = 'rgba(30,40,30,0.25)'; ctx.fillRect(x + o - s, ty, s * 2, Math.max(0.6, s * 0.3));
-    }
-  }
-  // alt kenarda yakın çime kaybolsun
-  const g = ctx.createLinearGradient(0, h * 0.45, 0, h); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-  ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); ctx.globalCompositeOperation = 'source-over';
+  ctx.putImageData(img, 0, 0);
+  softenCanvas(canvas, 0.6);
   register(scene, key, canvas);
 }
 

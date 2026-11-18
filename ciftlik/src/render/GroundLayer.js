@@ -54,11 +54,12 @@ export default class GroundLayer {
         this.smalls.push(im);
       }
     };
-    place((rr) => 'env_tuft_' + Math.floor(rr() * 3), 260, DEPTH.GROUND + 0.2);
-    place((rr) => 'env_stone_' + Math.floor(rr() * 3), 70, DEPTH.GROUND + 0.2);
+    // ufka yakın bölgede taş/tutam yok: küçülünce koyu benek gibi okunuyorlar (uzak alan tarla şeritlerine bırakılır)
+    place((rr) => 'env_tuft_' + Math.floor(rr() * 3), 260, DEPTH.GROUND + 0.2, 150);
+    place((rr) => 'env_stone_' + Math.floor(rr() * 3), 70, DEPTH.GROUND + 0.2, 260);
     // çiçek öbekleri
     for (let c = 0; c < 46; c++) {
-      const cx = r() * WORLD_W, cy = 60 + r() * (WORLD_H + 100); const col = Math.floor(r() * 5);
+      const cx = r() * WORLD_W, cy = 130 + r() * (WORLD_H + 30); const col = Math.floor(r() * 5);
       for (let i = 0; i < 6 + r() * 8; i++) {
         const x = cx + (r() - 0.5) * 120, y = cy + (r() - 0.5) * 60; if (blocked(x, y)) continue;
         const far = persp(y); if (r() > 0.2 + 0.8 * far) continue;

@@ -57,7 +57,8 @@ export function softenCanvas(canvas, radius) {
 }
 
 /**
- * Kaynak silüetten yumuşak gölge dokusu üretir.
+ * Kaynak silüetten yumuşak gölge dokusu üretir. Temas sertleşmesi: ayak satırında keskin (küçük bulanıklık,
+ * tam yoğunluk), silüetin ucuna doğru yumuşar ve solar — gölge nesnenin tabanına yapışık okunur.
  * @returns {HTMLCanvasElement} meta: {footX, footY (gölge dokusunda), scale, silH, silW}
  */
 export function makeShadowCanvas(src, footX, footY, scale, blur, color = WORLD.shadow) {
@@ -70,15 +71,24 @@ export function makeShadowCanvas(src, footX, footY, scale, blur, color = WORLD.s
   const d = img.data;
   const a = new Float32Array(w * h);
   for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3] / 255;
+  const near = blurAlpha(Float32Array.from(a), w, h, Math.max(1, blur * 0.3));
   blurAlpha(a, w, h, blur);
   const n = parseInt(color.slice(1), 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  for (let i = 0; i < a.length; i++) {
-    d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b;
-    d[i * 4 + 3] = Math.min(255, a[i] * 255 * 1.08);
+  const fy = pad + footY * scale, span = Math.max(1, fy - pad);
+  for (let y = 0; y < h; y++) {
+    const t = Math.min(1, Math.max(0, (fy - y) / span)); // 0 ayak .. 1 silüet tepesi
+    const m = Math.min(1, t / 0.35); const k = m * m * (3 - 2 * m); // ayaktan ilk %35'te keskin→yumuşak
+    const fade = 1 - 0.45 * t;
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const v = (near[i] + (a[i] - near[i]) * k) * fade;
+      d[i * 4] = r; d[i * 4 + 1] = g; d[i * 4 + 2] = b;
+      d[i * 4 + 3] = Math.min(255, v * 255 * 1.08);
+    }
   }
   ctx.putImageData(img, 0, 0);
-  canvas.__meta = { footX: pad + footX * scale, footY: pad + footY * scale, scale, silH: sh, silW: sw, w, h };
+  canvas.__meta = { footX: pad + footX * scale, footY: fy, scale, silH: sh, silW: sw, w, h };
   return canvas;
 }
 

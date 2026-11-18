@@ -11,14 +11,54 @@ import BootScene from './scenes/BootScene.js';
 import WorldScene from './scenes/WorldScene.js';
 import { mountUI } from './ui/index.js';
 
-// ------------------------------------------------------------------ durum + sistemler
-const loaded = SaveSystem.load();
-const state = loaded ?? createInitialState();
-if (!('camera' in state)) state.camera = null;
+const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
+const params = new URLSearchParams(window.location.search);
 
-const registry = new SystemRegistry(state, bus);
-registry.register(TimeSystem);
-SaveSystem.attach(state, bus);
+// ------------------------------------------------------------------ kurtarma
+// Yüklenen kayıtla kurulum istisna atarsa: kayıt :corrupt anahtarına taşınır, sayfa yeni oyunla
+// yeniden açılır ve toast gösterilir. Yeni oyunla da başarısız olursa DOM'da hata mesajı gösterilir.
+let loadedFromSave = false;
+let recovering = false;
+function showFatal(err) {
+  console.error('[main] kurulum hatası', err);
+  try {
+    const el = document.createElement('div');
+    el.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;'
+      + 'background:#05060c;color:#f5ecd9;font:16px Georgia,serif;text-align:center;padding:24px;z-index:9999';
+    el.textContent = 'Oyun başlatılamadı. Sayfayı yenilemeyi deneyin.';
+    document.body.appendChild(el);
+  } catch { /* yok say */ }
+}
+function recover(err) {
+  if (recovering) return;
+  recovering = true;
+  if (!loadedFromSave) { showFatal(err); return; }
+  console.error('[main] kayıtla kurulum başarısız; kayıt karantinaya alınıp yeni oyun açılıyor', err);
+  SaveSystem.quarantine();
+  try { window.sessionStorage.setItem(RECOVER_FLAG, '1'); } catch { /* yok say */ }
+  try { window.location.reload(); } catch { showFatal(err); }
+}
+
+let recoveredNow = false;
+try {
+  recoveredNow = window.sessionStorage.getItem(RECOVER_FLAG) === '1';
+  if (recoveredNow) window.sessionStorage.removeItem(RECOVER_FLAG);
+} catch { /* yok say */ }
+
+// ------------------------------------------------------------------ durum + sistemler
+let state, registry;
+try {
+  const loaded = SaveSystem.load();
+  loadedFromSave = !!loaded;
+  state = loaded ?? createInitialState();
+  SaveSystem.applyStoredSettings(state);
+  registry = new SystemRegistry(state, bus);
+  registry.register(TimeSystem);
+  SaveSystem.attach(state, bus);
+} catch (e) {
+  recover(e);
+  throw e;
+}
 
 // ------------------------------------------------------------------ kalite + DPR
 const QUALITY_LEVELS = ['high', 'medium', 'low'];
@@ -31,7 +71,8 @@ function resolveQuality(q) {
   return touch && shortSide < 900 ? 'medium' : 'high';
 }
 
-const app = { state, bus, registry, quality: resolveQuality(state.settings.quality), camera: null, game: null };
+const app = { state, bus, registry, quality: 'high', camera: null, game: null, recover };
+try { app.quality = resolveQuality(state.settings.quality); } catch (e) { recover(e); throw e; }
 let renderDpr = 1;
 function computeDpr(level) {
   return Math.max(1, Math.min(window.devicePixelRatio || 1, DPR_CAP[level] || 1));
@@ -87,40 +128,49 @@ bus.on('settings:set', (p) => {
   } else {
     state.settings[key] = value;
   }
+  SaveSystem.saveSettings(state.settings);
   bus.emit('save:request', {});
 });
 
 // ------------------------------------------------------------------ Phaser
-const game = new Phaser.Game({
-  type: Phaser.AUTO,
-  parent: 'game',
-  backgroundColor: '#05060c',
-  antialias: true,
-  disableContextMenu: true,
-  scale: {
-    mode: Phaser.Scale.RESIZE,
-    width: Math.floor(window.innerWidth * renderDpr),
-    height: Math.floor(window.innerHeight * renderDpr),
-  },
-  render: { antialias: true, powerPreference: 'high-performance' },
-  input: { touch: true, mouse: { preventDefaultWheel: true }, activePointers: 3 },
-  fps: { target: 60, smoothStep: true },
-  callbacks: {
-    preBoot: (g) => { g.registry.set('dpr', renderDpr); },
-    postBoot: (g) => {
-      const c = g.canvas;
-      c.style.width = '100%';
-      c.style.height = '100%';
-      c.style.display = 'block';
-      g.scale.refresh();
+// ?renderer=canvas → Canvas renderer (test / zayıf cihaz yedeği). Varsayılan AUTO.
+const RENDER_TYPE = params.get('renderer') === 'canvas' ? Phaser.CANVAS : Phaser.AUTO;
+let game;
+try {
+  game = new Phaser.Game({
+    type: RENDER_TYPE,
+    parent: 'game',
+    backgroundColor: '#05060c',
+    antialias: true,
+    disableContextMenu: true,
+    scale: {
+      mode: Phaser.Scale.RESIZE,
+      width: Math.floor(window.innerWidth * renderDpr),
+      height: Math.floor(window.innerHeight * renderDpr),
     },
-  },
-  scene: [new BootScene(app), new WorldScene(app)],
-});
+    render: { antialias: true, powerPreference: 'high-performance' },
+    input: { touch: true, mouse: { preventDefaultWheel: true }, activePointers: 3 },
+    fps: { target: 60, smoothStep: true },
+    callbacks: {
+      preBoot: (g) => { g.registry.set('dpr', renderDpr); },
+      postBoot: (g) => {
+        const c = g.canvas;
+        c.style.width = '100%';
+        c.style.height = '100%';
+        c.style.display = 'block';
+        g.scale.refresh();
+      },
+    },
+    scene: [new BootScene(app), new WorldScene(app)],
+  });
+} catch (e) {
+  recover(e);
+  throw e;
+}
 app.game = game;
 
 // ------------------------------------------------------------------ debug kancası
-const DEBUG = import.meta.env.DEV || new URLSearchParams(window.location.search).get('debug') === '1';
+const DEBUG = import.meta.env.DEV || params.get('debug') === '1';
 
 const debug = {
   setTime(h) {
@@ -171,8 +221,13 @@ try {
 bus.emit('settings:quality', { level: app.quality });
 bus.emit('time:speedChanged', { speed: state.time.speed });
 
-if (SaveSystem.lastLoad === 'backup') {
+if (recoveredNow) {
+  bus.emit('toast', { text: 'Kayıt yüklenemedi; bozuk kayıt ayrıldı ve yeni bir oyun başlatıldı.', kind: 'bad' });
+} else if (SaveSystem.lastLoad === 'backup') {
   bus.emit('toast', { text: 'Son kayıt okunamadı; yedek kayıttan devam ediliyor.', kind: 'bad' });
 } else if (SaveSystem.lastLoad === 'corrupt') {
   bus.emit('toast', { text: 'Kayıt dosyası bozuk; yeni bir oyun başlatıldı.', kind: 'bad' });
+}
+if (SaveSystem.lastRepairs.length && SaveSystem.lastLoad !== 'corrupt') {
+  bus.emit('toast', { kind: 'bad', text: 'Kayıttaki bazı bozuk veriler onarıldı.' });
 }

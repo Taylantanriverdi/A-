@@ -22,15 +22,32 @@ function calendarInto(out, totalMinutes) {
   return out;
 }
 
+const INTRO_FADE_MS = 700;
+const RECOVER_WINDOW_MS = 5000; // kurulum sonrası bu süre içindeki simülasyon istisnası → kayıt kurtarma
+
 export default class WorldScene extends Phaser.Scene {
   constructor(app) {
     super({ key: 'World' });
     this.app = app;
     this.frame = { time: 0, delta: 0, totalMinutes: 0, cal: {}, zoom: 1, dpr: 1 };
     this._renderErr = false;
+    this._intro = false;
+    this._introStart = 0;
+    this._createdAt = 0;
+    this._failed = false;
   }
 
   create() {
+    try {
+      this._create();
+    } catch (e) {
+      this._failed = true;
+      console.error('[world] create', e);
+      this.app.recover?.(e);
+    }
+  }
+
+  _create() {
     const { state, bus } = this.app;
     this.cameras.main.setBackgroundColor('#05060c');
 
@@ -51,7 +68,12 @@ export default class WorldScene extends Phaser.Scene {
     const offQ = bus.on('settings:quality', applyQuality);
     bus.emit('settings:quality', { level: this.app.quality });
 
-    this.cameras.main.fadeIn(700, 5, 6, 12);
+    // Açılış fade'i: bitene kadar simülasyon durur; süre gerçek zamana (performance.now) bağlıdır,
+    // Phaser'ın kırpılmış kare deltası düşük FPS'te fade'i uzatmasın.
+    this.cameras.main.fadeIn(INTRO_FADE_MS, 5, 6, 12);
+    this._intro = true;
+    this._introStart = performance.now();
+    this._createdAt = this._introStart;
     this.events.once('shutdown', () => {
       offQ();
       try { this.renderer2?.destroy(); } catch { /* yok say */ }
@@ -64,8 +86,17 @@ export default class WorldScene extends Phaser.Scene {
     // oyun zamanı gerçek süreye bağlı kalsın diye ham kare süresi kullanılır (registry 250 ms'de kırpar).
     const raw = this.game.loop.rawDelta;
     const real = raw > 0 && raw < 5000 ? raw : delta;
-    registry.tick(real);
-    this.camera.update(real);
+    if (this._failed) return;
+    if (this._intro) this._updateIntro();
+    try {
+      if (!this._intro) registry.tick(real);
+      this.camera.update(real);
+    } catch (e) {
+      this._failed = true;
+      console.error('[world] update', e);
+      if (performance.now() - this._createdAt < RECOVER_WINDOW_MS) this.app.recover?.(e);
+      return;
+    }
     const f = this.frame;
     f.time = time;
     f.delta = real;
@@ -79,5 +110,21 @@ export default class WorldScene extends Phaser.Scene {
     } catch (e) {
       if (!this._renderErr) { this._renderErr = true; console.error('[world] Renderer.update', e); }
     }
+  }
+
+  /** Fade ilerlemesini gerçek zamana eşitler; süre dolunca efekti bitirir ve simülasyonu açar. */
+  _updateIntro() {
+    const fx = this.cameras.main.fadeEffect;
+    const el = performance.now() - this._introStart;
+    if (fx && fx.isRunning) {
+      if (el >= fx.duration) {
+        fx.alpha = 0;
+        fx.progress = 1;
+        fx.effectComplete();
+      } else if (fx._elapsed < el) {
+        fx._elapsed = el;
+      }
+    }
+    if (!fx || !fx.isRunning || el >= INTRO_FADE_MS) this._intro = false;
   }
 }

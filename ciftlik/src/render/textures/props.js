@@ -171,7 +171,8 @@ function trees(scene) {
       const W = Math.max(v.cw, tw), H = v.ch + v.trunkH + 10;
       const { canvas, ctx } = makeCanvas(W, H);
       const tc = scene.textures.get(tk).getSourceImage(); const cc = scene.textures.get(`prop_tree${k}_canopy_spring`).getSourceImage();
-      ctx.drawImage(tc, (W - tw) / 2, H - th);
+      // gövde gölgede biraz kalın: ince gövde bulanıklıkla kaybolmasın, tepe gölgesi ayağa bağlansın
+      ctx.drawImage(tc, (W - tw * 1.7) / 2, H - th, tw * 1.7, th);
       ctx.drawImage(cc, (W - v.cw) / 2, H - 4 - v.trunkH - v.ch + 6);
       registerShadow(scene, sk, canvas, W / 2, H - 4);
     }

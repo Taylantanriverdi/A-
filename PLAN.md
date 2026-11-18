@@ -160,6 +160,9 @@ export default {
 - Anahtar: `altin-saat-ciftligi:save:v1` (+ `:backup` önceki kayıt).
 - Otomatik kayıt: her oyun saatinde, `visibilitychange` (hidden) ve `pagehide`'da.
 - Yükleme: JSON parse + `version` kontrol + `migrations[v]()` zinciri; hata olursa yedeğe, o da bozuksa yeni oyun (ve toast ile bildir).
+- **Şema temizleme (`sanitize`)**: her yüklemede state, `createInitialState()` referansıyla derin doğrulanır (null/yanlış tip → varsayılan, sayılar sonlu ve sınırlı). Onarım olursa toast. Kurulumda istisna → kayıt `:corrupt` anahtarına karantinaya alınır, yeni oyun açılır.
+- **Ayarlar ayrı anahtarda**: `altin-saat-ciftligi:settings` (kalite/ses/müzik). "Yeni oyun" ayarları korur.
+- **Kural (Aşama 2+)**: Her yeni sistem kendi state alanı için bir doğrulayıcı (`validate(state, onFix)`) sağlar ve SaveSystem'in sanitize kancasına kaydeder; dizi elemanları (animals, ledger, tiles…) o sistemin sorumluluğundadır.
 
 ### Hata ayıklama kancası (qa-tester için)
 `window.__game = { state, bus, debug: { setTime(hour), skip(minutes), setSpeed(x), setWeather(type), addMoney(n), cinematic(), quality(level) } }` — yalnızca `import.meta.env.DEV` veya `?debug=1` iken.

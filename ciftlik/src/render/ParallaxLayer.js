@@ -72,8 +72,8 @@ class Scatter {
   }
 }
 
-const SEASON_HILL = { spring: '#76a85a', summer: '#6d9a4e', autumn: '#a39a55', winter: '#8b9b97' };
-const SEASON_FOREST = { spring: '#33603c', summer: '#2c5434', autumn: '#6a4a26', winter: '#3c4c4a' };
+export const SEASON_HILL = { spring: '#76a85a', summer: '#6d9a4e', autumn: '#a39a55', winter: '#8b9b97' };
+export const SEASON_FOREST = { spring: '#33603c', summer: '#2c5434', autumn: '#6a4a26', winter: '#3c4c4a' };
 
 export default class ParallaxLayer {
   constructor(scene) {
