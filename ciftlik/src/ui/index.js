@@ -79,7 +79,8 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   on('time:speedChanged', speed.onSpeedChanged);
   on('settings:quality', settings.onQuality);
   on('toast', toasts.push);
-  on('cinematic:letterbox', (p) => { letterboxPending = p || { amount: 0 }; });
+  on('cinematic:letterbox', (p) => { letterboxPending = p || { amount: 0 }; celebrate.onLetterbox(p); });
+  on('camera:cinematicStart', (p) => celebrate.onCinematicStart(p));
 
   // ---- Tarım (Aşama 2) ----
   // Fırça darbesi: dünyada yeni bir basış ya da (basılı değilken) 400 ms ara → yeni darbe.
@@ -118,7 +119,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   on('farm:milestone', (p) => {
     if (!p || p.kind !== 'firstHarvest') return;
     const h0 = notes.claim(p.tileId); // aynı hasadın küçük notu yerine büyük kutlama kartı
-    celebrate.show(h0 || { cropId: p.cropId, itemId: p.cropId });
+    celebrate.arm(h0 || { cropId: p.cropId, itemId: p.cropId }); // sinematik başlayınca görünür
   });
   on('xp:gained', xp.onGained);
   on('farm:result', (p) => {

@@ -257,7 +257,11 @@ export function createTileCard(root, ctx) {
       let dtxt;
       if (dead) dtxt = STR.chips.dead;
       else if ((crop.stage | 0) >= 4) dtxt = crop.rotIn != null ? STR.rotIn(crop.rotIn) : STR.daysLeft(0);
-      else if (typeof dl === 'number' && Number.isFinite(dl)) dtxt = STR.daysLeft(dl);
+      else if (typeof dl === 'number' && Number.isFinite(dl)) {
+        dtxt = STR.daysLeft(dl);
+        // Kuraklıkta büyüme durur: kalan gün ideal sulama varsayımıyla
+        if (tile.state === 'plowed' && (Number(soil.moisture) || 0) < SOIL.droughtBelow) dtxt += ` · ${STR.ifWatered}`;
+      }
       else dtxt = typeof crop.readyIn === 'string' ? crop.readyIn : STR.notGrowing;
       setText(E.days, dtxt);
       setText(E.qn, qe ? `${STR.quality}: ${STR.qualityName[qe] || qe}` : '');
@@ -274,12 +278,21 @@ export function createTileCard(root, ctx) {
     if (crop && !dead && crop.pest > 0) { has.pest = true; chips.push(['bad', `${STR.chips.pest} %${Math.max(1, Math.round(crop.pest * 100))}`, TOOL_ICON.bug]); }
     if (crop && !dead && crop.disease > 0) { has.disease = true; chips.push(['bad', `${STR.chips.disease} %${Math.max(1, Math.round(crop.disease * 100))}`, TOOL_ICON.alert]); }
     if (weeds > 0) { has.weeds = true; chips.push(['warn', `${STR.chips.weeds} %${Math.max(1, Math.round(weeds * 100))}`, TOOL_ICON.weed]); }
-    if (tile.state === 'plowed' && m < SOIL.droughtBelow) { has.dry = true; chips.push(['warn', STR.chips.dry, TOOL_ICON.drop]); }
+    // Kuraklık: büyüme durur → çip bunu açıkça söyler; tam metin (rules uyarısı) çipin title'ında
+    const growing = !!(crop && !dead && (crop.stage | 0) < 4);
+    const drought = tile.state === 'plowed' && m < SOIL.droughtBelow;
+    if (drought) {
+      has.dry = true;
+      let dryText = '';
+      const ws = Array.isArray(info.warnings) ? info.warnings : [];
+      for (let i = 0; i < ws.length; i++) { const w = normWarn(ws[i]); if (w && w.code === 'dry') { dryText = w.text; break; } }
+      chips.push([growing ? 'bad' : 'warn', growing ? STR.droughtChip : STR.chips.dry, TOOL_ICON.drop, dryText]);
+    }
     else if (m > SOIL.waterlogAbove) { has.wet = true; chips.push(['warn', STR.chips.wet, TOOL_ICON.drop]); }
-    const ck = chips.map((c) => c[0] + c[1]).join('|');
+    const ck = chips.map((c) => c[0] + c[1] + (c[3] || '')).join('|');
     if (ck !== chipsKey) {
       chipsKey = ck;
-      E.chips.innerHTML = chips.map(([k, t, ic]) => `<span class="chip c-${k}"><span class="ci">${ic}</span>${t}</span>`).join('');
+      E.chips.innerHTML = chips.map(([k, t, ic, tip]) => `<span class="chip c-${k}"${tip ? ` title="${String(tip).replace(/"/g, '&quot;')}"` : ''}><span class="ci">${ic}</span>${t}</span>`).join('');
       setShow(E.chips, chips.length > 0);
     }
 

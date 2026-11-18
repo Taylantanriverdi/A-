@@ -83,7 +83,10 @@ export function createHarvestNotes(root) {
  * İlk hasat kutlaması: letterbox'ın üstünde, HUD'dan bağımsız katmanda ortada zarif kart.
  * Sinematik sırasında da görünür (hud-layer dışında).
  */
-const CELEB_MS = 3800;
+const CELEB_MS = 3800;      // sinematik yoksa görünme süresi
+const CINE_WAIT_MS = 6000;  // milestone'dan sonra sinematik bu sürede başlamazsa yine de göster
+const CINE_TAIL_MS = 1000;  // sinematik bitince kartın kalma süresi
+const CINE_MAX_MS = 9000;   // güvenlik: bitiş sinyali gelmezse kapat
 export function createCelebration(root) {
   const el = h('div', 'celebrate', `<div class="cb-card glass"><span class="cb-ic"></span><div class="cb-tt"><div class="cb-k"></div><div class="cb-v num"></div><div class="cb-s"></div></div></div>`);
   el.setAttribute('aria-live', 'assertive');
@@ -92,8 +95,37 @@ export function createCelebration(root) {
   const card = el.querySelector('.cb-card');
   let pendingShow = null;
   let timer = 0;
+  let waiting = null;   // sinematiği bekleyen yük
+  let waitTimer = 0;
+  let holding = false;  // sinematik boyunca açık
+  let lastStartAt = 0;
+  const hideIn = (ms) => { clearTimeout(timer); timer = setTimeout(() => { holding = false; el.classList.remove('show'); }, ms); };
   return {
-    show(p) { pendingShow = p || {}; },
+    /** firstHarvest: yükü sakla; kart camera:cinematicStart{reason:'firstHarvest'} ile açılır (K16: sinematik ertelenebilir). */
+    arm(p) {
+      // Sinematik aynı olay zincirinde (milestone'dan önce) başlamış olabilir
+      if (lastStartAt && performance.now() - lastStartAt < 500) {
+        clearTimeout(waitTimer); waiting = null; pendingShow = p || {}; holding = true; return;
+      }
+      waiting = p || {};
+      clearTimeout(waitTimer);
+      waitTimer = setTimeout(() => {
+        if (!waiting) return;
+        pendingShow = waiting; waiting = null; holding = false;
+      }, CINE_WAIT_MS);
+    },
+    onCinematicStart(p) {
+      if (!p || p.reason !== 'firstHarvest') return;
+      lastStartAt = performance.now();
+      if (!waiting) return;
+      clearTimeout(waitTimer);
+      pendingShow = waiting; waiting = null; holding = true;
+    },
+    /** cinematic:letterbox {amount:0} → sinematik bitti: ~1 sn sonra kapan. */
+    onLetterbox(p) {
+      if (holding && !((Number(p && p.amount) || 0) > 0)) hideIn(CINE_TAIL_MS);
+    },
+    show(p) { pendingShow = p || {}; holding = false; },
     render() {
       if (!pendingShow) return;
       const p = pendingShow; pendingShow = null;
@@ -105,10 +137,9 @@ export function createCelebration(root) {
       setText(sub, STR.firstHarvestSub);
       card.dataset.q = p.quality || '';
       el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-      clearTimeout(timer);
-      timer = setTimeout(() => el.classList.remove('show'), CELEB_MS);
+      hideIn(holding ? CINE_MAX_MS : CELEB_MS);
     },
-    destroy() { clearTimeout(timer); el.remove(); },
+    destroy() { clearTimeout(timer); clearTimeout(waitTimer); el.remove(); },
   };
 }
 

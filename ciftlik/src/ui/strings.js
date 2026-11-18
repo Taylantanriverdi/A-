@@ -80,6 +80,8 @@ export const STR = {
     rotation: 'Ekim nöbeti cezası', outOfSeason: 'Mevsim dışı', wither: 'Bitki soluyor', rotting: 'Çürümek üzere',
     revertSoon: 'Toprak yakında çimene döner', lateInSeason: 'Mevsim bitmeden yetişmez',
   },
+  droughtChip: 'Kuraklık — büyüme durdu',
+  ifWatered: 'sulanırsa',
   chips: { pest: 'Zararlı', disease: 'Hastalık', weeds: 'Yabani ot', dead: 'Ölü ekin', wither: 'Solgun', dry: 'Kuru toprak', wet: 'Aşırı ıslak' },
 
   // ---- Bildirimler ----

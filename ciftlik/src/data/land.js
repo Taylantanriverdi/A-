@@ -11,6 +11,22 @@ export const BLOCK_LABELS_TR = {
 };
 
 export const P1_BLOCKED = {
+  // K14b: görsel silüet arkası (çatı, kuyu çatısı, ağaç tacı) — QA regresyon Y1/Y2
+  '41,6': 'house',
+  '41,7': 'house',
+  '42,6': 'house',
+  '42,7': 'house',
+  '43,6': 'house',
+  '43,7': 'house',
+  '44,6': 'house',
+  '44,7': 'house',
+  '37,13': 'well',
+  '38,13': 'well',
+  '39,13': 'well',
+  '46,8': 'tree',
+  '47,8': 'tree',
+  '35,14': 'tree',
+  '36,14': 'tree',
   '32,12': 'bush',
   '32,13': 'bush',
   '33,12': 'bush',

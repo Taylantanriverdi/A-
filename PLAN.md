@@ -488,7 +488,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K11 | Alet seçiliyken tek parmak sürükleme = boyama, kamera iki parmak/sağ tık | 24+ karoyu tek tek dokunmak mobilde yorucu |
 | K12 | Envanter yığını (kalite, organik) çiftiyle anahtarlanır | Aşama 3 organik pazar bonusu |
 | K13 | A kalite eşiği careScore 90 | Günlük bakım A, iki günde bir sulama B olmalı (sim-farm) |
-| K14 | Dekorla kaplı karolar `data/land.js` P1_BLOCKED'de; ekilemez, kart açılmaz | QA: evin arkasına ekin ekilebiliyordu |
+| K14 | Dekorla kaplı karolar `data/land.js` P1_BLOCKED'de (zemin izi + görsel silüet arkası: çatı, kuyu çatısı, ağaç tacı); ekilemez, kart açılmaz | QA: evin arkasına ekin ekilebiliyordu |
 | K15 | Hastalık yayılma 0.08; başlangıçta 4 organik sprey | QA: bakımsız salgın 10 günde tarlayı siliyordu, mağaza yokken çaresizlik |
 | K16 | Sinematik, boyama darbesi bitene kadar ertelenir | QA: ilk hasat sinematiği boyamalı hasatı yarıda kesiyordu |
 
