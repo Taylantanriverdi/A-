@@ -9,6 +9,12 @@ export const PARCELS = {
   P2: { tx: 69, ty: 5, w: 11, h: 17, price: 12000, name: 'Doğu tarlası' },
   P3: { tx: 8,  ty: 5, w: 12, h: 17, price: 15000, name: 'Batı çayırı' },
   P4: { tx: 0,  ty: 5, w: 8,  h: 17, price: 9000,  name: 'Dere kenarı' },
+  // K25: kuzey ve güney genişleme (dünya yüksekliği 40 karo)
+  P5: { tx: 20, ty: 0,  w: 49, h: 5,  price: 8000,  name: 'Kuzey yamacı' },     // ufka bakan dar şerit
+  P6: { tx: 20, ty: 22, w: 49, h: 9,  price: 18000, name: 'Güney ovası' },
+  P7: { tx: 20, ty: 31, w: 49, h: 9,  price: 22000, name: 'Göl kıyısı' },
+  P8: { tx: 0,  ty: 22, w: 20, h: 18, price: 20000, name: 'Güneybatı korusu' },
+  P9: { tx: 69, ty: 22, w: 11, h: 18, price: 14000, name: 'Güneydoğu bayırı' },
 };
 
 export const BLOCK_LABELS_TR = {

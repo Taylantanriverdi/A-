@@ -5,7 +5,8 @@ import { INVENTORY } from '../data/progression.js';
 import { DONKEY } from '../data/workers.js';
 
 /** Arazi parselleri (sahiplik). Fiyat/kilit değerleri data/land.js'e aittir. */
-const PARCEL_IDS = ['P1', 'P2', 'P3', 'P4', 'P5'];
+import { PARCELS } from '../data/land.js';
+const PARCEL_IDS = Object.keys(PARCELS); // K25: parseller data/land.js'ten
 
 function randomSeed() {
   // 32-bit pozitif tohum

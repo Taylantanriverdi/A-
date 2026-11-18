@@ -2,9 +2,9 @@
 export const TILE_W = 64;
 export const TILE_H = 44;
 export const WORLD_TILES_X = 80;
-export const WORLD_TILES_Y = 24;
+export const WORLD_TILES_Y = 40; // K25: güneye genişleme için 24 → 40
 export const WORLD_W = TILE_W * WORLD_TILES_X; // 5120
-export const WORLD_H = TILE_H * WORLD_TILES_Y; // 1056 (zemin düzlemi)
+export const WORLD_H = TILE_H * WORLD_TILES_Y; // 1760 (zemin düzlemi)
 // Zemin düzlemi dünya y=0'dan başlar; ufuk ve gökyüzü negatif y bölgesindedir.
 export const HORIZON_Y = 0;
 export const SKY_H = 700; // ufkun üstünde görünür gökyüzü/arka plan yüksekliği
@@ -34,6 +34,6 @@ export const DEPTH = {
 // Y-sıralama: tüm dünya nesneleri (ekin, hayvan, bina, ağaç) bu fonksiyonla derinlik alır.
 // Aralık DEPTH.OBJECTS .. ~DEPTH.OBJECTS+11; WEATHER/LIGHT katmanlarının altında kalır.
 export function depthForY(y) {
-  const c = y < -100 ? -100 : y > 1300 ? 1300 : y;
-  return DEPTH.OBJECTS + c / 120;
+  const c = y < -100 ? -100 : y > 1900 ? 1900 : y;
+  return DEPTH.OBJECTS + c / 100; // aralık ~49..69 (WEATHER 70'in altında)
 }

@@ -504,6 +504,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K22 | Kredi limiti = 5.000 + brüt varlık × 0.4 − borç (borç bir kez düşülür); vergi matrahı yatırımları gider sayar | Oyuncu dostu, sade |
 | K23 | Kredi anaparası günlük gelir/gider ve kâr-zararda sayılmaz | Grafikte kredi gelir gibi görünüyordu |
 | K24 | Kuraklık 0.012; yağmur nemi 88'de durur; festival rakipleri güçlendirildi | sim-weather: kuraklık %18 gün, uzun yağmur ekini çürütüyordu, festival hep kazanılıyordu |
+| K25 | Dünya 80×40 karo; kuzey (P5) ve güney (P6–P9) parselleri eklendi | Kullanıcı arazinin yukarı/aşağı da büyümesini istedi |
 | K18 | Hayvan ürününde A için mutluluk ≥ 90 (sevme gerekir); tavuk 400 ₺, yumurta 15 ₺ | sim-animals: kümes ve ahır yatırımı ~47 günde geri döner |
 | K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 
