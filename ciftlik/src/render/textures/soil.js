@@ -9,6 +9,7 @@ import { TILE_W, TILE_H } from '../../core/constants.js';
 export const SOIL_ATLAS = 'soil_atlas';
 export const SOIL_MISC = 'soil_misc';
 export const SOIL_ERASE = 'soil_erase';
+export const SOIL_BLEED = 'soil_bleed';
 // maske bitleri: komşu SÜRÜLMÜŞ ise 1
 export const N = 1, E = 2, S = 4, W = 8;
 export const WEED_FRAMES = 3, BIT_FRAMES = 4;
@@ -21,6 +22,8 @@ const LEVELS = [
 ];
 
 export function soilFrame(mask, level) { return `m${mask}_w${level}`; }
+/** dir: 0 N, 1 E, 2 S, 3 W; level: komşunun (daha ıslak) kademesi 1|2 */
+export function bleedFrame(mask, level, dir) { return `b${mask}_${level}_${dir}`; }
 
 function genAtlas(scene) {
   if (scene.textures.exists(SOIL_ATLAS)) return;
@@ -110,6 +113,44 @@ function genAtlas(scene) {
   ctx.restore();
   const tex = register(scene, SOIL_ATLAS, canvas);
   for (let lv = 0; lv < 3; lv++) for (let m = 0; m < 16; m++) tex.add(soilFrame(m, lv), 0, m * TW, lv * TH, TW, TH);
+  genBleed(scene, ctx, TW, TH);
+}
+
+/**
+ * Nem sızıntısı: daha ıslak komşunun dokusu bu karonun o kenarına ~14 px gürültülü rampayla taşar
+ * (kuru↔ıslak karo sınırı sert kare olmasın). Kare = bu karonun maskesi (kenar şekli) × komşunun nem kademesi.
+ */
+function genBleed(scene, atlasCtx, TW, TH) {
+  if (scene.textures.exists(SOIL_BLEED)) return;
+  const src = atlasCtx.getImageData(0, 0, TW * 16, TH * 3).data; const sStride = TW * 16;
+  const { canvas, ctx } = makeCanvas(TW * 16, TH * 8);
+  const img = ctx.createImageData(TW * 16, TH * 8); const d = img.data;
+  const n = new TileNoise(41, 8, 6);
+  const BW = [18, 26, 18, 26]; // N, E, S, W rampa genişliği (px)
+  const ramp = new Float32Array(TW * TH * 4);
+  for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) {
+    const j = (n.fbm(x / TW, y / TH, 3) - 0.5) * 10;
+    const dist = [y, TW - 1 - x, TH - 1 - y, x]; // N, E, S, W kenarına uzaklık
+    // kenar boyunca uçlara doğru incelme (köşede kesik bant görünmesin; ardışık ıslak karolarda hafif kalır)
+    const endH = Math.min(x, TW - 1 - x), endV = Math.min(y, TH - 1 - y);
+    for (let k = 0; k < 4; k++) {
+      const t = Math.max(0, Math.min(1, 1 - (dist[k] + j) / BW[k]));
+      const e = Math.min(1, (k % 2 === 0 ? endH : endV) / 16); const taper = 0.3 + 0.7 * e * e * (3 - 2 * e);
+      ramp[k * TW * TH + y * TW + x] = Math.min(1, t * 1.25) ** 1.4 * taper;
+    }
+  }
+  for (let L = 1; L <= 2; L++) for (let k = 0; k < 4; k++) for (let m = 0; m < 16; m++) {
+    const ox = m * TW, oy = ((L - 1) * 4 + k) * TH;
+    for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) {
+      const si = ((L * TH + y) * sStride + ox + x) * 4, di = ((oy + y) * sStride + ox + x) * 4;
+      const a = src[si + 3] * ramp[k * TW * TH + y * TW + x];
+      if (a < 1) continue;
+      d[di] = src[si]; d[di + 1] = src[si + 1]; d[di + 2] = src[si + 2]; d[di + 3] = a;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = register(scene, SOIL_BLEED, canvas);
+  for (let L = 1; L <= 2; L++) for (let k = 0; k < 4; k++) for (let m = 0; m < 16; m++) tex.add(bleedFrame(m, L, k), 0, m * TW, ((L - 1) * 4 + k) * TH, TW, TH);
 }
 
 /** Ot tutamı: tabandan yelpaze yapan yumuşak hacimli yapraklar, kenar ışığı. foot = (w/2, h-1) */

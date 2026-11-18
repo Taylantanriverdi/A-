@@ -9,8 +9,8 @@ import { TILE_W, TILE_H, DEPTH, depthForY } from '../core/constants.js';
 import { CROPS } from '../data/crops.js';
 import { ITEMS } from '../data/items.js';
 import { canApply, cropVisual } from '../systems/farm/rules.js';
-import { genSoil, SOIL_ATLAS, SOIL_MISC, SOIL_ERASE, soilFrame, N, E, S, W, WEED_FRAMES, BIT_FRAMES } from '../render/textures/soil.js';
-import { genCrops, CROP_ATLAS, CROP_CELL, SHAPE_META, cropFrame } from '../render/textures/crops.js';
+import { genSoil, SOIL_ATLAS, SOIL_MISC, SOIL_ERASE, SOIL_BLEED, soilFrame, bleedFrame, N, E, S, W, WEED_FRAMES, BIT_FRAMES } from '../render/textures/soil.js';
+import { genCrops, CROP_ATLAS, CROP_CELL, CROP_SCALE, SHAPE_META, cropFrame } from '../render/textures/crops.js';
 import { genFieldFx } from '../render/textures/fieldfx.js';
 
 const CHUNK_TX = 16, CHUNK_TY = 12;
@@ -123,18 +123,24 @@ export default class FieldView {
       let tx = tile.tx, ty = tile.ty;
       if (!Number.isFinite(tx) || !Number.isFinite(ty)) { const k = String(id).split(','); tx = +k[0]; ty = +k[1]; }
       if (!Number.isFinite(tx) || !Number.isFinite(ty)) return;
-      rec = { id, tx, ty, plowed: false, sig: 0, mask: 0, lv: 0, wc: 0, crop: null };
+      rec = { id, tx, ty, plowed: false, sig: 0, mask: 0, lv: 0, wc: 0, bn: 0, be: 0, bs: 0, bw: 0, crop: null };
       this.recs.set(id, rec);
     }
     const plowed = tile.state === 'plowed';
-    if (plowed !== rec.plowed) { rec.plowed = plowed; this._markNeighbors(rec.tx, rec.ty); }
+    const lv = plowed ? moistLevel(+tile.moisture || 0) : 0;
+    if (plowed !== rec.plowed || lv !== rec.lv) { rec.plowed = plowed; rec.lv = lv; this._markNeighbors(rec.tx, rec.ty); }
     let sig = 0;
     if (plowed) {
       const tx = rec.tx, ty = rec.ty;
-      const mask = (this._isPlowed(tx, ty - 1) ? N : 0) | (this._isPlowed(tx + 1, ty) ? E : 0) | (this._isPlowed(tx, ty + 1) ? S : 0) | (this._isPlowed(tx - 1, ty) ? W : 0);
-      const lv = moistLevel(+tile.moisture || 0), wc = weedCount(+tile.weeds || 0);
-      rec.mask = mask; rec.lv = lv; rec.wc = wc;
-      sig = 1 | (mask << 1) | (lv << 5) | (wc << 7);
+      const tn = this._tile(tx, ty - 1), te = this._tile(tx + 1, ty), ts = this._tile(tx, ty + 1), tw = this._tile(tx - 1, ty);
+      const pn = !!tn && tn.state === 'plowed', pe = !!te && te.state === 'plowed', ps = !!ts && ts.state === 'plowed', pw = !!tw && tw.state === 'plowed';
+      const mask = (pn ? N : 0) | (pe ? E : 0) | (ps ? S : 0) | (pw ? W : 0);
+      // daha ıslak komşudan sızıntı kademesi (yalnızca sürülmüş komşular)
+      const bl = (p, t) => { if (!p) return 0; const l = moistLevel(+t.moisture || 0); return l > lv ? l : 0; };
+      const bn = bl(pn, tn), be = bl(pe, te), bs = bl(ps, ts), bw = bl(pw, tw);
+      const wc = weedCount(+tile.weeds || 0);
+      rec.mask = mask; rec.wc = wc; rec.bn = bn; rec.be = be; rec.bs = bs; rec.bw = bw;
+      sig = 1 | (mask << 1) | (lv << 5) | (wc << 7) | (bn << 9) | (be << 11) | (bs << 13) | (bw << 15);
     }
     if (sig !== rec.sig) { rec.sig = sig; this._soilQ.push(rec); }
     this._updateCrop(rec, tile);
@@ -189,6 +195,10 @@ export default class FieldView {
 
   _drawSoil(dt, r, lx, ly) {
     dt.batchDrawFrame(SOIL_ATLAS, soilFrame(r.mask, r.lv), lx, ly);
+    if (r.bn) dt.batchDrawFrame(SOIL_BLEED, bleedFrame(r.mask, r.bn, 0), lx, ly);
+    if (r.be) dt.batchDrawFrame(SOIL_BLEED, bleedFrame(r.mask, r.be, 1), lx, ly);
+    if (r.bs) dt.batchDrawFrame(SOIL_BLEED, bleedFrame(r.mask, r.bs, 2), lx, ly);
+    if (r.bw) dt.batchDrawFrame(SOIL_BLEED, bleedFrame(r.mask, r.bw, 3), lx, ly);
     let h = hash2(r.tx, r.ty);
     const rnd = () => { h = (Math.imul(h, 1664525) + 1013904223) >>> 0; return h / 4294967296; };
     const nb = (h & 3) === 0 ? 0 : (h & 3) === 3 ? 2 : 1;
@@ -253,7 +263,7 @@ export default class FieldView {
     c.id = v.cropId; c.stage = stage;
     const meta = SHAPE_META[def.shape] || SHAPE_META.bush;
     c.flex = stage === 0 ? 0 : dead ? 0.12 : wither ? meta.flex * 0.45 : meta.flex;
-    c.h = meta.h[stage] * (dead ? 0.55 : wither ? 0.8 : 1); c.w = meta.w[stage];
+    c.h = meta.h[stage] * CROP_SCALE * (dead ? 0.55 : wither ? 0.8 : 1); c.w = meta.w[stage] * CROP_SCALE;
     c.pest = +v.pest || 0; c.disease = +v.disease || 0;
     // hastalık: sararmış/lekeli tint (WebGL); Canvas'ta tint yok → yalnız lekeler
     if (c.disease > 0.2 && !dead) c.im.setTint(mixInt(0xffffff, 0xcfc070, Math.min(1, (c.disease - 0.2) / 0.6) * 0.85 + 0.15));
@@ -262,7 +272,7 @@ export default class FieldView {
     // zararlılar
     if (c.pest > 0.2 && stage >= 1 && !dead) {
       const f = c.pest > 0.7 ? 'bugs2' : c.pest > 0.45 ? 'bugs1' : 'bugs0';
-      if (!c.ov) c.ov = this._img(this.pools.ov, 'crop_bugs', f).setOrigin(0.5, 0.5);
+      if (!c.ov) c.ov = this._img(this.pools.ov, 'crop_bugs', f).setOrigin(0.5, 0.5).setScale(1.3);
       else c.ov.setFrame(f);
       c.ov.setDepth(depthForY(c.y) + 0.002).setVisible(c.vis);
     } else if (c.ov) { this._free(this.pools.ov, c.ov); c.ov = null; }
@@ -288,7 +298,7 @@ export default class FieldView {
     const amp = 0.022 + wind * 0.1, f = 1.0 + wind * 1.9, lean = wind * 0.07;
     // gölge yönü: ShadowSystem ile aynı (konteyner basıklığı tek görüntüye katlanır)
     const ss = this.renderer && this.renderer.shadowSystem;
-    const sr = ss ? ss.rot : Math.PI, slen = ss ? ss.len : 1, sa = ss ? ss.alpha * 0.85 : 0.25;
+    const sr = ss ? ss.rot : Math.PI, slen = ss ? ss.len : 1, sa = ss ? Math.min(0.72, ss.alpha * 1.8) : 0.3; // yumuşak leke: silüet gölgesinden seyrek → daha yüksek alfa
     const sx = Math.sin(sr), sy = Math.cos(sr) * FORESHORTEN;
     const shRot = Math.atan2(sx, sy), shK = Math.sqrt(sx * sx + sy * sy) * slen / SH_TEX_H;
     const shVis = sa > 0.006;

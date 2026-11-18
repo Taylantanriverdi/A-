@@ -9,7 +9,8 @@ import { CROPS } from '../../data/crops.js';
 export const CROP_ATLAS = 'crop_atlas';
 export const CROP_CELL = { w: 88, h: 124, footX: 44, footY: 114 };
 export const CROP_IDS = Object.keys(CROPS);
-const COLS = 14; // 0–4 sağlıklı, 5–8 solgun 1–4, 9–12 ölü 1–4, 13 ikon
+const COLS = 14;
+export const CROP_SCALE = 1.18; // çizim ölçeği (SHAPE_META değerleri ölçeksizdir; FieldView çarpar) // 0–4 sağlıklı, 5–8 solgun 1–4, 9–12 ölü 1–4, 13 ikon
 const RIM = '#fff0c4';
 
 // FieldView için yaklaşık bitki yüksekliği/genişliği (gölge) ve esneklik (rüzgâr salınımı)
@@ -19,7 +20,7 @@ export const SHAPE_META = {
   berry: { h: [3, 9, 14, 18, 20], w: [10, 16, 26, 34, 40], flex: 0.45 },
   grain: { h: [3, 10, 24, 44, 52], w: [8, 10, 20, 34, 40], flex: 1.25 },
   vine: { h: [3, 10, 32, 54, 64], w: [10, 14, 22, 30, 34], flex: 0.3 },
-  tall: { h: [3, 14, 38, 74, 96], w: [10, 14, 24, 36, 40], flex: 0.75 },
+  tall: { h: [3, 14, 38, 66, 84], w: [10, 14, 24, 36, 40], flex: 0.75 },
   melon: { h: [3, 7, 11, 16, 22], w: [10, 18, 36, 52, 58], flex: 0.22 },
   root: { h: [3, 9, 16, 24, 28], w: [10, 14, 24, 32, 36], flex: 0.9 },
 };
@@ -51,7 +52,7 @@ function leaf(ctx, x, y, ang, len, wid, col, bend = 0, rim = 0.7, rib = true) {
   ctx.globalAlpha = rim; ctx.fillStyle = mixHex(col, RIM, 0.55); ctx.fill(); ctx.globalAlpha = 1;
   const t = leafPath(ctx, x + 0.7, y + 0.9, ang, len * 0.98, wid * 0.96, bend);
   const g = ctx.createLinearGradient(x, y, t[0], t[1]);
-  g.addColorStop(0, shade(col, -0.42)); g.addColorStop(0.55, col); g.addColorStop(1, shade(col, 0.2));
+  g.addColorStop(0, shade(col, -0.3)); g.addColorStop(0.5, col); g.addColorStop(1, shade(col, 0.26));
   ctx.fillStyle = g; ctx.fill();
   if (rib && len > 9) {
     const m = pt(x, y, ang, len * 0.5, bend * 0.7);
@@ -87,9 +88,10 @@ function stem(ctx, x0, y0, x1, y1, w, col, bend = 0) {
 /** Taban: pişmiş temas gölgesi + küçük toprak tümseği. */
 function mound(ctx, cx, fy, w, soil = true) {
   ctx.save(); ctx.translate(cx, fy + 1); ctx.scale(1, 0.32);
-  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.8);
+  const R = Math.min(w * 0.8, 32); // hücre kenarında kesilmesin
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
   g.addColorStop(0, 'rgba(26,18,12,0.5)'); g.addColorStop(0.6, 'rgba(26,18,12,0.22)'); g.addColorStop(1, 'rgba(26,18,12,0)');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, w * 0.8, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill(); ctx.restore();
   if (!soil) return;
   const mg = ctx.createLinearGradient(0, fy - w * 0.22, 0, fy + 2);
   mg.addColorStop(0, '#a77a50'); mg.addColorStop(0.5, '#7b5536'); mg.addColorStop(1, '#4f3522');
@@ -279,7 +281,7 @@ function drawVine(ctx, cx, fy, s, c, id, r) {
     const p = pts[Math.min(pts.length - 1, 1 + Math.floor(i * (pts.length - 1) / nL))];
     const side = i % 2 ? 1 : -1;
     const ang = side * (0.9 + r() * 0.5);
-    const col = mixHex(c.color, shade(c.color, 0.18), r());
+    const col = mixHex(mixHex(c.color, '#8cc35a', 0.18), shade(c.color, 0.22), r());
     const L = leafLen * (0.8 + r() * 0.35) * (0.75 + K[s] * 0.3);
     if (id === 'tomato') { // bileşik, dilimli yaprak
       const t = pt(p[0], p[1], ang, L * 0.6, 0); stem(ctx, p[0], p[1], t[0], t[1], 0.8, col);
@@ -317,7 +319,7 @@ function drawTall(ctx, cx, fy, s, c, id, r) {
   const corn = id === 'corn';
   mound(ctx, cx, fy, [11, 13, 20, 26, 30][s]);
   if (s === 0) { sprout(ctx, cx, fy - 1, c.color, 0.85); return; }
-  const H = corn ? [0, 14, 38, 74, 96][s] : [0, 12, 34, 70, 90][s];
+  const H = corn ? [0, 14, 38, 68, 86][s] : [0, 12, 34, 62, 78][s];
   const sw = corn ? [0, 1.6, 2.4, 3.2, 3.4][s] : [0, 1.5, 2.2, 3, 3.2][s];
   const lean = 0.6;
   const stalkTop = [cx + lean, fy - H];
@@ -337,7 +339,7 @@ function drawTall(ctx, cx, fy, s, c, id, r) {
   }
   const drawL = (L) => {
     const y = fy - H * L.h, x = cx + lean * L.h;
-    if (corn) { const len = (24 + r() * 10) * (0.7 + K[s] * 0.35); leaf(ctx, x, y, L.side * (0.75 + r() * 0.4), len, 2.6, mixHex(stalkCol, '#8cc35a', r() * 0.3), L.side * 7, 0.75, true); }
+    if (corn) { const len = (21 + r() * 8) * (0.7 + K[s] * 0.35); leaf(ctx, x, y, L.side * (0.75 + r() * 0.4), len, 2.6, mixHex(stalkCol, '#8cc35a', r() * 0.3), L.side * 7, 0.75, true); }
     else { const len = (11 + r() * 4) * (0.75 + K[s] * 0.3) * (1.15 - L.h * 0.4); const t = pt(x, y, L.side * 1.2, 4, 0); stem(ctx, x, y, t[0], t[1], 0.9, c.color); leaf(ctx, t[0], t[1], L.side * (1.3 + r() * 0.3), len, len * 0.6, mixHex(c.color, shade(c.color, 0.12), r()), L.side * 2.5); }
   };
   for (const L of leaves) if (L.back) drawL(L);
@@ -425,7 +427,7 @@ function drawMelon(ctx, cx, fy, s, c, id, r) {
     const reach = L * (s >= 3 ? 1.2 : 0.9);
     const bx = cx + Math.sin(v.a) * reach * 0.55, by = fy - 2 - Math.cos(v.a) * reach * 0.25;
     ctx.save(); ctx.translate(bx, by); ctx.scale(1, 0.72);
-    const col = mixHex(c.color, shade(c.color, 0.16), r());
+    const col = mixHex(mixHex(c.color, '#8cc35a', 0.22), shade(c.color, 0.2), r());
     leaf(ctx, 0, 0, v.a * 0.6, L, L * 0.62, col, 0, 0.8);
     leaf(ctx, 0, 0, v.a * 0.6 - 0.6, L * 0.7, L * 0.38, shade(col, -0.08), -1, 0.6, false);
     leaf(ctx, 0, 0, v.a * 0.6 + 0.6, L * 0.7, L * 0.38, shade(col, -0.08), 1, 0.6, false);
@@ -509,7 +511,7 @@ function deriveWither(ctx, src, sx, sy, dx, dy) {
   const { w, h, footX, footY } = CROP_CELL;
   ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
   ctx.translate(dx + footX, dy + footY);
-  ctx.transform(1.06, 0, -0.16, 0.8, 0, 0);
+  ctx.transform(1.04, 0, -0.09, 0.8, 0, 0);
   ctx.drawImage(src, sx, sy, w, h, -footX, -footY, w, h);
   ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
@@ -525,7 +527,7 @@ function deriveDead(ctx, src, sx, sy, dx, dy, r) {
   const { w, h, footX, footY } = CROP_CELL;
   ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
   ctx.translate(dx + footX, dy + footY);
-  ctx.transform(1.0, 0, -0.32, 0.55, 0, 0);
+  ctx.transform(1.0, 0, -0.18, 0.55, 0, 0);
   ctx.drawImage(src, sx, sy, w, h, -footX, -footY, w, h);
   ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
@@ -542,24 +544,36 @@ export function genCrops(scene) {
   const t0 = performance.now();
   const { w, h, footX, footY } = CROP_CELL;
   const rows = CROP_IDS.length;
-  const { canvas, ctx } = makeCanvas(w * COLS, h * rows);
+  // Hızlandırılmış (GPU) 2B canvas: willReadFrequently yok — piksel okumuyoruz, yalnızca yol çizimi.
+  const canvas = document.createElement('canvas'); canvas.width = w * COLS; canvas.height = h * rows;
+  const ctx = canvas.getContext('2d');
+  // 1) sağlıklı aşamalar (CROP_SCALE ile ayak çevresinde büyütülmüş)
   CROP_IDS.forEach((id, row) => {
     const c = CROPS[id]; const fn = SHAPES[c.shape] || drawBush;
     const oy = row * h;
     for (let s = 0; s < 5; s++) {
       const r = mulberry32(1000 + row * 31 + s * 7);
+      const fx = s * w + footX, fy = oy + footY;
       ctx.save(); ctx.beginPath(); ctx.rect(s * w, oy, w, h); ctx.clip();
-      fn(ctx, s * w + footX, oy + footY, s, c, id, r);
+      ctx.translate(fx, fy); ctx.scale(CROP_SCALE, CROP_SCALE); ctx.translate(-fx, -fy);
+      fn(ctx, fx, fy, s, c, id, r);
       ctx.restore();
     }
+  });
+  // 2) solgun/ölü: sağlıklı bölgenin TEK kopyasından türetilir (aynı canvas'a kendinden çizim pahalı kopya yaratır)
+  const snap = document.createElement('canvas'); snap.width = w * 5; snap.height = h * rows;
+  snap.getContext('2d').drawImage(canvas, 0, 0, w * 5, h * rows, 0, 0, w * 5, h * rows);
+  CROP_IDS.forEach((id, row) => {
+    const c = CROPS[id]; const oy = row * h;
     const r2 = mulberry32(5000 + row);
     for (let s = 1; s <= 4; s++) {
-      deriveWither(ctx, canvas, s * w, oy, (4 + s) * w, oy);
-      deriveDead(ctx, canvas, Math.max(2, s) * w, oy, (8 + s) * w, oy, r2);
+      deriveWither(ctx, snap, s * w, oy, (4 + s) * w, oy);
+      deriveDead(ctx, snap, Math.max(2, s) * w, oy, (8 + s) * w, oy, r2);
       // ölü hücrenin tabanına tümseği geri koy (kurumuş bitki toprağın üstünde)
       ctx.save(); ctx.beginPath(); ctx.rect((8 + s) * w, oy, w, h); ctx.clip();
-      ctx.globalCompositeOperation = 'destination-over'; mound(ctx, (8 + s) * w + footX, oy + footY, 18 + s * 3); ctx.restore();
+      ctx.globalCompositeOperation = 'destination-over'; mound(ctx, (8 + s) * w + footX, oy + footY, (18 + s * 3) * CROP_SCALE); ctx.restore();
     }
+    // 3) ürün ikonu
     ctx.save(); ctx.beginPath(); ctx.rect(13 * w, oy, w, h); ctx.clip();
     drawIcon(ctx, 13 * w + w / 2, oy + h / 2, id, c, mulberry32(9000 + row));
     ctx.restore();
@@ -579,7 +593,7 @@ export function genCrops(scene) {
       const v = 1 - (y + 0.5) / sh; // 0 ayak .. 1 uç
       const u = ((x + 0.5) / sw * 2 - 1) / (0.55 + 0.45 * Math.sin(Math.min(1, v * 1.3 + 0.15) * Math.PI * 0.9));
       const a = Math.max(0, 1 - u * u) * Math.pow(Math.max(0, 1 - v), 0.8) * Math.min(1, (1 - v) * 6);
-      const i = (y * sw + x) * 4; d[i] = 26; d[i + 1] = 22; d[i + 2] = 48; d[i + 3] = Math.min(255, a * a * 255);
+      const i = (y * sw + x) * 4; d[i] = 26; d[i + 1] = 22; d[i + 2] = 48; d[i + 3] = Math.min(255, Math.pow(a, 1.3) * 255);
     }
     g2.putImageData(img, 0, 0); register(scene, 'crop_sh', c2);
   }

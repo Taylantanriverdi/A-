@@ -14,6 +14,7 @@ import Lighting from './Lighting.js';
 import Decor from './Decor.js';
 import HorizonLayer from './HorizonLayer.js';
 import Particles from './Particles.js';
+import FieldView from '../world/FieldView.js';
 import GradePipeline from './postfx/GradePipeline.js';
 import BloomPipeline from './postfx/BloomPipeline.js';
 import { createLook } from './postfx/CinematicPipeline.js';
@@ -59,6 +60,8 @@ export default class Renderer {
     this.lighting.create();
     this.decor = new Decor(s, this.shadows, this.lighting); this.decor.create();
     this.particles = new Particles(s); this.particles.create();
+    // tarla karoları + ekinler + imleç + tarım efektleri (state.tiles'tan; yalnızca okur)
+    try { this.field = new FieldView(s, this.state, this.bus, this); } catch (e) { console.error('[render] FieldView', e); this.field = null; }
     // kararma katmanı (uyku geçişi) + Canvas letterbox
     this.cTop = s.add.container(0, 0).setScrollFactor(0).setDepth(1000);
     this.fadeRect = s.add.rectangle(0, 0, 10, 10, 0x05060c).setOrigin(0, 0).setAlpha(0).setVisible(false);
@@ -124,6 +127,7 @@ export default class Renderer {
     const q = QUALITY[level];
     this.particles.setQuality(level);
     this.shadowSystem.setQuality(level);
+    this.field?.setQuality(level);
     this._applyPostFX(q.bloom);
     if (this.fx && this.fx.bloom) { this.fx.bloom.strength = q.bloomStrength; this.fx.bloom.passes = q.bloomPasses; }
     this.look.grain = q.grain;
@@ -161,6 +165,7 @@ export default class Renderer {
     this.lighting.update(env);
     this.shadowSystem.update(env);
     this.decor.update(env);
+    if (this.field) { try { this.field.update(frame); } catch (e) { if (!this._fieldErr) { this._fieldErr = true; console.error('[render] FieldView.update', e); } } }
     this.particles.update(env);
     this._updateFX(env, dt);
     this._fps(frame.delta || 16.7);
@@ -226,7 +231,7 @@ export default class Renderer {
     for (const off of this._offs) off(); this._offs.length = 0;
     if (this._cam && this._origPreRender) { delete this._cam.preRender; if (this._cam.preRender !== this._origPreRender) this._cam.preRender = this._origPreRender; }
     try { if (this.fx && this.fx.pipe) this._cam.removePostPipeline(this.fx.pipe); } catch { /* yok say */ }
-    for (const m of [this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
+    for (const m of [this.field, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
     this.cTop?.destroy();
   }
 }
