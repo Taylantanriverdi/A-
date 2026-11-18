@@ -239,9 +239,9 @@ function silhouette(scene, parts) {
     const { canvas: mk, ctx: m } = makeCanvas(W, H);
     m.drawImage(canvas, 0, 0); m.globalCompositeOperation = 'source-in'; m.fillStyle = '#fff3d6'; m.fillRect(0, 0, W, H);
     const { canvas: hc, ctx: h } = makeCanvas(W, H);
-    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; h.drawImage(mk, Math.cos(a) * 3.5, Math.sin(a) * 3.5); }
+    h.globalAlpha = 0.35; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; h.drawImage(mk, Math.cos(a) * 3, Math.sin(a) * 3); } h.globalAlpha = 1;
     softenCanvas(hc, 3);
-    h.globalCompositeOperation = 'destination-out'; h.globalAlpha = 0.8; h.drawImage(mk, 0, 0);
+    h.globalCompositeOperation = 'destination-out'; h.globalAlpha = 0.93; h.drawImage(mk, 0, 0);
     h.globalCompositeOperation = 'source-over'; h.globalAlpha = 1;
     register(scene, 'prop_stall_hl', hc, { footX: FX, footY: FY });
   }
@@ -276,7 +276,7 @@ function fx(scene) {
     for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
       const u = (x + 0.5) / s * 2 - 1, v = (y + 0.5) / s * 2 - 1; const rr = Math.sqrt(u * u + v * v);
       const k = (rr - 0.92) / 0.035; const a = Math.exp(-k * k) + Math.max(0, 0.18 * (1 - Math.abs(rr - 0.86) / 0.14)) * (rr < 0.92 ? 1 : 0);
-      const i = (y * s + x) * 4; d[i] = 255; d[i + 1] = 220 + 30 * Math.exp(-k * k); d[i + 2] = 140 + 80 * Math.exp(-k * k); d[i + 3] = Math.min(255, a * 255);
+      const i = (y * s + x) * 4; d[i] = 255; d[i + 1] = 196 + 44 * Math.exp(-k * k); d[i + 2] = 96 + 70 * Math.exp(-k * k); d[i + 3] = Math.min(255, a * 255);
     }
     ctx.putImageData(img, 0, 0); register(scene, 'fx_ring_gold', canvas);
   }

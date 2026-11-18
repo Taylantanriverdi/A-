@@ -104,7 +104,7 @@ export function createShopPanel(ctx) {
     if (!c) return null;
     const inSeason = c.seasons.includes(season);
     const names = c.seasons.map((s) => SEASON_NAMES_TR[s] || s).join(' · ');
-    return { inSeason, text: inSeason ? `${STR.inSeasonNow} · ${names}` : STR.seasonSeed(names) };
+    return { inSeason, text: inSeason ? names : STR.seasonSeed(names) };
   }
 
   function render(t) {

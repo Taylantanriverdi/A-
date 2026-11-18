@@ -110,6 +110,10 @@ export function createMarketPanel(ctx) {
     if (c === 'wholesale' && wholesaleLocked()) return;
     if (c === channel) return;
     channel = c; qty = 0; dirty = true; sellDirty = true;
+    // Seçili yığın bu kanalın en az lotunu karşılamıyorsa karşılayan ilk yığına geç
+    const lot = CHANNELS[c].minLot || 1;
+    const cur = groups.find((g) => g.key === selKey);
+    if (!cur || cur.qty < lot) { const g = groups.find((x) => x.qty >= lot); if (g) selKey = g.key; }
   });
   list.addEventListener('click', (e) => {
     const hd = e.target.closest && e.target.closest('.mrow-h');
@@ -237,14 +241,14 @@ export function createMarketPanel(ctx) {
     const max = Math.min(g.qty, limitLeft);
     let why = '';
     if (!q1) why = STR.limitReached;
-    else if (q1.ok === false && q1.reason && !(max >= minLot)) why = String(q1.reason);
     else if (limitLeft < minLot || limitLeft === 0) why = STR.limitReached;
-    else if (max < minLot) why = STR.belowMinLot(minLot, g.qty);
+    else if (g.qty < minLot) why = STR.belowMinLot(minLot, g.qty);
+    else if (q1.ok === false && q1.reason && !(max >= minLot)) why = String(q1.reason);
     lim = { min: minLot, max, ok: !why };
 
     const d = demandOf(state, g.itemId);
     demM.className = `ms-dem ${d.lvl}`;
-    demM.style.setProperty('--seg', String(Math.max(1, Math.round(d.f * 5))));
+    demM.dataset.seg = String(Math.max(1, Math.round(d.f * 5)));
     setText(demT, `${STR.demand}: ${STR.demandLvl[d.lvl]}`);
     setText(limEl, channel === 'wholesale' ? STR.payTomorrow : Number.isFinite(limitLeft) ? STR.dailyLimit(limitLeft) : '');
     limEl.classList.toggle('later', channel === 'wholesale');

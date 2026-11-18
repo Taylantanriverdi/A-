@@ -132,7 +132,6 @@ export const STR = {
   owned: (n) => `Envanterde: ${n}`,
   buy: 'Satın al',
   seasonSeed: (names) => `${names} tohumu`,
-  inSeasonNow: 'Mevsiminde',
   levelLock: (n) => `Seviye ${n}`,
   notEnoughMoney: 'Yeterli paran yok',
   bought: (amount, qty, name) => `−${amount} · ${qty} ${name}`,

@@ -135,7 +135,7 @@ export default class MarketStall {
     this.t = t;
     // hover: yumuşak geçiş + nefes alan kenar ışığı
     this.hoverT += (this.hover - this.hoverT) * Math.min(1, dt * 9);
-    const ha = this.hoverT * (0.42 + 0.16 * Math.sin(t * 4.2)) * (1 + 0.5 * (1 - env.day.light));
+    const ha = this.hoverT * (0.5 + 0.2 * Math.sin(t * 4.2)) * (0.75 + 0.35 * (1 - env.day.light));
     this.hl.setVisible(ha > 0.01).setAlpha(Math.min(1, ha));
     // dokunuş: küçük yaylı esneme
     if (this.press > 0) {

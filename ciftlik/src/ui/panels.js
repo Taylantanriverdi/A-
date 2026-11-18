@@ -100,6 +100,7 @@ export function createPanelHost(root, ctx, navParent) {
       const wasOpen = current != null;
       if (current && views[current]) { views[current].el.hidden = true; if (views[current].onClose) views[current].onClose(); }
       current = id;
+      for (const k in views) if (k !== id) views[k].el.hidden = true; // kapanış zamanlayıcısı beklenmez
       v.el.hidden = false;
       if (v.onOpen) v.onOpen(arg || null);
       syncChrome();

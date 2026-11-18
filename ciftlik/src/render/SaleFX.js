@@ -166,7 +166,7 @@ export default class SaleFX {
           if (sq < 0.22 && p.ph >= 0) { const e = Math.sin(sq / 0.22 * Math.PI) * (1 - sq / 0.22); sx += e * 0.22; sy -= e * 0.2; }
           if (k > 0.72) { const e = (k - 0.72) / 0.28; p.z = e * e * 10; sx *= 1 - e * 0.75; sy *= 1 - e * 0.75; a = 1 - e * e; }
           else a = Math.min(1, p.age / 0.06);
-          im.setPosition(p.x, p.y - p.z).setScale(sx, sy).setAlpha(a);
+          im.setPosition(p.x, p.y - p.z).setScale(sx * 1.3, sy * 1.3).setAlpha(a);
           break;
         }
         default: break;
@@ -177,7 +177,7 @@ export default class SaleFX {
   layout(v) {
     const L = this.lvl;
     if (!L.on) { this.cScr.setVisible(false); return; }
-    const t = this.t - L.t0, dur = 1.9;
+    const t = this.t - L.t0, dur = 1.7;
     if (t > dur + 0.25) { L.on = false; this.cScr.setVisible(false); return; }
     v.fit(this.cScr); this.cScr.setVisible(true);
     const cx = v.W / 2, cy = v.H / 2, diag = Math.sqrt(v.W * v.W + v.H * v.H);
@@ -185,7 +185,7 @@ export default class SaleFX {
       const k = clamp((t - i * 0.2) / dur, 0, 1); const im = this.ring[i];
       const e = 1 - Math.pow(1 - k, 3);
       const sc = (0.04 + e * 0.62) * diag / 256 * (i ? 0.9 : 1);
-      const a = (i ? 0.45 : 0.85) * Math.pow(1 - k, 1.4) * clamp(k / 0.05, 0, 1);
+      const a = (i ? 0.6 : 1) * Math.pow(1 - k, 1.1) * clamp(k / 0.04, 0, 1);
       im.setVisible(a > 0.005).setPosition(cx, cy).setScale(sc).setAlpha(a);
     }
     const fk = clamp(t / 0.9, 0, 1);
