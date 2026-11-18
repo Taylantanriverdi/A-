@@ -63,7 +63,7 @@ export default class WorldScene extends Phaser.Scene {
     this.camera = new CameraDirector(this, state, bus);
     this.app.camera = this.camera;
     this.cinematics = new Cinematics(bus);
-    this.worldLinks = new WorldLinks(bus);
+    this.worldLinks = new WorldLinks(bus, state);
 
     // Kalite: Renderer yaratıldıktan sonra da ilk değer ulaşsın.
     const applyQuality = ({ level }) => {

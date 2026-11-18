@@ -1654,5 +1654,3 @@
 #ui .wrk-actions button { flex: 1; min-width: 150px; min-height: var(--hit); padding: 0 12px; }
 #ui .wrk-actions .armed { border-color: var(--bad); color: var(--bad); }
 
-/* K20: seviye sistemi kaldırıldı — XP göstergesi gizli */
-.xp.glass { display: none !important; }

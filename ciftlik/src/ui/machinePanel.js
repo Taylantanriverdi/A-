@@ -48,20 +48,19 @@ export function createMachinePanel(ctx) {
 
   let type = null;
   let dirty = true;
+  let placedId = null;
   const pending = new Map();
   const recCards = new Map(); // recipeId → refs
   const chipEls = new Map();
   let qRefs = [];
   let lastQKey = '';
 
-  const machine = () => (type ? state.machines.find((m) => m.type === type) || null : null);
-  const level = () => Number(state.player && state.player.level) || 1;
+  const machine = () => (type ? state.machines.find((m) => (placedId != null ? (m.placedId ?? m.type) === placedId : m.type === type)) || null : null);
   const money = () => Number(state.finance && state.finance.money) || 0;
   const busy = (k) => (pending.get(k) || 0) > performance.now();
   const hold = (k) => { pending.set(k, performance.now() + PENDING_MS); dirty = true; };
-  const mid = () => `m_${type}`;
+  const mid = () => (machine() ? machine().id : `m_${placedId ?? type}`);
 
-  tap(E.buy, () => { if (!E.buy.disabled) { hold('build'); bus.emit('shop:buildMachine', { machine: type }); } });
   tap(S.repair, () => { if (!S.repair.disabled) { hold('repair'); bus.emit('machine:repair', { machineId: mid() }); } });
   tap(collectBtn, () => { if (!collectBtn.disabled) { hold('collect'); bus.emit('machine:collect', { machineId: mid() }); } });
 
@@ -183,14 +182,11 @@ export function createMachinePanel(ctx) {
   function renderEmpty() {
     const def = MACHINES[type];
     if (!def) return;
-    setText(E.name, `${M.emptyLot} · ${def.name}`);
-    setText(E.hint, `${M.emptyHint} ${M.makes(type)}.`);
-    setText(E.lvl, STR.levelLock(def.level));
-    setText(E.buyT, STR.bld.buildBtn);
-    setText(E.buyV, formatMoney(def.price));
-    const locked = level() < def.level, poor = money() < def.price;
-    E.buy.disabled = locked || poor || busy('build');
-    setText(E.why, locked ? STR.levelLock(def.level) : poor ? STR.notEnoughMoney : '');
+    setText(E.name, def.name);
+    setText(E.hint, M.notFound);
+    setText(E.lvl, '');
+    E.buy.hidden = true;
+    setText(E.why, '');
   }
 
   function render() {
@@ -208,9 +204,9 @@ export function createMachinePanel(ctx) {
   return {
     id: 'machine',
     el,
-    title() { const def = type && MACHINES[type]; return def ? (machine() ? def.name : `${M.emptyLot} · ${def.name}`) : ''; },
+    title() { const def = type && MACHINES[type]; return def ? def.name : ''; },
     onOpen(a) {
-      if (a && a.machine && MACHINES[a.machine]) { type = a.machine; lastQKey = '\0'; }
+      if (a && a.machine && MACHINES[a.machine]) { type = a.machine; placedId = a.placedId ?? null; lastQKey = '\0'; }
       dirty = true;
       const sc = el.querySelector('.bp-body');
       if (sc) sc.scrollTop = 0;

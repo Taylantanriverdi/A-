@@ -99,6 +99,7 @@ export function createPanelHost(root, ctx, navParent) {
   const api = {
     /** HUD portre düğmesinin içeriğini yazar (workerPanel.hudPortrait). */
     setWorkerPortrait(html) { const c = wbtn.querySelector('.wpic'); if (c) c.innerHTML = html; },
+    nav,
     get isOpen() { return current != null; },
     get current() { return current; },
     /** Panel açılıp kapanınca çağrılır: fn(id|null) */

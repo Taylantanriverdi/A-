@@ -18,12 +18,14 @@ export function lotOf(lotId) {
   }
   return null;
 }
-export const buildingId = (lotId) => `b_${lotId}`;
+export const buildingId = (placedId) => `b_${placedId}`;
+/** Bina kaydının yerleştirme kimliği (eski kayıtlarda lotId). */
+export const placedIdOf = (b) => (b ? (b.placedId ?? b.lotId ?? null) : null);
 export const buildingOf = (state, id) => state.buildings.find((b) => b.id === id) || null;
 export const animalsIn = (state, bid) => state.animals.filter((a) => a.buildingId === bid);
 
-export function newBuilding(type, lotId, day) {
-  return { id: buildingId(lotId), type, lotId, builtDay: day, dirt: 0, trough: { feed: 0, water: 0 }, box: {} };
+export function newBuilding(type, placedId, day) {
+  return { id: buildingId(placedId), type, placedId, builtDay: day, dirt: 0, trough: { feed: 0, water: 0 }, box: {} };
 }
 
 export function newAnimal(state, type, bid, rng, adult) {

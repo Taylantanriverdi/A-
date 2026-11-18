@@ -1,4 +1,4 @@
-// Bina paneli (PLAN §10): arsaya dokununca `ui:open {panel:'building', buildingType, lotId}`.
+// Bina paneli (PLAN §10): arsaya dokununca `ui:open {panel:'building', buildingType, placedId}`.
 // Boş arsa → inşa teklifi; dolu bina → yemlik/suluk/kir göstergeleri, eylemler, hayvan listesi, hayvan al.
 // state'i yalnızca OKUR; eylemler `shop:build`, `shop:buyAnimal`, `animal:action` komutlarıdır. Kapalıyken DOM işi yok.
 import { ANIMALS, ANIMAL_PRODUCTS } from '../data/animals.js';
@@ -85,7 +85,7 @@ export function createBuildingPanel(ctx) {
   };
   const list = $('.alist'), none = $('.a-none'), aTitle = $('.a-title'), buylist = $('.buylist');
 
-  let arg = null;          // {buildingType, lotId}
+  let arg = null;          // {buildingType, placedId}
   let dirty = true;
   let feedPick = null;     // seçili yem itemId
   const pendingUntil = new Map();
@@ -94,8 +94,7 @@ export function createBuildingPanel(ctx) {
   const buyRows = new Map();
 
   const lotType = () => arg && arg.buildingType;
-  const building = () => (arg ? state.buildings.find((b) => b.lotId === arg.lotId) || null : null);
-  const level = () => Number(state.player && state.player.level) || 1;
+  const building = () => (arg ? state.buildings.find((b) => (b.placedId ?? b.lotId) === arg.placedId) || null : null);
   const money = () => Number(state.finance && state.finance.money) || 0;
   const busy = (k) => (pendingUntil.get(k) || 0) > performance.now();
   const hold = (k) => { pendingUntil.set(k, performance.now() + PENDING_MS); dirty = true; };
@@ -106,12 +105,6 @@ export function createBuildingPanel(ctx) {
     bus.emit('animal:action', { type, buildingId: b.id, ...extra });
   };
 
-  tap(E.buy, () => {
-    if (E.buy.disabled) return;
-    const type = lotType();
-    if (type === 'hive') { hold('build'); bus.emit('shop:buyAnimal', { animal: 'bee', lotId: arg.lotId }); }
-    else { hold('build'); bus.emit('shop:build', { building: type, lotId: arg.lotId }); }
-  });
   tap(A.feed, () => { if (!A.feed.disabled && feedPick) act('feed', { itemId: feedPick }); });
   tap(A.water, () => { if (!A.water.disabled) act('water'); });
   tap(A.clean, () => { if (!A.clean.disabled) act('clean'); });
@@ -246,36 +239,28 @@ export function createBuildingPanel(ctx) {
         buyRows.set(t, r);
         buylist.appendChild(row);
       }
-      const locked = level() < d.level;
       const full = alist.length >= def.capacity;
       const poor = money() < d.price;
       const pr = ANIMAL_PRODUCTS[d.product.itemId];
       r.name.innerHTML = '';
       const nm = document.createElement('span'); nm.textContent = d.name;
       const sub = document.createElement('span'); sub.className = 'bs';
-      sub.textContent = locked ? STR.levelLock(d.level) : full ? B.full : B.produces(pr ? pr.name : '', d.product.intervalDays);
+      sub.textContent = full ? B.full : B.produces(pr ? pr.name : '', d.product.intervalDays);
       r.name.append(nm, sub);
       setText(r.bv, formatMoney(d.price));
-      r.btn.disabled = locked || full || poor || busy(`buy${t}`);
-      r.btn.title = poor && !locked ? STR.notEnoughMoney : '';
+      r.btn.disabled = full || poor || busy(`buy${t}`);
+      r.btn.title = poor ? STR.notEnoughMoney : '';
     }
   }
 
   function renderEmpty(type) {
     const def = BUILDINGS[type];
-    const hive = type === 'hive';
-    const bee = ANIMALS.bee;
-    const price = hive ? bee.price : def.price;
-    const lv = hive ? bee.level : def.level;
-    setText(E.name, hive ? B.buyHive : `${B.emptyLot} · ${def.name}`);
-    setText(E.hint, hive ? B.hiveHint : B.emptyLotHint);
-    setText(E.lvl, STR.levelLock(lv));
-    setText(E.cap, hive ? '' : B.capacityN(def.capacity));
-    setText(E.buyT, hive ? B.buyHive : B.buildBtn);
-    setText(E.buyV, formatMoney(price));
-    const locked = level() < lv, poor = money() < price;
-    E.buy.disabled = locked || poor || busy('build');
-    setText(E.why, locked ? STR.levelLock(lv) : poor ? STR.notEnoughMoney : '');
+    setText(E.name, def.name);
+    setText(E.hint, B.notFound);
+    setText(E.lvl, '');
+    setText(E.cap, '');
+    E.buy.hidden = true;
+    setText(E.why, '');
   }
 
   function render() {
@@ -295,10 +280,10 @@ export function createBuildingPanel(ctx) {
       if (!arg) return '';
       const def = BUILDINGS[lotType()];
       const b = building();
-      return def ? (b ? def.name : `${B.emptyLot} · ${def.name}`) : '';
+      return def ? def.name : '';
     },
     onOpen(a) {
-      if (a && a.lotId) { arg = { buildingType: a.buildingType, lotId: a.lotId }; feedPick = null; }
+      if (a && (a.placedId != null || a.lotId != null)) { arg = { buildingType: a.buildingType, placedId: a.placedId ?? a.lotId }; feedPick = null; }
       dirty = true;
       const sc = el.querySelector('.bp-body');
       if (sc) sc.scrollTop = 0;

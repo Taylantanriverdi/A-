@@ -5,7 +5,7 @@ import TimeSystem from '../src/systems/TimeSystem.js';
 import InventorySystem, { add, count } from '../src/systems/InventorySystem.js';
 import EconomySystem from '../src/systems/EconomySystem.js';
 import ProgressionSystem from '../src/systems/ProgressionSystem.js';
-import ProductionSystem, { validate } from '../src/systems/ProductionSystem.js';
+import ProductionSystem, { validate, canRemove } from '../src/systems/ProductionSystem.js';
 import { MACHINES, MACHINE_RULES, RECIPES } from '../src/data/recipes.js';
 import { recipeEconomics } from '../src/systems/production/sim.js';
 import { calendar } from '../src/core/timeUtils.js';
@@ -25,6 +25,10 @@ reg.register(TimeSystem).register(InventorySystem).register(EconomySystem).regis
 const results = []; const events = [];
 bus.on('machine:result', (r) => results.push(r));
 for (const n of ['machine:done', 'building:built', 'xp:add']) bus.on(n, (p) => events.push([n, p]));
+const build = (type, placedId = type) => {
+  (state.placed ??= []).push({ id: placedId, type, tx: 10, ty: 10 }); bus.emit('placed:changed', {}); bus.emit('building:built', { type, placedId, tx: 10, ty: 10 });
+};
+const unplace = (id) => { state.placed = (state.placed || []).filter((o) => o.id !== id); bus.emit('placed:changed', {}); };
 const cmd = (n, p) => { bus.emit(n, p); return results[results.length - 1]; };
 const ledger = (cat) => state.finance.ledger.filter((e) => e.category === cat).reduce((s, e) => s + e.amount, 0);
 const rows = [];
@@ -33,10 +37,14 @@ const run = (min) => reg.advance(min, true);
 
 // 1) inşa
 const money0 = state.finance.money;
-let r = cmd('shop:buildMachine', { machine: 'dairy' });
-check('Mandıra inşa + building:built + defter buildings', r.ok && ledger('buildings') === -MACHINES.dairy.price && events.some((e) => e[0] === 'building:built' && e[1].lotId === 'dairy'), `₺${money0 - state.finance.money}`);
-check('İkinci inşa reddedilir', !cmd('shop:buildMachine', { machine: 'dairy' }).ok);
-state.player.level = 1; check('Seviye kilidi', !cmd('shop:buildMachine', { machine: 'loom' }).ok); state.player.level = 12;
+let r;
+build('dairy');
+check('Mandıra building:built → kayıt m_dairy', state.machines.length === 1 && state.machines[0].id === 'm_dairy' && state.machines[0].placedId === 'dairy');
+build('dairy', 'dairyB');
+check('İkinci mandıra serbest (m_dairyB)', state.machines.length === 2 && !!state.machines[1] && state.machines[1].id === 'm_dairyB');
+check('canRemove: boş atölye serbest', canRemove(state, 'dairyB').ok);
+unplace('dairyB');
+check('Kaldırılınca kayıt silinir', state.machines.length === 1);
 
 // 2) 6 süt -> 2 peynir (kalite en düşük, organik)
 add(state, 'milk', 4, 'A', true); add(state, 'milk', 2, 'C', true);
@@ -66,7 +74,7 @@ check('Karışık organik -> organik değil', m.output.cheese?.[0]?.organic === 
 cmd('machine:collect', { machineId: 'm_dairy' });
 
 // 3) un -> ekmek
-cmd('shop:buildMachine', { machine: 'mill' }); cmd('shop:buildMachine', { machine: 'bakery' });
+build('mill'); build('bakery');
 add(state, 'wheat', 8, 'B', false);
 cmd('machine:queue', { machineId: 'm_mill', recipe: 'flour' }); cmd('machine:queue', { machineId: 'm_mill', recipe: 'flour' });
 run(4 * 60); cmd('machine:collect', { machineId: 'm_mill' });
@@ -75,7 +83,7 @@ cmd('machine:queue', { machineId: 'm_bakery', recipe: 'bread' }); cmd('machine:q
 run(6 * 60); cmd('machine:collect', { machineId: 'm_bakery' });
 check('Un -> 4 ekmek', count(state, 'bread') === 4);
 // 4) reçel
-cmd('shop:buildMachine', { machine: 'cannery' }); add(state, 'strawberry', 3, 'B', false);
+build('cannery'); add(state, 'strawberry', 3, 'B', false);
 cmd('machine:queue', { machineId: 'm_cannery', recipe: 'strawberry_jam' }); run(4 * 60);
 cmd('machine:collect', { machineId: 'm_cannery' });
 check('3 çilek -> reçel', count(state, 'strawberry_jam') === 1);

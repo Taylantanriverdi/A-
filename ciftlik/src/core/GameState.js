@@ -32,6 +32,8 @@ export function createInitialState(seed = randomSeed()) {
     animals: [],
     buildings: [],
     machines: [],
+    placed: [],        // PLAN §12: [{id,type,tx,ty}]
+    removedDecor: [],  // temizlenen ağaç/çalı kimlikleri
     workers: [],
     donkey: { x: (DONKEY.homeTile.tx + 0.5) * TILE_W, y: (DONKEY.homeTile.ty + 0.5) * TILE_H, mode: 'home' }, // PLAN §11
     market: { prices: {}, history: {}, activeEvents: [] },

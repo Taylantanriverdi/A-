@@ -1,7 +1,8 @@
 // ProductionSystem — üretim zincirleri (PLAN.md §11). Phaser import ETMEZ.
-// Komutlar: shop:buildMachine {machine}, machine:queue {machineId, recipe}, machine:auto {machineId, recipe|null},
+// Dinler: building:built {type, placedId, tx, ty}, placed:changed. Dışa: canRemove(state, placedId).
+// Komutlar: machine:queue {machineId, recipe}, machine:auto {machineId, recipe|null},
 //           machine:collect {machineId}, machine:repair {machineId}.
-// Olaylar: building:built {type, lotId, tx, ty}, machines:changed {ids}, machine:result {ok, type, machineId?, reason?, text?},
+// Olaylar: machines:changed {ids}, machine:result {ok, type, machineId?, reason?, text?},
 //          machine:done {machineId, itemId, qty}, xp:add. Para yalnızca EconomySystem.transact
 // (kategoriler 'buildings', 'electricity', 'maintenance').
 // State: state.machines[] (PLAN §11). Kuyruğun yalnızca başındaki işin bitiş dakikası tickMinute'ta denetlenir.
@@ -12,14 +13,14 @@ import { calendar } from '../core/timeUtils.js';
 import { transact } from './EconomySystem.js';
 import * as Inv from './InventorySystem.js';
 import {
-  QRANK, machineOf, machineIdOf, newMachine, durationMin, isStopped, repairCost, powerCost, addOutput, outputCount,
+  QRANK, machineOf, machineIdOf, placedIdOf, newMachine, durationMin, isStopped, repairCost, powerCost, addOutput, outputCount,
 } from './production/sim.js';
 
 export const REASONS = {
   badMachine: 'Bilinmeyen makine.',
-  locked: (lv) => `Seviye ${lv} gerekir.`,
   noMoney: 'Yeterli paran yok.',
-  built: 'Bu atölye zaten kurulu.',
+  busy: 'Önce kuyruktaki işleri bitir.',
+  hasOutput: 'Önce çıktıyı topla.',
   notBuilt: 'Önce atölyeyi inşa et.',
   badRecipe: 'Bu makine bu tarifi yapamaz.',
   queueFull: 'Kuyruk dolu.',
@@ -34,7 +35,6 @@ export const REASONS = {
 let offs = [];
 const nowMin = (state) => Math.floor(state.time.totalMinutes);
 const dayOf = (state) => calendar(state.time.totalMinutes).day;
-const levelOf = (state) => Number(state.player?.level) || 1;
 const result = (bus, p) => { if (bus) bus.emit('machine:result', p); return p; };
 const changed = (bus, ids) => { if (bus && ids.length) bus.emit('machines:changed', { ids }); };
 
@@ -112,19 +112,33 @@ function queueJob(state, bus, m, recipeId, silent = false) {
   return result(bus, { ok: true, type, machineId: m.id, recipe: recipeId, cost, text: 'İş kuyruğa eklendi.' });
 }
 
-function buildMachine(state, bus, p = {}) {
-  const type = p.machine;
-  const def = MACHINES[type];
-  const fail = (reason) => result(bus, { ok: false, type: 'build', machine: type, reason });
-  if (!def) return fail(REASONS.badMachine);
-  if (machineOf(state, type)) return fail(REASONS.built);
-  if (levelOf(state) < def.level) return fail(REASONS.locked(def.level));
-  if (!transact(state, bus, { amount: -def.price, category: 'buildings', label: `İnşaat: ${def.name}` })) return fail(REASONS.noMoney);
-  const m = newMachine(type, dayOf(state));
+/** building:built {type: makine türü, placedId, tx, ty} → makine kaydı m_<placedId>. Ücret PlacementSystem'de alınır. */
+function onBuilt(state, bus, p = {}) {
+  if (!MACHINES[p.type] || p.placedId == null) return null;
+  if (state.machines.some((m) => placedIdOf(m) === p.placedId)) return null;
+  const m = newMachine(p.type, p.placedId, dayOf(state));
   state.machines.push(m);
-  bus.emit('building:built', { type, lotId: type, tx: (def.lot.x0 + def.lot.x1) / 2, ty: (def.lot.y0 + def.lot.y1) / 2 });
   changed(bus, [m.id]);
-  return result(bus, { ok: true, type: 'build', machine: type, machineId: m.id, text: `${def.name} inşa edildi.` });
+  return m;
+}
+
+/** build:remove öncesi kontrol (PlacementSystem çağırır): kuyruk veya çıktı doluysa red. */
+export function canRemove(state, placedId) {
+  const m = state.machines.find((x) => placedIdOf(x) === placedId);
+  if (!m) return { ok: true };
+  if (m.queue.length) return { ok: false, reason: REASONS.busy };
+  if (outputCount(m) > 0) return { ok: false, reason: REASONS.hasOutput };
+  return { ok: true };
+}
+
+function syncPlaced(state, bus) {
+  if (!Array.isArray(state.placed)) return;
+  const live = new Set(state.placed.map((o) => o.id));
+  const gone = state.machines.filter((m) => m.placedId != null && !live.has(m.placedId));
+  if (!gone.length) return;
+  const ids = gone.map((m) => m.id);
+  state.machines = state.machines.filter((m) => !ids.includes(m.id));
+  changed(bus, ids);
 }
 
 function collect(state, bus, m) {
@@ -192,9 +206,10 @@ export function validate(state, onFix = () => {}) {
   const kept = [];
   state.machines.forEach((m, i) => {
     const path = `machines.${i}`;
-    if (!isPlainObject(m) || !MACHINES[m.type] || seen.has(m.type)) { onFix(path); return; }
-    seen.add(m.type);
-    if (m.id !== machineIdOf(m.type)) { onFix(`${path}.id`); m.id = machineIdOf(m.type); }
+    const pid = isPlainObject(m) ? placedIdOf(m) : null;
+    if (!isPlainObject(m) || !MACHINES[m.type] || pid == null || seen.has(pid)) { onFix(path); return; }
+    seen.add(pid);
+    if (m.id !== machineIdOf(pid)) { onFix(`${path}.id`); m.id = machineIdOf(pid); }
     if (!Number.isFinite(m.builtDay)) onFix(`${path}.builtDay`);
     m.builtDay = num(m.builtDay, 1, 0, 1e9);
     if (!Number.isFinite(m.condition)) onFix(`${path}.condition`);
@@ -239,7 +254,8 @@ const ProductionSystem = {
     for (const off of offs) off();
     offs = [];
     validate(state, () => {});
-    offs.push(bus.on('shop:buildMachine', (p) => buildMachine(state, bus, p)));
+    offs.push(bus.on('building:built', (p) => onBuilt(state, bus, p)));
+    offs.push(bus.on('placed:changed', () => syncPlaced(state, bus)));
     offs.push(bus.on('machine:queue', (p) => command(state, bus, { ...p, type: 'queue' }, (m) => queueJob(state, bus, m, p.recipe))));
     offs.push(bus.on('machine:auto', (p) => command(state, bus, { ...p, type: 'auto' }, (m) => {
       const rec = p.recipe ?? null;

@@ -133,10 +133,9 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
     for (const k of ['head', 'tasks', 'pay', 'actions']) secs[k].hidden = !w;
     if (!w) {
       const def = WORKER_TYPES.apprentice;
-      const lock = (Number(state.player.level) || 1) < def.hireLevel;
       setText(E.hireV, def.hireCost > 0 ? formatMoney(def.hireCost) : W.hireFree);
-      E.hire.disabled = lock || state.finance.money < def.hireCost;
-      setText(E.why, lock ? W.lock(def.hireLevel) : '');
+      E.hire.disabled = state.finance.money < def.hireCost;
+      setText(E.why, '');
       return;
     }
     const def = WORKER_TYPES[w.type];

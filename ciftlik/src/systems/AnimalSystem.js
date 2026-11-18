@@ -1,6 +1,7 @@
 // AnimalSystem — hayvancılık (PLAN.md §10). Phaser import ETMEZ.
-// Komutlar: shop:build {building, lotId?}, shop:buyAnimal {animal, buildingId?, lotId?}, animal:action {type, buildingId, animalId?, itemId?}.
-// Olaylar: building:built {type, lotId, tx, ty}, animal:born {animal, reason}, animal:result {ok, type, buildingId?, reason?, text?, ...},
+// Dinler: building:built {type, placedId, tx, ty} (PlacementSystem), placed:changed. Dışa: canRemove(state, placedId).
+// Komutlar: shop:buyAnimal {animal, buildingId?}, animal:action {type, buildingId, animalId?, itemId?}.
+// Olaylar: animal:born {animal, reason}, animal:result {ok, type, buildingId?, reason?, text?, ...},
 //          animals:changed {buildingIds}, xp:add. Para yalnızca EconomySystem.transact (kategori 'other').
 // State: state.buildings[], state.animals[] (PLAN §10).
 import { ANIMALS, CARE, VET, ANIMAL_PRODUCTS } from '../data/animals.js';
@@ -12,17 +13,15 @@ import { calendar } from '../core/timeUtils.js';
 import { transact } from './EconomySystem.js';
 import * as Inv from './InventorySystem.js';
 import {
-  lotOf, buildingOf, animalsIn, newBuilding, newAnimal, hourStep, dayStep, feedNeedPerDay, acceptedFeed, troughCap, boxCount,
+  buildingId, placedIdOf, buildingOf, animalsIn, newBuilding, newAnimal, hourStep, dayStep, feedNeedPerDay, acceptedFeed, troughCap, boxCount,
   BOX_MAX, MIN_HEALTH,
 } from './animals/sim.js';
 
 export { BOX_MAX };
 export const REASONS = {
   badBuilding: 'Bilinmeyen bina.',
-  locked: (lv) => `Seviye ${lv} gerekir.`,
   noMoney: 'Yeterli paran yok.',
-  lotTaken: 'Bu arsa dolu.',
-  noFreeLot: 'Boş arsa kalmadı.',
+  sellFirst: 'Önce hayvanları sat.',
   needBuilding: (name) => `Önce ${name.toLowerCase()} inşa et.`,
   full: 'Bina dolu.',
   noBuilding: 'Bina bulunamadı.',
@@ -44,30 +43,45 @@ let busRef = null;
 let rngRef = null;
 let offs = [];
 
-const lotCenter = (lot) => ({ tx: (lot.x0 + lot.x1) / 2, ty: (lot.y0 + lot.y1) / 2 });
-const levelOf = (state) => Number(state.player?.level) || 1;
 
 function result(bus, p) { if (bus) bus.emit('animal:result', p); return p; }
 function changed(bus, ids) { if (bus && ids.length) bus.emit('animals:changed', { buildingIds: ids }); }
 
-function build(state, bus, p = {}, rng) {
-  const type = p.building;
-  const def = BUILDINGS[type];
-  const fail = (reason) => result(bus, { ok: false, type: 'build', building: type, reason });
-  if (!def) return fail(REASONS.badBuilding);
-  if (levelOf(state) < def.level) return fail(REASONS.locked(def.level));
-  const lot = p.lotId
-    ? def.lots.find((l) => l.id === p.lotId)
-    : def.lots.find((l) => !state.buildings.some((b) => b.lotId === l.id));
-  if (!lot) return fail(p.lotId ? REASONS.badBuilding : REASONS.noFreeLot);
-  if (state.buildings.some((b) => b.lotId === lot.id)) return fail(REASONS.lotTaken);
-  if (def.price > 0 && !transact(state, bus, { amount: -def.price, category: 'buildings', label: `İnşaat: ${def.name}` })) return fail(REASONS.noMoney);
-  const b = newBuilding(type, lot.id, dayOf(state));
+/** building:built {type: coop|barn|hive, placedId, tx, ty} → bina kaydı (hive: bina + bir arı). Ücret PlacementSystem'de alınır. */
+function onBuilt(state, bus, p = {}, rng) {
+  const type = p.type;
+  if (!BUILDINGS[type] || p.placedId == null) return null;
+  const id = buildingId(p.placedId);
+  if (buildingOf(state, id)) return null;
+  const b = newBuilding(type, p.placedId, dayOf(state));
   state.buildings.push(b);
-  const c = lotCenter(lot);
-  bus.emit('building:built', { type, lotId: lot.id, tx: c.tx, ty: c.ty });
+  if (isHive(type)) {
+    const a = newAnimal(state, 'bee', b.id, rng, true);
+    state.animals.push(a);
+    bus.emit('animal:born', { animal: a, reason: 'bought' });
+  }
   changed(bus, [b.id]);
-  return result(bus, { ok: true, type: 'build', building: type, buildingId: b.id, lotId: lot.id, text: `${def.name} inşa edildi.` });
+  return b;
+}
+
+/** build:remove öncesi kontrol (PlacementSystem çağırır). */
+export function canRemove(state, placedId) {
+  const b = state.buildings.find((x) => placedIdOf(x) === placedId);
+  if (!b) return { ok: true };
+  if (animalsIn(state, b.id).length) return { ok: false, reason: REASONS.sellFirst };
+  return { ok: true };
+}
+
+/** Yerleştirilmiş listesinde olmayan bina kayıtlarını (ve varsa hayvanlarını) sil. */
+function syncPlaced(state, bus) {
+  if (!Array.isArray(state.placed)) return;
+  const live = new Set(state.placed.map((o) => o.id));
+  const gone = state.buildings.filter((b) => b.placedId != null && !live.has(b.placedId));
+  if (!gone.length) return;
+  const ids = new Set(gone.map((b) => b.id));
+  state.buildings = state.buildings.filter((b) => !ids.has(b.id));
+  state.animals = state.animals.filter((a) => !ids.has(a.buildingId));
+  changed(bus, [...ids]);
 }
 
 function buyAnimal(state, bus, p = {}, rng) {
@@ -75,32 +89,12 @@ function buyAnimal(state, bus, p = {}, rng) {
   const def = ANIMALS[type];
   const fail = (reason) => result(bus, { ok: false, type: 'buy', animal: type, reason });
   if (!def) return fail(REASONS.badBuilding);
-  if (levelOf(state) < def.level) return fail(REASONS.locked(def.level));
   const bdef = BUILDINGS[def.building];
-  let b = null;
-  let makeLot = null;
-  if (isHive(def.building)) {
-    // arı: boş kovan yeri = bina oluşturur
-    b = state.buildings.find((x) => x.id === p.buildingId && x.type === 'hive' && animalsIn(state, x.id).length < bdef.capacity)
-      || state.buildings.find((x) => x.type === 'hive' && animalsIn(state, x.id).length < bdef.capacity);
-    if (!b) {
-      makeLot = (p.lotId && bdef.lots.find((l) => l.id === p.lotId && !state.buildings.some((x) => x.lotId === l.id)))
-        || bdef.lots.find((l) => !state.buildings.some((x) => x.lotId === l.id));
-      if (!makeLot) return fail(REASONS.noFreeLot);
-    }
-  } else {
-    const cands = state.buildings.filter((x) => x.type === def.building && (!p.buildingId || x.id === p.buildingId));
-    if (!cands.length) return fail(REASONS.needBuilding(bdef.name));
-    b = cands.find((x) => animalsIn(state, x.id).length < bdef.capacity);
-    if (!b) return fail(REASONS.full);
-  }
+  const cands = state.buildings.filter((x) => x.type === def.building && (!p.buildingId || x.id === p.buildingId));
+  if (!cands.length) return fail(REASONS.needBuilding(bdef.name));
+  const b = cands.find((x) => animalsIn(state, x.id).length < bdef.capacity);
+  if (!b) return fail(REASONS.full);
   if (!transact(state, bus, { amount: -def.price, category: 'animals', label: `Hayvan: ${def.name}` })) return fail(REASONS.noMoney);
-  if (makeLot) {
-    b = newBuilding('hive', makeLot.id, dayOf(state));
-    state.buildings.push(b);
-    const c = lotCenter(makeLot);
-    bus.emit('building:built', { type: 'hive', lotId: makeLot.id, tx: c.tx, ty: c.ty });
-  }
   const a = newAnimal(state, type, b.id, rng, true);
   state.animals.push(a);
   bus.emit('animal:born', { animal: a, reason: 'bought' });
@@ -235,15 +229,15 @@ export function validate(state, onFix = () => {}) {
   if (!Array.isArray(state.buildings)) { onFix('buildings'); state.buildings = []; }
   if (!Array.isArray(state.animals)) { onFix('animals'); state.animals = []; }
   if (!isPlainObject(state.flags)) state.flags = {};
-  const lots = new Set();
+  const pids = new Set();
   const kept = [];
   state.buildings.forEach((b, i) => {
     const path = `buildings.${i}`;
-    const lot = isPlainObject(b) ? lotOf(b.lotId) : null;
-    if (!lot || lot.type !== b.type || lots.has(b.lotId)) { onFix(path); return; }
-    lots.add(b.lotId);
+    const pid = isPlainObject(b) ? placedIdOf(b) : null;
+    if (pid == null || !BUILDINGS[b.type] || pids.has(pid)) { onFix(path); return; }
+    pids.add(pid);
     const f = (cond, key) => { if (!cond) onFix(`${path}.${key}`); };
-    f(b.id === `b_${b.lotId}`, 'id'); b.id = `b_${b.lotId}`;
+    f(b.id === buildingId(pid), 'id'); b.id = buildingId(pid);
     f(Number.isFinite(b.builtDay), 'builtDay'); b.builtDay = num(b.builtDay, 1, 0, 1e9);
     f(Number.isFinite(b.dirt), 'dirt'); b.dirt = num(b.dirt, 0, 0, 100);
     if (!isPlainObject(b.trough)) { onFix(`${path}.trough`); b.trough = { feed: 0, water: 0 }; }
@@ -299,7 +293,8 @@ const AnimalSystem = {
     busRef = bus;
     rngRef = registry?.ctx?.rng || createRng(state);
     validate(state, () => {});
-    offs.push(bus.on('shop:build', (p) => build(state, bus, p, rngRef)));
+    offs.push(bus.on('building:built', (p) => onBuilt(state, bus, p, rngRef)));
+    offs.push(bus.on('placed:changed', () => syncPlaced(state, bus)));
     offs.push(bus.on('shop:buyAnimal', (p) => buyAnimal(state, bus, p, rngRef)));
     offs.push(bus.on('animal:action', (p) => action(state, bus, p)));
   },

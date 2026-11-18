@@ -1,39 +1,33 @@
 // Izgara A* (8 yön) — PLAN.md §11. Phaser/bus bağımlılığı yok.
-// Izgara 80×24 karo. Engel: P1_BLOCKED ('path' hariç: patika yürünebilir), bina/makine arsaları, pazar tezgâhı.
+// Izgara 80×24 karo. Engel: occupancy (walk:true).
 // Sonuçlar (başlangıç, hedef) çiftine göre önbelleklenir; arama ön ayrılmış typed array'lerle yapılır.
 import { WORLD_TILES_X, WORLD_TILES_Y } from '../../core/constants.js';
-import { P1_BLOCKED } from '../../data/land.js';
-import { BUILDINGS } from '../../data/buildings.js';
-import { MACHINES } from '../../data/recipes.js';
-import { STALL } from '../../render/layout.js';
+import { walkGrid, version as occVersion } from '../world/occupancy.js';
 
 export const GW = WORLD_TILES_X;
 export const GH = WORLD_TILES_Y;
 const N = GW * GH;
 const SQ2 = Math.SQRT2;
 
-const blocked = new Uint8Array(N);
-function fillRect(x0, x1, y0, y1) {
-  for (let y = Math.max(0, y0); y <= Math.min(GH - 1, y1); y++) {
-    for (let x = Math.max(0, x0); x <= Math.min(GW - 1, x1); x++) blocked[y * GW + x] = 1;
-  }
+// Engel kaynağı: world/occupancy (yerleştirilenler + dekor + sabit engeller; patika/köy yolu geçilebilir).
+// WorkerSystem.init `bindState` ile state'i bağlar; doluluk değişince (version) yol önbelleği temizlenir.
+let boundState = null;
+let blocked = new Uint8Array(N);
+let seenVersion = -1;
+export function bindState(state) { boundState = state; seenVersion = -1; }
+function sync() {
+  if (!boundState) return;
+  const v = occVersion(boundState);
+  if (v !== seenVersion) { seenVersion = v; blocked = walkGrid(boundState); cache.clear(); }
 }
-for (const k in P1_BLOCKED) {
-  if (P1_BLOCKED[k] === 'path') continue;
-  const [x, y] = k.split(',').map(Number);
-  fillRect(x, x, y, y);
-}
-for (const type in BUILDINGS) for (const l of BUILDINGS[type].lots) fillRect(l.x0, l.x1, l.y0, l.y1);
-for (const type in MACHINES) { const l = MACHINES[type].lot; fillRect(l.x0, l.x1, l.y0, l.y1); }
-if (STALL && STALL.tiles) fillRect(STALL.tiles.x0, STALL.tiles.x1, STALL.tiles.y0, STALL.tiles.y1);
 
 export const cellOf = (tx, ty) => {
   const x = tx < 0 ? 0 : tx >= GW ? GW - 1 : tx | 0;
   const y = ty < 0 ? 0 : ty >= GH ? GH - 1 : ty | 0;
   return y * GW + x;
 };
-export const isBlockedCell = (c) => blocked[c] === 1;
-export const isBlocked = (tx, ty) => tx < 0 || ty < 0 || tx >= GW || ty >= GH || blocked[ty * GW + tx] === 1;
+export const isBlockedCell = (c) => { sync(); return blocked[c] === 1; };
+export const isBlocked = (tx, ty) => { sync(); return tx < 0 || ty < 0 || tx >= GW || ty >= GH || blocked[ty * GW + tx] === 1; };
 
 /** (tx,ty)'ye en yakın yürünebilir hücre (halka araması). */
 export function nearestFree(tx, ty) {
@@ -110,6 +104,7 @@ export function clearPathCache() { cache.clear(); }
  * @returns {Int16Array|null} hücre indeksleri (başlangıç dahil); yol yoksa null. Önbellekten gelen dizi DEĞİŞTİRİLMEMELİ.
  */
 export function findPath(sc, gc) {
+  sync();
   const key = sc * N + gc;
   const hit = cache.get(key);
   if (hit !== undefined) return hit;

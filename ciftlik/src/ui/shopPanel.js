@@ -6,7 +6,6 @@ import { CROPS } from '../data/crops.js';
 import { SHOP, SHOP_TABS, MAX_BUY_QTY } from '../data/shop.js';
 import { ANIMALS, ANIMAL_PRODUCTS } from '../data/animals.js';
 import { BUILDINGS } from '../data/buildings.js';
-import { MACHINES } from '../data/recipes.js';
 import { SEASON_NAMES_TR } from '../core/constants.js';
 import { STR } from './strings.js';
 import { ICON } from './icons.js';
@@ -16,8 +15,8 @@ import { tap } from './touch.js';
 import { formatMoney } from './hud.js';
 import { countItem } from './toolbar.js';
 
-// Aşama 5: 'Atölyeler' sekmesi (shop:buildMachine) mağaza sekmelerine yerel olarak eklenir.
-const TABS = [...SHOP_TABS, { id: 'workshops', name: STR.mach.tab }];
+// Aşama 5b: bina/atölye kurulumu İnşa modundadır; 'Binalar' sekmesi yalnızca ipucu kartı gösterir.
+const TABS = SHOP_TABS;
 
 const HOLD_DELAY = 380, HOLD_EVERY = 70;
 const PENDING_MS = 1500;
@@ -114,7 +113,7 @@ export function createShopPanel(ctx) {
   }
 
   // ---- Hayvanlar / Binalar sekmeleri (shop:buyAnimal / shop:build) ----
-  const CATALOG = { animals: 'a', buildings: 'b', workshops: 'w' };
+  const CATALOG = { animals: 'a', buildings: 'h' };
   const catCards = new Map(); // 'a:chicken' | 'b:coop' → {el, refs}
   const animalsIn = (bid) => state.animals.reduce((n, a) => n + (a.buildingId === bid ? 1 : 0), 0);
 
@@ -122,10 +121,8 @@ export function createShopPanel(ctx) {
     const out = [];
     if (tabId === 'animals') {
       for (const id in ANIMALS) out.push({ kind: 'a', id, key: `a:${id}`, def: ANIMALS[id], level: ANIMALS[id].level, price: ANIMALS[id].price });
-    } else if (tabId === 'workshops') {
-      for (const id in MACHINES) out.push({ kind: 'w', id, key: `w:${id}`, def: MACHINES[id], level: MACHINES[id].level, price: MACHINES[id].price });
     } else {
-      for (const id in BUILDINGS) if (BUILDINGS[id].price > 0) out.push({ kind: 'b', id, key: `b:${id}`, def: BUILDINGS[id], level: BUILDINGS[id].level, price: BUILDINGS[id].price });
+      out.push({ kind: 'h', id: 'hint', key: 'h:hint' });
     }
     return out;
   }
@@ -149,23 +146,23 @@ export function createShopPanel(ctx) {
       own: c.querySelector('.co'), why: c.querySelector('.cat-why'), buy: c.querySelector('.cb'), buyT: c.querySelector('.cbt'),
       buyV: c.querySelector('.cbv'), lockT: c.querySelector('.sc-lock .lt'),
     };
+    if (e.kind === 'h') {
+      c.classList.add('hintcard');
+      setText(refs.name, STR.bld.buildHint);
+      refs.buy.hidden = true; refs.price.hidden = true;
+      return { el: c, refs };
+    }
     const def = e.def;
-    refs.dot.style.background = e.kind === 'a' ? `radial-gradient(circle at 35% 30%, ${def.color}, ${def.accent})` : e.kind === 'w' ? `radial-gradient(circle at 35% 30%, ${def.color}, #4a3a2a)` : 'radial-gradient(circle at 35% 30%, #c8553d, #6b4a2f)';
+    refs.dot.style.background = e.kind === 'a' ? `radial-gradient(circle at 35% 30%, ${def.color}, ${def.accent})` : 'radial-gradient(circle at 35% 30%, #c8553d, #6b4a2f)';
     setText(refs.name, def.name);
     if (e.kind === 'a') {
       const pr = ANIMAL_PRODUCTS[def.product.itemId];
       setText(refs.sub, STR.bld.produces(pr ? pr.name : '', def.product.intervalDays));
-    } else if (e.kind === 'w') setText(refs.sub, STR.mach.makes(e.id));
-    else setText(refs.sub, STR.bld.capacityN(def.capacity));
+    }
     tap(refs.buy, () => {
       if (refs.buy.disabled) return;
       pending.set(e.key, performance.now() + PENDING_MS);
       if (e.kind === 'a') bus.emit('shop:buyAnimal', { animal: e.id });
-      else if (e.kind === 'w') bus.emit('shop:buildMachine', { machine: e.id });
-      else {
-        const lot = def.lots.find((l) => !state.buildings.some((b) => b.lotId === l.id));
-        if (lot) bus.emit('shop:build', { building: e.id, lotId: lot.id });
-      }
       dirty = true;
     });
     return { el: c, refs };
@@ -175,29 +172,17 @@ export function createShopPanel(ctx) {
     let card = catCards.get(e.key);
     if (!card) { card = makeCatCard(e); catCards.set(e.key, card); }
     const R = card.refs;
-    const locked = lv < e.level;
+    if (e.kind === 'h') return card.el;
+    const locked = false;
     let why = '';
     let hardBlock = false;
     if (e.kind === 'a') {
       const bdef = BUILDINGS[e.def.building];
       const bs = state.buildings.filter((b) => b.type === e.def.building);
-      const isHive = e.def.building === 'hive';
-      if (isHive) {
-        if (bs.length >= bdef.lots.length) { why = STR.bld.noLot; hardBlock = true; }
-      } else if (!bs.length) { why = STR.bld.needBuilding(bdef.name); hardBlock = true; }
+      if (!bs.length) { why = STR.bld.needBuilding(bdef.name); hardBlock = true; }
       else if (!bs.some((b) => animalsIn(b.id) < bdef.capacity)) { why = STR.bld.full; hardBlock = true; }
       setText(R.own, STR.bld.have(state.animals.reduce((n, a) => n + (a.type === e.id ? 1 : 0), 0)));
       setText(R.buyT, STR.buy);
-    } else if (e.kind === 'w') {
-      const built = state.machines.some((m) => m.type === e.id);
-      if (built) { why = STR.bld.built; hardBlock = true; }
-      setText(R.own, built ? STR.mach.builtShort : '');
-      setText(R.buyT, STR.bld.buildBtn);
-    } else {
-      const used = state.buildings.filter((b) => b.type === e.id).length;
-      if (used >= e.def.lots.length) { why = STR.bld.built; hardBlock = true; }
-      setText(R.own, used ? STR.bld.builtN(used) : '');
-      setText(R.buyT, STR.bld.buildBtn);
     }
     const afford = e.price <= money;
     const busy = pending.has(e.key);
@@ -205,7 +190,6 @@ export function createShopPanel(ctx) {
     card.el.classList.toggle('poor', !afford && !locked && !hardBlock);
     setText(R.price, formatMoney(e.price));
     setText(R.buyV, formatMoney(e.price));
-    setText(R.lockT, STR.levelLock(e.level));
     setText(R.why, why);
     R.why.hidden = !why;
     R.buy.disabled = locked || hardBlock || !afford || busy;

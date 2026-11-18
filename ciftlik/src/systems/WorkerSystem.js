@@ -5,11 +5,12 @@
 // State: state.workers[] ve state.donkey (x,y dünya px; tickMinute her oyun dakikasında yazar, prevX/prevY önceki dakika → görsel lerp).
 // Para yalnızca EconomySystem.transact (kategori 'wages').
 import { WORKER_TYPES, DONKEY, WORKER_HOME } from '../data/workers.js';
+import { PLACEABLES } from '../data/placeables.js';
 import { TILE_W as TW, TILE_H as TH, MIN_PER_DAY } from '../core/constants.js';
 import { isPlainObject } from '../core/GameState.js';
 import { calendar } from '../core/timeUtils.js';
 import { transact } from './EconomySystem.js';
-import { findPath, cellOf, GW } from './workers/pathfinding.js';
+import { findPath, cellOf, GW, bindState } from './workers/pathfinding.js';
 import { pickTask, TASK_KINDS, ACTION_KEY, statusText } from './workers/tasks.js';
 
 export { statusText };
@@ -26,9 +27,16 @@ const DECIDE_EVERY = 5;       // boştayken karar aralığı (oyun dakikası)
 const NAME_MAX = 16;
 
 const HOME_X = (WORKER_HOME.tx + 0.5) * TW, HOME_Y = (WORKER_HOME.ty + 0.5) * TH;
-const SHED_X = (DONKEY.homeTile.tx + 0.5) * TW, SHED_Y = (DONKEY.homeTile.ty + 0.5) * TH;
+// Eşek evi konumu state.placed'teki 'shed'den okunur (PLAN §12); yoksa DONKEY.homeTile.
+let SHED_X = (DONKEY.homeTile.tx + 0.5) * TW, SHED_Y = (DONKEY.homeTile.ty + 0.5) * TH;
 const HOME_CELL = cellOf(WORKER_HOME.tx, WORKER_HOME.ty);
-const SHED_CELL = cellOf(DONKEY.homeTile.tx, DONKEY.homeTile.ty);
+let SHED_CELL = cellOf(DONKEY.homeTile.tx, DONKEY.homeTile.ty);
+function refreshShed(state) {
+  const sh = Array.isArray(state.placed) ? state.placed.find((p) => p.type === 'shed') : null;
+  const tx = sh ? sh.tx + PLACEABLES.shed.w - 1 : DONKEY.homeTile.tx;
+  const ty = sh ? sh.ty + PLACEABLES.shed.h - 1 : DONKEY.homeTile.ty;
+  SHED_X = (tx + 0.5) * TW; SHED_Y = (ty + 0.5) * TH; SHED_CELL = cellOf(tx, ty);
+}
 
 let busRef = null;
 let regRef = null;
@@ -479,6 +487,14 @@ const WorkerSystem = {
     regRef = registry || null;
     resetRuntime();
     followCache.clear();
+    bindState(state);
+    refreshShed(state);
+    offs.push(bus.on('placed:changed', () => {
+      const ox = SHED_X, oy = SHED_Y;
+      refreshShed(state);
+      // Sundurma taşındıysa evde bekleyen eşek yeni yere gelir.
+      if (state.donkey.mode === 'home' && (ox !== SHED_X || oy !== SHED_Y)) { state.donkey.x = SHED_X; state.donkey.y = SHED_Y; }
+    }));
     validate(state, () => {});
     const keep = (p) => { lastResult = p; };
     offs.push(bus.on('farm:result', keep));

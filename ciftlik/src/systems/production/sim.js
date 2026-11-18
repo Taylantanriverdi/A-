@@ -6,17 +6,18 @@ import { currentPrice } from '../market/pricing.js';
 export const QRANK = { C: 0, B: 1, A: 2 };
 const QLIST = ['C', 'B', 'A'];
 
-export const machineIdOf = (type) => `m_${type}`;
+export const machineIdOf = (placedId) => `m_${placedId}`;
+export const placedIdOf = (m) => (m ? (m.placedId ?? m.type) : null);
 
-/** id ('m_dairy') veya tür ('dairy') ile makine bul. */
+/** Makine kimliği ('m_<placedId>'), placedId veya (eski kayıt) tür ile bul. */
 export function machineOf(state, idOrType) {
   if (typeof idOrType !== 'string') return null;
-  const type = idOrType.startsWith('m_') ? idOrType.slice(2) : idOrType;
-  return state.machines.find((m) => m.type === type) || null;
+  const key = idOrType.startsWith('m_') ? idOrType.slice(2) : idOrType;
+  return state.machines.find((m) => placedIdOf(m) === key) || state.machines.find((m) => m.type === key) || null;
 }
 
-export function newMachine(type, day) {
-  return { id: machineIdOf(type), type, builtDay: day, condition: 100, queue: [], output: {}, auto: null };
+export function newMachine(type, placedId, day) {
+  return { id: machineIdOf(placedId), type, placedId, builtDay: day, condition: 100, queue: [], output: {}, auto: null };
 }
 
 export const recipesOf = (type) => Object.keys(RECIPES).filter((id) => RECIPES[id].machine === type);

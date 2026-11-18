@@ -2,7 +2,7 @@
 import { CROPS, STAGE_NAMES_TR, ROT_AFTER_DAYS } from '../../data/crops.js';
 import { ITEMS } from '../../data/items.js';
 import { HEALTH, SOIL } from '../../data/farming.js';
-import { BLOCK_LABELS_TR, blockedKind } from '../../data/land.js';
+import { isBlocked as occBlocked, objectAt, labelOf } from '../world/occupancy.js';
 import { DAYS_PER_SEASON, SEASONS } from '../../core/constants.js';
 import { calendar } from '../../core/timeUtils.js';
 import { count } from '../InventorySystem.js';
@@ -41,7 +41,7 @@ export function seasonListLoc(seasons) {
 }
 
 /** "Kuyu burada — ekilemez" */
-export function blockedReason(kind) { return `${BLOCK_LABELS_TR[kind] ?? 'Engel'} burada — ekilemez`; }
+export function blockedReason(label) { return `${label || 'Engel'} burada — ekilemez`; }
 
 const NO = (reason) => ({ ok: false, reason });
 const OK = { ok: true };
@@ -57,8 +57,7 @@ export function canApply(state, action, season) {
   if (!action) return NO(REASONS.unknown);
   const t = state.tiles?.[action.tileId];
   if (!t || !isOwnedTile(state, t)) return NO(REASONS.notOwned);
-  const blk = blockedKind(action.tileId);
-  if (blk) return NO(blockedReason(blk));
+  if (occBlocked(state, t.tx, t.ty)) return NO(blockedReason(labelOf(objectAt(state, t.tx, t.ty)) || 'Engel'));
   const sea = season || calendar(state.time.totalMinutes).season;
   const crop = t.crop;
   const id = action.itemId;
@@ -145,10 +144,12 @@ const W = (code, text) => ({ code, text });
  */
 export function tileInfo(state, tileId, now) {
   const t = state.tiles?.[tileId];
-  const blk = blockedKind(tileId);
-  if (blk) {
+  {
     const xy = t ? [t.tx, t.ty] : tileId.split(',').map(Number);
-    return { tileId, tx: xy[0], ty: xy[1], blocked: blk, label: BLOCK_LABELS_TR[blk] ?? blk };
+    if (occBlocked(state, xy[0], xy[1])) {
+      const obj = objectAt(state, xy[0], xy[1]);
+      return { tileId, tx: xy[0], ty: xy[1], blocked: obj ? (obj.type || obj.kind) : 'block', label: labelOf(obj) || 'Engel' };
+    }
   }
   if (!t) return null;
   const cal = now && now.season ? now : calendar(state.time.totalMinutes);

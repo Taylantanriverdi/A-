@@ -1,37 +1,10 @@
 // WorldLinks — dünyadaki tıklanabilir yapıları (karo bölgeleri) UI eylemlerine bağlayan küçük kural tablosu.
 // Cinematics gibi: bus'ı dinler, yalnızca olay yayar; sistemleri veya UI'yi doğrudan çağırmaz.
 // Yeni bağlantı (ör. Aşama 5 bina tıklaması) için LINKS'e satır ekle.
-import { BUILDINGS } from '../data/buildings.js';
-import { MACHINES } from '../data/recipes.js';
-import { DONKEY } from '../data/workers.js';
+import { PLACEABLES } from '../data/placeables.js';
 
-/**
- * Bağlantı: { id, area: {x0, x1, y0, y1} (karo, uçlar dahil), emit: [olay, yük] , tools?: ['hand', ...] }
- * tools verilmezse her alette tetiklenir (alet seçiliyken farm:action üretmemek UI'nin işi).
- */
-export const LINKS = [
-  {
-    id: 'marketStall', // PLAN §9: pazar tezgâhı, karo 42–44 × 18–19 (visual-dev MarketStall çizer)
-    area: { x0: 42, x1: 44, y0: 18, y1: 19 },
-    event: 'ui:open',
-    payload: { panel: 'market', source: 'marketStall' },
-  },
-  // Aşama 4: bina arsaları (data/buildings.js lots) → bina paneli (boşsa inşa teklifi)
-  ...Object.entries(BUILDINGS).flatMap(([type, b]) => b.lots.map((l) => ({
-    id: l.id,
-    area: { x0: l.x0, x1: l.x1, y0: l.y0, y1: l.y1 },
-    event: 'ui:open',
-    payload: { panel: 'building', buildingType: type, lotId: l.id, source: 'lot' },
-  }))),
-  // Aşama 5: atölye arsaları → makine paneli (boşsa inşa teklifi); eşek sundurması → çalışan paneli
-  ...Object.entries(MACHINES).map(([type, m]) => ({
-    id: `machine_${type}`,
-    area: { ...m.lot },
-    event: 'ui:open',
-    payload: { panel: 'machine', machine: type, source: 'lot' },
-  })),
-  { id: 'donkeyShed', area: { ...DONKEY.shed }, event: 'ui:open', payload: { panel: 'worker', source: 'shed' } },
-];
+// PLAN §12: bağlantılar statik değildir. Dokunulan karodaki placed nesnenin PLACEABLES[type].link paneli açılır
+// (`ui:open {...link, placedId, source:'placed'}`). Nesne ayak izi state.placed'ten bulunur.
 
 const STROKE_GAP_MS = 400; // bundan kısa aralıkla gelen tile:tap'ler boyama darbesi sayılır
 const REOPEN_MS = 600;     // aynı bağlantı bu süre içinde tekrar tetiklenmez
@@ -43,11 +16,11 @@ function now() {
 export default class WorldLinks {
   /**
    * @param {{on:Function, emit:Function}} bus
-   * @param {Array} [links]
+   * @param {object} state GameState (state.placed okunur)
    */
-  constructor(bus, links = LINKS) {
+  constructor(bus, state) {
     this.bus = bus;
-    this.links = links;
+    this.state = state;
     this.tool = 'hand';
     this.lastTapAt = -Infinity;
     this.lastTapLink = null; // son tile:tap'in düştüğü bağlantı (null = bağlantı dışı)
@@ -60,9 +33,14 @@ export default class WorldLinks {
 
   /** (tx, ty) karosundaki bağlantı ya da null. */
   linkAt(tx, ty) {
-    for (const l of this.links) {
-      const a = l.area;
-      if (tx >= a.x0 && tx <= a.x1 && ty >= a.y0 && ty <= a.y1) return l;
+    const list = this.state && this.state.placed;
+    if (!Array.isArray(list)) return null;
+    for (const p of list) {
+      const def = PLACEABLES[p.type];
+      if (!def || !def.link) continue;
+      if (tx >= p.tx && tx < p.tx + def.w && ty >= p.ty && ty < p.ty + def.h) {
+        return { id: p.id, event: 'ui:open', payload: { ...def.link, placedId: p.id, source: 'placed' } };
+      }
     }
     return null;
   }
@@ -77,7 +55,7 @@ export default class WorldLinks {
     this.lastTapAt = t;
     this.lastTapLink = link;
     if (!link || inStroke) return;
-    if (link.tools && !link.tools.includes(this.tool)) return;
+    if (this.tool === 'build') return; // İnşa modunda dokunuş yerleştirme içindir, panel açmaz
     const prev = this.firedAt.get(link.id);
     if (prev !== undefined && t - prev < REOPEN_MS) return;
     this.firedAt.set(link.id, t);

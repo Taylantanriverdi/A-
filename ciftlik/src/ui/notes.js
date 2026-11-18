@@ -1,9 +1,8 @@
-// Küçük oyun içi bildirimler: hasat ("+2 Patates · A", art arda hasatlar birleşir) ve XP göstergesi.
+// Küçük oyun içi bildirimler: hasat ("+2 Patates · A", art arda hasatlar birleşir).
 // Olaylar yalnızca biriktirilir; DOM yazımı kare döngüsünde (render).
 import { ITEMS } from '../data/items.js';
 import { STR } from './strings.js';
 import { TOOL_ICON, ICON } from './icons.js';
-import { xpToNext, MAX_LEVEL, UNLOCKS } from '../data/progression.js';
 import { shield } from './touch.js';
 import { itemIcon } from './itemIcons.js';
 import { h, setText } from './frame.js';
@@ -142,111 +141,5 @@ export function createCelebration(root) {
       hideIn(holding ? CINE_MAX_MS : CELEB_MS);
     },
     destroy() { clearTimeout(timer); clearTimeout(waitTimer); el.remove(); },
-  };
-}
-
-/** Saat kartının altında ince XP göstergesi: seviye + gerçek ilerleme (xp / toNext). */
-export function createXp(parent, ctx) {
-  const { state } = ctx;
-  const el = h('div', 'xp glass', `<span class="xs">${TOOL_ICON.spark}</span><span class="xl num"></span><span class="xv num"></span><span class="xg num"></span><i class="xbar"><i></i></i><i class="xline"></i>`);
-  el.setAttribute('role', 'progressbar');
-  el.setAttribute('aria-label', STR.xp);
-  el.setAttribute('aria-valuemin', '0');
-  parent.appendChild(el);
-  const lvl = el.querySelector('.xl'), val = el.querySelector('.xv'), gain = el.querySelector('.xg');
-  const fill = el.querySelector('.xbar > i');
-  let pendingGain = 0;
-  let shownKey = '';
-  let timer = 0;
-  let gainSum = 0; // gösterge açıkken gelen kazançlar birikir
-  let last = null; // son xp:gained yükü {level, xp, toNext}
-  return {
-    onGained(p) {
-      const a = Number(p && p.amount) || 0;
-      if (a > 0) pendingGain += a;
-      if (p && Number(p.toNext) > 0) last = { level: Number(p.level) || 0, xp: Number(p.xp) || 0, toNext: Number(p.toNext) };
-    },
-    onLevelUp() { el.classList.remove('lvl'); void el.offsetWidth; el.classList.add('lvl'); },
-    render() {
-      const pl = state.player || {};
-      const lv = Math.max(1, Number(pl.level) || 1);
-      const xp = Math.max(0, Math.floor(Number(pl.xp) || 0));
-      const toNext = last && last.level === lv && last.toNext > 0 ? last.toNext : xpToNext(lv);
-      const key = `${lv}|${xp}|${toNext}`;
-      if (key !== shownKey) {
-        shownKey = key;
-        setText(lvl, STR.level(lv));
-        const maxed = lv >= MAX_LEVEL;
-        setText(val, maxed ? `${xp} ${STR.xp}` : STR.xpProgress(xp, toNext));
-        const r = maxed ? 1 : Math.max(0, Math.min(1, xp / Math.max(1, toNext)));
-        fill.style.transform = `scaleX(${r.toFixed(4)})`;
-        el.setAttribute('aria-valuemax', String(toNext));
-        el.setAttribute('aria-valuenow', String(Math.min(xp, toNext)));
-        el.title = `${STR.level(lv)} · ${STR.xpProgress(xp, toNext)} ${STR.xp}`;
-      }
-      if (pendingGain > 0) {
-        gainSum += pendingGain;
-        pendingGain = 0;
-        setText(gain, STR.xpGain(Math.round(gainSum * 10) / 10));
-        el.classList.remove('gain'); void el.offsetWidth; el.classList.add('gain');
-        clearTimeout(timer);
-        timer = setTimeout(() => { el.classList.remove('gain'); gainSum = 0; }, 1600);
-      }
-    },
-    destroy() { clearTimeout(timer); },
-  };
-}
-
-/**
- * Seviye atlama kutlaması: ortada zarif kart ("Seviye 3!" + açılımlar), 4.8 sn, dokununca kapanır.
- * Aynı anda birden fazla level:up gelirse en yüksek seviye gösterilir, açılımlar birleşir.
- */
-const LVL_MS = 4800;
-export function createLevelUp(root) {
-  const el = h('div', 'lvlup', `<div class="lv-card glass" role="dialog" aria-live="assertive">
-      <div class="lv-glow" aria-hidden="true"></div>
-      <span class="lv-ic">${ICON.trophy}</span>
-      <div class="lv-k"></div><div class="lv-v num"></div>
-      <div class="lv-u"><div class="lv-uh"></div><ul class="lv-list"></ul></div>
-      <div class="lv-hint"></div></div>`);
-  shield(el);
-  root.appendChild(el);
-  const k = el.querySelector('.lv-k'), v = el.querySelector('.lv-v'), list = el.querySelector('.lv-list');
-  const uh = el.querySelector('.lv-uh'), hint = el.querySelector('.lv-hint'), ubox = el.querySelector('.lv-u');
-  let pending = null;
-  let timer = 0;
-  let open = false;
-  const hide = () => { clearTimeout(timer); open = false; el.classList.remove('show'); };
-  el.addEventListener('click', hide);
-  return {
-    get isOpen() { return open; },
-    push(p) {
-      const level = Number(p && p.level) || 0;
-      if (!level) return;
-      const unlocks = Array.isArray(p.unlocks) && p.unlocks.length ? p.unlocks : (UNLOCKS[level] || []);
-      if (pending && pending.level >= level) { pending.unlocks = unlocks.concat(pending.unlocks); return; }
-      pending = { level, unlocks: pending ? pending.unlocks.concat(unlocks) : unlocks.slice() };
-    },
-    hide,
-    render() {
-      if (!pending) return;
-      const p = pending; pending = null;
-      setText(k, STR.levelUpKicker);
-      setText(v, STR.levelUpTitle(p.level));
-      setText(uh, p.unlocks.length ? STR.levelUpUnlocks : STR.levelUpNone);
-      list.innerHTML = '';
-      for (const u of p.unlocks.slice(0, 6)) {
-        const li = h('li', null, `<span class="ic">${ICON.check}</span><span></span>`);
-        li.lastChild.textContent = String(u);
-        list.appendChild(li);
-      }
-      ubox.classList.toggle('none', !p.unlocks.length);
-      setText(hint, STR.tapToClose);
-      el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
-      open = true;
-      clearTimeout(timer);
-      timer = setTimeout(hide, LVL_MS);
-    },
-    destroy() { clearTimeout(timer); el.remove(); },
   };
 }

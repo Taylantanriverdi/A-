@@ -24,7 +24,7 @@ export const STR = {
   newGameConfirm: 'Evet, her şeyi sil',
   newGameCancel: 'Vazgeç',
   newGameAsk: 'Emin misin? Bu işlem geri alınamaz.',
-  shortcuts: 'Kısayollar: 1–8 aletler · I/P/M paneller · Boşluk duraklat · Shift+1/2/3 hız · Esc kapat',
+  shortcuts: 'Kısayollar: 1–8 aletler · I/P/M paneller · B inşa · Boşluk duraklat · Shift+1/2/3 hız · Esc kapat',
   fps: 'FPS',
 
   // ---- Aşama 2: araç çubuğu ----
@@ -88,9 +88,6 @@ export const STR = {
   firstHarvest: 'İlk hasat!',
   firstHarvestSub: 'Emeğinin ilk meyvesi',
   harvestNote: (qty, name, q) => (q ? `+${qty} ${name} · ${q}` : `+${qty} ${name}`),
-  xp: 'XP',
-  xpGain: (n) => `+${n} XP`,
-  level: (n) => `Sv ${n}`,
 
   // ---- Aşama 3: envanter / pazar / mağaza / seviye ----
   nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', worker: 'Çalışan' },
@@ -108,6 +105,7 @@ export const STR = {
   // pazar
   channel: 'Satış kanalı',
   channelLocked: (n) => `Seviye ${n}`,
+  levelLock: (n) => `Seviye ${n}`, // buildingPanel/machinePanel/shopPanel (gameplay-dev) temizleyene dek
   payTomorrow: 'Ödeme yarın 08:00',
   payNow: 'Ödeme hemen',
   minLotNote: (n) => `En az ${n} birim`,
@@ -132,7 +130,6 @@ export const STR = {
   owned: (n) => `Envanterde: ${n}`,
   buy: 'Satın al',
   seasonSeed: (names) => `${names} tohumu`,
-  levelLock: (n) => `Seviye ${n}`,
   notEnoughMoney: 'Yeterli paran yok',
   bought: (amount, qty, name) => `−${amount} · ${qty} ${name}`,
   dec: 'Azalt',
@@ -146,12 +143,7 @@ export const STR = {
     return a.join(', ');
   },
   // seviye
-  levelUpKicker: 'Seviye atladın',
-  levelUpTitle: (n) => `Seviye ${n}!`,
-  levelUpNone: 'Yeni kapılar yakında açılacak',
-  levelUpUnlocks: 'Açılanlar',
   tapToClose: 'Kapatmak için dokun',
-  xpProgress: (xp, next) => `${xp}/${next}`,
   // ---- Aşama 4: hayvancılık ----
   bld: {
     produces: (name, days) => (days <= 1 ? `${name} · her gün` : `${name} · ${days} günde bir`),
@@ -165,6 +157,8 @@ export const STR = {
     buildBtn: 'İnşa et',
     emptyLot: 'Boş arsa',
     emptyLotHint: 'Burada yeni bir yapı kurabilirsin.',
+    notFound: 'Bina bulunamadı.',
+    buildHint: 'Binaları İnşa modundan (B) yerleştir.',
     hiveHint: 'Kovan kurulur ve arılar yerleşir.',
     buyHive: 'Arı kovanı kur',
     capacity: (n, m) => `Kapasite ${n}/${m}`,
@@ -190,6 +184,7 @@ export const STR = {
     tab: 'Atölyeler',
     builtShort: 'Kurulu',
     emptyLot: 'Boş atölye arsası',
+    notFound: 'Atölye bulunamadı.',
     emptyHint: 'Burada atölyeyi kurup ürünleri işleyebilirsin.',
     makes: (type) => ({ dairy: 'Peynir, tereyağı, yoğurt', mill: 'Un', bakery: 'Ekmek', cannery: 'Reçel, meyve suyu', spinning: 'İplik', loom: 'Kumaş' })[type] || '',
     recipes: 'Tarifler', queue: 'Kuyruk', output: 'Çıktı kutusu', outputEmpty: 'Kutu boş', queueEmpty: 'Kuyruk boş',
@@ -224,7 +219,29 @@ export const STR = {
     noneTitle: 'Çalışan yok',
     noneBody: 'Çırak yakın işlere yürür, uzak işlere eşekle gider: sular, hasat eder, hayvanlara bakar, atölyeden ürün toplar.',
     donkey: 'Eşek sundurmada bekler.',
-    lock: (lv) => `Seviye ${lv} gerekir`,
+  },
+  // ---- Aşama 5b: inşa modu ----
+  build: {
+    btn: 'İnşa', btnKey: 'İnşa modu (B)', done: 'Bitti', cancel: 'İptal', confirm: 'Onayla',
+    modes: { place: 'Yerleştir', move: 'Taşı', remove: 'Kaldır', clear: 'Temizle' },
+    cats: 'Kategoriler', catalog: 'Yapı kataloğu', modeBar: 'İnşa modu',
+    movable: 'Taşınabilir', footprint: (w, h) => `${w}×${h}`,
+    confirmPlace: (price) => `Onayla · ${price}`,
+    hint: {
+      place: 'Katalogdan bir yapı seç', placeTouch: 'Konumu seçmek için haritaya dokun', placeDesk: 'Yerleştirmek için tıkla',
+      paint: 'Sürükleyerek çiz', move: 'Taşımak istediğin yapıya dokun', moveTo: 'Yeni konuma dokun',
+      moveToDesk: 'Yeni konuma tıkla', remove: 'Kaldırmak istediğin yapıya dokun', clear: 'Temizlemek istediğin ağaca ya da çalıya dokun',
+    },
+    uniqueGo: (name) => `${name} tek bir tane olur: Taşı moduna geçildi`,
+    removeAsk: (name, refund) => (refund > 0 ? `${name} kaldır · +${refund} iade` : `${name} kaldır`),
+    clearAsk: (name, cost) => `${name} temizle · ${cost}`,
+    tree: 'Ağaç', bush: 'Çalı', treeAcc: 'Ağacı', bushAcc: 'Çalıyı',
+    required: 'Bu yapı kaldırılamaz, yalnızca taşınabilir',
+    placed: 'Yerleştirildi', moved: 'Taşındı', removed: 'Kaldırıldı', cleared: 'Temizlendi',
+    notSelectable: 'Burada taşınabilir bir yapı yok',
+    useClear: 'Ağaç ve çalılar için Temizle modunu kullan',
+    nothing: 'Burada bir şey yok',
+    invalid: 'Buraya yerleştirilemez',
   },
   panelShortcuts: 'I envanter · P pazar · M mağaza · Esc kapat',
 };

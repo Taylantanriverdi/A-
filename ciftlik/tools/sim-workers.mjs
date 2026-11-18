@@ -53,7 +53,7 @@ const check = (name, cond, detail = '') => rows.push([name, cond ? 'GEÇTİ' : '
   const ids = ['34,8', '35,8', '36,8', '34,9', '35,9', '36,9'];
   add(state, 'seed_potato', 20); add(state, 'chicken_feed', 40);
   for (const id of ids) bus.emit('farm:action', { type: 'plant', tileId: id, itemId: 'seed_potato' });
-  bus.emit('shop:build', { building: 'coop', lotId: 'coop1' });
+  (state.placed ??= []).push({ id: 'coop1', type: 'coop', tx: 26, ty: 6 }); bus.emit('building:built', { type: 'coop', placedId: 'coop1', tx: 26, ty: 6 });
   for (let i = 0; i < 3; i++) bus.emit('shop:buyAnimal', { animal: 'chicken' });
   const moneyBefore = state.finance.money;
   bus.emit('worker:hire', {});

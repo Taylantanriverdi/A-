@@ -103,11 +103,9 @@ export function createMarketPanel(ctx) {
   let groups = [];
   const rows = new Map(); // key → {el, refs, sig}
 
-  const wholesaleLocked = () => (Number(state.player && state.player.level) || 1) < (CHANNELS.wholesale.level || 1);
 
   for (const b of chBtns) tap(b, () => {
     const c = b.dataset.ch;
-    if (c === 'wholesale' && wholesaleLocked()) return;
     if (c === channel) return;
     channel = c; qty = 0; dirty = true; sellDirty = true;
     // Seçili yığın bu kanalın en az lotunu karşılamıyorsa karşılayan ilk yığına geç
@@ -196,16 +194,12 @@ export function createMarketPanel(ctx) {
   function renderRows() {
     const nowCal = now();
     groups = sellableGroups(state);
-    const locked = wholesaleLocked();
-    if (locked && channel === 'wholesale') channel = 'market';
     for (const b of chBtns) {
       const c = b.dataset.ch;
-      const lk = c === 'wholesale' && locked;
       b.classList.toggle('on', c === channel);
-      b.classList.toggle('locked', lk);
       b.setAttribute('aria-checked', c === channel ? 'true' : 'false');
-      b.setAttribute('aria-disabled', lk ? 'true' : 'false');
-      setText(b.querySelector('.cl'), lk ? STR.channelLocked(CHANNELS[c].level) : '');
+      b.setAttribute('aria-disabled', 'false');
+      setText(b.querySelector('.cl'), '');
     }
     setText(note, channel === 'wholesale' ? `${STR.payTomorrow} · ${STR.minLotNote(CHANNELS.wholesale.minLot)}` : STR.payNow);
     note.classList.toggle('later', channel === 'wholesale');
