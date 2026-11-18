@@ -5,7 +5,7 @@ import { h } from './frame.js';
 import { shield, tap } from './touch.js';
 
 const QUALITIES = ['auto', 'high', 'medium', 'low'];
-const CONFIRM_MS = 6000;
+const CONFIRM_MS = 10000; // gerçek zaman (setTimeout), oyun saatinden bağımsız
 
 export function createSettings(root, ctx, moneyWrap) {
   const { state, bus } = ctx;

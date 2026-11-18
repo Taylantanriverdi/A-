@@ -70,11 +70,13 @@ export function createClock(root, ctx) {
         lastDay = c.day;
         setText(dEl, STR.dateLine(SEASON_NAMES_TR[c.season] || c.season, c.dayOfSeason, c.year));
       }
-      // Gün yayı: güneş 06→19, ay 19→06
+      // Gün yayı: güneş SUN.rise→SUN.set, ay SUN.set→ertesi SUN.rise (isNightHour ile aynı kaynak)
       const hf = c.hour + c.minute / 60;
+      const dayLen = SUN.set - SUN.rise;
       let t;
-      if (!night) t = (hf - 6) / 13;
-      else t = (((hf - 19) + 24) % 24) / 11;
+      if (!night) t = (hf - SUN.rise) / dayLen;
+      else t = (((hf - SUN.set) + 24) % 24) / (24 - dayLen);
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
       const a = Math.PI - t * Math.PI;
       const x = (ARC_CX + Math.cos(a) * ARC_R).toFixed(1);
       const y = (ARC_CY - Math.sin(a) * ARC_R).toFixed(1);
