@@ -1,7 +1,8 @@
 // GameState — PLAN.md §1 şeması. Saf JSON: sınıf örneği, fonksiyon, Phaser nesnesi YOK.
-import { START_MINUTES, SAVE_VERSION } from './constants.js';
+import { START_MINUTES, SAVE_VERSION, TILE_W, TILE_H } from './constants.js';
 import { START_MONEY } from '../data/economy.js';
 import { INVENTORY } from '../data/progression.js';
+import { DONKEY } from '../data/workers.js';
 
 /** Arazi parselleri (sahiplik). Fiyat/kilit değerleri data/land.js'e aittir. */
 const PARCEL_IDS = ['P1', 'P2', 'P3', 'P4', 'P5'];
@@ -32,6 +33,7 @@ export function createInitialState(seed = randomSeed()) {
     buildings: [],
     machines: [],
     workers: [],
+    donkey: { x: (DONKEY.homeTile.tx + 0.5) * TILE_W, y: (DONKEY.homeTile.ty + 0.5) * TILE_H, mode: 'home' }, // PLAN §11
     market: { prices: {}, history: {}, activeEvents: [] },
     contracts: [],
     stats: { harvested: {}, sold: {}, earned: 0, spent: 0 },

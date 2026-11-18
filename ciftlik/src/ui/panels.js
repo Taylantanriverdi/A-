@@ -35,6 +35,17 @@ export function createPanelHost(root, ctx, navParent) {
     nav.appendChild(b);
     navBtns[id] = b;
   }
+  // Aşama 5: çalışan portre düğmesi (panel 'worker' ui/workerPanel.js'te kayıtlıdır)
+  const wbtn = h('button', 'nav-btn worker-btn glass interactive', `<span class="wpic"></span><span class="lbl">${STR.nav.worker}</span>`);
+  wbtn.type = 'button';
+  wbtn.dataset.panel = 'worker';
+  wbtn.title = STR.nav.worker;
+  wbtn.setAttribute('aria-label', STR.nav.worker);
+  wbtn.setAttribute('aria-haspopup', 'dialog');
+  shield(wbtn);
+  tap(wbtn, () => api.toggle('worker'));
+  nav.appendChild(wbtn);
+  navBtns.worker = wbtn;
   navParent.insertBefore(nav, navParent.firstChild);
 
   // ---- Panel ----
@@ -77,7 +88,7 @@ export function createPanelHost(root, ctx, navParent) {
       b.classList.toggle('on', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     }
-    for (const id of PANEL_ORDER) {
+    for (const id in navBtns) {
       navBtns[id].classList.toggle('on', id === current);
       navBtns[id].setAttribute('aria-expanded', id === current ? 'true' : 'false');
     }
@@ -86,6 +97,8 @@ export function createPanelHost(root, ctx, navParent) {
   }
 
   const api = {
+    /** HUD portre düğmesinin içeriğini yazar (workerPanel.hudPortrait). */
+    setWorkerPortrait(html) { const c = wbtn.querySelector('.wpic'); if (c) c.innerHTML = html; },
     get isOpen() { return current != null; },
     get current() { return current; },
     /** Panel açılıp kapanınca çağrılır: fn(id|null) */

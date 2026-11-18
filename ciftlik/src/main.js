@@ -11,6 +11,7 @@ import FarmSystem from './systems/FarmSystem.js';
 import InventorySystem from './systems/InventorySystem.js';
 import AnimalSystem from './systems/AnimalSystem.js';
 import ProductionSystem from './systems/ProductionSystem.js';
+import WorkerSystem, { followTarget, debugSummary } from './systems/WorkerSystem.js';
 import { QUALITY } from './data/farming.js';
 import BootScene from './scenes/BootScene.js';
 import WorldScene from './scenes/WorldScene.js';
@@ -32,7 +33,7 @@ const MarketSystem = optionalSystem('MarketSystem.js', 'market');
 const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
 const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
 // Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
-const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, ProgressionSystem].filter(Boolean);
+const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, ProgressionSystem, WorkerSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);
@@ -202,6 +203,13 @@ try {
 }
 app.game = game;
 
+// Aşama 5: çalışan takibi — panel `camera:follow {workerId|null}` yayar; kamera canlı (interpolasyonlu) konumu izler.
+bus.on('camera:follow', (p) => {
+  const cam = app.camera;
+  if (!cam) return;
+  cam.follow(p && p.workerId ? followTarget(state, p.workerId) : null);
+});
+
 // ------------------------------------------------------------------ debug kancası
 const DEBUG = import.meta.env.DEV || params.get('debug') === '1';
 
@@ -255,6 +263,8 @@ const debug = {
   buy(itemId, qty = 1) { bus.emit('shop:buy', { itemId, qty: Math.max(1, Math.floor(Number(qty) || 1)) }); },
   xp(n) { bus.emit('xp:add', { amount: Number(n) || 0, reason: 'debug' }); },
   open(panel) { bus.emit('ui:open', { panel }); },
+  /** Çalışan durum özeti (konum, mod, görev, eşek). */
+  worker() { const r = debugSummary(state); console.log(r); return r; },
   cinematic() {
     bus.emit('camera:cinematic', {
       target: { x: 36 * TILE_W, y: 9 * TILE_H }, zoom: 1.6, duration: 3000, letterbox: true, reason: 'debug',

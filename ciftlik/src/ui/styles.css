@@ -1613,3 +1613,43 @@
 #ui .mach .qrow + .qrow { margin-top: 6px; }
 #ui .mach .qrow .gl { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text); }
 #ui .mach .bld-card[hidden], #ui .mach .bld-empty[hidden] { display: none; }
+
+/* ---- Aşama 5: çalışan paneli + HUD portre düğmesi ---- */
+#ui .bigpanel[data-panel='worker'] .bp-tabs { display: none; }
+#ui .bigpanel[data-panel='worker'] .bp-title { display: block; }
+#ui .worker-btn { padding: 0 10px 0 4px; }
+#ui .worker-btn .wpic { width: 34px; height: 34px; flex: none; border-radius: 50%; overflow: hidden; border: 2px solid rgba(242, 184, 75, 0.55); background: rgba(40, 44, 60, 0.7); display: block; }
+#ui .worker-btn .wpic svg { width: 100%; height: 100%; display: block; }
+@media (max-width: 1100px) { #ui .worker-btn { padding: 0; } }
+#ui .wrk-body { display: flex; flex-direction: column; gap: 12px; }
+#ui .wrk-head { flex-direction: row; align-items: center; gap: 14px; flex-wrap: wrap; }
+#ui .wrk-none { align-items: center; text-align: center; padding: 20px 14px; }
+#ui .wrk-none p { margin: 0; font-size: 13px; color: var(--text-dim); max-width: 440px; }
+#ui .wrk-none .cb { min-width: 200px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 14px; }
+#ui .wrk-none .why { font-size: 12.5px; color: var(--accent); min-height: 1em; }
+#ui .wrk-pic { width: 72px; height: 72px; flex: none; border-radius: 50%; overflow: hidden; border: 3px solid rgba(242, 184, 75, 0.5); background: rgba(40, 44, 60, 0.6); }
+#ui .wrk-pic svg { width: 100%; height: 100%; display: block; }
+#ui .wrk-id { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 4px; }
+#ui .wrk-lbl { display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--text-dim); }
+#ui .wrk-lbl input { height: 38px; padding: 0 10px; border-radius: 10px; font: inherit; font-size: 16px; font-weight: 650; color: var(--text); background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 244, 220, 0.16); }
+#ui .wrk-lbl input:focus { outline: none; border-color: rgba(242, 184, 75, 0.7); }
+#ui .wrk-role { font-size: 12.5px; color: var(--text-dim); }
+#ui .wrk-status { font-size: 14px; font-weight: 650; color: #ffe2a0; min-height: 1.3em; }
+#ui .wrk-head .w-enable { min-height: var(--hit); padding: 0 14px; }
+#ui .wrk-head .w-enable.on { border-color: rgba(120, 200, 110, 0.6); }
+#ui .wrk-tasks { display: flex; flex-direction: column; gap: 8px; }
+#ui .wrk-task { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 244, 220, 0.08); }
+#ui .wt-sw { flex: 1; min-width: 0; display: grid; grid-template-columns: 24px 1fr; column-gap: 10px; align-items: center; cursor: pointer; }
+#ui .wt-sw input { grid-row: 1 / 3; width: 22px; height: 22px; accent-color: #f2b84b; margin: 0; }
+#ui .wt-n { font-weight: 650; font-size: 14px; }
+#ui .wt-h { font-size: 11.5px; color: var(--text-dim); }
+#ui .wt-mv { display: flex; gap: 4px; }
+#ui .wt-mv button { width: 40px; min-height: 40px; padding: 0; font-size: 12px; }
+#ui .wt-mv button:disabled { opacity: 0.3; }
+#ui .wrk-small { margin: 0; font-size: 12px; color: var(--text-dim); }
+#ui .wrk-pay { font-size: 14px; font-weight: 650; }
+#ui .wrk-debt { font-size: 13px; color: var(--bad); font-weight: 650; }
+#ui .wrk-debt[hidden], #ui .wrk [hidden] { display: none; }
+#ui .wrk-actions { flex-direction: row; gap: 10px; flex-wrap: wrap; }
+#ui .wrk-actions button { flex: 1; min-width: 150px; min-height: var(--hit); padding: 0 12px; }
+#ui .wrk-actions .armed { border-color: var(--bad); color: var(--bad); }

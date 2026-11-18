@@ -93,9 +93,9 @@ export const STR = {
   level: (n) => `Sv ${n}`,
 
   // ---- Aşama 3: envanter / pazar / mağaza / seviye ----
-  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza' },
+  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', worker: 'Çalışan' },
   navKey: (name, k) => `${name} (${k})`,
-  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası', machine: 'Atölye' },
+  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası', machine: 'Atölye', worker: 'Çalışan' },
   slotsUsed: (u, c) => `${u}/${c} yuva`,
   invFilters: { all: 'Tümü', crop: 'Ürün', animal: 'Hayvansal', processed: 'İşlenmiş', seed: 'Tohum', fertilizer: 'Gübre', chemical: 'Bakım', feed: 'Yem' },
   invEmpty: 'Bu bölümde eşya yok',
@@ -200,6 +200,31 @@ export const STR = {
     have: 'Girdi var', missing: 'Girdi yok', stopped: 'Makine bakım istiyor', slow: 'Yıpranmış: iş %30 yavaş',
     waiting: 'Bekliyor', done: (name, qty) => `${qty} ${name} hazır`,
     collected: (got, nameOf) => 'Toplandı: ' + Object.keys(got).map((id) => `${got[id]} ${nameOf(id)}`).join(', '),
+  },
+  // ---- Aşama 5: çalışan ----
+  wrk: {
+    title: 'Çalışan',
+    role: (title, wage) => `${title} · günlük ${wage}`,
+    nameLabel: 'Adı',
+    working: 'Çalışıyor', onLeave: 'İzinde',
+    tasks: 'Görevler ve öncelik',
+    tasksHint: 'Yukarıdaki iş önce seçilir; aynı grupta en yakın iş yapılır.',
+    task: { water: 'Sulama', harvest: 'Hasat', animals: 'Hayvanlar', machines: 'Atölyeler' },
+    taskHint: {
+      water: 'Susuz ekili karoları sular', harvest: 'Olgun ekinleri toplar',
+      animals: 'Yem, su, ürün toplama', machines: 'Çıktıyı alır, otomatik tarifi yükler',
+    },
+    up: 'Yukarı taşı', down: 'Aşağı taşı',
+    wageLine: (wage, hour) => `Maaş: ${wage} / gün · her akşam ${String(hour).padStart(2, '0')}:00'da`,
+    hours: (a, b) => `Çalışma saatleri ${String(a).padStart(2, '0')}:00–${String(b).padStart(2, '0')}:00`,
+    debt: (amt) => `Ödenmemiş maaş: ${amt}. Ödenene kadar çalışmaz.`,
+    follow: 'Kamerayla takip et', unfollow: 'Takibi bırak',
+    fire: 'İşten çıkar', fireConfirm: 'Emin misin? Tekrar dokun',
+    hire: 'İşe al', hireFree: 'Ücretsiz alım',
+    noneTitle: 'Çalışan yok',
+    noneBody: 'Çırak yakın işlere yürür, uzak işlere eşekle gider: sular, hasat eder, hayvanlara bakar, atölyeden ürün toplar.',
+    donkey: 'Eşek sundurmada bekler.',
+    lock: (lv) => `Seviye ${lv} gerekir`,
   },
   panelShortcuts: 'I envanter · P pazar · M mağaza · Esc kapat',
 };

@@ -16,6 +16,7 @@ import { createInventoryPanel } from './inventoryPanel.js';
 import { createMarketPanel } from './marketPanel.js';
 import { createShopPanel } from './shopPanel.js';
 import { createBuildingPanel } from './buildingPanel.js';
+import { createWorkerPanel, hudPortrait } from './workerPanel.js';
 import { createMachinePanel } from './machinePanel.js';
 import { formatMoney } from './hud.js';
 import { ITEMS } from '../data/items.js';
@@ -78,6 +79,9 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   const bldPanel = createBuildingPanel(ctx);
   panels.register(shopPanel);
   panels.register(bldPanel);
+  const wrkPanel = createWorkerPanel(ctx, { closePanel: () => panels.close() });
+  panels.register(wrkPanel);
+  panels.setWorkerPortrait(hudPortrait(30));
   const machPanel = createMachinePanel(ctx);
   panels.register(machPanel);
   panels.onChange((id) => {
@@ -157,8 +161,12 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   const itemName = (id) => (ITEMS[id] && ITEMS[id].name) || String(id || '');
   on('ui:open', (p) => {
     const id = p && p.panel;
-    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building' || id === 'machine') openPanel(id, p);
+    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building' || id === 'worker' || id === 'machine') openPanel(id, p);
   });
+  on('workers:changed', () => wrkPanel.markDirty());
+  on('worker:result', (p) => { wrkPanel.markDirty(); if (p && p.ok === false && p.reason) toasts.push({ text: String(p.reason), kind: 'bad' }); });
+  on('money:changed', () => wrkPanel.markDirty());
+  on('time:day', () => wrkPanel.markDirty());
   on('inventory:changed', markAll);
   // ---- Aşama 4: hayvancılık ----
   on('animals:changed', () => { bldPanel.markDirty(); shopPanel.markDirty(); });
