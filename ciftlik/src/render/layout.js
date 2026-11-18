@@ -22,3 +22,6 @@ export const TREES = [
   [3520, 160, 1, 0.8], [1700, 140, 0, 0.8],
 ];
 export const BUSHES = [[HOUSE.x - 150, HOUSE.y + 8, 0], [HOUSE.x + 152, HOUSE.y + 6, 1], [2110, 580, 1], [3330, 610, 0], [1690, 360, 1], [2480, 760, 0], [4400, 640, 1], [1100, 700, 0]];
+// Pazar tezgâhı (Aşama 3): P1 dışında, patikanın kapıdan çıktığı yolun doğusunda. Ayak noktası dünya koordinatı;
+// fiziksel olarak 42–44 × 18–19 karolarını kaplar (engine-dev bu karolara dokunuşu `ui:open {panel:'market'}`'e bağlar).
+export const STALL = { x: 2784, y: 862, tiles: { x0: 42, x1: 44, y0: 18, y1: 19 } };

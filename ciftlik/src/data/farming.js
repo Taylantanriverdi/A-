@@ -52,5 +52,3 @@ export const QUALITY = {
   organicBonus: 0.15,
 };
 
-// Oyuncu eylemleri: XP (Aşama 3+ seviye sistemi kullanır)
-export const XP = { harvestPerValue: 0.1, plow: 1, plant: 1 };
