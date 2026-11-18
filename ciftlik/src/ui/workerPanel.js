@@ -1,7 +1,8 @@
 // Çalışan paneli (PLAN §11): `ui:open {panel:'worker'}` ve HUD portre düğmesi.
 // state'i yalnızca OKUR; eylemler worker:hire / worker:fire / worker:set komutları ve camera:follow olayıdır.
 // Portre: ui/portrait.js (visual-dev) varsa portraitSVG(size); yoksa basit yedek daire.
-import { WORKER_TYPES } from '../data/workers.js';
+import { WORKER_TYPES, MAX_WORKERS, HIRING } from '../data/workers.js';
+import { calendar } from '../core/timeUtils.js';
 import { statusText, TASK_KINDS } from '../systems/workers/tasks.js';
 import { STR } from './strings.js';
 import { h, setText } from './frame.js';
@@ -23,19 +24,44 @@ export function portraitHTML(size) {
   return FALLBACK(size);
 }
 
+
+// Yetişkin çalışan figür ikonu: look 0..3 → ten/saç/kıyafet rengi (visual-dev'in sahne varyantlarıyla uyumlu tonlar).
+const LOOKS = [
+  { skin: '#e8c196', hair: '#3a2a22', shirt: '#4f7fa8', pants: '#3b3f55' },
+  { skin: '#c99468', hair: '#1f1a18', shirt: '#b5563f', pants: '#33384a' },
+  { skin: '#f0d2b0', hair: '#9a6a3a', shirt: '#5f9a5a', pants: '#4a4036' },
+  { skin: '#8d5c3c', hair: '#15110f', shirt: '#d1a23c', pants: '#2f3a4a' },
+];
+/** Basit SVG figür (baş-omuz daire içinde). Çırak için portre kullanılır. */
+export function figureHTML(size, look, type) {
+  if (type === 'apprentice') return portraitHTML(size);
+  const c = LOOKS[((look | 0) % 4 + 4) % 4];
+  const hat = type === 'master' ? '<path d="M18 27h28l-3-8H21z" fill="#6b4a2a"/><rect x="16" y="26" width="32" height="3" rx="1.5" fill="#54391f"/>' : '';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 64 64" aria-hidden="true">
+  <circle cx="32" cy="32" r="31" fill="#e7b46a"/><path d="M6 62c1-14 12-20 26-20s25 6 26 20z" fill="${c.shirt}"/>
+  <rect x="27" y="36" width="10" height="8" rx="3" fill="${c.skin}"/><circle cx="32" cy="27" r="11" fill="${c.skin}"/>
+  <path d="M20.5 26c0-9 7-13 12-13s11.500 3.500 11.500 13c-3-5-7-6.500-11.500-6.500S23.500 21 20.500 26z" fill="${c.hair}"/>
+  <circle cx="28" cy="28" r="1.300" fill="#2a1a10"/><circle cx="36" cy="28" r="1.300" fill="#2a1a10"/>
+  <path d="M28.500 33c2 1.700 5 1.700 7 0" fill="none" stroke="#7a4a30" stroke-width="1.300" stroke-linecap="round"/>${hat}</svg>`;
+}
+
+const skillBars = (skills) => ['farm', 'animal', 'machine'].map((k) => {
+  const v = (skills && skills[k]) || 1;
+  return `<div class="wk-sk"><span>${W.skill[k]}</span><span class="wk-bar"><i style="width:${v * 20}%"></i></span><b>${v}</b></div>`;
+}).join('');
+
 export function createWorkerPanel(ctx, { closePanel } = {}) {
   const { state, bus } = ctx;
   const el = h('div', 'wrk');
   el.innerHTML = `
     <div class="bp-body scrollable"><div class="wrk-body">
-      <section class="bld-card wrk-none" data-sec="none">
-        <div class="wrk-pic"></div>
-        <b>${W.noneTitle}</b>
-        <p>${W.noneBody}</p>
-        <p class="wrk-small">${W.donkey}</p>
-        <button type="button" class="cb solid-gold w-hire"><span class="cbt">${W.hire}</span><span class="cbv num"></span></button>
-        <div class="why"></div>
-      </section>
+      <div class="seg chips wrk-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="staff">${W.tabs.staff}</button>
+        <button type="button" role="tab" data-tab="board">${W.tabs.board}</button>
+      </div>
+      <section class="wrk-list" data-sec="list"></section>
+      <section class="wrk-list" data-sec="board"></section>
+      <button type="button" class="ghost wrk-back" data-sec="back">‹ ${W.back}</button>
       <section class="bld-card wrk-head" data-sec="head">
         <div class="wrk-pic"></div>
         <div class="wrk-id">
@@ -45,6 +71,7 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
         </div>
         <button type="button" class="ghost w-enable"></button>
       </section>
+      <section class="bld-card" data-sec="skills"><h4>${W.skills}</h4><div class="wk-skills"></div><p class="wrk-small wk-perk"></p></section>
       <section class="bld-card" data-sec="tasks">
         <h4>${W.tasks}</h4>
         <div class="wrk-tasks"></div>
@@ -63,11 +90,11 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
   const $ = (s) => el.querySelector(s);
   const secs = {};
   for (const n of el.querySelectorAll('[data-sec]')) secs[n.dataset.sec] = n;
-  const pics = el.querySelectorAll('.wrk-pic');
-  for (const p of pics) p.innerHTML = portraitHTML(72);
+  const tabBtns = [...el.querySelectorAll('.wrk-tabs button')];
+  $('.wrk-head .wrk-pic').innerHTML = portraitHTML(72);
   const E = {
-    hire: $('.w-hire'), hireV: $('.w-hire .cbv'), why: $('.wrk-none .why'),
-    name: $('.w-name'), role: $('.wrk-role'), status: $('.wrk-status'), enable: $('.w-enable'),
+    name: $('.w-name'), role: $('.wrk-role'), status: $('.wrk-status'), enable: $('.w-enable'), pic: $('.wrk-head .wrk-pic'),
+    skills: $('.wk-skills'), perk: $('.wk-perk'),
     tasks: $('.wrk-tasks'), pay: $('.wrk-pay'), hours: $('.wrk-hours'), debt: $('.wrk-debt'),
     follow: $('.w-follow'), fire: $('.w-fire'),
   };
@@ -75,8 +102,11 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
   let following = false;
   let fireArmed = 0;
   let editing = false;
+  let tab = 'staff';
+  let selId = null;
+  let statusEls = [];
 
-  const worker = () => state.workers[0] || null;
+  const worker = () => (selId ? state.workers.find((w) => w.id === selId) || null : null);
   const rows = {};
   for (const k of TASK_KINDS) {
     const r = h('div', 'wrk-task');
@@ -110,7 +140,8 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
   E.name.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); E.name.blur(); } e.stopPropagation(); });
   E.name.addEventListener('keyup', (e) => e.stopPropagation());
 
-  tap(E.hire, () => { if (!E.hire.disabled) bus.emit('worker:hire', { type: 'apprentice' }); });
+  for (const b of tabBtns) tap(b, () => { if (tab !== b.dataset.tab) { tab = b.dataset.tab; selId = null; dirty = true; } });
+  tap(secs.back, () => { selId = null; dirty = true; });
   tap(E.enable, () => { const w = worker(); if (w) bus.emit('worker:set', { workerId: w.id, enabled: !w.enabled }); });
   tap(E.follow, () => {
     const w = worker(); if (!w) return;
@@ -122,35 +153,97 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
   tap(E.fire, () => {
     const w = worker(); if (!w) return;
     const t = performance.now();
-    if (t - fireArmed < 4000) { fireArmed = 0; following = false; bus.emit('camera:follow', { workerId: null }); bus.emit('worker:fire', { workerId: w.id }); } else { fireArmed = t; }
+    if (t - fireArmed < 4000) { fireArmed = 0; following = false; selId = null; bus.emit('camera:follow', { workerId: null }); bus.emit('worker:fire', { workerId: w.id }); } else { fireArmed = t; }
     dirty = true;
   });
 
+  function renderList() {
+    const box = secs.list;
+    box.innerHTML = '';
+    statusEls = [];
+    const head = h('div', 'wrk-small', W.count(state.workers.length, MAX_WORKERS));
+    box.appendChild(head);
+    if (!state.workers.length) box.appendChild(h('p', 'wrk-small', W.listEmpty));
+    if (!state.workers.some((x) => x.type === 'apprentice') && state.workers.length < MAX_WORKERS) {
+      const card = h('div', 'bld-card wk-cand');
+      card.innerHTML = `<div class="wk-chead"><span class="wrk-pic wk-ic">${portraitHTML(52)}</span><span class="wk-tx"><b>${W.type.apprentice}</b><span class="wk-ty">${W.apprenticeCand}</span></span></div>
+        <button type="button" class="cb solid-gold"><span class="cbt">${W.hire} · ${W.hireFree}</span></button>`;
+      tap(card.querySelector('button'), () => bus.emit('worker:hire', { type: 'apprentice' }));
+      box.appendChild(card);
+    }
+    for (const w of state.workers) {
+      const def = WORKER_TYPES[w.type];
+      const b = h('button', 'bld-card wk-row');
+      b.type = 'button';
+      b.innerHTML = `<span class="wrk-pic wk-ic">${figureHTML(48, w.look, w.type)}</span>
+        <span class="wk-tx"><b></b><span class="wk-ty"></span><span class="wk-st"></span></span><span class="wk-wage num"></span>`;
+      b.querySelector('b').textContent = w.name;
+      b.querySelector('.wk-ty').textContent = def.title;
+      b.querySelector('.wk-wage').textContent = W.wagePer(formatMoney(w.wage || def.wagePerDay));
+      statusEls.push([b.querySelector('.wk-st'), w]);
+      tap(b, () => { selId = w.id; dirty = true; });
+      box.appendChild(b);
+    }
+  }
+  function renderBoard() {
+    const box = secs.board;
+    box.innerHTML = '';
+    const hr = state.hiring || { candidates: [], refreshedDay: 0 };
+    const day = calendar(state.time.totalMinutes).day;
+    box.appendChild(h('div', 'wrk-small', `${W.boardInfo(Math.max(0, hr.refreshedDay + HIRING.refreshEveryDays - day))} · ${W.count(state.workers.length, MAX_WORKERS)}`));
+    if (!hr.candidates.length) box.appendChild(h('p', 'wrk-small', W.boardEmpty));
+    const full = state.workers.length >= MAX_WORKERS;
+    for (const c of hr.candidates) {
+      const def = WORKER_TYPES[c.type];
+      const card = h('div', 'bld-card wk-cand');
+      card.innerHTML = `<div class="wk-chead"><span class="wrk-pic wk-ic">${figureHTML(52, c.look, c.type)}</span>
+        <span class="wk-tx"><b></b><span class="wk-ty"></span><span class="wk-wage num"></span></span></div>
+        <div class="wk-skills">${skillBars(c.skills)}</div><p class="wrk-small wk-note"></p>
+        <button type="button" class="cb solid-gold"><span class="cbt"></span></button><div class="why"></div>`;
+      card.querySelector('b').textContent = c.name;
+      card.querySelector('.wk-ty').textContent = def.title;
+      card.querySelector('.wk-wage').textContent = W.wagePer(formatMoney(c.wage));
+      card.querySelector('.wk-note').textContent = c.type === 'master' ? W.masterPerk : c.type === 'apprentice' ? W.apprenticeCand : '';
+      const btn = card.querySelector('button');
+      btn.querySelector('.cbt').textContent = W.hireFor(c.hireCost > 0 ? formatMoney(c.hireCost) : W.hireFree);
+      const poor = state.finance.money < c.hireCost;
+      btn.disabled = full || poor;
+      setText(card.querySelector('.why'), full ? W.full : poor ? 'Yeterli paran yok.' : '');
+      tap(btn, () => { if (!btn.disabled) bus.emit('worker:hire', { candidateId: c.id }); });
+      box.appendChild(card);
+    }
+  }
+
   function renderStatic() {
     dirty = false;
+    if (selId && !worker()) selId = null;
     const w = worker();
-    secs.none.hidden = !!w;
-    for (const k of ['head', 'tasks', 'pay', 'actions']) secs[k].hidden = !w;
-    if (!w) {
-      const def = WORKER_TYPES.apprentice;
-      setText(E.hireV, def.hireCost > 0 ? formatMoney(def.hireCost) : W.hireFree);
-      E.hire.disabled = state.finance.money < def.hireCost;
-      setText(E.why, '');
-      return;
-    }
+    for (const b of tabBtns) b.classList.toggle('on', b.dataset.tab === tab);
+    const showCard = tab === 'staff' && !!w;
+    secs.list.hidden = !(tab === 'staff' && !w);
+    secs.board.hidden = tab !== 'board';
+    for (const k of ['back', 'head', 'skills', 'tasks', 'pay', 'actions']) secs[k].hidden = !showCard;
+    if (tab === 'board') renderBoard();
+    else if (!w) renderList();
+    if (!showCard) return;
     const def = WORKER_TYPES[w.type];
     if (!editing && E.name.value !== w.name) E.name.value = w.name;
-    setText(E.role, W.role(def.title, formatMoney(def.wagePerDay)));
+    E.pic.innerHTML = figureHTML(72, w.look, w.type);
+    const wage = w.wage || def.wagePerDay;
+    setText(E.role, W.role(def.title, formatMoney(wage)));
     setText(E.enable, w.enabled ? W.working : W.onLeave);
     E.enable.classList.toggle('on', w.enabled);
+    E.skills.innerHTML = skillBars(w.skills);
+    setText(E.perk, w.type === 'master' ? W.masterPerk : '');
     E.tasks.innerHTML = '';
     w.order.forEach((k, i) => {
       const r = rows[k];
+      if (!r) return;
       r.cb.checked = !!w.tasks[k];
       r.up.disabled = i === 0; r.dn.disabled = i === w.order.length - 1;
       E.tasks.appendChild(r.el);
     });
-    setText(E.pay, W.wageLine(formatMoney(def.wagePerDay), def.payHour));
+    setText(E.pay, W.wageLine(formatMoney(wage), def.payHour));
     setText(E.hours, W.hours(def.workHours[0], def.workHours[1]));
     E.debt.hidden = !(w.debt > 0);
     if (w.debt > 0) setText(E.debt, W.debt(formatMoney(w.debt)));
@@ -163,17 +256,23 @@ export function createWorkerPanel(ctx, { closePanel } = {}) {
   return {
     id: 'worker',
     el,
-    title() { const w = worker(); return w ? w.name : W.title; },
-    onOpen() { dirty = true; fireArmed = 0; const sc = el.querySelector('.bp-body'); if (sc) sc.scrollTop = 0; },
+    title() { const w = worker(); return w ? w.name : tab === 'board' ? W.tabs.board : W.title; },
+    onOpen(arg) {
+      dirty = true; fireArmed = 0;
+      tab = arg && arg.tab === 'board' ? 'board' : 'staff';
+      selId = arg && arg.workerId && state.workers.some((x) => x.id === arg.workerId) ? arg.workerId : (state.workers.length === 1 && tab === 'staff' ? state.workers[0].id : null);
+      const sc = el.querySelector('.bp-body'); if (sc) sc.scrollTop = 0;
+    },
     onClose() { fireArmed = 0; },
     markDirty() { dirty = true; },
     render() {
       if (dirty) renderStatic();
       const w = worker();
-      if (w) {
-        setText(E.status, statusText(state, w, ctx.now().hour));
+      const hr = ctx.now().hour;
+      if (w && tab === 'staff') {
+        setText(E.status, statusText(state, w, hr));
         if (fireArmed && performance.now() - fireArmed >= 4000) { fireArmed = 0; dirty = true; }
-      }
+      } else if (tab === 'staff') for (const [n, x] of statusEls) setText(n, statusText(state, x, hr));
     },
     destroy() {},
   };

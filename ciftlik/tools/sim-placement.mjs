@@ -42,7 +42,7 @@ ok(last(bus, 'building:built')?.placedId === coop.id, 'building:built yayıldı'
 bus.emit('build:place', { type: 'coop', tx: 27, ty: 7 });
 ok(last(bus, 'build:result').reason === 'Burası dolu', 'dolu yere ret');
 bus.emit('build:place', { type: 'barn', tx: 5, ty: 5 });
-ok(last(bus, 'build:result').reason === 'Arazinin dışında', 'arazi dışı ret');
+ok(last(bus, 'build:result').reason === 'Bu arazi senin değil — satın al', 'satılık parselde yerleştirme reddi (Aşama 8)');
 const nB = bus.log.filter((e) => e[0] === 'building:built').length;
 bus.emit('build:place', { type: 'fence', tx: 30, ty: 18 });
 ok(last(bus, 'build:result').ok && bus.log.filter((e) => e[0] === 'building:built').length === nB, 'çit yerleşti, building:built yok');

@@ -1926,3 +1926,23 @@
 #ui .fp-item .qb.q-A { background: #f2b84b; color: #1b1408; } #ui .fp-item .qb.q-B { background: #9bb7ff; color: #10131c; }
 #ui .fp-empty { font-size: 13px; color: var(--text-dim); padding: 8px 0; }
 #ui .fp-rank { font-size: 22px; font-weight: 700; color: var(--accent); text-align: center; }
+
+/* Aşama 8: çalışan listesi + ilan panosu */
+#ui .wrk-list { display: flex; flex-direction: column; gap: 10px; }
+#ui .wrk-list[hidden], #ui .wrk-back[hidden], #ui .wrk .bld-card[hidden] { display: none; }
+#ui .wrk-back { align-self: flex-start; min-height: var(--hit); padding: 0 14px; }
+#ui .wk-row { flex-direction: row; align-items: center; gap: 12px; text-align: left; cursor: pointer; color: inherit; font: inherit; width: 100%; }
+#ui .wk-ic { width: 48px; height: 48px; border-width: 2px; }
+#ui .wk-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#ui .wk-tx b { font-size: 15px; }
+#ui .wk-ty { font-size: 12px; color: var(--text-dim); }
+#ui .wk-st { font-size: 12.5px; color: #ffe2a0; font-weight: 600; }
+#ui .wk-wage { font-size: 13px; font-weight: 650; white-space: nowrap; }
+#ui .wk-chead { display: flex; align-items: center; gap: 12px; }
+#ui .wk-skills { display: flex; flex-direction: column; gap: 6px; }
+#ui .wk-sk { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+#ui .wk-sk > span:first-child { width: 58px; color: var(--text-dim); }
+#ui .wk-bar { flex: 1; height: 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+#ui .wk-bar i { display: block; height: 100%; background: linear-gradient(90deg, #f7c868, #e9a93a); }
+#ui .wk-cand .cb { display: flex; justify-content: center; min-height: var(--hit); }
+#ui .wk-cand .why { font-size: 12.5px; color: var(--accent); min-height: 1em; }

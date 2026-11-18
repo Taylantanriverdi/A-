@@ -10,6 +10,8 @@ import { isPlainObject } from '../core/GameState.js';
 import { transact } from './EconomySystem.js';
 import { canRemove as animalCanRemove } from './AnimalSystem.js';
 import { canRemove as machineCanRemove } from './ProductionSystem.js';
+import { canRemove as inventoryCanRemove, recomputeCapacity } from './InventorySystem.js';
+import { canRemove as vehicleCanRemove, reassignVehicles } from './VehicleSystem.js';
 import * as occ from './world/occupancy.js';
 import { buildCostMult } from './events/mods.js';
 
@@ -33,7 +35,12 @@ function addPlaced(state, type, tx, ty) {
   return p;
 }
 function result(bus, p) { if (bus) bus.emit('build:result', p); return p; }
-function changed(state, bus, extra = {}) { occ.invalidate(state); if (bus) bus.emit('placed:changed', { ids: [], ...extra }); }
+function changed(state, bus, extra = {}) {
+  occ.invalidate(state);
+  reassignVehicles(state);       // garaj/ahır taşındı veya kaldırıldı
+  recomputeCapacity(state);      // depo/silo yuvaları (PLAN §15)
+  if (bus) bus.emit('placed:changed', { ids: [], ...extra });
+}
 
 // ------------------------------------------------------------------ komutlar
 export function place(state, bus, { type, tx, ty } = {}, silent = false) {
@@ -68,7 +75,7 @@ export function remove(state, bus, { placedId } = {}) {
   if (!p) return fail('Nesne bulunamadı');
   const def = PLACEABLES[p.type];
   if (def.unique && def.required) return fail('Bu yapı kaldırılamaz');
-  for (const chk of [animalCanRemove, machineCanRemove]) {
+  for (const chk of [animalCanRemove, machineCanRemove, inventoryCanRemove, vehicleCanRemove]) {
     const c = chk(state, p.id);
     if (c && !c.ok) return fail(c.reason);
   }
@@ -178,6 +185,7 @@ const PlacementSystem = {
     for (const off of offs) off();
     offs = [];
     ensureStart(state);
+    recomputeCapacity(state);
     offs.push(bus.on('build:place', (p) => place(state, bus, p)));
     offs.push(bus.on('build:move', (p) => move(state, bus, p)));
     offs.push(bus.on('build:remove', (p) => remove(state, bus, p)));

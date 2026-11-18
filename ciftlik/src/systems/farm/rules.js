@@ -2,7 +2,8 @@
 import { CROPS, STAGE_NAMES_TR, ROT_AFTER_DAYS } from '../../data/crops.js';
 import { ITEMS } from '../../data/items.js';
 import { HEALTH, SOIL } from '../../data/farming.js';
-import { isBlocked as occBlocked, objectAt, labelOf } from '../world/occupancy.js';
+import { isBlocked as occBlocked, objectAt, labelOf, isCovered, NOT_OWNED } from '../world/occupancy.js';
+import { PARCELS } from '../../data/land.js';
 import { DAYS_PER_SEASON, SEASONS } from '../../core/constants.js';
 import { calendar } from '../../core/timeUtils.js';
 import { count } from '../InventorySystem.js';
@@ -15,6 +16,9 @@ const SEASON_TR = { spring: 'İlkbahar', summer: 'Yaz', autumn: 'Sonbahar', wint
 
 export const REASONS = {
   notOwned: 'Burası senin arazin değil',
+  parcelForSale: NOT_OWNED,
+  markHasCrop: 'Burada zaten ekin var',
+  markDone: 'Bu iş zaten yapılmış',
   notPlowed: 'Önce toprağı sürmelisin',
   alreadyPlowed: 'Burası zaten sürülmüş',
   cropPresent: 'Burada zaten ekin var',
@@ -43,6 +47,18 @@ export function seasonListLoc(seasons) {
 /** "Kuyu burada — ekilemez" */
 export function blockedReason(label) { return `${label || 'Engel'} burada — ekilemez`; }
 
+/** Karo, satın alınabilir (henüz sahip olunmayan) bir parselde mi? */
+function forSale(tileId) {
+  const i = typeof tileId === 'string' ? tileId.indexOf(',') : -1;
+  if (i <= 0) return false;
+  const x = Number(tileId.slice(0, i)), y = Number(tileId.slice(i + 1));
+  for (const id in PARCELS) {
+    const r = PARCELS[id];
+    if (id !== 'P1' && x >= r.tx && y >= r.ty && x < r.tx + r.w && y < r.ty + r.h) return true;
+  }
+  return false;
+}
+
 const NO = (reason) => ({ ok: false, reason });
 const OK = { ok: true };
 
@@ -56,8 +72,8 @@ const OK = { ok: true };
 export function canApply(state, action, season) {
   if (!action) return NO(REASONS.unknown);
   const t = state.tiles?.[action.tileId];
-  if (!t || !isOwnedTile(state, t)) return NO(REASONS.notOwned);
-  if (occBlocked(state, t.tx, t.ty)) return NO(blockedReason(labelOf(objectAt(state, t.tx, t.ty)) || 'Engel'));
+  if (!t || !isOwnedTile(state, t)) return NO(forSale(action.tileId) ? REASONS.parcelForSale : REASONS.notOwned);
+  if (occBlocked(state, t.tx, t.ty, { farm: true })) return NO(blockedReason(labelOf(objectAt(state, t.tx, t.ty)) || 'Engel'));
   const sea = season || calendar(state.time.totalMinutes).season;
   const crop = t.crop;
   const id = action.itemId;
@@ -72,7 +88,7 @@ export function canApply(state, action, season) {
       if (t.state !== 'plowed') return NO(REASONS.notPlowed);
       if (crop) return NO(REASONS.cropPresent);
       const def = CROPS[item.crop];
-      if (!inSeason(def, sea)) return NO(`Bu tohum ${seasonListLoc(def.seasons)} ekilir`);
+      if (!isCovered(state, t.tx, t.ty) && !inSeason(def, sea)) return NO(`Bu tohum ${seasonListLoc(def.seasons)} ekilir`);
       if (count(state, id) < 1) return NO(REASONS.noSeed);
       return OK;
     }
@@ -146,14 +162,15 @@ export function tileInfo(state, tileId, now) {
   const t = state.tiles?.[tileId];
   {
     const xy = t ? [t.tx, t.ty] : tileId.split(',').map(Number);
-    if (occBlocked(state, xy[0], xy[1])) {
+    if (occBlocked(state, xy[0], xy[1], { farm: true })) {
       const obj = objectAt(state, xy[0], xy[1]);
       return { tileId, tx: xy[0], ty: xy[1], blocked: obj ? (obj.type || obj.kind) : 'block', label: labelOf(obj) || 'Engel' };
     }
   }
   if (!t) return null;
   const cal = now && now.season ? now : calendar(state.time.totalMinutes);
-  const season = cal.season;
+  const covered = isCovered(state, t.tx, t.ty);
+  const season = covered && t.crop && CROPS[t.crop.id] ? CROPS[t.crop.id].seasons[0] : cal.season; // sera: mevsim muafiyeti
   const warnings = [];
   const c = t.crop;
   const alive = !!c && !c.dead;
@@ -174,7 +191,7 @@ export function tileInfo(state, tileId, now) {
         const rate = idealRatePerHour(t, c, def, season);
         hoursLeft = rate > 0 ? (1 - c.growth) / rate : Infinity;
       }
-      const willMature = !c.dead && (c.stage >= 4 || (Number.isFinite(hoursLeft) && hoursLeft <= growableHoursLeft(def, cal)));
+      const willMature = !c.dead && (covered || c.stage >= 4 || (Number.isFinite(hoursLeft) && hoursLeft <= growableHoursLeft(def, cal)));
       const score = careScore(c, careSample(t, c, def));
       crop = {
         id: c.id,
@@ -214,7 +231,7 @@ export function tileInfo(state, tileId, now) {
     warnings.push(W('revertSoon', `${n} gün içinde çime döner`));
   }
   return {
-    tileId, tx: t.tx, ty: t.ty, state: t.state,
+    tileId, tx: t.tx, ty: t.ty, state: t.state, covered, mark: t.mark || null,
     soil: { moisture: Math.round(t.moisture), n: Math.round(t.n), p: Math.round(t.p), k: Math.round(t.k), ph: Math.round(t.ph * 10) / 10 },
     crop,
     weeds: t.weeds,
@@ -261,4 +278,25 @@ export function cropVisual(tile) {
     wither: !c.dead && c.health < HEALTH.witherBelow,
     dead: !!c.dead, pest: c.pest, disease: c.disease, weeds: tile.weeds,
   };
+}
+
+/**
+ * İşaret (farm:mark) uygulanabilir mi? plan: 'plow' | 'plant'. İşaret kaldırma her zaman serbesttir (plan null/'clear').
+ * @returns {{ok:boolean, reason?:string}}
+ */
+export function canMark(state, tileId, plan, itemId) {
+  if (plan == null || plan === 'clear') return OK;
+  const t = state.tiles?.[tileId];
+  if (!t || !isOwnedTile(state, t)) return NO(forSale(tileId) ? REASONS.parcelForSale : REASONS.notOwned);
+  if (occBlocked(state, t.tx, t.ty, { farm: true })) return NO(blockedReason(labelOf(objectAt(state, t.tx, t.ty)) || 'Engel'));
+  if (t.crop) return NO(REASONS.markHasCrop);
+  if (plan === 'plow') return t.state === 'plowed' ? NO(REASONS.alreadyPlowed) : OK;
+  if (plan === 'plant') {
+    const item = itemId ? ITEMS[itemId] : null;
+    if (!item || item.category !== 'seed') return NO(REASONS.pickSeed);
+    const def = CROPS[item.crop];
+    if (!isCovered(state, t.tx, t.ty) && !inSeason(def, calendar(state.time.totalMinutes).season)) return NO(`Bu tohum ${seasonListLoc(def.seasons)} ekilir`);
+    return OK;
+  }
+  return NO(REASONS.unknown);
 }

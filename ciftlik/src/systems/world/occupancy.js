@@ -10,6 +10,7 @@ const F_WALK = 2;    // yerleştirilmiş, yürünebilir (patika)
 const F_DECOR = 4;   // temizlenmemiş ağaç/çalı
 const F_FIXED = 8;   // P1_BLOCKED (ev vb.), yürünemez
 const F_FIXWALK = 16; // P1_BLOCKED 'path' — yürünebilir
+const F_GLASS = 32;  // sera ayak izi: ekilebilir (farm için engel değil), yürünebilir
 
 // Sabit dekor ayak izleri (saf veri; 1×1): { id, kind, tx, ty }
 export const DECOR = [];
@@ -50,14 +51,14 @@ function build(state) {
       for (let x = p.tx; x < p.tx + def.w; x++) {
         if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
         const c = y * GW + x;
-        flags[c] |= def.walkable ? F_WALK : F_PLACED;
+        flags[c] |= def.walkable ? F_WALK : (def.covered ? (F_PLACED | F_GLASS) : F_PLACED);
         owner[c] = i;
       }
     }
   }
   for (let c = 0; c < GW * GH; c++) {
     const f = flags[c];
-    walkBlocked[c] = (f & (F_PLACED | F_DECOR | F_FIXED)) ? 1 : 0;
+    walkBlocked[c] = ((f & F_GLASS) ? (f & (F_DECOR | F_FIXED)) : (f & (F_PLACED | F_DECOR | F_FIXED))) ? 1 : 0;
   }
   const entry = { flags, owner, decor, walkBlocked, fixedKind, version: ++versionSeq, placed };
   caches.set(state, entry);
@@ -74,9 +75,16 @@ export function walkGrid(state) { return get(state).walkBlocked; }
  */
 export function isBlocked(state, tx, ty, opts = {}) {
   if (tx < 0 || ty < 0 || tx >= GW || ty >= GH) return true;
-  const f = get(state).flags[ty * GW + tx];
+  let f = get(state).flags[ty * GW + tx];
+  if ((opts.farm || opts.walk) && (f & F_GLASS)) f &= ~(F_PLACED | F_GLASS); // sera içi: ekim ve yürüyüş için engel değil
   if (opts.walk) return (f & (F_PLACED | F_DECOR | F_FIXED)) !== 0;
   return f !== 0;
+}
+
+/** Karo bir seranın (covered yapı) ayak izinde mi? Mevsim/hava muafiyeti için. */
+export function isCovered(state, tx, ty) {
+  if (tx < 0 || ty < 0 || tx >= GW || ty >= GH) return false;
+  return (get(state).flags[ty * GW + tx] & F_GLASS) !== 0;
 }
 
 /** Karodaki nesne: placed kaydı | {decorId, kind, tx, ty} | {fixed:true, kind} | null. */
@@ -106,12 +114,21 @@ function inOwnedParcel(state, tx, ty) {
   return false;
 }
 
+export const NOT_OWNED = 'Bu arazi senin değil — satın al';
+function parcelAt(tx, ty) {
+  for (const id in PARCELS) {
+    const r = PARCELS[id];
+    if (tx >= r.tx && ty >= r.ty && tx < r.tx + r.w && ty < r.ty + r.h) return id;
+  }
+  return null;
+}
+
 export function canPlace(state, type, tx, ty, ignoreId) {
   const def = PLACEABLES[type];
   if (!def || !Number.isInteger(tx) || !Number.isInteger(ty)) return { ok: false, reason: 'Geçersiz yapı' };
   const e = get(state);
   for (let y = ty; y < ty + def.h; y++) {
-    for (let x = tx; x < tx + def.w; x++) if (!inOwnedParcel(state, x, y)) return { ok: false, reason: 'Arazinin dışında' };
+    for (let x = tx; x < tx + def.w; x++) if (!inOwnedParcel(state, x, y)) return { ok: false, reason: parcelAt(x, y) ? NOT_OWNED : 'Arazinin dışında' };
   }
   for (let y = ty; y < ty + def.h; y++) {
     for (let x = tx; x < tx + def.w; x++) {
@@ -120,7 +137,7 @@ export function canPlace(state, type, tx, ty, ignoreId) {
       if (e.flags[c] & (F_FIXED | F_FIXWALK | F_DECOR)) return { ok: false, reason: 'Burası dolu' };
       if (o >= 0 && e.placed[o].id !== ignoreId) return { ok: false, reason: 'Burası dolu' };
       const t = state.tiles?.[`${x},${y}`];
-      if (t && (t.crop || (t.state && t.state !== 'grass'))) {
+      if (t && (t.crop || (t.state && t.state !== 'grass' && !def.covered))) {
         return { ok: false, reason: type === 'fence' || type === 'path' ? `Ekili/sürülmüş toprağa ${type === 'fence' ? 'çit' : 'patika'} konmaz` : 'Ekili/sürülmüş toprağa yapı konmaz' };
       }
     }

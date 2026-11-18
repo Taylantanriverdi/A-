@@ -1,17 +1,30 @@
 // WorkerSystem — çiftlik çalışanları (PLAN.md §11). Phaser import ETMEZ.
-// Komutlar: worker:hire {type?}, worker:fire {workerId}, worker:set {workerId, name?, tasks?, order?, enabled?}.
+// Komutlar: worker:hire {candidateId | type:'apprentice'}, worker:fire {workerId}, worker:set {workerId, name?, tasks?, order?, enabled?}.
+// Aşama 8: iş ilanı panosu state.hiring = {candidates, refreshedDay}; çalışan başına type/skills/wage/look; plow/plant görevleri (farm:mark işaretleri);
+// makine yeteneği >= 3 ve garajda boş traktör varsa 3x3 iş için traktör (vehicle:run, yakıt 'fuel').
 // Olaylar: workers:changed, worker:result {ok, type, workerId?, reason?}, worker:state {workerId, mode, x, y, onDonkey, kind},
 //          worker:did {workerId, kind, ok, target}, toast. Eylemler gerçek komutlarla: farm:action, animal:action, machine:collect, machine:queue.
 // State: state.workers[] ve state.donkey (x,y dünya px; tickMinute her oyun dakikasında yazar, prevX/prevY önceki dakika → görsel lerp).
 // Para yalnızca EconomySystem.transact (kategori 'wages').
-import { WORKER_TYPES, DONKEY, WORKER_HOME } from '../data/workers.js';
+import { WORKER_TYPES, DONKEY, WORKER_HOME, MAX_WORKERS, WORKER_NAMES, HIRING } from '../data/workers.js';
+import { VEHICLES } from '../data/placeables.js';
 import { PLACEABLES } from '../data/placeables.js';
 import { TILE_W as TW, TILE_H as TH, MIN_PER_DAY } from '../core/constants.js';
 import { isPlainObject } from '../core/GameState.js';
 import { calendar } from '../core/timeUtils.js';
 import { transact } from './EconomySystem.js';
+import { count } from './InventorySystem.js';
+import { createRng } from '../core/Rng.js';
 import { findPath, cellOf, GW, bindState } from './workers/pathfinding.js';
-import { pickTask, TASK_KINDS, ACTION_KEY, statusText } from './workers/tasks.js';
+import { pickTask, TASK_KINDS, ACTION_KEY, statusText, actionMinutes, jobOk, standCell } from './workers/tasks.js';
+
+// Opsiyonel: VehicleSystem.chargeFuel(state, bus, vehicleType, tiles) (gameplay-dev). Node'da / dosya yoksa geçici transact.
+let VEHICLE_MOD = null;
+try { VEHICLE_MOD = Object.values(import.meta.glob('./VehicleSystem.js', { eager: true }))[0] || null; } catch (_) { VEHICLE_MOD = null; }
+const VEHICLE_SPEED_MULT = 2;     // araçla yürüyüş hızı çarpanı
+const VEHICLE_MIN_TILES = 3;      // 3x3 bölgede en az bu kadar uygun karo varsa araç alınır
+const VEHICLE_MIN_SKILL = 3;      // makine yeteneği eşiği
+const vehTaken = new Map();       // vehicleId → workerId
 
 export { statusText };
 export const REASONS = {
@@ -20,6 +33,9 @@ export const REASONS = {
   already: 'Bu çalışan zaten işe alındı.',
   noMoney: 'Yeterli paran yok.',
   noWorker: 'Çalışan bulunamadı.',
+  noCand: 'Bu aday artık ilanda yok.',
+  full: (n) => `En fazla ${n} çalışan çalıştırabilirsin.`,
+  needBoard: 'İş ilanı panosundan bir aday seç.',
 };
 const MODES = ['idle', 'walk', 'ride', 'work', 'home'];
 const BAN_MIN = 120;          // başarısız hedef bu kadar dakika yeniden seçilmez
@@ -54,9 +70,9 @@ const env = {
     return b !== undefined && b > env.now;
   },
 };
-const KINDS = ['water', 'harvest', 'feed', 'waterAnimals', 'collect', 'machineCollect', 'machineLoad'];
+const KINDS = ['water', 'harvest', 'feed', 'waterAnimals', 'collect', 'machineCollect', 'machineLoad', 'plow', 'plant'];
 function resetRuntime() {
-  rts.clear();
+  rts.clear(); vehTaken.clear();
   for (const k of KINDS) { taken[k] = new Set(); bans[k] = new Map(); }
 }
 resetRuntime();
@@ -75,7 +91,7 @@ function rtOf(w) {
 
 // ---------------------------------------------------------------- yardımcılar
 function emitState(w) {
-  if (busRef) busRef.emit('worker:state', { workerId: w.id, mode: w.mode, x: w.x, y: w.y, onDonkey: w.onDonkey, kind: w.task ? w.task.kind : null });
+  if (busRef) busRef.emit('worker:state', { workerId: w.id, mode: w.mode, x: w.x, y: w.y, onDonkey: w.onDonkey, kind: w.task ? w.task.kind : null, vehicle: w.vehicle || null });
 }
 function setMode(w, mode) {
   if (w.mode === mode) return;
@@ -98,7 +114,45 @@ function dismount(state, w) {
   emitState(w);
 }
 function release(rt) {
-  if (rt.cur) { taken[rt.cur.kind].delete(rt.cur.target); rt.cur = null; }
+  const c = rt.cur;
+  if (c) {
+    taken[c.kind].delete(c.target);
+    if (c.tiles) for (const id of c.tiles) taken[c.kind].delete(id);
+    rt.cur = null;
+  }
+}
+function releaseVehicle(w) {
+  for (const [vid, wid] of vehTaken) if (wid === w.id) vehTaken.delete(vid);
+  w.vehicle = null;
+}
+const speedOf = (w, def) => (w.vehicle ? def.walkTilesPerMin * VEHICLE_SPEED_MULT : w.onDonkey ? def.donkeyTilesPerMin : def.walkTilesPerMin);
+
+/** Traktörle 3x3 iş planı: {vehicle, vtype, garageCell, tiles, cx, cy} ya da null. */
+function planVehicle(state, w, c) {
+  if (!(w.skills && w.skills.machine >= VEHICLE_MIN_SKILL) || !Array.isArray(state.vehicles)) return null;
+  const vd = VEHICLES.tractor;
+  const veh = state.vehicles.find((v) => v.type === 'tractor' && !vehTaken.has(v.id));
+  if (!veh || !vd) return null;
+  const garageCell = standCell(state, veh.garageId);
+  if (garageCell < 0) return null;
+  const t0 = state.tiles[c.target];
+  let best = null;
+  for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) {
+    const list = [];
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const id = `${t0.tx + ox + dx},${t0.ty + oy + dy}`;
+      if (state.tiles[id] && jobOk(state, id, c.kind, env, c.itemId)) list.push(id);
+    }
+    if (list.includes(c.target) && (!best || list.length > best.tiles.length)) best = { tiles: list, cx: t0.tx + ox, cy: t0.ty + oy };
+  }
+  if (!best || best.tiles.length < VEHICLE_MIN_TILES) return null;
+  if (c.kind === 'plant') best.tiles.length = Math.min(best.tiles.length, count(state, c.itemId));
+  if (state.finance.money < best.tiles.length * vd.fuelPerTile) return null;
+  return { vehicle: veh.id, vtype: 'tractor', garageCell, ...best };
+}
+function payFuel(state, bus, vtype, tiles) {
+  if (VEHICLE_MOD && typeof VEHICLE_MOD.chargeFuel === 'function') return VEHICLE_MOD.chargeFuel(state, bus, vtype, tiles) !== false;
+  return transact(state, bus, { amount: -tiles.length * VEHICLES[vtype].fuelPerTile, category: 'fuel', label: 'Yakıt' });
 }
 function ban(kind, target, until) { bans[kind].set(target, until); }
 
@@ -163,6 +217,21 @@ function decide(state, w, rt, def, mins) {
     if (!c) return false;
     const goal = cellOf(c.cx, c.cy);
     const task = { kind: c.kind, target: c.target, itemId: c.itemId, recipe: c.recipe };
+    const vp = (c.kind === 'plow' || c.kind === 'plant') ? planVehicle(state, w, c) : null;
+    if (vp) {
+      w.task = { kind: c.kind, target: c.target, endMin: 0, phase: 'toGarage', place: 'tarlaya', subject: '' };
+      if (setPath(w, rt, vp.garageCell)) {
+        task.tiles = vp.tiles; task.vehicle = vp.vehicle; task.vtype = vp.vtype;
+        rt.cur = task; rt.goal = cellOf(vp.cx, vp.cy); rt.garage = vp.garageCell; rt.phase = 'toGarage';
+        vehTaken.set(vp.vehicle, w.id);
+        for (const id of vp.tiles) taken[task.kind].add(id);
+        taken[task.kind].add(task.target);
+        setMode(w, 'walk');
+        return true;
+      }
+      w.task = null; ban(c.kind, c.target, mins + BAN_MIN);
+      continue;
+    }
     w.task = { kind: c.kind, target: c.target, endMin: 0, phase: '', place: c.place, subject: c.subject };
     if (startTravel(state, w, rt, goal, def)) {
       rt.cur = task; rt.goal = goal;
@@ -179,6 +248,11 @@ function abortTask(w, rt) {
   release(rt);
   w.task = null;
   rt.phase = 'idle';
+  if (w.vehicle) startRetVehicle(w, rt);
+  else releaseVehicle(w);
+}
+function startRetVehicle(w, rt) {
+  if (rt.garage != null && setPath(w, rt, rt.garage)) { rt.phase = 'retVehicle'; setMode(w, 'walk'); } else { releaseVehicle(w); rt.phase = 'idle'; emitState(w); }
 }
 
 function startReturn(state, w, rt, def) {
@@ -197,11 +271,27 @@ function retWalk(w, rt) {
   if (setPath(w, rt, HOME_CELL)) { rt.phase = 'retWalk'; setMode(w, 'walk'); } else { rt.phase = 'idle'; setMode(w, 'idle'); }
 }
 
-function execute(state, bus, task) {
+function tileJobDo(state, bus, kind, id, itemId) {
   lastResult = null;
+  bus.emit('farm:action', { type: kind, tileId: id, itemId });
+  const ok = !!(lastResult && lastResult.ok);
+  const t = state.tiles[id];
+  if (ok && t && t.mark && t.mark.plan === kind) delete t.mark;
+  return ok;
+}
+function execute(state, bus, task, def) {
+  lastResult = null;
+  const bonus = def && def.qualityBonus > 0 ? { bonusCare: def.qualityBonus } : null;
+  if (task.tiles) {
+    let n = 0;
+    for (const id of task.tiles) if (tileJobDo(state, bus, task.kind, id, task.kind === 'plant' ? (state.tiles[id].mark?.itemId || task.itemId) : undefined)) n++;
+    lastResult = { ok: n > 0 };
+    return n > 0;
+  }
   switch (task.kind) {
-    case 'water': bus.emit('farm:action', { type: 'water', tileId: task.target }); break;
-    case 'harvest': bus.emit('farm:action', { type: 'harvest', tileId: task.target }); break;
+    case 'plow': case 'plant': return tileJobDo(state, bus, task.kind, task.target, task.itemId || undefined);
+    case 'water': bus.emit('farm:action', { type: 'water', tileId: task.target, ...bonus }); break;
+    case 'harvest': bus.emit('farm:action', { type: 'harvest', tileId: task.target, ...bonus }); break;
     case 'feed': bus.emit('animal:action', { type: 'feed', buildingId: task.target, itemId: task.itemId }); break;
     case 'waterAnimals': bus.emit('animal:action', { type: 'water', buildingId: task.target }); break;
     case 'collect': bus.emit('animal:action', { type: 'collect', buildingId: task.target }); break;
@@ -212,11 +302,11 @@ function execute(state, bus, task) {
   return !!(lastResult && lastResult.ok);
 }
 
-function finish(state, bus, w, rt, mins) {
+function finish(state, bus, w, rt, mins, def) {
   const task = rt.cur;
-  const ok = task ? execute(state, bus, task) : false;
+  const ok = task ? execute(state, bus, task, def) : false;
   if (task) {
-    if (!ok) ban(task.kind, task.target, mins + BAN_MIN);
+    if (!ok) { ban(task.kind, task.target, mins + BAN_MIN); if (task.tiles) for (const id of task.tiles) ban(task.kind, id, mins + BAN_MIN); }
     bus.emit('worker:did', { workerId: w.id, kind: task.kind, ok, target: task.target });
   }
   release(rt);
@@ -233,8 +323,8 @@ function tickWorker(state, bus, w, mins, mod) {
   w.prevX = w.x; w.prevY = w.y;
   const working = w.enabled && !(w.debt > 0) && mod >= def.workHours[0] * 60 && mod < def.workHours[1] * 60;
   if (!working) {
-    if (rt.phase === 'work' || rt.phase === 'move' || rt.phase === 'toDonkey') abortTask(w, rt);
-    if (rt.phase !== 'retRide' && rt.phase !== 'retWalk') {
+    if (rt.phase === 'work' || rt.phase === 'move' || rt.phase === 'toDonkey' || rt.phase === 'toGarage') abortTask(w, rt);
+    if (rt.phase !== 'retRide' && rt.phase !== 'retWalk' && rt.phase !== 'retVehicle') {
       if (atHome(w) && !w.onDonkey) { setMode(w, 'home'); rt.phase = 'idle'; return; }
       startReturn(state, w, rt, def);
     }
@@ -261,17 +351,41 @@ function tickWorker(state, bus, w, mins, mod) {
       }
       break;
     case 'move':
-      if (moveAlong(state, w, rt, w.onDonkey ? def.donkeyTilesPerMin : def.walkTilesPerMin)) {
+      if (moveAlong(state, w, rt, speedOf(w, def))) {
         if (w.onDonkey) dismount(state, w);
+        const cur = rt.cur;
+        let am;
+        if (cur.tiles) {
+          if (!payFuel(state, bus, cur.vtype, cur.tiles)) {
+            for (const id of cur.tiles) ban(cur.kind, id, mins + BAN_MIN);
+            bus.emit('toast', { text: 'Yakıt parası yetmedi.', kind: 'bad' });
+            abortTask(w, rt);
+            break;
+          }
+          bus.emit('vehicle:run', { type: cur.vtype, tiles: cur.tiles.slice(), driverId: w.id });
+          am = cur.tiles.length * VEHICLES[cur.vtype].minutesPerTile;
+        } else am = actionMinutes(def, w, cur.kind);
         rt.phase = 'work'; setMode(w, 'work');
-        const am = def.actionMinutes[ACTION_KEY[rt.cur.kind]] || 3;
         w.task.endMin = mins + am; w.task.phase = 'work';
+      }
+      break;
+    case 'toGarage':
+      if (moveAlong(state, w, rt, def.walkTilesPerMin)) {
+        w.vehicle = rt.cur.vtype;
+        if (setPath(w, rt, rt.goal)) { rt.phase = 'move'; w.task.phase = 'move'; emitState(w); } else { ban(rt.cur.kind, rt.cur.target, mins + BAN_MIN); abortTask(w, rt); }
+      }
+      break;
+    case 'retVehicle':
+      if (moveAlong(state, w, rt, speedOf(w, def))) {
+        releaseVehicle(w); emitState(w);
+        rt.phase = 'idle'; rt.nextDecide = mins; setMode(w, 'idle');
       }
       break;
     case 'work':
       if (mins >= w.task.endMin) {
-        finish(state, bus, w, rt, mins);
-        if (working && decide(state, w, rt, def, mins)) moveAlong(state, w, rt, w.onDonkey ? def.donkeyTilesPerMin : def.walkTilesPerMin);
+        const usedVehicle = !!w.vehicle;
+        finish(state, bus, w, rt, mins, def);
+        if (usedVehicle) { startRetVehicle(w, rt); if (rt.phase === 'retVehicle') moveAlong(state, w, rt, speedOf(w, def)); } else if (working && decide(state, w, rt, def, mins)) moveAlong(state, w, rt, speedOf(w, def));
       }
       break;
     case 'retRide':
@@ -320,46 +434,108 @@ function onHour(state, bus) {
       continue;
     }
     if (hour !== def.payHour || !w.enabled) continue;
-    if (transact(state, bus, { amount: -def.wagePerDay, category: 'wages', label: `Maaş: ${w.name}` })) {
+    const wage = wageOf(w, def);
+    if (transact(state, bus, { amount: -wage, category: 'wages', label: `Maaş: ${w.name}` })) {
       bus.emit('workers:changed', { ids: [w.id] });
     } else {
-      w.debt = def.wagePerDay;
+      w.debt = wage;
       bus.emit('toast', { text: `${w.name}'in maaşı ödenemedi; ödenene kadar çalışmayacak.`, kind: 'bad' });
       bus.emit('workers:changed', { ids: [w.id] });
     }
   }
 }
-function onDay() { for (const k of KINDS) bans[k].clear(); }
+function onDay(state, bus) {
+  for (const k of KINDS) bans[k].clear();
+  const day = calendar(state.time.totalMinutes).day;
+  if (day - state.hiring.refreshedDay >= HIRING.refreshEveryDays) {
+    refreshHiring(state, bus);
+    bus.emit('toast', { text: 'İş ilanı panosu yenilendi: yeni adaylar var.', kind: 'info' });
+  }
+}
+const wageOf = (w, def) => (finite(w.wage) && w.wage > 0 ? w.wage : def.wagePerDay);
 
 // ---------------------------------------------------------------- komutlar
 function res(bus, p) { bus.emit('worker:result', p); return p; }
 const levelOf = (state) => Number(state.player?.level) || 1;
 
-function newWorker(state, type) {
+let rngRef = null;
+const rngOf = (state) => rngRef || (rngRef = createRng(state));
+const clampSkill = (v) => Math.max(1, Math.min(5, Math.round(Number(v)) || 1));
+
+/** Aday üretir (ctx.rng): tür ağırlıkları experienced 5, master 3, çırak 2 (yalnızca alınmamışsa). */
+function makeCandidate(state, rng, usedTypes) {
+  const flags = state.flags;
+  const pool = [['experienced', 5], ['master', 3]];
+  if (!state.workers.some((w) => w.type === 'apprentice') && !usedTypes.has('apprentice')) pool.push(['apprentice', 2]);
+  let r = rng.next() * pool.reduce((a, q) => a + q[1], 0);
+  let type = pool[0][0];
+  for (const q of pool) { if (r < q[1]) { type = q[0]; break; } r -= q[1]; }
+  const def = WORKER_TYPES[type];
+  const sr = def.skillRange || [1, 1];
+  const seq = (Number(flags.candSeq) || 0) + 1;
+  flags.candSeq = seq;
+  const jit = def.wageJitter || 0;
+  return {
+    id: `c${seq}`, type, name: rng.pick(WORKER_NAMES) || def.defaultName || def.title,
+    skills: { farm: rng.int(sr[0], sr[1]), animal: rng.int(sr[0], sr[1]), machine: rng.int(sr[0], sr[1]) },
+    wage: Math.max(1, Math.round(def.wagePerDay * (1 + (jit ? rng.range(-jit, jit) : 0)))),
+    look: type === 'apprentice' ? null : rng.int(0, 3),
+    hireCost: def.hireCost || 0,
+  };
+}
+export function refreshHiring(state, bus) {
+  const rng = rngOf(state);
+  const list = [];
+  const used = new Set();
+  for (let i = 0; i < HIRING.candidates; i++) { const c = makeCandidate(state, rng, used); used.add(c.type); list.push(c); }
+  state.hiring.candidates = list;
+  state.hiring.refreshedDay = calendar(state.time.totalMinutes).day;
+  if (bus) { bus.emit('hiring:changed', { day: state.hiring.refreshedDay }); bus.emit('workers:changed', { ids: [] }); }
+}
+
+function newWorker(state, type, cand) {
   const def = WORKER_TYPES[type];
   const seq = (Number(state.flags.workerSeq) || 0) + 1;
   state.flags.workerSeq = seq;
+  const skills = cand ? { ...cand.skills } : { farm: 1, animal: 1, machine: 1 };
   return {
-    id: `w${seq}`, type, name: def.defaultName, hiredDay: calendar(state.time.totalMinutes).day, enabled: true,
+    id: `w${seq}`, type, name: (cand && cand.name) || def.defaultName, hiredDay: calendar(state.time.totalMinutes).day, enabled: true,
     tasks: Object.fromEntries(TASK_KINDS.map((k) => [k, true])), order: def.tasks.slice(),
+    skills, wage: cand ? cand.wage : def.wagePerDay, look: type === 'apprentice' ? null : (cand ? cand.look : 0), vehicle: null,
     x: HOME_X, y: HOME_Y, prevX: HOME_X, prevY: HOME_Y, mode: 'home', task: null, onDonkey: false, debt: 0,
   };
 }
 
 function hire(state, bus, p = {}) {
-  const type = p.type || 'apprentice';
+  let cand = null;
+  let type = p.type;
+  if (p.candidateId) {
+    cand = state.hiring.candidates.find((c) => c.id === p.candidateId);
+    if (!cand) return res(bus, { ok: false, type: 'hire', reason: REASONS.noCand });
+    type = cand.type;
+  } else {
+    type = type || 'apprentice';
+    if (type !== 'apprentice') return res(bus, { ok: false, type: 'hire', reason: REASONS.needBoard });
+  }
   const def = WORKER_TYPES[type];
   if (!def) return res(bus, { ok: false, type: 'hire', reason: REASONS.badType });
-  if (levelOf(state) < def.hireLevel) return res(bus, { ok: false, type: 'hire', reason: REASONS.locked(def.hireLevel) });
-  if (state.workers.some((w) => w.type === type)) return res(bus, { ok: false, type: 'hire', reason: REASONS.already });
-  if (def.hireCost > 0 && !transact(state, bus, { amount: -def.hireCost, category: 'wages', label: `İşe alım: ${def.title}` })) {
+  if (levelOf(state) < (def.hireLevel || 0)) return res(bus, { ok: false, type: 'hire', reason: REASONS.locked(def.hireLevel) });
+  if (state.workers.length >= MAX_WORKERS) return res(bus, { ok: false, type: 'hire', reason: REASONS.full(MAX_WORKERS) });
+  if (def.unique && state.workers.some((w) => w.type === type)) return res(bus, { ok: false, type: 'hire', reason: REASONS.already });
+  const cost = def.hireCost || 0;
+  if (cost > 0 && !transact(state, bus, { amount: -cost, category: 'wages', label: `İşe alım: ${cand ? cand.name : def.title}` })) {
     return res(bus, { ok: false, type: 'hire', reason: REASONS.noMoney });
   }
-  const w = newWorker(state, type);
+  const w = newWorker(state, type, cand);
   state.workers.push(w);
-  state.donkey.x = SHED_X; state.donkey.y = SHED_Y; state.donkey.mode = 'home';
+  if (cand) {
+    state.hiring.candidates = state.hiring.candidates.filter((c) => c.id !== cand.id);
+    if (type === 'apprentice') state.hiring.candidates = state.hiring.candidates.filter((c) => c.type !== 'apprentice');
+  } else if (type === 'apprentice') state.hiring.candidates = state.hiring.candidates.filter((c) => c.type !== 'apprentice');
+  if (type === 'apprentice') { state.donkey.x = SHED_X; state.donkey.y = SHED_Y; state.donkey.mode = 'home'; }
   emitState(w);
   bus.emit('workers:changed', { ids: [w.id] });
+  bus.emit('hiring:changed', {});
   bus.emit('toast', { text: `${w.name} işe başladı!`, kind: 'good' });
   return res(bus, { ok: true, type: 'hire', workerId: w.id });
 }
@@ -370,9 +546,10 @@ function fire(state, bus, p = {}) {
   const w = state.workers[i];
   const rt = rts.get(w.id);
   if (rt) release(rt);
+  releaseVehicle(w);
   rts.delete(w.id);
   state.workers.splice(i, 1);
-  state.donkey.x = SHED_X; state.donkey.y = SHED_Y; state.donkey.mode = 'home';
+  if (w.onDonkey || w.type === 'apprentice') { state.donkey.x = SHED_X; state.donkey.y = SHED_Y; state.donkey.mode = 'home'; }
   bus.emit('worker:state', { workerId: w.id, mode: 'gone', x: w.x, y: w.y, onDonkey: false, kind: null });
   bus.emit('workers:changed', { ids: [w.id] });
   return res(bus, { ok: true, type: 'fire', workerId: w.id });
@@ -388,7 +565,8 @@ function set(state, bus, p = {}) {
   if (!w) return res(bus, { ok: false, type: 'set', reason: REASONS.noWorker });
   if (p.name !== undefined) { const n = cleanName(p.name); if (n) w.name = n; }
   if (isPlainObject(p.tasks)) for (const k of TASK_KINDS) if (typeof p.tasks[k] === 'boolean') w.tasks[k] = p.tasks[k];
-  if (Array.isArray(p.order) && p.order.length === TASK_KINDS.length && TASK_KINDS.every((k) => p.order.includes(k))) w.order = p.order.slice();
+  const kinds = WORKER_TYPES[w.type].tasks;
+  if (Array.isArray(p.order) && p.order.length === kinds.length && kinds.every((k) => p.order.includes(k))) w.order = p.order.slice();
   if (typeof p.enabled === 'boolean') w.enabled = p.enabled;
   bus.emit('workers:changed', { ids: [w.id] });
   return res(bus, { ok: true, type: 'set', workerId: w.id });
@@ -403,6 +581,10 @@ export function validate(state, onFix = () => {}) {
   const d = state.donkey;
   if (!finite(d.x) || !finite(d.y)) { onFix('donkey.pos'); d.x = SHED_X; d.y = SHED_Y; }
   if (d.mode !== 'home' && d.mode !== 'carrying') { onFix('donkey.mode'); d.mode = 'home'; }
+  if (!isPlainObject(state.hiring)) { onFix('hiring'); state.hiring = { candidates: [], refreshedDay: 0 }; }
+  if (!Array.isArray(state.hiring.candidates)) state.hiring.candidates = [];
+  state.hiring.candidates = state.hiring.candidates.filter((c) => isPlainObject(c) && typeof c.id === 'string' && WORKER_TYPES[c.type] && isPlainObject(c.skills) && finite(c.wage));
+  if (!finite(state.hiring.refreshedDay)) state.hiring.refreshedDay = 0;
   const ids = new Set();
   const kept = [];
   state.workers.forEach((w, i) => {
@@ -422,9 +604,18 @@ export function validate(state, onFix = () => {}) {
     if (typeof w.enabled !== 'boolean') { onFix(`${path}.enabled`); w.enabled = true; }
     if (!isPlainObject(w.tasks)) { onFix(`${path}.tasks`); w.tasks = {}; }
     for (const k of TASK_KINDS) if (typeof w.tasks[k] !== 'boolean') w.tasks[k] = true;
-    if (!Array.isArray(w.order) || w.order.length !== TASK_KINDS.length || !TASK_KINDS.every((k) => w.order.includes(k))) {
-      onFix(`${path}.order`); w.order = def.tasks.slice();
+    if (!Array.isArray(w.order) || w.order.length !== def.tasks.length || !def.tasks.every((k) => w.order.includes(k))) {
+      // eski kayıt (4 görev): eksik görevleri sona ekle, fazlaları at
+      const old = Array.isArray(w.order) ? w.order.filter((k) => def.tasks.includes(k)) : [];
+      w.order = old.concat(def.tasks.filter((k) => !old.includes(k)));
     }
+    if (!isPlainObject(w.skills)) w.skills = {};
+    const sr = def.skillRange || [1, 1];
+    for (const k of ['farm', 'animal', 'machine']) w.skills[k] = finite(w.skills[k]) ? clampSkill(w.skills[k]) : clampSkill((sr[0] + sr[1]) / 2);
+    if (!(finite(w.wage) && w.wage > 0)) w.wage = def.wagePerDay;
+    if (w.type === 'apprentice') w.look = null;
+    else if (!(Number.isInteger(w.look) && w.look >= 0 && w.look <= 3)) w.look = 0;
+    w.vehicle = null;
     if (!finite(w.x) || !finite(w.y)) { onFix(`${path}.pos`); w.x = HOME_X; w.y = HOME_Y; }
     if (!finite(w.prevX) || !finite(w.prevY)) { w.prevX = w.x; w.prevY = w.y; }
     if (!MODES.includes(w.mode)) { onFix(`${path}.mode`); w.mode = 'idle'; }
@@ -469,7 +660,7 @@ export function debugSummary(state) {
     workers: state.workers.map((w) => {
       const rt = rts.get(w.id);
       return {
-        id: w.id, name: w.name, mode: w.mode, phase: rt ? rt.phase : null, onDonkey: w.onDonkey, debt: w.debt,
+        id: w.id, name: w.name, type: w.type, vehicle: w.vehicle, mode: w.mode, phase: rt ? rt.phase : null, onDonkey: w.onDonkey, debt: w.debt,
         tile: [Math.floor(w.x / TW), Math.floor(w.y / TH)], task: w.task ? { ...w.task } : null,
         status: statusText(state, w, cal.hour),
       };
@@ -486,6 +677,7 @@ const WorkerSystem = {
     busRef = bus;
     regRef = registry || null;
     resetRuntime();
+    rngRef = registry && registry.ctx && registry.ctx.rng ? registry.ctx.rng : null;
     followCache.clear();
     bindState(state);
     refreshShed(state);
@@ -496,6 +688,7 @@ const WorkerSystem = {
       if (state.donkey.mode === 'home' && (ox !== SHED_X || oy !== SHED_Y)) { state.donkey.x = SHED_X; state.donkey.y = SHED_Y; }
     }));
     validate(state, () => {});
+    if (!state.hiring.refreshedDay) refreshHiring(state, null);
     const keep = (p) => { lastResult = p; };
     offs.push(bus.on('farm:result', keep));
     offs.push(bus.on('animal:result', keep));

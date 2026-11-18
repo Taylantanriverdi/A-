@@ -3,6 +3,8 @@
 // stats.earned/spent, `money:changed {amount, balance, category}`.
 import { LEDGER_CATEGORIES, LEDGER_MAX_ENTRIES, TAX, UPKEEP_KWH } from '../data/economy.js';
 import { MACHINE_RULES } from '../data/recipes.js';
+import { PLACEABLES, VEHICLES } from '../data/placeables.js';
+import { PARCELS } from '../data/land.js';
 import { MIN_PER_DAY, DAYS_PER_SEASON } from '../core/constants.js';
 import { calendar } from '../core/timeUtils.js';
 import { isPlainObject } from '../core/GameState.js';
@@ -127,7 +129,14 @@ export function dailyUpkeep(state, bus) {
   const season = calendar(state.time.totalMinutes).season;
   const per = (type) => { const u = UPKEEP_KWH[type]; return u ? (u[season] ?? u.all ?? 0) : 0; };
   let kwh = per('house');
-  for (const p of state.placed || []) if (p && (p.type === 'barn' || p.type === 'coop')) kwh += per(p.type);
+  for (const p of state.placed || []) {
+    if (!p) continue;
+    if (p.type === 'barn' || p.type === 'coop') kwh += per(p.type);
+    const def = PLACEABLES[p.type];
+    if (def?.kwhPerDay) kwh += def.kwhPerDay;                                // soğuk hava deposu (8/gün)
+    if (def?.kwhWinter && season === 'winter') kwh += def.kwhWinter;         // sera: yalnızca kışın ısıtma
+  }
+  for (const v of state.vehicles || []) kwh += VEHICLES[v?.type]?.kwhPerDay || 0; // sağım makinesi (3/gün)
   const cost = Math.round(kwh * MACHINE_RULES.kwhPrice);
   if (cost > 0) transact(state, bus, { amount: -cost, category: 'electricity', label: `Sabit elektrik (${kwh} kWh)` });
   return cost;
@@ -153,7 +162,15 @@ export function closeSeason(state, bus) {
   let tax = 0;
   if (seasonAbs >= TAX.graceSeasons && profit > 0) tax = Math.min(Math.round(profit * TAX.incomeRate), Math.max(0, f.money));
   if (tax > 0) transact(state, bus, { amount: -tax, category: 'tax', label: 'Gelir vergisi' });
-  const entry = { year: cal.year, season: cal.season, income, expense, profit, tax, byCategory };
+  // Emlak vergisi (Aşama 8): sahip olunan P2+ parseller, fiyat × propertyRate; ilk mevsim muafiyeti yok
+  let propertyTax = 0;
+  for (const pid in PARCELS) {
+    if (pid !== 'P1' && state.land?.parcels?.some((q) => q && q.id === pid && q.owned === true)) propertyTax += Math.round((PARCELS[pid].price || 0) * TAX.propertyRate);
+  }
+  propertyTax = Math.min(propertyTax, Math.max(0, f.money));
+  if (propertyTax > 0) transact(state, bus, { amount: -propertyTax, category: 'tax', label: 'Emlak vergisi' });
+  tax += propertyTax;
+  const entry = { year: cal.year, season: cal.season, income, expense, profit, tax, propertyTax, byCategory };
   f.seasonSummary.push(entry);
   if (f.seasonSummary.length > SEASON_SUMMARY_MAX) f.seasonSummary.splice(0, f.seasonSummary.length - SEASON_SUMMARY_MAX);
   bus.emit('finance:seasonClosed', entry);

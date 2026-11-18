@@ -6,6 +6,7 @@
 import { ITEMS } from '../data/items.js';
 import { CROPS } from '../data/crops.js';
 import { INVENTORY } from '../data/progression.js';
+import { PLACEABLES } from '../data/placeables.js';
 import { isPlainObject } from '../core/GameState.js';
 
 export const QUALITIES = ['A', 'B', 'C'];
@@ -28,6 +29,45 @@ function itemsOf(state) {
 function capacityOf(state) {
   const c = state?.inventory?.capacity;
   return Number.isInteger(c) && c > 0 ? c : INVENTORY.startSlots;
+}
+
+// ---------------- Depolama (Aşama 8, PLAN §15) ----------------
+/** Yerleştirilmiş depo/silo yuvalarının toplamı. */
+export function bonusSlotsOf(state) {
+  let n = 0;
+  for (const p of Array.isArray(state?.placed) ? state.placed : []) n += PLACEABLES[p?.type]?.slots || 0;
+  return n;
+}
+/** capacity = taban + depo/silo yuvaları; inventory.bonusSlots son uygulanan bonusu tutar. @returns {boolean} değişti mi */
+export function recomputeCapacity(state) {
+  const inv = state?.inventory;
+  if (!isPlainObject(inv)) return false;
+  const prev = Number.isInteger(inv.bonusSlots) && inv.bonusSlots > 0 ? inv.bonusSlots : 0;
+  const now = bonusSlotsOf(state);
+  const base = capacityOf(state) - prev;
+  const cap = Math.max(1, base) + now;
+  if (cap === inv.capacity && now === prev) return false;
+  inv.capacity = cap; inv.bonusSlots = now;
+  return true;
+}
+/** Yapı kaldırılabilir mi? (depo/silo: dolu yuvalar yeni kapasiteye sığmalı) */
+export function canRemove(state, placedId) {
+  const p = (state.placed || []).find((q) => q.id === placedId);
+  const slots = p ? PLACEABLES[p.type]?.slots || 0 : 0;
+  if (!slots) return { ok: true };
+  if (usedSlots(state) > capacityOf(state) - slots) return { ok: false, reason: 'Depoda eşya var — önce boşalt (kapasite yetmez)' };
+  return { ok: true };
+}
+/** Bozulma çarpanı: soğuk hava deposu varsa spoilMult (0.2), yoksa 1. */
+export function spoilRate(state) {
+  let r = 1;
+  for (const p of Array.isArray(state?.placed) ? state.placed : []) { const m = PLACEABLES[p?.type]?.spoilMult; if (m > 0 && m < r) r = m; }
+  return r;
+}
+function siloNoSpoil(state) {
+  const set = new Set();
+  for (const p of Array.isArray(state?.placed) ? state.placed : []) for (const id of PLACEABLES[p?.type]?.noSpoil || []) set.add(id);
+  return set;
 }
 
 function emitChanged(itemId, delta, quality, organic) {
@@ -179,7 +219,10 @@ export function spoilDay(state, emit) {
   const out = [];
   if (!isPlainObject(items)) return out;
   const max = stackMax();
+  const rate = spoilRate(state);
+  const safe = siloNoSpoil(state);
   for (const itemId of Object.keys(items)) {
+    if (safe.has(itemId)) continue; // silo: tahıl bozulmaz
     const def = ITEMS[itemId];
     if (!def || (def.category !== 'crop' && def.category !== 'animal')) continue;
     const fresh = def.freshDays ?? CROPS[def.crop]?.freshDays;
@@ -188,8 +231,8 @@ export function spoilDay(state, emit) {
     const expired = [];
     for (let i = stacks.length - 1; i >= 0; i--) {
       const st = stacks[i];
-      st.age = (Number(st.age) || 0) + 1;
-      if (st.age >= fresh) { expired.push(st); stacks.splice(i, 1); }
+      st.age = (Number(st.age) || 0) + rate;
+      if (st.age >= fresh - 1e-9) { expired.push(st); stacks.splice(i, 1); }
     }
     if (!expired.length) continue;
     // C'den başla: düşen yığın aynı gün tekrar düşmesin (yeni age 0 zaten).
@@ -285,13 +328,16 @@ export function validate(state, onFix = () => {}) {
     if (bad) onFix(path);
     if (out.length) { sortStacks(out); inv.items[id] = out; } else delete inv.items[id];
   }
+  const prevCap = inv.capacity;
+  recomputeCapacity(state);
+  if (!(Number.isInteger(prevCap) && prevCap > 0)) inv.capacity = Math.max(inv.capacity, INVENTORY.startSlots);
   migrateCapacity(state, onFix);
   return state;
 }
 
 const InventorySystem = {
   id: 'inventory',
-  add, remove, count, canAdd, freeSlots, usedSlots, spoilDay, validate,
+  add, remove, count, canAdd, freeSlots, usedSlots, spoilDay, validate, recomputeCapacity, canRemove, spoilRate, bonusSlotsOf,
 
   init(state, bus) {
     for (const off of offs) off();
@@ -299,6 +345,7 @@ const InventorySystem = {
     busRef = bus;
     itemsOf(state);
     migrateCapacity(state, () => {});
+    recomputeCapacity(state);
     offs.push(bus.on('inventory:add', (p) => {
       if (!p || !ITEMS[p.itemId]) return;
       add(state, p.itemId, p.qty ?? 1, p.quality ?? 'B', p.organic === true);

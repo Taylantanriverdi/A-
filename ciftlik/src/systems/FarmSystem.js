@@ -18,7 +18,8 @@ import {
 import { REGROW_GROWTH, inSeason, growthRatePerHour, stageFor, rotationMult } from './farm/growth.js';
 import { healthDeltaHour, dailyWeeds, dailyPestDisease, spreadTo, applyTreatment } from './farm/threats.js';
 import { careSample, careScore, gradeFor, harvestYield, harvestXp } from './farm/quality.js';
-import { canApply } from './farm/rules.js';
+import { canApply, canMark } from './farm/rules.js';
+import { isCovered } from './world/occupancy.js';
 import { damageCrops } from './farm/hazards.js';
 import { evMult } from './events/mods.js';
 
@@ -32,6 +33,7 @@ let list = [];          // tile nesneleri
 let ids = [];           // 'tx,ty' anahtarları (string birleştirme yapılmasın)
 let nbr = new Int32Array(0); // 4 komşu indeksi / -1
 let mark = new Uint8Array(0);
+let covered = new Uint8Array(0); // 1 = sera karosu (mevsim/hava muafiyeti)
 let changed = new Int32Array(0);
 let dirty = true;
 
@@ -54,6 +56,8 @@ function rebuildCache(state) {
     for (let j = 0; j < 4; j++) nbr[i * 4 + j] = index.has(ks[j]) ? index.get(ks[j]) : -1;
   }
   mark = new Uint8Array(n);
+  covered = new Uint8Array(n);
+  for (let i = 0; i < n; i++) covered[i] = isCovered(state, list[i].tx, list[i].ty) ? 1 : 0;
   changed = new Int32Array(n);
   dirty = false;
 }
@@ -185,6 +189,7 @@ export function applyAction(state, bus, p) {
   switch (type) {
     case 'plow':
       t.state = 'plowed'; t.weeds = 0; t.idleDays = 0;
+      if (t.mark && t.mark.plan === 'plow') delete t.mark;
       gainXp(bus, XP_RULES.plow, 'plow');
       break;
     case 'plant': {
@@ -192,6 +197,7 @@ export function applyAction(state, bus, p) {
       remove(state, itemId, 1);
       t.crop = newCrop(cropId, t, now.day);
       t.idleDays = 0;
+      if (t.mark && t.mark.plan === 'plant') delete t.mark;
       res.itemId = itemId;
       gainXp(bus, XP_RULES.plant, 'plant');
       if (!flags.firstPlant) {
@@ -228,7 +234,8 @@ export function applyAction(state, bus, p) {
         break;
       }
       const def = CROPS[c.id];
-      const qty = harvestYield(def, c, rng);
+      let qty = harvestYield(def, c, rng);
+      if (p.yieldMult > 1) qty = Math.round(qty * p.yieldMult); // biçerdöver (VEHICLES.harvester.yieldMult)
       const quality = gradeFor(careScore(c, careSample(t, c, def)));
       const organic = t.organic;
       // Yer kontrolü: ekinin tamamı sığmıyorsa hasat yapılmaz (kayıp olmasın).
@@ -268,6 +275,28 @@ export function applyAction(state, bus, p) {
   return res;
 }
 
+/**
+ * farm:mark {tileId, plan:'plow'|'plant'|null, itemId?} → state.tiles[id].mark = {plan, itemId?}.
+ * Aynı işaret tekrar gelirse kaldırılır (aç/kapa); plan null/'clear' işareti siler. farm:markResult + farm:changed yayar.
+ */
+export function applyMark(state, bus, p) {
+  const tileId = p?.tileId;
+  const plan = p?.plan ?? null;
+  const itemId = plan === 'plant' ? p.itemId : undefined;
+  const t = state.tiles?.[tileId];
+  const fail = (reason) => { const r = { ok: false, tileId, plan, reason }; bus.emit('farm:markResult', r); bus.emit('farm:result', { ok: false, type: 'mark', tileId, reason }); return r; };
+  if (!t) return fail('Burası senin arazin değil');
+  const chk = canMark(state, tileId, plan, itemId);
+  if (!chk.ok) return fail(chk.reason);
+  const clear = plan == null || plan === 'clear' || (t.mark && t.mark.plan === plan && t.mark.itemId === itemId && p.toggle !== false);
+  if (clear) delete t.mark;
+  else t.mark = itemId ? { plan, itemId } : { plan };
+  const r = { ok: true, tileId, plan: clear ? null : plan, itemId };
+  bus.emit('farm:markResult', r);
+  bus.emit('farm:changed', { tileIds: [tileId] });
+  return r;
+}
+
 // ---------------- Simülasyon ----------------
 
 function onHour(state, bus, ctx) {
@@ -281,20 +310,22 @@ function onHour(state, bus, ctx) {
   for (let i = 0; i < n; i++) {
     const t = list[i];
     const wasWet = t.moisture >= 50;
-    moistureHour(t, season, wt, lossMult);
+    const cov = covered[i] === 1; // sera: yağmur sulamaz, kar/mevsim etkisi yok
+    moistureHour(t, season, cov ? 'clear' : wt, lossMult);
     let vis = t.state === 'plowed' && wasWet !== (t.moisture >= 50);
     const c = t.crop;
     if (c !== null && !c.dead) {
       const def = CROPS[c.id];
       if (def !== undefined) {
+        const sea = cov ? def.seasons[0] : season;
         const wasWither = c.health < WITHER;
-        const h = c.health + healthDeltaHour(t, c, def, season);
+        const h = c.health + healthDeltaHour(t, c, def, sea);
         c.health = h > 100 ? 100 : h;
         if (c.health <= 0) {
           c.health = 0; c.dead = true; vis = true;
         } else {
           if (c.stage < 4) {
-            const g = c.growth + growthRatePerHour(t, c, def, season) * gm;
+            const g = c.growth + growthRatePerHour(t, c, def, sea) * (cov ? 1 : gm);
             c.growth = g > 1 ? 1 : g;
             const st = stageFor(c.growth);
             if (st !== c.stage) { c.stage = st; vis = true; }
@@ -334,7 +365,7 @@ function onDay(state, bus, ctx) {
     if (c !== null && !c.dead) {
       const def = CROPS[c.id];
       if (def !== undefined) {
-        if (!seasonStart && !def.frostHardy && !inSeason(def, season)) {
+        if (covered[i] === 0 && !seasonStart && !def.frostHardy && !inSeason(def, season)) {
           c.health -= HEALTH.outOfSeasonPerDay;
           ch = true;
         }
@@ -373,7 +404,7 @@ function onSeason(state, bus, ctx) {
     const c = list[i].crop;
     if (c === null || c.dead) continue;
     const def = CROPS[c.id];
-    if (!def || def.frostHardy || inSeason(def, season)) continue;
+    if (!def || def.frostHardy || inSeason(def, season) || covered[i] === 1) continue;
     c.health -= HEALTH.outOfSeasonOnChange;
     if (c.health <= 0) { c.health = 0; c.dead = true; }
     hurt++;
@@ -453,6 +484,10 @@ export function validate(state, onFix = () => {}) {
       if (pf.length !== t.pendingFert.length) onFix(`${path}.pendingFert`);
       t.pendingFert = pf;
     }
+    if (t.mark !== undefined) {
+      const m = t.mark;
+      if (!isPlainObject(m) || (m.plan !== 'plow' && m.plan !== 'plant') || (m.plan === 'plant' && !(ITEMS[m.itemId]?.category === 'seed'))) { onFix(`${path}.mark`); delete t.mark; }
+    }
     if (t.crop === undefined) t.crop = null;
     validateCrop(t, `${path}.crop`, onFix);
     if (t.crop && t.state !== 'plowed') { onFix(`${path}.state`); t.state = 'plowed'; }
@@ -466,6 +501,7 @@ const FarmSystem = {
   id: 'farm',
   validate,
   applyAction,
+  applyMark,
   setupNewFarm,
   ensureParcelTiles,
   clearBlockedTiles,
@@ -490,12 +526,14 @@ const FarmSystem = {
     }
     rebuildCache(state);
     offs.push(bus.on('farm:action', (p) => applyAction(state, busRef, p)));
+    offs.push(bus.on('farm:mark', (p) => applyMark(state, busRef, p)));
+    offs.push(bus.on('placed:changed', () => { dirty = true; })); // sera ayak izi değişti → covered önbelleği
     // Hava/olay hasarı (WeatherSystem/EventSystem yayar): açık alan ekinleri
     offs.push(bus.on('hazard:crops', (p) => {
       if (!p || !(p.damage > 0)) return;
       ensureCache(state);
       const out = [];
-      damageCrops(state.tiles, rngOf(state), { chance: p.chance ?? 1, damage: p.damage, onlyNonHardy: p.onlyNonHardy === true }, out);
+      damageCrops(state.tiles, rngOf(state), { chance: p.chance ?? 1, damage: p.damage, onlyNonHardy: p.onlyNonHardy === true, skip: (tx, ty) => isCovered(state, tx, ty) }, out);
       if (out.length) bus.emit('farm:changed', { tileIds: out });
     }));
   },

@@ -12,14 +12,38 @@ import { nearestFree, cellOf } from './pathfinding.js';
 export const WATER_BELOW = 45;       // nem bunun altındaki ekili karo sulanır
 export const FEED_BELOW_DAYS = 0.5;  // yemlik günlük ihtiyacın bu kadarının altına inince yem konur
 export const WATER_BELOW_DAYS = 1;   // suluk < 1 gün
-export const TASK_KINDS = ['water', 'harvest', 'animals', 'machines'];
+export const TASK_KINDS = ['water', 'harvest', 'animals', 'machines', 'plow', 'plant'];
 export const GROUP_KINDS = {
   water: ['water'], harvest: ['harvest'], animals: ['feed', 'waterAnimals', 'collect'], machines: ['machineCollect', 'machineLoad'],
+  plow: ['plow'], plant: ['plant'],
 };
+/** Eylem türü → yetenek (skills.farm/animal/machine). Eylem süresi = actionMinutes × (1.25 − 0.1 × yetenek) / speedMult. */
+export const SKILL_OF = {
+  water: 'farm', harvest: 'farm', plow: 'farm', plant: 'farm', feed: 'animal', waterAnimals: 'animal', collect: 'animal',
+  machineCollect: 'machine', machineLoad: 'machine',
+};
+export function actionMinutes(def, w, kind) {
+  const base = def.actionMinutes[ACTION_KEY[kind]] || 3;
+  const skill = (w.skills && w.skills[SKILL_OF[kind]]) || 3;
+  return (base * (1.25 - 0.1 * skill)) / (def.speedMult || 1);
+}
+/** Işaretli (farm:mark) karo bu iş için uygun mu? plow: plow işareti ya da sürülmemiş plant işareti; plant: sürülü boş karo + tohum. */
+export function jobOk(state, id, kind, env, itemId) {
+  const t = state.tiles[id];
+  const m = t && t.mark;
+  if (!m || t.crop || env.isTaken(kind, id)) return false;
+  if (kind === 'plow') {
+    if (t.state === 'plowed' || (m.plan !== 'plow' && m.plan !== 'plant')) return false;
+    return canApply(state, { type: 'plow', tileId: id }).ok;
+  }
+  if (m.plan !== 'plant' || !m.itemId || t.state !== 'plowed' || count(state, m.itemId) < 1) return false;
+  if (itemId && m.itemId !== itemId) return false;
+  return canApply(state, { type: 'plant', tileId: id, itemId: m.itemId }).ok;
+}
 /** Eylem süresi anahtarı (WORKER_TYPES.*.actionMinutes). */
 export const ACTION_KEY = {
   water: 'water', harvest: 'harvest', feed: 'feed', waterAnimals: 'waterAnimals', collect: 'collect',
-  machineCollect: 'machineCollect', machineLoad: 'machineLoad',
+  machineCollect: 'machineCollect', machineLoad: 'machineLoad', plow: 'plow', plant: 'plant',
 };
 
 const PLACE_DAT = { coop: 'kümese', barn: 'ahıra', hive: 'kovana' };
@@ -90,6 +114,14 @@ function scanGroup(state, group, px, py, env) {
         if (!c || c.dead || c.stage < 4) continue;
         if (env.isTaken('harvest', id) || !canApply(state, { type: 'harvest', tileId: id }).ok) continue;
         offer('harvest', id, t.tx, t.ty, px, py, null, null, 'tarlaya', CROPS[c.id] ? CROPS[c.id].name : '');
+      }
+      break;
+    case 'plow':
+    case 'plant':
+      for (const id in state.tiles) {
+        const t = state.tiles[id];
+        if (!t.mark || !jobOk(state, id, group, env, null)) continue;
+        offer(group, id, t.tx, t.ty, px, py, group === 'plant' ? t.mark.itemId : null, null, 'tarlaya', '');
       }
       break;
     case 'animals':
@@ -167,12 +199,18 @@ export function statusText(state, w, hourNow) {
   if (!w.enabled) return 'İzinde';
   if (w.debt > 0) return 'Maaşını bekliyor';
   const t = w.task;
+  if (w.vehicle) {
+    if (!t) return 'Aracı garaja götürüyor';
+    if (w.mode === 'work') return t.kind === 'plant' ? 'Traktörle ekim yapıyor' : 'Traktörle toprağı sürüyor';
+    return 'Traktörle tarlaya gidiyor';
+  }
   switch (w.mode) {
     case 'home': return hourNow != null && hourNow < 7 ? 'Evde, güne hazırlanıyor' : 'Evde dinleniyor';
     case 'idle': return 'Yapacak iş arıyor';
     case 'walk':
       if (!t) return w.onDonkey ? 'Eşekle eve dönüyor' : 'Eve dönüyor';
       if (t.phase === 'toDonkey') return 'Eşeğe gidiyor';
+      if (t.phase === 'toGarage') return 'Garaja gidiyor';
       return `${cap(t.place || 'işe')} gidiyor`;
     case 'ride':
       if (!t) return 'Eşekle eve dönüyor';
@@ -192,6 +230,8 @@ function workText(t) {
     case 'collect': return 'Hayvan ürünlerini topluyor';
     case 'machineCollect': return `${cap(t.subject || 'atölyeyi')} boşaltıyor`;
     case 'machineLoad': return `${cap(t.subject || 'makineyi')} dolduruyor`;
+    case 'plow': return 'Toprağı sürüyor';
+    case 'plant': return 'Tohum ekiyor';
     default: return 'Çalışıyor';
   }
 }

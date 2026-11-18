@@ -16,6 +16,8 @@ import AnimalSystem from './systems/AnimalSystem.js';
 import ProductionSystem from './systems/ProductionSystem.js';
 import BankSystem from './systems/BankSystem.js';
 import ContractSystem from './systems/ContractSystem.js';
+import LandSystem from './systems/LandSystem.js';
+import VehicleSystem from './systems/VehicleSystem.js';
 import WorkerSystem, { followTarget, debugSummary } from './systems/WorkerSystem.js';
 import { QUALITY } from './data/farming.js';
 import BootScene from './scenes/BootScene.js';
@@ -38,7 +40,7 @@ const MarketSystem = optionalSystem('MarketSystem.js', 'market');
 const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
 const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
 // Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
-const SYSTEMS = [TimeSystem, WeatherSystem, EventSystem, InventorySystem, PlacementSystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, BankSystem, ContractSystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ WorkerSystem].filter(Boolean);
+const SYSTEMS = [TimeSystem, WeatherSystem, EventSystem, InventorySystem, PlacementSystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, BankSystem, ContractSystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ LandSystem, VehicleSystem, WorkerSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);

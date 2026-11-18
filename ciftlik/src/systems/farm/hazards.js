@@ -5,7 +5,7 @@ import { CROPS } from '../../data/crops.js';
  * Açık alandaki canlı ekinlere hasar verir (karo başına `chance`). onlyNonHardy: frostHardy ekinler etkilenmez.
  * @returns {number} etkilenen karo sayısı; `out`a karo kimlikleri eklenir
  */
-export function damageCrops(tiles, rng, { chance = 1, damage = 0, onlyNonHardy = false }, out) {
+export function damageCrops(tiles, rng, { chance = 1, damage = 0, onlyNonHardy = false, skip = null }, out) {
   let n = 0;
   for (const key in tiles) {
     const c = tiles[key].crop;
@@ -13,6 +13,7 @@ export function damageCrops(tiles, rng, { chance = 1, damage = 0, onlyNonHardy =
     const def = CROPS[c.id];
     if (!def) continue;
     if (onlyNonHardy && def.frostHardy) continue;
+    if (skip && skip(tiles[key].tx, tiles[key].ty)) continue; // sera: don/dolu/fırtına etkilemez
     if (chance < 1 && rng.next() >= chance) continue;
     c.health -= damage;
     if (c.health <= 0) { c.health = 0; c.dead = true; }
