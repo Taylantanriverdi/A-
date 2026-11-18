@@ -1,0 +1,30 @@
+// Tüm UI metinleri (Türkçe). Yeni metin eklerken buraya ekleyin.
+export const STR = {
+  dateLine: (season, dayOfSeason, year) => `${season} · ${dayOfSeason}. Gün · Yıl ${year}`,
+  currency: '₺',
+  weather: {
+    clear: 'Açık', cloudy: 'Bulutlu', rain: 'Yağmurlu', storm: 'Fırtına', snow: 'Karlı', fog: 'Sisli',
+  },
+  day: 'Gündüz',
+  night: 'Gece',
+  speed: { 0: 'Duraklat', 1: 'Normal hız', 2: '2x hız', 4: '4x hız' },
+  speedGroup: 'Oyun hızı',
+  sleep: 'Sabaha geç',
+  sleepHint: 'Uyu ve 06:00\'da uyan',
+  saved: 'Kaydedildi',
+  settings: 'Ayarlar',
+  close: 'Kapat',
+  quality: 'Grafik kalitesi',
+  qualityOpts: { auto: 'Otomatik', high: 'Yüksek', medium: 'Orta', low: 'Düşük' },
+  qualityAutoNow: (lvl) => `Şu an: ${lvl}`,
+  sound: 'Ses efektleri',
+  music: 'Müzik',
+  newGame: 'Yeni oyun',
+  newGameHint: 'Mevcut çiftlik silinir ve baştan başlanır.',
+  newGameConfirm: 'Evet, her şeyi sil',
+  newGameCancel: 'Vazgeç',
+  newGameAsk: 'Emin misin? Bu işlem geri alınamaz.',
+  shortcuts: 'Kısayollar: Boşluk duraklat · 1/2/3 hız · Esc kapat',
+  fps: 'FPS',
+};
+export default STR;
