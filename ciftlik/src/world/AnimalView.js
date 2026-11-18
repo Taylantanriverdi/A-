@@ -5,7 +5,7 @@
 import { depthForY, DEPTH, TILE_W, TILE_H } from '../core/constants.js';
 import { ANIMALS } from '../data/animals.js';
 import { BUILDINGS } from '../data/buildings.js';
-import { AN, POSES, animKey } from '../render/textures/animals.js';
+import { AN, POSES, animKey, genAnimals } from '../render/textures/animals.js';
 
 const SPEED = { chicken: 34, cow: 17, sheep: 19, goat: 24 };
 const HOP = { chicken: 9, cow: 6, sheep: 9, goat: 12 };
@@ -24,6 +24,7 @@ export default class AnimalView {
   }
 
   create() {
+    genAnimals(this.scene); // idempotent
     const on = (n, f) => this._offs.push(this.bus.on(n, f, this));
     on('animals:changed', () => { this.dirty = true; });
     on('save:loaded', () => { this.dirty = true; });
@@ -74,7 +75,7 @@ export default class AnimalView {
         this.entries.set(a.id, e); this.list.push(e);
         this._bounds(e); this._place(e);
         const m = this._minutes();
-        e.inside = this._night(m, e) && m >= 1230 || m < 330; // yüklenirken gece ise doğrudan içeride
+        e.inside = m >= 1230 || m < 300; // yüklenirken gece ise doğrudan içeride
         e.fade = e.inside ? 0 : 1;
         e.scale = (Number(a.ageDays) < ANIMALS[a.type].adultDays) ? BABY : 1;
         e.c.setVisible(!e.inside); e.shadow.setVisible(!e.inside);
@@ -159,7 +160,7 @@ export default class AnimalView {
       }
       // ---- görünüm
       const sk = sick ? 1 : 0;
-      const pi = e.mode === WALK || e.going && e.mode === WALK ? ((Math.floor(e.step) & 1) ? 2 : 1)
+      const pi = e.mode === WALK ? ((Math.floor(e.step) & 1) ? 2 : 1)
         : e.mode === GRAZE ? (e.type === 'chicken' && Math.sin(t * 9 + e.seed) < 0.1 ? 0 : 3) : 0;
       const key = KEYS[e.type][sk][pi];
       if (e.curKey !== key) { e.body.setTexture(key); e.curKey = key; }
@@ -174,7 +175,7 @@ export default class AnimalView {
       e.body.setFlipX(e.dir < 0).setScale(fs * (2 - sq), fs * breathe * sq);
       if (e.tail) {
         const T = N.tail; const wag = e.type === 'cow' ? Math.sin(t * 2.6 + e.seed) * 0.28 + 0.05 : Math.sin(t * 9 + e.seed) * 0.35;
-        e.tail.setPosition(T.x * e.dir * fs, T.y * fs).setFlipX(e.dir < 0).setScale(fs).setRotation(wag * e.dir * (sick ? 0.3 : 1)).setTexture(e.tail.texture.key);
+        e.tail.setPosition(T.x * e.dir * fs, T.y * fs).setFlipX(e.dir < 0).setScale(fs).setRotation(wag * e.dir * (sick ? 0.3 : 1));
       }
       e.shadow.setPosition(e.x - 2 * e.dir * fs, e.y - 1).setDisplaySize(N.shw * fs * 1.05, N.shw * fs * 0.3).setAlpha(shA * e.fade * (hopY > 0 ? 0.7 : 1));
     }

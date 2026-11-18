@@ -16,6 +16,8 @@ import HorizonLayer from './HorizonLayer.js';
 import Particles from './Particles.js';
 import FieldView from '../world/FieldView.js';
 import MarketStall from '../world/MarketStall.js';
+import BuildingView from '../world/BuildingView.js';
+import AnimalView from '../world/AnimalView.js';
 import SaleFX from './SaleFX.js';
 import GradePipeline from './postfx/GradePipeline.js';
 import BloomPipeline from './postfx/BloomPipeline.js';
@@ -66,6 +68,9 @@ export default class Renderer {
     try { this.field = new FieldView(s, this.state, this.bus, this); } catch (e) { console.error('[render] FieldView', e); this.field = null; }
     // pazar tezgâhı + satış/alış/seviye efektleri (Aşama 3)
     try { this.stall = new MarketStall(s, this.state, this.bus, this); this.stall.create(); } catch (e) { console.error('[render] MarketStall', e); this.stall = null; }
+    // kümes/ahır/kovan + hayvanlar (Aşama 4)
+    try { this.buildings = new BuildingView(s, this.state, this.bus, this); this.buildings.create(); } catch (e) { console.error('[render] BuildingView', e); this.buildings = null; }
+    try { this.animals = new AnimalView(s, this.state, this.bus, this, this.buildings); this.animals.create(); } catch (e) { console.error('[render] AnimalView', e); this.animals = null; }
     try { this.saleFx = new SaleFX(s, this.bus, this.webgl); this.saleFx.create(); } catch (e) { console.error('[render] SaleFX', e); this.saleFx = null; }
     // kararma katmanı (uyku geçişi) + Canvas letterbox
     this.cTop = s.add.container(0, 0).setScrollFactor(0).setDepth(1000);
@@ -173,6 +178,8 @@ export default class Renderer {
     this.decor.update(env);
     if (this.field) { try { this.field.update(frame); } catch (e) { if (!this._fieldErr) { this._fieldErr = true; console.error('[render] FieldView.update', e); } } }
     if (this.stall) { try { this.stall.update(env); } catch (e) { if (!this._stallErr) { this._stallErr = true; console.error('[render] MarketStall.update', e); } } }
+    if (this.buildings) { try { this.buildings.update(env); } catch (e) { if (!this._bldErr) { this._bldErr = true; console.error('[render] BuildingView.update', e); } } }
+    if (this.animals) { try { this.animals.update(env); } catch (e) { if (!this._aniErr) { this._aniErr = true; console.error('[render] AnimalView.update', e); } } }
     this.saleFx?.update(env);
     this.particles.update(env);
     this._updateFX(env, dt);
@@ -240,7 +247,7 @@ export default class Renderer {
     for (const off of this._offs) off(); this._offs.length = 0;
     if (this._cam && this._origPreRender) { delete this._cam.preRender; if (this._cam.preRender !== this._origPreRender) this._cam.preRender = this._origPreRender; }
     try { if (this.fx && this.fx.pipe) this._cam.removePostPipeline(this.fx.pipe); } catch { /* yok say */ }
-    for (const m of [this.saleFx, this.stall, this.field, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
+    for (const m of [this.saleFx, this.animals, this.buildings, this.stall, this.field, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
     this.cTop?.destroy();
   }
 }
