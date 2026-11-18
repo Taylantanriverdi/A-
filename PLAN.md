@@ -484,6 +484,9 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K7 | Oyun zamanı `game.loop.rawDelta` ile ilerler | Phaser'ın yumuşatılmış delta'sı düşük FPS'te zamanı yavaşlatıyordu |
 | K8 | DPR kaliteye bağlı (2 / 1.5 / 1) | Mobilde dolgu oranı maliyetini sınırlamak |
 | K9 | Uyku sırasında dakikalar sessiz modda tek tek simüle edilir | Determinizm; ağır sistemler gelirse toplu "catch-up" fonksiyonu eklenecek |
+| K10 | Sulama nemi hedefe (80) doldurur, toplamaz; nem kaybı ilkbahar 1.2/saat | "Her gün sula" doğal ritmi cezalandırılmamalı; atlanan gün stres yaratmalı (sim-farm bulgusu) |
+| K11 | Alet seçiliyken tek parmak sürükleme = boyama, kamera iki parmak/sağ tık | 24+ karoyu tek tek dokunmak mobilde yorucu |
+| K12 | Envanter yığını (kalite, organik) çiftiyle anahtarlanır | Aşama 3 organik pazar bonusu |
 
 ---
 
@@ -596,9 +599,10 @@ state.tiles['tx,ty'] = {
   crop: null | {
     id, plantedDay, growth: 0..1, stage: 0..4, health: 0..100,
     pest: 0..1, disease: 0..1, careSum, careCount, readyDays: 0, harvests: 0, dead: false,
+    rot: 1.0,                                   // ekim anındaki ekim nöbeti verim çarpanı
   },
 }
-state.inventory.items[itemId] = [{ q: 'A'|'B'|'C', qty, age: 0 }]   // InventorySystem sahibi
+state.inventory.items[itemId] = [{ q: 'A'|'B'|'C', organic: boolean, qty, age: 0 }]   // InventorySystem sahibi; yığın anahtarı (q, organic)
 state.flags = { farmInitialized: true, firstHarvest: { potato: true } }   // engine GameState'e `flags:{}` ekler
 ```
 - Yeni oyunda FarmSystem.init: `flags.farmInitialized` yoksa P1 (karo 32..47 × 6..17) için tüm karoları `grass` olarak oluşturur, **(34..39 × 8..11)** 24 karoyu `plowed` yapar, `STARTING_INVENTORY`'yi ekler, bayrağı koyar.

@@ -1,16 +1,17 @@
 // Toprak ve tarım kuralları — PLAN.md §3 "Toprak modeli". Denge değerleri yalnızca burada.
 export const SOIL = {
   start: { moisture: 45, n: 55, p: 50, k: 50, ph: 6.5 },
-  moistureLossPerHour: { spring: 0.6, summer: 1.0, autumn: 0.5, winter: 0.3 },
+  moistureLossPerHour: { spring: 1.2, summer: 1.4, autumn: 1.0, winter: 0.5 },
   rainGainPerHour: { rain: 4, storm: 6, snow: 0.5 },
-  waterAmount: 60,            // sulama başına nem
+  waterTarget: 80,            // sulama nemi bu değere DOLDURUR (üstüne çıkarmaz); günlük sulama ideal ritimdir
+  wetEnoughAbove: 78,         // bunun üstünde sulama reddedilir ("Toprak zaten ıslak")
   droughtBelow: 20,           // bunun altı kuraklık stresi
   waterlogAbove: 92,          // uzun süre üstünde → kök çürüğü riski
   phIdeal: [6.0, 7.0],
   phRange: [4.5, 8.5],
   rotationPenalty: [1.0, 0.85, 0.70], // aynı ürün art arda 1., 2., 3+ kez
-  legumeNBonus: 15,
-  grassRecoverDays: 6,        // sürülmüş ama boş karo bu kadar gün sonra yabani ota/çime döner
+  // Baklagil N katkısı crops.js'te negatif uptake.n ile verilir (ayrı bonus yok).
+  grassRecoverDays: 14,        // sürülmüş ama boş karo bu kadar gün sonra yabani ota/çime döner
 };
 
 // Büyüme çarpanları
@@ -36,11 +37,12 @@ export const HEALTH = {
 
 // Zararlı, hastalık, yabani ot (günlük olasılık, karo başına)
 export const THREATS = {
-  pestDaily: 0.015,           // yaz ×2, ekim nöbeti ihlali ×1.5
+  pestDaily: 0.01,            // yaz ×2, ekim nöbeti ihlali ×1.5
   diseaseDaily: 0.01,         // nem > 85 ×2.5, sağlık < 50 ×1.5
-  weedDaily: 0.03,            // ekili veya sürülmüş karo
+  weedDaily: 0.02,            // ekili veya sürülmüş karo
   growthPerDay: { pest: 0.25, disease: 0.2, weeds: 0.2 }, // şiddet artışı
   spreadChance: 0.15,         // komşu karoya yayılma (günlük, şiddet > 0.5)
+  weedNutrientPerDay: 4,      // ot yoğunluğu 1 iken N/P/K'dan günlük çalınan puan
 };
 
 // Kalite: careScore (0..100) → sınıf. Fiyat çarpanları Aşama 3 pazar tarafından kullanılır.

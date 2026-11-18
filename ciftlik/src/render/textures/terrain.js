@@ -1,4 +1,4 @@
-// Arazi dokuları: dağlar, tepeler, orman, çim, toprak tarla, yol, küçük süsler, ön plan çimleri.
+// Arazi dokuları: dağlar, tepeler, orman, çim, yol, küçük süsler, ön plan çimleri.
 import { makeCanvas, register, bakeTint, softenCanvas, shade, mixHex, rgba } from './canvas.js';
 import { mulberry32, TileNoise, profile1D } from './noise.js';
 import { WORLD } from '../../data/palette.js';
@@ -175,36 +175,6 @@ function groundMacro(scene) {
     else d[i + 3] = 0;
   }
   ctx.putImageData(img, 0, 0); register(scene, key, canvas);
-}
-
-/** 6×4 karo sürülmüş tarla: her karo sırasında 2 kabarık sıra, yumuşak kenar. */
-function soilField(scene) {
-  const key = 'env_field'; if (scene.textures.exists(key)) return;
-  const tw = 6, th = 4, TW = 64, TH = 44, m = 10; const w = tw * TW + m * 2, h = th * TH + m * 2;
-  const { canvas, ctx } = makeCanvas(w, h); const n = new TileNoise(21, 32, 16), n2 = new TileNoise(22, 96, 48);
-  const base = [122, 85, 54], dk = [74, 50, 32], lt = [160, 118, 80];
-  const img = ctx.createImageData(w, h); const d = img.data;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const lx = x - m, ly = y - m; const i = (y * w + x) * 4;
-    const ex = Math.min(lx, tw * TW - lx), ey = Math.min(ly, th * TH - ly);
-    const edge = Math.min(ex, ey) + (n.sample(x * 0.3, y * 0.3) - 0.5) * 6;
-    const a = Math.max(0, Math.min(1, (edge + 4) / 8));
-    if (a <= 0) { d[i + 3] = 0; continue; }
-    const rowPhase = (ly / (TH / 2)) % 1; // her karo 2 sıra
-    const ridge = Math.sin(rowPhase * Math.PI); // 0 oluk, 1 sırt
-    const slopeLight = Math.cos(rowPhase * Math.PI); // üst yüz aydınlık
-    let k = 0.82 + ridge * 0.16 + slopeLight * 0.08;
-    const clod = n2.sample(x * 0.9, y * 0.9); k *= 0.9 + clod * 0.2;
-    const gx = (lx % TW + TW) % TW; const seam = gx < 1.2 || gx > TW - 1.2 ? 0.92 : 1;
-    const mixDk = 1 - ridge;
-    for (let c = 0; c < 3; c++) d[i + c] = Math.min(255, (base[c] * (1 - mixDk * 0.45) + dk[c] * mixDk * 0.45) * k * seam + (slopeLight > 0.6 ? (lt[c] - base[c]) * 0.15 : 0));
-    d[i + 3] = a * 255;
-  }
-  ctx.putImageData(img, 0, 0);
-  // taş ve saman kırıntıları
-  const r = mulberry32(23);
-  for (let i = 0; i < 140; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(200,170,130,0.5)' : 'rgba(60,40,25,0.5)'; ctx.fillRect(m + r() * tw * TW, m + r() * th * TH, 1.5, 1.2); }
-  register(scene, key, canvas, { margin: m });
 }
 
 /** Toprak yol: polyline (doku yerel koordinatı) etrafında yumuşak kenarlı şerit. */
@@ -388,7 +358,7 @@ export function genTerrain(scene, canvasMode, step) {
   mountain(scene, 'env_mtn_near', 2002, 420, 200, 70, 0.3, canvasMode, WORLD.mountainNear); step();
   hills(scene, canvasMode); forest(scene, canvasMode); step();
   grass(scene); groundMacro(scene); step();
-  soilField(scene); smalls(scene); foreground(scene); step();
+  smalls(scene); foreground(scene); step();
 }
 
 export { mixHex, shade, rgba };

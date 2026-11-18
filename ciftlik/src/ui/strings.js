@@ -57,6 +57,8 @@ export const STR = {
   growth: 'İlerleme',
   daysLeft: (d) => (d <= 0 ? 'Hasada hazır' : d < 1 ? '1 günden az kaldı' : `${Math.ceil(d)} gün kaldı`),
   health: 'Sağlık',
+  rotIn: (d) => (d <= 0 ? 'Hasada hazır · bugün çürüyebilir' : `Hasada hazır · ${d} gün içinde topla`),
+  notGrowing: 'Büyümüyor',
   quality: 'Tahmini kalite',
   qualityName: { A: 'A sınıfı', B: 'B sınıfı', C: 'C sınıfı' },
   noCrop: 'Ekin yok',

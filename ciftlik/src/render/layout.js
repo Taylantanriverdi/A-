@@ -1,4 +1,4 @@
-// Faz 1 dekor yerleşimi (dünya koordinatı). PLAN §7: P1 içinde 6×4 sürülmüş alan (34,8) ve çiftlik evi.
+// Dekor yerleşimi (dünya koordinatı). FIELD: başlangıç sürülmüş alanı (34,8 6×4) — yalnızca süs yerleşimini engeller; karolar FieldView çizer.
 import { TILE_W, TILE_H } from '../core/constants.js';
 
 export const FIELD = { tx: 34, ty: 8, w: 6, h: 4 };

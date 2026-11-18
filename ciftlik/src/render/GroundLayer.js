@@ -1,5 +1,5 @@
 // Zemin (DEPTH.GROUND): büyük döşemeli çim dokusu (statik görüntüler, her karede çizim yok), makro ton
-// varyasyonu, ufuk puslanması, P1 sürülmüş tarla, toprak yol, çiçek/taş/çim tutamları.
+// varyasyonu, ufuk puslanması, toprak yol, çiçek/taş/çim tutamları.
 import { DEPTH, TILE_W, TILE_H, WORLD_W, WORLD_H } from '../core/constants.js';
 import { genPath } from './textures/terrain.js';
 import { mulberry32 } from './textures/noise.js';
@@ -31,9 +31,7 @@ export default class GroundLayer {
     };
     this.path = mk(PATHS[0]);
     this.path2 = mk(PATHS[1]);
-    // tarla
-    const fm = s.textures.get('env_field').customData?.margin ?? 10;
-    this.field = s.add.image(FIELD.tx * TILE_W - fm, FIELD.ty * TILE_H - fm, 'env_field').setOrigin(0, 0).setDepth(DEPTH.GROUND + 0.12);
+    // tarla karoları artık state.tiles'tan çizilir (world/FieldView.js); FIELD yalnızca süs yerleşimini engeller
     // küçük süsler
     const r = mulberry32(777);
     const blocked = (x, y) => {
@@ -80,6 +78,6 @@ export default class GroundLayer {
     }
   }
 
-  destroy() { for (const im of [...this.tiles, ...this.smalls, this.macro, this.path, this.path2, this.field]) im?.destroy(); }
+  destroy() { for (const im of [...this.tiles, ...this.smalls, this.macro, this.path, this.path2]) im?.destroy(); }
 }
 

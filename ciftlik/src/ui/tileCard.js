@@ -2,7 +2,7 @@
 // Veri: rules.tileInfo(state, tileId, now) — yalnızca okunur. DOM bir kez kurulur, sonra yalnızca değişen yazılır.
 import { tileInfo } from '../systems/farm/rules.js';
 import { CROPS, WATER_BANDS, STAGE_NAMES_TR, STAGE_THRESHOLDS } from '../data/crops.js';
-import { SOIL } from '../data/farming.js';
+import { SOIL, HEALTH } from '../data/farming.js';
 import { STR } from './strings.js';
 import { ICON, TOOL_ICON } from './icons.js';
 import { cropIcon } from './itemIcons.js';
@@ -13,6 +13,8 @@ const PH_MIN = SOIL.phRange[0], PH_MAX = SOIL.phRange[1];
 const pct = (v) => (v < 0 ? 0 : v > 100 ? 100 : v);
 const phPos = (ph) => pct(((ph - PH_MIN) / (PH_MAX - PH_MIN)) * 100);
 const r1 = (v) => Math.round(v * 10) / 10;
+// rules.tileInfo uyarı metni → aynı bilgiyi gösteren çip anahtarı
+const WARN_DUP = { 'Zararlı var': 'pest', 'Hastalık var': 'disease', 'Yabani ot': 'weeds', 'Bitki soluyor': 'wither', 'Toprak kuru': 'dry' };
 
 function setW(el, v) {
   const s = `${pct(v).toFixed(1)}%`;
@@ -111,7 +113,7 @@ export function createTileCard(root, ctx) {
     const crop = info.crop || (tile.crop ? fallbackCrop(tile) : null);
     const cid = tile.crop && tile.crop.id;
     const def = cid ? CROPS[cid] : null;
-    const dead = !!(tile.crop && tile.crop.dead);
+    const dead = !!((crop && crop.dead) || (tile.crop && tile.crop.dead));
 
     // Başlık
     const ik = crop && cid ? `c:${cid}` : tile.state;
@@ -139,8 +141,13 @@ export function createTileCard(root, ctx) {
       setText(E.hv, `${hp}`);
       setW(E.hp, hp);
       setCls(E.hpBar, `bar hp ${hp < 40 ? 'low' : hp < 70 ? 'mid' : 'ok'}`);
-      const dl = Number(crop.daysLeft);
-      setText(E.days, dead ? STR.chips.dead : STR.daysLeft(Number.isFinite(dl) ? dl : 0));
+      const dl = crop.daysLeft;
+      let dtxt;
+      if (dead) dtxt = STR.chips.dead;
+      else if ((crop.stage | 0) >= 4) dtxt = crop.rotIn != null ? STR.rotIn(crop.rotIn) : STR.daysLeft(0);
+      else if (typeof dl === 'number' && Number.isFinite(dl)) dtxt = STR.daysLeft(dl);
+      else dtxt = typeof crop.readyIn === 'string' ? crop.readyIn : STR.notGrowing;
+      setText(E.days, dtxt);
       setText(E.qn, qe ? `${STR.quality}: ${STR.qualityName[qe] || qe}` : '');
     }
 
@@ -149,12 +156,13 @@ export function createTileCard(root, ctx) {
     const m = Number(soil.moisture) || 0;
     const band = WATER_BANDS[def ? def.water : 'med'];
     const chips = [];
+    const has = { pest: false, disease: false, weeds: false, wither: false, dry: false };
     if (dead) chips.push(['bad', STR.chips.dead, TOOL_ICON.alert]);
-    else if (crop && crop.health < 40) chips.push(['warn', STR.chips.wither, TOOL_ICON.alert]);
-    if (crop && crop.pest > 0.05) chips.push(['bad', `${STR.chips.pest} %${Math.round(crop.pest * 100)}`, TOOL_ICON.bug]);
-    if (crop && crop.disease > 0.05) chips.push(['bad', `${STR.chips.disease} %${Math.round(crop.disease * 100)}`, TOOL_ICON.alert]);
-    if (weeds > 0.08) chips.push(['warn', `${STR.chips.weeds} %${Math.round(weeds * 100)}`, TOOL_ICON.weed]);
-    if (tile.state === 'plowed' && m < SOIL.droughtBelow) chips.push(['warn', STR.chips.dry, TOOL_ICON.drop]);
+    else if (crop && crop.health < HEALTH.witherBelow) { has.wither = true; chips.push(['warn', STR.chips.wither, TOOL_ICON.alert]); }
+    if (crop && !dead && crop.pest > 0) { has.pest = true; chips.push(['bad', `${STR.chips.pest} %${Math.max(1, Math.round(crop.pest * 100))}`, TOOL_ICON.bug]); }
+    if (crop && !dead && crop.disease > 0) { has.disease = true; chips.push(['bad', `${STR.chips.disease} %${Math.max(1, Math.round(crop.disease * 100))}`, TOOL_ICON.alert]); }
+    if (weeds > 0) { has.weeds = true; chips.push(['warn', `${STR.chips.weeds} %${Math.max(1, Math.round(weeds * 100))}`, TOOL_ICON.weed]); }
+    if (tile.state === 'plowed' && m < SOIL.droughtBelow) { has.dry = true; chips.push(['warn', STR.chips.dry, TOOL_ICON.drop]); }
     else if (m > SOIL.waterlogAbove) chips.push(['warn', STR.chips.wet, TOOL_ICON.drop]);
     const ck = chips.map((c) => c[0] + c[1]).join('|');
     if (ck !== chipsKey) {
@@ -169,7 +177,7 @@ export function createTileCard(root, ctx) {
     setW(E.moist, m);
     setL(E.bandEl, band.min); setW(E.bandEl, band.max - band.min);
     setCls(E.moistBar, `bar moist ${m < band.min ? 'lo' : m > band.max ? 'hi' : 'ok'}`);
-    setText(E.org, tile.organic === false ? '' : STR.organic);
+    setText(E.org, (info.organic ?? tile.organic) === false ? '' : STR.organic);
 
     // N/P/K
     for (const nu of E.nut) {
@@ -190,7 +198,8 @@ export function createTileCard(root, ctx) {
     setCls(E.phMk, `mk ${ph < SOIL.phIdeal[0] - 0.5 || ph > SOIL.phIdeal[1] + 0.5 ? 'bad' : ph < SOIL.phIdeal[0] || ph > SOIL.phIdeal[1] ? 'warn' : 'ok'}`);
 
     // Uyarılar
-    const warns = Array.isArray(info.warnings) ? info.warnings : [];
+    // Çip olarak zaten gösterilen uyarıları tekrar listeleme
+    const warns = (Array.isArray(info.warnings) ? info.warnings : []).filter((w) => !(WARN_DUP[w] && has[WARN_DUP[w]]));
     const wk = warns.join('|');
     if (wk !== warnKey) {
       warnKey = wk;
