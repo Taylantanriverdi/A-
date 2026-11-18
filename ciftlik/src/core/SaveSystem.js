@@ -149,6 +149,8 @@ const SaveSystem = {
       if (info.repairs.length) console.warn('[save] onarılan alanlar:', info.repairs.join(', '));
       return main;
     }
+    // Okunamayan ana kaydı incelenebilsin diye karantinaya al (sonraki kayıt üstüne yazmadan önce).
+    if (raw != null) { try { ls.setItem(CORRUPT_KEY, raw); } catch { /* kota */ } }
     const backup = parseSave(rawB, info);
     if (backup) {
       console.warn('[save] ana kayıt okunamadı, yedekten yüklendi');
