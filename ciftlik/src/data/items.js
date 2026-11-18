@@ -26,5 +26,6 @@ export const TOOL_NAMES_TR = {
 export const STARTING_INVENTORY = [
   { itemId: 'seed_lettuce', qty: 10, quality: 'B' },
   { itemId: 'seed_potato', qty: 6, quality: 'B' },
-  { itemId: 'compost', qty: 10, quality: 'B' },
+  { itemId: 'compost', qty: 10, quality: 'B', organic: true },
+  { itemId: 'organic_spray', qty: 4, quality: 'B', organic: true },  // QA: mağaza gelmeden salgına karşı çaresiz kalmasın
 ];

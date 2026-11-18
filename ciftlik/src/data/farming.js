@@ -41,7 +41,7 @@ export const THREATS = {
   diseaseDaily: 0.01,         // nem > 85 ×2.5, sağlık < 50 ×1.5
   weedDaily: 0.02,            // ekili veya sürülmüş karo
   growthPerDay: { pest: 0.25, disease: 0.2, weeds: 0.2 }, // şiddet artışı
-  spreadChance: 0.15,         // komşu karoya yayılma (günlük, şiddet > 0.5)
+  spreadChance: 0.08,         // komşu karoya yayılma (günlük, şiddet > 0.5)
   weedNutrientPerDay: 4,      // ot yoğunluğu 1 iken N/P/K'dan günlük çalınan puan
 };
 

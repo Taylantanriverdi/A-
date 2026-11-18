@@ -488,6 +488,9 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K11 | Alet seçiliyken tek parmak sürükleme = boyama, kamera iki parmak/sağ tık | 24+ karoyu tek tek dokunmak mobilde yorucu |
 | K12 | Envanter yığını (kalite, organik) çiftiyle anahtarlanır | Aşama 3 organik pazar bonusu |
 | K13 | A kalite eşiği careScore 90 | Günlük bakım A, iki günde bir sulama B olmalı (sim-farm) |
+| K14 | Dekorla kaplı karolar `data/land.js` P1_BLOCKED'de; ekilemez, kart açılmaz | QA: evin arkasına ekin ekilebiliyordu |
+| K15 | Hastalık yayılma 0.08; başlangıçta 4 organik sprey | QA: bakımsız salgın 10 günde tarlayı siliyordu, mağaza yokken çaresizlik |
+| K16 | Sinematik, boyama darbesi bitene kadar ertelenir | QA: ilk hasat sinematiği boyamalı hasatı yarıda kesiyordu |
 
 ---
 
@@ -607,7 +610,8 @@ state.inventory.items[itemId] = [{ q: 'A'|'B'|'C', organic: boolean, qty, age: 0
 state.flags = { farmInitialized: true, firstHarvest: { potato: true } }   // engine GameState'e `flags:{}` ekler
 ```
 - Yeni oyunda FarmSystem.init: `flags.farmInitialized` yoksa P1 (karo 32..47 × 6..17) için tüm karoları `grass` olarak oluşturur, **(34..39 × 8..11)** 24 karoyu `plowed` yapar, `STARTING_INVENTORY`'yi ekler, bayrağı koyar.
-- Yalnızca sahip olunan parsellerdeki karolar etkileşime açıktır (Aşama 2'de yalnızca P1).
+- Yalnızca sahip olunan parsellerdeki karolar etkileşime açıktır (Aşama 2'de yalnızca P1). `data/land.js` P1_BLOCKED karoları (ev, kuyu, ağaç, çalı, patika) hiçbir eyleme açık değildir.
+- Her yüklemede eksik P1 karoları (bozuk kayıt / validator silmesi) varsayılanla tamamlanır.
 
 ### Simülasyon (FarmSystem)
 - `onHour`: her ekili karo için nem kaybı/yağmur kazancı, büyüme (PLAN §3 formülü + farming.js GROWTH), sağlık, care örneklemesi. Boş karolarda nem.
