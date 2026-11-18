@@ -9,7 +9,7 @@ import { itemIcon } from './itemIcons.js';
 import { h, setText } from './frame.js';
 import { tap } from './touch.js';
 
-const FILTERS = ['all', 'crop', 'animal', 'seed', 'fertilizer', 'chemical', 'feed'];
+const FILTERS = ['all', 'crop', 'animal', 'processed', 'seed', 'fertilizer', 'chemical', 'feed'];
 const CAT_ORDER = { crop: 0, seed: 1, fertilizer: 2, chemical: 3 };
 const ITEM_ORDER = {};
 Object.keys(ITEMS).forEach((id, i) => { ITEM_ORDER[id] = i; });
@@ -20,7 +20,7 @@ const stackMax = () => INVENTORY.stackMax || 99;
 /** Tazelik: crop yığınları için { left, total, pct, warn, rotNext } yoksa null. */
 export function freshness(itemId, st) {
   const it = ITEMS[itemId];
-  if (!it || (it.category !== 'crop' && it.category !== 'animal')) return null;
+  if (!it || (it.category !== 'crop' && it.category !== 'animal' && it.category !== 'processed')) return null;
   const fd = it.freshDays ?? CROPS[it.crop]?.freshDays;
   const total = Number.isFinite(fd) && fd > 0 ? fd : 0;
   if (!total) return null;
@@ -139,7 +139,7 @@ export function createInventoryPanel(ctx, { openPanel }) {
     if (sigs[i] === sig) return;
     sigs[i] = sig;
     const it = ITEMS[s.itemId];
-    const showQ = (it.category === 'crop' || it.category === 'animal');
+    const showQ = (it.category === 'crop' || it.category === 'animal' || it.category === 'processed');
     c.disabled = false;
     c.dataset.key = s.key;
     c.className = `slot${sel ? ' on' : ''}${fr && fr.warn ? (fr.rotNext ? ' rot' : ' stale') : ''}`;
@@ -167,14 +167,14 @@ export function createInventoryPanel(ctx, { openPanel }) {
     const it = ITEMS[s.itemId];
     dI.innerHTML = itemIcon(s.itemId);
     const parts = [STR.catName[it.category] || it.category, STR.qtyOf(s.qty)];
-    if ((it.category === 'crop' || it.category === 'animal')) parts.splice(1, 0, STR.qualityName[s.q]);
+    if ((it.category === 'crop' || it.category === 'animal' || it.category === 'processed')) parts.splice(1, 0, STR.qualityName[s.q]);
     if (s.organic) parts.push(STR.organic);
     const fr = freshness(s.itemId, s);
     if (fr) parts.push(fr.rotNext ? STR.freshLastC(fr.left) : STR.freshLeft(fr.left));
     setText(dN, it.name);
     setText(dM, parts.join(' · '));
     dM.classList.toggle('warn', !!(fr && fr.warn));
-    dSell.hidden = (it.category !== 'crop' && it.category !== 'animal');
+    dSell.hidden = (it.category !== 'crop' && it.category !== 'animal' && it.category !== 'processed');
   }
 
   function render() {

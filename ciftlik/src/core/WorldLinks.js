@@ -2,6 +2,8 @@
 // Cinematics gibi: bus'ı dinler, yalnızca olay yayar; sistemleri veya UI'yi doğrudan çağırmaz.
 // Yeni bağlantı (ör. Aşama 5 bina tıklaması) için LINKS'e satır ekle.
 import { BUILDINGS } from '../data/buildings.js';
+import { MACHINES } from '../data/recipes.js';
+import { DONKEY } from '../data/workers.js';
 
 /**
  * Bağlantı: { id, area: {x0, x1, y0, y1} (karo, uçlar dahil), emit: [olay, yük] , tools?: ['hand', ...] }
@@ -21,6 +23,14 @@ export const LINKS = [
     event: 'ui:open',
     payload: { panel: 'building', buildingType: type, lotId: l.id, source: 'lot' },
   }))),
+  // Aşama 5: atölye arsaları → makine paneli (boşsa inşa teklifi); eşek sundurması → çalışan paneli
+  ...Object.entries(MACHINES).map(([type, m]) => ({
+    id: `machine_${type}`,
+    area: { ...m.lot },
+    event: 'ui:open',
+    payload: { panel: 'machine', machine: type, source: 'lot' },
+  })),
+  { id: 'donkeyShed', area: { ...DONKEY.shed }, event: 'ui:open', payload: { panel: 'worker', source: 'shed' } },
 ];
 
 const STROKE_GAP_MS = 400; // bundan kısa aralıkla gelen tile:tap'ler boyama darbesi sayılır

@@ -13,8 +13,8 @@
 | 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Onaylandı |
 | 2 | Tarım ve toprak mekaniği | ✅ Onaylandı |
 | 3 | Envanter, mağaza, pazar | ✅ Onaylandı |
-| 4 | Hayvancılık | ✅ Tamamlandı (sim-animals 16/16 + beyin duman testi) — onay bekleniyor |
-| 5 | Üretim binaları ve zincirleri | — |
+| 4 | Hayvancılık | ✅ Onaylandı |
+| 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | 🔨 Devam ediyor |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
 | 8 | İşçiler, makineler, arazi genişletme | — |
@@ -784,3 +784,44 @@ state.animals = [{ id, type, name, buildingId, ageDays, hunger, thirst, health, 
 ### Görsel
 - Kümes (sevimli ahşap, kırmızı çatı, rampa), ahır (büyük kırmızı-ahşap, çift kapı), kovan (beyaz ahşap kutu, arılar). Boş arsa: ince işaretli kazık/ip çevrili toprak + tabela. Gece pencere ışığı. Gölge, `depthForY`.
 - Hayvanlar pen alanında dolaşır (basit durum makinesi: yürü/otla/dur), yetişkin/yavru boyutu, hasta (soluk, yavaş), mutlu (zıplama). Tavuklar gagalar, inekler kuyruk sallar, arılar kovan çevresinde uçar. Gece hayvanlar binaya girer (görünmez). `building:built` → inşa "pop" + toz/parıltı.
+
+---
+
+## 11. Aşama 5 Sözleşmesi — Üretim Zincirleri + İlk Çalışan (bağlayıcı, kısa)
+
+Kullanıcı isteği: kullanıcının paylaştığı fotoğraftaki çocuktan esinlenen bir karakter çiftliğin ilk çalışanı "Çırak" olur; **yakın işlere yürür, uzak işlere eşekle gider**. Fotoğraf oyuna konmaz; karakter prosedürel çizilir. Karakter tarifi (visual-dev için bağlayıcı): ~11 yaşında erkek çocuk; kısa, alında yana doğru taranmış, uçları hafif dağınık **koyu kahverengi** saç; **kalın koyu kaşlar**; iri **kahverengi gözler**; açık buğday ten, hafif pembe yanaklar; sakin, hafif yana çekik **gülümseme**; **gri-lacivert-lila kamuflaj desenli kapüşonlu sweatshirt**, göğsünde **kırmızı** yazı/desen; koyu pantolon, spor ayakkabı. Animasyon filmi tarzı, sevimli, saygılı.
+
+Beyin dosyaları: `data/recipes.js` (MACHINES + sabit arsalar, MACHINE_RULES, RECIPES, PROCESSED), `data/workers.js` (WORKER_TYPES.apprentice, DONKEY, WORKER_HOME), items.js (işlenmiş ürünler 'processed'), economy.js (yeni defter kategorileri: buildings, animals, electricity, maintenance, wages). Beyin ayrıca: pazar işlenmiş ürünleri satar; `WorldLinks`: atölye arsası → `ui:open {panel:'machine', machine}`, eşek sundurması → `ui:open {panel:'worker'}`.
+
+| İşçi | Dosyalar |
+|---|---|
+| gameplay-dev | `systems/ProductionSystem.js` (+ `systems/production/*`), `ui/machinePanel.js`, mağazaya 'Atölyeler' kartları (shopPanel), main.js kaydı |
+| engine-dev | `systems/WorkerSystem.js` (+ `systems/workers/*`: görev seçimi, hareket, eşek), `ui/workerPanel.js`, main.js kaydı |
+| visual-dev | `world/MachineView.js`, `world/WorkerView.js` (çocuk + eşek), `render/textures/machines.js`, `render/textures/worker.js`, UI portresi `src/ui/portrait.js` (SVG, aynı tarif) |
+
+### State
+```js
+state.machines = [{ id: 'm_dairy', type, builtDay, condition: 100, queue: [{ recipe, startMin, endMin, inputs:{q, organic} }], output: { [itemId]: [{ q, organic, qty }] }, auto: null | recipeId }]
+state.workers = [{ id: 'w1', type: 'apprentice', name, hiredDay, enabled: true, tasks: { water: true, harvest: true, animals: true, machines: true },
+                   x, y /* dünya px */, mode: 'idle'|'walk'|'ride'|'work'|'home', task: null | { kind, target, endMin }, onDonkey: false }]
+state.donkey = { x, y, mode: 'home'|'carrying' }
+```
+### ProductionSystem (gameplay-dev)
+- `shop:buildMachine {machine}` → seviye + `transact(-price, 'buildings')` → `building:built {type: machine, lotId: machine, tx, ty}` (sinematik).
+- `machine:queue {machineId, recipe}`: girdiler envanterde (en düşük kaliteden alınır) → `transact(-kwh×2.5, 'electricity')` → kuyruğa (max 3; iş sıralı çalışır, süre `hours`, condition < 50 → ×1.3, < 20 → durur). `machine:auto {machineId, recipe|null}`: kuyruk boşaldıkça girdi varsa otomatik ekle (çalışan da yapabilir).
+- tickMinute/onHour: biten iş → `output` kutusu, condition −2, `machine:done`. `machine:collect {machineId}` → envanter (`canAdd`), XP (değer × 0.05). `machine:repair` → `transact(-price×0.04, 'maintenance')` → 100.
+- Olaylar: `machines:changed {ids}`, `machine:result {ok, reason?}`, `machine:done {machineId, itemId, qty}`.
+- Makine paneli: boş arsa → inşa; kurulu → tarif kartları (girdi/çıktı/süre/elektrik/kâr tahmini: çıktı değeri − girdi değeri − elektrik, `currentPrice` ile), kuyruk (ilerleme çubukları), çıktı kutusu + Topla, durum (condition) + Bakım, Otomatik tarif seçici.
+- Node testi `tools/sim-production.mjs`: süt→peynir, buğday→un→ekmek zincirleri; kâr tablosu.
+
+### WorkerSystem (engine-dev)
+- Yeni oyunda Çırak işe alınmaz; mağaza/çalışan panelinde "İşe al" (WORKER_TYPES.apprentice.hireLevel 1, ücretsiz alım, günlük maaş 90 ₺ saat 20:00'de `transact(-wage, 'wages')`; para yetmezse o gün çalışmaz + toast). İşe alınınca evin önünde belirir; eşek sundurmada bekler.
+- Çalışma saatleri 07–19. Her karar anında (iş bitince / boştayken 5 oyun dakikada bir) etkin görev türlerinden **en yakın** işi seçer, öncelik sırası `tasks`: water (nem < 45 ekili karo), harvest (hazır ekin; envanter yeri), animals (yemlik boş + envanterde yem → feed; suluk < 1 gün → water; kutuda ürün → collect), machines (çıktı kutusu dolu → collect; `auto` tarif ve girdi varsa → load). Aynı hedefi iki kez seçmez (rezervasyon).
+- **Hareket:** hedefe Öklid mesafe ≤ `donkeyAbove` karo → yürür; uzaksa önce eşeğe gider (sundurma), eşekle hedefe gider (eşek hedefte bekler), iş bitince sıradaki hedef uzaksa eşekle devam, yakınsa iner ve yürür; gün sonu (19:00) eşeği sundurmaya bırakıp eve yürür. Hız oyun dakikası başına karo (oyun hızıyla ölçeklenir). Yol bulma: düz çizgi + engelli karolardan (P1_BLOCKED, bina/makine arsaları) kaçınan basit ızgara A* (8 yön, ~100×30 ızgara, sonuç önbellekli).
+- Eylemler gerçek komutlarla yapılır (`farm:action`, `animal:action`, `machine:collect`/`machine:queue`) — kurallar aynı kalır; sonuçlar `worker:did {workerId, kind, ok}`.
+- Çalışan paneli (`ui:open {panel:'worker'}` ve HUD'da küçük portre düğmesi): portre (visual-dev'in `ui/portrait.js`), ad (düzenlenebilir), durum ("Domatesleri suluyor", "Eşekle mandıraya gidiyor"), görev anahtarları ve sırası, maaş, "Kamerayla takip et" (`camera follow`), İşe al / Çıkar.
+- `workers:changed`, `worker:state {workerId, mode, x, y, onDonkey}` (görsel için mod değişiminde).
+### Görsel (visual-dev)
+- Atölye binaları (mandıra: beyaz-mavi süt evi; değirmen: taş gövde + dönen kanatlı yel değirmeni; fırın: tuğla, bacadan duman; konserve: kırmızı kapılı küçük atölye; iplikhane ve dokuma: ahşap atölye, dokumada renkli kumaş). Çalışırken duman/hareket, gece ışık; boş arsa işareti. Kirli/aşınmış (condition < 50) hafif yıpranmış görünüm.
+- **Çırak**: tarif edilen karakter, 3/4 görünüm, yürüme döngüsü (4–6 kare, sol/sağ ayna), iş animasyonu (sulama kovası, sepet, eğilme), boşta göz kırpma; **eşek** (gri-kahve, uzun kulaklar, heybe), binerken çocuk eşeğin üstünde; eşek yürüyüşü, kulak/kuyruk hareketi. `depthForY`, gölge, gece fener (çocuk 19:00'da eve gider). Kamera takip edilirken akıcı.
+- `ui/portrait.js`: SVG portre (baş-omuz), aynı tarif; panelde ve HUD düğmesinde kullanılır.

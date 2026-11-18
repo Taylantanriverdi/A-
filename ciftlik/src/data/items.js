@@ -1,4 +1,4 @@
-// Eşya tanımları. category: 'seed' | 'fertilizer' | 'chemical' | 'crop' | 'feed' | 'animal' | 'tool'.
+// Eşya tanımları. category: 'seed' | 'fertilizer' | 'chemical' | 'crop' | 'feed' | 'animal' | 'processed' | 'tool'.
 // price: mağaza alış fiyatı (Aşama 3). Ürünlerin satış fiyatı crops.js basePrice'tan gelir.
 import { CROPS } from './crops.js';
 
@@ -21,6 +21,11 @@ for (const [id, c] of Object.entries(CROPS)) {
 import { ANIMAL_PRODUCTS } from './animals.js';
 for (const [id, p] of Object.entries(ANIMAL_PRODUCTS)) {
   ITEMS[id] = { name: p.name, category: 'animal', basePrice: p.basePrice, freshDays: p.freshDays, color: p.color };
+}
+
+import { PROCESSED } from './recipes.js';
+for (const [id, p] of Object.entries(PROCESSED)) {
+  ITEMS[id] = { name: p.name, category: 'processed', basePrice: p.basePrice, freshDays: p.freshDays ?? undefined, color: p.color };
 }
 
 // Aletler (envanterde değil, araç çubuğunda her zaman var)

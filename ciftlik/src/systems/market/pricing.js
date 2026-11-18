@@ -38,7 +38,7 @@ const DEFAULT_ENTRY = Object.freeze({ saturation: 1, noise: 1, soldToday: 0 });
 /** Satılabilir mi? (Aşama 3: yalnızca category 'crop') */
 export function isSellable(itemId) {
   const it = ITEMS[itemId];
-  return !!it && ((it.category === 'crop' && !!CROPS[it.crop]) || it.category === 'animal'); // Aşama 4: hayvan ürünleri
+  return !!it && ((it.category === 'crop' && !!CROPS[it.crop]) || it.category === 'animal' || it.category === 'processed'); // Aşama 4–5
 }
 
 /** Ürünün pazar durumu (yoksa varsayılan, salt okunur). */
