@@ -15,3 +15,5 @@ Yöntem:
 7. Ekran görüntülerini `ciftlik/qa/` altına kaydet (deviceScaleFactor 1).
 
 KOD DÜZELTME. Sadece hataları bul ve raporla. Rapor: her hata için önem (kritik/yüksek/orta/düşük), yeniden üretme adımları, beklenen/gerçek davranış, şüphelenilen dosya. Sonda kabul kriterleri tablosu (GEÇTİ/KALDI) ve FPS ölçümleri.
+
+Ekonomik mod: tek tur, kısa duman testi + kritik akışlar; en fazla 3 ekran görüntüsü; headless FPS ölçme; rapor en fazla ~40 satır.
