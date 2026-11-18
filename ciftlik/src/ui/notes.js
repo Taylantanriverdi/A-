@@ -16,6 +16,7 @@ export function createHarvestNotes(root) {
   root.appendChild(box);
   const pending = [];
   const live = []; // {itemId, qty, q, mixed, el, txt, t, timer}
+  let paused = false; // sinematik: HUD gizliyken ömür sayılmaz
 
   function retire(n) {
     const i = live.indexOf(n);
@@ -24,7 +25,7 @@ export function createHarvestNotes(root) {
     n.el.classList.add('out');
     setTimeout(() => n.el.remove(), 300);
   }
-  const arm = (n) => { clearTimeout(n.timer); n.timer = setTimeout(() => retire(n), LIFE_MS); };
+  const arm = (n) => { clearTimeout(n.timer); n.timer = paused ? 0 : setTimeout(() => retire(n), LIFE_MS); };
 
   function text(n) {
     const name = (ITEMS[n.itemId] && ITEMS[n.itemId].name) || n.itemId;
@@ -35,6 +36,20 @@ export function createHarvestNotes(root) {
     push(p) {
       if (!p || !p.itemId || !(p.qty > 0)) return;
       pending.push(p);
+    },
+    /** Bekleyen (henüz çizilmemiş) hasat bildirimini al — ilk hasat kutlamasına devredilir. */
+    claim(tileId) {
+      for (let i = pending.length - 1; i >= 0; i--) {
+        if (pending[i].tileId === tileId) return pending.splice(i, 1)[0];
+      }
+      return null;
+    },
+    /** Sinematik sırasında zamanlayıcıları dondur; bitince tam ömürle yeniden başlat. */
+    setPaused(v) {
+      v = !!v;
+      if (v === paused) return;
+      paused = v;
+      for (const n of live) arm(n);
     },
     render(now) {
       if (!pending.length) return;
@@ -61,6 +76,39 @@ export function createHarvestNotes(root) {
       pending.length = 0;
     },
     destroy() { for (const n of live) clearTimeout(n.timer); },
+  };
+}
+
+/**
+ * İlk hasat kutlaması: letterbox'ın üstünde, HUD'dan bağımsız katmanda ortada zarif kart.
+ * Sinematik sırasında da görünür (hud-layer dışında).
+ */
+const CELEB_MS = 3800;
+export function createCelebration(root) {
+  const el = h('div', 'celebrate', `<div class="cb-card glass"><span class="cb-ic"></span><div class="cb-tt"><div class="cb-k"></div><div class="cb-v num"></div><div class="cb-s"></div></div></div>`);
+  el.setAttribute('aria-live', 'assertive');
+  root.appendChild(el);
+  const ic = el.querySelector('.cb-ic'), k = el.querySelector('.cb-k'), v = el.querySelector('.cb-v'), sub = el.querySelector('.cb-s');
+  const card = el.querySelector('.cb-card');
+  let pendingShow = null;
+  let timer = 0;
+  return {
+    show(p) { pendingShow = p || {}; },
+    render() {
+      if (!pendingShow) return;
+      const p = pendingShow; pendingShow = null;
+      const id = p.itemId || p.cropId;
+      const name = (ITEMS[id] && ITEMS[id].name) || id || '';
+      ic.innerHTML = id ? itemIcon(id) : TOOL_ICON.spark;
+      setText(k, STR.firstHarvest);
+      setText(v, p.qty > 0 ? STR.harvestNote(p.qty, name, p.quality) : name);
+      setText(sub, STR.firstHarvestSub);
+      card.dataset.q = p.quality || '';
+      el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+      clearTimeout(timer);
+      timer = setTimeout(() => el.classList.remove('show'), CELEB_MS);
+    },
+    destroy() { clearTimeout(timer); el.remove(); },
   };
 }
 

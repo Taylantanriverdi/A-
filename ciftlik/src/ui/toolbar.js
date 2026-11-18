@@ -8,6 +8,14 @@ import { TOOL_ICON } from './icons.js';
 import { itemIcon } from './itemIcons.js';
 import { h, setText } from './frame.js';
 import { shield, tap } from './touch.js';
+import * as rules from '../systems/farm/rules.js';
+
+/** rules.seedWarning (gameplay-dev ekliyor) varsa → {code,text} | null; yoksa / hata → null. */
+function seedWarn(state, cropId, now) {
+  const fn = rules.seedWarning;
+  if (typeof fn !== 'function') return null;
+  try { return fn(state, cropId, now) || null; } catch (e) { return null; }
+}
 
 /** Alet → farm:action tipi. 'hand' eylem üretmez (bilgi kartı). */
 export const TOOL_ACTION = {
@@ -18,7 +26,6 @@ export const TOOL_ACTION = {
 const SEED_IDS = Object.keys(ITEMS).filter((id) => ITEMS[id].category === 'seed');
 const FIXED_ITEMS = { fertilize: ['compost', 'npk', 'lime'], treat: ['pesticide', 'organic_spray'] };
 const PICK_TITLE = { seed: STR.pickSeed, fertilize: STR.pickFert, treat: STR.pickTreat };
-const NEED_ITEM_TOAST_MS = 1500;
 
 export function countItem(state, itemId) {
   const inv = state.inventory && state.inventory.items;
@@ -80,7 +87,7 @@ export function createToolbar(root, ctx) {
   let seasonDirty = true;
   let season = '';
   let toolDirty = true;
-  let lastNeedToast = 0;
+  let needToastStroke = -1; // "önce eşya seç" toast'ı fırça darbesi başına bir kez
 
   const emitSelect = () => {
     const itemId = tool in selected ? selected[tool] : undefined;
@@ -174,6 +181,7 @@ export function createToolbar(root, ctx) {
   function paintPicker() {
     if (!pickerFor) return;
     buildPicker(pickerFor);
+    const now = pickerFor === 'seed' ? calendar(state.time.totalMinutes) : null;
     for (const [id, r] of pickRows) {
       const n = counts[id] | 0;
       if (n !== r.shownQty) { r.shownQty = n; setText(r.q, STR.qtyBadge(n)); }
@@ -186,14 +194,21 @@ export function createToolbar(root, ctx) {
         r.b.setAttribute('aria-disabled', off ? 'true' : 'false');
       }
       let sub = '';
+      let late = false;
       if (!seasonOk) {
         const c = CROPS[ITEMS[id].crop];
         sub = c.seasons.map((s) => SEASON_NAMES_TR[s]).join(' · ');
       } else if (n <= 0) sub = STR.noneLeft;
-      if (sub !== r.shownSub) {
-        r.shownSub = sub;
+      else if (pickerFor === 'seed') {
+        const w = seedWarn(state, ITEMS[id].crop, now);
+        if (w) { late = true; sub = STR.lateInSeason; r.lateText = w.text || STR.lateInSeason; }
+      }
+      const subKey = (late ? '!' : '') + sub;
+      if (subKey !== r.shownSub) {
+        r.shownSub = subKey;
         setText(r.sub, sub);
-        r.b.title = !seasonOk ? `${STR.outOfSeason} — ${STR.seasonsLine(sub)}` : ITEMS[id].name;
+        r.b.classList.toggle('late', late);
+        r.b.title = !seasonOk ? `${STR.outOfSeason} — ${STR.seasonsLine(sub)}` : late ? `${ITEMS[id].name} — ${r.lateText}` : ITEMS[id].name;
       }
       const on = selected[pickerFor] === id;
       if (on !== r.shownOn) { r.shownOn = on; r.b.classList.toggle('on', on); r.b.setAttribute('aria-selected', on ? 'true' : 'false'); }
@@ -290,15 +305,14 @@ export function createToolbar(root, ctx) {
     markInventory() { invDirty = true; },
     markSeason() { seasonDirty = true; },
     /** tile:tap (alet ≠ hand) → tek farm:action. DOM işi yok (yalnızca nadir, kısıtlı toast). */
-    apply(tileId) {
+    apply(tileId, stroke = -2) {
       const type = TOOL_ACTION[tool];
       if (!type || tileId == null) return;
       if (tool in selected) {
         const itemId = selected[tool];
         if (!itemId) {
-          const now = performance.now();
-          if (now - lastNeedToast > NEED_ITEM_TOAST_MS) {
-            lastNeedToast = now;
+          if (stroke !== needToastStroke || stroke === -2) {
+            needToastStroke = stroke;
             bus.emit('toast', { text: STR.needItem[tool], kind: 'bad' });
             if (!pickerFor) openPicker(tool);
           }

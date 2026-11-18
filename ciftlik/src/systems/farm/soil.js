@@ -1,6 +1,6 @@
 // Toprak yardımcıları — saf fonksiyonlar (PLAN.md §3, §8). Değerler data/farming.js'ten.
 import { SOIL, THREATS } from '../../data/farming.js';
-import { P1 } from '../../core/constants.js';
+import { PARCELS, blockedKind } from '../../data/land.js';
 
 export const TILE_STATES = ['grass', 'plowed'];
 
@@ -17,15 +17,25 @@ export function parseKey(id) {
   return Number.isInteger(x) && Number.isInteger(y) ? [x, y] : null;
 }
 
-/** Parsel geometrisi: Aşama 2'de yalnızca P1 bilinir (diğerleri data/land.js ile gelecek). */
-const PARCEL_RECTS = { P1 };
-
+/** Parsel geometrisi data/land.js PARCELS'tan ({tx, ty, w, h}). */
 export function parcelOf(tx, ty) {
-  for (const id in PARCEL_RECTS) {
-    const r = PARCEL_RECTS[id];
-    if (tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h) return id;
+  for (const id in PARCELS) {
+    const r = PARCELS[id];
+    if (tx >= r.tx && tx < r.tx + r.w && ty >= r.ty && ty < r.ty + r.h) return id;
   }
   return null;
+}
+
+/** state.land.parcels içinde sahip olunan parsel kimlikleri (PARCELS'te tanımlı olanlar). */
+export function ownedParcelIds(state) {
+  const out = ['P1']; // başlangıç parseli asla kaybedilemez (bozuk land.parcels'a karşı)
+  const parcels = state.land?.parcels;
+  if (!Array.isArray(parcels)) return out;
+  for (let i = 0; i < parcels.length; i++) {
+    const p = parcels[i];
+    if (p && p.owned === true && PARCELS[p.id] && out.indexOf(p.id) === -1) out.push(p.id);
+  }
+  return out;
 }
 
 export function isOwnedTile(state, tile) {
@@ -36,6 +46,9 @@ export function isOwnedTile(state, tile) {
   for (let i = 0; i < parcels.length; i++) if (parcels[i].id === pid) return parcels[i].owned === true;
   return false;
 }
+
+/** Dekor (ev, kuyu, ağaç...) altındaki karo türü veya null. */
+export function tileBlocked(tileId) { return blockedKind(tileId); }
 
 export function createTile(tx, ty, st = 'grass') {
   const s = SOIL.start;

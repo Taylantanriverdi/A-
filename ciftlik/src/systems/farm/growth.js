@@ -41,6 +41,13 @@ export function growthRatePerHour(t, crop, def, season) {
     * GROWTH.phFactor(t.ph) * sf * (crop.health / 100);
 }
 
+/** İdeal sulamayla (nem bandında, çarpan 1) saatlik büyüme; besin/pH/mevsim/sağlık mevcut değerler. */
+export function idealRatePerHour(t, crop, def, season) {
+  const sf = inSeason(def, season) ? 1 : GROWTH.outOfSeasonFactor;
+  if (sf === 0) return 0;
+  return baseRatePerHour(crop, def) * nutrientFactor(t, def) * GROWTH.phFactor(t.ph) * sf * (crop.health / 100);
+}
+
 export function stageFor(growth) {
   for (let i = STAGE_THRESHOLDS.length - 1; i > 0; i--) if (growth >= STAGE_THRESHOLDS[i] - 1e-9) return i;
   return 0;

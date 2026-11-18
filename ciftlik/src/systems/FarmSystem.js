@@ -5,13 +5,13 @@
 import { CROPS, ROT_AFTER_DAYS, REGROW_STAGE } from '../data/crops.js';
 import { HEALTH, SOIL, XP } from '../data/farming.js';
 import { ITEMS, STARTING_INVENTORY } from '../data/items.js';
-import { P1 } from '../core/constants.js';
+import { PARCELS, blockedKind } from '../data/land.js';
 import { calendar } from '../core/timeUtils.js';
 import { createRng } from '../core/Rng.js';
 import { isPlainObject } from '../core/GameState.js';
 import { add, remove } from './InventorySystem.js';
 import {
-  TILE_STATES, clamp, tileKey, parseKey, createTile, moistureHour, water, applyFertilizer, releasePending, harvestSoil, weedSteal,
+  TILE_STATES, clamp, tileKey, parseKey, createTile, ownedParcelIds, moistureHour, water, applyFertilizer, releasePending, harvestSoil, weedSteal,
 } from './farm/soil.js';
 import { REGROW_GROWTH, inSeason, growthRatePerHour, stageFor, rotationMult } from './farm/growth.js';
 import { healthDeltaHour, dailyWeeds, dailyPestDisease, spreadTo, applyTreatment } from './farm/threats.js';
@@ -85,20 +85,62 @@ function gainXp(state, bus, amount, reason) {
   bus.emit('xp:gained', { amount, reason });
 }
 
-/** Yeni oyun kurulumu: P1 çim + 24 sürülmüş karo + başlangıç envanteri. */
+function isStartPlowed(tx, ty) {
+  return tx >= START_PLOWED.x0 && tx <= START_PLOWED.x1 && ty >= START_PLOWED.y0 && ty <= START_PLOWED.y1;
+}
+
+/**
+ * Sahip olunan parsellerin eksik karolarını varsayılan çim (SOIL.start) ile tamamlar; mevcutlara dokunmaz.
+ * Bozuk kayıt / validator silmesi sonrası kalıcı delik kalmasın diye her init'te çalışır.
+ * @param {object} state
+ * @param {boolean} [startPlowed] yalnızca yeni oyunda: başlangıç 24 karosu sürülmüş
+ * @returns {string[]} eklenen karo kimlikleri
+ */
+export function ensureParcelTiles(state, startPlowed = false) {
+  if (!isPlainObject(state.tiles)) state.tiles = {};
+  const added = [];
+  for (const pid of ownedParcelIds(state)) {
+    const r = PARCELS[pid];
+    for (let ty = r.ty; ty < r.ty + r.h; ty++) {
+      for (let tx = r.tx; tx < r.tx + r.w; tx++) {
+        const key = tileKey(tx, ty);
+        if (isPlainObject(state.tiles[key])) continue;
+        const plowed = startPlowed && !blockedKind(key) && isStartPlowed(tx, ty);
+        state.tiles[key] = createTile(tx, ty, plowed ? 'plowed' : 'grass');
+        added.push(key);
+      }
+    }
+  }
+  if (added.length) dirty = true;
+  return added;
+}
+
+/**
+ * Dekor altındaki karoları çime döndürür (eski kayıtlarda ekin/sürülmüş toprak). Ekin envantere gitmez.
+ * @returns {string[]} temizlenen karo kimlikleri
+ */
+export function clearBlockedTiles(state, onFix = () => {}) {
+  const out = [];
+  if (!isPlainObject(state.tiles)) return out;
+  for (const key of Object.keys(state.tiles)) {
+    if (!blockedKind(key)) continue;
+    const t = state.tiles[key];
+    if (!isPlainObject(t)) continue;
+    if (t.crop == null && t.state === 'grass' && !(t.weeds > 0) && !(t.idleDays > 0)) continue;
+    onFix(`tiles.${key}.blocked`);
+    t.crop = null; t.state = 'grass'; t.weeds = 0; t.idleDays = 0;
+    out.push(key);
+  }
+  if (out.length) dirty = true;
+  return out;
+}
+
+/** Yeni oyun kurulumu: sahip olunan parseller çim + 24 sürülmüş karo + başlangıç envanteri. */
 export function setupNewFarm(state) {
   const flags = ensureFlags(state);
   if (flags.farmInitialized) return false;
-  if (!isPlainObject(state.tiles)) state.tiles = {};
-  for (let ty = P1.y; ty < P1.y + P1.h; ty++) {
-    for (let tx = P1.x; tx < P1.x + P1.w; tx++) {
-      const key = tileKey(tx, ty);
-      if (state.tiles[key]) continue;
-      const plowed = tx >= START_PLOWED.x0 && tx <= START_PLOWED.x1 && ty >= START_PLOWED.y0 && ty <= START_PLOWED.y1;
-      state.tiles[key] = createTile(tx, ty, plowed ? 'plowed' : 'grass');
-    }
-  }
-  for (const it of STARTING_INVENTORY) add(state, it.itemId, it.qty, it.quality);
+  ensureParcelTiles(state, true);
+  for (const it of STARTING_INVENTORY) add(state, it.itemId, it.qty, it.quality, it.organic === true);
   flags.farmInitialized = true;
   dirty = true;
   return true;
@@ -402,6 +444,7 @@ export function validate(state, onFix = () => {}) {
     validateCrop(t, `${path}.crop`, onFix);
     if (t.crop && t.state !== 'plowed') { onFix(`${path}.state`); t.state = 'plowed'; }
   }
+  clearBlockedTiles(state, onFix);
   dirty = true;
   return state;
 }
@@ -411,6 +454,8 @@ const FarmSystem = {
   validate,
   applyAction,
   setupNewFarm,
+  ensureParcelTiles,
+  clearBlockedTiles,
   /** Karo eklendiğinde (arazi genişletme) çağrılır. */
   invalidate() { dirty = true; },
 
@@ -422,7 +467,14 @@ const FarmSystem = {
     fallbackRng = null;
     ensureFlags(state);
     if (!isPlainObject(state.tiles)) state.tiles = {};
-    setupNewFarm(state);
+    if (!setupNewFarm(state)) {
+      // Yükleme sonrası onarım: eksik parsel karoları + dekor altı karolar.
+      const fixed = ensureParcelTiles(state).concat(clearBlockedTiles(state));
+      if (fixed.length) {
+        this.invalidate();
+        bus.emit('farm:changed', { tileIds: fixed });
+      }
+    }
     rebuildCache(state);
     offs.push(bus.on('farm:action', (p) => applyAction(state, busRef, p)));
   },

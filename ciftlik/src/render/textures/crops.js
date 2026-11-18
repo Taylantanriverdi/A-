@@ -1,7 +1,8 @@
-// Ekin dokuları (PLAN §2, §8): 13 ürün × `shape` tipine göre 5 aşama + solgun (1–4) + ölü (1–4) + ürün ikonu.
+// Ekin dokuları (PLAN §2, §8): 13 ürün × `shape` tipine göre 5 aşama + solgun (1–4) + ölü (1–4) + ürün ikonu
+// + hastalıklı (1–4; tint'siz → Canvas renderer'da da sarı lekeli görünür).
 // Tek atlas ('crop_atlas'), hücre 88×124, ayak (taban orta) = (44, 114). Animasyon filmi dili: kontur yok;
 // gradyanla yumuşak hacim, sol-üstten kenar ışığı (rim), tabanda pişmiş temas gölgesi.
-// Solgun/ölü varyantlar sağlıklı hücreden türetilir (ezme + sarkma + renk kayması) → üretim ucuz.
+// Solgun/hastalıklı varyantlar sağlıklı hücreden türetilir; ölü varyant her aşamada ayrı, okunur bir silüet olarak çizilir.
 import { makeCanvas, register, shade, mixHex, rgba } from './canvas.js';
 import { mulberry32 } from './noise.js';
 import { CROPS } from '../../data/crops.js';
@@ -9,8 +10,8 @@ import { CROPS } from '../../data/crops.js';
 export const CROP_ATLAS = 'crop_atlas';
 export const CROP_CELL = { w: 88, h: 124, footX: 44, footY: 114 };
 export const CROP_IDS = Object.keys(CROPS);
-const COLS = 14;
-export const CROP_SCALE = 1.18; // çizim ölçeği (SHAPE_META değerleri ölçeksizdir; FieldView çarpar) // 0–4 sağlıklı, 5–8 solgun 1–4, 9–12 ölü 1–4, 13 ikon
+const COLS = 18;
+export const CROP_SCALE = 1.18; // çizim ölçeği (SHAPE_META değerleri ölçeksizdir; FieldView çarpar) // 0–4 sağlıklı, 5–8 solgun 1–4, 9–12 ölü 1–4, 13 ikon, 14–17 hastalıklı 1–4
 const RIM = '#fff0c4';
 
 // FieldView için yaklaşık bitki yüksekliği/genişliği (gölge) ve esneklik (rüzgâr salınımı)
@@ -25,10 +26,11 @@ export const SHAPE_META = {
   root: { h: [3, 9, 16, 24, 28], w: [10, 14, 24, 32, 36], flex: 0.9 },
 };
 
-export const cropFrame = (id, stage, wither, dead) => {
+export const cropFrame = (id, stage, wither, dead, sick) => {
   const s = stage < 0 ? 0 : stage > 4 ? 4 : stage | 0;
   if (dead) return `${id}_d${s < 1 ? 1 : s}`;
   if (wither && s > 0) return `${id}_w${s}`;
+  if (sick && s > 0) return `${id}_s${s}`;
   return `${id}_${s}`;
 };
 
@@ -506,37 +508,129 @@ function drawIcon(ctx, cx, cy, id, c, r) {
 }
 
 // ------------------------------------------------------------------ türetilmiş varyantlar
-/** Solgun: sarkık (dikey ezme + yana yatma), sararmış (source-atop renk), hafif kahverengi uçlar. */
-function deriveWither(ctx, src, sx, sy, dx, dy) {
-  const { w, h, footX, footY } = CROP_CELL;
-  ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
-  ctx.translate(dx + footX, dy + footY);
-  ctx.transform(1.04, 0, -0.09, 0.8, 0, 0);
-  ctx.drawImage(src, sx, sy, w, h, -footX, -footY, w, h);
-  ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
-  ctx.globalCompositeOperation = 'source-atop';
-  const g = ctx.createLinearGradient(0, dy + 20, 0, dy + footY);
-  g.addColorStop(0, 'rgba(176,138,58,0.62)'); g.addColorStop(0.7, 'rgba(198,176,72,0.45)'); g.addColorStop(1, 'rgba(150,140,60,0.3)');
-  ctx.fillStyle = g; ctx.fillRect(dx, dy, w, h);
-  ctx.restore();
+let _tmp = null;
+function tmpCell() {
+  const { w, h } = CROP_CELL;
+  if (!_tmp) { const c = document.createElement('canvas'); c.width = w; c.height = h; _tmp = { canvas: c, ctx: c.getContext('2d') }; }
+  _tmp.ctx.setTransform(1, 0, 0, 1, 0, 0); _tmp.ctx.globalCompositeOperation = 'source-over'; _tmp.ctx.globalAlpha = 1;
+  _tmp.ctx.clearRect(0, 0, w, h);
+  return _tmp;
 }
 
-/** Ölü: büzülmüş, kurumuş kahverengi; tümsek altta kalır. */
-function deriveDead(ctx, src, sx, sy, dx, dy, r) {
+/** Solgun: belirgin sarkma (ezme + yana yatma), soldurulmuş doygunluk, sarı-kahve renk, kahverengi uç lekeleri. */
+function deriveWither(ctx, src, sx, sy, dx, dy, r) {
   const { w, h, footX, footY } = CROP_CELL;
-  ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
-  ctx.translate(dx + footX, dy + footY);
-  ctx.transform(1.0, 0, -0.18, 0.55, 0, 0);
-  ctx.drawImage(src, sx, sy, w, h, -footX, -footY, w, h);
+  const { canvas: tc, ctx: t } = tmpCell();
+  const squash = () => { t.save(); t.translate(footX, footY); t.transform(1.08, 0, -0.16, 0.72, 0, 0); t.drawImage(src, sx, sy, w, h, -footX, -footY, w, h); t.restore(); };
+  squash();
+  // doygunluğu düşür (ışıklılık korunur), sonra özgün alfaya geri kırp
+  t.globalCompositeOperation = 'saturation'; t.fillStyle = 'rgba(128,128,128,0.7)'; t.fillRect(0, 0, w, h);
+  t.globalCompositeOperation = 'destination-in'; squash();
+  t.globalCompositeOperation = 'source-atop';
+  const g = t.createLinearGradient(0, 20, 0, footY);
+  g.addColorStop(0, 'rgba(196,140,52,0.72)'); g.addColorStop(0.65, 'rgba(204,170,64,0.6)'); g.addColorStop(1, 'rgba(150,118,52,0.5)');
+  t.fillStyle = g; t.fillRect(0, 0, w, h);
+  for (let i = 0; i < 26; i++) { // kurumuş kahverengi uçlar
+    const x = 10 + r() * (w - 20), y = 8 + r() * (footY - 14), rr = 1.5 + r() * 2.5;
+    const rg = t.createRadialGradient(x, y, 0, x, y, rr); rg.addColorStop(0, 'rgba(112,72,34,0.75)'); rg.addColorStop(1, 'rgba(112,72,34,0)');
+    t.fillStyle = rg; t.beginPath(); t.arc(x, y, rr, 0, Math.PI * 2); t.fill();
+  }
+  ctx.drawImage(tc, dx, dy);
+}
+
+/** Hastalıklı (tint'siz, iki renderer'da da aynı): sarı yaprak lekeleri + kahverengi benekler. */
+function deriveSick(ctx, src, sx, sy, dx, dy, r) {
+  const { w, h, footY } = CROP_CELL;
+  const { canvas: tc, ctx: t } = tmpCell();
+  t.drawImage(src, sx, sy, w, h, 0, 0, w, h);
+  t.globalCompositeOperation = 'source-atop';
+  t.fillStyle = 'rgba(214,196,84,0.22)'; t.fillRect(0, 0, w, h);
+  for (let i = 0; i < 16; i++) {
+    const x = 8 + r() * (w - 16), y = 6 + r() * (footY - 10), rr = 4 + r() * 6;
+    const rg = t.createRadialGradient(x, y, 0, x, y, rr); rg.addColorStop(0, 'rgba(236,214,78,0.85)'); rg.addColorStop(0.6, 'rgba(222,196,72,0.5)'); rg.addColorStop(1, 'rgba(222,196,72,0)');
+    t.fillStyle = rg; t.beginPath(); t.arc(x, y, rr, 0, Math.PI * 2); t.fill();
+  }
+  for (let i = 0; i < 30; i++) {
+    const x = 8 + r() * (w - 16), y = 6 + r() * (footY - 10), rr = 0.9 + r() * 1.3;
+    t.fillStyle = r() < 0.6 ? 'rgba(98,62,26,0.85)' : 'rgba(70,50,22,0.75)'; t.beginPath(); t.arc(x, y, rr, 0, Math.PI * 2); t.fill();
+  }
+  ctx.drawImage(tc, dx, dy);
+}
+
+const DRY = ['#a58e6c', '#b49d7a', '#8d775b', '#c2ad89', '#9a7f5e'];
+const DRY_STALK = '#7d6a52';
+/** Ölü: her aşamada okunur silüet — koyu kuru toprak halkası, sarkık/devrilmiş saman-gri saplar, kıvrık kuru yapraklar. */
+function drawDead(ctx, cx, fy, s, shape, r) {
+  const meta = SHAPE_META[shape] || SHAPE_META.bush;
+  const H = Math.max(14, Math.min(46, meta.h[s] * 0.62 + 6));
+  const W = Math.max(20, Math.min(40, meta.w[s] * 0.7 + 6));
+  const dcol = () => DRY[(r() * DRY.length) | 0];
+  // kuru, çatlak toprak halkası
+  ctx.save(); ctx.translate(cx, fy + 1); ctx.scale(1, 0.36);
+  const R = W * 0.62 + 5;
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+  g.addColorStop(0, 'rgba(34,22,14,0.78)'); g.addColorStop(0.62, 'rgba(40,27,17,0.6)'); g.addColorStop(0.85, 'rgba(58,40,26,0.3)'); g.addColorStop(1, 'rgba(58,40,26,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = 'rgba(160,136,104,0.5)'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  for (let i = 0; i < 5; i++) {
+    const a = r() * Math.PI * 2, r0 = R * (0.25 + r() * 0.2), r1 = R * (0.55 + r() * 0.25);
+    ctx.beginPath(); ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0); ctx.lineTo(Math.cos(a + 0.25) * (r0 + r1) / 2, Math.sin(a + 0.25) * (r0 + r1) / 2); ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1); ctx.stroke();
+  }
   ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, w, h); ctx.clip();
-  ctx.globalCompositeOperation = 'source-atop';
-  const g = ctx.createLinearGradient(0, dy + 30, 0, dy + footY);
-  g.addColorStop(0, 'rgba(150,112,70,0.86)'); g.addColorStop(1, 'rgba(92,64,40,0.82)');
-  ctx.fillStyle = g; ctx.fillRect(dx, dy, w, h);
-  for (let i = 0; i < 40; i++) { ctx.fillStyle = r() < 0.5 ? 'rgba(60,40,24,0.5)' : 'rgba(196,160,110,0.35)'; ctx.fillRect(dx + 14 + r() * (w - 28), dy + 40 + r() * (footY - 40), 1.4, 1.4); }
-  ctx.restore();
+  // yere düşmüş kuru yapraklar
+  for (let i = 0; i < 2 + (s > 2 ? 1 : 0); i++) {
+    const x = cx + (r() - 0.5) * W * 0.9, y = fy + (r() - 0.3) * 3;
+    leaf(ctx, x, y, (r() < 0.5 ? -1 : 1) * (1.35 + r() * 0.3), 4.5 + r() * 2, 1.8, dcol(), (r() - 0.5) * 2, 0.6, false);
+  }
+  const low = shape === 'melon' || shape === 'leafy' || shape === 'berry';
+  const upright = shape === 'grain' || shape === 'tall' || shape === 'vine';
+  if (shape === 'vine' && s >= 2) { // eğilmiş destek çubuğu
+    const wg = ctx.createLinearGradient(cx, 0, cx + 3, 0); wg.addColorStop(0, '#a88a64'); wg.addColorStop(1, '#5e4630');
+    ctx.save(); ctx.translate(cx + 3, fy); ctx.rotate(0.28); ctx.fillStyle = wg; ctx.beginPath(); ctx.roundRect(-1.5, -H * 1.05, 3, H * 1.05 + 1, 1.5); ctx.fill(); ctx.restore();
+  }
+  if (low) {
+    // çökmüş rozet: yere yatmış, kıvrık yapraklar + kısa sarkık saplar
+    const n = 4 + s;
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 ? 1 : -1, ang = side * (1.25 + r() * 0.55);
+      const L = W * (0.32 + r() * 0.18);
+      const bx = cx + side * r() * 3;
+      stem(ctx, bx, fy - 1, bx + side * L * 0.5, fy - 3 - r() * 3, 1.3, DRY_STALK, -side * 2);
+      leaf(ctx, bx + side * L * 0.4, fy - 3, ang + side * 0.3, L * 0.8, L * 0.26, dcol(), side * 2.5, 0.7, false);
+    }
+    // ortada sarkık birkaç sap
+    for (let i = 0; i < 2; i++) { const side = i ? 1 : -1; const top = [cx + side * 3, fy - H * 0.55]; stem(ctx, cx, fy - 1, top[0], top[1], 1.4, DRY_STALK, side); leaf(ctx, top[0], top[1], side * 2.5, H * 0.38, 2, dcol(), side * 2, 0.7, false); }
+    if (shape === 'melon' && s >= 3) {
+      const x = cx + 6, y = fy - 2.5; fruit(ctx, x, y, 6.5 + s, 3.6 + s * 0.4, '#8e7652', 0.12);
+      ctx.strokeStyle = 'rgba(60,44,28,0.55)'; ctx.lineWidth = 0.8;
+      for (let k = -1; k <= 1; k++) { ctx.beginPath(); ctx.moveTo(x + k * 3 - 2, y - 2); ctx.quadraticCurveTo(x + k * 3, y, x + k * 3 - 1, y + 2.5); ctx.stroke(); }
+    }
+    if (shape === 'berry' && s >= 3) for (let k = 0; k < 4; k++) fruit(ctx, cx + (r() - 0.5) * W * 0.6, fy - 1 - r() * 3, 1.8, 1.6, '#5a3a2a', 0.15);
+    return;
+  }
+  // dik/çalı: yükselip devrilen saplar
+  const n = shape === 'grain' ? 3 + s : upright ? 2 + (s > 2 ? 1 : 0) : 3 + (s > 2 ? 1 : 0);
+  const wid = shape === 'tall' ? 2.2 + s * 0.25 : 1.5 + s * 0.2;
+  for (let i = 0; i < n; i++) {
+    const t = spread(n, i), dir = t === 0 ? (r() < 0.5 ? -1 : 1) : Math.sign(t);
+    const bx = cx + t * W * (upright ? 0.35 : 0.5);
+    const hh = H * (0.7 + r() * 0.35) * (upright ? 1 : 0.8);
+    const knee = [bx + dir * hh * 0.12, fy - hh];                  // kırılma/bükülme noktası
+    const tip = [knee[0] + dir * hh * (0.38 + r() * 0.15), fy - hh * (0.35 + r() * 0.2)]; // sarkan uç
+    stem(ctx, bx, fy - 1, knee[0], knee[1], wid, DRY_STALK, dir * 1.5);
+    stem(ctx, knee[0], knee[1], tip[0], tip[1], wid * 0.85, DRY_STALK, -dir * hh * 0.08);
+    // sapa asılı kıvrık kuru yapraklar (aşağı bakar)
+    const nl = 1 + (s > 1 ? 1 : 0) + (s > 3 ? 1 : 0);
+    for (let k = 0; k < nl; k++) {
+      const u = 0.35 + k * 0.25 + r() * 0.08;
+      const lx = bx + (knee[0] - bx) * u, ly = fy - 1 + (knee[1] - fy + 1) * u;
+      const side = k % 2 ? dir : -dir;
+      leaf(ctx, lx, ly, side * (2.25 + r() * 0.4), 5 + s * 1.6 + r() * 2, 1.9 + s * 0.2, dcol(), side * 2.5, 0.7, false);
+    }
+    if (shape === 'grain' && s >= 3) grainHead(ctx, tip[0], tip[1], dir * 2.3, 8, '#b8a37c', false);
+    else if (shape === 'tall' && s >= 3 && i === 0) fruit(ctx, knee[0] + dir * 2, knee[1] + hh * 0.3, 2.6, 6, '#8a7452', 0.1, dir * 0.4);
+    else leaf(ctx, tip[0], tip[1], dir * 2.6, 4 + s, 1.7, dcol(), dir * 2, 0.7, false);
+  }
 }
 
 export function genCrops(scene) {
@@ -565,13 +659,15 @@ export function genCrops(scene) {
   snap.getContext('2d').drawImage(canvas, 0, 0, w * 5, h * rows, 0, 0, w * 5, h * rows);
   CROP_IDS.forEach((id, row) => {
     const c = CROPS[id]; const oy = row * h;
-    const r2 = mulberry32(5000 + row);
+    const r2 = mulberry32(5000 + row), r3 = mulberry32(6000 + row), r4 = mulberry32(7000 + row);
     for (let s = 1; s <= 4; s++) {
-      deriveWither(ctx, snap, s * w, oy, (4 + s) * w, oy);
-      deriveDead(ctx, snap, Math.max(2, s) * w, oy, (8 + s) * w, oy, r2);
-      // ölü hücrenin tabanına tümseği geri koy (kurumuş bitki toprağın üstünde)
+      deriveWither(ctx, snap, s * w, oy, (4 + s) * w, oy, r3);
+      deriveSick(ctx, snap, s * w, oy, (13 + s) * w, oy, r4);
+      const fx = (8 + s) * w + footX, fy = oy + footY;
       ctx.save(); ctx.beginPath(); ctx.rect((8 + s) * w, oy, w, h); ctx.clip();
-      ctx.globalCompositeOperation = 'destination-over'; mound(ctx, (8 + s) * w + footX, oy + footY, (18 + s * 3) * CROP_SCALE); ctx.restore();
+      ctx.translate(fx, fy); ctx.scale(CROP_SCALE, CROP_SCALE); ctx.translate(-fx, -fy);
+      drawDead(ctx, fx, fy, s, c.shape, r2);
+      ctx.restore();
     }
     // 3) ürün ikonu
     ctx.save(); ctx.beginPath(); ctx.rect(13 * w, oy, w, h); ctx.clip();
@@ -582,7 +678,7 @@ export function genCrops(scene) {
   CROP_IDS.forEach((id, row) => {
     const oy = row * h;
     for (let s = 0; s < 5; s++) tex.add(`${id}_${s}`, 0, s * w, oy, w, h);
-    for (let s = 1; s <= 4; s++) { tex.add(`${id}_w${s}`, 0, (4 + s) * w, oy, w, h); tex.add(`${id}_d${s}`, 0, (8 + s) * w, oy, w, h); }
+    for (let s = 1; s <= 4; s++) { tex.add(`${id}_w${s}`, 0, (4 + s) * w, oy, w, h); tex.add(`${id}_d${s}`, 0, (8 + s) * w, oy, w, h); tex.add(`${id}_s${s}`, 0, (13 + s) * w, oy, w, h); }
     tex.add(`${id}_icon`, 0, 13 * w, oy, w, h);
   });
   // ekin gölgesi: ayakta keskin, uca doğru yumuşayan dikey leke (orijin taban orta)
@@ -599,19 +695,27 @@ export function genCrops(scene) {
   }
   // zararlı böcekler (3 kare) ve hastalık lekeleri
   if (!scene.textures.exists('crop_bugs')) {
-    const bw = 24, bh = 18; const { canvas: c3, ctx: g3 } = makeCanvas(bw * 4, bh);
+    // zoom 1'de seçilebilir böcekler: ~6 px gövde, bacaklar, parlak kabuk
+    const bw = 34, bh = 26; const { canvas: c3, ctx: g3 } = makeCanvas(bw * 4, bh);
     const rb = mulberry32(77);
+    const POS = [[9, 9], [24, 15], [15, 19], [26, 6], [7, 18], [18, 9], [29, 20]];
     for (let f = 0; f < 3; f++) {
-      const n = 3 + f;
+      const n = [3, 5, 7][f];
       for (let i = 0; i < n; i++) {
-        const x = f * bw + 4 + rb() * (bw - 8), y = 4 + rb() * (bh - 8);
-        const col = i % 3 === 0 ? '#3a2a1a' : i % 3 === 1 ? '#2f3a1a' : '#5a2418';
-        fruit(g3, x, y, 1.7, 1.3, col, 0.7, rb() * 3);
-        g3.fillStyle = 'rgba(20,14,8,0.7)'; g3.beginPath(); g3.arc(x + 1.5, y - 0.6, 0.7, 0, Math.PI * 2); g3.fill();
+        const x = f * bw + POS[i][0] + (rb() - 0.5) * 2, y = POS[i][1] + (rb() - 0.5) * 2, rot = rb() * Math.PI * 2;
+        const col = i % 3 === 0 ? '#2e2216' : i % 3 === 1 ? '#2c3a16' : '#6a2416';
+        g3.save(); g3.translate(x, y); g3.rotate(rot);
+        g3.strokeStyle = 'rgba(18,12,6,0.85)'; g3.lineWidth = 0.8; g3.lineCap = 'round';
+        for (let k = -1; k <= 1; k++) { g3.beginPath(); g3.moveTo(k * 1.4, -1); g3.lineTo(k * 2.2, -3.4); g3.moveTo(k * 1.4, 1); g3.lineTo(k * 2.2, 3.4); g3.stroke(); }
+        g3.fillStyle = 'rgba(16,10,6,0.35)'; g3.beginPath(); g3.ellipse(0.6, 0.9, 3.4, 2.4, 0, 0, Math.PI * 2); g3.fill(); // temas gölgesi
+        fruit(g3, 0, 0, 3.2, 2.3, col, 0.75);
+        g3.fillStyle = '#140c06'; g3.beginPath(); g3.arc(3.3, 0, 1.25, 0, Math.PI * 2); g3.fill(); // baş
+        g3.strokeStyle = 'rgba(0,0,0,0.35)'; g3.lineWidth = 0.5; g3.beginPath(); g3.moveTo(-2.8, 0); g3.lineTo(2.2, 0); g3.stroke(); // kanat çizgisi
+        g3.restore();
       }
     }
-    for (let i = 0; i < 9; i++) { // lekeler
-      const x = 3 * bw + 3 + rb() * (bw - 6), y = 3 + rb() * (bh - 6), rr = 1 + rb() * 1.6;
+    for (let i = 0; i < 11; i++) { // lekeler
+      const x = 3 * bw + 4 + rb() * (bw - 8), y = 4 + rb() * (bh - 8), rr = 1.4 + rb() * 2;
       const g = g3.createRadialGradient(x, y, 0, x, y, rr); g.addColorStop(0, 'rgba(92,60,24,0.85)'); g.addColorStop(0.7, 'rgba(150,120,40,0.6)'); g.addColorStop(1, 'rgba(180,160,60,0)');
       g3.fillStyle = g; g3.beginPath(); g3.arc(x, y, rr, 0, Math.PI * 2); g3.fill();
     }

@@ -5,10 +5,11 @@ import SystemRegistry from '../src/core/SystemRegistry.js';
 import TimeSystem from '../src/systems/TimeSystem.js';
 import InventorySystem, { add, count } from '../src/systems/InventorySystem.js';
 import FarmSystem from '../src/systems/FarmSystem.js';
-import { tileInfo, canApply } from '../src/systems/farm/rules.js';
+import { tileInfo, canApply, seedWarning } from '../src/systems/farm/rules.js';
+import { P1_BLOCKED } from '../src/data/land.js';
 import { MIN_PER_DAY } from '../src/core/constants.js';
 import { calendar } from '../src/core/timeUtils.js';
-import { SOIL, QUALITY } from '../src/data/farming.js';
+import { SOIL, QUALITY, THREATS } from '../src/data/farming.js';
 import { CROPS } from '../src/data/crops.js';
 
 const ARGS = process.argv.slice(2);
@@ -291,12 +292,71 @@ function newGame() {
   };
 }
 
+// ---------- Aşama 2 QA ----------
+function loadAndInit(saved) {
+  // main.js akışı: validate (load) → registry.register → init
+  const s = JSON.parse(JSON.stringify(saved));
+  const fixes = [];
+  FarmSystem.validate(s, (p) => fixes.push(p));
+  InventorySystem.validate(s, (p) => fixes.push(p));
+  const bus = makeBus();
+  const reg = new SystemRegistry(s, bus);
+  reg.register(TimeSystem).register(InventorySystem).register(FarmSystem);
+  return { s, bus, fixes };
+}
+
+function qa() {
+  const out = [];
+  const w = makeWorld();
+  const base = w.state;
+  const ownedCount = Object.keys(base.tiles).length;
+  // 1) tiles:'q'
+  const b1 = JSON.parse(JSON.stringify(base)); b1.tiles = 'q';
+  const r1 = loadAndInit(b1);
+  const res1 = []; r1.bus.on('farm:result', (r) => res1.push(r));
+  r1.bus.emit('farm:action', { type: 'plow', tileId: '34,14' });
+  out.push(`tiles:'q' → ${Object.keys(r1.s.tiles).length}/${ownedCount} karo, çapa: ${res1[0].ok ? 'ok' : res1[0].reason}`);
+  // 1b) validator silmesi
+  const b2 = JSON.parse(JSON.stringify(base)); b2.tiles['33,9'] = 'bozuk'; delete b2.tiles['34,8'];
+  const r2 = loadAndInit(b2);
+  out.push(`silinen karolar → 33,9: ${r2.s.tiles['33,9']?.state}, 34,8: ${r2.s.tiles['34,8']?.state} (mevcut 35,8: ${r2.s.tiles['35,8'].state})`);
+  // 2) dekor
+  const bk = Object.keys(P1_BLOCKED);
+  const blockedPlowed = bk.filter((k) => base.tiles[k]?.state !== 'grass').length;
+  const cw = canApply(base, { type: 'plow', tileId: '37,14' });
+  const b3 = JSON.parse(JSON.stringify(base));
+  b3.tiles['41,9'].state = 'plowed';
+  b3.tiles['41,9'].crop = JSON.parse(JSON.stringify({ id: 'potato', plantedDay: 1, growth: 0.5, stage: 2, health: 90, pest: 0, disease: 0, careSum: 0, careCount: 0, readyDays: 0, harvests: 0, dead: false, rot: 1 }));
+  const r3 = loadAndInit(b3);
+  out.push(`dekor: yeni oyunda sürülmüş dekor karosu ${blockedPlowed}; kuyuya çapa: "${cw.reason}"; ev altı ekin → ${r3.s.tiles['41,9'].state}/${r3.s.tiles['41,9'].crop} (onarım: ${r3.fixes.filter((f) => f.endsWith('.blocked')).join(',')})`);
+  out.push(`tileInfo(41,9): ${JSON.stringify(tileInfo(base, '41,9', w.now()))}`);
+  // 3) envanter
+  out.push(`başlangıç envanteri: ${JSON.stringify(base.inventory.items.compost)} ${JSON.stringify(base.inventory.items.organic_spray)}`);
+  // 4) daysLeft kararlılığı (loadAndInit FarmSystem'i başka bus'a bağladı → yeni dünya)
+  const w2 = makeWorld(); const base2 = w2.state;
+  w2.act('plant', '34,8', 'seed_potato');
+  const t = base2.tiles['34,8'];
+  const rows = [];
+  for (const m of [80, 45, 25, 15, 5]) { t.moisture = m; const i = tileInfo(base2, '34,8', w2.now()); rows.push(`nem ${m}: ${i.crop.daysLeft} gün [${i.warnings.map((x) => x.code).join(',')}]`); }
+  t.moisture = 80;
+  out.push(`daysLeft (patates, yeni ekim): ${rows.join(' · ')}`);
+  const i0 = tileInfo(base2, '34,8', w2.now());
+  out.push(`seasonDaysLeft ${i0.seasonDaysLeft}, willMature ${i0.crop.willMature}`);
+  // 6) revertSoon
+  base.tiles['35,9'].idleDays = SOIL.grassRecoverDays - 3;
+  out.push(`revertSoon: ${JSON.stringify(tileInfo(base, '35,9', w.now()).warnings)}`);
+  // 7) seedWarning
+  const late = makeWorld(); late.reg.advance(24 * MIN_PER_DAY, true);
+  out.push(`seedWarning gün 1: ${JSON.stringify(seedWarning(base, 'potato', w.now()))}; gün ${late.now().dayOfSeason}: ${JSON.stringify(seedWarning(late.state, 'potato', late.now()))}, marul: ${JSON.stringify(seedWarning(late.state, 'seed_lettuce', late.now()))}`);
+  return out;
+}
+
 // ================= ÇIKTI =================
 console.log(`sim-farm — tohum ${SEED}${QA ? ` (DENEME: A eşiği ${QUALITY.thresholds.A})` : ''}`);
 const ng = newGame();
 console.log(`\nYeni oyun: ${ng.tiles} karo, ${ng.plowed} sürülmüş; envanter: ${ng.inv}`);
 console.log('Ret mesajları:', ng.reasons.join(' | '));
-console.log('tileInfo(34,8):', JSON.stringify({ crop: ng.info.crop && { name: ng.info.crop.name, readyIn: ng.info.crop.readyIn, q: ng.info.crop.qualityEstimate }, warnings: ng.info.warnings }));
+console.log('tileInfo(34,8):', JSON.stringify({ crop: ng.info.crop && { name: ng.info.crop.name, readyIn: ng.info.crop.readyIn, q: ng.info.crop.qualityEstimate }, warnings: ng.info.warnings.map((x) => x.code) }));
 
 const a1 = scenarioA('daily');
 const a2 = scenarioA('alt');
@@ -314,6 +374,15 @@ table('(d) 25. günde ekim → mevsim geçişi (sağlık, büyüme%)', ['gün', 
 console.log('Yazın patates ekme:', d.summerPlant.reason);
 
 table('(e) 27 gün, 24 karo, sürekli patates — tehdit başlangıçları', ['bakım', 'ot', 'zararlı', 'hastalık', 'ölü', 'verim', 'kalite', 'tehditli karo-gün'], [scenarioE(false), scenarioE(true)]);
+{
+  const cur = THREATS.spreadChance;
+  const rows = [];
+  for (const sc of [0.25, cur]) { THREATS.spreadChance = sc; const r = scenarioE(false); r[0] = `bakımsız @${sc}`; rows.push(r); }
+  THREATS.spreadChance = cur;
+  table('(e2) yayılma karşılaştırması (bakımsız)', ['yayılma', 'ot', 'zararlı', 'hastalık', 'ölü', 'verim', 'kalite', 'tehditli karo-gün'], rows);
+}
+console.log('\nAşama 2 QA:');
+for (const l of qa()) console.log(' -', l);
 
 const p = perf();
 console.log(`\nPerformans: ${p.tiles} karo — onHour ${p.hourMs.toFixed(3)} ms, onDay ${p.dayMs.toFixed(3)} ms`);

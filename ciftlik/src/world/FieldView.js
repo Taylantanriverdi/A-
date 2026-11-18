@@ -2,7 +2,7 @@
 // • Toprak: parça (chunk) başına bir RenderTexture; yalnızca `farm:changed` ile gelen (ve görsel imzası değişen)
 //   karolar silinip yeniden basılır. Komşu maskesi → organik, birleşik tarla kenarı. Nem 3 kademe, ot 0–3 tutam.
 // • Ekinler: karo başına havuzlanmış Image (atlas karesi), depthForY, rüzgârla salınım (pivot taban), stage ≥ 3 gölge,
-//   zararlı böcek noktaları, hastalık tint + leke. Kamera dışındakiler gizlenir ve hesaplanmaz.
+//   zararlı böcekler, hastalık (tint'siz sarı lekeli kare + leke katmanı; WebGL'de hafif evre için ek tint). Kamera dışındakiler gizlenir ve hesaplanmaz.
 // • İmleç: tile:hover / son tile:tap karosunda nefes alan çerçeve; seçili alet canApply ile geçerli/geçersiz.
 // • Efektler: farm:result (ok) / farm:harvested → nesne havuzlu parçacıklar. update'te bellek ayırma yok.
 import { TILE_W, TILE_H, DEPTH, depthForY } from '../core/constants.js';
@@ -24,7 +24,8 @@ const FX_MAX = { high: 220, medium: 150, low: 80 };
 const FX_MUL = { high: 1, medium: 0.7, low: 0.4 };
 const SH_TEX_W = 32, SH_TEX_H = 64, FORESHORTEN = 0.56;
 const WATER_DEFER = 0.65;                    // s — ıslaklık lekesi yayılırken toprak dokusu geç değişir
-const TINT_NEUTRAL = 0xfff4e4, TINT_OK = 0xfff0cc, TINT_BAD = 0xff6a55;
+const CURSOR_TEX = { n: 'fx_tilecursor_n', ok: 'fx_tilecursor_ok', bad: 'fx_tilecursor_bad' }; // önceden renklendirilmiş (tint yok → Canvas'ta da)
+const SICK_AT = 0.35;                        // bu hastalık düzeyinden itibaren sarı lekeli kare
 
 const hexInt = (h) => (typeof h === 'string' ? parseInt(h.slice(1), 16) : 0xffffff);
 function mixInt(a, b, t) {
@@ -49,8 +50,8 @@ export default class FieldView {
     this.pools = { crop: [], sh: [], ov: [] };
     this.t = 0;
     // imleç
-    this.cursor = scene.add.image(0, 0, 'fx_tilecursor').setDepth(CURSOR_DEPTH).setVisible(false);
-    this.cursorGlow = scene.add.image(0, 0, 'fx_tilecursor').setDepth(DEPTH.LIGHT + 1).setBlendMode('ADD').setVisible(false);
+    this.cursor = scene.add.image(0, 0, CURSOR_TEX.n).setDepth(CURSOR_DEPTH).setVisible(false);
+    this.cursorGlow = scene.add.image(0, 0, CURSOR_TEX.n).setDepth(DEPTH.LIGHT + 1).setBlendMode('ADD').setVisible(false);
     this.hover = null; this.tap = null; this.hadHover = false; this.tool = 'hand'; this.itemId = null;
     this.valid = null; this._cx = 0; this._cy = 0; this._cTile = null; this._checkT = 0;
     this._act = { type: 'plow', tileId: '', itemId: undefined };
@@ -255,7 +256,8 @@ export default class FieldView {
     const c = rec.crop || this._acquireCrop(rec);
     const stage = Math.max(0, Math.min(4, v.stage | 0));
     const dead = !!v.dead, wither = !!v.wither && !dead;
-    const frame = cropFrame(v.cropId, stage, wither, dead);
+    const dis = +v.disease || 0;
+    const frame = cropFrame(v.cropId, stage, wither, dead, dis > SICK_AT);
     if (c.frame !== frame) {
       if (c.frame && !c.pop) { c.pop = 0.3; c.popK = 0; } // aşama değişimi: küçük sıçrama
       c.im.setFrame(frame); c.frame = frame;
@@ -263,22 +265,23 @@ export default class FieldView {
     c.id = v.cropId; c.stage = stage;
     const meta = SHAPE_META[def.shape] || SHAPE_META.bush;
     c.flex = stage === 0 ? 0 : dead ? 0.12 : wither ? meta.flex * 0.45 : meta.flex;
-    c.h = meta.h[stage] * CROP_SCALE * (dead ? 0.55 : wither ? 0.8 : 1); c.w = meta.w[stage] * CROP_SCALE;
+    c.h = (dead ? Math.max(14, Math.min(46, meta.h[stage] * 0.62 + 6)) : meta.h[stage] * (wither ? 0.72 : 1)) * CROP_SCALE; c.w = meta.w[stage] * CROP_SCALE;
     c.pest = +v.pest || 0; c.disease = +v.disease || 0;
-    // hastalık: sararmış/lekeli tint (WebGL); Canvas'ta tint yok → yalnız lekeler
-    if (c.disease > 0.2 && !dead) c.im.setTint(mixInt(0xffffff, 0xcfc070, Math.min(1, (c.disease - 0.2) / 0.6) * 0.85 + 0.15));
+    // hastalık: SICK_AT üstü tint'siz sarı lekeli kare (+ leke katmanı) iki renderer'da da görünür;
+    // tint yalnızca WebGL'de ek bir ton (hafif evre 0.2–SICK_AT ve solgun+hastalık) — Canvas'ta yok sayılır.
+    if (c.disease > 0.2 && !dead) c.im.setTint(mixInt(0xffffff, 0xcfc070, Math.min(1, (c.disease - 0.2) / 0.6) * 0.6 + 0.15));
     else c.im.clearTint();
     this._setShadow(c, stage >= 3 && this.quality !== 'low');
     // zararlılar
     if (c.pest > 0.2 && stage >= 1 && !dead) {
       const f = c.pest > 0.7 ? 'bugs2' : c.pest > 0.45 ? 'bugs1' : 'bugs0';
-      if (!c.ov) c.ov = this._img(this.pools.ov, 'crop_bugs', f).setOrigin(0.5, 0.5).setScale(1.3);
+      if (!c.ov) c.ov = this._img(this.pools.ov, 'crop_bugs', f).setOrigin(0.5, 0.5);
       else c.ov.setFrame(f);
       c.ov.setDepth(depthForY(c.y) + 0.002).setVisible(c.vis);
     } else if (c.ov) { this._free(this.pools.ov, c.ov); c.ov = null; }
-    if (c.disease > 0.35 && stage >= 2 && !dead) {
+    if (c.disease > SICK_AT && stage >= 1 && !dead) {
       if (!c.sp) c.sp = this._img(this.pools.ov, 'crop_bugs', 'spots').setOrigin(0.5, 0.5);
-      const s = 0.8 + c.w / 40;
+      const s = (0.8 + c.w / 40) * 0.72;
       c.sp.setScale(s * 1.1, s * 0.9).setAlpha(Math.min(0.95, 0.3 + c.disease)).setDepth(depthForY(c.y) + 0.001).setPosition(c.x, c.y - Math.min(c.h * 0.45, 16)).setVisible(c.vis);
     } else if (c.sp) { this._free(this.pools.ov, c.sp); c.sp = null; }
   }
@@ -328,7 +331,12 @@ export default class FieldView {
         c.sh.setVisible(shVis);
         if (shVis) { c.sh.rotation = shRot + rot * 0.6; c.sh.scaleY = Math.max(0.05, c.h * shK); c.sh.scaleX = Math.max(0.2, c.w * 0.62 / SH_TEX_W); c.sh.alpha = sa; }
       }
-      if (c.ov) c.ov.setPosition(c.x + Math.sin(t * 1.3 + c.bugPh) * 2.5 + Math.sin(rot) * c.h * 0.5, c.y - c.h * 0.5 - 2 + Math.sin(t * 0.9 + c.bugPh * 2) * 1.5);
+      if (c.ov) {
+        // böcekler: yavaş gezinme + kısa sıçramalar + hafif dönme
+        const hop = Math.max(0, Math.sin(t * 2.6 + c.bugPh * 3));
+        c.ov.setPosition(c.x + Math.sin(t * 1.3 + c.bugPh) * 3 + Math.sin(rot) * c.h * 0.5, c.y - Math.min(c.h * 0.5, 22) - 2 + Math.sin(t * 0.9 + c.bugPh * 2) * 1.5 - hop * hop * 1.2);
+        c.ov.rotation = Math.sin(t * 1.7 + c.bugPh * 1.3) * 0.18;
+      }
     }
     this._updateCursor(dt, env);
     this._updateFx(dt, wind);
@@ -361,12 +369,13 @@ export default class FieldView {
     const k = Math.min(1, dt * 22);
     this._cx += (tx - this._cx) * k; this._cy += (ty - this._cy) * k;
     const br = 0.5 + 0.5 * Math.sin(this.t * 3.4);
-    const tint = this.valid === null ? TINT_NEUTRAL : this.valid ? TINT_OK : TINT_BAD;
+    const key = this.valid === null ? CURSOR_TEX.n : this.valid ? CURSOR_TEX.ok : CURSOR_TEX.bad;
+    if (im.texture.key !== key) { im.setTexture(key); gl.setTexture(key); }
     const a = (this.valid === null ? 0.5 : 0.62) + br * 0.3;
     const s = 1 + br * 0.03;
-    im.setVisible(true).setPosition(this._cx, this._cy).setScale(s).setTint(tint).setAlpha(a);
+    im.setVisible(true).setPosition(this._cx, this._cy).setScale(s).setAlpha(a);
     const night = this.renderer && this.renderer.lighting ? this.renderer.lighting.night : 0;
-    if (night > 0.05) gl.setVisible(true).setPosition(this._cx, this._cy).setScale(s).setTint(tint).setAlpha(a * night * 0.45);
+    if (night > 0.05) gl.setVisible(true).setPosition(this._cx, this._cy).setScale(s).setAlpha(a * night * 0.45);
     else if (gl.visible) gl.setVisible(false);
   }
 

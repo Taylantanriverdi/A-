@@ -64,4 +64,7 @@ export const TOOL_ICON = {
   bug: svg('<ellipse cx="12" cy="13.5" rx="4.2" ry="5.5" fill="currentColor" fill-opacity=".25"/><path d="M12 8V19M9.5 6.5L8 4.5M14.5 6.5L16 4.5M7.8 11H4.5M7.8 15H4.8M16.2 11h3.3M16.2 15h3"/>'),
   drop: svg('<path d="M12 3.5c3.5 4.5 6 7.6 6 10.8a6 6 0 0 1-12 0c0-3.2 2.5-6.3 6-10.8z" fill="currentColor" fill-opacity=".25"/>'),
   alert: svg('<path d="M12 4l9 15.5H3z" fill="currentColor" fill-opacity=".2"/><path d="M12 10v4M12 17v.01" stroke-width="2.2"/>'),
+  clock: svg('<circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity=".18"/><path d="M12 7.5V12l3 2"/>'),
+  calendar: svg('<rect x="4" y="5.5" width="16" height="14.5" rx="2.2" fill="currentColor" fill-opacity=".18"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4M12 13.5v3.2M12 16.7l2-1.4"/>'),
+  grass: svg('<path d="M4 20h16"/><path d="M7 20c0-3-1-5-2.5-6.5M10 20c0-4 .5-7 2-9.5M13.5 20c0-3.5 1-6 3-8M17 20c0-2 .8-3.6 2-4.6"/>'),
 };

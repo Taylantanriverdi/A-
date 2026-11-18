@@ -17,6 +17,13 @@ const TOUCH_HOVER_MUTE_MS = 800; // dokunuştan sonra taklit fare olaylarıyla h
 const TAP_MAX_MS = 400;
 const PERSIST_MS = 1000;
 const LETTERBOX_MS = 600;
+const CINE_DEFER_MS = 250;     // basılı işaretçi bırakıldıktan sonra ertelenen sinematiğin gecikmesi (K16)
+const CINE_DEFER_MAX_MS = 20000; // takılı kalmış işaretçiye karşı emniyet
+const GLIDE_MS = 400;          // camera:ensureVisible kayması
+const VIS_MARGIN_CSS = 40;     // ensureVisible kenar payı
+// Yeni oyunda ilk kadraj: başlangıç tarlası + ev (karo, kapsayıcı)
+const START_FRAME = { x0: 34, x1: 45, y0: 7, y1: 12 };
+const START_FIT_PAD_CSS = { x: 16, y: 140 }; // HUD/araç çubuğu için toplam pay
 const BOUNDS = { minX: 0, maxX: WORLD_W, minY: -SKY_H, maxY: WORLD_H };
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -35,12 +42,12 @@ export default class CameraDirector {
     this.cam = scene.cameras.main;
 
     const c = state.camera;
+    this._autoFit = false;       // yeni oyun: kullanıcı kamerayı ellenene kadar resize'da yeniden sığdır
     if (c && Number.isFinite(c.x) && Number.isFinite(c.y) && Number.isFinite(c.zoom)) {
       this.cx = c.x; this.cy = c.y; this.zoom = clamp(c.zoom, ZOOM_MIN, ZOOM_MAX);
     } else {
-      this.cx = (P1.x + P1.w / 2) * TILE_W;
-      this.cy = (P1.y + P1.h / 2) * TILE_H;
-      this.zoom = 1;
+      this._autoFit = true;
+      this._fitStartFrame();
     }
     this.targetZoom = this.zoom;
     this.vx = 0; this.vy = 0;
@@ -49,6 +56,10 @@ export default class CameraDirector {
     this.locked = false;
     this.cine = null;
     this.queue = [];
+    this.deferred = [];          // basılı işaretçi varken gelen sinematikler (K16)
+    this._deferAt = 0;           // >0: işaretçiler bırakıldı, bu zamanda oynat
+    this._deferSince = 0;
+    this.glide = null;           // {fx, fy, tx, ty, t, dur} ensureVisible kayması
     this.drag = null;
     this.pinch = null;
     this.pointers = new Map();   // id → {x, y}
@@ -67,11 +78,16 @@ export default class CameraDirector {
     this._bindPointer();
     this._bindKeyboard();
     this._offs.push(
-      bus.on('camera:cinematic', (p) => this.cinematic(p)),
+      bus.on('camera:cinematic', (p) => this.requestCinematic(p)),
+      bus.on('camera:ensureVisible', (p) => this.ensureVisible(p)),
       bus.on('save:before', () => this.persist()),
       bus.on('tool:select', (p) => this.setTool(p && p.tool)),
     );
-    this._onResize = () => { this.cam.setSize(this.scene.scale.width, this.scene.scale.height); this._clamp(); this._apply(); };
+    this._onResize = () => {
+      this.cam.setSize(this.scene.scale.width, this.scene.scale.height);
+      if (this._autoFit && !this.cine) this._fitStartFrame();
+      this._clamp(); this._apply();
+    };
     scene.scale.on('resize', this._onResize);
     scene.events.once('shutdown', () => this.destroy());
 
@@ -117,7 +133,73 @@ export default class CameraDirector {
     this.anchor = { sx, sy, wx: w.x, wy: w.y };
   }
 
-  panTo(x, y) { this.cx = x; this.cy = y; this.vx = this.vy = 0; this._clamp(); }
+  panTo(x, y) { this.cx = x; this.cy = y; this.vx = this.vy = 0; this.glide = null; this._clamp(); }
+
+  /** Yeni oyun kadrajı: START_FRAME dikdörtgenini ortalar, dar ekranda sığdıran zoom (0.5–1). */
+  _fitStartFrame() {
+    const x0 = START_FRAME.x0 * TILE_W, x1 = (START_FRAME.x1 + 1) * TILE_W;
+    const y0 = START_FRAME.y0 * TILE_H, y1 = (START_FRAME.y1 + 1) * TILE_H;
+    const dpr = this.dpr;
+    const vw = Math.max(1, this.cam.width / dpr - START_FIT_PAD_CSS.x);
+    const vh = Math.max(1, this.cam.height / dpr - START_FIT_PAD_CSS.y);
+    this.zoom = this.targetZoom = clamp(Math.min(1, vw / (x1 - x0), vh / (y1 - y0)), ZOOM_MIN, 1);
+    this.cx = (x0 + x1) / 2; this.cy = (y0 + y1) / 2;
+    this.vx = this.vy = 0; this.anchor = null;
+  }
+
+  /** Kullanıcı kamerayı elledi: otomatik kadraj ve ensureVisible kayması biter. */
+  _userCam() { this._autoFit = false; this.glide = null; }
+
+  /**
+   * camera:ensureVisible {x, y, insetBottom, insetTop} — inset'ler CSS px.
+   * Dünya noktası serbest alanın (kenar payıyla) dışındaysa GLIDE_MS içinde yumuşakça kayar.
+   */
+  ensureVisible(p) {
+    if (this.cine || this.locked || !p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+    const dpr = this.dpr, z = this.zoom;
+    const W = this.cam.width / dpr, H = this.cam.height / dpr;
+    const insT = Math.max(0, Number(p.insetTop) || 0), insB = Math.max(0, Number(p.insetBottom) || 0);
+    const m = VIS_MARGIN_CSS;
+    let top = insT + m, bot = H - insB - m;
+    if (bot < top) { const mid = (insT + H - insB) / 2; top = bot = mid; }
+    const left = Math.min(m, W / 2), right = Math.max(W - m, W / 2);
+    // noktanın şimdiki ekran konumu (CSS px)
+    const sx = (p.x - this.cx) * z + W / 2, sy = (p.y - this.cy) * z + H / 2;
+    let dx = 0, dy = 0;
+    if (sx < left) dx = sx - left; else if (sx > right) dx = sx - right;
+    if (sy < top || sy > bot) dy = sy - (top + bot) / 2; // dikeyde serbest alanın ortasına
+    if (!dx && !dy) return;
+    const to = { x: this.cx + dx / z, y: this.cy + dy / z, z };
+    this._clampPoint(to);
+    if (Math.abs(to.x - this.cx) < 0.5 && Math.abs(to.y - this.cy) < 0.5) return;
+    this.vx = this.vy = 0; this.followTarget = null; this._autoFit = false;
+    this.glide = { fx: this.cx, fy: this.cy, tx: to.x, ty: to.y, t: 0, dur: GLIDE_MS };
+  }
+
+  /** Bus girişi: basılı işaretçi (boyama darbesi, sürükleme, pinch) varken sinematik ertelenir (K16). */
+  requestCinematic(p = {}) {
+    if (this.cine && !this.deferred.length) { this.cinematic(p); return; } // oynayan çekimin kuyruğu
+    if (this.pointers.size > 0 || this.deferred.length) {
+      if (this.deferred.length < 3) this.deferred.push(p);
+      if (this.deferred.length === 1) this._deferSince = performance.now();
+      if (this.pointers.size === 0 && !this._deferAt) this._deferAt = performance.now() + CINE_DEFER_MS;
+      return;
+    }
+    this.cinematic(p);
+  }
+
+  _pumpDeferred(now) {
+    if (!this.deferred.length || this.cine) return;
+    const stuck = now - this._deferSince > CINE_DEFER_MAX_MS;
+    if (this.pointers.size > 0 && !stuck) { this._deferAt = 0; return; }
+    if (!this._deferAt) { this._deferAt = now + CINE_DEFER_MS; return; }
+    if (now < this._deferAt && !stuck) return;
+    this._deferAt = 0;
+    const list = this.deferred.splice(0);
+    this.pointers.clear();
+    this.cinematic(list[0]);
+    for (let i = 1; i < list.length; i++) if (this.queue.length < 3) this.queue.push(list[i]);
+  }
 
   /** camera:cinematic {target:{x,y}, zoom, duration, letterbox, reason} */
   cinematic(p = {}) {
@@ -130,6 +212,7 @@ export default class CameraDirector {
     this._clampPoint(to);
     this._setHover(false);
     this.locked = true;
+    this.glide = null; this._autoFit = false;
     this.drag = null; this.pinch = null; this.anchor = null;
     this._endPaint();
     this.vx = this.vy = 0;
@@ -145,6 +228,7 @@ export default class CameraDirector {
   // ---------------------------------------------------------------- kare güncellemesi
   update(delta) {
     const dt = delta > 250 ? 250 : delta > 0 ? delta : 0;
+    if (this.deferred.length) this._pumpDeferred(performance.now());
     if (this.cine) {
       this._updateCinematic(dt);
     } else {
@@ -171,9 +255,21 @@ export default class CameraDirector {
       const s = (KEY_PAN_SPEED / this.zoom) * dt / 1000;
       this.cx += kx * s; this.cy += ky * s;
       this.vx = this.vy = 0; this.followTarget = null; this.anchor = null;
+      this._userCam();
+    }
+    const g = this.glide;
+    if (g) {
+      if (this.drag?.moved || this.pinch) this.glide = null;
+      else {
+        g.t += dt;
+        const e = ease(Math.min(1, g.t / g.dur));
+        this.cx = g.fx + (g.tx - g.fx) * e; this.cy = g.fy + (g.ty - g.fy) * e;
+        if (g.t >= g.dur) this.glide = null;
+      }
     }
     const kz = k.zin - k.zout;
     if (kz) {
+      this._userCam();
       this.targetZoom = clamp(this.targetZoom * Math.exp(kz * KEY_ZOOM_RATE * dt / 1000), ZOOM_MIN, ZOOM_MAX);
       this.anchor = null;
     }
@@ -444,7 +540,7 @@ export default class CameraDirector {
       this.vx = this.vx * 0.55 + (wdx / dtm) * 0.45;
       this.vy = this.vy * 0.55 + (wdy / dtm) * 0.45;
       d.lastX = p.x; d.lastY = p.y; d.lastT = now;
-      this.anchor = null; this.followTarget = null;
+      this.anchor = null; this.followTarget = null; this._userCam();
       this.targetZoom = this.zoom;
     };
     const onUp = (p) => {
@@ -452,6 +548,7 @@ export default class CameraDirector {
       const rec = this.pointers.get(p.id);
       this.pointers.delete(p.id);
       if (isTouch(p)) this._lastTouchAt = performance.now();
+      if (this.pointers.size === 0 && this.deferred.length) this._deferAt = performance.now() + CINE_DEFER_MS;
       if (this.locked) return;
       if (this.pinch) {
         if (this.pointers.size < 2) {
@@ -493,7 +590,7 @@ export default class CameraDirector {
       if (mode === 1) d *= 33; else if (mode === 2) d *= 400;
       d = clamp(d, -300, 300);
       this.setZoom(this.targetZoom * Math.exp(-d * 0.0015), p.x, p.y);
-      this.followTarget = null;
+      this.followTarget = null; this._userCam();
     };
     const onOut = () => { this.mouse.inside = false; if (!this.locked) this._setHover(false); };
     const onOver = () => { this.mouse.inside = performance.now() - this._lastTouchAt > TOUCH_HOVER_MUTE_MS; };
@@ -535,7 +632,7 @@ export default class CameraDirector {
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
     const w = this.screenToWorld(mx, my);
     this.pinch = { a, b, dist0: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), zoom0: this.zoom, wx: w.x, wy: w.y };
-    this.anchor = null; this.followTarget = null;
+    this.anchor = null; this.followTarget = null; this._userCam();
   }
 
   _updatePinch() {

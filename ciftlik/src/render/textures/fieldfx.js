@@ -56,15 +56,29 @@ export function genFieldFx(scene) {
     ctx.strokeStyle = 'rgba(230,250,180,0.5)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(1, 3.5); ctx.lineTo(11, 3.5); ctx.stroke();
     register(scene, 'fx_leaf', canvas);
   }
-  if (!scene.textures.exists('fx_tilecursor')) {
-    // yumuşak parlayan yuvarlatılmış çerçeve + çok hafif iç dolgu (tint ile sıcak beyaz / kırmızımsı)
-    const m = 10, w = TILE_W + m * 2, h = TILE_H + m * 2; const { canvas, ctx } = makeCanvas(w, h);
-    const rr = (inset, rad) => { ctx.beginPath(); ctx.roundRect(m + inset, m + inset, TILE_W - inset * 2, TILE_H - inset * 2, rad); };
-    ctx.save(); ctx.filter = 'blur(3px)'; ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 4; rr(1, 10); ctx.stroke(); ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1.6; rr(1.5, 9); ctx.stroke();
-    const g = ctx.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, TILE_W * 0.6);
-    g.addColorStop(0, 'rgba(255,255,255,0.05)'); g.addColorStop(1, 'rgba(255,255,255,0.2)');
-    ctx.fillStyle = g; rr(2.5, 8); ctx.fill();
-    register(scene, 'fx_tilecursor', canvas, { margin: m });
+  // karo imleci: tint'e dayanmayan, önceden renklendirilmiş kopyalar (Canvas renderer'da da renkli)
+  cursor(scene, 'fx_tilecursor', [255, 255, 255], 0.2, false);
+  cursor(scene, 'fx_tilecursor_n', [255, 244, 228], 0.18, false);
+  cursor(scene, 'fx_tilecursor_ok', [255, 236, 190], 0.22, false);
+  cursor(scene, 'fx_tilecursor_bad', [255, 92, 72], 0.32, true);
+}
+
+/** Yumuşak parlayan yuvarlatılmış çerçeve + hafif iç dolgu; `bad` → çapraz çizgili kırmızı dolgu. */
+function cursor(scene, key, rgb, fill, bad) {
+  if (scene.textures.exists(key)) return;
+  const m = 10, w = TILE_W + m * 2, h = TILE_H + m * 2; const { canvas, ctx } = makeCanvas(w, h);
+  const c = (a) => `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${a})`;
+  const rr = (inset, rad) => { ctx.beginPath(); ctx.roundRect(m + inset, m + inset, TILE_W - inset * 2, TILE_H - inset * 2, rad); };
+  ctx.save(); ctx.filter = 'blur(3px)'; ctx.strokeStyle = c(0.75); ctx.lineWidth = 4; rr(1, 10); ctx.stroke(); ctx.restore();
+  ctx.strokeStyle = c(0.95); ctx.lineWidth = bad ? 2.2 : 1.6; rr(1.5, 9); ctx.stroke();
+  const g = ctx.createRadialGradient(w / 2, h / 2, 4, w / 2, h / 2, TILE_W * 0.6);
+  g.addColorStop(0, c(fill * 0.25)); g.addColorStop(1, c(fill));
+  ctx.fillStyle = g; rr(2.5, 8); ctx.fill();
+  if (bad) {
+    ctx.save(); rr(2.5, 8); ctx.clip();
+    ctx.strokeStyle = c(0.22); ctx.lineWidth = 2;
+    for (let x = -TILE_H; x < TILE_W + TILE_H; x += 9) { ctx.beginPath(); ctx.moveTo(m + x, m + TILE_H); ctx.lineTo(m + x + TILE_H, m); ctx.stroke(); }
+    ctx.restore();
   }
+  register(scene, key, canvas, { margin: m });
 }

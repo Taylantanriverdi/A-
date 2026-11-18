@@ -2,10 +2,12 @@
 import { CROPS, STAGE_NAMES_TR, ROT_AFTER_DAYS } from '../../data/crops.js';
 import { ITEMS } from '../../data/items.js';
 import { HEALTH, SOIL } from '../../data/farming.js';
+import { BLOCK_LABELS_TR, blockedKind } from '../../data/land.js';
+import { DAYS_PER_SEASON, SEASONS } from '../../core/constants.js';
 import { calendar } from '../../core/timeUtils.js';
 import { count } from '../InventorySystem.js';
 import { isOwnedTile } from './soil.js';
-import { inSeason, growthRatePerHour, rotationCount, nutrientRatio } from './growth.js';
+import { inSeason, idealRatePerHour, rotationCount } from './growth.js';
 import { careScore, careSample, gradeFor } from './quality.js';
 
 const SEASON_LOC_TR = { spring: "İlkbahar'da", summer: "Yaz'da", autumn: "Sonbahar'da", winter: "Kış'ta" };
@@ -38,6 +40,9 @@ export function seasonListLoc(seasons) {
   return `${head} veya ${SEASON_LOC_TR[seasons[seasons.length - 1]]}`;
 }
 
+/** "Kuyu burada — ekilemez" */
+export function blockedReason(kind) { return `${BLOCK_LABELS_TR[kind] ?? 'Engel'} burada — ekilemez`; }
+
 const NO = (reason) => ({ ok: false, reason });
 const OK = { ok: true };
 
@@ -52,6 +57,8 @@ export function canApply(state, action, season) {
   if (!action) return NO(REASONS.unknown);
   const t = state.tiles?.[action.tileId];
   if (!t || !isOwnedTile(state, t)) return NO(REASONS.notOwned);
+  const blk = blockedKind(action.tileId);
+  if (blk) return NO(blockedReason(blk));
   const sea = season || calendar(state.time.totalMinutes).season;
   const crop = t.crop;
   const id = action.itemId;
@@ -107,28 +114,66 @@ function fmtReady(hours) {
   return h > 0 && d < 3 ? `~${d} gün ${h} saat` : `~${Math.round(hours / 24)} gün`;
 }
 
+/** Bu andan mevsim sonuna kadar kalan saat (bugünün kalanı dahil). */
+function seasonHoursLeft(cal) {
+  const frac = typeof cal.dayFraction === 'number' ? cal.dayFraction : (cal.hour * 60 + (cal.minute || 0)) / 1440;
+  return (DAYS_PER_SEASON - cal.dayOfSeason + (1 - frac)) * 24;
+}
+
+/** Ürünün art arda uygun mevsimlerde büyüyebileceği kalan saat (mevcut mevsim uygun değilse 0). */
+function growableHoursLeft(def, cal) {
+  if (!inSeason(def, cal.season)) return 0;
+  let h = seasonHoursLeft(cal);
+  let si = SEASONS.indexOf(cal.season);
+  for (let i = 0; i < 3; i++) {
+    si = (si + 1) % SEASONS.length;
+    if (!inSeason(def, SEASONS[si])) break;
+    h += DAYS_PER_SEASON * 24;
+  }
+  return h;
+}
+
+const W = (code, text) => ({ code, text });
+
 /**
  * Karo bilgi kartı verisi.
- * @returns {null | {soil, crop, weeds, organic, history, warnings:string[]}}
+ * Dekorlu karoda: { tileId, tx, ty, blocked: kind, label } (UI kart açmaz).
+ * warnings: [{ code, text }] — kodlar: dry, wet, lowN, lowP, lowK, acidic, alkaline, pest, disease,
+ *   weeds, rotation, outOfSeason, wither, rotting, revertSoon.
+ * crop.daysLeft / readyIn ideal sulama varsayımıyla (mevcut besin/pH/sağlık/mevsim çarpanları); kuraklık ayrıca 'dry' uyarısıdır.
+ * @returns {null | {tileId, tx, ty, blocked?, label?, state, soil, crop, weeds, organic, history, pendingFert, seasonDaysLeft, warnings}}
  */
 export function tileInfo(state, tileId, now) {
   const t = state.tiles?.[tileId];
+  const blk = blockedKind(tileId);
+  if (blk) {
+    const xy = t ? [t.tx, t.ty] : tileId.split(',').map(Number);
+    return { tileId, tx: xy[0], ty: xy[1], blocked: blk, label: BLOCK_LABELS_TR[blk] ?? blk };
+  }
   if (!t) return null;
   const cal = now && now.season ? now : calendar(state.time.totalMinutes);
   const season = cal.season;
   const warnings = [];
   const c = t.crop;
+  const alive = !!c && !c.dead;
+  const seasonHours = seasonHoursLeft(cal);
   let crop = null;
-  if (t.state === 'plowed' && t.moisture < SOIL.droughtBelow + 10) warnings.push('Toprak kuru');
-  if (t.ph < SOIL.phIdeal[0]) warnings.push('pH asidik');
+  if (t.state === 'plowed') {
+    if (t.moisture < SOIL.droughtBelow) warnings.push(W('dry', alive ? 'Kuraklık büyümeyi durduruyor — sula' : 'Toprak çok kuru'));
+    else if (t.moisture < SOIL.droughtBelow + 10) warnings.push(W('dry', 'Toprak kuru'));
+    if (t.moisture > SOIL.waterlogAbove) warnings.push(W('wet', 'Toprak su dolu — kök çürüyebilir'));
+  }
+  if (t.ph < SOIL.phIdeal[0]) warnings.push(W('acidic', 'pH asidik'));
+  else if (t.ph > SOIL.phIdeal[1]) warnings.push(W('alkaline', 'pH bazik'));
   if (c) {
     const def = CROPS[c.id];
     if (def) {
       let hoursLeft = 0;
       if (!c.dead && c.stage < 4) {
-        const rate = growthRatePerHour(t, c, def, season);
+        const rate = idealRatePerHour(t, c, def, season);
         hoursLeft = rate > 0 ? (1 - c.growth) / rate : Infinity;
       }
+      const willMature = !c.dead && (c.stage >= 4 || (Number.isFinite(hoursLeft) && hoursLeft <= growableHoursLeft(def, cal)));
       const score = careScore(c, careSample(t, c, def));
       crop = {
         id: c.id,
@@ -140,6 +185,7 @@ export function tileInfo(state, tileId, now) {
         dead: !!c.dead,
         daysLeft: c.dead ? null : Number.isFinite(hoursLeft) ? Math.round((hoursLeft / 24) * 10) / 10 : null,
         readyIn: c.dead ? 'Öldü' : fmtReady(hoursLeft),
+        willMature,
         rotIn: !c.dead && c.stage >= 4 ? Math.max(0, ROT_AFTER_DAYS - c.readyDays) : null,
         qualityEstimate: gradeFor(score),
         careScore: Math.round(score),
@@ -148,22 +194,24 @@ export function tileInfo(state, tileId, now) {
         harvests: c.harvests,
       };
       if (!c.dead) {
-        if (def.need.n > 0 && t.n / def.need.n < 0.7) warnings.push('Azot düşük');
-        else if (nutrientRatio(t, def, 1) < 0.7) warnings.push('Besin düşük');
-        if (c.pest > 0) warnings.push('Zararlı var');
-        if (c.disease > 0) warnings.push('Hastalık var');
-        if (c.health < HEALTH.witherBelow) warnings.push('Bitki soluyor');
-        if (!inSeason(def, season)) warnings.push('Mevsim dışı');
-        if (c.stage >= 4 && c.readyDays >= ROT_AFTER_DAYS - 1) warnings.push('Çürümek üzere');
+        const nd = def.need;
+        if (nd.n > 0 && t.n / nd.n < 0.7) warnings.push(W('lowN', 'Azot düşük'));
+        if (nd.p > 0 && t.p / nd.p < 0.7) warnings.push(W('lowP', 'Fosfor düşük'));
+        if (nd.k > 0 && t.k / nd.k < 0.7) warnings.push(W('lowK', 'Potasyum düşük'));
+        if (c.pest > 0) warnings.push(W('pest', 'Zararlı var'));
+        if (c.disease > 0) warnings.push(W('disease', 'Hastalık var'));
+        if (c.health < HEALTH.witherBelow) warnings.push(W('wither', 'Bitki soluyor'));
+        if (!inSeason(def, season)) warnings.push(W('outOfSeason', 'Mevsim dışı'));
+        if (c.stage >= 4 && c.readyDays >= ROT_AFTER_DAYS - 1) warnings.push(W('rotting', 'Çürümek üzere — hasat et'));
       }
-      const rc = (c.rot ?? 1) < 1;
-      if (rc) {
-        const pct = Math.round((1 - c.rot) * 100);
-        warnings.push(`Ekim nöbeti: verim -%${pct}`);
-      }
+      if ((c.rot ?? 1) < 1) warnings.push(W('rotation', `Ekim nöbeti: verim -%${Math.round((1 - c.rot) * 100)}`));
     }
   }
-  if (t.weeds > 0) warnings.push('Yabani ot');
+  if (t.weeds > 0) warnings.push(W('weeds', 'Yabani ot'));
+  if (t.state === 'plowed' && !c && t.idleDays >= SOIL.grassRecoverDays - 5) {
+    const n = Math.max(1, SOIL.grassRecoverDays - t.idleDays);
+    warnings.push(W('revertSoon', `${n} gün içinde çime döner`));
+  }
   return {
     tileId, tx: t.tx, ty: t.ty, state: t.state,
     soil: { moisture: Math.round(t.moisture), n: Math.round(t.n), p: Math.round(t.p), k: Math.round(t.k), ph: Math.round(t.ph * 10) / 10 },
@@ -172,8 +220,26 @@ export function tileInfo(state, tileId, now) {
     organic: t.organic,
     history: t.history.slice(),
     pendingFert: t.pendingFert.length,
+    seasonDaysLeft: Math.ceil(seasonHours / 24 - 1e-9),
     warnings,
   };
+}
+
+/**
+ * Tohum seçici uyarısı: şimdi ekilirse (ideal koşulda) uygun mevsim(ler) bitmeden yetişmeyecekse.
+ * Mevsim dışı ürün için null (canApply zaten reddeder). cropId yerine tohum itemId de kabul edilir.
+ * @returns {null | {code:'lateInSeason', text:string}}
+ */
+export function seedWarning(state, cropId, now) {
+  const id = CROPS[cropId] ? cropId : ITEMS[cropId]?.crop;
+  const def = CROPS[id];
+  if (!def) return null;
+  const cal = now && now.season ? now : calendar(state.time.totalMinutes);
+  if (!inSeason(def, cal.season)) return null;
+  const left = growableHoursLeft(def, cal);
+  if (def.growDays * 24 <= left) return null;
+  const d = Math.max(0, Math.floor(left / 24));
+  return { code: 'lateInSeason', text: `Mevsim bitmeden yetişmez (${def.growDays} gün gerekir, ${d} gün kaldı)` };
 }
 
 /** Ekim nöbeti uyarısını ekmeden önce göstermek için (UI tohum seçici). */

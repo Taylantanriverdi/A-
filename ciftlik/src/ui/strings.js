@@ -65,9 +65,25 @@ export const STR = {
   history: 'Son ekilenler',
   historyNone: 'Henüz hasat yok',
   organic: 'Organik',
+  grassHint: 'Çim — çapa ile sür',
+  plowedHint: 'Ekime hazır — tohum aletiyle ek',
+  expand: 'Ayrıntılar',
+  collapse: 'Daha az',
+  lateInSeason: 'Mevsim bitmeden yetişmez',
+  willNotMature: (d) => `Mevsim bitmeden yetişmez · mevsimin bitmesine ${d} gün`,
+  seasonLeft: (d) => `Mevsimin bitmesine ${d} gün`,
+  // tileInfo uyarı kodu → metin (kod gelip metin gelmezse)
+  warn: {
+    dry: 'Toprak kuru', wet: 'Toprak aşırı ıslak', lowN: 'Azot düşük', lowP: 'Fosfor düşük', lowK: 'Potasyum düşük',
+    acidic: 'pH asidik', alkaline: 'pH bazik', pest: 'Zararlı var', disease: 'Hastalık var', weeds: 'Yabani ot',
+    rotation: 'Ekim nöbeti cezası', outOfSeason: 'Mevsim dışı', wither: 'Bitki soluyor', rotting: 'Çürümek üzere',
+    revertSoon: 'Toprak yakında çimene döner', lateInSeason: 'Mevsim bitmeden yetişmez',
+  },
   chips: { pest: 'Zararlı', disease: 'Hastalık', weeds: 'Yabani ot', dead: 'Ölü ekin', wither: 'Solgun', dry: 'Kuru toprak', wet: 'Aşırı ıslak' },
 
   // ---- Bildirimler ----
+  firstHarvest: 'İlk hasat!',
+  firstHarvestSub: 'Emeğinin ilk meyvesi',
   harvestNote: (qty, name, q) => (q ? `+${qty} ${name} · ${q}` : `+${qty} ${name}`),
   xp: 'XP',
   xpGain: (n) => `+${n} XP`,
