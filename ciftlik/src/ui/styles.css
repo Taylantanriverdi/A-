@@ -1946,3 +1946,25 @@
 #ui .wk-bar i { display: block; height: 100%; background: linear-gradient(90deg, #f7c868, #e9a93a); }
 #ui .wk-cand .cb { display: flex; justify-content: center; min-height: var(--hit); }
 #ui .wk-cand .why { font-size: 12.5px; color: var(--accent); min-height: 1em; }
+
+/* ---- Aşama 8: arazi paneli, makineler, işaretler ---- */
+#ui .land-panel {
+  position: absolute; z-index: 6; top: calc(var(--gap) + var(--sa-t) + 56px); left: 50%; transform: translateX(-50%);
+  width: min(420px, calc(100vw - 24px)); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+}
+#ui .land-panel[hidden] { display: none; }
+#ui .lp-head { display: flex; align-items: center; justify-content: space-between; font-size: 1.05rem; }
+#ui .lp-x { background: none; border: 0; color: inherit; font-size: 1.4rem; line-height: 1; cursor: pointer; padding: 0 4px; }
+#ui .lp-note { font-size: 0.78rem; opacity: 0.75; }
+#ui .lp-list { display: flex; flex-direction: column; gap: 8px; }
+#ui .lp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+#ui .lp-row.owned { opacity: 0.6; }
+#ui .lp-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#ui .lp-sub, #ui .lp-tax { font-size: 0.76rem; opacity: 0.78; }
+#ui .lp-buy { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+#ui .lp-price { font-weight: 700; }
+#ui .lp-btn { padding: 6px 12px; border-radius: 8px; border: 0; cursor: pointer; font: inherit; }
+#ui .lp-btn:disabled { opacity: 0.45; cursor: default; }
+#ui .bm-mode.bm-land { margin-left: 6px; }
+#ui .tool.vehicle[hidden] { display: none; }
+#ui .shop .cat-why.warn { color: #e8a56a; }

@@ -236,7 +236,8 @@ export function applyAction(state, bus, p) {
       const def = CROPS[c.id];
       let qty = harvestYield(def, c, rng);
       if (p.yieldMult > 1) qty = Math.round(qty * p.yieldMult); // biçerdöver (VEHICLES.harvester.yieldMult)
-      const quality = gradeFor(careScore(c, careSample(t, c, def)));
+      const bonus = p.bonusCare > 0 ? Math.min(30, p.bonusCare) : 0; // usta çalışan: careScore +bonusCare
+      const quality = gradeFor(Math.min(100, careScore(c, careSample(t, c, def)) + bonus));
       const organic = t.organic;
       // Yer kontrolü: ekinin tamamı sığmıyorsa hasat yapılmaz (kayıp olmasın).
       if (canAdd(state, c.id, qty, quality, organic) < qty) {

@@ -119,6 +119,14 @@ export function work(state, bus, { type, tileId, itemId, driverId } = {}) {
   return result(bus, { ok: true, type: 'work', vehicle: type, count: worked.length, actions, fuel: cost, tiles: worked, driverId: driverId || null });
 }
 
+/** Çalışan/araç işi için yakıt: tiles × fuelPerTile → transact('fuel'). Para yetmezse false (hiçbir şey düşmez). */
+export function chargeFuel(state, bus, vehicleType, tiles) {
+  const def = VEHICLES[vehicleType];
+  const n = Array.isArray(tiles) ? tiles.length : Math.floor(Number(tiles) || 0);
+  if (!def || !(def.fuelPerTile > 0) || n <= 0) return !!def;
+  return transact(state, bus, { amount: -Math.max(1, Math.round(def.fuelPerTile * n)), category: 'fuel', label: `Yakıt: ${def.name} (${n} karo)` });
+}
+
 /** 07:00 sağım: her sağım makinesinin ahırındaki süt/keçi sütü → envanter. @returns {Array} toplananlar */
 export function milkRun(state, bus, rng) {
   const out = [];
@@ -170,7 +178,7 @@ export function validate(state, onFix = () => {}) {
 
 const VehicleSystem = {
   id: 'vehicles',
-  validate, buyVehicle, work, canBuy, milkRun, areaTiles, hasVehicle,
+  validate, buyVehicle, work, chargeFuel, canBuy, milkRun, areaTiles, hasVehicle,
   init(state, bus) {
     for (const off of offs) off();
     offs = [];
