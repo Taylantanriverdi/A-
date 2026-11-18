@@ -12,7 +12,7 @@
 | 0 | İşçi ajanları + PLAN.md | ✅ Onaylandı |
 | 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Onaylandı |
 | 2 | Tarım ve toprak mekaniği | ✅ Onaylandı |
-| 3 | Envanter, mağaza, pazar | 🔨 Devam ediyor |
+| 3 | Envanter, mağaza, pazar | ✅ Tamamlandı (beyin duman testi; tam QA ekonomik mod gereği atlandı) — onay bekleniyor |
 | 4 | Hayvancılık | — |
 | 5 | Üretim binaları ve zincirleri | — |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
@@ -31,6 +31,12 @@
 | qa-tester | Derleme, Playwright ile masaüstü+mobil test, FPS/bellek ölçümü, hata raporu (kod düzeltmez) |
 
 ---
+
+## 0b. Ekonomik Çalışma Düzeni (Aşama 3'ten itibaren, kullanıcı isteği)
+- Aşama başına en fazla 2 işçi; küçük işleri beyin doğrudan yapar.
+- İşçiler ekran görüntüsü döngüsü yapmaz (en fazla 1 kontrol karesi); headless FPS ölçümü yapılmaz.
+- QA: aşama sonunda tek tur, kısa duman testi + kritik akışlar. Ayrı regresyon turu yalnızca yüksek önemli hata çıkarsa.
+- Oynanabilir sürüm her aşama sonunda aynı Artifact adresinde güncellenir (`npm run play`).
 
 ## 1. Teknik Altyapı
 
