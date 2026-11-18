@@ -9,9 +9,28 @@ import { SPEEDS, MIN_PER_DAY, TILE_W, TILE_H } from './core/constants.js';
 import TimeSystem from './systems/TimeSystem.js';
 import FarmSystem from './systems/FarmSystem.js';
 import InventorySystem from './systems/InventorySystem.js';
+import { QUALITY } from './data/farming.js';
 import BootScene from './scenes/BootScene.js';
 import WorldScene from './scenes/WorldScene.js';
 import { mountUI } from './ui/index.js';
+
+// Aşama 3 sistemleri (PLAN §9): MarketSystem ('market'), EconomySystem ('economy'), ProgressionSystem ('progression').
+// Paralel geliştirme sırasında dosya henüz yoksa derleme kırılmasın diye eager glob ile alınır:
+// var olan dosya statik import gibi pakete girer; olmayan atlanır (konsola uyarı).
+const OPTIONAL_SYSTEMS = import.meta.glob(
+  ['./systems/MarketSystem.js', './systems/EconomySystem.js', './systems/ProgressionSystem.js'],
+  { eager: true, import: 'default' },
+);
+function optionalSystem(file, id) {
+  const sys = OPTIONAL_SYSTEMS[`./systems/${file}`];
+  if (!sys) { console.warn(`[main] ${file} bulunamadı; '${id}' sistemi kayıtsız`); return null; }
+  return sys;
+}
+const MarketSystem = optionalSystem('MarketSystem.js', 'market');
+const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
+const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
+// Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
+const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, MarketSystem, EconomySystem, ProgressionSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);
@@ -51,7 +70,7 @@ try {
 let state, registry;
 
 // Sistem doğrulayıcıları load()'dan ÖNCE kaydedilir (sanitize şema temizlemesinden sonra çağırır).
-for (const sys of [InventorySystem, FarmSystem]) {
+for (const sys of SYSTEMS) {
   if (sys && typeof sys.validate === 'function') {
     const v = (st, onFix) => sys.validate(st, onFix);
     Object.defineProperty(v, 'name', { value: `${sys.id || 'system'}.validate` });
@@ -65,9 +84,7 @@ try {
   state = loaded ?? createInitialState();
   SaveSystem.applyStoredSettings(state);
   registry = new SystemRegistry(state, bus);
-  registry.register(TimeSystem);
-  registry.register(InventorySystem);
-  registry.register(FarmSystem);
+  for (const sys of SYSTEMS) registry.register(sys);
   SaveSystem.attach(state, bus);
 } catch (e) {
   recover(e);
@@ -208,11 +225,34 @@ const debug = {
     if (w.type === 'clear') w.intensity = 0; else if (!(w.intensity > 0)) w.intensity = 0.6;
     bus.emit('weather:changed', { type: w.type, intensity: w.intensity, wind: w.wind });
   },
+  /** EconomySystem varsa transact (kategori 'other', defter + özet); yoksa eski doğrudan yazım. */
   addMoney(n) {
-    const amount = Number(n) || 0;
+    const amount = Math.round(Number(n) || 0);
+    if (!amount) return false;
+    if (EconomySystem && typeof EconomySystem.transact === 'function') {
+      return EconomySystem.transact(state, bus, { amount, category: 'other', label: 'Debug' });
+    }
     state.finance.money += amount;
-    bus.emit('money:changed', { amount, balance: state.finance.money, category: 'debug' });
+    bus.emit('money:changed', { amount, balance: state.finance.money, category: 'other' });
+    return true;
   },
+  /** En değerli (kalite × organik) yığından market:sell; adet o (q, organic) toplamıyla sınırlanır. */
+  sell(itemId, qty = 1, channel = 'market') {
+    const stacks = state.inventory.items[itemId];
+    if (!Array.isArray(stacks) || !stacks.length) { console.warn('[debug] envanterde yok:', itemId); return null; }
+    const value = (st) => (QUALITY.priceMult[st.q] || 0) * (st.organic ? 1 + QUALITY.organicBonus : 1);
+    let best = stacks[0];
+    for (const st of stacks) if (value(st) > value(best)) best = st;
+    let have = 0;
+    for (const st of stacks) if (st.q === best.q && !!st.organic === !!best.organic) have += st.qty;
+    const n = Math.max(1, Math.min(have, Math.floor(Number(qty) || 1)));
+    const p = { itemId, q: best.q, organic: !!best.organic, qty: n, channel };
+    bus.emit('market:sell', p);
+    return p;
+  },
+  buy(itemId, qty = 1) { bus.emit('shop:buy', { itemId, qty: Math.max(1, Math.floor(Number(qty) || 1)) }); },
+  xp(n) { bus.emit('xp:add', { amount: Number(n) || 0, reason: 'debug' }); },
+  open(panel) { bus.emit('ui:open', { panel }); },
   cinematic() {
     bus.emit('camera:cinematic', {
       target: { x: 36 * TILE_W, y: 9 * TILE_H }, zoom: 1.6, duration: 3000, letterbox: true, reason: 'debug',

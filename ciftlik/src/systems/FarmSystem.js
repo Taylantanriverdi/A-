@@ -1,15 +1,16 @@
 // FarmSystem — tarım ve toprak simülasyonu (PLAN.md §3, §8). Phaser import ETMEZ.
-// Komut: farm:action → farm:result, farm:changed, farm:harvested, farm:milestone, xp:gained.
+// Komut: farm:action → farm:result, farm:changed, farm:harvested, farm:milestone, xp:add (ProgressionSystem işler).
 // onHour: nem, sağlık, büyüme, bakım örneği. onDay: kompost, ot/zararlı/hastalık, çürüme, boş karo.
 // onSeason: mevsim dışı hasar. Rastgelelik yalnızca ctx.rng (tohumlu).
 import { CROPS, ROT_AFTER_DAYS, REGROW_STAGE } from '../data/crops.js';
-import { HEALTH, SOIL, XP } from '../data/farming.js';
+import { HEALTH, SOIL } from '../data/farming.js';
+import { XP_RULES } from '../data/progression.js';
 import { ITEMS, STARTING_INVENTORY } from '../data/items.js';
 import { PARCELS, blockedKind } from '../data/land.js';
 import { calendar } from '../core/timeUtils.js';
 import { createRng } from '../core/Rng.js';
 import { isPlainObject } from '../core/GameState.js';
-import { add, remove } from './InventorySystem.js';
+import { add, remove, canAdd } from './InventorySystem.js';
 import {
   TILE_STATES, clamp, tileKey, parseKey, createTile, ownedParcelIds, moistureHour, water, applyFertilizer, releasePending, harvestSoil, weedSteal,
 } from './farm/soil.js';
@@ -79,10 +80,10 @@ function ensureFlags(state) {
   return state.flags;
 }
 
-function gainXp(state, bus, amount, reason) {
+/** XP isteği: seviye/XP state'ini ProgressionSystem yazar (PLAN §9). */
+function gainXp(bus, amount, reason) {
   if (!(amount > 0)) return;
-  if (isPlainObject(state.player)) state.player.xp = (Number(state.player.xp) || 0) + amount;
-  bus.emit('xp:gained', { amount, reason });
+  bus.emit('xp:add', { amount, reason });
 }
 
 function isStartPlowed(tx, ty) {
@@ -181,7 +182,7 @@ export function applyAction(state, bus, p) {
   switch (type) {
     case 'plow':
       t.state = 'plowed'; t.weeds = 0; t.idleDays = 0;
-      gainXp(state, bus, XP.plow, 'plow');
+      gainXp(bus, XP_RULES.plow, 'plow');
       break;
     case 'plant': {
       const cropId = ITEMS[itemId].crop;
@@ -189,7 +190,7 @@ export function applyAction(state, bus, p) {
       t.crop = newCrop(cropId, t, now.day);
       t.idleDays = 0;
       res.itemId = itemId;
-      gainXp(state, bus, XP.plant, 'plant');
+      gainXp(bus, XP_RULES.plant, 'plant');
       if (!flags.firstPlant) {
         flags.firstPlant = true;
         bus.emit('farm:milestone', { kind: 'firstPlant', cropId, tileId, tx: t.tx, ty: t.ty });
@@ -227,6 +228,12 @@ export function applyAction(state, bus, p) {
       const qty = harvestYield(def, c, rng);
       const quality = gradeFor(careScore(c, careSample(t, c, def)));
       const organic = t.organic;
+      // Yer kontrolü: ekinin tamamı sığmıyorsa hasat yapılmaz (kayıp olmasın).
+      if (canAdd(state, c.id, qty, quality, organic) < qty) {
+        const fail = { ok: false, type, tileId, reason: 'Envanter dolu', itemId: c.id };
+        bus.emit('farm:result', fail);
+        return fail;
+      }
       const first = c.harvests === 0;
       add(state, c.id, qty, quality, organic);
       harvestSoil(t, c.id, def, first);
@@ -243,7 +250,7 @@ export function applyAction(state, bus, p) {
       }
       Object.assign(res, { itemId: c.id, qty, quality, organic });
       bus.emit('farm:harvested', { tileId, tx: t.tx, ty: t.ty, cropId: c.id, itemId: c.id, qty, quality, organic });
-      gainXp(state, bus, harvestXp(c.id, qty, quality), 'harvest');
+      gainXp(bus, harvestXp(c.id, qty), 'harvest');
       if (!flags.firstHarvest[c.id]) {
         flags.firstHarvest[c.id] = true;
         bus.emit('farm:milestone', { kind: 'firstHarvest', cropId: c.id, tileId, tx: t.tx, ty: t.ty });

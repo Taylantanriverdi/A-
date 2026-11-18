@@ -1,5 +1,7 @@
 // GameState — PLAN.md §1 şeması. Saf JSON: sınıf örneği, fonksiyon, Phaser nesnesi YOK.
 import { START_MINUTES, SAVE_VERSION } from './constants.js';
+import { START_MONEY } from '../data/economy.js';
+import { INVENTORY } from '../data/progression.js';
 
 /** Arazi parselleri (sahiplik). Fiyat/kilit değerleri data/land.js'e aittir. */
 const PARCEL_IDS = ['P1', 'P2', 'P3', 'P4', 'P5'];
@@ -20,16 +22,17 @@ export function createInitialState(seed = randomSeed()) {
     rngState: seed | 0, // mulberry32 iç durumu (Rng.js yazar) — kayıt sonrası tekrarlanabilirlik
     time: { totalMinutes: START_MINUTES, speed: 1 },
     weather: { type: 'clear', intensity: 0, wind: 0.2, forecast: [], puddles: 0, snowCover: 0 },
-    player: { name: 'Çiftçi', level: 1, xp: 0, reputation: 10 },
-    finance: { money: 5000, ledger: [], loans: [], dailySummary: [] },
-    inventory: { capacity: 60, items: {} },
+    // PLAN §9: xp = mevcut seviyedeki XP, totalXp = toplam
+    player: { name: 'Çiftçi', level: 1, xp: 0, totalXp: 0, reputation: 10 },
+    finance: { money: START_MONEY, ledger: [], loans: [], dailySummary: [], receivables: [] },
+    inventory: { capacity: INVENTORY.startSlots, items: {} }, // kapasite = yığın sayısı
     land: { parcels: PARCEL_IDS.map((id) => ({ id, owned: id === 'P1' })) },
     tiles: {},
     animals: [],
     buildings: [],
     machines: [],
     workers: [],
-    market: { prices: {}, activeEvents: [] },
+    market: { prices: {}, history: {}, activeEvents: [] },
     contracts: [],
     stats: { harvested: {}, sold: {}, earned: 0, spent: 0 },
     settings: { quality: 'auto', sound: 0.8, music: 0.5 },

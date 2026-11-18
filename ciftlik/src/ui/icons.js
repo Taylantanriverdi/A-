@@ -46,6 +46,14 @@ export const ICON = {
   sunSmall: svg(sunBody),
   bed: svg('<path d="M3 18V7M3 14h18v4M21 14v-2.5a2.5 2.5 0 0 0-2.5-2.5H11v5"/><circle cx="7" cy="11" r="1.8"/>'),
   coin: svg('<circle cx="12" cy="12" r="8.2" fill="#f2b84b" stroke="#c98a22" stroke-width="1.4"/><circle cx="12" cy="12" r="5.6" stroke="#fff2c8" stroke-width="1.1" opacity=".7"/>'),
+  bag: svg('<path d="M6 9h12l-.8 10.2A2 2 0 0 1 15.2 21H8.8a2 2 0 0 1-2-1.8z" fill="currentColor" fill-opacity=".2"/><path d="M9 9V7.5a3 3 0 0 1 6 0V9"/><path d="M9.5 13.5h5"/>'),
+  stall: svg('<path d="M3.5 9.5L5 4.5h14l1.5 5" fill="currentColor" fill-opacity=".2"/><path d="M3.5 9.5c0 1.4 1.1 2.2 2.4 2.2s2.3-.8 2.3-2.2c0 1.4 1.2 2.2 2.4 2.2S13 10.9 13 9.5c0 1.4 1.1 2.2 2.3 2.2s2.4-.8 2.4-2.2c0 1.4 1 2.2 2.4 2.2s.4 0 .4 0"/><path d="M5 12v8.5h14V12M9 20.5v-4.5h6v4.5"/>'),
+  shop: svg('<path d="M4 7.5h16l-1.6 7.2a2 2 0 0 1-2 1.6H8.2a2 2 0 0 1-2-1.6z" fill="currentColor" fill-opacity=".2"/><path d="M4 7.5L3 4H1.8M9 19.5h.01M16 19.5h.01" stroke-width="2.2"/><path d="M9.5 11h5"/>'),
+  leaf: svg('<path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14z" fill="#8fd16a" stroke="#2f5a1c" stroke-width="1.4"/><path d="M5.5 18.5L13 11" stroke="#2f5a1c" stroke-width="1.3"/>'),
+  lock: svg('<rect x="5.5" y="10.5" width="13" height="9.5" rx="2" fill="currentColor" fill-opacity=".2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><path d="M12 14.2v2.4"/>'),
+  minus: svg('<path d="M6 12h12" stroke-width="2.2"/>'),
+  plus: svg('<path d="M6 12h12M12 6v12" stroke-width="2.2"/>'),
+  trophy: svg('<path d="M8 4.5h8v5a4 4 0 0 1-8 0z" fill="currentColor" fill-opacity=".25"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/>'),
   check: svg('<path d="M5 12.5l4.2 4.2L19 7"/>'),
 };
 

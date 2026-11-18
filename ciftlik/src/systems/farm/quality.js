@@ -1,6 +1,7 @@
 // Kalite ve verim — saf fonksiyonlar (PLAN.md §8 careScore, verim).
 import { WATER_BANDS } from '../../data/crops.js';
-import { QUALITY, XP } from '../../data/farming.js';
+import { QUALITY } from '../../data/farming.js';
+import { XP_RULES } from '../../data/progression.js';
 import { CROPS } from '../../data/crops.js';
 import { nutrientRatio } from './growth.js';
 
@@ -38,7 +39,8 @@ export function harvestYield(def, crop, rng) {
   return q < 1 ? 1 : q;
 }
 
-export function harvestXp(cropId, qty, q) {
-  const v = (CROPS[cropId]?.basePrice ?? 0) * qty * (QUALITY.priceMult[q] ?? 1);
-  return Math.max(1, Math.round(v * XP.harvestPerValue));
+/** Hasat XP'si: B kalite pazar değeri (basePrice × adet × priceMult.B) × XP_RULES.harvestPerValue, en az 1. */
+export function harvestXp(cropId, qty) {
+  const v = (CROPS[cropId]?.basePrice ?? 0) * qty * (QUALITY.priceMult.B ?? 1);
+  return Math.max(1, Math.round(v * XP_RULES.harvestPerValue));
 }

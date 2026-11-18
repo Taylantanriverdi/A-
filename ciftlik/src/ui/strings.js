@@ -24,7 +24,7 @@ export const STR = {
   newGameConfirm: 'Evet, her şeyi sil',
   newGameCancel: 'Vazgeç',
   newGameAsk: 'Emin misin? Bu işlem geri alınamaz.',
-  shortcuts: 'Kısayollar: 1–8 aletler · Boşluk duraklat · Shift+1/2/3 hız · Esc kapat',
+  shortcuts: 'Kısayollar: 1–8 aletler · I/P/M paneller · Boşluk duraklat · Shift+1/2/3 hız · Esc kapat',
   fps: 'FPS',
 
   // ---- Aşama 2: araç çubuğu ----
@@ -91,5 +91,68 @@ export const STR = {
   xp: 'XP',
   xpGain: (n) => `+${n} XP`,
   level: (n) => `Sv ${n}`,
+
+  // ---- Aşama 3: envanter / pazar / mağaza / seviye ----
+  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza' },
+  navKey: (name, k) => `${name} (${k})`,
+  panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza' },
+  slotsUsed: (u, c) => `${u}/${c} yuva`,
+  invFilters: { all: 'Tümü', crop: 'Ürün', seed: 'Tohum', fertilizer: 'Gübre', chemical: 'Bakım' },
+  invEmpty: 'Bu bölümde eşya yok',
+  invHint: 'Bir eşyaya dokun: ayrıntılar burada görünür',
+  catName: { crop: 'Ürün', seed: 'Tohum', fertilizer: 'Gübre', chemical: 'Bakım', tool: 'Alet' },
+  freshLeft: (d) => (d <= 0 ? 'Bugün bozulur' : d <= 1 ? '1 gün içinde kalite düşer' : `${d} gün taze`),
+  freshLastC: (d) => (d <= 0 ? 'Bugün çürür' : d <= 1 ? '1 gün içinde çürür' : `${d} gün sonra çürür`),
+  sellThis: 'Pazarda sat',
+  qtyOf: (n) => `${n} adet`,
+  // pazar
+  channel: 'Satış kanalı',
+  channelLocked: (n) => `Seviye ${n}`,
+  payTomorrow: 'Ödeme yarın 08:00',
+  payNow: 'Ödeme hemen',
+  minLotNote: (n) => `En az ${n} birim`,
+  dailyLimit: (n) => `Bugün bu üründen ${n} birim daha alınır`,
+  limitReached: 'Bugünlük alım limiti doldu',
+  belowMinLot: (n, have) => `Toptancı en az ${n} birim alır (elinde ${have})`,
+  noSellable: 'Satılacak ürün yok',
+  noSellableHint: 'Hasat ettiğin ürünler burada listelenir.',
+  unitPrice: 'birim',
+  avgUnit: (v) => `ort. birim ${v}`,
+  total: 'Toplam',
+  sell: 'Sat',
+  sellAll: 'Hepsi',
+  demand: 'Talep',
+  demandLvl: { high: 'yüksek', mid: 'orta', low: 'düşük' },
+  trend28: '28 gün',
+  noHistory: 'Fiyat geçmişi yok',
+  pct: (v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}%${Math.abs(v).toFixed(Math.abs(v) < 10 ? 1 : 0).replace('.', ',')}`,
+  sold: (amount, qty, name) => `+${amount} · ${qty} ${name}`,
+  soldLater: (amount, qty, name) => `${qty} ${name} satıldı · ${amount} yarın 08:00`,
+  // mağaza
+  owned: (n) => `Envanterde: ${n}`,
+  buy: 'Satın al',
+  seasonSeed: (names) => `${names} tohumu`,
+  inSeasonNow: 'Mevsiminde',
+  levelLock: (n) => `Seviye ${n}`,
+  notEnoughMoney: 'Yeterli paran yok',
+  bought: (amount, qty, name) => `−${amount} · ${qty} ${name}`,
+  dec: 'Azalt',
+  inc: 'Artır',
+  // envanter bildirimleri
+  invFull: 'Envanter dolu — pazarda sat ya da yer aç',
+  spoiled: (stale, rotten) => {
+    const a = [];
+    if (stale > 0) a.push(`${stale} ürün bayatladı`);
+    if (rotten > 0) a.push(`${rotten} ürün çürüdü`);
+    return a.join(', ');
+  },
+  // seviye
+  levelUpKicker: 'Seviye atladın',
+  levelUpTitle: (n) => `Seviye ${n}!`,
+  levelUpNone: 'Yeni kapılar yakında açılacak',
+  levelUpUnlocks: 'Açılanlar',
+  tapToClose: 'Kapatmak için dokun',
+  xpProgress: (xp, next) => `${xp}/${next}`,
+  panelShortcuts: 'I envanter · P pazar · M mağaza · Esc kapat',
 };
 export default STR;

@@ -1,9 +1,13 @@
 // Tarım simülasyonu (Node, Phaser yok): node tools/sim-farm.mjs [seed]
 // FarmSystem + InventorySystem SystemRegistry ile sürülür; senaryo sonuçları tablo olarak yazdırılır.
 import { createInitialState } from '../src/core/GameState.js';
+import { remove } from '../src/systems/InventorySystem.js';
 import SystemRegistry from '../src/core/SystemRegistry.js';
 import TimeSystem from '../src/systems/TimeSystem.js';
-import InventorySystem, { add, count } from '../src/systems/InventorySystem.js';
+import InventorySystem, { add, count, canAdd, freeSlots, usedSlots, spoilDay } from '../src/systems/InventorySystem.js';
+import ProgressionSystem, { levelFromTotal } from '../src/systems/ProgressionSystem.js';
+import { sanitize, registerValidator } from '../src/core/SaveSystem.js';
+import { INVENTORY, xpToNext } from '../src/data/progression.js';
 import FarmSystem from '../src/systems/FarmSystem.js';
 import { tileInfo, canApply, seedWarning } from '../src/systems/farm/rules.js';
 import { P1_BLOCKED } from '../src/data/land.js';
@@ -32,16 +36,21 @@ function makeWorld(seed = SEED, { pre, post } = {}) {
   if (!state.flags) state.flags = {};
   const bus = makeBus();
   const reg = new SystemRegistry(state, bus);
-  reg.register(TimeSystem).register(InventorySystem);
+  reg.register(TimeSystem).register(InventorySystem).register(ProgressionSystem);
   if (pre) reg.register(pre);
   reg.register(FarmSystem);
   if (post) reg.register(post);
   const results = [];
   bus.on('farm:result', (r) => results.push(r));
+  const xpEvents = [], levelUps = [], fullEvents = [], spoiled = [];
+  bus.on('xp:gained', (e) => xpEvents.push(e));
+  bus.on('level:up', (e) => levelUps.push(e));
+  bus.on('inventory:full', (e) => fullEvents.push(e));
+  bus.on('inventory:spoiled', (e) => spoiled.push({ ...e, day: calendar(state.time.totalMinutes).day }));
   const harvests = [];
   bus.on('farm:harvested', (h) => harvests.push({ ...h, day: calendar(state.time.totalMinutes).day }));
   const w = {
-    state, bus, reg, results, harvests,
+    state, bus, reg, results, harvests, xpEvents, levelUps, fullEvents, spoiled,
     act(type, tileId, itemId) { bus.emit('farm:action', { type, tileId, itemId }); return results[results.length - 1]; },
     now() { return calendar(state.time.totalMinutes); },
     /** bir sonraki günün belirtilen saatine kadar ilerle */
@@ -261,6 +270,7 @@ function saveRoundTrip() {
   const fixes = [];
   FarmSystem.validate(s, (p) => fixes.push(p));
   InventorySystem.validate(s, (p) => fixes.push(p));
+  ProgressionSystem.validate(s, (p) => fixes.push(p));
   const bad = JSON.parse(JSON.stringify(w.state));
   bad.tiles['34,8'].moisture = 'x'; bad.tiles['35,8'].crop = { id: 'nope' }; bad.tiles['foo'] = 3;
   bad.tiles['36,8'].state = 'planted'; bad.inventory.items.compost = [{ q: 'Z', qty: 2 }, { q: 'B', qty: 3.5 }];
@@ -301,7 +311,7 @@ function loadAndInit(saved) {
   InventorySystem.validate(s, (p) => fixes.push(p));
   const bus = makeBus();
   const reg = new SystemRegistry(s, bus);
-  reg.register(TimeSystem).register(InventorySystem).register(FarmSystem);
+  reg.register(TimeSystem).register(InventorySystem).register(ProgressionSystem).register(FarmSystem);
   return { s, bus, fixes };
 }
 
@@ -351,6 +361,123 @@ function qa() {
   return out;
 }
 
+// ---------- Aşama 3: XP akışı ----------
+function xpFlow() {
+  const w = makeWorld();
+  add(w.state, 'seed_potato', 30); add(w.state, 'organic_spray', 30);
+  w.toHour(7);
+  w.act('plow', '34,12');
+  for (const id of PLOT) w.act('plant', id, 'seed_potato');
+  for (let d = 0; d < 10 && w.harvests.length < 24; d++) { care(w, PLOT); w.nextDayAt(7); }
+  const p = w.state.player;
+  const byReason = {};
+  for (const e of w.xpEvents) byReason[e.reason] = (byReason[e.reason] || 0) + e.amount;
+  const last = w.xpEvents[w.xpEvents.length - 1];
+  const consistent = levelFromTotal(p.totalXp).level === p.level && w.xpEvents.every((e) => e.toNext === xpToNext(e.level));
+  return { byReason, player: { ...p }, last, levelUps: w.levelUps, consistent, harvested: w.harvests.reduce((s, h) => s + h.qty, 0) };
+}
+
+function multiLevel() {
+  const w = makeWorld();
+  w.bus.emit('xp:add', { amount: 1000, reason: 'debug' });
+  return { player: { ...w.state.player }, levelUps: w.levelUps.map((l) => `${l.level}:[${l.unlocks.length}]`), ev: w.xpEvents[0] };
+}
+
+// ---------- Aşama 3: 24 yuva, hasatta dolma ----------
+function inventoryFull() {
+  const w = makeWorld();
+  const st = w.state;
+  const rows = [];
+  rows.push(`başlangıç: kapasite ${st.inventory.capacity}, kullanılan ${usedSlots(st)}, boş ${freeSlots(st)}`);
+  add(st, 'seed_potato', 24); add(st, 'organic_spray', 30);
+  w.toHour(7);
+  for (const id of PLOT) w.act('plant', id, 'seed_potato');
+  // boş yuvaları farklı (kalite, organik) yığınlarla doldur, son yuvaya 95 B organik patates
+  const fillers = ['npk', 'lime', 'pesticide', 'seed_wheat', 'seed_bean', 'seed_corn', 'seed_tomato', 'seed_strawberry', 'seed_sunflower', 'seed_watermelon'];
+  let k = 0;
+  while (freeSlots(st) > 1) { add(st, fillers[k % fillers.length], 1, ['A', 'B', 'C'][Math.floor(k / fillers.length) % 3]); k++; }
+  add(st, 'potato', 95, 'B', true);
+  rows.push(`ekim + doldurma sonrası: kullanılan ${usedSlots(st)}/${st.inventory.capacity}, canAdd(patates B org, 10) = ${canAdd(st, 'potato', 10, 'B', true)}, canAdd(patates A org, 1) = ${canAdd(st, 'potato', 1, 'A', true)}`);
+  const n0 = w.fullEvents.length;
+  const probe = JSON.parse(JSON.stringify(st));
+  const partial = add(probe, 'potato', 10, 'B', true);
+  rows.push(`add(patates B org, 10) [kopya state] → eklenen ${partial}, inventory:full olayı ${w.fullEvents.length - n0}`);
+  const r0 = w.results.length;
+  const before = count(st, 'potato');
+  // hazır olana kadar bakım, sonra 2 gün daha her gün hasat denemesi
+  while (!PLOT.some((id) => st.tiles[id].crop?.stage >= 4)) { care(w, PLOT); w.nextDayAt(7); }
+  for (let d = 0; d < 1; d++) { care(w, PLOT); w.nextDayAt(7); }
+  const hr = w.results.slice(r0).filter((r) => r.type === 'harvest');
+  const ok = hr.filter((r) => r.ok && !r.cleared), fail = hr.filter((r) => !r.ok);
+  const gained = count(st, 'potato') - before;
+  rows.push(`dolu envanterle hasat: başarılı ${ok.length} (${ok.map((r) => `${r.qty}${r.quality}`).join(',')}), reddedilen deneme ${fail.length} [${[...new Set(fail.map((r) => r.reason))].join(',')}], tarlada bekleyen ${PLOT.filter((id) => st.tiles[id].crop && !st.tiles[id].crop.dead).length}`);
+  rows.push(`kayıp yok: hasat edilen ${ok.reduce((s, r) => s + r.qty, 0)} = envantere giren ${gained}; kullanılan yuva ${usedSlots(st)}/${st.inventory.capacity}`);
+  // yer aç (ör. satış) → kalan hasat yapılabilir
+  for (let i = 0; i < 6; i++) { const id = fillers[i]; remove(st, id, 99); }
+  const r1 = w.results.length;
+  for (const id of PLOT) if (st.tiles[id].crop?.stage >= 4) w.act('harvest', id);
+  const after = w.results.slice(r1);
+  rows.push(`6 yuva boşaltıldı → hasat ${after.filter((r) => r.ok).length} başarılı / ${after.filter((r) => !r.ok).length} red; yuva ${usedSlots(st)}/${st.inventory.capacity}; patates ${JSON.stringify(st.inventory.items.potato.map((x) => `${x.q}${x.organic ? 'o' : ''}×${x.qty}`))}`);
+  return rows;
+}
+
+// ---------- Aşama 3: bozulma zaman çizelgesi ----------
+function spoilTimeline() {
+  const w = makeWorld();
+  const st = w.state;
+  w.toHour(9);
+  add(st, 'lettuce', 10, 'A', true);
+  add(st, 'potato', 5, 'A', false);
+  add(st, 'compost', 3); // kategori fertilizer — bozulmaz
+  const d0 = w.now().day;
+  const rows = [];
+  const fmt = (id) => (st.inventory.items[id] || []).map((s) => `${s.q}${s.organic ? 'o' : ''}×${s.qty}(y${s.age})`).join(' ') || '—';
+  for (let i = 0; i <= 13; i++) {
+    const ev = w.spoiled.filter((e) => e.day === w.now().day).map((e) => `${e.itemId} ${e.fromQ}→${e.toQ ?? 'çürüdü'} ×${e.qty}`).join('; ');
+    rows.push([`+${w.now().day - d0}`, fmt('lettuce'), fmt('potato'), fmt('compost'), ev || '']);
+    w.nextDayAt(9);
+  }
+  return rows;
+}
+
+function spoilMerge() {
+  const s = { inventory: { capacity: 24, items: { lettuce: [{ q: 'A', organic: false, qty: 60, age: 3 }, { q: 'B', organic: false, qty: 70, age: 1 }] } } };
+  const before = JSON.stringify(s.inventory.items.lettuce);
+  const ev = spoilDay(s);
+  return `${before} → ${JSON.stringify(s.inventory.items.lettuce)} olay ${JSON.stringify(ev)}`;
+}
+
+// ---------- Aşama 3: eski kayıt göçü ----------
+function legacyMigration() {
+  registerValidator(FarmSystem.validate);
+  registerValidator(InventorySystem.validate);
+  registerValidator(ProgressionSystem.validate);
+  const out = [];
+  const mk = (stacks) => {
+    const s = createInitialState(7);
+    delete s.flags; s.version = 1;
+    s.player = { name: 'Çiftçi', xp: 250, reputation: 10 }; // Aşama 2: level/totalXp yok, xp toplam
+    s.inventory = { capacity: 60, items: {} };
+    const ids = Object.keys(CROPS);
+    for (let i = 0; i < stacks; i++) s.inventory.items[ids[i % ids.length]] = (s.inventory.items[ids[i % ids.length]] || []).concat([{ q: 'ABC'[Math.floor(i / ids.length) % 3], organic: i >= 27, qty: 150, age: 0 }]);
+    return JSON.parse(JSON.stringify(s));
+  };
+  for (const n of [6, 30]) {
+    const raw = mk(n);
+    const before = Object.values(raw.inventory.items).reduce((a, l) => a + l.reduce((b, x) => b + x.qty, 0), 0);
+    const { state: s, repairs } = sanitize(raw);
+    const after = Object.values(s.inventory.items).reduce((a, l) => a + l.reduce((b, x) => b + x.qty, 0), 0);
+    out.push(`capacity 60, ${n} yığın (her biri 150 adet) → capacity ${s.inventory.capacity}, yığın ${usedSlots(s)}, toplam adet ${before}→${after}, player ${JSON.stringify({ level: s.player.level, xp: s.player.xp, totalXp: s.player.totalXp })}; onarımlar: ${repairs.filter((r) => /inventory\.capacity|player/.test(r)).join(',')}`);
+    // ikinci yükleme kararlı mı?
+    const again = sanitize(JSON.parse(JSON.stringify(s)));
+    out.push(`  ikinci yükleme: capacity ${again.state.inventory.capacity}, player ${again.state.player.level}/${again.state.player.xp}/${again.state.player.totalXp}, onarım ${again.repairs.length}`);
+  }
+  // yeni oyun kapasitesi 60'a büyütülse de ikinci kez göç olmaz
+  const s2 = createInitialState(9); s2.inventory.capacity = 60; s2.flags.inventorySlotsV2 = true;
+  out.push(`göç bayrağı varken capacity 60 korunur: ${sanitize(s2).state.inventory.capacity}`);
+  return out;
+}
+
 // ================= ÇIKTI =================
 console.log(`sim-farm — tohum ${SEED}${QA ? ` (DENEME: A eşiği ${QUALITY.thresholds.A})` : ''}`);
 const ng = newGame();
@@ -383,6 +510,21 @@ table('(e) 27 gün, 24 karo, sürekli patates — tehdit başlangıçları', ['b
 }
 console.log('\nAşama 2 QA:');
 for (const l of qa()) console.log(' -', l);
+
+console.log('\nAşama 3 — XP akışı:');
+{
+  const x = xpFlow();
+  console.log(` - nedene göre XP: ${JSON.stringify(x.byReason)} (${x.harvested} adet patates hasadı)`);
+  console.log(` - player: ${JSON.stringify(x.player)}; son xp:gained ${JSON.stringify(x.last)}; level:up ${JSON.stringify(x.levelUps)}; tutarlı: ${x.consistent ? 'EVET' : 'HAYIR'}`);
+  const m = multiLevel();
+  console.log(` - xp:add 1000 → ${JSON.stringify(m.player)}; level:up sırası ${m.levelUps.join(' ')}; xp:gained ${JSON.stringify(m.ev)}`);
+}
+console.log(`\nAşama 3 — 24 yuvalık envanter (stackMax ${INVENTORY.stackMax}):`);
+for (const l of inventoryFull()) console.log(' -', l);
+table('Aşama 3 — bozulma (marul freshDays 4, patates 20; kompost bozulmaz)', ['gün', 'marul', 'patates', 'kompost', 'inventory:spoiled'], spoilTimeline());
+console.log('Birleşme taşması:', spoilMerge());
+console.log('\nAşama 3 — eski kayıt göçü:');
+for (const l of legacyMigration()) console.log(' -', l);
 
 const p = perf();
 console.log(`\nPerformans: ${p.tiles} karo — onHour ${p.hourMs.toFixed(3)} ms, onDay ${p.dayMs.toFixed(3)} ms`);
