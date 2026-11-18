@@ -48,3 +48,20 @@ export const ICON = {
   coin: svg('<circle cx="12" cy="12" r="8.2" fill="#f2b84b" stroke="#c98a22" stroke-width="1.4"/><circle cx="12" cy="12" r="5.6" stroke="#fff2c8" stroke-width="1.1" opacity=".7"/>'),
   check: svg('<path d="M5 12.5l4.2 4.2L19 7"/>'),
 };
+
+// Alet ikonları (araç çubuğu) — currentColor; aktif düğmede koyu, pasifte krem.
+export const TOOL_ICON = {
+  hand: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5" stroke-width="2.6"/><path d="M8 8.6a3.2 3.2 0 0 1 2.6-1.4" opacity=".6"/>'),
+  hoe: svg('<path d="M5 20.5L15.5 10" stroke-width="2.2"/><path d="M13.2 7.6l3.6-3.4c.8-.7 2-.6 2.6.2l1.5 1.8c.6.8.4 1.9-.4 2.4l-4.3 2.8z" fill="currentColor" fill-opacity=".25"/><path d="M14 9l3 3"/>'),
+  seed: svg('<path d="M12 21v-7"/><path d="M12 14c0-4 3-6.5 7-6.5 0 4-3 6.5-7 6.5z" fill="currentColor" fill-opacity=".25"/><path d="M12 15.5c0-3-2.3-5-5.5-5 0 3 2.3 5 5.5 5z" fill="currentColor" fill-opacity=".25"/><path d="M6 21h12"/>'),
+  water: svg('<path d="M4.5 10h11v7.5a2.5 2.5 0 0 1-2.5 2.5H7a2.5 2.5 0 0 1-2.5-2.5z" fill="currentColor" fill-opacity=".22"/><path d="M15.5 12.5l4.5-4M20 8.5l1.6 1.6M7.5 10V8a2.5 2.5 0 0 1 5 0v2"/><path d="M20.6 13.6v.01M19 16v.01M21.6 17.2v.01" stroke-width="2.4"/>'),
+  fertilize: svg('<path d="M6.5 8c0-1.5 1.5-2.5 5.5-2.5s5.5 1 5.5 2.5l1 11c0 1.4-2.5 2-6.5 2s-6.5-.6-6.5-2z" fill="currentColor" fill-opacity=".22"/><path d="M7 8.3c1.5.8 3.2 1.1 5 1.1s3.5-.3 5-1.1"/><path d="M12 17.5c-2.2 0-3-1.5-3-3 1.6 0 3 .9 3 3zm0 0c0-2.2 1.4-3.6 3.2-3.6 0 2.1-1.2 3.6-3.2 3.6z"/>'),
+  treat: svg('<path d="M9 4.5h4v3H9zM13 5.5h3.5l-.8 1.6"/><path d="M8.5 7.5h5l1.5 2.5v9.5A1.5 1.5 0 0 1 13.5 21h-5A1.5 1.5 0 0 1 7 19.5V10z" fill="currentColor" fill-opacity=".22"/><path d="M18.5 4.5v.01M20.5 6.5v.01M18.8 8.4v.01" stroke-width="2.3"/>'),
+  weed: svg('<path d="M12 13.5V4"/><path d="M12 9c-1.5-2.5-4-3-6-2.5.5 2.5 3 3.5 6 2.5zM12 7.5c1.5-2.5 4-3 6-2.5-.5 2.5-3 3.5-6 2.5z" fill="currentColor" fill-opacity=".25"/><path d="M12 13.5c-1 2-3 3-5 3M12 13.5c0 2.5.5 4.5 2 6M12 13.5c1.5 1.5 3.5 2 5.5 1.5"/><path d="M4 20.5h16" opacity=".55" stroke-dasharray="1.5 2.2"/>'),
+  harvest: svg('<path d="M3.5 11h17l-1.8 8.2a2 2 0 0 1-2 1.6H7.3a2 2 0 0 1-2-1.6z" fill="currentColor" fill-opacity=".22"/><path d="M7.5 11c0-3.5 2-6 4.5-6s4.5 2.5 4.5 6"/><path d="M9 14.5v3.5M12 14.5v3.5M15 14.5v3.5"/>'),
+  chevron: svg('<path d="M7 14l5-5 5 5"/>'),
+  spark: svg('<path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8z" fill="currentColor" stroke="none"/>'),
+  bug: svg('<ellipse cx="12" cy="13.5" rx="4.2" ry="5.5" fill="currentColor" fill-opacity=".25"/><path d="M12 8V19M9.5 6.5L8 4.5M14.5 6.5L16 4.5M7.8 11H4.5M7.8 15H4.8M16.2 11h3.3M16.2 15h3"/>'),
+  drop: svg('<path d="M12 3.5c3.5 4.5 6 7.6 6 10.8a6 6 0 0 1-12 0c0-3.2 2.5-6.3 6-10.8z" fill="currentColor" fill-opacity=".25"/>'),
+  alert: svg('<path d="M12 4l9 15.5H3z" fill="currentColor" fill-opacity=".2"/><path d="M12 10v4M12 17v.01" stroke-width="2.2"/>'),
+};

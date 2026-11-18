@@ -33,6 +33,7 @@ export function createInitialState(seed = randomSeed()) {
     contracts: [],
     stats: { harvested: {}, sold: {}, earned: 0, spent: 0 },
     settings: { quality: 'auto', sound: 0.8, music: 0.5 },
+    flags: {}, // tek seferlik bayraklar (ör. farmInitialized, firstHarvest:{potato:true}) — sistemler yazar
     camera: null, // {x, y, zoom} — CameraDirector yazar
   };
 }

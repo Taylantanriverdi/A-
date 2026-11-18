@@ -3,6 +3,7 @@
 import Phaser from 'phaser';
 import Renderer from '../render/Renderer.js';
 import CameraDirector from '../render/CameraDirector.js';
+import Cinematics from '../core/Cinematics.js';
 import { MIN_PER_DAY, DAYS_PER_SEASON, SEASONS } from '../core/constants.js';
 
 /** timeUtils.calendar ile aynı hesap, ama tek nesneyi yeniden kullanır (kare başına ayırma yok). */
@@ -60,6 +61,7 @@ export default class WorldScene extends Phaser.Scene {
     }
     this.camera = new CameraDirector(this, state, bus);
     this.app.camera = this.camera;
+    this.cinematics = new Cinematics(bus);
 
     // Kalite: Renderer yaratıldıktan sonra da ilk değer ulaşsın.
     const applyQuality = ({ level }) => {
@@ -76,6 +78,7 @@ export default class WorldScene extends Phaser.Scene {
     this._createdAt = this._introStart;
     this.events.once('shutdown', () => {
       offQ();
+      this.cinematics?.destroy();
       try { this.renderer2?.destroy(); } catch { /* yok say */ }
     });
   }

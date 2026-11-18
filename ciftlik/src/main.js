@@ -7,6 +7,8 @@ import SaveSystem from './core/SaveSystem.js';
 import SystemRegistry from './core/SystemRegistry.js';
 import { SPEEDS, MIN_PER_DAY, TILE_W, TILE_H } from './core/constants.js';
 import TimeSystem from './systems/TimeSystem.js';
+import FarmSystem from './systems/FarmSystem.js';
+import InventorySystem from './systems/InventorySystem.js';
 import BootScene from './scenes/BootScene.js';
 import WorldScene from './scenes/WorldScene.js';
 import { mountUI } from './ui/index.js';
@@ -47,6 +49,16 @@ try {
 
 // ------------------------------------------------------------------ durum + sistemler
 let state, registry;
+
+// Sistem doğrulayıcıları load()'dan ÖNCE kaydedilir (sanitize şema temizlemesinden sonra çağırır).
+for (const sys of [InventorySystem, FarmSystem]) {
+  if (sys && typeof sys.validate === 'function') {
+    const v = (st, onFix) => sys.validate(st, onFix);
+    Object.defineProperty(v, 'name', { value: `${sys.id || 'system'}.validate` });
+    SaveSystem.registerValidator(v);
+  }
+}
+
 try {
   const loaded = SaveSystem.load();
   loadedFromSave = !!loaded;
@@ -54,6 +66,8 @@ try {
   SaveSystem.applyStoredSettings(state);
   registry = new SystemRegistry(state, bus);
   registry.register(TimeSystem);
+  registry.register(InventorySystem);
+  registry.register(FarmSystem);
   SaveSystem.attach(state, bus);
 } catch (e) {
   recover(e);
@@ -205,6 +219,9 @@ const debug = {
     });
   },
   quality(level) { bus.emit('settings:set', { key: 'quality', value: level }); },
+  addItem(id, qty = 10, q = 'B') { bus.emit('inventory:add', { itemId: id, qty: Number(qty) || 0, quality: q }); },
+  grow(days) { debug.skip(Math.max(0, Number(days) || 0) * MIN_PER_DAY); },
+  tool(t) { bus.emit('tool:select', { tool: t }); },
   speeds: SPEEDS,
 };
 

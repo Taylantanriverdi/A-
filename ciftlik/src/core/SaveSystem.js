@@ -16,6 +16,17 @@ const MIN_AUTOSAVE_GAP_MS = 1000; // time:hour yüksek hızda/skip'te kayıt fı
  */
 export const migrations = {};
 
+/**
+ * Sistem doğrulayıcıları: fn(state, onFix). sanitize() şema temizlemesinden SONRA sırayla çağırır.
+ * Her sistem kendi alanının dizi/sözlük elemanlarını doğrular (PLAN §1 "Kayıt sistemi" kuralı).
+ */
+const validators = [];
+
+/** @param {(state:object, onFix:(path:string)=>void)=>void} fn */
+export function registerValidator(fn) {
+  if (typeof fn === 'function' && !validators.includes(fn)) validators.push(fn);
+}
+
 function storage() {
   try { return window.localStorage; } catch { return null; }
 }
@@ -88,6 +99,15 @@ export function sanitize(s) {
   // rastgele üretici durumu (fillDefaults sayı olmayanları yeniden üretti); 32-bit aralığa çek
   s.rngSeed = s.rngSeed >>> 0;
   s.rngState |= 0;
+
+  // sistem doğrulayıcıları (biri istisna atarsa diğerleri yine çalışır)
+  for (let i = 0; i < validators.length; i++) {
+    try {
+      validators[i](s, fix);
+    } catch (e) {
+      console.error('[save] doğrulayıcı hatası', validators[i].name || i, e);
+    }
+  }
   return { state: s, repairs };
 }
 
@@ -133,6 +153,9 @@ const SaveSystem = {
   _pending: 0,
   _disabled: false,
   _quotaWarned: false,
+
+  /** Sistem doğrulayıcısı kaydı — load()'dan ÖNCE çağrılmalı. */
+  registerValidator(fn) { registerValidator(fn); },
 
   /** @returns {object|null} */
   load() {

@@ -2,7 +2,7 @@
 // Kamera durumu dünya merkez noktası (cx, cy) + kullanıcı zoom'u olarak tutulur.
 // Gerçek Phaser zoom'u = zoom × dpr (main.js canvas'ı aygıt pikseliyle çizer, bkz. registry 'dpr').
 import Phaser from 'phaser';
-import { WORLD_W, WORLD_H, SKY_H, P1, TILE_W, TILE_H } from '../core/constants.js';
+import { WORLD_W, WORLD_H, SKY_H, P1, TILE_W, TILE_H, WORLD_TILES_X, WORLD_TILES_Y } from '../core/constants.js';
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
@@ -11,7 +11,9 @@ const ZOOM_TAU_MS = 110;      // zoom yumuşatma zaman sabiti
 const INERTIA_TAU_MS = 240;   // kayma sönümü
 const KEY_PAN_SPEED = 900;    // ekran px/sn (zoom'dan bağımsız his)
 const KEY_ZOOM_RATE = 1.6;    // log-zoom/sn
-const TAP_SLOP_CSS = 7;       // tıklama/sürükleme eşiği (CSS px)
+const TAP_SLOP_CSS = 8;       // tıklama/sürükleme eşiği (CSS px; × dpr ile oyun pikseline)
+const PAINT_HOLD_MS = 110;    // dokunmatik boyamada ilk karo gecikmesi (iki parmak pan'ı ayırt etmek için)
+const TOUCH_HOVER_MUTE_MS = 800; // dokunuştan sonra taklit fare olaylarıyla hover yayma
 const TAP_MAX_MS = 400;
 const PERSIST_MS = 1000;
 const LETTERBOX_MS = 600;
@@ -51,6 +53,14 @@ export default class CameraDirector {
     this.pinch = null;
     this.pointers = new Map();   // id → {x, y}
     this.keys = { up: 0, down: 0, left: 0, right: 0, zin: 0, zout: 0 };
+    // karo girdisi
+    this.tool = 'hand';
+    this.paint = null;           // {id, tx, ty, sx, sy, t0, pending, touch, moved}
+    this._visited = new Set();   // bu fırçada yayılan karolar (tekrar yok)
+    this.mouse = { x: 0, y: 0, inside: false };
+    this.hoverTx = -1; this.hoverTy = -1; this.hoverOn = false;
+    this._lastTouchAt = -1e9;
+    this._tmp = { x: 0, y: 0 };
     this._persistAcc = 0;
     this._offs = [];
 
@@ -59,6 +69,7 @@ export default class CameraDirector {
     this._offs.push(
       bus.on('camera:cinematic', (p) => this.cinematic(p)),
       bus.on('save:before', () => this.persist()),
+      bus.on('tool:select', (p) => this.setTool(p && p.tool)),
     );
     this._onResize = () => { this.cam.setSize(this.scene.scale.width, this.scene.scale.height); this._clamp(); this._apply(); };
     scene.scale.on('resize', this._onResize);
@@ -71,6 +82,15 @@ export default class CameraDirector {
 
   get dpr() { return this.scene.registry.get('dpr') || 1; }
   get isCinematic() { return !!this.cine; }
+  /** Boyama modu: 'hand' dışı bir alet seçiliyken tek parmak / sol tık sürükleme karo boyar. */
+  get painting() { return this.tool !== 'hand'; }
+
+  setTool(tool) {
+    const t = typeof tool === 'string' && tool ? tool : 'hand';
+    if (t === this.tool) return;
+    this.tool = t;
+    this._endPaint();
+  }
 
   // ---------------------------------------------------------------- dış API
   /** Takip: {x,y} taşıyan canlı nesne (sprite vb.) veya null. */
@@ -108,8 +128,10 @@ export default class CameraDirector {
     const travel = clamp(duration * 0.3, 500, 1400);
     const to = { x: tgt.x, y: tgt.y, z: tz };
     this._clampPoint(to);
+    this._setHover(false);
     this.locked = true;
     this.drag = null; this.pinch = null; this.anchor = null;
+    this._endPaint();
     this.vx = this.vy = 0;
     this.cine = {
       phase: 'in', t: 0, travel, hold: Math.max(0, duration - travel),
@@ -130,6 +152,14 @@ export default class CameraDirector {
     }
     this._clamp();
     this._apply();
+    if (!this.locked) {
+      const pt = this.paint;
+      if (pt && pt.pending && performance.now() - pt.t0 >= PAINT_HOLD_MS) this._commitPaint();
+      if (this.mouse.inside && !pt && !this.drag && !this.pinch
+        && performance.now() - this._lastTouchAt > TOUCH_HOVER_MUTE_MS) {
+        this._hoverAt(this.mouse.x, this.mouse.y); // zoom/klavye pan'da imleç altındaki karo değişebilir
+      }
+    }
     this._persistAcc += dt;
     if (this._persistAcc >= PERSIST_MS) { this._persistAcc = 0; this.persist(); }
   }
@@ -254,25 +284,150 @@ export default class CameraDirector {
     if (c && typeof c === 'object') { c.x = x; c.y = y; c.zoom = zoom; } else this.state.camera = { x, y, zoom };
   }
 
+  // ---------------------------------------------------------------- karo girdisi
+  /** Ekran (oyun pikseli) → karo; zemin düzlemindeyse true ve out.x/out.y = tx/ty. */
+  _tileAt(sx, sy, out) {
+    const w = this.screenToWorld(sx, sy, this._tmp);
+    if (!(w.x >= 0 && w.x < WORLD_W && w.y >= 0 && w.y < WORLD_H)) return false;
+    out.x = Math.floor(w.x / TILE_W);
+    out.y = Math.floor(w.y / TILE_H);
+    return true;
+  }
+
+  /** x, y: dokunulan dünya noktası (boyamada doldurulan karolar için karo merkezi). */
+  _emitTileTap(tx, ty, x = (tx + 0.5) * TILE_W, y = (ty + 0.5) * TILE_H) {
+    if (this.locked || tx < 0 || ty < 0 || tx >= WORLD_TILES_X || ty >= WORLD_TILES_Y) return;
+    this.bus.emit('tile:tap', { tx, ty, tileId: `${tx},${ty}`, x, y });
+  }
+
+  /** Hover: yalnızca karo değişince (veya zemin dışına çıkınca null) yayar. */
+  _hoverAt(sx, sy) {
+    const t = this._tmpT || (this._tmpT = { x: 0, y: 0 });
+    if (!this._tileAt(sx, sy, t)) { this._setHover(false); return; }
+    if (this.hoverOn && t.x === this.hoverTx && t.y === this.hoverTy) return;
+    this.hoverOn = true; this.hoverTx = t.x; this.hoverTy = t.y;
+    this.bus.emit('tile:hover', { tx: t.x, ty: t.y, tileId: `${t.x},${t.y}` });
+  }
+
+  _setHover(on) {
+    if (on || !this.hoverOn) return;
+    this.hoverOn = false; this.hoverTx = this.hoverTy = -1;
+    this.bus.emit('tile:hover', null);
+  }
+
+  /** Boyama fırçası: basılan karo + sonra geçilen her yeni karo (Bresenham ile boşluksuz). */
+  _beginPaint(p, touch) {
+    const t = { x: 0, y: 0 };
+    const on = this._tileAt(p.x, p.y, t);
+    const w = this.screenToWorld(p.x, p.y, this._tmp);
+    this._visited.clear();
+    this.paint = {
+      id: p.id, sx: p.x, sy: p.y, t0: performance.now(), touch, moved: false,
+      // zemin dışında başlayan fırça için ham (sınırsız) karo koordinatı tutulur
+      tx: on ? t.x : Math.floor(w.x / TILE_W), ty: on ? t.y : Math.floor(w.y / TILE_H),
+      pending: touch, // dokunmatikte ikinci parmak gelebilir: kısa süre bekle
+    };
+    if (!touch) this._paintTile(this.paint.tx, this.paint.ty);
+  }
+
+  _commitPaint() {
+    const pt = this.paint;
+    if (!pt || !pt.pending) return;
+    pt.pending = false;
+    this._paintTile(pt.tx, pt.ty);
+  }
+
+  _paintTile(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= WORLD_TILES_X || ty >= WORLD_TILES_Y) return;
+    const key = ty * WORLD_TILES_X + tx;
+    if (this._visited.has(key)) return;
+    this._visited.add(key);
+    this._emitTileTap(tx, ty);
+  }
+
+  _paintMove(sx, sy) {
+    const pt = this.paint;
+    const w = this.screenToWorld(sx, sy, this._tmp);
+    const nx = Math.floor(w.x / TILE_W), ny = Math.floor(w.y / TILE_H);
+    if (nx === pt.tx && ny === pt.ty) return;
+    // Bresenham: (pt.tx, pt.ty) hariç → (nx, ny) dahil
+    let x = pt.tx, y = pt.ty;
+    const dx = Math.abs(nx - x), dy = -Math.abs(ny - y);
+    const stx = x < nx ? 1 : -1, sty = y < ny ? 1 : -1;
+    let err = dx + dy;
+    let guard = 4096;
+    while ((x !== nx || y !== ny) && guard-- > 0) {
+      const e2 = 2 * err;
+      // çapraz adımda köşe karosunu da doldur (4-bağlantılı çizgi: köşeden atlama yok)
+      if (e2 >= dy && e2 <= dx) {
+        err += dy; x += stx;
+        this._paintTile(x, y);
+        err += dx; y += sty;
+      } else if (e2 >= dy) {
+        err += dy; x += stx;
+      } else {
+        err += dx; y += sty;
+      }
+      this._paintTile(x, y);
+    }
+    pt.tx = nx; pt.ty = ny;
+  }
+
+  _endPaint() {
+    this.paint = null;
+    this._visited.clear();
+  }
+
   // ---------------------------------------------------------------- giriş: fare + dokunmatik
   _bindPointer() {
     const input = this.scene.input;
+    const isTouch = (p) => !!p.wasTouch;
     const onDown = (p) => {
       if (this.locked) return;
-      this.pointers.set(p.id, { x: p.x, y: p.y });
+      if (this.pointers.has(p.id)) return; // aynı farede ikinci tuş
+      const touch = isTouch(p);
+      if (touch) { this._lastTouchAt = performance.now(); this._setHover(false); }
+      this.pointers.set(p.id, { x: p.x, y: p.y, button: p.button ?? 0 });
       this.vx = this.vy = 0;
       if (this.pointers.size === 1) {
-        this._startDrag(p.id, p.x, p.y, false);
+        if (this.painting && (p.button ?? 0) === 0) {
+          this.drag = null;
+          this._beginPaint(p, touch);
+        } else {
+          this._startDrag(p.id, p.x, p.y, false);
+        }
       } else if (this.pointers.size === 2) {
         this.drag = null;
+        this._endPaint(); // iki parmak → pan/pinch; boyama biter (bekleyen ilk karo yayılmaz)
         this._startPinch();
       }
     };
     const onMove = (p) => {
+      const touch = isTouch(p);
+      if (touch) this._lastTouchAt = performance.now();
+      else {
+        this.mouse.x = p.x; this.mouse.y = p.y; this.mouse.inside = true;
+      }
       const rec = this.pointers.get(p.id);
-      if (!rec || this.locked) return;
+      if (this.locked) return;
+      if (!touch && !this.drag && !this.pinch
+        && performance.now() - this._lastTouchAt > TOUCH_HOVER_MUTE_MS) this._hoverAt(p.x, p.y);
+      if (!rec) return;
       rec.x = p.x; rec.y = p.y;
       if (this.pinch) { this._updatePinch(); return; }
+      const pt = this.paint;
+      if (pt && pt.id === p.id) {
+        if (!pt.moved) {
+          const slop = TAP_SLOP_CSS * this.dpr;
+          if (Math.abs(p.x - pt.sx) > slop || Math.abs(p.y - pt.sy) > slop) pt.moved = true;
+        }
+        if (pt.pending) {
+          if (!pt.moved) return;
+          this._commitPaint();
+        }
+        this._paintMove(p.x, p.y);
+        return;
+      }
       const d = this.drag;
       if (!d || d.id !== p.id) return;
       const dx = p.x - d.lastX, dy = p.y - d.lastY;
@@ -294,15 +449,26 @@ export default class CameraDirector {
     };
     const onUp = (p) => {
       if (!this.pointers.has(p.id)) return;
+      const rec = this.pointers.get(p.id);
       this.pointers.delete(p.id);
+      if (isTouch(p)) this._lastTouchAt = performance.now();
       if (this.locked) return;
       if (this.pinch) {
         if (this.pointers.size < 2) {
           this.pinch = null;
           this.vx = this.vy = 0;
+          // Boyama modunda kalan parmak ne kaydırır ne boyar (iki parmak hareketinin artığı).
           const it = this.pointers.entries().next();
-          if (!it.done) this._startDrag(it.value[0], it.value[1].x, it.value[1].y, true);
+          if (!it.done && !this.painting) this._startDrag(it.value[0], it.value[1].x, it.value[1].y, true);
         }
+        return;
+      }
+      const pt = this.paint;
+      if (pt && pt.id === p.id) {
+        if (pt.pending) this._commitPaint(); // kısa dokunuş → tek karo
+        const tapLike = !pt.moved && performance.now() - pt.t0 < TAP_MAX_MS;
+        this._endPaint();
+        if (tapLike) this._emitInputTap(p, false);
         return;
       }
       const d = this.drag;
@@ -311,11 +477,8 @@ export default class CameraDirector {
       const now = performance.now();
       if (!d.moved && now - d.t0 < TAP_MAX_MS) {
         this.vx = this.vy = 0;
-        const w = this.screenToWorld(p.x, p.y);
-        this.bus.emit('input:tap', {
-          x: w.x, y: w.y, screenX: p.x / this.dpr, screenY: p.y / this.dpr,
-          button: p.button ?? 0, touch: !!p.wasTouch,
-        });
+        // Karo seçimi yalnızca birincil tuşla (sağ/orta tık boyama modunda pan içindir).
+        this._emitInputTap(p, (rec?.button ?? 0) === 0);
       } else if (now - d.lastT > 90) {
         this.vx = this.vy = 0; // bırakmadan önce durmuşsa kayma yok
       } else {
@@ -332,15 +495,33 @@ export default class CameraDirector {
       this.setZoom(this.targetZoom * Math.exp(-d * 0.0015), p.x, p.y);
       this.followTarget = null;
     };
+    const onOut = () => { this.mouse.inside = false; if (!this.locked) this._setHover(false); };
+    const onOver = () => { this.mouse.inside = performance.now() - this._lastTouchAt > TOUCH_HOVER_MUTE_MS; };
     input.on('pointerdown', onDown);
     input.on('pointermove', onMove);
     input.on('pointerup', onUp);
     input.on('pointerupoutside', onUp);
     input.on('wheel', onWheel);
+    input.on('gameout', onOut);
+    input.on('gameover', onOver);
     this._offs.push(() => {
       input.off('pointerdown', onDown); input.off('pointermove', onMove);
       input.off('pointerup', onUp); input.off('pointerupoutside', onUp); input.off('wheel', onWheel);
+      input.off('gameout', onOut); input.off('gameover', onOver);
     });
+  }
+
+  /** input:tap (dünya koordinatı) + zemin düzlemindeyse ve withTile ise tile:tap. */
+  _emitInputTap(p, withTile) {
+    const w = this.screenToWorld(p.x, p.y, this._tmp);
+    const wx = w.x, wy = w.y;
+    this.bus.emit('input:tap', {
+      x: wx, y: wy, screenX: p.x / this.dpr, screenY: p.y / this.dpr,
+      button: p.button ?? 0, touch: !!p.wasTouch,
+    });
+    if (withTile && wx >= 0 && wx < WORLD_W && wy >= 0 && wy < WORLD_H) {
+      this._emitTileTap(Math.floor(wx / TILE_W), Math.floor(wy / TILE_H), wx, wy);
+    }
   }
 
   _startDrag(id, x, y, moved) {

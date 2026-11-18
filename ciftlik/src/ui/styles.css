@@ -20,6 +20,8 @@
   --gap: 14px;
   --hit: 44px;
   --ease: cubic-bezier(0.22, 0.8, 0.26, 1);
+  --tb-h: 68px;   /* araç çubuğu yüksekliği (yerleşim hesapları) */
+  --sp-h: 52px;   /* hız çubuğu yüksekliği */
 
   position: fixed;
   inset: 0;
@@ -77,11 +79,18 @@
 #ui.cinematic .hud-top { transform: translateY(-8px); }
 #ui.cinematic .hud-bottom { transform: translateY(8px); }
 
-/* ---------- Sol üst: saat kartı ---------- */
-#ui .hud-clock {
+/* ---------- Sol üst: saat kartı + XP ---------- */
+#ui .hud-left {
   position: absolute;
   top: calc(var(--gap) + var(--sa-t));
   left: calc(var(--gap) + var(--sa-l));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+#ui .hud-clock {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -479,11 +488,6 @@
 /* Yatay telefon: toast ortada kalır (yer var) */
 @media (max-height: 500px) and (min-width: 601px) {
   #ui .toasts { top: calc(var(--gap) + var(--sa-t)); width: min(360px, 40vw); }
-}
-/* Dikey telefon: hız çubuğu alt ortada (iki başparmak da erişir) */
-@media (max-width: 600px) and (orientation: portrait) {
-  #ui .hud-speed { right: 50%; transform: translateX(50%); align-items: center; }
-  #ui.cinematic .hud-speed { transform: translate(50%, 8px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
