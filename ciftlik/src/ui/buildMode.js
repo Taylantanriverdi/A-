@@ -439,6 +439,7 @@ export function createBuildMode(root, ctx, opts) {
     }
     const ht = currentHint();
     if (ht !== shownHint) { shownHint = ht; setText(hint, ht); }
+    hint.classList.toggle('low', mode !== 'place');
     // onay çubuğu (dokunmatik yerleştir/taşı)
     const needConfirm = touch && !!pending && ((mode === 'place' && selType) || (mode === 'move' && moveId));
     confirmBar.classList.toggle('show', needConfirm);

@@ -8,6 +8,8 @@ import { MACHINES } from '../data/recipes.js';
 import { WORLD_TILES_X, WORLD_TILES_Y } from '../core/constants.js';
 import { isPlainObject } from '../core/GameState.js';
 import { transact } from './EconomySystem.js';
+import { canRemove as animalCanRemove } from './AnimalSystem.js';
+import { canRemove as machineCanRemove } from './ProductionSystem.js';
 import * as occ from './world/occupancy.js';
 
 const BUILT_EVENT = (type) => type in BUILDINGS || type in MACHINES;
@@ -58,20 +60,16 @@ export function move(state, bus, { placedId, tx, ty } = {}) {
   return result(bus, { ok: true, kind: 'move', placedId: p.id, type: p.type });
 }
 
-function hasContent(state, p) {
-  const b = (state.buildings || []).find((x) => x.placedId === p.id);
-  if (b && (state.animals || []).some((a) => a.buildingId === b.id)) return true;
-  const m = (state.machines || []).find((x) => x.placedId === p.id);
-  return !!(m && Array.isArray(m.queue) && m.queue.length);
-}
-
 export function remove(state, bus, { placedId } = {}) {
   const p = byId(state, placedId);
   const fail = (reason) => result(bus, { ok: false, kind: 'remove', placedId, reason });
   if (!p) return fail('Nesne bulunamadı');
   const def = PLACEABLES[p.type];
   if (def.unique && def.required) return fail('Bu yapı kaldırılamaz');
-  if (hasContent(state, p)) return fail('Önce hayvanları sat/taşı');
+  for (const chk of [animalCanRemove, machineCanRemove]) {
+    const c = chk(state, p.id);
+    if (c && !c.ok) return fail(c.reason);
+  }
   const refund = Math.round(def.price * (def.refund || 0));
   placedArr(state).splice(placedArr(state).indexOf(p), 1);
   if (refund > 0) transact(state, bus, { amount: refund, category: 'buildings', label: `İade: ${def.name}` });

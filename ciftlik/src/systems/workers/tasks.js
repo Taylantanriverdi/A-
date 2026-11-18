@@ -1,6 +1,7 @@
 // Çalışan görev seçimi + durum metni — PLAN.md §11. Saf yardımcılar; state'e YAZMAZ.
 // Görev türleri: water, harvest (tarla) · feed, waterAnimals, collect (hayvan binaları) · machineCollect, machineLoad (atölyeler).
-import { BUILDINGS } from '../../data/buildings.js';
+import { PLACEABLES } from '../../data/placeables.js';
+import { isBlocked as isBlockedOcc } from '../world/occupancy.js';
 import { MACHINES, MACHINE_RULES, RECIPES } from '../../data/recipes.js';
 import { CROPS } from '../../data/crops.js';
 import { freeSlots, count } from '../InventorySystem.js';
@@ -48,18 +49,20 @@ function offer(kind, target, cx, cy, px, py, itemId, recipe, place, subject) {
   cand.itemId = itemId; cand.recipe = recipe; cand.place = place; cand.subject = subject;
 }
 
-/** Bina/atölye arsasının önünde (alt kenar) durulacak yürünebilir hücre. */
-export function standCell(lot) {
-  const cell = nearestFree((lot.x0 + lot.x1) / 2, lot.y1 + 1);
-  return cell;
-}
-
-function lotOfBuilding(b) {
-  for (const type in BUILDINGS) {
-    const l = BUILDINGS[type].lots.find((x) => x.id === b.lotId);
-    if (l) return l;
+/** Bina/atölyenin (state.placed) ayak izinin hemen altındaki ilk yürünebilir hücre; yoksa en yakın boş hücre. */
+export function standCell(state, placedId) {
+  const o = Array.isArray(state.placed) ? state.placed.find((q) => q.id === placedId) : null;
+  const def = o && PLACEABLES[o.type];
+  if (!def) return -1;
+  const mid = o.tx + (def.w >> 1);
+  for (let dy = 0; dy < 3; dy++) {
+    const y = o.ty + def.h + dy;
+    for (let k = 0; k < def.w + 2; k++) {
+      const x = mid + (k % 2 ? (k + 1) >> 1 : -(k >> 1));
+      if (!isBlockedOcc(state, x, y, { walk: true })) return cellOf(x, y);
+    }
   }
-  return null;
+  return nearestFree(mid, o.ty + def.h);
 }
 
 /**
@@ -93,9 +96,8 @@ function scanGroup(state, group, px, py, env) {
       for (const b of state.buildings) {
         const list = animalsIn(state, b.id);
         if (!list.length) continue;
-        const lot = lotOfBuilding(b);
-        if (!lot) continue;
-        const cell = standCell(lot);
+        const cell = standCell(state, b.placedId);
+        if (cell < 0) continue;
         const cx = cell % 80, cy = (cell / 80) | 0;
         const place = PLACE_DAT[b.type] || '';
         // yem
@@ -119,9 +121,9 @@ function scanGroup(state, group, px, py, env) {
     case 'machines':
       if (!Array.isArray(state.machines)) break;
       for (const m of state.machines) {
-        const def = MACHINES[m.type];
-        if (!def) continue;
-        const cell = standCell(def.lot);
+        if (!MACHINES[m.type]) continue;
+        const cell = standCell(state, m.placedId ?? (state.placed || []).find((q) => q.type === m.type)?.id);
+        if (cell < 0) continue;
         const cx = cell % 80, cy = (cell / 80) | 0;
         if (free && m.output && !env.isTaken('machineCollect', m.id)) {
           let any = false;

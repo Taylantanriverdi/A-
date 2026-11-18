@@ -42,7 +42,8 @@ const check = (name, cond, detail = '') => rows.push([name, cond ? 'GEÇTİ' : '
   let mounts = 0, prevMode = null, prevOn = false;
   bus.on('worker:state', (e) => { if (e.onDonkey && !prevOn) mounts++; prevOn = e.onDonkey; prevMode = e.mode; });
   // sahte atölye (ProductionSystem yok): çıktı kutusu + machine:collect komutu
-  state.machines = [{ id: 'm_mill', type: 'mill', builtDay: 1, condition: 100, queue: [], output: {}, auto: null }];
+  (state.placed ??= []).push({ id: 'pmill', type: 'mill', tx: 58, ty: 6 });
+  state.machines = [{ id: 'm_pmill', placedId: 'pmill', type: 'mill', builtDay: 1, condition: 100, queue: [], output: {}, auto: null }];
   bus.on('machine:collect', ({ machineId }) => {
     const m = state.machines.find((x) => x.id === machineId);
     let n = 0;

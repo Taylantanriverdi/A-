@@ -6,6 +6,7 @@
 // • Gölge (shadows API, birleşik silüet), depthForY. `tile:hover` tezgâh karolarındayken sıcak kenar ışığı.
 // Tüm görüntüler create'te bir kez kurulur; update'te bellek ayırma yok.
 import { depthForY } from '../core/constants.js';
+import { firstPlacedOfType, footOf, SLIDE_TIME } from './placedUtil.js';
 import { ITEMS } from '../data/items.js';
 import { CROP_ATLAS } from '../render/textures/crops.js';
 import { genMarket, STALL_LAYOUT as S, STRIPES, STRIPE_W, CRATE_LIP } from '../render/textures/market.js';
@@ -20,7 +21,8 @@ const ICON_SCALE = 0.62;
 export default class MarketStall {
   constructor(scene, state, bus, renderer) {
     this.scene = scene; this.state = state; this.bus = bus; this.renderer = renderer;
-    this.x = STALL.x; this.y = STALL.y; this.tiles = STALL.tiles;
+    this.x = STALL.x; this.y = STALL.y; this.tiles = STALL.tiles; // STALL (layout.js) çalışma anında yerleştirmeye göre güncellenir (SaleFX/FieldView okur)
+    this.placedId = null; this.slideT = -1; this.sx = 0; this.sy = 0; this.tx2 = 0; this.ty2 = 0; this.liftId = null; this.lift = 0; this.absent = false; this._foot = { x: 0, y: 0 };
     this.dirty = true; this.hover = 0; this.hoverT = 0; this.press = 0; this.t = 0;
     this._top = [null, null, null]; this._cnt = [0, 0, 0]; this._shown = ['', '', ''];
     this._offs = [];
@@ -78,10 +80,44 @@ export default class MarketStall {
     // olaylar
     const on = (n, f) => this._offs.push(this.bus.on(n, f, this));
     on('inventory:changed', () => { this.dirty = true; });
+    on('placed:changed', () => this._syncPlaced(false));
+    on('build:ghost', (p) => { this.liftId = p && p.moving != null ? p.moving : null; });
     on('save:loaded', () => { this.dirty = true; });
     on('tile:hover', (p) => { this.hover = p && this._isStallTile(p.tx, p.ty) ? 1 : 0; });
     on('tile:tap', (p) => { if (p && this._isStallTile(p.tx, p.ty)) this.press = 1; });
     this._refreshGoods();
+    this._syncPlaced(true);
+  }
+
+  _setPos(x, y) {
+    this.x = x; this.y = y; STALL.x = x; STALL.y = y;
+    const T = this.tiles, tx0 = Math.round(x / 64 - 1.5), ty0 = Math.round((y + 18) / 44 - 2);
+    T.x0 = tx0; T.x1 = tx0 + 2; T.y0 = ty0; T.y1 = ty0 + 1;
+    this.c.setPosition(x, y - this.lift * 7).setDepth(depthForY(y));
+    this.shadow?.set({ footX: x, footY: y - 2 });
+    const lx = x + S.lantern.dx, ly = y + S.lantern.dy;
+    this.lights[0].set({ x: lx, y: ly + 24 }); this.lights[1].set({ x: x + 24, y: y - 64 });
+    this.glow.setPosition(lx, ly + 24);
+  }
+
+  /** state.placed'teki 'stall' nesnesine göre konum (yoksa varsayılan; placed dizisi varsa ve tezgâh yoksa gizli). */
+  _syncPlaced(initial) {
+    if (!this.c) return;
+    const pl = this.state && this.state.placed;
+    if (!Array.isArray(pl)) return;
+    const p = firstPlacedOfType(this.state, 'stall');
+    this.absent = !p;
+    this.c.setVisible(!!p); this.glow.setVisible(!!p);
+    for (const l of this.lights) l.set({ intensity: p ? undefined : 0 });
+    if (!p) return;
+    this.placedId = p.id;
+    const f = footOf('stall', p.tx, p.ty, this._foot);
+    if (initial) { this._setPos(f.x, f.y); return; }
+    if (Math.abs(f.x - this.x) > 0.5 || Math.abs(f.y - this.y) > 0.5) {
+      if (this.slideT < 0) { this.sx = this.x; this.sy = this.y; }
+      else { this.sx = this.x; this.sy = this.y; }
+      this.tx2 = f.x; this.ty2 = f.y; this.slideT = 0;
+    }
   }
 
   _isStallTile(tx, ty) {
@@ -129,9 +165,18 @@ export default class MarketStall {
   }
 
   update(env) {
-    if (!this.c) return;
+    if (!this.c || this.absent) return;
     if (this.dirty) this._refreshGoods();
     const t = env.t, dt = env.dt, w = env.wind;
+    let mv = false;
+    if (this.slideT >= 0) {
+      this.slideT += dt / SLIDE_TIME; const k = Math.min(1, this.slideT), e = k * k * (3 - 2 * k);
+      this.x = this.sx + (this.tx2 - this.sx) * e; this.y = this.sy + (this.ty2 - this.sy) * e; mv = true;
+      if (k >= 1) { this.slideT = -1; this.x = this.tx2; this.y = this.ty2; const fx = this.renderer.buildings?.fx; if (fx) fx.dust(this.x, this.y + 2, 90, 8); }
+    }
+    const lt = this.liftId != null && this.liftId === this.placedId ? 1 : 0;
+    if (lt !== this.lift) { this.lift += (lt - this.lift) * Math.min(1, dt * 12); if (Math.abs(lt - this.lift) < 0.01) this.lift = lt; mv = true; this.c.setAlpha(1 - 0.45 * this.lift); }
+    if (mv) this._setPos(this.x, this.y);
     this.t = t;
     // hover: yumuşak geçiş + nefes alan kenar ışığı
     this.hoverT += (this.hover - this.hoverT) * Math.min(1, dt * 9);

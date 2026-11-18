@@ -1,12 +1,12 @@
-// BuildingView — boş arsa işaretleri, kümes/ahır/arı kovanı ve inşa efektleri (PLAN §10 "Görsel").
-// State'i YALNIZCA OKUR: state.buildings. Olaylar: building:built (pop + toz/parıltı), animals:changed, animal:result,
-// save:loaded, tile:hover (boş arsa vurgusu). Tüm nesneler create'te / bina eklenince BİR KEZ kurulur; update'te bellek ayrılmaz.
-import { depthForY, DEPTH, TILE_W, TILE_H } from '../core/constants.js';
-import { BUILDINGS } from '../data/buildings.js';
-import { genBuildings, BLD, LOT_PAD, SIGN, lotKey, lotHlKey } from '../render/textures/buildings.js';
+// BuildingView — kümes/ahır/arı kovanı ve inşa efektleri (PLAN §10 "Görsel", §12 serbest yerleşim).
+// State'i YALNIZCA OKUR: state.buildings + state.placed (konum: building.placedId → placed {tx,ty}; eski kayıtta lotId).
+// Olaylar: placed:changed (ekle/taşı/yok et; taşımada kayma), building:built (pop + toz/parıltı), animals:changed, animal:result,
+// save:loaded, build:ghost (taşınan nesne kalkık/şeffaf). Nesneler bir kez kurulur; update'te bellek ayrılmaz.
+import { depthForY, DEPTH } from '../core/constants.js';
+import { genBuildings, BLD } from '../render/textures/buildings.js';
+import { locate, footOf, easeOutBack, SLIDE_TIME } from './placedUtil.js';
 
 const FX_N = 56;
-const SIGN_Y = { hive: 3, coop: 4, barn: 4 };
 
 /** Paylaşılan, havuzlanmış parçacık sprite'ları (toz, parıltı, kalp). */
 export class FxPool {
@@ -60,42 +60,21 @@ const BEES = 5;
 export default class BuildingView {
   constructor(scene, state, bus, renderer) {
     this.scene = scene; this.state = state; this.bus = bus; this.renderer = renderer;
-    this.lots = []; this.byLot = new Map(); this.byId = new Map();
-    this.dirty = true; this.poll = 0; this.t = 0; this.hoverLot = null; this._offs = [];
-    this.pending = new Set(); this._door = { x: 0, y: 0 };
+    this.lots = []; this.byId = new Map();
+    this.dirty = true; this.poll = 0; this.t = 0; this._offs = []; this.liftId = null; this._initial = true;
+    this._door = { x: 0, y: 0 }; this._loc = { placedId: null, tx: 0, ty: 0, w: 1, h: 1, legacy: false }; this._foot = { x: 0, y: 0 };
   }
 
   create() {
-    const s = this.scene;
-    genBuildings(s); // idempotent
-    this.fx = new FxPool(s);
-    for (const type of Object.keys(BUILDINGS)) {
-      for (const lot of BUILDINGS[type].lots) {
-        const wt = lot.x1 - lot.x0 + 1, ht = lot.y1 - lot.y0 + 1;
-        const px = lot.x0 * TILE_W, py = lot.y0 * TILE_H, W = wt * TILE_W, H = ht * TILE_H;
-        const botY = py + H;
-        const lv = {
-          type, lot, id: lot.id, px, py, W, H, botY, fx: px + W / 2, fy: botY - (type === 'hive' ? 6 : type === 'barn' ? 8 : 10),
-          hover: 0, ph: this.lots.length * 1.7, b: null, bv: null, popT: -1, shown: false,
-        };
-        const dep = depthForY(botY);
-        lv.patch = s.add.image(px - LOT_PAD.x, py - LOT_PAD.t, lotKey(wt, ht)).setOrigin(0, 0).setDepth(dep - 0.02);
-        lv.hl = s.add.image(px - LOT_PAD.x, py - LOT_PAD.t, lotHlKey(wt, ht)).setOrigin(0, 0).setBlendMode('ADD').setAlpha(0).setVisible(false).setDepth(dep - 0.015);
-        const sx = type === 'hive' ? px + W - 10 : px + W * 0.5 - (type === 'barn' ? 90 : 60);
-        lv.sign = s.add.image(sx, botY + SIGN_Y[type], `bld_sign_${type}`).setOrigin(SIGN.ox / SIGN.w, SIGN.oy / SIGN.h).setDepth(depthForY(botY + SIGN_Y[type]));
-        this.lots.push(lv); this.byLot.set(lot.id, lv);
-      }
-    }
+    genBuildings(this.scene); // idempotent
+    this.fx = new FxPool(this.scene);
     const on = (n, f) => this._offs.push(this.bus.on(n, f, this));
     on('animals:changed', () => { this.dirty = true; });
     on('animal:result', () => { this.dirty = true; });
-    on('save:loaded', () => { this.dirty = true; });
-    on('building:built', (p) => { if (p && p.lotId) this.pending.add(p.lotId); this.dirty = true; });
-    on('tile:hover', (p) => {
-      this.hoverLot = null;
-      if (!p) return;
-      for (const lv of this.lots) { const l = lv.lot; if (!lv.b && p.tx >= l.x0 && p.tx <= l.x1 && p.ty >= l.y0 && p.ty <= l.y1) { this.hoverLot = lv; break; } }
-    });
+    on('placed:changed', () => { this.dirty = true; });
+    on('building:built', () => { this.dirty = true; });
+    on('save:loaded', () => { this.dirty = true; this._initial = true; });
+    on('build:ghost', (p) => { this.liftId = p && p.moving != null ? p.moving : null; });
     this.sync(true);
   }
 
@@ -149,37 +128,58 @@ export default class BuildingView {
     bv.c.destroy(); lv.bv = null;
   }
 
+  /** Konteyner + gölge + ışıkları (fx,fy)'ye taşır (yalnızca konum değişince çağrılır). */
+  _reposition(lv) {
+    const bv = lv.bv; if (!bv) return;
+    const L = BLD[lv.type];
+    bv.c.setPosition(lv.fx, lv.fy - lv.lift * 7).setDepth(depthForY(lv.fy));
+    bv.shadow?.set({ footX: lv.fx, footY: lv.fy - 1 });
+    for (let i = 0; i < L.win.length; i++) {
+      const wx = L.win[i][0], wy = L.win[i][1];
+      bv.glows[i].setPosition(lv.fx + wx, lv.fy + wy);
+      bv.lights[i].set({ x: lv.fx + wx, y: lv.fy + wy + 10 });
+    }
+  }
+
   sync(initial = false) {
     this.dirty = false;
+    if (this._initial) { initial = true; this._initial = false; }
     const list = this.state?.buildings; const arr = Array.isArray(list) ? list : [];
-    for (const lv of this.lots) lv.b = null;
-    this.byId.clear();
+    const loc = this._loc, foot = this._foot;
+    for (let i = 0; i < this.lots.length; i++) this.lots[i].seen = false;
     for (let i = 0; i < arr.length; i++) {
-      const b = arr[i]; const lv = b && this.byLot.get(b.lotId);
-      if (lv) { lv.b = b; this.byId.set(b.id, lv); }
-    }
-    for (const lv of this.lots) {
-      const b = lv.b;
-      lv.patch.setVisible(!b); lv.sign.setVisible(!b);
-      if (!b) {
-        lv.hl.setVisible(false);
-        if (lv.bv) { this._unbuild(lv); }
-        lv.shown = false; continue;
-      }
-      if (!lv.bv) {
+      const b = arr[i]; if (!b || !BLD[b.type] || !locate(this.state, b, 'building', loc)) continue;
+      let lv = this.byId.get(b.id);
+      footOf(b.type, loc.tx, loc.ty, foot);
+      if (loc.legacy) { foot.x = (loc.tx + loc.w / 2) * 64; foot.y = (loc.ty + loc.h) * 44 - 10; }
+      if (!lv) {
+        lv = { type: b.type, id: b.id, b, placedId: loc.placedId, tx: loc.tx, ty: loc.ty, w: loc.w, h: loc.h, fx: foot.x, fy: foot.y, ph: this.lots.length * 1.7,
+          bv: null, popT: -1, seen: true, slideT: -1, sx: 0, sy: 0, tfx: foot.x, tfy: foot.y, lift: 0 };
+        this.lots.push(lv); this.byId.set(b.id, lv);
         this._build(lv);
-        if (!initial && this.pending.has(lv.id)) this._pop(lv);
+        if (!initial) this._pop(lv);
+      } else {
+        lv.b = b; lv.seen = true; lv.placedId = loc.placedId;
+        if (loc.tx !== lv.tx || loc.ty !== lv.ty) { // taşındı: kısa kayma
+          lv.tx = loc.tx; lv.ty = loc.ty; lv.w = loc.w; lv.h = loc.h;
+          lv.sx = lv.fx; lv.sy = lv.fy; lv.tfx = foot.x; lv.tfy = foot.y; lv.slideT = 0;
+          this.fx.dust(lv.fx, lv.fy + 2, BLD[lv.type].shw * 0.3, 5);
+        }
       }
-      this.pending.delete(lv.id);
       const bv = lv.bv; bv.c.setVisible(true);
       // kir lekeleri
       const dirt = Number(b.dirt) || 0;
       const n = dirt > 60 ? Math.min(MAX_DIRT, 1 + Math.floor((dirt - 60) / 40 * MAX_DIRT)) : 0;
-      if (n !== bv.dirtN) { for (let i = 0; i < MAX_DIRT; i++) bv.dirt[i].setVisible(i < n); bv.dirtN = n; }
+      if (n !== bv.dirtN) { for (let k = 0; k < MAX_DIRT; k++) bv.dirt[k].setVisible(k < n); bv.dirtN = n; }
       // ürün sepeti
       let qty = 0; const box = b.box;
-      if (box) for (const k in box) { const st = box[k]; if (Array.isArray(st)) for (let i = 0; i < st.length; i++) qty += st[i] && st[i].qty > 0 ? st[i].qty : 0; }
+      if (box) for (const k in box) { const st = box[k]; if (Array.isArray(st)) for (let j = 0; j < st.length; j++) qty += st[j] && st[j].qty > 0 ? st[j].qty : 0; }
       bv.basket.setVisible(qty > 0);
+    }
+    for (let i = this.lots.length - 1; i >= 0; i--) { // kaldırılanlar
+      const lv = this.lots[i]; if (lv.seen) continue;
+      if (lv.bv) this.fx.dust(lv.fx, lv.fy + 2, BLD[lv.type].shw * 0.4, 8);
+      this._unbuild(lv); this.byId.delete(lv.id); this.lots.splice(i, 1);
     }
   }
 
@@ -192,34 +192,36 @@ export default class BuildingView {
   }
 
   update(env) {
-    if (!this.lots.length) return;
     const dt = env.dt, t = env.t; this.t = t;
     this.poll += dt;
     if (this.dirty || this.poll > 0.5) { this.poll = 0; this.sync(); }
     this.fx.update(dt);
+    if (!this.lots.length) return;
     const v = this.scene.cameras.main.worldView;
     const wind = env.wind, light = env.day.light;
     const beesOut = light > 0.5 && env.cloud < 0.8;
     for (const lv of this.lots) {
-      if (lv.px + lv.W + 200 < v.x || lv.px - 200 > v.right || lv.botY + 60 < v.y || lv.botY - 330 > v.bottom) continue;
-      if (!lv.b) {
-        const hv = this.hoverLot === lv ? 1 : 0;
-        lv.hover += (hv - lv.hover) * Math.min(1, dt * 9);
-        const a = lv.hover * (0.55 + 0.25 * Math.sin(t * 4.2)) * (0.8 + 0.3 * (1 - light));
-        lv.hl.setVisible(a > 0.01).setAlpha(Math.min(1, a));
-        lv.sign.rotation = Math.sin(t * 1.4 + lv.ph) * (0.015 + wind * 0.05) - wind * 0.03 + lv.hover * Math.sin(t * 6) * 0.03;
-        continue;
-      }
       const bv = lv.bv; if (!bv) continue;
+      // kayma (taşıma) + kalkma (taşıma modunda seçili nesne)
+      let moved = false;
+      if (lv.slideT >= 0) {
+        lv.slideT += dt / SLIDE_TIME; const k = Math.min(1, lv.slideT), e = k * k * (3 - 2 * k);
+        lv.fx = lv.sx + (lv.tfx - lv.sx) * e; lv.fy = lv.sy + (lv.tfy - lv.sy) * e; moved = true;
+        if (k >= 1) { lv.slideT = -1; this.fx.dust(lv.fx, lv.fy + 2, BLD[lv.type].shw * 0.3, 6); }
+      }
+      const lt = this.liftId != null && this.liftId === lv.placedId ? 1 : 0;
+      if (lt !== lv.lift) { lv.lift += (lt - lv.lift) * Math.min(1, dt * 12); if (Math.abs(lt - lv.lift) < 0.01) lv.lift = lt; moved = true; }
+      if (moved) this._reposition(lv);
+      if (lv.fx + 260 < v.x || lv.fx - 260 > v.right || lv.fy + 60 < v.y || lv.fy - 330 > v.bottom) continue;
       if (lv.popT >= 0) {
         lv.popT += dt; const k = lv.popT / 0.85;
-        if (k >= 1) { lv.popT = -1; bv.c.setScale(1).setAlpha(1); }
+        if (k >= 1) { lv.popT = -1; bv.c.setScale(1).setAlpha(1 - 0.45 * lv.lift); }
         else {
           const s = 1 - Math.exp(-5.5 * k) * Math.cos(k * Math.PI * 3.1);
           const sy = Math.max(0.001, s);
           bv.c.setScale(0.9 + 0.1 * Math.min(1.1, sy), sy).setAlpha(Math.min(1, k * 6));
         }
-      }
+      } else if (lv.lift > 0 || bv.c.alpha !== 1) bv.c.setAlpha(1 - 0.45 * lv.lift);
       if (bv.basket.visible) bv.basket.setScale((lv.type === 'hive' ? 0.8 : 0.95) * (1 + Math.sin(t * 3 + lv.ph) * 0.025));
       if (bv.bees) {
         for (let i = 0; i < BEES; i++) {
@@ -238,7 +240,7 @@ export default class BuildingView {
 
   destroy() {
     for (const off of this._offs) off(); this._offs.length = 0;
-    for (const lv of this.lots) { this._unbuild(lv); lv.patch?.destroy(); lv.hl?.destroy(); lv.sign?.destroy(); }
-    this.lots.length = 0; this.fx?.destroy();
+    for (const lv of this.lots) this._unbuild(lv);
+    this.lots.length = 0; this.byId.clear(); this.fx?.destroy();
   }
 }

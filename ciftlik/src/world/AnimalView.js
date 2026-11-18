@@ -4,7 +4,7 @@
 // Olaylar: animals:changed, animal:born (kalp/parıltı), save:loaded. update'te bellek ayrılmaz.
 import { depthForY, DEPTH, TILE_W, TILE_H } from '../core/constants.js';
 import { ANIMALS } from '../data/animals.js';
-import { BUILDINGS } from '../data/buildings.js';
+import { locate, penFor } from './placedUtil.js';
 import { AN, POSES, animKey, genAnimals } from '../render/textures/animals.js';
 
 const SPEED = { chicken: 34, cow: 17, sheep: 19, goat: 24 };
@@ -21,21 +21,23 @@ export default class AnimalView {
     this.scene = scene; this.state = state; this.bus = bus; this.renderer = renderer; this.bv = buildingView;
     this.entries = new Map(); this.free = []; this.list = []; this.seq = 0;
     this.dirty = true; this.poll = 0; this._offs = []; this.t = 0;
+    this._loc = { placedId: null, tx: 0, ty: 0, w: 1, h: 1, legacy: false }; this._pen = { x0: 0, x1: 0, y0: 0, y1: 0 };
   }
 
   create() {
     genAnimals(this.scene); // idempotent
     const on = (n, f) => this._offs.push(this.bus.on(n, f, this));
     on('animals:changed', () => { this.dirty = true; });
+    on('placed:changed', () => { this.dirty = true; });
     on('save:loaded', () => { this.dirty = true; });
     on('animal:born', (p) => this._born(p));
     this.sync();
   }
 
+  /** Pen alanı (ayak izinin altı; PLAN §12). Ortak nesneyi yeniden kullanır → her hayvan için kopya `e.pen`. */
   _penOf(b) {
-    const def = BUILDINGS[b.type]; if (!def) return null;
-    for (const l of def.lots) if (l.id === b.lotId) return l.pen || null;
-    return null;
+    if (!locate(this.state, b, 'building', this._loc)) return null;
+    return penFor(this.state, b, this._loc, this._pen);
   }
 
   _mk(type) {
@@ -60,7 +62,7 @@ export default class AnimalView {
       const a = animals[i]; if (!a || !AN[a.type]) continue;
       let b = null; for (let k = 0; k < buildings.length; k++) if (buildings[k].id === a.buildingId) { b = buildings[k]; break; }
       if (!b) continue;
-      const pen = this._penOf(b); if (!pen) continue;
+      const pp = this._penOf(b); if (!pp) continue;
       let e = this.entries.get(a.id);
       if (!e || e.type !== a.type) {
         if (e) this._release(e);
@@ -68,7 +70,7 @@ export default class AnimalView {
         let idx = -1; for (let k = 0; k < this.free.length; k++) if (this.free[k].type === a.type) { idx = k; break; }
         const v = idx >= 0 ? this.free.splice(idx, 1)[0] : this._mk(a.type);
         e = Object.assign(v, {
-          id: a.id, seen: true, a, b, pen, x: 0, y: 0, tx: 0, ty: 0, mode: STAND, timer: 0, dir: 1, phase: 0, step: 0, seed: (this.seq * 2.399) % 6.28,
+          id: a.id, seen: true, a, b, pen: { x0: pp.x0, x1: pp.x1, y0: pp.y0, y1: pp.y1 }, x: 0, y: 0, tx: 0, ty: 0, mode: STAND, timer: 0, dir: 1, phase: 0, step: 0, seed: (this.seq * 2.399) % 6.28,
           off: (this.seq * 11) % 30, hopT: 3 + (this.seq * 3.7) % 9, hop: -1, inside: false, fade: 0, scale: 1, curKey: '', cx0: 0, cx1: 0, cy0: 0, cy1: 0, going: false,
         });
         this.seq++;
@@ -79,7 +81,14 @@ export default class AnimalView {
         e.fade = e.inside ? 0 : 1;
         e.scale = (Number(a.ageDays) < ANIMALS[a.type].adultDays) ? BABY : 1;
         e.c.setVisible(!e.inside); e.shadow.setVisible(!e.inside);
-      } else { e.a = a; e.b = b; e.pen = pen; this._bounds(e); }
+      } else {
+        e.a = a; e.b = b;
+        const P = e.pen;
+        if (P.x0 !== pp.x0 || P.y0 !== pp.y0 || P.x1 !== pp.x1 || P.y1 !== pp.y1) { // bina taşındı: yeni pen'e geç
+          P.x0 = pp.x0; P.x1 = pp.x1; P.y0 = pp.y0; P.y1 = pp.y1; this._bounds(e);
+          if (!e.inside) { this._place(e); e.mode = STAND; e.going = false; }
+        }
+      }
       e.seen = true;
     }
     for (let i = this.list.length - 1; i >= 0; i--) {
