@@ -16,8 +16,8 @@
 | 4 | Hayvancılık | ✅ Onaylandı |
 | 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
 | 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Onaylandı |
-| 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | ✅ Tamamlandı (sim-economy + beyin birleşik duman testi) — onay bekleniyor |
-| 7 | Hava durumu, mevsimler, rastgele olaylar | — |
+| 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | ✅ Onaylandı |
+| 7 | Hava durumu, mevsimler, rastgele olaylar | 🔨 Devam ediyor |
 | 8 | İşçiler, makineler, arazi genişletme | — |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
 
@@ -894,3 +894,34 @@ state.player.reputation (0..100)
 - **Defter:** son kayıtlar (filtre: kategori), tarih-saat, tutar renkli.
 - **Banka:** limit, aktif krediler (kalan, taksit, sonraki ödeme tarihi, ilerleme), yeni kredi (tutar kaydırıcısı + vade seçimi + toplam geri ödeme önizlemesi), erken kapama.
 - **Sözleşmeler:** teklifler (ürün ikonu, adet, min kalite rozeti, ödül, birim ödül vs pazar fiyatı farkı %, süre, "Kabul et"), aktifler (teslim edilen/gereken, kalan süre, envanterde uygun adet, "Teslim et"). HUD rozeti: yeni teklif / süresi yaklaşan sözleşme sayısı.
+
+---
+
+## 14. Aşama 7 Sözleşmesi — Hava, Mevsim Görselleri, Rastgele Olaylar (bağlayıcı, kısa)
+
+Beyin dosyaları: `data/weather.js` (SEASON_WEATHER, WIND, INTENSITY, PERSISTENCE, FORECAST_DAYS, INTRADAY_CHANGE, EFFECTS), `data/events.js` (EVENTS, FESTIVAL).
+
+| İşçi | Dosyalar |
+|---|---|
+| gameplay-dev | `systems/WeatherSystem.js`, `systems/EventSystem.js`, Farm/Animal/Market/Placement'ta olay ve hava etkileri, `ui/weatherStrip.js` (HUD tahmin şeridi), `ui/eventCard.js` (olay kartı + festival paneli), main.js kaydı, `tools/sim-weather.mjs` |
+| visual-dev | `render/WeatherFX.js` (yağmur, fırtına+şimşek, kar, sis, bulut gölgeleri, birikintiler, ıslak zemin parlaması), mevsim görselleri (kış kar örtüsü: zemin, çatılar, ağaçlar; sonbahar yaprakları), olay görsel ipuçları |
+
+### State
+```js
+state.weather = { type, intensity, wind, forecast: [{ type, intensity, wind }] /*3 gün*/, puddles: 0..1, snowCover: 0..1, wetness: 0..1, changeAtMin: null|dk }
+state.market.activeEvents = [{ id, kind, itemId?, mult, untilMin }]   // pricing.js eventMult zaten okur
+state.events = { active: [{ id, kind, startMin, untilMin, data }], history: [...son 20], festival: { lastYearSeason } }
+```
+### Kurallar (gameplay-dev)
+- **WeatherSystem:** 05:00'te tahminden bugünün havası (PERSISTENCE + mevsim dağılımı, ctx.rng), tahmin 3 güne tamamlanır; gün içinde INTRADAY_CHANGE ile öğleden sonra bir değişim. Saatlik: puddles/wetness (yağmurda artar, açıkta kurur), snowCover (kar yağarken artar, sıcak mevsimde/açıkta erir). `weather:changed {type, intensity, wind}` (mevcut debug setWeather ile uyumlu). Kar: açık alan ekin büyümesi durur (soil/growth), Fırtına: EFFECTS.storm ekin hasarı + hayvan mutluluğu. Kuraklık olayı aktifken yağmur çıkmaz, nem kaybı ×1.5.
+- **EventSystem:** 06:00'da EVENTS (chance, seasons, summerMult, 'edge'); aktif aynı tür tekrar çıkmaz. Etkiler: priceMult → `market.activeEvents` (pricing zaten uygular), cropDamage (açık alan ekinleri; frost yalnız frostHardy olmayan), sickChanceMult (AnimalSystem okur), pestChanceMult (farm threats okur), subsidy → `transact(+grant,'other')` + PlacementSystem inşa bedelinde %20 indirim (aktifken). `event:started {id, kind, title, text}`, `event:ended`. Festival: her mevsimin 21. günü 10:00 → `festival:open`; oyuncu panelde envanterden bir ürün seçer (`festival:enter {itemId, q}`) → puan = pazar değeri × kalite; rakipler rng; ödül `transact(+,'contracts')` + itibar; `festival:result {rank, prize}`. 12:00'ye kadar seçmezse katılmamış sayılır.
+- **UI:** HUD saat kartının altında 3 günlük tahmin şeridi (ikon + sıcaklık yok, yalnız tür); olay başladığında ortada kısa olay kartı (başlık, metin, etki çipleri, 6 sn veya dokun), aktif olaylar saat kartında küçük çipler; festival paneli (ürün seçimi, sonuç kartı).
+### Görsel (visual-dev)
+- Yağmur: eğik çizgi parçacıkları (rüzgârla eğim), zeminde sıçrama halkaları, `puddles`'a göre birikinti lekeleri (yumuşak, hafif gök yansıması), `wetness`'e göre zemin ve toprak koyulaşması + ışık kaynaklarında parlama; çatılardan damla.
+- Fırtına: yoğun yağmur, güçlü rüzgâr (ekin/ağaç salınımı artar), şimşek: rastgele aralıkla ekran flaşı + gökte çatallı şimşek + 0.5–2 sn sonra kamera hafif sarsıntısı (ses Aşama 9).
+- Kar: salınımlı tanecikler; `snowCover`'a göre zemin, çatılar, çit üstleri, ağaç tepeleri beyazlaşır (doku katmanı, tint'e dayanmadan Canvas uyumlu); kışın göl/birikinti yok.
+- Sis: yoğun alçak sis katmanı (mevcut sabah sisi altyapısı, gün boyu).
+- Bulutlu: güneş yoğunluğu ve gölgeler azalır; kayan bulut gölgeleri (zemin üstünde büyük yumuşak lekeler, rüzgâr yönünde).
+- Mevsim: sonbaharda düşen yapraklar parçacığı; kışın kar örtüsü (yağış olmasa da snowCover > 0 iken).
+- Olay ipuçları: kuraklıkta zemin hafif sararır, dolu (fırtına + beyaz dolu taneleri), don: sabah zemin ve ekinlerde beyaz kırağı tonu (gün içinde erir).
+- Performans: parçacık havuzları, kaliteye göre sayı, update'te bellek ayırma yok.
