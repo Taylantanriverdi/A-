@@ -14,7 +14,8 @@
 | 2 | Tarım ve toprak mekaniği | ✅ Onaylandı |
 | 3 | Envanter, mağaza, pazar | ✅ Onaylandı |
 | 4 | Hayvancılık | ✅ Onaylandı |
-| 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Tamamlandı (sim 28/28 + 19/19, beyin birleşik duman testi) — onay bekleniyor |
+| 5 | Üretim binaları ve zincirleri + ilk çalışan (Çırak + eşek) | ✅ Onaylandı |
+| 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | 🔨 Devam ediyor |
 | 6 | Ekonomi, banka, giderler, finans paneli | — |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | — |
 | 8 | İşçiler, makineler, arazi genişletme | — |
@@ -498,6 +499,8 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K15 | Hastalık yayılma 0.08; başlangıçta 4 organik sprey | QA: bakımsız salgın 10 günde tarlayı siliyordu, mağaza yokken çaresizlik |
 | K16 | Sinematik, boyama darbesi bitene kadar ertelenir | QA: ilk hasat sinematiği boyamalı hasatı yarıda kesiyordu |
 | K19 | Meyve suları 3 meyve → 2 şişe | sim-production: üzüm suyu zarardaydı |
+| K20 | Seviye/XP sistemi kaldırıldı; tüm içerik baştan açık, tek koşul para | Kullanıcı isteği |
+| K21 | Serbest yerleşim; başlangıç arazisi karo 20..68 × 5..21; sabit yalnızca çiftlik evi ve köy yolu | Kullanıcı kendi çiftlik düzenini kurmak istiyor |
 | K18 | Hayvan ürününde A için mutluluk ≥ 90 (sevme gerekir); tavuk 400 ₺, yumurta 15 ₺ | sim-animals: kümes ve ahır yatırımı ~47 günde geri döner |
 | K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 
@@ -826,3 +829,32 @@ state.donkey = { x, y, mode: 'home'|'carrying' }
 - Atölye binaları (mandıra: beyaz-mavi süt evi; değirmen: taş gövde + dönen kanatlı yel değirmeni; fırın: tuğla, bacadan duman; konserve: kırmızı kapılı küçük atölye; iplikhane ve dokuma: ahşap atölye, dokumada renkli kumaş). Çalışırken duman/hareket, gece ışık; boş arsa işareti. Kirli/aşınmış (condition < 50) hafif yıpranmış görünüm.
 - **Çırak**: tarif edilen karakter, 3/4 görünüm, yürüme döngüsü (4–6 kare, sol/sağ ayna), iş animasyonu (sulama kovası, sepet, eğilme), boşta göz kırpma; **eşek** (gri-kahve, uzun kulaklar, heybe), binerken çocuk eşeğin üstünde; eşek yürüyüşü, kulak/kuyruk hareketi. `depthForY`, gölge, gece fener (çocuk 19:00'da eve gider). Kamera takip edilirken akıcı.
 - `ui/portrait.js`: SVG portre (baş-omuz), aynı tarif; panelde ve HUD düğmesinde kullanılır.
+
+---
+
+## 12. Aşama 5b Sözleşmesi — Serbest Yerleşim (bağlayıcı, kısa)
+
+Kullanıcı isteği: kümes, ahır, kovan, atölyeler, tezgâh, kuyu, sundurma, çit ve patikayı **oyuncu kendisi yerleştirir, taşır, kaldırır**; ağaç/çalı temizlenebilir; tarlayı istediği yere çapalar. Seviye yok (K20).
+Beyin dosyaları: `data/placeables.js` (PLACEABLES, BUILD_CATS, CLEAR_COST, START_LAYOUT, START_FENCE), `data/land.js` (P1 = 20..68 × 5..21; P1_BLOCKED yalnızca ev + köy yolu).
+
+### State
+```js
+state.placed = [{ id: 'p12', type, tx, ty }]           // tx,ty = sol-üst karo; ayak izi PLACEABLES[type].w×h
+state.removedDecor = ['tree_3', 'bush_5']               // render/layout.js TREES/BUSHES dizinleri
+state.buildings[i].placedId / state.machines[i].placedId // lotId yerine (eski kayıt göçü)
+```
+### Çekirdek (engine-dev): `systems/PlacementSystem.js` + `systems/world/occupancy.js` (saf)
+- `occupancy`: `isBlocked(state, tx, ty, {walk})` (yerleştirilenler + temizlenmemiş dekor ayak izi + P1_BLOCKED; `walk:true` iken patika ve köy yolu geçilebilir), `canPlace(state, type, tx, ty, ignoreId?) → {ok, reason}` (arazi içinde, boş, ekinli/sürülmüş karo değil — çit ve patika sürülmüş karoya konamaz), `objectAt(state, tx, ty) → placed|decor|null`, `penOf(state, placedId) → {x0,x1,y0,y1}` (ayak izinin hemen altında, w+2 × 3, engelsiz karolar). Önbellek `placed:changed`'de yenilenir; render/layout.js yalnızca saf veri olarak import edilir.
+- Komutlar: `build:place {type, tx, ty}` → `canPlace` + `transact(-price,'buildings')` → `placed:changed`, `building:built {type, placedId, tx, ty}` (sinematik yalnızca bina/atölye/kovan için; çit/patika için yok). `build:move {placedId, tx, ty}` (ücretsiz; içerik/hayvanlar taşınır). `build:remove {placedId}` (unique+required kaldırılamaz; hayvanlı bina/kuyruğu dolu makine reddedilir: "Önce hayvanları sat/taşı"; iade `price×refund`). `build:clear {decorId}` → `transact(-CLEAR_COST)` → removedDecor. `build:result {ok, reason}`.
+- Yeni oyun: START_LAYOUT + START_FENCE çiti `state.placed`'e yazılır. **Eski kayıt göçü:** lot'lu binalar/makineler lot konumunda placed nesnelere, sabit tezgâh/kuyu/sundurma/çit varsayılan konumlarına dönüştürülür.
+- `rules.canApply` (farm) ve `WorkerSystem` yol bulma `occupancy` kullanır (P1_BLOCKED doğrudan değil); WorldLinks yerine **placed nesneye dokunma** → `PLACEABLES[type].link` paneli (`placedId` ekli) — WorldLinks bu tabloyu dinamik üretir.
+- FarmSystem: genişleyen P1 için eksik karoları mevcut `ensureParcelTiles` tamamlar (gameplay-dev doğrular).
+### Sistem uyarlaması (gameplay-dev)
+- AnimalSystem: `shop:build`/lot mantığı kalkar; `building:built` (coop/barn/hive) → bina kaydı (`placedId`), hive → bina + arılar. Kalem: `build:move` hayvan konumlarına dokunmaz (görsel pen'den alır); `build:remove` boş binayı siler. ProductionSystem: `shop:buildMachine` kalkar; `building:built` (makine türü) → makine kaydı; makine türü başına birden fazla atölye serbest (`id = m_<placedId>`). Mağazadaki Binalar/Atölyeler kartları kaldırılır (inşa artık İnşa modunda). Paneller arsa yerine `placedId` ile açılır. Seviye artıkları (levelLock metinleri) temizlenir. Simler güncellenir.
+### Görsel (visual-dev)
+- Tüm görünümler (BuildingView, MachineView, AnimalView pen, MarketStall, kuyu, sundurma, WorkerView eşek evi) konumu `state.placed`'ten alır, `placed:changed`'de kurar/taşır/yok eder. Sabit "boş arsa" işaretleri kalkar. Decor: `removedDecor` ağaç/çalıları gizler; P1 içi ve dışı sabit dekor `layout.js`'ten okunur (ev ve köy yolu sabit).
+- **Çit** (otomatik bağlanan ahşap çit: komşu çitlere göre yatay/dikey/köşe parçaları) ve **taş patika** (komşulara göre birleşen taşlar) dokuları ve görünümü; eski P1 çiti artık bu sistemden çizilir (render'daki sabit çit kalkar).
+- **Hayalet önizleme:** `build:ghost {type, tx, ty, valid} | null` → yarı saydam sprite, yeşilimsi/kırmızımsı kenar; taşıma modunda seçili nesne hafif kalkık. Yerleştirme: pop + toz.
+### UI (ui-dev)
+- HUD'a **İnşa** düğmesi (B). İnşa modu: alt kenarda kategori sekmeli katalog (BUILD_CATS; kartta ikon, ad, fiyat, ayak izi), üstte mod çubuğu: **Yerleştir / Taşı / Kaldır / Temizle (ağaç)** ve Bitti. Seçili nesne → `tool:select {tool:'build'}` (CameraDirector boyama semantiği) ve `tile:hover`/`tile:tap` → `build:ghost` (+ `canPlace`) → masaüstünde tık = yerleştir; mobilde ilk dokunuş hayaleti koyar, "Onayla" düğmesi yerleştirir; çit/patika sürükleyerek boyanır (her karo bir `build:place`). Taşı: nesneye dokun → hayalet → hedef → onay. Kaldır: dokun → iade tutarıyla onay. Temizle: ağaç/çalıya dokun → bedelle onay. `build:result ok:false` → toast (darbe başına bir). Esc/Bitti → çıkış, alet İncele'ye döner.
+- Seviye artıkları: mağaza/pazar/çalışan/bina/makine panellerindeki seviye kilidi metinleri ve level:up kartı kaldırılır (veriler zaten level 1).

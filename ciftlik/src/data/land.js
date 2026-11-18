@@ -3,13 +3,16 @@
 // beyin tarafından hesaplandı (araç: scratchpad blocked.mjs). Dekor yeri değişirse bu liste güncellenir.
 // Değer: engel türü → UI etiketi için BLOCK_LABELS_TR.
 export const PARCELS = {
-  P1: { tx: 32, ty: 6, w: 16, h: 12, price: 0, level: 1 },
+  // K21: başlangıç arazisi genişletildi (serbest yerleşim için) — eski P1 (32,6,16×12) bunun içinde
+  P1: { tx: 20, ty: 5, w: 49, h: 17, price: 0, level: 1 },
 };
 
 export const BLOCK_LABELS_TR = {
   house: 'Çiftlik evi', well: 'Kuyu', lamp: 'Fener', tree: 'Ağaç', bush: 'Çalı', path: 'Patika',
 };
 
+// K21: yalnızca SABİT engeller (çiftlik evi, fener, köy yolu). Kuyu, ağaç, çalı ve tüm yerleştirilenler
+// artık dinamik: systems/world/occupancy.js (state.placed + temizlenmemiş dekor).
 export const P1_BLOCKED = {
   // K14b: görsel silüet arkası (çatı, kuyu çatısı, ağaç tacı) — QA regresyon Y1/Y2
   '41,6': 'house',
@@ -20,33 +23,6 @@ export const P1_BLOCKED = {
   '43,7': 'house',
   '44,6': 'house',
   '44,7': 'house',
-  '37,13': 'well',
-  '38,13': 'well',
-  '39,13': 'well',
-  '46,8': 'tree',
-  '47,8': 'tree',
-  '35,14': 'tree',
-  '36,14': 'tree',
-  '32,12': 'bush',
-  '32,13': 'bush',
-  '33,12': 'bush',
-  '33,13': 'bush',
-  '35,15': 'tree',
-  '35,16': 'tree',
-  '36,15': 'tree',
-  '36,16': 'tree',
-  '37,14': 'well',
-  '37,15': 'well',
-  '38,14': 'well',
-  '38,15': 'well',
-  '38,16': 'bush',
-  '38,17': 'bush',
-  '39,14': 'well',
-  '39,15': 'well',
-  '39,16': 'bush',
-  '39,17': 'bush',
-  '40,10': 'bush',
-  '40,11': 'bush',
   '40,16': 'path',
   '40,17': 'path',
   '41,10': 'house',
@@ -74,12 +50,6 @@ export const P1_BLOCKED = {
   '44,11': 'house',
   '44,8': 'house',
   '44,9': 'house',
-  '45,10': 'bush',
-  '45,11': 'bush',
-  '46,10': 'tree',
-  '46,9': 'tree',
-  '47,10': 'tree',
-  '47,9': 'tree',
 };
 
 export function blockedKind(tileId) { return P1_BLOCKED[tileId] ?? null; }
