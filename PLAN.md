@@ -18,7 +18,7 @@
 | 5b | Serbest yerleşim (inşa modu) + seviye sisteminin kaldırılması | ✅ Onaylandı |
 | 6 | Ekonomi, banka, giderler, finans paneli, sözleşmeler | ✅ Onaylandı |
 | 7 | Hava durumu, mevsimler, rastgele olaylar | ✅ Onaylandı |
-| 8 | İşçiler, makineler, arazi genişletme | — |
+| 8 | İşçiler, makineler, arazi genişletme, sera ve depolama | ✅ Tamamlandı (8 sim 0 hata + beyin duman testi) — onay bekleniyor |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
 
 ### İşçi kadrosu (`.claude/agents/`; Aşama 4+ `model: sonnet`, kullanıcı kararı)
