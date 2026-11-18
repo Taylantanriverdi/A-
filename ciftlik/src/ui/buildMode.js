@@ -8,6 +8,7 @@ import { ICON } from './icons.js';
 import { h, setText } from './frame.js';
 import { shield, tap } from './touch.js';
 import { formatMoney } from './hud.js';
+import { createLandPanel } from './landPanel.js';
 
 const B = STR.build;
 const MODES = ['place', 'move', 'remove', 'clear'];
@@ -71,6 +72,12 @@ export function createBuildMode(root, ctx, opts) {
     modeBar.appendChild(b);
     modeBtns[m] = b;
   }
+  const landPanel = createLandPanel(root, ctx);
+  const landBtn = h('button', 'bm-mode bm-land', '<span class="t">Arazi</span>');
+  landBtn.type = 'button';
+  landBtn.title = 'Satılık arazileri göster';
+  tap(landBtn, () => landPanel.toggle());
+  modeBar.appendChild(landBtn);
   const doneBtn = h('button', 'bm-done', `<span class="ic">${ICON.check}</span><span class="t">${B.done}</span>`);
   doneBtn.type = 'button';
   tap(doneBtn, () => api.exit());
@@ -375,6 +382,7 @@ export function createBuildMode(root, ctx, opts) {
     exit() {
       if (!active) return;
       active = false;
+      landPanel.close();
       clearTransient(); selType = null; hoverT = null;
       root.classList.remove('building');
       btn.classList.remove('on');
@@ -398,6 +406,7 @@ export function createBuildMode(root, ctx, opts) {
       window.removeEventListener('pointerdown', onDown, true);
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointermove', onMove, true);
+      landPanel.destroy();
       for (const e of [modeBar, hint, bubble, confirmBar, dock, btn]) e.remove();
     },
   };
@@ -414,6 +423,7 @@ export function createBuildMode(root, ctx, opts) {
 
   function render(force) {
     if (!active && !force) return;
+    landPanel.render();
     const money = state.finance ? state.finance.money : 0;
     if (money !== shownMoney) { shownMoney = money; dirty = true; }
     if (!dirty && !catDirty && !modeDirty) return;

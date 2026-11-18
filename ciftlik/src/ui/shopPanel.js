@@ -6,6 +6,8 @@ import { CROPS } from '../data/crops.js';
 import { SHOP, SHOP_TABS, MAX_BUY_QTY } from '../data/shop.js';
 import { ANIMALS, ANIMAL_PRODUCTS } from '../data/animals.js';
 import { BUILDINGS } from '../data/buildings.js';
+import { VEHICLES } from '../data/placeables.js';
+import { canBuy as vehicleCanBuy } from '../systems/VehicleSystem.js';
 import { SEASON_NAMES_TR } from '../core/constants.js';
 import { STR } from './strings.js';
 import { ICON } from './icons.js';
@@ -16,7 +18,7 @@ import { formatMoney } from './hud.js';
 import { countItem } from './toolbar.js';
 
 // Aşama 5b: bina/atölye kurulumu İnşa modundadır; 'Binalar' sekmesi yalnızca ipucu kartı gösterir.
-const TABS = SHOP_TABS;
+const TABS = SHOP_TABS.concat([{ id: 'vehicles', name: 'Makineler' }]); // Aşama 8: shop:buyVehicle
 
 const HOLD_DELAY = 380, HOLD_EVERY = 70;
 const PENDING_MS = 1500;
@@ -113,7 +115,7 @@ export function createShopPanel(ctx) {
   }
 
   // ---- Hayvanlar / Binalar sekmeleri (shop:buyAnimal / shop:build) ----
-  const CATALOG = { animals: 'a', buildings: 'h' };
+  const CATALOG = { animals: 'a', buildings: 'h', vehicles: 'v' };
   const catCards = new Map(); // 'a:chicken' | 'b:coop' → {el, refs}
   const animalsIn = (bid) => state.animals.reduce((n, a) => n + (a.buildingId === bid ? 1 : 0), 0);
 
@@ -121,6 +123,8 @@ export function createShopPanel(ctx) {
     const out = [];
     if (tabId === 'animals') {
       for (const id in ANIMALS) out.push({ kind: 'a', id, key: `a:${id}`, def: ANIMALS[id], level: ANIMALS[id].level, price: ANIMALS[id].price });
+    } else if (tabId === 'vehicles') {
+      for (const id in VEHICLES) out.push({ kind: 'v', id, key: `v:${id}`, def: VEHICLES[id], price: VEHICLES[id].price });
     } else {
       out.push({ kind: 'h', id: 'hint', key: 'h:hint' });
     }
@@ -153,7 +157,7 @@ export function createShopPanel(ctx) {
       return { el: c, refs };
     }
     const def = e.def;
-    refs.dot.style.background = e.kind === 'a' ? `radial-gradient(circle at 35% 30%, ${def.color}, ${def.accent})` : 'radial-gradient(circle at 35% 30%, #c8553d, #6b4a2f)';
+    refs.dot.style.background = e.kind === 'v' ? 'radial-gradient(circle at 35% 30%, #d9a441, #7a5a1f)' : e.kind === 'a' ? `radial-gradient(circle at 35% 30%, ${def.color}, ${def.accent})` : 'radial-gradient(circle at 35% 30%, #c8553d, #6b4a2f)';
     setText(refs.name, def.name);
     if (e.kind === 'a') {
       const pr = ANIMAL_PRODUCTS[def.product.itemId];
@@ -163,6 +167,7 @@ export function createShopPanel(ctx) {
       if (refs.buy.disabled) return;
       pending.set(e.key, performance.now() + PENDING_MS);
       if (e.kind === 'a') bus.emit('shop:buyAnimal', { animal: e.id });
+      else if (e.kind === 'v') bus.emit('shop:buyVehicle', { vehicle: e.id });
       dirty = true;
     });
     return { el: c, refs };
@@ -175,6 +180,7 @@ export function createShopPanel(ctx) {
     if (e.kind === 'h') return card.el;
     const locked = false;
     let why = '';
+    let warn = false;
     let hardBlock = false;
     if (e.kind === 'a') {
       const bdef = BUILDINGS[e.def.building];
@@ -184,6 +190,15 @@ export function createShopPanel(ctx) {
       setText(R.own, STR.bld.have(state.animals.reduce((n, a) => n + (a.type === e.id ? 1 : 0), 0)));
       setText(R.buyT, STR.buy);
     }
+    if (e.kind === 'v') {
+      const owned = state.vehicles && state.vehicles.some((v) => v.type === e.id);
+      const need = e.def.needs && !(state.placed || []).some((p) => p.type === e.def.needs);
+      if (owned) { why = 'Sahipsin'; hardBlock = true; }
+      else if (need) { why = vehicleCanBuy(state, e.id).reason || ''; hardBlock = true; warn = true; }
+      setText(R.sub, e.def.area ? `${e.def.area}×${e.def.area} alan · yakıt ${e.def.fuelPerTile} ₺/karo` : `Her sabah sütü toplar · ${e.def.kwhPerDay} kWh/gün`);
+      setText(R.buyT, STR.buy);
+    }
+    R.why.classList.toggle('warn', warn);
     const afford = e.price <= money;
     const busy = pending.has(e.key);
     card.el.classList.toggle('locked', locked);

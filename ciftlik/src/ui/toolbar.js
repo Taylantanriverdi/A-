@@ -9,6 +9,20 @@ import { itemIcon } from './itemIcons.js';
 import { h, setText } from './frame.js';
 import { shield, tap } from './touch.js';
 import * as rules from '../systems/farm/rules.js';
+import { areaTiles } from '../systems/VehicleSystem.js';
+
+// Aşama 8 (PLAN §15): İşaretle aleti (her zaman), Traktör/Biçerdöver (sahip olunca görünür).
+const svg0 = (inner) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+const EXTRA = ['mark', 'tractor', 'harvester'];
+const ALL_TOOLS = TOOLS.concat(EXTRA);
+const EXTRA_NAME = { mark: 'İşaretle', tractor: 'Traktör', harvester: 'Biçerdöver' };
+const EXTRA_ICON = {
+  mark: svg0('<path d="M6 20V4"/><path d="M6 5h11l-2.5 3.5L17 12H6" fill="currentColor" fill-opacity=".25"/>'),
+  tractor: svg0('<circle cx="7" cy="16.5" r="3.3"/><circle cx="17.5" cy="17.5" r="2.2"/><path d="M10 16h5.5M4 13V8h6l2 5M12 8h3l2 4v3.5"/>'),
+  harvester: svg0('<path d="M3 17h13V8H8l-2 4H3z" fill="currentColor" fill-opacity=".2"/><circle cx="8" cy="18" r="2"/><circle cx="16" cy="18" r="2"/><path d="M16 12h5v6h-3M19 6v6"/>'),
+};
+const VEH_TOOLS = ['tractor', 'harvester'];
+const SEED_PICK = ['seed', 'mark', 'tractor']; // tohum seçici açan aletler (mark/tractor: boş seçim = yalnız sür)
 
 /** rules.seedWarning (gameplay-dev ekliyor) varsa → {code,text} | null; yoksa / hata → null. */
 function seedWarn(state, cropId, now) {
@@ -25,7 +39,7 @@ export const TOOL_ACTION = {
 // Eşya seçen aletler. seed listesi envanterden dinamik, diğerleri sabit.
 const SEED_IDS = Object.keys(ITEMS).filter((id) => ITEMS[id].category === 'seed');
 const FIXED_ITEMS = { fertilize: ['compost', 'npk', 'lime'], treat: ['pesticide', 'organic_spray'] };
-const PICK_TITLE = { seed: STR.pickSeed, fertilize: STR.pickFert, treat: STR.pickTreat };
+const PICK_TITLE = { seed: STR.pickSeed, fertilize: STR.pickFert, treat: STR.pickTreat, mark: 'Tohum seç (seçilmezse: sürülecek işareti)', tractor: 'Tohum seç (seçilmezse yalnız sürer)' };
 
 export function countItem(state, itemId) {
   const inv = state.inventory && state.inventory.items;
@@ -54,15 +68,16 @@ export function createToolbar(root, ctx) {
   root.appendChild(wrap);
 
   const btns = new Map(); // tool → {b, sel, selIc, selQty}
-  TOOLS.forEach((t, i) => {
-    const hasPick = t === 'seed' || t in FIXED_ITEMS;
+  ALL_TOOLS.forEach((t, i) => {
+    const hasPick = SEED_PICK.includes(t) || t in FIXED_ITEMS;
     const b = h('button', `tool${hasPick ? ' has-pick' : ''}`,
-      `<span class="ic">${TOOL_ICON[t] || ''}</span><span class="lbl">${TOOL_NAMES_TR[t] || t}</span><span class="key">${i + 1}</span>` +
+      `<span class="ic">${TOOL_ICON[t] || EXTRA_ICON[t] || ''}</span><span class="lbl">${TOOL_NAMES_TR[t] || EXTRA_NAME[t] || t}</span><span class="key">${i < 8 ? i + 1 : ''}</span>` +
       (hasPick ? '<span class="sel"><span class="sel-ic"></span><span class="sel-q num"></span></span>' : ''));
     b.type = 'button';
     b.dataset.tool = t;
-    const name = TOOL_NAMES_TR[t] || t;
-    b.title = STR.toolKey(name, i + 1);
+    const name = TOOL_NAMES_TR[t] || EXTRA_NAME[t] || t;
+    b.title = i < 8 ? STR.toolKey(name, i + 1) : name;
+    if (VEH_TOOLS.includes(t)) { b.classList.add('vehicle'); b.hidden = true; }
     b.setAttribute('aria-label', name);
     b.setAttribute('aria-pressed', 'false');
     tap(b, () => onToolButton(t));
@@ -78,7 +93,7 @@ export function createToolbar(root, ctx) {
   });
 
   let tool = 'hand';
-  const selected = { seed: null, fertilize: null, treat: null };
+  const selected = { seed: null, fertilize: null, treat: null, mark: null, tractor: null };
   let pickerFor = null;          // açık seçicinin aleti
   let pickerKey = '';            // seçici içeriği anahtarı (yeniden kurmayı önler)
   const pickRows = new Map();    // itemId → {b, q, sub, shownQty, shownOff, shownOn}
@@ -87,6 +102,7 @@ export function createToolbar(root, ctx) {
   let seasonDirty = true;
   let season = '';
   let toolDirty = true;
+  let markStroke = -3; const markSeen = new Set();
   let needToastStroke = -1; // "önce eşya seç" toast'ı fırça darbesi başına bir kez
 
   let emitting = false; // kendi yaydığımız tool:select'i dış olay sanmayalım
@@ -97,7 +113,7 @@ export function createToolbar(root, ctx) {
   };
   /** Dışarıdan gelen tool:select {tool, itemId?} (ör. debug.tool) → seçili aleti/eşyayı senkronla. */
   function onExternalSelect(p) {
-    if (emitting || !p || !TOOLS.includes(p.tool)) return;
+    if (emitting || !p || !ALL_TOOLS.includes(p.tool)) return;
     const t = p.tool;
     if (t in selected && p.itemId && ITEMS[p.itemId]) selected[t] = p.itemId;
     const changed = t !== tool;
@@ -130,17 +146,17 @@ export function createToolbar(root, ctx) {
     const c = CROPS[ITEMS[id].crop];
     return !!(c && c.seasons.includes(season));
   };
-  const usable = (t, id) => counts[id] > 0 && (t !== 'seed' || inSeason(id));
-  const optionsFor = (t) => (t === 'seed' ? SEED_IDS.filter((id) => counts[id] > 0) : FIXED_ITEMS[t] || []);
+  const usable = (t, id) => (t === 'mark' || counts[id] > 0) && (!SEED_PICK.includes(t) || inSeason(id));
+  const optionsFor = (t) => (t === 'mark' ? SEED_IDS : SEED_PICK.includes(t) ? SEED_IDS.filter((id) => counts[id] > 0) : FIXED_ITEMS[t] || []);
 
   function autoPick(t) {
-    if (!(t in selected) || selected[t]) return;
+    if (!(t in selected) || selected[t] || t === 'mark' || t === 'tractor') return;
     const opts = optionsFor(t);
     for (const id of opts) if (usable(t, id)) { selected[t] = id; return; }
   }
 
   function setTool(t, { open = false } = {}) {
-    if (!TOOLS.includes(t)) return;
+    if (!ALL_TOOLS.includes(t)) return;
     const changed = t !== tool;
     const prevItem = t in selected ? selected[t] : null;
     tool = t;
@@ -169,7 +185,7 @@ export function createToolbar(root, ctx) {
   function chooseItem(t, id) {
     if (!usable(t, id)) return;
     const changed = selected[t] !== id || tool !== t;
-    selected[t] = id;
+    selected[t] = (t === 'mark' || t === 'tractor') && selected[t] === id && tool === t ? null : id; // aynı tohuma tekrar dokunma: seçimi kaldır
     if (tool !== t) { tool = t; toolDirty = true; api.onToolChange && api.onToolChange(t); }
     toolDirty = true;
     closePicker();
@@ -204,12 +220,12 @@ export function createToolbar(root, ctx) {
   function paintPicker() {
     if (!pickerFor) return;
     buildPicker(pickerFor);
-    const now = pickerFor === 'seed' ? calendar(state.time.totalMinutes) : null;
+    const now = SEED_PICK.includes(pickerFor) ? calendar(state.time.totalMinutes) : null;
     for (const [id, r] of pickRows) {
       const n = counts[id] | 0;
       if (n !== r.shownQty) { r.shownQty = n; setText(r.q, STR.qtyBadge(n)); }
-      const seasonOk = pickerFor !== 'seed' || inSeason(id);
-      const off = n <= 0 || !seasonOk;
+      const seasonOk = !SEED_PICK.includes(pickerFor) || inSeason(id);
+      const off = (n <= 0 && pickerFor !== 'mark') || !seasonOk;
       if (off !== r.shownOff) {
         r.shownOff = off;
         r.b.classList.toggle('off', off);
@@ -221,8 +237,8 @@ export function createToolbar(root, ctx) {
       if (!seasonOk) {
         const c = CROPS[ITEMS[id].crop];
         sub = c.seasons.map((s) => SEASON_NAMES_TR[s]).join(' · ');
-      } else if (n <= 0) sub = STR.noneLeft;
-      else if (pickerFor === 'seed') {
+      } else if (n <= 0 && pickerFor !== 'mark') sub = STR.noneLeft;
+      else if (SEED_PICK.includes(pickerFor)) {
         const w = seedWarn(state, ITEMS[id].crop, now);
         if (w) { late = true; sub = STR.lateShort; r.lateText = w.text || STR.lateInSeason; }
       }
@@ -277,7 +293,37 @@ export function createToolbar(root, ctx) {
   const onResize = () => { if (pickerFor) placePicker(pickerFor); };
   window.addEventListener('resize', onResize);
 
+  // ---- Araç modu: 3×3 önizleme (farm:areaHint) ve görünürlük ----
+  let hintOn = false, vehKey = '';
+  const isVeh = () => VEH_TOOLS.includes(tool);
+  function onHover(p) {
+    if (isVeh() && p && p.tileId) { hintOn = true; bus.emit('farm:areaHint', { tiles: areaTiles(p.tileId, 3) }); }
+    else if (hintOn) { hintOn = false; bus.emit('farm:areaHint', { tiles: null }); }
+  }
+  const offHover = bus.on('tile:hover', onHover);
+  let lastVehMsg = '', lastVehAt = 0;
+  const offVeh = bus.on('vehicle:result', (p) => {
+    if (!p || p.ok !== false || !p.reason || !isVeh()) return;
+    const t = performance.now();
+    if (p.reason === lastVehMsg && t - lastVehAt < 2500) return;
+    lastVehMsg = p.reason; lastVehAt = t;
+    bus.emit('toast', { text: String(p.reason), kind: 'bad' });
+  });
+  function syncVehicles() {
+    const own = Array.isArray(state.vehicles) ? state.vehicles : [];
+    const key = own.map((v) => v.type).join(',');
+    if (key === vehKey) return;
+    vehKey = key;
+    for (const vt of VEH_TOOLS) {
+      const has = own.some((v) => v.type === vt);
+      btns.get(vt).b.hidden = !has;
+      if (!has && tool === vt) setTool('hand');
+    }
+  }
+
   function render() {
+    syncVehicles();
+    if (toolDirty && !isVeh() && hintOn) { hintOn = false; bus.emit('farm:areaHint', { tiles: null }); }
     let selDirty = toolDirty;
     if (seasonDirty) { seasonDirty = false; if (refreshSeason()) selDirty = true; }
     if (invDirty) {
@@ -287,7 +333,7 @@ export function createToolbar(root, ctx) {
       // Biten seçimi temizle
       for (const t in selected) {
         const id = selected[t];
-        if (id && !(counts[id] > 0)) {
+        if (id && !(counts[id] > 0) && t !== 'mark') {
           selected[t] = null;
           if (tool === t) emitSelect();
         }
@@ -307,7 +353,8 @@ export function createToolbar(root, ctx) {
           r.shownItem = id;
           r.sel.classList.toggle('show', !!id);
           r.selIc.innerHTML = id ? itemIcon(id) : '';
-          r.b.title = STR.toolKey(TOOL_NAMES_TR[t], TOOLS.indexOf(t) + 1) + (id ? ` — ${ITEMS[id].name}` : '');
+          const ti = ALL_TOOLS.indexOf(t);
+          r.b.title = (ti < 8 ? STR.toolKey(TOOL_NAMES_TR[t] || EXTRA_NAME[t], ti + 1) : EXTRA_NAME[t]) + (id ? ` — ${ITEMS[id].name}` : '');
         }
         const n = id ? counts[id] | 0 : -1;
         if (n !== r.shownQty) { r.shownQty = n; setText(r.selQty, n >= 0 ? STR.qtyBadge(n) : ''); }
@@ -324,11 +371,25 @@ export function createToolbar(root, ctx) {
     render,
     select: (t) => setTool(t),
     selectIndex(i) { const t = TOOLS[i]; if (t) onToolButton(t); },
+    onHover,
     closePicker,
     markInventory() { invDirty = true; },
     markSeason() { seasonDirty = true; },
     /** tile:tap (alet ≠ hand) → tek farm:action. DOM işi yok (yalnızca nadir, kısıtlı toast). */
     apply(tileId, stroke = -2) {
+      if (tileId == null) return;
+      if (tool === 'tractor' || tool === 'harvester') {
+        bus.emit('vehicle:work', tool === 'tractor' && selected.tractor ? { type: tool, tileId, itemId: selected.tractor } : { type: tool, tileId });
+        return;
+      }
+      if (tool === 'mark') {
+        if (stroke !== markStroke) { markStroke = stroke; markSeen.clear(); }
+        if (markSeen.has(tileId)) return; // sürüklerken aynı karo iki kez aç/kapa olmasın
+        markSeen.add(tileId);
+        const itemId = selected.mark;
+        bus.emit('farm:mark', itemId ? { tileId, plan: 'plant', itemId } : { tileId, plan: 'plow' });
+        return;
+      }
       const type = TOOL_ACTION[tool];
       if (!type || tileId == null) return;
       if (tool in selected) {
@@ -350,6 +411,8 @@ export function createToolbar(root, ctx) {
     init() { emitSelect(); },
     destroy() {
       if (typeof offSelect === 'function') offSelect();
+      if (typeof offHover === 'function') offHover();
+      if (typeof offVeh === 'function') offVeh();
       window.removeEventListener('pointerdown', onDownOutside, true);
       window.removeEventListener('resize', onResize);
     },
