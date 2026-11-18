@@ -30,12 +30,13 @@ export function dailyWeeds(t, rng) {
 }
 
 /** Zararlı/hastalık oluşumu ve şiddet artışı (canlı ekin). @returns {number} bit 1: yeni zararlı, 2: yeni hastalık, 4: şiddet değişti */
-export function dailyPestDisease(t, crop, season, rng) {
+export function dailyPestDisease(t, crop, season, rng, pestMult = 1) {
   let r = 0;
   if (crop.pest > 0) { if (crop.pest < 1) { crop.pest = grow(crop.pest, G.pest); r |= 4; } } else {
     let p = THREATS.pestDaily;
     if (season === 'summer') p *= 2;
     if ((crop.rot ?? 1) < 1) p *= 1.5; // ekim nöbeti ihlali
+    p *= pestMult; // zararlı istilası olayı (PLAN §14)
     if (rng.next() < p) { crop.pest = G.pest; r |= 1; }
   }
   if (crop.disease > 0) { if (crop.disease < 1) { crop.disease = grow(crop.disease, G.disease); r |= 4; } } else {

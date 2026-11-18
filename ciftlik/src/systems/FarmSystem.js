@@ -4,6 +4,7 @@
 // onSeason: mevsim dışı hasar. Rastgelelik yalnızca ctx.rng (tohumlu).
 import { CROPS, ROT_AFTER_DAYS, REGROW_STAGE } from '../data/crops.js';
 import { HEALTH, SOIL } from '../data/farming.js';
+import { EFFECTS } from '../data/weather.js';
 import { XP_RULES } from '../data/progression.js';
 import { ITEMS, STARTING_INVENTORY } from '../data/items.js';
 import { PARCELS, blockedKind } from '../data/land.js';
@@ -18,6 +19,8 @@ import { REGROW_GROWTH, inSeason, growthRatePerHour, stageFor, rotationMult } fr
 import { healthDeltaHour, dailyWeeds, dailyPestDisease, spreadTo, applyTreatment } from './farm/threats.js';
 import { careSample, careScore, gradeFor, harvestYield, harvestXp } from './farm/quality.js';
 import { canApply } from './farm/rules.js';
+import { damageCrops } from './farm/hazards.js';
+import { evMult } from './events/mods.js';
 
 /** Başlangıçta sürülmüş 24 karo (PLAN §8). */
 const START_PLOWED = { x0: 34, x1: 39, y0: 8, y1: 11 };
@@ -271,12 +274,14 @@ function onHour(state, bus, ctx) {
   ensureCache(state);
   const season = ctx.now.season;
   const wt = state.weather ? state.weather.type : 'clear';
+  const lossMult = evMult(state, 'moistureLossMult'); // kuraklık olayı
+  const gm = wt === 'snow' ? EFFECTS.snow.openFieldGrowthMult : 1; // kar: açık alan büyümesi (PLAN §14)
   const n = list.length;
   let cnt = 0;
   for (let i = 0; i < n; i++) {
     const t = list[i];
     const wasWet = t.moisture >= 50;
-    moistureHour(t, season, wt);
+    moistureHour(t, season, wt, lossMult);
     let vis = t.state === 'plowed' && wasWet !== (t.moisture >= 50);
     const c = t.crop;
     if (c !== null && !c.dead) {
@@ -289,7 +294,7 @@ function onHour(state, bus, ctx) {
           c.health = 0; c.dead = true; vis = true;
         } else {
           if (c.stage < 4) {
-            const g = c.growth + growthRatePerHour(t, c, def, season);
+            const g = c.growth + growthRatePerHour(t, c, def, season) * gm;
             c.growth = g > 1 ? 1 : g;
             const st = stageFor(c.growth);
             if (st !== c.stage) { c.stage = st; vis = true; }
@@ -310,6 +315,7 @@ function onDay(state, bus, ctx) {
   const rng = ctx.rng;
   const season = ctx.now.season;
   const seasonStart = ctx.now.dayOfSeason === 1; // o gün onSeason hasarı uygular
+  const pestMult = evMult(state, 'pestChanceMult');
   const n = list.length;
   let cnt = 0;
   for (let i = 0; i < n; i++) {
@@ -333,7 +339,7 @@ function onDay(state, bus, ctx) {
           ch = true;
         }
         if (c.health <= 0) { c.health = 0; c.dead = true; ch = true; } else {
-          if (dailyPestDisease(t, c, season, rng) !== 0) ch = true;
+          if (dailyPestDisease(t, c, season, rng, pestMult) !== 0) ch = true;
           if (c.stage >= 4) {
             c.readyDays += 1;
             if (c.readyDays >= ROT_AFTER_DAYS) { c.dead = true; ch = true; }
@@ -484,6 +490,14 @@ const FarmSystem = {
     }
     rebuildCache(state);
     offs.push(bus.on('farm:action', (p) => applyAction(state, busRef, p)));
+    // Hava/olay hasarı (WeatherSystem/EventSystem yayar): açık alan ekinleri
+    offs.push(bus.on('hazard:crops', (p) => {
+      if (!p || !(p.damage > 0)) return;
+      ensureCache(state);
+      const out = [];
+      damageCrops(state.tiles, rngOf(state), { chance: p.chance ?? 1, damage: p.damage, onlyNonHardy: p.onlyNonHardy === true }, out);
+      if (out.length) bus.emit('farm:changed', { tileIds: out });
+    }));
   },
 
   onHour,

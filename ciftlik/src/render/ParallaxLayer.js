@@ -10,6 +10,7 @@ import { mulberry32 } from './textures/noise.js';
 const REF_Y = -700;      // kamera tavanı (dünya)
 const SINK = 0.12;       // dikey paralaks gücü
 const WHITE = [1, 1, 1];
+const GREYC = [0.5, 0.54, 0.62], SNOWW = [0.93, 0.96, 1];
 
 /** Katman ölçeği: uzak katmanlar zoom'a daha az tepki verir. */
 export function layerScale(v, s) { return v.dpr * Math.pow(v.uz, 0.35 + 0.65 * s); }
@@ -134,9 +135,12 @@ export default class ParallaxLayer {
       hexToRgb(SEASON_HILL[env.season] || WORLD.hill, this.cols.hill);
       hexToRgb(SEASON_FOREST[env.season] || WORLD.forest, this.cols.forest);
     }
-    lit(this.cols.hill, this.t1); mixRgb(this.t1, sky, 0.22, this.t2); mixRgb(this.t1, sky, 0.38, this.t3);
+    const snK = env.snowCover || 0;
+    lit(this.cols.hill, this.t1); if (snK > 0.01) { mulRgb(SNOWW, amb, this.t4); mixRgb(this.t1, this.t4, snK * 0.65, this.t1); }
+    mixRgb(this.t1, sky, 0.22, this.t2); mixRgb(this.t1, sky, 0.38, this.t3);
     this.hills.tint(this.t2, this.t3);
-    lit(this.cols.forest, this.t1); mixRgb(this.t1, sky, 0.16, this.t2); mixRgb(this.t1, sky, 0.38 + day.fog * 0.3, this.t3);
+    lit(this.cols.forest, this.t1); if (snK > 0.01) { mulRgb(SNOWW, amb, this.t4); mixRgb(this.t1, this.t4, snK * 0.4, this.t1); }
+    mixRgb(this.t1, sky, 0.16, this.t2); mixRgb(this.t1, sky, 0.38 + day.fog * 0.3, this.t3);
     this.forest.tint(this.t2, this.t3);
     this.forestBottom[0] = this.t3[0]; this.forestBottom[1] = this.t3[1]; this.forestBottom[2] = this.t3[2];
     const ft = rgbToInt(this.t2), fb = rgbToInt(this.t3);
@@ -149,8 +153,10 @@ export default class ParallaxLayer {
     // bulut renkleri: üst ışık rengi, alt gök gölgesi
     mixRgb(WHITE, day.sun, 0.5, this.t1); scaleRgb(this.t1, 0.3 + 0.7 * day.light, this.t1); mixRgb(this.t1, sky, 0.12, this.t1);
     mixRgb(day.skyTop, sky, 0.6, this.t2); mixRgb(this.t1, this.t2, 0.32, this.t2);
+    const cg = env.cloud; // yağışlı havada bulutlar koyulaşır, kapsama artar
+    mixRgb(this.t1, GREYC, cg * 0.45 * (0.4 + 0.6 * day.light), this.t1); mixRgb(this.t2, GREYC, cg * 0.5 * (0.4 + 0.6 * day.light), this.t2);
     const ct = rgbToInt(this.t1), cb = rgbToInt(this.t2);
-    const ca = 0.4 + 0.45 * day.light;
+    const ca = Math.min(1, (0.4 + 0.45 * day.light) * (1 + cg * 0.55));
     for (const it of this.clouds.items) { it.im.setTint(ct, ct, cb, cb); it.baseA = ca * it.a; }
     // rüzgâr: bulut kayması ve sis bandı akışı
     const dt = env.dt;

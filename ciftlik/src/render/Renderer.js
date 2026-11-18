@@ -14,6 +14,7 @@ import Lighting from './Lighting.js';
 import Decor from './Decor.js';
 import HorizonLayer from './HorizonLayer.js';
 import Particles from './Particles.js';
+import WeatherFX from './WeatherFX.js';
 import FieldView from '../world/FieldView.js';
 import MarketStall from '../world/MarketStall.js';
 import BuildingView from '../world/BuildingView.js';
@@ -29,6 +30,7 @@ import { createLook } from './postfx/CinematicPipeline.js';
 
 const CLOUDINESS = { clear: 0, sunny: 0, partly: 0.3, cloudy: 0.65, overcast: 0.8, rain: 0.9, storm: 1, snow: 0.8, fog: 0.7 };
 const GREY = [0.62, 0.64, 0.7];
+const WX_TOP = [0, 0, 0], WX_BOT = [0, 0, 0];
 const QUALITY = {
   high: { bloom: true, bloomStrength: 0.85, bloomPasses: 3, grain: 0.04 },
   medium: { bloom: true, bloomStrength: 0.45, bloomPasses: 2, grain: 0.04 },
@@ -68,6 +70,7 @@ export default class Renderer {
     this.lighting.create();
     this.decor = new Decor(s, this.shadows, this.lighting, this.state, this.bus, this); this.decor.create();
     this.particles = new Particles(s); this.particles.create();
+    try { this.weatherFx = new WeatherFX(s, this.state, this.bus, this); this.weatherFx.create(); } catch (e) { console.error('[render] WeatherFX', e); this.weatherFx = null; }
     // tarla karoları + ekinler + imleç + tarım efektleri (state.tiles'tan; yalnızca okur)
     try { this.field = new FieldView(s, this.state, this.bus, this); } catch (e) { console.error('[render] FieldView', e); this.field = null; }
     // çit + taş patika (state.placed; PLAN §12) ve yerleştirme hayaleti
@@ -146,6 +149,7 @@ export default class Renderer {
     if (!this._ready) return;
     const q = QUALITY[level];
     this.particles.setQuality(level);
+    this.weatherFx?.setQuality(level);
     this.shadowSystem.setQuality(level);
     this.field?.setQuality(level);
     this.saleFx?.setQuality(level);
@@ -168,10 +172,20 @@ export default class Renderer {
     const w = this.state?.weather || {};
     const cloudT = clamp((CLOUDINESS[w.type] ?? 0) * (w.type && w.type !== 'clear' ? 0.6 + 0.4 * (w.intensity ?? 0.6) : 1), 0, 1);
     env.cloud = lerp(env.cloud, cloudT, Math.min(1, dt * 0.5));
-    const wt = clamp(Number.isFinite(w.wind) ? w.wind : 0.2, 0, 1);
+    const storm = env.stormK || 0;
+    const wt = clamp(Math.max(Number.isFinite(w.wind) ? w.wind : 0.2, storm * (0.72 + 0.2 * (w.intensity ?? 0.8))), 0, 1);
     this._wind = lerp(this._wind, wt, Math.min(1, dt * 0.6));
-    const gust = 0.8 + 0.2 * Math.sin(env.t * 0.43) * Math.sin(env.t * 0.17 + 1);
+    // fırtınada rüzgâr güçlü salınır (hamleler)
+    const gust = 0.8 + 0.2 * Math.sin(env.t * 0.43) * Math.sin(env.t * 0.17 + 1) + storm * 0.16 * Math.sin(env.t * 1.7 + Math.sin(env.t * 0.6) * 2);
     env.wind = clamp(this._wind * gust, 0, 1);
+    // hava efektleri (yağış/sis/kar örtüsü hedefleri env'e yazılır) ve gök/ışık griye kayması
+    if (this.weatherFx) { try { this.weatherFx.update(env); } catch (e) { if (!this._wxErr) { this._wxErr = true; console.error('[render] WeatherFX.update', e); } } }
+    if (env.cloud > 0.01) {
+      const light = env.day.light, lum = 0.25 + 0.75 * light, k = clamp(env.cloud * 0.8, 0, 0.8);
+      WX_TOP[0] = 0.46 * lum; WX_TOP[1] = 0.53 * lum; WX_TOP[2] = 0.64 * lum;
+      WX_BOT[0] = 0.66 * lum; WX_BOT[1] = 0.7 * lum; WX_BOT[2] = 0.76 * lum;
+      mixRgb(env.day.skyTop, WX_TOP, k, env.day.skyTop); mixRgb(env.day.skyBottom, WX_BOT, k * 0.9, env.day.skyBottom);
+    }
     // ambient: bulutlu havada gri ve koyu
     copyRgb(env.day.ambient, env.ambient);
     if (env.cloud > 0.01) { mixRgb(env.ambient, GREY, env.cloud * 0.45, env.ambient); for (let i = 0; i < 3; i++) env.ambient[i] *= 1 - env.cloud * 0.18; }
@@ -244,6 +258,7 @@ export default class Renderer {
     this.parallax.layout(v, env);
     this.lighting.layout(v);
     this.particles.layout(v, env);
+    this.weatherFx?.layout(v, env);
     this.saleFx?.layout(v);
     // üst katman: kararma + Canvas letterbox
     v.fit(this.cTop);
@@ -261,7 +276,7 @@ export default class Renderer {
     for (const off of this._offs) off(); this._offs.length = 0;
     if (this._cam && this._origPreRender) { delete this._cam.preRender; if (this._cam.preRender !== this._origPreRender) this._cam.preRender = this._origPreRender; }
     try { if (this.fx && this.fx.pipe) this._cam.removePostPipeline(this.fx.pipe); } catch { /* yok say */ }
-    for (const m of [this.ghost, this.fences, this.saleFx, this.workers, this.machines, this.animals, this.buildings, this.stall, this.field, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
+    for (const m of [this.ghost, this.fences, this.saleFx, this.workers, this.machines, this.animals, this.buildings, this.stall, this.field, this.weatherFx, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
     this.cTop?.destroy();
   }
 }

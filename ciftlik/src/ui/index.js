@@ -20,6 +20,8 @@ import { createWorkerPanel, hudPortrait } from './workerPanel.js';
 import { createMachinePanel } from './machinePanel.js';
 import { createFinancePanel, createSeasonCard, financeBadge } from './financePanel.js';
 import { createBuildMode } from './buildMode.js';
+import { createWeatherStrip } from './weatherStrip.js';
+import { createEventCard, createFestivalPanel } from './eventCard.js';
 import { formatMoney } from './hud.js';
 import { ITEMS } from '../data/items.js';
 import { tileInfo } from '../systems/farm/rules.js';
@@ -59,6 +61,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   const left = h('div', 'hud-left');
   top.appendChild(left);
   const clock = createClock(left, ctx);
+  const wxStrip = createWeatherStrip(left, ctx); // Aşama 7: 3 günlük tahmin + aktif olay çipleri
   const money = createMoney(top, ctx);
   const speed = createSpeed(bottom, ctx);
   const toolbar = createToolbar(bottom, ctx);
@@ -88,6 +91,8 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   const finPanel = createFinancePanel(ctx);
   panels.register(finPanel);
   const seasonCard = createSeasonCard(root);
+  const evCard = createEventCard(root);
+  const festPanel = createFestivalPanel(root, ctx);
   const build = createBuildMode(root, ctx, {
     nav: panels.nav,
     closeAll: () => { panels.close(); if (toolbar.isPickerOpen) toolbar.closePicker(); if (card.isOpen) card.close(); if (settings.isOpen) settings.close(); toolbar.select('hand'); },
@@ -211,6 +216,12 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   on('contract:completed', () => { finPanel.markDirty(); refreshBadge(); });
   on('contract:failed', () => { finPanel.markDirty(); refreshBadge(); });
   refreshBadge();
+  // ---- Aşama 7: hava / olaylar / festival ----
+  for (const n of ['weather:changed', 'event:started', 'event:ended', 'time:day']) on(n, wxStrip.markDirty);
+  on('event:started', (p) => { if (p) evCard.show(p); });
+  on('festival:open', () => { festPanel.onOpen(); toasts.push({ text: STR.ev.fest.toast, kind: 'event' }); });
+  on('festival:result', (p) => { festPanel.onResult(p); if (p && p.ok === false && p.reason) toasts.push({ text: String(p.reason), kind: 'bad' }); });
+  on('inventory:changed', festPanel.refresh);
   // ---- Aşama 5: atölyeler ----
   on('machines:changed', () => { machPanel.markDirty(); shopPanel.markDirty(); });
   on('time:hour', () => machPanel.markDirty());
@@ -295,6 +306,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
 
   const loop = createFrameLoop();
   loop.add(clock.render);
+  loop.add(wxStrip.render);
   loop.add(money.render);
   loop.add(speed.render);
   loop.add(toolbar.render);
@@ -378,6 +390,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
       window.removeEventListener('pointercancel', onCancel, true);
       clearTimeout(outsideTimer);
       clearTimeout(spoil.timer);
+      wxStrip.destroy(); evCard.destroy(); festPanel.destroy();
       seasonCard.destroy(); build.destroy(); toolbar.destroy(); notes.destroy(); celebrate.destroy();
       shopPanel.destroy(); panels.destroy();
       money.destroy(); settings.destroy(); toasts.destroy();

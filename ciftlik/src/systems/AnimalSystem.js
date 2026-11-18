@@ -297,6 +297,13 @@ const AnimalSystem = {
     offs.push(bus.on('placed:changed', () => syncPlaced(state, bus)));
     offs.push(bus.on('shop:buyAnimal', (p) => buyAnimal(state, bus, p, rngRef)));
     offs.push(bus.on('animal:action', (p) => action(state, bus, p)));
+    // Hava/olay etkisi (fırtına): tüm hayvanların mutluluğu düşer (PLAN §14)
+    offs.push(bus.on('hazard:animals', (p) => {
+      const d = Number(p?.happiness);
+      if (!Number.isFinite(d) || d === 0) return;
+      for (const a of state.animals) a.happiness = Math.max(0, Math.min(100, a.happiness + d));
+      bus.emit('animals:changed', { buildingIds: [] });
+    }));
   },
   onHour,
   onDay,

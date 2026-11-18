@@ -7,6 +7,8 @@ import SaveSystem from './core/SaveSystem.js';
 import SystemRegistry from './core/SystemRegistry.js';
 import { SPEEDS, MIN_PER_DAY, TILE_W, TILE_H } from './core/constants.js';
 import TimeSystem from './systems/TimeSystem.js';
+import WeatherSystem from './systems/WeatherSystem.js';
+import EventSystem from './systems/EventSystem.js';
 import PlacementSystem from './systems/PlacementSystem.js';
 import FarmSystem from './systems/FarmSystem.js';
 import InventorySystem from './systems/InventorySystem.js';
@@ -36,7 +38,7 @@ const MarketSystem = optionalSystem('MarketSystem.js', 'market');
 const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
 const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
 // Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
-const SYSTEMS = [TimeSystem, InventorySystem, PlacementSystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, BankSystem, ContractSystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ WorkerSystem].filter(Boolean);
+const SYSTEMS = [TimeSystem, WeatherSystem, EventSystem, InventorySystem, PlacementSystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, BankSystem, ContractSystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ WorkerSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);
@@ -233,11 +235,10 @@ const debug = {
   },
   setSpeed(x) { bus.emit('time:speed', { speed: Number(x) }); },
   setWeather(type) {
-    const w = state.weather;
-    w.type = String(type);
-    if (w.type === 'clear') w.intensity = 0; else if (!(w.intensity > 0)) w.intensity = 0.6;
-    bus.emit('weather:changed', { type: w.type, intensity: w.intensity, wind: w.wind });
+    bus.emit('weather:set', { type: String(type) }); // WeatherSystem işler (PLAN §14)
   },
+  /** Olay zorla: 'drought' | 'hail' | 'frost' | 'outbreak' | 'priceCrash' | 'subsidy' | 'pestWave' | 'festival' */
+  event(kind) { bus.emit('event:force', { kind: String(kind) }); },
   /** EconomySystem varsa transact (kategori 'other', defter + özet); yoksa eski doğrudan yazım. */
   addMoney(n) {
     const amount = Math.round(Number(n) || 0);

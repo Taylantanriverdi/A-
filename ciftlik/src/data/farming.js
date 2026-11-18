@@ -3,6 +3,7 @@ export const SOIL = {
   start: { moisture: 45, n: 55, p: 50, k: 50, ph: 6.5 },
   moistureLossPerHour: { spring: 1.2, summer: 1.4, autumn: 1.0, winter: 0.5 },
   rainGainPerHour: { rain: 4, storm: 6, snow: 0.5 },
+  rainCap: 88,                // K24: yağmur nemi bunun üstüne çıkarmaz (waterlogAbove 92'nin altı)
   waterTarget: 80,            // sulama nemi bu değere DOLDURUR (üstüne çıkarmaz); günlük sulama ideal ritimdir
   wetEnoughAbove: 78,         // bunun üstünde sulama reddedilir ("Toprak zaten ıslak")
   droughtBelow: 20,           // bunun altı kuraklık stresi

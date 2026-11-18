@@ -269,6 +269,24 @@ export const STR = {
     deadline: (d) => `Teslim süresi ${d} gün`,
     badge: (n) => `${n} bildirim`,
   },
+  // Aşama 7: hava tahmini, olaylar, festival
+  ev: {
+    forecast: 'Hava tahmini', tomorrow: 'Yarın', inDays: (n) => `+${n} gün`,
+    tap: 'Kapatmak için dokun', until: (d) => (d >= 1 ? `${d} gün sürer` : 'Bugün'),
+    chip: {
+      drought: 'Kuraklık', hail: 'Dolu', frost: 'Don', outbreak: 'Salgın', priceCrash: 'Fiyat çöküşü', subsidy: 'Teşvik', pestWave: 'Zararlı',
+    },
+    chips: {
+      priceUp: (n, p) => `${n} +%${p}`, priceDown: (n, p) => `${n} −%${p}`, moisture: (x) => `Nem kaybı ×${x}`, noRain: 'Yağmur yok',
+      sick: (x) => `Hastalık şansı ×${x}`, pest: (x) => `Zararlı şansı ×${x}`, discount: (p) => `İnşaat −%${p}`, grant: (m) => `Hibe +${m}`,
+      cropDamage: 'Açık alan ekinleri zarar gördü', nonHardy: 'Dayanıksız ekinler',
+    },
+    fest: {
+      title: 'Ürün yarışması', hint: 'Envanterinden bir ürün seç; 12:00\'ye kadar karar ver.', empty: 'Envanterinde yarışacak ürün yok.',
+      enter: 'Yarışa sok', left: (h) => `Kalan süre ${h}`, prizes: 'Ödüller', rank: (n) => `${n}. oldun`, noPrize: 'Ödül yok', skipped: 'Bu yıl katılmadın',
+      score: 'Puanın', rivals: 'Rakipler', rep: (n) => `İtibar +${n}`, close: 'Kapat', later: 'Sonra', toast: 'Festival başladı! 12:00\'ye kadar ürün seçebilirsin.',
+    },
+  },
   panelShortcuts: 'I envanter · P pazar · M mağaza · F finans · Esc kapat',
 };
 export default STR;

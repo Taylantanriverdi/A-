@@ -57,7 +57,7 @@ export default class Lighting {
     for (const it of this.points) {
       const p = it.p;
       const f = 1 + Math.sin(this.t * 7.3 + it.ph) * p.flicker + Math.sin(this.t * 13.1 + it.ph * 2) * p.flicker * 0.5;
-      const a = clamp((p.nightOnly ? this.night : 1) * p.intensity * f, 0, 1);
+      const a = clamp((p.nightOnly ? this.night : 1) * p.intensity * f * (p.emissive ? 1 : 1 + (env.wetness || 0) * 0.35), 0, 1); // ıslak zeminde ışık yansır
       it.im.setAlpha(a); it.im.setVisible(a > 0.004);
     }
   }

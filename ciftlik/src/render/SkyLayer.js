@@ -113,16 +113,17 @@ export default class SkyLayer {
     const low = 1 - smoothstep(2, 22, sun.elevationDeg);
     this.sunX = sx; this.sunY = sy; this.sunScreenVisible = sun.visible && sy > -60 * d;
     mixRgb(SUN_HOT, env.day.sun, 0.45, tmpA); mixRgb(tmpA, SUN_LOW, low * 0.8, tmpA);
-    const sunOn = sun.elevationDeg > -4;
+    const vis = 1 - clamp(env.cloud * 1.5 - 0.15, 0, 1); // yağışlı/kapalı havada güneş diski görünmez
+    const sunOn = sun.elevationDeg > -4 && vis > 0.01;
     this.sun.setVisible(sunOn); this.sunHalo.setVisible(sunOn); this.sunHaloWide.setVisible(sunOn);
     if (sunOn) {
       const size = (64 + 34 * low) * d;
-      this.sun.setPosition(sx, sy).setDisplaySize(size, size).setTint(rgbToInt(tmpA)).setAlpha(clamp((sun.elevationDeg + 4) / 4, 0, 1));
+      this.sun.setPosition(sx, sy).setDisplaySize(size, size).setTint(rgbToInt(tmpA)).setAlpha(clamp((sun.elevationDeg + 4) / 4, 0, 1) * vis);
       mixRgb(env.day.sun, tmpA, 0.4, tmpB);
       const hs = size * (5.5 + low * 2);
-      this.sunHalo.setPosition(sx, sy).setDisplaySize(hs, hs).setTint(rgbToInt(tmpB)).setAlpha(0.32 + low * 0.4);
+      this.sunHalo.setPosition(sx, sy).setDisplaySize(hs, hs).setTint(rgbToInt(tmpB)).setAlpha((0.32 + low * 0.4) * vis);
       const ws = size * 16;
-      this.sunHaloWide.setPosition(sx, sy).setDisplaySize(ws, ws * 0.8).setTint(rgbToInt(env.day.sun)).setAlpha(0.05 + low * 0.3);
+      this.sunHaloWide.setPosition(sx, sy).setDisplaySize(ws, ws * 0.8).setTint(rgbToInt(env.day.sun)).setAlpha((0.05 + low * 0.3) * vis);
     }
     // ufuk parlaması (doğuş/batış tarafında)
     const g = env.twilight;

@@ -1,7 +1,7 @@
 // Rastgele olaylar — PLAN.md §4 "Rastgele olaylar" ve §14. Her sabah 06:00'da en fazla bir yeni olay (rng).
 // chance: günlük olasılık; seasons: yalnızca bu mevsimlerde; days: süre aralığı. Aynı türden aktif olay varken tekrar çıkmaz.
 export const EVENTS = {
-  drought:     { title: 'Bölgesel kuraklık', chance: 0.03, seasons: ['spring', 'summer', 'autumn'], days: [5, 10], summerMult: 2,
+  drought:     { title: 'Bölgesel kuraklık', chance: 0.012, seasons: ['spring', 'summer', 'autumn'], days: [5, 10], summerMult: 2,
                  effect: { priceMult: [1.3, 1.5], priceItems: 'randomCrops2', moistureLossMult: 1.5, noRain: true },
                  text: (e) => `Bölgede kuraklık: ${e.itemNames} fiyatları %${e.pct} arttı.` },
   hail:        { title: 'Dolu', chance: 0.015, seasons: ['spring', 'summer'], days: [1, 1],
@@ -23,5 +23,6 @@ export const FESTIVAL = {
   title: 'Ürün yarışması festivali',
   prizes: [3000, 1500, 500],        // 1., 2., 3. — oyuncunun en değerli tek ürünü (envanterden seçer) rakiplerle yarışır
   reputation: [8, 4, 2],
-  rivals: 3,                         // rakip puanı: rng × mevsimin en değerli ürün fiyatı × kalite
+  rivals: 3,                         // rakip puanı: (rivalMin + rng × rivalSpread) × mevsimin en değerli ürün fiyatı × kalite
+  rivalMin: 0.55, rivalSpread: 0.75, // K24: rakipler güçlendirildi (eski: 0..1)
 };

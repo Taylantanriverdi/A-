@@ -1884,3 +1884,45 @@
   #ui .lg-t { grid-area: t; } #ui .lg-a { grid-area: a; } #ui .lg-l { grid-area: l; } #ui .lg-c { grid-area: c; justify-self: end; }
   #ui .ct { flex-wrap: wrap; } #ui .ct .solid-gold { width: 100%; }
 }
+
+/* ---- Aşama 7: hava tahmini şeridi, olay çipleri, olay kartı, festival paneli ---- */
+#ui .wx-strip { display: flex; gap: 4px; padding: 4px 8px; border-radius: 12px; pointer-events: auto; }
+#ui .wx-strip[hidden] { display: none; }
+#ui .wx-day { display: flex; flex-direction: column; align-items: center; min-width: 40px; }
+#ui .wx-day .wx-i { width: 24px; height: 24px; display: block; }
+#ui .wx-day .wx-i svg { width: 100%; height: 100%; }
+#ui .wx-day small { font-size: 10px; color: var(--text-dim); line-height: 1.1; }
+#ui .ev-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+#ui .ev-chips:empty { display: none; }
+#ui .ev-chip { font-size: 11px; font-weight: 650; padding: 2px 8px; border-radius: 9px; background: rgba(255, 244, 220, 0.14); color: var(--text); }
+#ui .ev-chip.k-drought, #ui .ev-chip.k-pestWave, #ui .ev-chip.k-outbreak, #ui .ev-chip.k-hail, #ui .ev-chip.k-frost, #ui .ev-chip.k-priceCrash { background: rgba(214, 90, 70, 0.32); }
+#ui .ev-chip.k-subsidy { background: rgba(242, 184, 75, 0.35); }
+#ui .event-card {
+  position: absolute; z-index: 61; left: 50%; top: 18%; width: min(340px, calc(100vw - 32px)); transform: translate(-50%, -14px); opacity: 0;
+  padding: 16px 18px; border-radius: 16px; display: flex; flex-direction: column; gap: 8px; pointer-events: auto; cursor: pointer;
+  background: var(--glass-strong); transition: opacity 240ms ease, transform 240ms var(--ease);
+}
+#ui .event-card.show { opacity: 1; transform: translate(-50%, 0); }
+#ui .event-card[hidden] { display: none; }
+#ui .event-card small { color: var(--accent); font-weight: 650; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+#ui .event-card b { font-size: 17px; }
+#ui .event-card p { margin: 0; font-size: 14px; line-height: 1.4; }
+#ui .event-card em { font-size: 11px; color: var(--text-dim); font-style: normal; text-align: center; }
+#ui .fest-panel {
+  position: absolute; z-index: 62; left: 50%; top: 50%; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 80px); transform: translate(-50%, -48%); opacity: 0;
+  padding: 16px 18px; border-radius: 16px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto;
+  background: var(--glass-strong); transition: opacity 220ms ease, transform 220ms var(--ease);
+}
+#ui .fest-panel.show { opacity: 1; transform: translate(-50%, -50%); }
+#ui .fest-panel[hidden] { display: none; }
+#ui .fest-panel p { margin: 0; font-size: 13px; color: var(--text-dim); }
+#ui .fp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; } #ui .fp-head b { font-size: 17px; } #ui .fp-head small { color: var(--accent); font-size: 12px; }
+#ui .fp-prizes { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; } #ui .fp-prizes em { color: var(--text-dim); font-style: normal; }
+#ui .fp-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 40vh; }
+#ui .fp-item { display: flex; align-items: center; gap: 10px; min-height: var(--hit); padding: 4px 10px; border-radius: 12px; border: 1px solid rgba(255, 244, 220, 0.14); background: rgba(255, 244, 220, 0.06); color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+#ui .fp-item:hover { background: rgba(255, 244, 220, 0.12); }
+#ui .fp-item .ct-i { width: 32px; height: 32px; flex: none; } #ui .fp-item .ct-i svg { width: 100%; height: 100%; }
+#ui .fp-item .fp-n { flex: 1; min-width: 0; } #ui .fp-item .qb { display: inline-block; font-style: normal; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 7px; margin-left: 4px; background: rgba(255, 244, 220, 0.14); }
+#ui .fp-item .qb.q-A { background: #f2b84b; color: #1b1408; } #ui .fp-item .qb.q-B { background: #9bb7ff; color: #10131c; }
+#ui .fp-empty { font-size: 13px; color: var(--text-dim); padding: 8px 0; }
+#ui .fp-rank { font-size: 22px; font-weight: 700; color: var(--accent); text-align: center; }

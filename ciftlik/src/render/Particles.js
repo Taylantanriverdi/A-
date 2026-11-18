@@ -61,7 +61,7 @@ export default class Particles {
     const h = env.day.hour, day = env.day;
     // sabah sisi penceresi
     const morning = smoothstep(5.3, 6.1, h) * (1 - smoothstep(8.2, 9.2, h));
-    this.fogAmt = day.fog * (0.18 + 0.82 * morning) * (1 + env.cloud * 0.3);
+    this.fogAmt = Math.max(day.fog * (0.18 + 0.82 * morning) * (1 + env.cloud * 0.3), (env.fogBoost || 0) * 0.95);
     // ateş böcekleri: 20:30–04:00, ilkbahar/yaz
     const nightW = h >= 12 ? smoothstep(20.5, 21.2, h) : 1 - smoothstep(3.3, 4.0, h);
     this.flyAmt = (env.season === 'spring' || env.season === 'summer') ? nightW * (1 - env.cloud * 0.7) : 0;

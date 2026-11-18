@@ -11,6 +11,7 @@ import { transact } from './EconomySystem.js';
 import { canRemove as animalCanRemove } from './AnimalSystem.js';
 import { canRemove as machineCanRemove } from './ProductionSystem.js';
 import * as occ from './world/occupancy.js';
+import { buildCostMult } from './events/mods.js';
 
 const BUILT_EVENT = (type) => type in BUILDINGS || type in MACHINES;
 let offs = [];
@@ -42,7 +43,8 @@ export function place(state, bus, { type, tx, ty } = {}, silent = false) {
   if (def.unique && placedArr(state).some((p) => p.type === type)) return fail('Bu yapıdan zaten var');
   const c = occ.canPlace(state, type, tx, ty);
   if (!c.ok) return fail(c.reason);
-  if (def.price > 0 && !transact(state, bus, { amount: -def.price, category: 'buildings', label: `İnşaat: ${def.name}` })) return fail('Yeterli paran yok');
+  const price = Math.round(def.price * buildCostMult(state)); // devlet teşviki: %20 indirim (PLAN §14)
+  if (price > 0 && !transact(state, bus, { amount: -price, category: 'buildings', label: `İnşaat: ${def.name}` })) return fail('Yeterli paran yok');
   const p = addPlaced(state, type, tx, ty);
   changed(state, bus, { ids: [p.id] });
   if (BUILT_EVENT(type) && bus) bus.emit('building:built', { type, placedId: p.id, tx, ty });

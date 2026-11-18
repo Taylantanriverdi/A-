@@ -68,11 +68,11 @@ export function clampSoil(t) {
 }
 
 /** Saatlik nem: yağışta kazanç, değilse mevsime göre kayıp. */
-export function moistureHour(t, season, weatherType) {
+export function moistureHour(t, season, weatherType, lossMult = 1) {
   const gain = SOIL.rainGainPerHour[weatherType];
   let m = t.moisture;
-  if (gain !== undefined) m += gain;
-  else m -= SOIL.moistureLossPerHour[season] ?? 0.6;
+  if (gain !== undefined) { if (m < SOIL.rainCap) m = Math.min(SOIL.rainCap, m + gain); } // K24: yağmur nemi rainCap'e kadar doldurur
+  else m -= (SOIL.moistureLossPerHour[season] ?? 0.6) * lossMult;
   t.moisture = m < 0 ? 0 : m > 100 ? 100 : m;
 }
 

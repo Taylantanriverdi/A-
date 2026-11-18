@@ -3,6 +3,7 @@
 import { ANIMALS, CARE, VET, ANIMAL_PRODUCTS } from '../../data/animals.js';
 import { BUILDINGS, TROUGH } from '../../data/buildings.js';
 import { pickName } from './names.js';
+import { evMult } from '../events/mods.js';
 
 export const BOX_MAX = 60;       // kutuda ürün başına en fazla adet (teknik sınır; dolunca üretim durur)
 export const MIN_HEALTH = 5;     // sağlık bunun altına inmez (ölüm yok)
@@ -124,7 +125,7 @@ export function dayStep(state, b, list, ctx, today) {
   for (const a of list) {
     const def = ANIMALS[a.type];
     a.ageDays++;
-    if (b.dirt > 60 && !a.sick && ctx.rng.chance(CARE.sickChanceDaily)) a.sick = true;
+    if (b.dirt > 60 && !a.sick && ctx.rng.chance(CARE.sickChanceDaily * evMult(state, 'sickChanceMult'))) a.sick = true;
     // mutluluk: beslenme, su, temizlik, sevme, sağlık → hedef; yarıya kadar yaklaş
     const petted = a.pettedDay === today - 1 ? 1 : 0;
     const target = 25 * (a.hunger / 100) + 20 * (a.thirst / 100) + 20 * (1 - b.dirt / 100) + 15 * petted + 20 * (a.health / 100) - (a.sick ? 15 : 0);
