@@ -11,7 +11,7 @@
 |---|---|---|
 | 0 | İşçi ajanları + PLAN.md | ✅ Onaylandı |
 | 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Onaylandı |
-| 2 | Tarım ve toprak mekaniği | 🔨 Devam ediyor |
+| 2 | Tarım ve toprak mekaniği | ✅ Tamamlandı (QA 2 tur + son düzeltmeler, 0 açık hata) — onay bekleniyor |
 | 3 | Envanter, mağaza, pazar | — |
 | 4 | Hayvancılık | — |
 | 5 | Üretim binaları ve zincirleri | — |
