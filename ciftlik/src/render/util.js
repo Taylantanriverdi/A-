@@ -29,7 +29,7 @@ export function copyRgb(a, out) { out[0] = a[0]; out[1] = a[1]; out[2] = a[2]; r
 export const luma = (c) => c[0] * 0.2126 + c[1] * 0.7152 + c[2] * 0.0722;
 
 /** Y-sıralı nesne derinliği: DEPTH.OBJECTS (50) .. ~61 aralığında kalır, WEATHER (70) altında. */
-export function depthForY(y) { return DEPTH.OBJECTS + clamp(y, -100, 1300) / 120; }
+export { depthForY } from '../core/constants.js';
 
 // --- Gün paleti ---
 const MOON_LIGHT = '#9fb4ff';

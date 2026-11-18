@@ -28,11 +28,11 @@ export function genBasics(scene, canvasMode) {
     ctx.fillStyle = radial(ctx, 64, 64, 64, [[0, 'rgba(26,22,48,0.85)'], [0.5, 'rgba(26,22,48,0.45)'], [1, 'rgba(26,22,48,0)']]);
     ctx.fillRect(0, 0, 128, 128); ctx.restore(); register(scene, 'fx_ao', canvas); }
   // dikey rampalar (ambient geçişi ve ufuk puslanması)
-  { const { canvas, ctx } = makeCanvas(8, 128); const g = ctx.createLinearGradient(0, 0, 0, 128);
-    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,1)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 8, 128);
+  { const { canvas, ctx } = makeCanvas(6, 126); const g = ctx.createLinearGradient(0, 0, 0, 126);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(255,255,255,1)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 6, 126);
     register(scene, 'fx_ramp_up', canvas); }
-  { const { canvas, ctx } = makeCanvas(8, 128); const g = ctx.createLinearGradient(0, 0, 0, 128);
-    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 8, 128);
+  { const { canvas, ctx } = makeCanvas(6, 126); const g = ctx.createLinearGradient(0, 0, 0, 126);
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, 6, 126);
     register(scene, 'fx_ramp_down', canvas); }
   // ışık huzmesi
   { const w = 96, h = 512; const { canvas, ctx } = makeCanvas(w, h);
@@ -48,7 +48,9 @@ export function genBasics(scene, canvasMode) {
     ctx.fillStyle = radial(ctx, 8, 8, 8, [[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.6)'], [1, 'rgba(255,255,255,0)']]);
     ctx.fillRect(0, 0, 16, 16); register(scene, 'fx_mote', canvas); }
   // gök gradyanı (dinamik, SkyLayer renk değişince yeniden boyar)
-  if (!scene.textures.exists('sky_grad')) scene.textures.createCanvas('sky_grad', 4, 256);
+  // NPOT → kenar kenetleme (POT dokular sarmalanır, kenarda çizgi oluşur). CPU canvas (willReadFrequently):
+  // GPU hızlandırmalı canvas'ın her yüklemesi 'GPU stall due to ReadPixels' uyarısı ve takılma üretir.
+  if (!scene.textures.exists('sky_grad')) { const { canvas } = makeCanvas(3, 250); scene.textures.addCanvas('sky_grad', canvas); }
 }
 
 export function genSun(scene) {
@@ -120,7 +122,7 @@ export function genClouds(scene) {
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       let s = 0;
       for (const [cx, cy, rr] of blobs) { const dx = (x - cx) / rr, dy = (y - cy) / (rr * (flat ? 0.55 : 0.85)); s += Math.exp(-(dx * dx + dy * dy) * 1.6); }
-      const base = y > H * 0.7 ? Math.exp(-((y - H * 0.7) / 8) ** 2) : 1; // düz taban
+      const base = y > H * 0.7 ? Math.exp(-(((y - H * 0.7) / 8) ** 2)) : 1; // düz taban
       s *= base * (0.75 + 0.5 * n.fbm(x / W, y / H, 4));
       dens[y * W + x] = s;
     }
@@ -130,7 +132,7 @@ export function genClouds(scene) {
       const above = y >= 9 ? dens[(y - 9) * W + x] : 0;
       const lit = Math.max(0, Math.min(1, 1 - above * 0.75));
       const vert = 1 - (y / H) * 0.35;
-      const b = Math.max(0, Math.min(1, 0.5 + 0.38 * lit + 0.12 * vert));
+      const b = Math.max(0, Math.min(1, 0.66 + 0.26 * lit + 0.08 * vert));
       const i = (y * W + x) * 4; d[i] = d[i + 1] = d[i + 2] = b * 255; d[i + 3] = a * a * (3 - 2 * a) * 255;
     }
     ctx.putImageData(img, 0, 0); register(scene, key, canvas);
@@ -139,7 +141,7 @@ export function genClouds(scene) {
 
 export function genFog(scene) {
   if (!scene.textures.exists('fx_fogband')) {
-    const w = 1024, h = 128; const n = new TileNoise(55, 16, 4);
+    const w = 1024, h = 126; const n = new TileNoise(55, 16, 4);
     const { canvas, ctx } = makeCanvas(w, h); const img = ctx.createImageData(w, h); const d = img.data;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const v = y / h; const prof = Math.exp(-(((v - 0.6) / 0.24) ** 2));

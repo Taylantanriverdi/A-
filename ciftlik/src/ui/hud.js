@@ -10,7 +10,9 @@ export const formatMoney = (n) => `${nf.format(Math.round(n))} ${STR.currency}`;
 const formatDelta = (n) => `${n >= 0 ? '+' : '−'}${nf.format(Math.abs(Math.round(n)))} ${STR.currency}`;
 
 /** Gündüz: 06:00–18:59 */
-export const isNightHour = (hr) => hr < 6 || hr >= 19;
+import { SUN } from '../data/palette.js';
+// Gece/gündüz, güneş modeliyle aynı kaynaktan (palette.SUN): doğuş 06:00, batış 20:00.
+export const isNightHour = (hr) => hr < SUN.rise || hr >= SUN.set;
 
 // Gün yayı geometrisi (viewBox 0 0 60 34): merkez (30,30), yarıçap 24
 const ARC_CX = 30, ARC_CY = 30, ARC_R = 24;

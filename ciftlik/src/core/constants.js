@@ -30,3 +30,10 @@ export const DEPTH = {
   SKY: 0, CELESTIAL: 5, MOUNTAINS: 10, CLOUDS: 15, HILLS: 20, FOREST: 25, FOG: 30,
   GROUND: 40, SHADOW: 45, OBJECTS: 50, WEATHER: 70, FOREGROUND: 80, LIGHT: 90,
 };
+
+// Y-sıralama: tüm dünya nesneleri (ekin, hayvan, bina, ağaç) bu fonksiyonla derinlik alır.
+// Aralık DEPTH.OBJECTS .. ~DEPTH.OBJECTS+11; WEATHER/LIGHT katmanlarının altında kalır.
+export function depthForY(y) {
+  const c = y < -100 ? -100 : y > 1300 ? 1300 : y;
+  return DEPTH.OBJECTS + c / 120;
+}
