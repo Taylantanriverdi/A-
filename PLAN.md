@@ -10,8 +10,8 @@
 | Aşama | Konu | Durum |
 |---|---|---|
 | 0 | İşçi ajanları + PLAN.md | ✅ Onaylandı |
-| 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Tamamlandı (QA 2 tur, 0 açık hata) — onay bekleniyor |
-| 2 | Tarım ve toprak mekaniği | — |
+| 1 | Temel motor, kamera, sinematik görsel altyapı, gün-gece | ✅ Onaylandı |
+| 2 | Tarım ve toprak mekaniği | 🔨 Devam ediyor |
 | 3 | Envanter, mağaza, pazar | — |
 | 4 | Hayvancılık | — |
 | 5 | Üretim binaları ve zincirleri | — |
@@ -569,3 +569,90 @@ export function mountUI({ state, bus, calendar, debug }) → { destroy() }
 - Ayarlar paneli: kalite (Otomatik/Yüksek/Orta/Düşük), ses ve müzik kaydırıcıları (değer kaydedilir, ses Aşama 9), "Yeni oyun" (onaylı → `save:reset`).
 - Toast kuyruğu (`toast` olayı). Debug iken FPS göstergesi (`fps` olayı).
 - Klavye: Boşluk = duraklat/devam, 1/2/3 = hız, Esc = paneli kapat.
+
+---
+
+## 8. Aşama 2 Entegrasyon Sözleşmesi — Tarım ve Toprak (bağlayıcı)
+
+Beyin dosyaları (DEĞİŞTİRME, öner): `src/data/crops.js`, `src/data/farming.js`, `src/data/items.js` + §7'dekiler.
+
+### Dosya sahipliği
+| İşçi | Dosyalar |
+|---|---|
+| gameplay-dev | `src/systems/FarmSystem.js`, `src/systems/InventorySystem.js`, `src/systems/farm/*` (saf yardımcılar: soil.js, growth.js, threats.js, quality.js, rules.js), `tools/sim-farm.mjs` |
+| visual-dev | `src/world/FieldView.js` (karoları ve ekinleri state'ten çizer), `src/render/textures/crops.js`, `src/render/textures/soil.js`, `src/render/**` içinde gerekli değişiklikler (P1'deki sabit "sürülmüş alan" dekoru kaldırılır — artık state'ten çizilir) |
+| ui-dev | `src/ui/toolbar.js`, `src/ui/tileCard.js`, `src/ui/itemIcons.js` + `src/ui/**` |
+| engine-dev | `src/main.js`, `src/core/*` (beyin dosyaları hariç), `src/scenes/*`, `src/render/CameraDirector.js`, yeni `src/core/Cinematics.js` |
+
+### State (FarmSystem sahibi)
+```js
+state.tiles['tx,ty'] = {
+  tx, ty, state: 'grass' | 'plowed',           // 'planted' yok: ekin varsa crop != null
+  moisture, n, p, k, ph,                        // farming.js SOIL.start ile başlar
+  weeds: 0..1, organic: true,                   // kimyasal kullanılınca false (bir sonraki hasada kadar)
+  history: ['potato', ...],                     // son 3 hasat edilen ürün
+  pendingFert: [{ n, p, k, daysLeft }],         // kompost yavaş salınım
+  idleDays: 0,                                  // boş sürülmüş karo sayacı (grassRecoverDays)
+  crop: null | {
+    id, plantedDay, growth: 0..1, stage: 0..4, health: 0..100,
+    pest: 0..1, disease: 0..1, careSum, careCount, readyDays: 0, harvests: 0, dead: false,
+  },
+}
+state.inventory.items[itemId] = [{ q: 'A'|'B'|'C', qty, age: 0 }]   // InventorySystem sahibi
+state.flags = { farmInitialized: true, firstHarvest: { potato: true } }   // engine GameState'e `flags:{}` ekler
+```
+- Yeni oyunda FarmSystem.init: `flags.farmInitialized` yoksa P1 (karo 32..47 × 6..17) için tüm karoları `grass` olarak oluşturur, **(34..39 × 8..11)** 24 karoyu `plowed` yapar, `STARTING_INVENTORY`'yi ekler, bayrağı koyar.
+- Yalnızca sahip olunan parsellerdeki karolar etkileşime açıktır (Aşama 2'de yalnızca P1).
+
+### Simülasyon (FarmSystem)
+- `onHour`: her ekili karo için nem kaybı/yağmur kazancı, büyüme (PLAN §3 formülü + farming.js GROWTH), sağlık, care örneklemesi. Boş karolarda nem.
+- `onDay`: zararlı/hastalık/ot olasılıkları ve şiddet artışı, yayılma, kompost salınımı, `readyDays` → ROT_AFTER_DAYS sonunda `dead`, boş sürülmüş karo `idleDays`.
+- `onSeason`: mevsim dışı kalan, frostHardy olmayan ürünlere hasar (HEALTH.outOfSeasonOnChange), sonra günlük hasar.
+- **careScore** = careSum/careCount; saatlik örnek = nem bandında mı (40%), besin karşılanma (25%), sağlık/100 (20%), zararlı+hastalık+ot yokluğu (15%). Hasatta QUALITY eşiklerine göre A/B/C.
+- **Verim**: `yield × rotasyonÇarpanı × (sağlık<50 ? 0.5 : 1)`, en az 1 (ölü hariç). Hasatta `uptake` besinleri düşer, `history`'ye eklenir; baklagil N ekler.
+- Tüm rastgelelik `ctx.rng`.
+- Performans: `onHour` karo başına sabit iş, bellek ayırma yok; ~1000 karoda < 2 ms.
+
+### Komutlar ve olaylar
+| Olay | Yük | Yön |
+|---|---|---|
+| `tool:select` | `{tool, itemId?}` (TOOLS listesi) | UI → herkes (FieldView imleci, CameraDirector boyama modu) |
+| `tile:hover` | `{tx, ty, tileId} \| null` | CameraDirector → FieldView, UI |
+| `tile:tap` | `{tx, ty, tileId, x, y}` | CameraDirector → UI |
+| `farm:action` | `{type:'plow'|'plant'|'water'|'fertilize'|'treat'|'weed'|'harvest', tileId, itemId?}` | UI → FarmSystem |
+| `farm:result` | `{ok, type, tileId, reason?, itemId?, qty?, quality?}` | FarmSystem → FieldView (efekt), UI (başarısızsa toast) |
+| `farm:changed` | `{tileIds:[...]}` (saatlik toplu da olabilir) | FarmSystem → FieldView, UI |
+| `farm:harvested` | `{tileId, tx, ty, cropId, itemId, qty, quality}` | FarmSystem → FieldView, UI, Cinematics |
+| `farm:milestone` | `{kind:'firstHarvest'|'firstPlant', cropId, tileId, tx, ty}` | FarmSystem → Cinematics |
+| `inventory:changed` | `{itemId, delta, quality}` | InventorySystem → UI |
+| `inventory:add` | `{itemId, qty, quality}` (debug/sonraki aşamalar) | herkes → InventorySystem |
+| `xp:gained` | `{amount, reason}` | FarmSystem → UI |
+
+### Saf yardımcılar (systems/farm/rules.js — UI ve FieldView import edebilir, sadece okur)
+```js
+canApply(state, action, season) → { ok: boolean, reason?: string }   // TR mesaj: "Bu mevsimde ekilemez", "Önce sürmelisin"...
+tileInfo(state, tileId, now) → { soil:{moisture,n,p,k,ph}, crop:{name, stage, stageName, growthPct, health, daysLeft, qualityEstimate, pest, disease, readyIn}, weeds, history, warnings:[...] }
+cropVisual(tile) → { cropId, stage, wither: boolean, dead: boolean, pest, disease, weeds }
+```
+InventorySystem dışa açık: `add(state, itemId, qty, q)`, `remove(state, itemId, qty, q?) → removed`, `count(state, itemId, q?)`.
+
+### Girdi (engine-dev)
+- `input:tap` → dünya koordinatından karo `tx = floor(x/TILE_W), ty = floor(y/TILE_H)`; dünya içindeyse `tile:tap`.
+- Masaüstünde fare hareketi → `tile:hover` (yalnızca karo değişince).
+- **Boyama modu**: `tool:select` ile `hand` dışı bir alet seçiliyken tek parmak / sol tık sürükleme kamerayı kaydırmaz, geçilen her YENİ karo için `tile:tap` yayar. Bu modda kaydırma: iki parmak, sağ/orta tık, WASD. `hand` iken eski davranış.
+- `Cinematics.js`: `farm:milestone firstHarvest` → `camera:cinematic {target: karo merkezi, zoom 1.5, duration 2200, letterbox: true, reason:'firstHarvest'}`. Kural tablosu genişletilebilir (Aşama 5 bina açılışı vb.).
+- `SaveSystem.registerValidator(fn(state, onFix))`: main.js validator'ları **load'dan önce** kaydeder. FarmSystem ve InventorySystem `validate` dışa açar (tiles/crop/inventory elemanlarını doğrular).
+- Debug: `addItem(id, qty=10, q='B')` → `inventory:add`; `grow(days)` → `skip(days*1440)`.
+
+### Görsel (visual-dev — FieldView)
+- Karolar: çim / sürülmüş (kuru ↔ ıslak: nem ≥ 50 koyu ve hafif parlak), ot yoğunluğu, organik olmayan karoda görünmez. Toprak bir RenderTexture'a **yalnızca değişen karolar** yeniden çizilerek basılır.
+- Ekinler: her ürün için `shape` (leafy/bush/berry/grain/vine/tall/melon/root) ve renklerden 5 aşama + solgun + ölü prosedürel doku; y-sıralı (`depthForY`), rüzgârla salınım, olgun (stage ≥3) ekinler küçük gölge.
+- Zararlı (küçük böcek noktaları) ve hastalık (sararmış/lekeli tint) görünür olmalı.
+- İmleç: `tile:hover` karosunda yumuşak vurgu; alet geçerliyse sıcak beyaz, değilse kırmızımsı (`canApply`). Mobilde son `tile:tap` karosu.
+- Efektler (`farm:result ok`): çapa toz bulutu, ekim küçük toprak serpintisi, sulama damla sıçraması + ıslaklık yayılması, gübre granülleri, ilaç sis bulutu, ot koparma yaprakları, hasat: ekin "pop" + parıltı + ürün ikonu yukarı süzülür.
+
+### UI (ui-dev)
+- Alt orta **araç çubuğu**: İncele, Çapa, Ek (tohum seçici açılır: envanterdeki tohumlar + adet, mevsimde ekilemeyenler soluk), Sula, Gübrele (kompost/NPK/kireç seçici), İlaçla (ilaç/organik sprey seçici), Ot temizle, Hasat. Klavye: `1–8` araçlar, hız kısayolları `Shift+1/2/3`'e taşınır, `Esc` → İncele.
+- `tile:tap` + seçili alet → `farm:action`. İncele modunda **karo bilgi kartı** (cam panel): nem çubuğu, N/P/K çubukları, pH, ekin adı/aşama/ilerleme %, kalan gün, sağlık, tahmini kalite (A/B/C rozet), zararlı/hastalık/ot uyarıları, son ekilen ürünler. `farm:changed` ile canlı güncellenir.
+- `farm:result ok:false` → toast (reason). `farm:harvested` → küçük "+2 Patates (A)" bildirimi. `xp:gained` göstergesi (ince).
+- Ürün/tohum/gübre ikonları SVG, `crops.js` / `items.js` renklerinden.
