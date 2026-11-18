@@ -287,9 +287,9 @@ export function createBuildMode(root, ctx, opts) {
       if (!moveId) {
         if (!first) return;
         const o = objectAt(tx, ty);
-        if (o && o.kind === 'placed') {
+        if (o && o.id && o.type) {
           moveId = o.id; pending = null; dirty = true; refreshGhost();
-        } else if (o && o.kind === 'decor') reasonOnce(B.useClear, 'info');
+        } else if (o && o.decorId) reasonOnce(B.useClear, 'info');
         else reasonOnce(B.notSelectable, 'info');
         return;
       }
@@ -306,8 +306,8 @@ export function createBuildMode(root, ctx, opts) {
     if (!first) return;
     const o = objectAt(tx, ty);
     if (mode === 'remove') {
-      if (!o) { reasonOnce(B.nothing, 'info'); return; }
-      if (o.kind === 'decor') { reasonOnce(B.useClear, 'info'); return; }
+      if (!o || o.fixed) { reasonOnce(B.nothing, 'info'); return; }
+      if (o.decorId) { reasonOnce(B.useClear, 'info'); return; }
       const pl = placedById(o.id);
       const d = PLACEABLES[o.type];
       if (!d) return;
@@ -317,10 +317,10 @@ export function createBuildMode(root, ctx, opts) {
       void pl;
     } else if (mode === 'clear') {
       if (!o) { reasonOnce(B.nothing, 'info'); return; }
-      if (o.kind !== 'decor') { reasonOnce(B.hint.clear, 'info'); return; }
-      const bush = o.type === 'bush';
+      if (!o.decorId) { reasonOnce(B.hint.clear, 'info'); return; }
+      const bush = o.kind === 'bush';
       const cost = CLEAR_COST[bush ? 'bush' : 'tree'] || 0;
-      bubbleCmd = { name: 'build:clear', payload: { decorId: o.id }, label: 'cleared', text: B.clearAsk(bush ? B.bushAcc : B.treeAcc, fmtPrice(cost)), x: lastPt.x, y: lastPt.y };
+      bubbleCmd = { name: 'build:clear', payload: { decorId: o.decorId }, label: 'cleared', text: B.clearAsk(bush ? B.bushAcc : B.treeAcc, fmtPrice(cost)), x: lastPt.x, y: lastPt.y };
     }
     dirty = true;
   }

@@ -108,14 +108,13 @@ export default class MarketStall {
     const p = firstPlacedOfType(this.state, 'stall');
     this.absent = !p;
     this.c.setVisible(!!p); this.glow.setVisible(!!p);
-    for (const l of this.lights) l.set({ intensity: p ? undefined : 0 });
+    this.lights[0].set({ intensity: p ? 0.9 : 0 }); this.lights[1].set({ intensity: p ? 0.5 : 0 });
     if (!p) return;
     this.placedId = p.id;
     const f = footOf('stall', p.tx, p.ty, this._foot);
     if (initial) { this._setPos(f.x, f.y); return; }
     if (Math.abs(f.x - this.x) > 0.5 || Math.abs(f.y - this.y) > 0.5) {
-      if (this.slideT < 0) { this.sx = this.x; this.sy = this.y; }
-      else { this.sx = this.x; this.sy = this.y; }
+      this.sx = this.x; this.sy = this.y;
       this.tx2 = f.x; this.ty2 = f.y; this.slideT = 0;
     }
   }

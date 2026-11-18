@@ -21,7 +21,7 @@ import { createMachinePanel } from './machinePanel.js';
 import { createBuildMode } from './buildMode.js';
 import { formatMoney } from './hud.js';
 import { ITEMS } from '../data/items.js';
-import { blockedKind, BLOCK_LABELS_TR } from '../data/land.js';
+import { tileInfo } from '../systems/farm/rules.js';
 
 const STROKE_GAP_MS = 400; // parmak/fare basılı değilken son tile:tap'ten bu kadar sonra yeni fırça darbesi
 const CARD_OUTSIDE_MS = 450; // dışarı dokunma ile yeni karo dokunuşunu ayırt etme penceresi
@@ -127,8 +127,10 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   let stroke = 0, strokeSeenSeq = -1, downSeq = 0, pointerHeld = false;
   const strokeReasons = new Set();
   const blockedLabel = (id, p) => {
-    const k = (p && p.blocked) || blockedKind(id);
-    return k ? (BLOCK_LABELS_TR[k] || String(k)) : null;
+    if (p && p.blocked && p.label) return p.label;
+    let info = null;
+    try { info = tileInfo(state, id, null); } catch (e) { info = null; }
+    return info && info.blocked ? (info.label || 'Engel') : null;
   };
   on('tile:tap', (p) => {
     if (!p) return;
