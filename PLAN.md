@@ -20,8 +20,8 @@
 | 8 | İşçiler, makineler, arazi genişletme | — |
 | 9 | Ses, cilalama, sinematik geçişler, kayıt, denge | — |
 
-### İşçi kadrosu (`.claude/agents/`, hepsi `model: opus`)
-| Ajan | Alan |
+### İşçi kadrosu (`.claude/agents/`; Aşama 4+ `model: sonnet`, kullanıcı kararı)
+| Ajan (model: sonnet — ekonomik mod) | Alan |
 |---|---|
 | engine-dev | Phaser yapılandırması, sahneler, ana döngü, EventBus, GameState, SaveSystem, kamera |
 | visual-dev | Gökyüzü, paralaks, ışık/color grading, gölgeler, hava FX, parçacıklar, post-process, prosedürel dokular |
