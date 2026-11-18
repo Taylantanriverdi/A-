@@ -264,7 +264,6 @@ function genGarage(scene) {
   const Fc = makeCanvas(L.w, L.h), fc = Fc.ctx;
   // çatı üst yüzü
   fc.fillStyle = lg(fc, 0, 74, 0, 124, [[0, '#6c7c86'], [1, '#4a5964']]); poly(fc, [[44, 76], [256, 76], [278, 124], [22, 124]]); fc.fill();
-  fc.strokeStyle = rgba('#2f3a42', 0.45); fc.lineWidth = 1.2; for (let i = 0; i <= 8; i++) { const t = i / 8; fc.beginPath(); fc.moveTo(44 + (22 - 44) * t + (256 - 44 - (278 - 22) * 0) * 0 + t * 0, 76 + t * 48); fc.moveTo(44 + 212 * (i / 8) * 0 + 0, 0); } // (boş)
   for (let i = 1; i < 12; i++) { const t = i / 12; fc.strokeStyle = rgba('#2f3a42', 0.4); fc.lineWidth = 1.2; fc.beginPath(); fc.moveTo(44 + 212 * t, 76); fc.lineTo(22 + 256 * t, 124); fc.stroke(); fc.strokeStyle = rgba('#b7c5ce', 0.28); fc.beginPath(); fc.moveTo(45 + 212 * t, 76); fc.lineTo(23 + 256 * t, 124); fc.stroke(); }
   fc.fillStyle = rgba('#fff', 0.35); fc.fillRect(46, 76, 208, 1.4);
   fc.fillStyle = lg(fc, 0, 118, 0, 130, [[0, '#3b4650'], [1, '#232c33']]); rr(fc, 20, 118, 260, 12, 3); fc.fill();
@@ -340,9 +339,9 @@ function genTractor(scene) {
   register(scene, V.over, O.canvas);
   genWheel(scene, 22); genWheel(scene, 13);
   // gölge silüeti
-  const S = makeCanvas(V.w * SSV, V.h * SSV); S.ctx.drawImage(B.canvas, 0, 0); S.ctx.drawImage(O.canvas, 0, 0);
-  for (const [x, y, rad] of [V.rw, V.fw]) { S.ctx.fillStyle = '#000'; S.ctx.beginPath(); S.ctx.arc(x * SSV, y * SSV, rad * SSV, 0, TAU); S.ctx.fill(); }
-  registerShadow(scene, V.body, S.canvas, V.ox * SSV, V.oy * SSV);
+  const S = makeCanvas(V.w, V.h); S.ctx.drawImage(B.canvas, 0, 0, V.w, V.h); S.ctx.drawImage(O.canvas, 0, 0, V.w, V.h);
+  for (const [x, y, rad] of [V.rw, V.fw]) { S.ctx.fillStyle = '#000'; S.ctx.beginPath(); S.ctx.arc(x, y, rad, 0, TAU); S.ctx.fill(); }
+  registerShadow(scene, V.body, S.canvas, V.ox, V.oy);
 }
 
 function genHarvester(scene) {
@@ -382,9 +381,9 @@ function genHarvester(scene) {
   for (let i = 0; i < 6; i++) { rc.save(); rc.translate(23, 23); rc.rotate(i * TAU / 6); rc.fillStyle = '#d8a82c'; rc.fillRect(2, -1.6, 19, 3.2); rc.fillStyle = '#e8e0c0'; rc.fillRect(14, -2.6, 9, 1.6); rc.fillStyle = rgba('#fff', 0.4); rc.fillRect(2, -1.6, 17, 0.9); rc.restore(); }
   ell(rc, 23, 23, 5, 5, '#4a8a38'); ell(rc, 23, 23, 2, 2, '#c0d8a0');
   register(scene, 'f8_reel', R.canvas);
-  const S = makeCanvas(V.w * SSV, V.h * SSV); S.ctx.drawImage(B.canvas, 0, 0); S.ctx.drawImage(O.canvas, 0, 0);
-  for (const [x, y, rad] of [V.rw, V.fw]) { S.ctx.fillStyle = '#000'; S.ctx.beginPath(); S.ctx.arc(x * SSV, y * SSV, rad * SSV, 0, TAU); S.ctx.fill(); }
-  registerShadow(scene, V.body, S.canvas, V.ox * SSV, V.oy * SSV);
+  const S = makeCanvas(V.w, V.h); S.ctx.drawImage(B.canvas, 0, 0, V.w, V.h); S.ctx.drawImage(O.canvas, 0, 0, V.w, V.h);
+  for (const [x, y, rad] of [V.rw, V.fw]) { S.ctx.fillStyle = '#000'; S.ctx.beginPath(); S.ctx.arc(x, y, rad, 0, TAU); S.ctx.fill(); }
+  registerShadow(scene, V.body, S.canvas, V.ox, V.oy);
 }
 
 // ------------------------------------------------------------------ YETİŞKİN ÇALIŞANLAR
@@ -524,6 +523,10 @@ function genMisc(scene) {
   });
   mk('f8_rope_h', 128, 14, (ctx) => { ctx.strokeStyle = 'rgba(20,14,8,0.28)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(0, 6.6); ctx.quadraticCurveTo(64, 15, 128, 6.6); ctx.stroke(); ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(0, 3); ctx.quadraticCurveTo(64, 11.4, 128, 3); ctx.stroke(); ctx.strokeStyle = rgba('#a8946a', 0.7); ctx.lineWidth = 0.6; ctx.setLineDash([2, 2]); ctx.beginPath(); ctx.moveTo(0, 3.6); ctx.quadraticCurveTo(64, 12, 128, 3.6); ctx.stroke(); });
   mk('f8_rope_v', 12, 88, (ctx) => { ctx.strokeStyle = 'rgba(20,14,8,0.26)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(7, 0); ctx.quadraticCurveTo(10, 44, 7, 88); ctx.stroke(); ctx.strokeStyle = '#e8dcc0'; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.moveTo(5, 0); ctx.quadraticCurveTo(8, 44, 5, 88); ctx.stroke(); });
+  const dash = (col, key) => mk(key, 64, 44, (ctx) => { ctx.strokeStyle = 'rgba(30,20,10,0.35)'; ctx.lineWidth = 3; ctx.setLineDash([7, 5]); rr(ctx, 6, 6, 52, 32, 7); ctx.stroke(); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([7, 5]); rr(ctx, 6, 5, 52, 32, 7); ctx.stroke(); });
+  dash('#d8b080', 'f8_mk_plow'); dash('#bfe08a', 'f8_mk_plant');
+  mk('f8_hoe', 18, 18, (ctx) => { ctx.strokeStyle = '#7a5230'; ctx.lineWidth = 2.2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(4, 15); ctx.lineTo(12, 3); ctx.stroke(); ctx.fillStyle = '#c8d0d8'; ctx.beginPath(); ctx.moveTo(9, 3); ctx.lineTo(16, 5); ctx.lineTo(13, 9); ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(30,20,10,0.4)'; ctx.lineWidth = 0.8; ctx.stroke(); });
+  mk('f8_seed', 14, 14, (ctx) => { for (const [x, y] of [[4, 5], [9, 4], [7, 9]]) { ell(ctx, x, y, 2.6, 3.2, '#ffffff'); ell(ctx, x - 0.6, y - 0.8, 0.9, 1.1, 'rgba(255,255,255,0.9)'); ctx.strokeStyle = 'rgba(30,20,10,0.45)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.ellipse(x, y, 2.6, 3.2, 0, 0, TAU); ctx.stroke(); } });
   // SATILIK tabelası: direk + tahta; üzerinde ev ve altın sikke (yazı yok)
   mk('f8_sign', 64, 84, (ctx) => {
     ell(ctx, 32, 80, 14, 3.4, 'rgba(20,14,8,0.32)');

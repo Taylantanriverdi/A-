@@ -364,6 +364,8 @@ export function createBuildMode(root, ctx, opts) {
 
   // ---- Giriş / çıkış ----
   tap(btn, () => api.toggle());
+  // Aşama 8: satılık parsel tabelasına dokununca İnşa modu + Arazi paneli (LandView `land:signClick`)
+  const offSign = bus.on('land:signClick', () => { api.enter(); landPanel.open(); });
   const api = {
     el: btn,
     get active() { return active; },
@@ -407,6 +409,7 @@ export function createBuildMode(root, ctx, opts) {
       window.removeEventListener('pointerup', onUp, true);
       window.removeEventListener('pointermove', onMove, true);
       landPanel.destroy();
+      offSign && offSign();
       for (const e of [modeBar, hint, bubble, confirmBar, dock, btn]) e.remove();
     },
   };

@@ -5,11 +5,13 @@
 //   zararlı böcekler, hastalık (tint'siz sarı lekeli kare + leke katmanı; WebGL'de hafif evre için ek tint). Kamera dışındakiler gizlenir ve hesaplanmaz.
 // • İmleç: tile:hover / son tile:tap karosunda nefes alan çerçeve; seçili alet canApply ile geçerli/geçersiz.
 // • Efektler: farm:result (ok) / farm:harvested → nesne havuzlu parçacıklar. update'te bellek ayırma yok.
+import Phaser from 'phaser';
 import { TILE_W, TILE_H, DEPTH, depthForY } from '../core/constants.js';
 import { CROPS } from '../data/crops.js';
 import { ITEMS } from '../data/items.js';
 import { canApply, cropVisual } from '../systems/farm/rules.js';
 import { genSoil, SOIL_ATLAS, SOIL_MISC, SOIL_ERASE, SOIL_BLEED, soilFrame, bleedFrame, N, E, S, W, WEED_FRAMES, BIT_FRAMES } from '../render/textures/soil.js';
+import { genFarm8 } from '../render/textures/farm8.js';
 import { genCrops, CROP_ATLAS, CROP_CELL, CROP_SCALE, SHAPE_META, cropFrame } from '../render/textures/crops.js';
 import { genFieldFx } from '../render/textures/fieldfx.js';
 import { STALL } from '../render/layout.js';
@@ -42,7 +44,7 @@ function hash2(tx, ty) { let h = (Math.imul(tx, 73856093) ^ Math.imul(ty, 193496
 export default class FieldView {
   constructor(scene, state, bus, renderer) {
     this.scene = scene; this.state = state; this.bus = bus; this.renderer = renderer;
-    genSoil(scene); genFieldFx(scene); genCrops(scene); // idempotent (açılışta generateTextures zaten üretir)
+    genSoil(scene); genFieldFx(scene); genCrops(scene); genFarm8(scene); // idempotent (açılışta generateTextures zaten üretir)
     this.quality = 'high';
     this.chunks = new Map();     // chunkKey → RenderTexture
     this.recs = new Map();       // tileId → kayıt
@@ -50,6 +52,8 @@ export default class FieldView {
     this.dirty = new Set(); this.deferred = new Map(); this._soilQ = []; this._full = true; this._tilesRef = null;
     this.pools = { crop: [], sh: [], ov: [] };
     this.t = 0;
+    this.marks = new Map(); this.markPool = []; this._markDirty = true; this._markT = 0; this.hint = null; this.hintN = 0; this.hintIms = [];
+    for (let i = 0; i < 16; i++) this.hintIms.push(scene.add.image(0, 0, 'f8_ah').setDepth(DEPTH.GROUND + 0.55).setVisible(false));
     // imleç
     this.cursor = scene.add.image(0, 0, CURSOR_TEX.n).setDepth(CURSOR_DEPTH).setVisible(false);
     this.cursorGlow = scene.add.image(0, 0, CURSOR_TEX.n).setDepth(DEPTH.LIGHT + 1).setBlendMode('ADD').setVisible(false);
@@ -67,9 +71,18 @@ export default class FieldView {
     this._offs = [];
     const on = (n, f) => this._offs.push(bus.on(n, f, this));
     on('farm:changed', (p) => {
+      this._markDirty = true;
       const ids = p && p.tileIds;
       if (!Array.isArray(ids)) { this._full = true; return; }
       for (let i = 0; i < ids.length; i++) this.dirty.add(ids[i]);
+    });
+    on('farm:areaHint', (p) => {
+      const t = p && Array.isArray(p.tiles) && p.tiles.length ? p.tiles : null;
+      this.hint = t; this.hintN = 0;
+      if (t) for (let i = 0; i < t.length && i < 16; i++) {
+        const k = String(t[i]).split(','); const im = this.hintIms[i]; im.setPosition(+k[0] * TILE_W + TILE_W / 2, +k[1] * TILE_H + TILE_H / 2).setVisible(true); this.hintN++;
+      }
+      for (let i = this.hintN; i < 16; i++) this.hintIms[i].setVisible(false);
     });
     on('farm:result', (p) => { if (p && p.ok) this._effect(p); });
     on('farm:harvested', (p) => this._harvestIcon(p));
@@ -345,7 +358,8 @@ export default class FieldView {
 
   // ------------------------------------------------------------------ imleç
   _cursorTarget() {
-    if (this.tool === 'build') return null; // inşa modunda tarla imleci yok (hayalet gösterilir)
+    if (this.tool === 'build') return null;
+    if (this.hint && (this.tool === 'tractor' || this.tool === 'harvester')) return null; // 3×3 alan vurgusu varken tek karo imleci yok // inşa modunda tarla imleci yok (hayalet gösterilir)
     const t = this.hover || (this.hadHover ? null : this.tap);
     // tezgâh karolarında genel imleç yok — orada yalnızca MarketStall'un kendi vurgusu
     if (t) { const S = STALL.tiles; if (t.tx >= S.x0 && t.tx <= S.x1 && t.ty >= S.y0 && t.ty <= S.y1) return null; }
@@ -363,7 +377,35 @@ export default class FieldView {
     this.valid = !!(res && res.ok);
   }
 
+  _syncMarks(dt) {
+    this._markT += dt;
+    if (!this._markDirty && this._markT < 1.5) return;
+    this._markDirty = false; this._markT = 0;
+    const tiles = this.state.tiles; if (!tiles) return;
+    for (const m of this.marks.values()) m.seen = false;
+    for (const id in tiles) {
+      const mk = tiles[id] && tiles[id].mark; if (!mk) continue;
+      let m = this.marks.get(id);
+      if (!m) {
+        const k = id.split(','); const x = +k[0] * TILE_W, y = +k[1] * TILE_H;
+        m = this.markPool.pop() || { fr: this.scene.add.image(0, 0, 'f8_mk_plow').setOrigin(0, 0).setDepth(DEPTH.GROUND + 0.4), ic: this.scene.add.image(0, 0, 'f8_hoe').setDepth(DEPTH.GROUND + 0.42) };
+        m.fr.setPosition(x, y).setVisible(true); m.ic.setPosition(x + TILE_W / 2, y + TILE_H / 2).setVisible(true); m.plan = ''; m.item = ''; this.marks.set(id, m);
+      }
+      m.seen = true;
+      const plan = mk.plan === 'plant' ? 'plant' : 'plow', item = mk.itemId || '';
+      if (m.plan !== plan || m.item !== item) {
+        m.plan = plan; m.item = item;
+        m.fr.setTexture(plan === 'plant' ? 'f8_mk_plant' : 'f8_mk_plow');
+        if (plan === 'plant') { let h = 0; for (let i = 0; i < item.length; i++) h = (h * 31 + item.charCodeAt(i)) | 0; const c = Phaser.Display.Color.HSLToColor(((h >>> 0) % 360) / 360, 0.55, 0.62).color; m.ic.setTexture('f8_seed').setTint(c); }
+        else m.ic.setTexture('f8_hoe').clearTint();
+      }
+    }
+    for (const [id, m] of this.marks) if (!m.seen) { m.fr.setVisible(false); m.ic.setVisible(false); this.marks.delete(id); this.markPool.push(m); }
+  }
+
   _updateCursor(dt, env) {
+    this._syncMarks(dt);
+    if (this.hintN) { const a = 0.55 + 0.25 * Math.sin(this.t * 4); for (let i = 0; i < this.hintN; i++) this.hintIms[i].setAlpha(a); }
     const tgt = this._cursorTarget();
     const im = this.cursor, gl = this.cursorGlow;
     if (!tgt) { if (im.visible) { im.setVisible(false); gl.setVisible(false); } this._cTile = null; return; }
@@ -534,6 +576,7 @@ export default class FieldView {
     for (const k of Object.keys(this.pools)) { for (const im of this.pools[k]) im.destroy(); this.pools[k].length = 0; }
     for (const p of this.fx) p.im.destroy();
     this.cursor.destroy(); this.cursorGlow.destroy();
+    for (const m of this.marks.values()) { m.fr.destroy(); m.ic.destroy(); } for (const m of this.markPool) { m.fr.destroy(); m.ic.destroy(); } for (const im of this.hintIms) im.destroy();
     this.recs.clear();
   }
 }

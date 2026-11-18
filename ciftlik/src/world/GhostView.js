@@ -5,6 +5,7 @@
 import { DEPTH, TILE_W, TILE_H, depthForY } from '../core/constants.js';
 import { PLACEABLES } from '../data/placeables.js';
 import { BLD } from '../render/textures/buildings.js';
+import { F8 } from '../render/textures/farm8.js';
 import { MCH, SHED, SAILS } from '../render/textures/machines.js';
 import { STALL_LAYOUT as SL } from '../render/textures/market.js';
 import { genPlaced, FENCE, PATH, fenceFrame, pathFrame, ghostFpKey } from '../render/textures/placed.js';
@@ -33,6 +34,7 @@ export default class GhostView {
   _layers(type) {
     // [key, originX px, originY px, dx, dy, w, h] — ayak noktasına göre
     const s = this.scene;
+    if (F8[type]) { const L = F8[type]; return L.back ? [[L.back, L.ox, L.oy, 0, 0, L.w, L.h], [L.front, L.ox, L.oy, 0, 0, L.w, L.h]] : [[L.key, L.ox, L.oy, 0, 0, L.w, L.h]]; }
     if (BLD[type]) { const L = BLD[type]; return [[L.key, L.ox, L.oy, 0, 0, L.w, L.h]]; }
     if (MCH[type]) {
       const L = MCH[type]; const r = [[L.key, L.ox, L.oy, 0, 0, L.w, L.h]];

@@ -5,6 +5,7 @@
 import { depthForY, DEPTH, TILE_W, TILE_H } from '../core/constants.js';
 import { DONKEY } from '../data/workers.js';
 import { firstPlacedOfType } from './placedUtil.js';
+import { genFarm8, adlKey, ADL } from '../render/textures/farm8.js';
 import { genWorker, KID, DK, WALK_N, kidKey, dkKey, bubbleKey } from '../render/textures/worker.js';
 
 const WALK_KEYS = []; for (let i = 0; i < WALK_N; i++) WALK_KEYS.push(kidKey('walk' + i));
@@ -36,7 +37,7 @@ export default class WorkerView {
   }
 
   create() {
-    genWorker(this.scene); // idempotent
+    genWorker(this.scene); genFarm8(this.scene); // idempotent
     this._mkDonkey();
     const on = (n, f) => this._offs.push(this.bus.on(n, f, this));
     on('workers:changed', () => { this.dirty = true; });
@@ -72,8 +73,10 @@ export default class WorkerView {
     const shadow = s.add.image(0, 0, 'fx_ao').setDepth(DEPTH.SHADOW + 0.01);
     const light = this.renderer.lights.addPoint({ x: 0, y: 0, radius: 58, color: 0xffd08a, intensity: 0.0, nightOnly: true, flicker: 0.06 });
     const x = Number.isFinite(w.x) ? w.x : HOME_X, y = Number.isFinite(w.y) ? w.y : HOME_Y;
+    const adult = !!w.type && w.type !== 'apprentice', look = (((w.look | 0) % 4) + 4) % 4;
+    if (adult) body.setTexture(adlKey(look, 'idle0'));
     return {
-      id: w.id, w, c, body, bub, shadow, light, lightI: 0, x, y, ptx: x, pty: y, tChange: 0, vEst: 0, mvx: 0, mvy: 0, dir: 1, dAcc: 0, step: 0,
+      adult, look, id: w.id, w, c, body, bub, shadow, light, lightI: 0, x, y, ptx: x, pty: y, tChange: 0, vEst: 0, mvx: 0, mvy: 0, dir: 1, dAcc: 0, step: 0,
       fade: 1, curKey: '', blinkT: 2.2 + this.kids.size, blink: 0, bubK: '', bubS: 0, seen: true, spd: 0, ph: this.kids.size * 1.7,
     };
   }
@@ -121,7 +124,8 @@ export default class WorkerView {
       if (e.dAcc > 1.5) e.dir = 1; else if (e.dAcc < -1.5) e.dir = -1;
       const mode = w.mode || 'idle';
       const riding = !!w.onDonkey && mode !== 'home';
-      const hide = mode === 'home';
+      const drv = !!w.onVehicle || (this.renderer.farm8 ? this.renderer.farm8.isDriving(w.id) : false);
+      const hide = mode === 'home' || drv;
       e.fade += ((hide ? 0 : 1) - e.fade) * Math.min(1, dt * 6);
       if (riding) { rider = e; }
       // fener ışığı: yalnızca gece ve görünürken
@@ -137,7 +141,15 @@ export default class WorkerView {
       // ---- kare seçimi
       let key, bob = 0, sy = 1;
       const moving = e.spd > 9;
-      if (mode === 'work') {
+      if (e.adult) {
+        if (mode === 'work') key = adlKey(e.look, (Math.floor(t * 2.2 + e.ph) & 1) ? 'work1' : 'work0');
+        else if (moving && (mode === 'walk' || mode === 'ride' || mode === 'idle')) { e.step += moved * (WALK_N / KID_STRIDE); key = adlKey(e.look, 'walk' + (((Math.floor(e.step) % WALK_N) + WALK_N) % WALK_N)); }
+        else {
+          e.blinkT -= dt; if (e.blinkT <= 0) { e.blink = 0.13; e.blinkT = 2.6 + ((i * 1.3 + t) % 2.4); }
+          if (e.blink > 0) e.blink -= dt;
+          key = adlKey(e.look, e.blink > 0 ? 'idle1' : 'idle0'); sy = 1 + Math.sin(t * 2.1 + e.ph) * 0.012;
+        }
+      } else if (mode === 'work') {
         const kind = w.task && w.task.kind;
         const f = (Math.floor(t * 2.2 + e.ph) & 1);
         key = BUCKET[kind] ? (f ? K.b1 : K.b0) : (f ? K.k1 : K.k0);
@@ -153,13 +165,13 @@ export default class WorkerView {
       }
       if (e.curKey !== key) { e.body.setTexture(key); e.curKey = key; }
       e.c.setPosition(e.x, e.y).setDepth(depthForY(e.y)).setAlpha(e.fade);
-      e.body.setScale(0.5 * e.dir, 0.5 * sy).setY(-bob);
+      const bs = e.adult ? ADL.scale : 0.5; e.body.setScale(bs * e.dir, bs * sy).setY(-bob);
       // ---- görev baloncuğu
       const kind = w.task && w.task.kind;
       const bk = mode === 'work' && kind ? (ICON[kind] || 'gear') : '';
       if (bk !== e.bubK) { e.bubK = bk; if (bk) e.bub.setTexture(bubbleKey(bk)); }
       e.bubS += ((bk ? 1 : 0) - e.bubS) * Math.min(1, dt * 10);
-      if (e.bubS > 0.02) e.bub.setVisible(true).setScale(0.5 * e.bubS * (1 + Math.sin(t * 4 + e.ph) * 0.04)).setY(-64 + Math.sin(t * 2.4 + e.ph) * 1.5); else e.bub.setVisible(false);
+      if (e.bubS > 0.02) e.bub.setVisible(true).setScale(0.5 * e.bubS * (1 + Math.sin(t * 4 + e.ph) * 0.04)).setY((e.adult ? -70 : -64) + Math.sin(t * 2.4 + e.ph) * 1.5); else e.bub.setVisible(false);
     }
     // ---- eşek
     const hasDk = !!st?.donkey || this.list.length > 0;

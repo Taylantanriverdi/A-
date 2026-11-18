@@ -23,6 +23,8 @@ import MachineView from '../world/MachineView.js';
 import WorkerView from '../world/WorkerView.js';
 import FenceView from '../world/FenceView.js';
 import GhostView from '../world/GhostView.js';
+import FarmView from '../world/FarmView.js';
+import LandView from '../world/LandView.js';
 import SaleFX from './SaleFX.js';
 import GradePipeline from './postfx/GradePipeline.js';
 import BloomPipeline from './postfx/BloomPipeline.js';
@@ -82,6 +84,8 @@ export default class Renderer {
     try { this.animals = new AnimalView(s, this.state, this.bus, this, this.buildings); this.animals.create(); } catch (e) { console.error('[render] AnimalView', e); this.animals = null; }
     // atölyeler + eşek sundurması, Çırak ve eşek (Aşama 5)
     try { this.machines = new MachineView(s, this.state, this.bus, this); this.machines.create(); } catch (e) { console.error('[render] MachineView', e); this.machines = null; }
+    try { this.farm8 = new FarmView(s, this.state, this.bus, this); this.farm8.create(); } catch (e) { console.error('[render] FarmView', e); this.farm8 = null; }
+    try { this.land = new LandView(s, this.state, this.bus, this); this.land.create(); } catch (e) { console.error('[render] LandView', e); this.land = null; }
     try { this.workers = new WorkerView(s, this.state, this.bus, this); this.workers.create(); } catch (e) { console.error('[render] WorkerView', e); this.workers = null; }
     try { this.ghost = new GhostView(s, this.state, this.bus, this); this.ghost.create(); } catch (e) { console.error('[render] GhostView', e); this.ghost = null; }
     try { this.saleFx = new SaleFX(s, this.bus, this.webgl); this.saleFx.create(); } catch (e) { console.error('[render] SaleFX', e); this.saleFx = null; }
@@ -205,6 +209,8 @@ export default class Renderer {
     if (this.buildings) { try { this.buildings.update(env); } catch (e) { if (!this._bldErr) { this._bldErr = true; console.error('[render] BuildingView.update', e); } } }
     if (this.animals) { try { this.animals.update(env); } catch (e) { if (!this._aniErr) { this._aniErr = true; console.error('[render] AnimalView.update', e); } } }
     if (this.machines) { try { this.machines.update(env); } catch (e) { if (!this._mchErr) { this._mchErr = true; console.error('[render] MachineView.update', e); } } }
+    if (this.farm8) { try { this.farm8.update(env); } catch (e) { if (!this._f8Err) { this._f8Err = true; console.error('[render] FarmView.update', e); } } }
+    if (this.land) { try { this.land.update(env); } catch (e) { if (!this._ldErr) { this._ldErr = true; console.error('[render] LandView.update', e); } } }
     if (this.workers) { try { this.workers.update(env); } catch (e) { if (!this._wrkErr) { this._wrkErr = true; console.error('[render] WorkerView.update', e); } } }
     if (this.fences) { try { this.fences.update(env); } catch (e) { if (!this._fenErr) { this._fenErr = true; console.error('[render] FenceView.update', e); } } }
     if (this.ghost) { try { this.ghost.update(env); } catch (e) { if (!this._ghErr) { this._ghErr = true; console.error('[render] GhostView.update', e); } } }
@@ -276,7 +282,7 @@ export default class Renderer {
     for (const off of this._offs) off(); this._offs.length = 0;
     if (this._cam && this._origPreRender) { delete this._cam.preRender; if (this._cam.preRender !== this._origPreRender) this._cam.preRender = this._origPreRender; }
     try { if (this.fx && this.fx.pipe) this._cam.removePostPipeline(this.fx.pipe); } catch { /* yok say */ }
-    for (const m of [this.ghost, this.fences, this.saleFx, this.workers, this.machines, this.animals, this.buildings, this.stall, this.field, this.weatherFx, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
+    for (const m of [this.ghost, this.land, this.farm8, this.fences, this.saleFx, this.workers, this.machines, this.animals, this.buildings, this.stall, this.field, this.weatherFx, this.particles, this.decor, this.shadowSystem, this.lighting, this.horizon, this.ground, this.parallax, this.sky]) { try { m?.destroy(); } catch { /* yok say */ } }
     this.cTop?.destroy();
   }
 }
