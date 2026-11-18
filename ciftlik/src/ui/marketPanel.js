@@ -28,7 +28,7 @@ export function sellableGroups(state) {
   for (const id in items) {
     const it = ITEMS[id];
     const arr = items[id];
-    if (!it || it.category !== 'crop' || !Array.isArray(arr)) continue;
+    if (!it || (it.category !== 'crop' && it.category !== 'animal') || !Array.isArray(arr)) continue;
     for (const st of arr) {
       const qty = st && st.qty > 0 ? Math.floor(st.qty) : 0;
       if (!qty) continue;

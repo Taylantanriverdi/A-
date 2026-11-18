@@ -3,7 +3,7 @@
 // product: ürün eşyası, intervalDays: üretim aralığı, qty: adet. adultDays: yetişkinliğe (üretim) kadar gün.
 // lifeDays: ömür (oyun günü; 1 yıl = 112 gün). oldAt: bu oranından sonra üretim %50.
 export const ANIMALS = {
-  chicken: { name: 'Tavuk',  price: 350,  building: 'coop', level: 2, feed: { itemId: 'chicken_feed', perDay: 1 },   altFeed: { wheat: 1, corn: 2 },
+  chicken: { name: 'Tavuk',  price: 400,  building: 'coop', level: 2, feed: { itemId: 'chicken_feed', perDay: 1 },   altFeed: { wheat: 1, corn: 2 },
              product: { itemId: 'egg', intervalDays: 1, qty: 1 }, adultDays: 7,  lifeDays: 448, oldAt: 0.75, breedChance: 0.02, color: '#f3ead8', accent: '#d9472b' },
   goat:    { name: 'Keçi',   price: 1800, building: 'barn', level: 4, feed: { itemId: 'hay', perDay: 0.7 },          altFeed: { corn: 2, wheat: 1 },
              product: { itemId: 'goat_milk', intervalDays: 1, qty: 1 }, adultDays: 14, lifeDays: 672, oldAt: 0.75, breedChance: 0.015, color: '#e9e1d2', accent: '#8a6a4a' },
@@ -27,7 +27,7 @@ export const CARE = {
   sickChanceDaily: 0.03,       // kir > 60 iken hayvan başına; salgın olayında ×5 (Aşama 7)
   sickHealthPerHour: 1.5,
   petHappiness: 10,            // günde bir kez sevme
-  productQuality: { A: 80, B: 50 }, // mutluluk eşikleri
+  productQuality: { A: 90, B: 50 }, // mutluluk eşikleri (K18: A için sevme de gerekir)
   minForProduction: 40,        // açlık/susuzluk/sağlık bunun üstünde olmalı
 };
 
@@ -35,7 +35,7 @@ export const VET = { visitPrice: 300, cureChance: 1.0, healthAfter: 70 };
 
 // Ürünler (pazarda satılır; seasonMult = 1)
 export const ANIMAL_PRODUCTS = {
-  egg:       { name: 'Yumurta',    basePrice: 18,  freshDays: 10,  color: '#f3e3c3' },
+  egg:       { name: 'Yumurta',    basePrice: 15,  freshDays: 10,  color: '#f3e3c3' },
   milk:      { name: 'Süt',        basePrice: 130, freshDays: 2,   color: '#f7f5ef' },
   goat_milk: { name: 'Keçi sütü',  basePrice: 70,  freshDays: 2,   color: '#efe8da' },
   wool:      { name: 'Yün',        basePrice: 200, freshDays: 60,  color: '#f1ece2' },

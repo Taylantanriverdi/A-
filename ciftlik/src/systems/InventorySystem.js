@@ -166,7 +166,7 @@ export function count(state, itemId, q, organic) {
 
 /**
  * Tek bir günlük bozulma adımı (saf; olayları `emit` ile bildirir).
- * Yalnızca category 'crop': age++; age ≥ freshDays → bir kalite düşer, age 0, aynı (q, organic)
+ * category 'crop' ve 'animal' (süre: ITEMS[id].freshDays ?? CROPS[crop].freshDays): age++; age ≥ freshDays → bir kalite düşer, age 0, aynı (q, organic)
  * yığınlarına stackMax'a kadar birleşir (age = max), taşan kısım ayrı yığın kalır; C → yok olur.
  * Ürün başına en fazla bir `inventory:spoiled` olayı: fromQ/toQ en yüksek düşen kaliteye aittir,
  * qty toplam etkilenen adettir; ayrıntı `changes: [{fromQ, toQ, qty}]`.
@@ -181,8 +181,8 @@ export function spoilDay(state, emit) {
   const max = stackMax();
   for (const itemId of Object.keys(items)) {
     const def = ITEMS[itemId];
-    if (!def || def.category !== 'crop') continue;
-    const fresh = CROPS[def.crop]?.freshDays;
+    if (!def || (def.category !== 'crop' && def.category !== 'animal')) continue;
+    const fresh = def.freshDays ?? CROPS[def.crop]?.freshDays;
     const stacks = items[itemId];
     if (!(fresh > 0) || !Array.isArray(stacks)) continue;
     const expired = [];

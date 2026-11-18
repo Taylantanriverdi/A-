@@ -15,6 +15,7 @@ import { createPanelHost } from './panels.js';
 import { createInventoryPanel } from './inventoryPanel.js';
 import { createMarketPanel } from './marketPanel.js';
 import { createShopPanel } from './shopPanel.js';
+import { createBuildingPanel } from './buildingPanel.js';
 import { formatMoney } from './hud.js';
 import { ITEMS } from '../data/items.js';
 import { blockedKind, BLOCK_LABELS_TR } from '../data/land.js';
@@ -73,7 +74,9 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   const shopPanel = createShopPanel(ctx);
   panels.register(invPanel);
   panels.register(mktPanel);
+  const bldPanel = createBuildingPanel(ctx);
   panels.register(shopPanel);
+  panels.register(bldPanel);
   panels.onChange((id) => {
     if (!id) return;
     if (toolbar.isPickerOpen) toolbar.closePicker();
@@ -147,13 +150,25 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   on('xp:gained', xp.onGained);
 
   // ---- Aşama 3 olayları (yalnızca kirli işaretler; DOM işi panel açıkken rAF'ta) ----
-  const markAll = () => { invPanel.markDirty(); mktPanel.markDirty(); shopPanel.markDirty(); };
+  const markAll = () => { invPanel.markDirty(); mktPanel.markDirty(); shopPanel.markDirty(); bldPanel.markDirty(); };
   const itemName = (id) => (ITEMS[id] && ITEMS[id].name) || String(id || '');
   on('ui:open', (p) => {
     const id = p && p.panel;
-    if (id === 'inventory' || id === 'market' || id === 'shop') openPanel(id, p);
+    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building') openPanel(id, p);
   });
   on('inventory:changed', markAll);
+  // ---- Aşama 4: hayvancılık ----
+  on('animals:changed', () => { bldPanel.markDirty(); shopPanel.markDirty(); });
+  on('building:built', () => { bldPanel.markDirty(); shopPanel.markDirty(); });
+  on('time:hour', () => bldPanel.markDirty());
+  on('animal:result', (p) => {
+    shopPanel.onAnimalResult(); bldPanel.markDirty();
+    if (!p) return;
+    if (p.ok === false && p.reason) toasts.push({ text: String(p.reason), kind: 'bad' });
+    else if (p.ok && p.type === 'collect') toasts.push({ text: STR.bld.collected(p.collected, itemName), kind: 'good' });
+    else if (p.ok && p.text) toasts.push({ text: p.text, kind: 'info' });
+  });
+  on('animal:born', (p) => { if (p && p.reason === 'bred' && p.animal) toasts.push({ text: STR.bld.born(p.animal.name), kind: 'good' }); });
   on('market:pricesUpdated', () => mktPanel.markDirty());
   on('money:changed', () => shopPanel.markDirty());
   on('time:day', markAll);

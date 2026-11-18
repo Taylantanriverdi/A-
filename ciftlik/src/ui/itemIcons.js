@@ -161,6 +161,28 @@ const SUPPLY = {
     `<path d="M13 7h7v3l2 3v13c0 1.5-1 2-2 2h-7c-1 0-2-.5-2-2V13l2-3z" fill="${col}" ${SW}/>` +
     `<path d="M16.5 25c-4 0-5-3-5-6 3 0 5 2 5 6zm0 0c0-4 2-7 5-7 0 4-2 7-5 7z" fill="#e8f5c8" stroke="#2f4a1c" stroke-width=".8"/>` +
     hi('M12.8 14v8'),
+  // Aşama 4: yem ve hayvan ürünleri
+  chicken_feed: (col) =>
+    `<path d="M8 9c0-2 2-3 8-3s8 1 8 3l1 16c0 2-3 3-9 3s-9-1-9-3z" fill="${col}" ${SW}/>` +
+    `<circle cx="13" cy="18" r="1.3" fill="#8a5a2a"/><circle cx="17" cy="16" r="1.3" fill="#8a5a2a"/><circle cx="19" cy="20" r="1.3" fill="#8a5a2a"/><circle cx="15" cy="21.5" r="1.3" fill="#8a5a2a"/>` +
+    hi('M10 11v9'),
+  hay: (col) =>
+    `<rect x="6" y="10" width="20" height="14" rx="3" fill="${col}" ${SW}/>` +
+    `<path d="M6 15h20M6 19h20" stroke="${shade(col, -0.3)}" stroke-width="1"/><path d="M11 10v14M21 10v14" stroke="#8a5a2a" stroke-width="1.6"/>`,
+  egg: (col) =>
+    `<path d="M16 5c5 0 8 8 8 13s-3.6 9-8 9-8-4-8-9 3-13 8-13z" fill="${col}" ${SW}/>` + hi('M12 11c-1 2-1.6 4-1.6 6'),
+  milk: (col) =>
+    `<path d="M12 5h8v3l3 4v14c0 1.5-1 2-2 2H11c-1 0-2-.5-2-2V12l3-4z" fill="${col}" ${SW}/>` +
+    `<rect x="11" y="15" width="10" height="7" rx="1.4" fill="#5b8fd1" stroke="${OUT}" stroke-width=".7"/>` + hi('M11 13v10'),
+  goat_milk: (col) =>
+    `<path d="M12 5h8v3l3 4v14c0 1.5-1 2-2 2H11c-1 0-2-.5-2-2V12l3-4z" fill="${col}" ${SW}/>` +
+    `<rect x="11" y="15" width="10" height="7" rx="1.4" fill="#8a6a4a" stroke="${OUT}" stroke-width=".7"/>` + hi('M11 13v10'),
+  wool: (col) =>
+    `<circle cx="12" cy="17" r="5" fill="${col}" ${SW}/><circle cx="20" cy="17" r="5" fill="${col}" ${SW}/><circle cx="16" cy="12.5" r="5" fill="${col}" ${SW}/><circle cx="16" cy="20" r="5" fill="${col}" ${SW}/>`,
+  honey: (col) =>
+    `<rect x="9" y="7" width="14" height="4" rx="1" fill="#d9472b" ${SW}/>` +
+    `<path d="M9 11h14l1 3v10c0 2-2 3-3 3H11c-1 0-3-1-3-3V14z" fill="${col}" ${SW}/>` +
+    `<path d="M13 17l3-2 3 2v3l-3 2-3-2z" fill="none" stroke="#8a5a1a" stroke-width="1"/>` + hi('M10.6 14v8'),
 };
 
 /** Eşya ikonu: tohum, ürün, gübre, ilaç. Bilinmeyen eşya → genel kutu. */

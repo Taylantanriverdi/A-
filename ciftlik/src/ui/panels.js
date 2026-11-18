@@ -47,6 +47,7 @@ export function createPanelHost(root, ctx, navParent) {
       <div class="bp-tabs" role="tablist">
         ${PANEL_ORDER.map((id) => `<button type="button" role="tab" data-panel="${id}"><span class="ic">${PANEL_ICON[id]}</span><span class="t">${STR.panelTitle[id]}</span></button>`).join('')}
       </div>
+      <div class="bp-title"></div>
       <div class="bp-money num"><span class="coin">${ICON.coin}</span><span class="v"></span></div>
       <button type="button" class="bp-close" aria-label="${STR.close}"><span class="ic">${ICON.close}</span></button>
     </header>
@@ -58,6 +59,7 @@ export function createPanelHost(root, ctx, navParent) {
   const views = {};
   const viewsBox = panel.querySelector('.bp-views');
   const tabBtns = [...panel.querySelectorAll('.bp-tabs button')];
+  const titleEl = panel.querySelector('.bp-title');
   const moneyV = panel.querySelector('.bp-money .v');
   for (const b of tabBtns) tap(b, () => api.open(b.dataset.panel));
   tap(panel.querySelector('.bp-close'), () => api.close());
@@ -65,6 +67,7 @@ export function createPanelHost(root, ctx, navParent) {
 
   let current = null;
   let shownMoney = null;
+  let shownTitle = null;
   let lastFocus = null;
   const listeners = [];
 
@@ -112,7 +115,7 @@ export function createPanelHost(root, ctx, navParent) {
       } else {
         v.el.classList.remove('swap'); void v.el.offsetWidth; v.el.classList.add('swap');
       }
-      shownMoney = null;
+      shownMoney = null; shownTitle = null;
       for (const fn of listeners) fn(current);
     },
     close() {
@@ -137,6 +140,7 @@ export function createPanelHost(root, ctx, navParent) {
       if (m !== shownMoney) { shownMoney = m; setText(moneyV, formatMoney(m)); }
       const v = views[current];
       if (v && v.render) v.render(now);
+      if (v && v.title) { const tt = v.title(); if (tt !== shownTitle) { shownTitle = tt; setText(titleEl, tt || ''); panel.setAttribute('aria-label', tt || STR.panelTitle[current] || ''); } }
     },
     destroy() { backdrop.remove(); nav.remove(); },
   };

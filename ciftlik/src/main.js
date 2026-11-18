@@ -9,6 +9,7 @@ import { SPEEDS, MIN_PER_DAY, TILE_W, TILE_H } from './core/constants.js';
 import TimeSystem from './systems/TimeSystem.js';
 import FarmSystem from './systems/FarmSystem.js';
 import InventorySystem from './systems/InventorySystem.js';
+import AnimalSystem from './systems/AnimalSystem.js';
 import { QUALITY } from './data/farming.js';
 import BootScene from './scenes/BootScene.js';
 import WorldScene from './scenes/WorldScene.js';
@@ -30,7 +31,7 @@ const MarketSystem = optionalSystem('MarketSystem.js', 'market');
 const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
 const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
 // Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
-const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, MarketSystem, EconomySystem, ProgressionSystem].filter(Boolean);
+const SYSTEMS = [TimeSystem, InventorySystem, FarmSystem, AnimalSystem, MarketSystem, EconomySystem, ProgressionSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);
