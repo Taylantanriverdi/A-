@@ -229,10 +229,16 @@ function Zamanlayici-Tik {
 # Komutlar her zamanki Komut-Isle denetiminden geçer (o an bir işlem sürüyorsa doğrudan basılmış gibi reddedilir);
 # 3 sn'den eski komut çalıştırılmaz (bekletilmiş bir hareket geç başlamasın). Pencereler tek tek (iç içe değil) gösterilir.
 function Tik-Sonrasi-Calistir {
-    if ($script:TikMesgul -or $script:BekciMesgul) { return }
+    if ($script:TikMesgul) { return }
+    # SK-15: öncelikli (DURDUR) bekçi sürerken de beklemez
+    while ($script:KomutKuyrugu.Count -gt 0 -and $script:KomutKuyrugu[0].Oncelikli) {
+        $k = $script:KomutKuyrugu[0]; $script:KomutKuyrugu.RemoveAt(0)
+        try { [void](Komut-Isle $k.Ad $k.Arg $k.Kaynak) } catch { try { [Kayit]::Yaz("ERTELENEN KOMUT: $($_.Exception.Message)") } catch { } }
+    }
+    if ($script:BekciMesgul) { return }
     while ($script:KomutKuyrugu.Count -gt 0) {
         $k = $script:KomutKuyrugu[0]; $script:KomutKuyrugu.RemoveAt(0)
-        if (((Get-Date) - $k.Zaman).TotalSeconds -gt 3) {
+        if (-not $k.Oncelikli -and ((Get-Date) - $k.Zaman).TotalSeconds -gt 3) {
             [Kayit]::Yaz("KOMUT ZAMAN AŞIMI (ertelenmişti): $($k.Ad) $($k.Arg)")
             Ui-Bildir "Komut zamanında işlenemedi, yeniden basın: $($k.Ad)" 'Uyari'
             continue
@@ -358,11 +364,20 @@ function Komut-Isle([string]$ad, [string]$arg = '', [string]$kaynak = 'yerel') {
         return $true
     }
     # SK-01: ana zamanlayıcının korumalı bloğu ya da bağlantı bekçisi sürerken (DoEvents ile) gelen komut iç içe çalışmaz:
-    # sıraya alınır, koruma bırakılınca Tik-Sonrasi-Calistir çalıştırır. ACİL STOP (yukarıda) ve DURDUR beklemez.
-    if (($script:TikMesgul -or $script:BekciMesgul) -and $ad -ne 'is.durdur') {
-        $script:KomutKuyrugu.Add(@{ Ad = $ad; Arg = $arg; Kaynak = $kaynak; Zaman = (Get-Date) })
-        [Kayit]::Yaz("KOMUT ERTELENDİ (zamanlayıcı işi sürüyor): $ad $arg")
-        return $true
+    # sıraya alınır, koruma bırakılınca Tik-Sonrasi-Calistir çalıştırır. ACİL STOP (yukarıda) hiç beklemez.
+    # SK-15: DURDUR korumalı blok içinde onay sorusunu (ertelenemez) açmasın: sıranın BAŞINA, öncelikli (zaman aşımı yok),
+    # koruma bırakılınca (ms) ilk o çalışır. Yalnız bekçi sürerken (korumanın dışında) DURDUR hemen işlenir.
+    if ($script:TikMesgul -or $script:BekciMesgul) {
+        if ($ad -ne 'is.durdur') {
+            $script:KomutKuyrugu.Add(@{ Ad = $ad; Arg = $arg; Kaynak = $kaynak; Zaman = (Get-Date); Oncelikli = $false })
+            [Kayit]::Yaz("KOMUT ERTELENDİ (zamanlayıcı işi sürüyor): $ad $arg")
+            return $true
+        }
+        if ($script:TikMesgul) {
+            $script:KomutKuyrugu.Insert(0, @{ Ad = $ad; Arg = $arg; Kaynak = $kaynak; Zaman = (Get-Date); Oncelikli = $true })
+            [Kayit]::Yaz("KOMUT ÖNCELİKLİ SIRADA (zamanlayıcı koruması bitince ilk): $ad $arg")
+            return $true
+        }
     }
     $t = $script:Komutlar[$ad]
     if (-not $t) { $n = "Bilinmeyen komut: $ad"; [Kayit]::Yaz("KOMUT: $n"); Ui-Bildir $n 'Uyari'; return $n }

@@ -355,11 +355,22 @@ Esit 1 $script:TikSonrasiKutular.Count 'pencere sırada'
 Esit $true (Komut-Isle 'acilstop' '') 'tık içinde ACİL STOP'
 Dogru ([Eding]::AcilKilit) 'ACİL STOP sırayı beklemeden kilitledi'
 Esit 1 $script:KomutKuyrugu.Count 'ACİL STOP sıraya girmedi'
-$r = Komut-Isle 'is.durdur' ''
-Dogru ($r -ne $true -or $script:KomutKuyrugu.Count -eq 1) 'tık içinde DURDUR hemen işlendi (sıraya girmedi)' "$r"
-Esit 1 $script:KomutKuyrugu.Count 'DURDUR sıraya girmedi'
+# SK-15: tık içinde DURDUR onay sorusunu korumanın içinde açmaz: sıranın başına (öncelikli, zaman aşımı yok)
+$script:UiKayit.Clear()
+Esit $true (Komut-Isle 'is.durdur' '') 'tık içinde DURDUR kabul edildi (öncelikli sırada)'
+Esit 2 $script:KomutKuyrugu.Count 'DURDUR sırada'
+Esit 'is.durdur' $script:KomutKuyrugu[0].Ad 'DURDUR sıranın başında'
+Dogru ($script:KomutKuyrugu[0].Oncelikli) 'DURDUR öncelikli'
+Esit 0 $script:UiKayit.Count 'tık içinde DURDUR hiçbir pencere / bildirim açmadı'
+$script:KomutKuyrugu[0].Zaman = (Get-Date).AddSeconds(-10)   # öncelikli komut zaman aşımına uğramaz
+function Log-Metin { $fs = New-Object System.IO.FileStream([Kayit]::Dosya, 'Open', 'Read', 'ReadWrite'); try { return (New-Object System.IO.StreamReader($fs)).ReadToEnd() } finally { $fs.Dispose() } }
+$logOnce = (Log-Metin).Length
 $script:TikMesgul = $false; $script:TikSonraki = ''
 Tik 1
+$logYeni = (Log-Metin).Substring($logOnce)
+$iD = $logYeni.IndexOf('KOMUT (yerel): is.durdur'); $iE = $logYeni.IndexOf('KOMUT (yerel): ekran kalibrasyon')
+Dogru ($iD -ge 0 -and $iE -gt $iD) 'koruma bırakılınca önce DURDUR, sonra sıradaki komut işlendi' "durdur@$iD ekran@$iE"
+Dogru (($script:UiKayit -join "`n") -match 'Çalışan iş yok') 'DURDUR (10 sn beklemiş, öncelikli) yine işlendi: iş yok nedeni bildirildi'
 Esit 'kalibrasyon' $script:EtkinEkran 'koruma bırakılınca sıradaki komut çalıştı'
 Esit 0 $script:KomutKuyrugu.Count 'sıra boş'
 Dogru (($script:UiKayit -join "`n") -match 'HATA \[Deneme hatası\] Deneme hata\.') 'ertelenen hata penceresi koruma bırakılınca gösterildi'
