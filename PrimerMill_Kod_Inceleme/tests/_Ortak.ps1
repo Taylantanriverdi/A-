@@ -28,7 +28,9 @@ function Varsayilan-Kaynak {
 function Kaynak-Dosyalari([string]$Kaynak) {
     if (-not $Kaynak) { $Kaynak = Varsayilan-Kaynak }
     if (Test-Path -LiteralPath $Kaynak -PathType Container) {
-        return @(Get-ChildItem -LiteralPath $Kaynak -Filter '*.ps1' -Recurse -File | Sort-Object FullName | ForEach-Object { $_.FullName })
+        # *_Klasik.ps1: teslimdeki eski panelin yedek kopyası (denenen kod değil; aynı adlı fonksiyonları gölgelemesin)
+        # tasima\: lib/*.ps1'i ilk kez üreten araç (tests altında)
+        return @(Get-ChildItem -LiteralPath $Kaynak -Filter '*.ps1' -Recurse -File | Where-Object { $_.Name -notlike '*_Klasik.ps1' } | Sort-Object FullName | ForEach-Object { $_.FullName })
     }
     if (Test-Path -LiteralPath $Kaynak -PathType Leaf) { return @((Resolve-Path -LiteralPath $Kaynak).Path) }
     throw "Kaynak bulunamadı: $Kaynak"
@@ -287,4 +289,42 @@ function Ozet([string]$baslik = '') {
     } else { Write-Host $m -ForegroundColor Green }
     $kod = $script:TestKaldi; if ($kod -gt 255) { $kod = 255 }
     exit $kod
+}
+
+# ---------------------------------------------------------------- PrimerMill 2 arayüz kapısı sahteleri
+# NOKTA ile çağır: . Ui-Sahte-Yukle   (lib/ArayuzKapisi.ps1'in yerine; pencere açmaz, her çağrıyı $script:UiKayit'a yazar)
+# Davranış değişkenleri: $script:SahteOnay (Ui-Onay / Ui-Tehlikeli-Onay cevabı, varsayılan $true), $script:SahteSecim (Ui-Secim),
+# $script:SahteListe (Ui-Liste-Sec: seçilecek öğe adı), $script:SahteDiyalog (açık diyalog sayısı), $script:SahteGeriSayim.
+function Ui-Sahte-Yukle {
+    $script:UiKayit = New-Object System.Collections.Generic.List[string]
+    $script:SahteOnay = $true; $script:SahteSecim = -1; $script:SahteListe = ''; $script:SahteDiyalog = 0; $script:SahteGeriSayim = $false
+    $script:SonDurumNesnesi = $null; $script:SonIzinTablosu = @{}
+    function script:Ui-Not([string]$m) { $script:UiKayit.Add($m) }
+    function script:Ui-Onay([string]$baslik, [string]$metin) { Ui-Not "ONAY [$baslik] $metin"; return [bool]$script:SahteOnay }
+    function script:Ui-Tehlikeli-Onay([string]$baslik, [string]$metin, $eski = $null, $yeni = $null, [string]$yedek = '') { Ui-Not "TEHLIKELI [$baslik] $metin | yeni: $(@($yeni) -join ' ') | yedek: $yedek"; return [bool]$script:SahteOnay }
+    function script:Ui-Bilgi([string]$baslik, [string]$metin) { Ui-Not "BILGI [$baslik] $metin" }
+    function script:Ui-Hata([string]$baslik, [string]$neOldu, [string]$neYapmali = '') { Ui-Not "HATA [$baslik] $neOldu $neYapmali" }
+    function script:Ui-Secim([string]$baslik, [string]$metin, [string[]]$secenekler) { Ui-Not "SECIM [$baslik] $metin"; return [int]$script:SahteSecim }
+    function script:Ui-Liste-Sec([string]$baslik, [string[]]$ogeler, [string[]]$aciklamalar, [string]$ek = '') { Ui-Not "LISTE [$baslik] $($ogeler -join ',')"; return [array]::IndexOf($ogeler, [string]$script:SahteListe) }
+    function script:Ui-Sayi([string]$baslik, [double]$mevcut, [double]$min, [double]$max, [int]$ondalik = 3) { return $null }
+    function script:Ui-Metin([string]$baslik, [string]$mevcut, [bool]$sadeceRakam = $false, [int]$enCok = 0) { return $null }
+    function script:Ui-Takim-Sec([int]$mevcut, [string[]]$aciklamalar) { return -1 }
+    function script:Ui-Geri-Sayim([string]$metin, [int]$saniye) { Ui-Not "GERISAYIM $metin"; return [bool]$script:SahteGeriSayim }
+    function script:Ui-Manuel-Adim([int]$adim, [string]$metin, [string[]]$dugmeler, [string]$baslik) { Ui-Not "MANUEL $adim $baslik"; return -1 }
+    function script:Ui-Devam([string]$dosya, [string]$bilgi, [int]$takim) { Ui-Not "DEVAM $dosya"; return @{ Secim = 'iptal'; Takim = $takim } }
+    function script:Ui-Dosya-Ac([string]$baslik, [string]$filtre, [string]$klasor) { return $null }
+    function script:Ui-Bildir([string]$metin, [string]$tur = 'Bilgi') { Ui-Not "BILDIR [$tur] $metin" }
+    function script:Ui-Olaylar { Start-Sleep -Milliseconds 5 }
+    function script:Ui-Mesgul($metin) { $script:MesgulMetni = $(if ($metin) { [string]$metin } else { $null }) }
+    function script:Ui-Uygula($durum) { $script:SonDurumNesnesi = $durum }
+    function script:Ui-Izin([hashtable]$neden) { $script:SonIzinTablosu = $neden }
+    function script:Ui-Acik-Diyalog { return [int]$script:SahteDiyalog }
+    function script:Ui-One-Al { }
+    function script:Ui-Ustte([bool]$ustte) { }
+    function script:Ui-Tema([bool]$koyu) { }
+    function script:Ui-Kucult { }
+    function script:Ui-Kapat { Ui-Not 'KAPAT' }
+    function script:Ui-Sim-Veri($analiz) { }
+    function script:Ui-Sim-Satir([int]$satir) { }
+    function script:Ui-Sim-Buyuk([bool]$buyuk) { }
 }

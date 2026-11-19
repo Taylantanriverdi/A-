@@ -1,4 +1,4 @@
-﻿// EdingSim.cs - PrimerMill demo modu için sahte Eding CNC API'si (cncapi.dll yerine).
+// EdingSim.cs - PrimerMill demo modu için sahte Eding CNC API'si (cncapi.dll yerine).
 //
 // KazimaBaslat.ps1 içindeki gerçek [Eding] sınıfıyla AYNI ADLI ve AYNI ÜYELİ (aynı imzalar).
 // Gerçek DLL yüklenmez; makine bellekte simüle edilir:

@@ -155,6 +155,9 @@ $script:Kabuk.Add_Shown({
     try { Panel-Acilis } catch { [Kayit]::Yaz("AÇILIŞ: $($_.Exception.Message)") }
     try { Okuma-Yap; Durum-Yenile } catch { }
     $script:AnaZaman.Start()
+    # tests/Demo_Ekran_Testi.ps1: yalnız demo modunda, ortam değişkeniyle ekran görüntüsü turu
+    $ek = [Environment]::GetEnvironmentVariable('PRIMERMILL_EKRAN')
+    if ($script:Demo -and $ek) { try { Ekran-Turu-Baslat $ek } catch { [Kayit]::Yaz("EKRAN TURU: $($_.Exception.Message)") } }
 })
 $script:Kabuk.Add_FormClosing({
     $script:AnaZaman.Stop()   # ED-07: bütün işler tek zamanlayıcıda

@@ -1,4 +1,4 @@
-# PrimerMill testleri
+﻿# PrimerMill testleri
 
 Bu klasördeki testler **Eding CNC ve makine olmadan** çalışır. Panel kodu (`PrimerMill/*.ps1`) çalıştırılmaz:
 dosyalar ayrıştırıcıyla (AST) okunur, yalnız denenecek fonksiyonlar ve sabitler yüklenir. Eding'e bağlı kısımlar
@@ -52,6 +52,10 @@ Tek bir test de doğrudan çalıştırılabilir, ör. `pwsh -NoProfile -File tes
 | `Ayar_Testi.ps1` | `Tercih-Yaz`/`Tercih-Oku` (panel_ayarlar.ini), `ayarlar.txt` → `Eding-Exe-Bul`, `Degisken-Yaz`, `Ayar-Yedekle` (ayar_*.txt biçimi), `Ayar-Geri-Yukle`, `Ayar-Kaydet` (virgüllü giriş): geçici klasörde, Türkçe karakterli yollarla, dört kültürde. Eding yerine EdingSim; pencereler ve onaylar sahte. |
 | `OtoKal_Hesap_Testi.ps1` | Otomatik kalibrasyon hesabı (`OtoKal-Hesapla-Ic`): sentetik ölçümle bilinen hataların geri bulunması. |
 | `Kal_NC_Cep_Testi.ps1` | Disk kalibrasyon programındaki cep çapları (`Kal-NC-Uret`). |
+| `Denetleyici_Testi.ps1` | PrimerMill 2 denetleyicisi (`teslim/PrimerMill/lib`): `lib/*.ps1` + EdingSim + sahte arayüz kapısı (`_Ortak.ps1` `Ui-Sahte-Yukle`). İzin tablosu (home yok, iş sürerken, duraklıyken, ACİL STOP, RafEksik), demo iş BAŞLAT → DURAKLAT → DEVAM → bitiş, `MakineDurumu` alanları, uzaktan BAŞLAT reddi (duraklı / diyalog açık / kalibrasyon ekranı), tehlikeli onay + yedek, `ui/ARAYUZ_API.md`'deki her komutun dağıtıcıda karşılığı. |
+| `Tasima_Testi.ps1` | Birebir taşıma kanıtı: eski paneldeki 185 fonksiyonun her biri teslimde mekanik dönüşümler dışında aynı mı; değişen / kaldırılan her biri `TASIMA_DEGISEN.txt` içinde gerekçeli olmalı (`-Fark` farkı satır satır basar). |
+| `Demo_Ekran_Testi.ps1` | Yalnız Windows: paneli `-Demo` ile açar, 17 ekranı `Kabuk.EkranGoster` ile gezer, `teslim/ekran_goruntuleri_demo/*.png` kaydeder, kapanır. Windows dışında yalnız ayrıştırır ve atlar. |
+| `ui/demo_ekran_testi.sh` | (bash, Mono) teslimdeki bütün C# dosyalarının `mcs -langversion:5` ile birlikte (demo ve makine takımı) ve tek tek derlendiği, `ui/` ve `lib/EdingSim.cs` kopyalarının kanonik dosyalarla aynı olduğu. |
 
 ## Altın (golden) çıktılar
 

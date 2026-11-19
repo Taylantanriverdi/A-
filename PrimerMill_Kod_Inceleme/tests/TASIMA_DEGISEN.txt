@@ -1,0 +1,91 @@
+# Tasima_Testi.ps1 - düzeltilmiş eski panelden (PrimerMill/KazimaBaslat.ps1) teslime taşınırken DEĞİŞEN ya da KALDIRILAN fonksiyonlar.
+# Biçim: Ad | DEGISTI veya KALDIRILDI | gerekçe. Listede olmayan her fonksiyon (mekanik dönüşümler dışında) birebir aynıdır.
+# Ayrıntılı fark: pwsh -NoProfile -File tests/Tasima_Testi.ps1 -Fark   ·   git: commit 047e088 (uyarlama) ve 19c0e22 (mekanik taşıma)
+# Hareket üreten G-kod satırları, sıraları, bekleme süreleri ve güvenlik kontrolleri hiçbir fonksiyonda değişmedi.
+Eding-Exe-Bul | DEGISTI | OpenFileDialog -> Ui-Dosya-Ac kapısı
+Eding-Gizle-Tik | DEGISTI | açık diyalog / panel öne alma kodu kabuğa taşındı (Ui-One-Al), mantık aynı
+Baglanti-Bekcisi | DEGISTI | $bar/$lblSure yerine $script:SureMetni / SureTur
+Baglan | DEGISTI | Get-Process CncServer -> Eding-Sunucu-Acik (aynı kontrol; demo modunda EdingSim için değiştirilebilsin)
+Yaz | DEGISTI | Detaylar penceresindeki mesaj kutusu yerine Kayıtlar listesi (Mesaj-Ekle); günlük ve SonMesajlar aynı
+Durum-Yaz | DEGISTI | etiket yerine $script:DurumTur (renk -> mesaj türü); günlük satırı aynı
+Dosyayi-Kontrol-Et | DEGISTI | ilerleme çubuğu / dans eden hayvan / SimView yerine durum değişkenleri ve Ui-Sim-Veri
+Btn-DosyaSec | DEGISTI | OpenFileDialog -> dokunmatik liste (Is-Dosyasi-Sec, GÖZAT = OpenFileDialog); WaitCursor -> Ui-Mesgul; kopyalama aynı
+Dosya-Ozeti | DEGISTI | $lblSure -> $script:SureMetni; "Detaylar" yerine yeni arayüzdeki yer
+Frez-Modu-Goster | DEGISTI | Sade akışta ilk satırda döner (eskisi gibi); kalan satırlar çip yerine $script:FrezModuMetni
+Frez-Modu-Sor | DEGISTI | özel pencere -> Ui-Secim (Diyalog.Secim); dönüş değerleri aynı
+Takim-Belirsiz-Coz | DEGISTI | özel pencere -> Ui-Secim (Boş/T1..T6); Esc = ACİL STOP + vazgeç (Diyalog), sonrası aynı
+Manuel-Diyalog | DEGISTI | özel pencere -> Ui-Manuel-Adim (Diyalog.ManuelFrezAdimi); Esc/ACİL STOP diyalogda çağrıldıysa ikinci kez çağrılmaz
+Blok-Cip-Guncelle | DEGISTI | çip yerine $script:BlokDurumMetni (Üretim bakım şeridi)
+Yeni-Blok | DEGISTI | pencereyi görünüm açar (Diyalog.YeniBlok), seçim komutla gelir; seçimden sonraki kod aynı; 'is' için dosya kontrolü (eski düğme pasifti)
+Uzak-Engel | DEGISTI | Ayarlar penceresi yerine Takımlar/Kalibrasyon/Ayarlar ekranı; panelde işlem sürerken uzaktan başlat/seç/blok reddi (yeni, güvenlik)
+Uzak-Is-Sec | DEGISTI | $lblDosya -> $script:DosyaMetni
+Uzak-Komut | DEGISTI | sec / baslat / duraklat / durdur / blok öncesi yerel izin tablosu da sorulur (GV-01/UZ-02); eski kontroller aynı sırada
+Uzak-Durum | DEGISTI | etiket metinleri yerine durum değişkenleri (JSON alanları aynı)
+Uzak-Baslat | DEGISTI | demo: yalnız 127.0.0.1; ekran görüntüsü kaynağı (EkranYakala); sayfa yolu $PanelKlasor; zamanlayıcı yerine $script:UzakAcik
+Uzak-Etiket-Guncelle | DEGISTI | etiket yerine $script:UzakDurumMetni
+Devam-Diyalog | DEGISTI | özel pencere -> Ui-Devam (Diyalog.Devam); dönüş aynı (Sec, Takim)
+Devam-Baslat | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır
+Devam-Acilis | DEGISTI | etiketler -> durum değişkenleri
+Btn-Baslat-Ic | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır
+Btn-Durdur | DEGISTI | $bar.Value -> $script:Yuzde; etiket -> SureMetni
+Btn-FrezBirak | DEGISTI | Onay -> Ui-Tehlikeli-Onay (TASARIM §6); hareket aynı
+Btn-Home | DEGISTI | WaitCursor -> Ui-Mesgul ("Home alınıyor…")
+Hiz-Ayarla | DEGISTI | çip yazısı -> $script:HizYuzde
+Geri-Sayim | DEGISTI | özel pencere -> Ui-Geri-Sayim (Diyalog.GeriSayim, süre dolunca İPTAL: GV-09 korunur)
+Acilis-Hazirla | DEGISTI | "Makine hazır · bir dosya seçin" etiketi kaldırıldı (görünüm kendisi yazar)
+Panel-Sifirla | DEGISTI | çubuk / etiket / SimView yerine durum değişkenleri ve Ui-Sim-Veri
+Acil-Stop | DEGISTI | E-stop düğmesi / lamba / çubuk yazıları kaldırıldı (MakineDurumu.AcilStop); makineye gönderilenler ve sıra aynı (ED-08)
+Acil-Stop-Kaldir | DEGISTI | E-stop düğmesi ve PENS düğmesi yazısı kaldırıldı
+Btn-Reset | DEGISTI | PENS düğmesi yazısı kaldırıldı
+Btn-Pens | DEGISTI | düğme yazısı kaldırıldı (yeni arayüzde PENS AÇ / PENS KAPAT ayrı komut: pens.ac -> Btn-Pens-Ac, pens.kapat -> Tek-Komut M55 P2)
+Mdi-Gonder | DEGISTI | satır komut argümanı; Onay -> Ui-Tehlikeli-Onay; G10/G92/#4xxx/#5xxx satırında önce ayar yedeği (yeni, güvenlik)
+Btn-Temizlik | DEGISTI | TEMİZLİK ve PARK ayrı düğme (KU-13): $adim parametresi; Z / A-B / G30 satırları ve beklemeler aynı
+Konuma-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
+Yuvaya-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
+Yuvaya-Yaklas | DEGISTI | Onay -> Ui-Tehlikeli-Onay; etiket -> durum değişkeni
+Yukari-Kaldir | DEGISTI | etiket -> $script:YuvaDurumMetni
+Ismili-Calistir | DEGISTI | devir metin kutusu yerine komut argümanı (aynı aralık denetimi)
+Pens-Ac-T0 | DEGISTI | Onay -> Ui-Tehlikeli-Onay (KU-01); M5 bekleme ve pens sırası aynı
+Ayar-Oku | DEGISTI | metin kutuları / etiketler yerine G54Deger / ParamDeger / G92Deger dizileri ve metinler (aynı değişkenler okunur)
+Ayar-Kaydet | DEGISTI | Onay + yedek -> Yedekli-Onay (yedek önce, adı ve eski/yeni değerler tehlikeli onayda); yazma aynı
+Konumu-Sensor-Yap | DEGISTI | Onay + yedek -> Yedekli-Onay
+Z-Alma-Yap | DEGISTI | Onay + yedek -> Yedekli-Onay
+G54-Ureticiye-Don | DEGISTI | Onay + yedek -> Yedekli-Onay
+G92-Sifirla | DEGISTI | Onay + yedek -> Yedekli-Onay
+Ayar-Yedekle | DEGISTI | dosya adı $script:SonYedekDosya'ya yazılır (onayda gösterilir); aynı saniyede ikinci yedek _2 ekiyle (önceki ezilmez)
+Ayar-Geri-Yukle | DEGISTI | OpenFileDialog -> dokunmatik liste (Yedek-Dosyasi-Sec); Onay + yedek -> Yedekli-Onay; yazma aynı
+Eding-Goster | DEGISTI | $form.TopMost -> Ui-Ustte
+Eding-Gizle | DEGISTI | $form.TopMost -> Ui-Ustte
+Yuva-Liste-Yenile | DEGISTI | ListView yerine $script:YuvaListesi (MakineDurumu.Yuvalar)
+Yuva-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
+Yuva-Yaklas | DEGISTI | Onay -> Ui-Tehlikeli-Onay; etiket -> durum değişkeni
+Yuva-Al | DEGISTI | onay kutusu ($chkYuvaZ) yerine $script:YuvaZ (yuva.zal); etiket -> durum değişkeni
+Yuva-Kaydet | DEGISTI | Onay + yedek -> Yedekli-Onay
+Yuva-Sifirla | DEGISTI | etiket -> durum değişkeni
+Yuva-Varsayilan | DEGISTI | Onay -> Ui-Tehlikeli-Onay (yedek zaten önceden alınıyordu; adı onayda)
+Kal-Degerleri-Goster | DEGISTI | etiket -> $script:KalSimdiMetni
+Kal-Test-Hazirla | DEGISTI | kutular yerine Tercih.KalT/KalD (ayar.kaydet) ve $script:DiskTestNo
+Kal-Hesapla | DEGISTI | kutular yerine $script:DiskOlcum, Tercih.KalS*; sonuç ayrıca tablo satırları ve uyarılar olarak (hesap satırları aynı)
+Kal-Uygula | DEGISTI | Onay + yedek -> Yedekli-Onay; sonuç hazır bayrağı
+Kal-Yerlesim-Yaz | DEGISTI | etiket -> $script:DiskYerlesimMetni, test no $script:DiskTestNo
+OtoKal-Goster | DEGISTI | etiketler -> durum değişkenleri, OtoOlcumBitti bayrağı
+OtoKal-Prob-Testi | DEGISTI | 120 ms zamanlayıcı yerine $script:ProbAktif (ana zamanlayıcı Prob-Tik çağırır; gövde aynı)
+OtoKal-Hazirla | DEGISTI | kutular yerine Tercih.OkT/OkUc/OkUcD; etiketler -> durum değişkenleri
+OtoKal-Oku | DEGISTI | sonuç ayrıca tablo / kalite satırları ve uyarılar olarak (hesap aynı)
+OtoKal-Uygula | DEGISTI | Onay + yedek -> Yedekli-Onay (yedek artık ikinci "büyük sonuç" sorusundan ÖNCE alınır); etiketler -> durum değişkenleri
+Ilerleme-Guncelle | DEGISTI | çubuk / etiket / SimView yerine durum değişkenleri (kalan, bitiş, satır) ve Ui-Sim-Satir; algılama mantığı ve sayaçlar aynı (1 sn'de bir çağrılır)
+Ana-Tik | DEGISTI | lib/Denetleyici.ps1: lamba / düğme / başlık / konum etiketi yerine durum değişkenleri; ACİL STOP bekçisi, durum sırası, TikSonraki aynı; Eding kapatıldıysa bekçi yeniden açmaz
+Blok-Sor | KALDIRILDI | ölü kod (Sade = $true iken hiç çağrılmaz; OZELLIK_ENVANTERI 5.6 / 11.7)
+Etiket | KALDIRILDI | eski WinForms ana pencere yapımı (yeni görünüm ui/PrimerUI.cs)
+Yumurta | KALDIRILDI | eski WinForms düğme yapımı
+Cip-Ekle | KALDIRILDI | eski WinForms çip yapımı
+Koord-Degistir | KALDIRILDI | eski koordinat etiketi; yeni: ayar.kaydet Koordinat (Tercih-Kaydet)
+Koord-Guncelle | KALDIRILDI | eski 50 ms koordinat etiketi; yeni: Okuma-Yap + MakineDurumu (X..MB)
+A-Baslik | KALDIRILDI | eski Ayarlar penceresi yapımı
+A-Etiket | KALDIRILDI | eski Ayarlar penceresi yapımı
+A-Buton | KALDIRILDI | eski Ayarlar penceresi yapımı
+A-Kutu | KALDIRILDI | eski Ayarlar penceresi yapımı
+A-Secim | KALDIRILDI | eski Ayarlar penceresi yapımı
+Sekme-Goster | KALDIRILDI | eski Ayarlar sekmeleri; yeni: ekran komutu (Ekran-Degisti aynı okumaları yapar)
+Adim-Isaretle | KALDIRILDI | eski jog adım düğmeleri; yeni: jog komut argümanı
+Tam-Ekran-Uygula | KALDIRILDI | ölçek döngüsü gereksiz (akışkan yerleşim); tam ekran / TopMost önyüklemede (KazimaBaslat.ps1)

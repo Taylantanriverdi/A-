@@ -40,6 +40,12 @@ function Hazir-Hareket([string]$islem) { return $true }
 function Onay([string]$metin, [string]$baslik) { $script:SonOnay = $metin; return $true }
 function Ayar-Oku { }
 $form = $null
+# PrimerMill 2 (teslim/PrimerMill, lib/*.ps1): arayüz kapısı sahteleri. Mesaj kutuları eskisi gibi [Kayit]::Show sahtesine,
+# tehlikeli onay Onay sahtesiyle aynı yere ($script:SonOnay), yedek seçici sahte dosyaya gider. Eski panelde kullanılmazlar.
+function Ui-Kutu([string]$metin, [string]$baslik, [string]$dugme = 'OK', [string]$simge = '') { return [Kayit]::Show($metin, $baslik, $dugme, $simge) }
+function Ui-Tehlikeli-Onay([string]$baslik, [string]$metin, $eski, $yeni, [string]$yedek) { $script:SonOnay = $metin; $script:SonYedekOnay = $yedek; return $true }
+function Ui-Liste-Sec([string]$baslik, [string[]]$ogeler, [string[]]$aciklamalar, [string]$ek) { return [array]::IndexOf($ogeler, [System.IO.Path]::GetFileName([string]$script:SahteDosya)) }
+function Ui-Dosya-Ac([string]$baslik, [string]$filtre, [string]$klasor) { return $script:SahteDosya }
 
 $kok = Gecici-Klasor 'pm_ayar'
 $ScriptKlasor = [System.IO.Path]::Combine($kok, 'PrimerMill_Çalışma İşleri')

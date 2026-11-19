@@ -32,12 +32,18 @@ $sorun = @()
 $dosyalar = @()
 if (Test-Path -LiteralPath $Kaynak -PathType Container) { $dosyalar += @(Get-ChildItem -LiteralPath $Kaynak -Filter '*.ps1' -Recurse -File | ForEach-Object { $_.FullName }) }
 else { $dosyalar += $Kaynak }
+# teslim klasöründe: .ps1 dosyaları CRLF, .bat dosyaları ASCII olmalı (CLAUDE.md kural 2)
+$teslimMi = (Test-Path -LiteralPath $Kaynak -PathType Container) -and (Test-Path -LiteralPath ([System.IO.Path]::Combine($Kaynak, 'lib')))
 $dosyalar += @(Get-ChildItem -LiteralPath $testKlasor -Filter '*.ps1' -File | ForEach-Object { $_.FullName })
 $ps7Turler = @('TernaryExpressionAst', 'PipelineChainAst')
 foreach ($d in $dosyalar) {
     $kisa = [System.IO.Path]::GetFileName($d)
     $b = [System.IO.File]::ReadAllBytes($d)
     if (-not ($b.Length -ge 3 -and $b[0] -eq 0xEF -and $b[1] -eq 0xBB -and $b[2] -eq 0xBF)) { $sorun += "$kisa : BOM'lu UTF-8 değil" }
+    if ($teslimMi -and $d.StartsWith($Kaynak)) {
+        $lfSay = 0; for ($i = 0; $i -lt $b.Length; $i++) { if ($b[$i] -eq 10 -and ($i -eq 0 -or $b[$i - 1] -ne 13)) { $lfSay++ } }
+        if ($lfSay -gt 0) { $sorun += "$kisa : $lfSay satır CRLF değil" }
+    }
     $tok = $null; $perr = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($d, [ref]$tok, [ref]$perr)
     foreach ($e in $perr) { $sorun += "$kisa satır $($e.Extent.StartLineNumber): $($e.Message)" }
@@ -47,6 +53,12 @@ foreach ($d in $dosyalar) {
                 ($n -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($n.Operator)" -eq 'QuestionQuestionEquals') -or
                 ($n -is [System.Management.Automation.Language.MemberExpressionAst] -and $n.NullConditional) }, $true)
         foreach ($n in $bul) { $sorun += "$kisa satır $($n.Extent.StartLineNumber): PowerShell 7 sözdizimi: $($n.Extent.Text.Split("`n")[0])" }
+    }
+}
+if ($teslimMi) {
+    foreach ($bat in @(Get-ChildItem -LiteralPath $Kaynak -Filter '*.bat' -Recurse -File)) {
+        $bb = [System.IO.File]::ReadAllBytes($bat.FullName)
+        if (@($bb | Where-Object { $_ -gt 127 }).Count) { $sorun += "$($bat.Name) : ASCII dışı karakter var (.bat ASCII olmalı)" }
     }
 }
 $durum = 'GECTI'; if ($sorun.Count) { $durum = 'KALDI' }
@@ -63,8 +75,9 @@ foreach ($t in $testler) {
     $arg = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $t.FullName)
     if ($icerik -match '\$Kaynak') {
         $k = $Kaynak
-        # _Ortak.ps1 kullanmayan eski testler tek bir KazimaBaslat.ps1 dosyası bekler
-        if (($icerik -notmatch '_Ortak\.ps1') -and (Test-Path -LiteralPath $Kaynak -PathType Container)) {
+        # _Ortak.ps1 kullanmayan eski testler tek bir KazimaBaslat.ps1 dosyası bekler; klasör kabul edenler (fonksiyonlar lib/*.ps1
+        # içinde olabilir: 'PathType Container' denetimi yapanlar) klasörü alır
+        if (($icerik -notmatch '_Ortak\.ps1') -and ($icerik -notmatch 'PathType Container') -and (Test-Path -LiteralPath $Kaynak -PathType Container)) {
             $k = [System.IO.Path]::Combine($Kaynak, 'KazimaBaslat.ps1')
             if (-not (Test-Path -LiteralPath $k)) {
                 $aday = @(Get-ChildItem -LiteralPath $Kaynak -Filter 'KazimaBaslat*.ps1' -Recurse -File | Select-Object -First 1)

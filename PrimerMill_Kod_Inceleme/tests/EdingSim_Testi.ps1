@@ -31,6 +31,13 @@ foreach ($d in (Kaynak-Dosyalari $Kaynak)) {
     foreach ($x in $s) { $gercekCs = $x.Value; break }
     if ($gercekCs) { break }
 }
+# teslim yapısı: gerçek sınıf lib/EdingApi.cs içinde (Add-Type -Path)
+if (-not $gercekCs -and (Test-Path -LiteralPath $Kaynak -PathType Container)) {
+    foreach ($cs in @(Get-ChildItem -LiteralPath $Kaynak -Filter '*.cs' -Recurse -File)) {
+        $m = [System.IO.File]::ReadAllText($cs.FullName)
+        if ($m -match 'public static class Eding\b' -and $m -match 'DllImport\("cncapi') { $gercekCs = $m; Bilgi "gerçek sınıf: $($cs.Name)"; break }
+    }
+}
 if (-not $gercekCs) { Kaldi 'gerçek [Eding] Add-Type kaynağı bulunamadı' }
 else {
     # Ad çakışmasın diye bir isim alanına sarılıp derlenir (DLL çağrılmaz, yalnız imzalar okunur)

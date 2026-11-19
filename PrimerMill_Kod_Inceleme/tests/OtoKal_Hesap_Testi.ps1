@@ -30,11 +30,16 @@ if (-not $Kaynak) {
 }
 if (-not $Kaynak -or -not (Test-Path -LiteralPath $Kaynak)) { throw "KazimaBaslat.ps1 bulunamadı. -Kaynak ile ver." }
 $OrnekKlasor = [System.IO.Path]::Combine([System.IO.Path]::GetDirectoryName([System.IO.Path]::GetDirectoryName($Kaynak)), 'ornekler')
+if (-not (Test-Path -LiteralPath $OrnekKlasor)) { $OrnekKlasor = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PSScriptRoot, '..', 'ornekler')) }
 Write-Host "Kaynak: $Kaynak"
 
 # ------------------------------------------------------------------ 1) AST ile çıkar
 $tok = $null; $perr = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($Kaynak, [ref]$tok, [ref]$perr)
+# Kaynak klasörse (teslim/PrimerMill: fonksiyonlar lib/*.ps1 içinde) bütün .ps1 dosyaları (*_Klasik hariç) tek metin olarak ayrıştırılır
+if (Test-Path -LiteralPath $Kaynak -PathType Container) {
+    $metin = (@(Get-ChildItem -LiteralPath $Kaynak -Filter '*.ps1' -Recurse -File | Where-Object { $_.Name -notlike '*_Klasik.ps1' } | Sort-Object FullName | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n")
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($metin, [ref]$tok, [ref]$perr)
+} else { $ast = [System.Management.Automation.Language.Parser]::ParseFile($Kaynak, [ref]$tok, [ref]$perr) }
 if ($perr -and $perr.Count) { throw "Ayrıştırma hatası: $($perr[0].Message) satır $($perr[0].Extent.StartLineNumber)" }
 
 $FonkAdlari = @('Sayi', 'Metin-Sayi', 'OkRot', 'OkModel', 'OkCoz', 'OtoKal-Hesapla-Ic', 'OtoKal-NC-Uret', 'OtoKal-Sim-Uret')

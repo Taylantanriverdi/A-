@@ -6,7 +6,11 @@ $ErrorActionPreference = 'Stop'
 if (-not $Kaynak) {
     foreach ($a in @([System.IO.Path]::Combine($PSScriptRoot, '..', 'PrimerMill', 'KazimaBaslat.ps1'), '/home/user/A-/PrimerMill_Kod_Inceleme/PrimerMill/KazimaBaslat.ps1')) { if (Test-Path -LiteralPath $a) { $Kaynak = (Resolve-Path -LiteralPath $a).Path; break } }
 }
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($Kaynak, [ref]$null, [ref]$null)
+# Kaynak klasörse (teslim/PrimerMill: fonksiyonlar lib/*.ps1 içinde) bütün .ps1 dosyaları (*_Klasik hariç) tek metin olarak ayrıştırılır
+if (Test-Path -LiteralPath $Kaynak -PathType Container) {
+    $metin = (@(Get-ChildItem -LiteralPath $Kaynak -Filter '*.ps1' -Recurse -File | Where-Object { $_.Name -notlike '*_Klasik.ps1' } | Sort-Object FullName | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n")
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($metin, [ref]$null, [ref]$null)
+} else { $ast = [System.Management.Automation.Language.Parser]::ParseFile($Kaynak, [ref]$null, [ref]$null) }
 $fAd = @('Kal-Saat', 'Kal-Duzen', 'Kal-Nokta', 'Kal-NC-Uret'); $vAd = @('KalGruplar', 'KalHalkaR')
 foreach ($n in $ast.EndBlock.Statements) {
     if ($n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and ($vAd -contains $n.Left.VariablePath.UserPath)) { Invoke-Expression $n.Extent.Text }
