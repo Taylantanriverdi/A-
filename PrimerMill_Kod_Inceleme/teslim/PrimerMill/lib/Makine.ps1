@@ -475,7 +475,7 @@ function Devam-Diyalog($k) {
     $r = Ui-Devam ([System.IO.Path]::GetFileNameWithoutExtension([string]$k.Dosya)) $bilgi $t0
     $sec = 'iptal'; $tk = $t0
     if ($r) { $sec = [string]$r.Secim; $tk = [int]$r.Takim }
-    if (@('guvenli', 'yakin', 'bastan', 'iptal') -notcontains $sec) { $sec = 'iptal' }
+    if (@('tam', 'guvenli', 'yakin', 'bastan', 'iptal') -notcontains $sec) { $sec = 'iptal' }
     if ($tk -lt 0 -or $tk -gt 6) { $sec = 'iptal' }
     [Kayit]::Yaz("DEVAM: seçim '$sec', iş milinde T$tk")
     return @{ Sec = $sec; Takim = $tk }
@@ -598,7 +598,7 @@ function Btn-Baslat-Ic {
     $dk = Devam-Oku
     if ($dk -and ([string]$dk.Dosya -eq $script:SeciliDosya -or [string]$dk.Kaynak -eq $script:SeciliDosya) -and -not $script:BekleyenBlok) {
         $ds = Devam-Diyalog $dk
-        if ($ds.Sec -eq 'guvenli' -or $ds.Sec -eq 'yakin') { Devam-Baslat $dk $ds.Sec $ds.Takim; return }
+        if (@('tam', 'guvenli', 'yakin') -contains $ds.Sec) { Devam-Baslat $dk $ds.Sec $ds.Takim; return }
         if ($ds.Sec -ne 'bastan') { return }
         Devam-Sil
     }

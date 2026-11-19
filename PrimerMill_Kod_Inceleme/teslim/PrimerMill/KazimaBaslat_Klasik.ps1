@@ -3070,7 +3070,11 @@ function Devam-Kaydet([int]$satir, [string]$durum, [double]$yuzde) {
     $script:DevamSonYazma = Get-Date
 }
 
-# Asıl programdan devam programı üretir. $mod: 'guvenli' (son geri çekilme noktasından) ya da 'yakin' (~1 dk geriden)
+# Asıl programdan devam programı üretir. $mod:
+#   'tam'     (önerilen) durduğu yerin ~10 sn gerisinden: güvenli yükseklikte X/Y'ye gider, yavaşça o noktanın Z'sine iner
+#   'yakin'   ~1 dk geriden, aynı yaklaşma
+#   'guvenli' son GOSUB Z_SAFE satırından (işlem başı). Bu CAM çıktısında bir işlem 20 000+ satır sürebildiği için
+#             eskiden 'kaldığı yerden' seçilince işin büyük kısmı (ilk işlemde neredeyse baştan) yeniden kazınıyordu.
 function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
     $L = [System.IO.File]::ReadAllLines($kaynak)
     $idx = [math]::Min($L.Length - 1, [math]::Max(0, $satir - 1))
@@ -3078,9 +3082,12 @@ function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
     $r = 0
     for ($i = $idx; $i -ge 0; $i--) { if ($L[$i] -match '(?i)^\s*(N\d+\s*)?GOSUB\s+Z_SAFE\b') { $r = $i; break } }
     $q = -1
-    if ($mod -eq 'yakin' -and $analiz -and $analiz.Kumulatif.Length -eq $L.Length) {
-        $hedef = $analiz.Kumulatif[$idx] - 60
+    if (($mod -eq 'yakin' -or $mod -eq 'tam') -and $analiz -and $analiz.Kumulatif.Length -eq $L.Length) {
+        $geriSn = 60; if ($mod -eq 'tam') { $geriSn = 10 }
+        $hedef = $analiz.Kumulatif[$idx] - $geriSn
         for ($i = $r + 1; $i -le $idx; $i++) { if ($analiz.Kumulatif[$i] -ge $hedef) { $q = $i; break } }
+    } elseif ($mod -eq 'tam' -and $idx - 40 -gt $r) {
+        $q = $idx - 40   # süre analizi yoksa ~40 satır geriden
     }
     $son = if ($q -gt $r) { $q } else { $r }      # bu satıra kadar (hariç) modal durum toplanır
     # 2) modal durum: frez, devir, iş mili, soğutma, ilerleme, A/B, X/Y/Z, hareket kipi
@@ -3140,7 +3147,7 @@ function Devam-Diyalog($k) {
     $f.Text = 'Yarım kalan iş'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.MinimizeBox = $false
     $f.TopMost = $true; $f.ShowInTaskbar = $false
     $f.BackColor = $cZemin; $f.ForeColor = $cYazi; $f.Font = New-Object System.Drawing.Font('Segoe UI', 11)
-    $f.ClientSize = New-Object System.Drawing.Size(620, 400)
+    $f.ClientSize = New-Object System.Drawing.Size(620, 470)
     $neden = switch ([string]$k.Durum) { 'calisiyor' { 'iş sürerken panel/elektrik kapandı' } 'hata' { 'Eding hatasıyla durdu (basınç / acil stop vb.)' } 'durduruldu' { 'DURDUR ile durduruldu' } default { 'yarıda kaldı' } }
     $lb = New-Object System.Windows.Forms.Label; $lb.Text = 'Yarım kalan iş'; $lb.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 16); $lb.ForeColor = $cAltinAc; $lb.SetBounds(24, 14, 570, 34); $f.Controls.Add($lb)
     $li = New-Object System.Windows.Forms.Label; $li.ForeColor = $cYazi; $li.SetBounds(24, 54, 570, 72)
@@ -3158,11 +3165,12 @@ function Devam-Diyalog($k) {
         $b.SetBounds($x, $y, $w, $h); $b.Tag = $deger
         $b.Add_Click({ param($s2, $e2) $fm = $s2.FindForm(); $fm.Tag = $s2.Tag; $fm.Close() })
         $f.Controls.Add($b); $b }
-    [void](& $mk "KALDIĞI YERDEN DEVAM`r`n(son güvenli noktadan, önerilen)" 24 200 300 80 $cYesil 'guvenli')
+    [void](& $mk "KALDIĞI YERDEN DEVAM`r`n(~10 sn geriden, yukarıdan iner, önerilen)" 24 200 300 80 $cYesil 'tam')
     [void](& $mk "YAKIN NOKTADAN`r`n(~1 dk geriden, yukarıdan iner)" 334 200 262 80 $cAltinAc 'yakin')
-    [void](& $mk 'BAŞTAN BAŞLAT' 24 296 300 56 $cSoluk 'bastan')
-    [void](& $mk 'Vazgeç' 334 296 262 56 $cSoluk 'iptal')
-    $lu = New-Object System.Windows.Forms.Label; $lu.Text = 'Blok tutucudan sökülmediyse devam doğru yerden kesilir.'; $lu.ForeColor = $cSoluk; $lu.Font = New-Object System.Drawing.Font('Segoe UI', 9.5); $lu.SetBounds(24, 362, 570, 24); $f.Controls.Add($lu)
+    [void](& $mk "İŞLEMİN BAŞINDAN`r`n(son güvenli noktadan)" 24 290 300 64 $cSoluk 'guvenli')
+    [void](& $mk 'BAŞTAN BAŞLAT' 334 290 262 64 $cSoluk 'bastan')
+    [void](& $mk 'Vazgeç' 24 364 572 50 $cSoluk 'iptal')
+    $lu = New-Object System.Windows.Forms.Label; $lu.Text = 'Blok tutucudan sökülmediyse devam doğru yerden kesilir.'; $lu.ForeColor = $cSoluk; $lu.Font = New-Object System.Drawing.Font('Segoe UI', 9.5); $lu.SetBounds(24, 428, 570, 24); $f.Controls.Add($lu)
     [void]$f.ShowDialog($form)
     return @{ Sec = [string]$f.Tag; Takim = $cT.SelectedIndex }
 }
@@ -3283,7 +3291,7 @@ function Btn-Baslat-Ic {
     $dk = Devam-Oku
     if ($dk -and ([string]$dk.Dosya -eq $script:SeciliDosya -or [string]$dk.Kaynak -eq $script:SeciliDosya) -and -not $script:BekleyenBlok) {
         $ds = Devam-Diyalog $dk
-        if ($ds.Sec -eq 'guvenli' -or $ds.Sec -eq 'yakin') { Devam-Baslat $dk $ds.Sec $ds.Takim; return }
+        if (@('tam', 'guvenli', 'yakin') -contains $ds.Sec) { Devam-Baslat $dk $ds.Sec $ds.Takim; return }
         if ($ds.Sec -ne 'bastan') { return }
         Devam-Sil
     }

@@ -698,7 +698,11 @@ function Devam-Oku {
 }
 function Devam-Sil { try { if ([System.IO.File]::Exists($DevamDosyasi)) { [System.IO.File]::Delete($DevamDosyasi) } } catch { } }
 
-# Asıl programdan devam programı üretir. $mod: 'guvenli' (son geri çekilme noktasından) ya da 'yakin' (~1 dk geriden)
+# Asıl programdan devam programı üretir. $mod:
+#   'tam'     (önerilen) durduğu yerin ~10 sn gerisinden: güvenli yükseklikte X/Y'ye gider, yavaşça o noktanın Z'sine iner
+#   'yakin'   ~1 dk geriden, aynı yaklaşma
+#   'guvenli' son GOSUB Z_SAFE satırından (işlem başı). Bu CAM çıktısında bir işlem 20 000+ satır sürebildiği için
+#             eskiden 'kaldığı yerden' seçilince işin büyük kısmı (ilk işlemde neredeyse baştan) yeniden kazınıyordu.
 function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
     $L = [System.IO.File]::ReadAllLines($kaynak)
     $idx = [math]::Min($L.Length - 1, [math]::Max(0, $satir - 1))
@@ -706,9 +710,12 @@ function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
     $r = 0
     for ($i = $idx; $i -ge 0; $i--) { if ($L[$i] -match '(?i)^\s*(N\d+\s*)?GOSUB\s+Z_SAFE\b') { $r = $i; break } }
     $q = -1
-    if ($mod -eq 'yakin' -and $analiz -and $analiz.Kumulatif.Length -eq $L.Length) {
-        $hedef = $analiz.Kumulatif[$idx] - 60
+    if (($mod -eq 'yakin' -or $mod -eq 'tam') -and $analiz -and $analiz.Kumulatif.Length -eq $L.Length) {
+        $geriSn = 60; if ($mod -eq 'tam') { $geriSn = 10 }
+        $hedef = $analiz.Kumulatif[$idx] - $geriSn
         for ($i = $r + 1; $i -le $idx; $i++) { if ($analiz.Kumulatif[$i] -ge $hedef) { $q = $i; break } }
+    } elseif ($mod -eq 'tam' -and $idx - 40 -gt $r) {
+        $q = $idx - 40   # süre analizi yoksa ~40 satır geriden
     }
     $son = if ($q -gt $r) { $q } else { $r }      # bu satıra kadar (hariç) modal durum toplanır
     # 2) modal durum: frez, devir, iş mili, soğutma, ilerleme, A/B, X/Y/Z, hareket kipi

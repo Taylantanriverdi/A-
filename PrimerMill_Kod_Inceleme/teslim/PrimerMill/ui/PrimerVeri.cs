@@ -256,7 +256,7 @@ namespace PrimerUI
     /// <summary>Yarım kalan iş diyaloğu sonucu.</summary>
     public class DevamSonucu
     {
-        /// <summary>"guvenli", "yakin", "bastan" ya da "iptal".</summary>
+        /// <summary>"tam" (önerilen, ~10 sn geriden), "yakin", "guvenli" (işlem başı), "bastan" ya da "iptal".</summary>
         public string Secim = "iptal";
         /// <summary>İş milinde takılı frez (0 = yok).</summary>
         public int Takim;

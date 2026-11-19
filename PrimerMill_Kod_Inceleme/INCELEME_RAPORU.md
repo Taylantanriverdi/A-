@@ -100,6 +100,7 @@ Windows PowerShell 5.1 ile çalıştırılmadı. İlk iş olarak Windows'ta çal
 | 17 | SK-16: yuva ayarı sihirbazında YAKLAŞ yalnız GİT noktasından X/Y ≤ 2 mm, Z/A/B ≤ 0.05 sapmada | GİT → 1 mm jog ile ortala → YAKLAŞ iner; 3 mm jog ya da Z− sonrası reddedilmeli |
 | 18 | Yeni panel, ekran ölçeği %125/%150 | Windows'ta ekran turu: bulanıklık, taşma yok |
 | 19 | Elle frez değişimi yeni sıra (kullanıcı isteği, makro sürüm 5): 1) PENS'İ AÇ 2) TAKTIM · pens kapanır, hareket yok 3) KAZIMAYA BAŞLA 4) makine Z'yi kaldırır, sensörde ölçer ve onay sormadan kazımaya başlar | Simülasyonda ve makinede elle modda bir iş: TAKTIM'dan sonra makine KIPIRDAMAMALI; KAZIMAYA BAŞLA'dan sonra ölçüm ve kazıma kesintisiz olmalı |
+| 20 | Kaldığı yerden devam (kullanıcı bildirimi: "önerilen" seçenek işi neredeyse baştan kazıyordu): önerilen kip artık durduğu yerin ~10 sn gerisinden başlar; güvenli Z'de A/B ve X/Y'ye gider, o noktanın Z'sine F≤600 ile iner. Eski davranış "İŞLEMİN BAŞINDAN" olarak duruyor | Simülasyonda bir işi ortasında DURDUR → BAŞLAT → KALDIĞI YERDEN: devam programı durduğu satırın hemen gerisinden başlamalı (Kayıtlar'da "asıl dosyada satır …"). Makinede ilk denemeyi boşta (frezsiz, blok takılı değilken) %10–30 hızla yapın, iniş noktasının doğru olduğunu görün |
 
 ## 6. Uygulanmayan öneriler
 

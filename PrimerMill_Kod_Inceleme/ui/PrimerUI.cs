@@ -4640,7 +4640,7 @@ namespace PrimerUI
         }
 
         // ------------------------------------------------------------------ Yarım kalan iş
-        /// <summary>Yarım kalan iş: "guvenli", "yakin", "bastan", "iptal" + iş milindeki takım.</summary>
+        /// <summary>Yarım kalan iş: "tam", "yakin", "guvenli", "bastan", "iptal" + iş milindeki takım.</summary>
         public static DevamSonucu Devam(string dosya, string bilgi, int takim)
         {
             var r = new DevamSonucu { Takim = Math.Max(0, Math.Min(6, takim)) };
@@ -4658,10 +4658,10 @@ namespace PrimerUI
                 b.Tiklandi += delegate { r.Secim = sec; r.Takim = t.Secili; f.Sonuc = 1; f.Close(); };
                 return b;
             };
-            iz.Ekle(mk("KALDIĞI YERDEN DEVAM", "son güvenli noktadan · önerilen", Rol.Basari, "guvenli"), 0, 3);
+            iz.Ekle(mk("KALDIĞI YERDEN DEVAM", "~10 sn geriden, yukarıdan iner · önerilen", Rol.Basari, "tam"), 0, 3);
             iz.Ekle(mk("YAKIN NOKTADAN", "~1 dk geriden, yukarıdan iner", Rol.Vurgu, "yakin"), 1, 3);
-            iz.Ekle(mk("BAŞTAN BAŞLAT", "", Rol.Normal, "bastan"), 0, 4);
-            iz.Ekle(new Yazi("Blok tutucudan sökülmediyse devam doğru yerden keser.", 10f, false, YaziRol.Soluk) { Sar = true }, 1, 4);
+            iz.Ekle(mk("İŞLEMİN BAŞINDAN", "son güvenli noktadan", Rol.Normal, "guvenli"), 0, 4);
+            iz.Ekle(mk("BAŞTAN BAŞLAT", "", Rol.Normal, "bastan"), 1, 4);
             f.DugmeEkle(0, "VAZGEÇ", Rol.Normal, Simge.Kapat, -1);
             f.DugmeYukseklik = 60;
             Goster(f);
