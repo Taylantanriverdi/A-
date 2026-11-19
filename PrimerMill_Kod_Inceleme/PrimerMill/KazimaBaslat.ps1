@@ -6417,21 +6417,31 @@ function Eding-Baslangic-Kaldir {
             } catch { [Kayit]::Yaz("BAŞLANGIÇ: $d kaldırılamadı (yönetici izni gerekebilir): $($_.Exception.Message)") }
         }
     }
-    foreach ($kok in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Run', 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run', 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run')) {
+    # PS-02: panel 32 bit çalıştığı için HKLM:\Software\... WOW6432Node'a yönlenir; gerçek 64 bit HKLM Run görünümü
+    # RegistryKey.OpenBaseKey(LocalMachine, Registry64) ile ayrıca taranır. PS-09: yedek kaydı açık UTF-8 ile eklenir.
+    $kayitDosya = [System.IO.Path]::Combine($ScriptKlasor, 'baslangic_yedek_kayit.txt')
+    $edingMi = { param($v) ($v -and ($v.IndexOf($ek, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or $v -match "(?i)\\$($script:EdingExeAd)\.exe")) }
+    $gorunumler = @(
+        @{ Ad = 'HKCU\...\Run'; Kok = [Microsoft.Win32.RegistryHive]::CurrentUser; Gorunum = [Microsoft.Win32.RegistryView]::Default },
+        @{ Ad = 'HKLM\...\Run (32 bit)'; Kok = [Microsoft.Win32.RegistryHive]::LocalMachine; Gorunum = [Microsoft.Win32.RegistryView]::Registry32 },
+        @{ Ad = 'HKLM\...\Run (64 bit)'; Kok = [Microsoft.Win32.RegistryHive]::LocalMachine; Gorunum = [Microsoft.Win32.RegistryView]::Registry64 })
+    foreach ($g in $gorunumler) {
+        $taban = $null; $rk = $null
         try {
-            $k = Get-ItemProperty -Path $kok -ErrorAction Stop
-            foreach ($pr in $k.PSObject.Properties) {
-                if ($pr.Name -like 'PS*') { continue }
-                $v = [string]$pr.Value
-                if ($v -and ($v.IndexOf($ek, [StringComparison]::OrdinalIgnoreCase) -ge 0 -or $v -match "(?i)\\$($script:EdingExeAd)\.exe")) {
-                    try {
-                        Add-Content -Path ([System.IO.Path]::Combine($ScriptKlasor, 'baslangic_yedek_kayit.txt')) -Value "$kok | $($pr.Name) | $v"
-                        Remove-ItemProperty -Path $kok -Name $pr.Name -ErrorAction Stop
-                        [Kayit]::Yaz("BAŞLANGIÇ: Eding'in Run kaydı kaldırıldı: $kok\$($pr.Name) = $v")
-                    } catch { [Kayit]::Yaz("BAŞLANGIÇ: Run kaydı kaldırılamadı ($kok\$($pr.Name)): $($_.Exception.Message)") }
-                }
+            $taban = [Microsoft.Win32.RegistryKey]::OpenBaseKey($g.Kok, $g.Gorunum)
+            try { $rk = $taban.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run', $true) } catch { $rk = $taban.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run', $false) }   # yönetici değilse salt okunur
+            if ($null -eq $rk) { continue }
+            foreach ($ad in @($rk.GetValueNames())) {
+                $v = [string]$rk.GetValue($ad)
+                if (-not (& $edingMi $v)) { continue }
+                try {
+                    [System.IO.File]::AppendAllText($kayitDosya, "$($g.Ad) | $ad | $v`r`n", [System.Text.Encoding]::UTF8)
+                    $rk.DeleteValue($ad)
+                    [Kayit]::Yaz("BAŞLANGIÇ: Eding'in Run kaydı kaldırıldı: $($g.Ad)\$ad = $v")
+                } catch { [Kayit]::Yaz("BAŞLANGIÇ: Run kaydı kaldırılamadı ($($g.Ad)\$ad): $($_.Exception.Message)") }
             }
-        } catch { }
+        } catch { [Kayit]::Yaz("BAŞLANGIÇ: $($g.Ad) okunamadı: $($_.Exception.Message)") }
+        finally { if ($rk) { $rk.Close() }; if ($taban) { $taban.Close() } }
     }
 }
 try { Eding-Baslangic-Kaldir } catch { [Kayit]::Yaz("BAŞLANGIÇ: Eding kaydı kontrol edilemedi: $($_.Exception.Message)") }
