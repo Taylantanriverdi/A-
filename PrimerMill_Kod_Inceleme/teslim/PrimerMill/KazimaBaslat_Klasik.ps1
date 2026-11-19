@@ -46,7 +46,7 @@ $script:TekMutex = New-Object System.Threading.Mutex($true, 'Local\PrimerMillPan
 if (-not $script:TekYeni) {
     # Arkada açık (görünmeyen / donmuş) bir kopya varsa sessizce çıkmak yerine sor
     $eski = @()
-    try { $eski = @(Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'KazimaBaslat\.ps1' -and $_.ProcessId -ne $PID }) } catch { }
+    try { $eski = @(Get-WmiObject Win32_Process -Filter "Name='powershell.exe'" | Where-Object { $_.CommandLine -match 'KazimaBaslat(_Klasik)?\.ps1' -and $_.ProcessId -ne $PID }) } catch { }
     $sahte = New-Object System.Windows.Forms.Form
     $sahte.TopMost = $true; $sahte.ShowInTaskbar = $false; $sahte.StartPosition = 'CenterScreen'; $sahte.Size = New-Object System.Drawing.Size(1, 1); $sahte.Show(); $sahte.Activate()
     $c = [System.Windows.Forms.MessageBox]::Show($sahte, "PrimerMill zaten açık (arkada çalışıyor$(if ($eski.Count) { ", $($eski.Count) kopya" })).`r`n`r`nEskisi kapatılıp PrimerMill yeniden açılsın mı?", 'PrimerMill', 'YesNo', 'Question')
