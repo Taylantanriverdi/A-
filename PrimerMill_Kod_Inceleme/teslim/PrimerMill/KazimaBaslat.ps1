@@ -127,6 +127,7 @@ if ($script:Demo) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', 'Demo.ps1'
 $script:PanelSurum = 'PrimerMill 2'
 
 Tercih-Baslangic
+if ($script:Demo) { Demo-Makine-Hazirla }
 try { Windows-Baslangic-Ayarla } catch { }
 try { Eding-Baslangic-Kaldir } catch { [Kayit]::Yaz("BAŞLANGIÇ: Eding kaydı kontrol edilemedi: $($_.Exception.Message)") }
 

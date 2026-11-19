@@ -29,12 +29,27 @@ function Eding-Yeniden {
     try { [void][Eding]::CncDisConnectServer() } catch { }
     $script:Bagli = $false
     [Eding]::SimSifirla()
+    Demo-Makine-Hazirla
     $script:AcilisYeniden = $true   # GV-09: yeniden açılışta otomatik home yok (gerçek davranışla aynı)
     $script:DemoEdingAcik = $false
     Eding-Baslat
     $script:AcilisDurum = 'bekliyor'
 }
 function Acilis-Eding-Sifirla { }
+
+# Demo makinesi: yuvalar / sensör / değişim noktası "doğrulanmış" varsayılanlarla kayıtlı başlar (yalnız EdingSim belleğinde),
+# böylece BAŞLAT ve takım değişimi denenebilir. İş satırları gözle izlenebilsin diye yavaş (saniyede 25 satır).
+function Demo-Makine-Hazirla {
+    try {
+        [Eding]::SimSatirHizi = 25.0
+        [Eding]::SimDegiskenYaz(4010, $RafVarsayilan.X)
+        for ($n = 1; $n -le 6; $n++) { [Eding]::SimDegiskenYaz(4010 + $n, $RafVarsayilan.Y1 + $RafAralik[$n]) }
+        [Eding]::SimDegiskenYaz(4017, $RafVarsayilan.A); [Eding]::SimDegiskenYaz(4018, $RafVarsayilan.B)
+        [Eding]::SimDegiskenYaz(4020, [Eding]::CncGetVariable(5221) - $RafSensorXFark); [Eding]::SimDegiskenYaz(4021, [Eding]::CncGetVariable(5222))
+        [Eding]::SimDegiskenYaz(4031, $RafDegisimVarsayilan.X); [Eding]::SimDegiskenYaz(4032, $RafDegisimVarsayilan.Y); [Eding]::SimDegiskenYaz(4033, $RafDegisimVarsayilan.Z)
+        [Kayit]::Yaz('DEMO: sahte makinede yuvalar / sensör / değişim noktası doğrulanmış değerlerle dolduruldu')
+    } catch { }
+}
 function Macro-Pens-Yamasi { }
 function Windows-Baslangic-Ayarla { }
 function Eding-Baslangic-Kaldir { }

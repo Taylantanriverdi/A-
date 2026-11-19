@@ -1,4 +1,4 @@
-# PrimerMill 2 — Arayüz sözleşmesi (`ui/PrimerUI.cs`)
+﻿# PrimerMill 2 — Arayüz sözleşmesi (`ui/PrimerUI.cs`)
 
 Bu belge görünüm katmanı ile denetleyici (PowerShell) arasındaki tam sözleşmedir. Tasarım: `TASARIM.md`. Özellik listesi: `OZELLIK_ENVANTERI.md`.
 
@@ -10,8 +10,9 @@ Bu belge görünüm katmanı ile denetleyici (PowerShell) arasındaki tam sözle
 ## 1. Yükleme (PowerShell 5.1, 32 bit)
 
 ```powershell
-Add-Type -Path "$PSScriptRoot\..\ui\PrimerUI.cs" `
-    -ReferencedAssemblies System.Windows.Forms, System.Drawing, System.Core
+# Veri sözleşmesi (MakineDurumu, KomutArgs ...) ui/PrimerVeri.cs'te; iki dosya birlikte derlenir
+Add-Type -Path "$PSScriptRoot\..\ui\PrimerVeri.cs", "$PSScriptRoot\..\ui\PrimerUI.cs" `
+    -ReferencedAssemblies System.Windows.Forms, System.Drawing, System.Core -IgnoreWarnings
 # (Add-Type -TypeDefinition (Get-Content ... -Raw -Encoding UTF8) da olur)
 [System.Windows.Forms.Application]::EnableVisualStyles()
 $kabuk = New-Object PrimerUI.Kabuk
@@ -95,7 +96,7 @@ Kalan kartında dosya uyarı/hata sayısı (`⚠ 2 UYARI`) dokunulunca görünü
 | `takim.olc` | — | TAKIM BOYUNU ÖLÇ (ayrıca Kalibrasyon kartı ve sihirbazlar) | Normal |
 | `takim.asinma` | — | AŞINMA KONTROLÜ (M100) | Normal |
 | `takim.bosmu` | — | İŞ MİLİ BOŞ MU? | Normal |
-| `yuva.git` | `T1`…`T6`, `SENSÖR`, `MANUEL` | YUVAYA GİT, Yuva ayarı › GİT | **Tehlikeli** (hareket) |
+| `yuva.git` | `T1`…`T6`, `SENSÖR`, `MANUEL`; Yuva ayarı sayfasından `ayar:` önekiyle (`ayar:T3`) | YUVAYA GİT, Yuva ayarı › GİT | **Tehlikeli** (hareket). Önek yok: eski TAKIM sekmesi (`Yuvaya-Git`), `ayar:`: yuva ayarı sihirbazı (`Yuva-Git`, kaydedilmemiş yeni değerlerle) |
 | `yuva.yaklas` | aynı | YAKLAŞ (#4001) | **Tehlikeli** |
 | `eksen.yukari` | — | YUKARI / İŞ MİLİ EN ÜSTE | Normal |
 | `pens.ac` | — | PENS AÇ (her yerde kırmızı çerçeveli) | **Tehlikeli** (KU-01) |
