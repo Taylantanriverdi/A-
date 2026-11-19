@@ -23,6 +23,8 @@ if ($acik.Count) {
 
 Write-Host "`n3) PrimerMill bu pencerede calistiriliyor (hata olursa asagida gorunur)..." -ForegroundColor Cyan
 try { & $dosya } catch { Write-Host "`nHATA: $($_.Exception.Message)" -ForegroundColor Red; Write-Host $_.InvocationInfo.PositionMessage -ForegroundColor Red; Write-Host $_.ScriptStackTrace }
+# ED-10 sonrası panel $Error'ı her saniye okuyup boşaltır: çalışma sırasındaki hatalar loglar\Panel_*.log dosyasındadır
+Write-Host ("   (Panel calisirken yakalanan program hatalari: " + (Join-Path $klasor 'loglar') + "\Panel_*.log)") -ForegroundColor Gray
 foreach ($e in $Error) { if ($e.InvocationInfo -and $e.InvocationInfo.ScriptName -like '*KazimaBaslat*') { Write-Host ("   satir {0}: {1}" -f $e.InvocationInfo.ScriptLineNumber, $e.Exception.Message) -ForegroundColor Yellow } }
 Stop-Transcript | Out-Null
 Write-Host "`nRapor masaustunde: $rapor" -ForegroundColor White
