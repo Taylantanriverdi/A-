@@ -3210,6 +3210,7 @@ function Btn-Baslat-Ic {
     if (-not (Hazir-Mi 'Başlat')) { return }
     if ((Calisiyor-Mu)) { [Kayit]::Show('Makine şu an çalışıyor.', 'Başlat', 'OK', 'Warning') | Out-Null; return }
     if (-not (Makro-Hazir-Mi 'Başlat')) { return }
+    if ([System.IO.Path]::GetFileName($script:SeciliDosya) -like 'PM_kalibrasyon_otomatik*' -and -not (OtoKal-Prob-Gecerli-Mi 'Başlat')) { return }   # K8
     if (-not (Takim-Kapisi 'Başlat')) { return }
 
     # Bu dosyanın yarım kalmış kaydı varsa: kaldığı yerden mi, baştan mı?
@@ -5280,6 +5281,9 @@ $OkGecmis = [System.IO.Path]::Combine($ScriptKlasor, 'oto_kalibrasyon_gecmisi.cs
 $script:OkSonuc = $null
 
 function OtoKal-NC-Uret([double]$T, [int]$kimlik) {
+    # K8 / KL-01: prob temas etmezse ilk G38.2 hedefi yüzeyin 6 mm (eğik noktalarda 8.7 mm) altında; hata denetimi hareketten sonra.
+    # Arama mesafesi ve hızları BİLEREK değiştirilmedi (makinede doğrulanmadan); öneri INCELEME_RAPORU.md KL-01: ilk noktada hedef T/2-2 ve F60,
+    # diğerlerinde beklenen temas - 1.5 mm. Şimdilik koruma: son 10 dakikada başarılı prob testi olmadan program hazırlanmaz / başlatılmaz.
     $ci = [System.Globalization.CultureInfo]::InvariantCulture
     $f = { param($v) ([double]$v).ToString('0.###', $ci) }
     $sb = New-Object System.Text.StringBuilder
@@ -5575,6 +5579,7 @@ $tmrProb.Add_Tick({
             } else { $lblOkProb.Text = 'Kablonun ucunu iş miline / pime değdir...'; $lblOkProb.ForeColor = $cAltinAc; return }
         }
         $temas = ("$($durum[$id])" -eq "$($script:Tercih.ProbAktif)")
+        if ($temas) { $script:ProbTemasAni = Get-Date }   # K8: bu oturumda temas görüldü
         $lblOkProb.Text = if ($temas) { "TEMAS VAR   (giriş $id)" } else { "TEMAS YOK   (giriş $id)" }
         $lblOkProb.ForeColor = if ($temas) { $cYesil } else { $cSoluk }
     } catch { $tmrProb.Stop(); $lblOkProb.Text = "Giriş okunamadı: $($_.Exception.Message)"; $lblOkProb.ForeColor = $cKirmizi }
@@ -5588,6 +5593,20 @@ function OtoKal-Prob-Testi {
     $tmrProb.Start()
 }
 
+# K8 (KL-01): otomatik kalibrasyon yalnız bu oturumda, son 10 dakika içinde prob testinde TEMAS görüldüyse ve şu an temas YOKSA hazırlanır / başlar
+$script:ProbTemasAni = [datetime]::MinValue
+function OtoKal-Prob-Gecerli-Mi([string]$islem) {
+    $yas = ((Get-Date) - $script:ProbTemasAni).TotalMinutes
+    if ($script:ProbTemasAni -eq [datetime]::MinValue -or $yas -gt 10) {
+        [Kayit]::Show("Otomatik kalibrasyondan önce PROB TESTİ zorunlu (son 10 dakika içinde).`r`n`r`nAyarlar › OTO KALİBRASYON › 'Prob testini başlat', kablonun ucunu pime / diske değdir: 'TEMAS VAR' görülmeli.`r`nTemas algılanmazsa pim titanyuma sürülür.`r`n`r`n$islem yapılmadı.", $islem, 'OK', 'Warning') | Out-Null
+        return $false
+    }
+    if ((OtoKal-Prob-Aktif-Mi) -ne $false) {
+        [Kayit]::Show("Prob şu an TEMAS gösteriyor ya da prob girişi okunamıyor.`r`nPim diske değmiyorken 'TEMAS YOK' görülmeli (izolasyon / kablo).`r`n`r`n$islem yapılmadı.", $islem, 'OK', 'Warning') | Out-Null
+        return $false
+    }
+    return $true
+}
 function OtoKal-Prob-Aktif-Mi {
     # Öğrenilmiş giriş varsa: şu an temas var mı? (bilinmiyorsa $null)
     $id = 0; if (-not [int]::TryParse("$($script:Tercih.ProbIo)", [ref]$id) -or $id -le 0) { return $null }
@@ -5601,6 +5620,7 @@ function OtoKal-Hazirla {
     if ($null -eq $T -or $T -lt 8 -or $T -gt 30) { [Kayit]::Show('Titanyum diskin kalınlığını mikrometreyle ölçüp yaz (ör. 10.02).', 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
     if (Is-Suruyor-Uyari 'Otomatik kalibrasyon') { return }
     if (-not (Baglan)) { [Kayit]::Show("Eding'e bağlanılamadı.", 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
+    if (-not (OtoKal-Prob-Gecerli-Mi 'Otomatik kalibrasyon')) { return }
     $aktif = OtoKal-Prob-Aktif-Mi
     if ($aktif -eq $true) {
         [Kayit]::Show("Prob ŞU AN temas gösteriyor ama pim diske değmiyor.`r`n`r`nDisk tutucuya / şaseye değiyor (izolasyon bozuk) ya da kablo kısa devre. Düzeltmeden ölçüm başlatılamaz.", 'Otomatik kalibrasyon', 'OK', 'Error') | Out-Null; return
