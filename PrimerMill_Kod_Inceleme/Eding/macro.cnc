@@ -403,7 +403,7 @@ endsub
 
 ;PrimerMill: panel bu macronun yuklu oldugunu buradan anlar
 sub pm_surum
-	#4038 = 3
+	#4038 = 4
 endsub
 
 ;PrimerMill: panelden PENS AC -> pens acilir, makine frezin cikarildigini bilir (T0)
