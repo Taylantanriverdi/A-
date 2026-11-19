@@ -57,6 +57,18 @@ export function createPanelHost(root, ctx, navParent) {
   tap(fbtn, () => api.toggle('finance'));
   nav.appendChild(fbtn);
   navBtns.finance = fbtn;
+  // Gece İstilası: Askerler düğmesi (panel 'soldier' ui/soldierPanel.js'te); yalnız mod açıkken görünür
+  const sbtn = h('button', 'nav-btn soldier-btn glass interactive', `<span class="ic">${ICON.shield}</span><span class="lbl">${STR.nav.soldier}</span>`);
+  sbtn.type = 'button';
+  sbtn.hidden = true;
+  sbtn.dataset.panel = 'soldier';
+  sbtn.title = STR.nav.soldier;
+  sbtn.setAttribute('aria-label', STR.nav.soldier);
+  sbtn.setAttribute('aria-haspopup', 'dialog');
+  shield(sbtn);
+  tap(sbtn, () => api.toggle('soldier'));
+  nav.appendChild(sbtn);
+  navBtns.soldier = sbtn;
   const fbadge = fbtn.querySelector('.nbadge');
   navParent.insertBefore(nav, navParent.firstChild);
 
@@ -112,6 +124,12 @@ export function createPanelHost(root, ctx, navParent) {
     /** HUD portre düğmesinin içeriğini yazar (workerPanel.hudPortrait). */
     setWorkerPortrait(html) { const c = wbtn.querySelector('.wpic'); if (c) c.innerHTML = html; },
     nav,
+    /** Gece İstilası modu açık/kapalı: Askerler düğmesi + açık panel kapanır. */
+    setRaidMode(on) {
+      if (sbtn.hidden === !on) return;
+      sbtn.hidden = !on;
+      if (!on && current === 'soldier') api.close();
+    },
     /** Finans düğmesi rozeti: n>0 sayı gösterir, urgent → amber. */
     setFinanceBadge(n, urgent) {
       const t = n > 0 ? String(n > 9 ? '9+' : n) : '';

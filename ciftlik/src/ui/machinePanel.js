@@ -5,6 +5,7 @@ import { MACHINES, MACHINE_RULES, RECIPES } from '../data/recipes.js';
 import { ITEMS } from '../data/items.js';
 import { STR } from './strings.js';
 import { h, setText } from './frame.js';
+import { createRepairStrip } from './repair.js';
 import { tap } from './touch.js';
 import { formatMoney } from './hud.js';
 import { countItem } from './toolbar.js';
@@ -46,6 +47,7 @@ export function createMachinePanel(ctx) {
   const recBox = $('.m-recipes'), qBox = $('.m-queue'), outBox = $('.m-out'), chips = $('.fchips');
   const collectBtn = $('.a-collect'), collectN = $('.a-collect .n');
 
+  const repairStrip = createRepairStrip(ctx, el.querySelector('.bld-body'));
   let type = null;
   let dirty = true;
   let placedId = null;
@@ -192,6 +194,7 @@ export function createMachinePanel(ctx) {
   function render() {
     if (!type) return;
     const m = machine();
+    repairStrip.update(placedId != null ? placedId : (m ? m.placedId ?? null : null));
     if (dirty) {
       dirty = false;
       secs.empty.hidden = !!m;

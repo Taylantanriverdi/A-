@@ -6,6 +6,7 @@ import { BUILDINGS, TROUGH } from '../data/buildings.js';
 import { ITEMS } from '../data/items.js';
 import { STR } from './strings.js';
 import { h, setText } from './frame.js';
+import { createRepairStrip } from './repair.js';
 import { tap } from './touch.js';
 import { formatMoney } from './hud.js';
 import { countItem } from './toolbar.js';
@@ -85,6 +86,7 @@ export function createBuildingPanel(ctx) {
   };
   const list = $('.alist'), none = $('.a-none'), aTitle = $('.a-title'), buylist = $('.buylist');
 
+  const repairStrip = createRepairStrip(ctx, el.querySelector('.bld-body'));
   let arg = null;          // {buildingType, placedId}
   let dirty = true;
   let feedPick = null;     // seçili yem itemId
@@ -264,6 +266,7 @@ export function createBuildingPanel(ctx) {
   }
 
   function render() {
+    if (arg) repairStrip.update(arg.placedId);
     if (!dirty || !arg) return;
     dirty = false;
     const b = building();

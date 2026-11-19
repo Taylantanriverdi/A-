@@ -37,10 +37,15 @@ export function createSettings(root, ctx, moneyWrap) {
       <div class="label l2"><b>${STR.music}</b><span class="num v-music"></span></div>
       <div class="slider"><input type="range" min="0" max="100" step="1" data-k="music" aria-label="${STR.music}"></div>
     </section>
+    <section class="s-raid">
+      <div class="label"><b>${STR.raidTitle}</b><span class="sub raid-now"></span></div>
+      <button type="button" class="sw raid-sw" role="switch" aria-checked="false" aria-label="${STR.raidTitle}"><i class="knob"></i><span class="swt">${STR.raidDesc}</span></button>
+    </section>
     <section class="newgame">
       <button type="button" class="danger first">${STR.newGame}</button>
       <div class="confirm">
         <p>${STR.newGameAsk}</p>
+        <button type="button" class="sw ng-raid" role="switch" aria-checked="false" aria-label="${STR.raidTitle}"><i class="knob"></i><span class="swt"><b>${STR.raidTitle}</b> ${STR.raidDesc}</span></button>
         <div class="row"><button type="button" class="ghost cancel">${STR.newGameCancel}</button><button type="button" class="danger solid yes">${STR.newGameConfirm}</button></div>
       </div>
       <p class="hint">${STR.newGameHint}</p>
@@ -55,6 +60,12 @@ export function createSettings(root, ctx, moneyWrap) {
   const ranges = [...panel.querySelectorAll('input[type=range]')];
   const vLabels = { sound: panel.querySelector('.v-sound'), music: panel.querySelector('.v-music') };
   const ng = panel.querySelector('.newgame');
+  const raidSw = panel.querySelector('.raid-sw');
+  const raidNow = panel.querySelector('.raid-now');
+  const ngRaid = panel.querySelector('.ng-raid');
+  let ngRaidOn = false;
+  let localRaids = null;
+  const raidsOn = () => (localRaids != null ? localRaids : !!(state.settings && state.settings.raids));
   let resolvedLevel = null; // settings:quality ile gelen gerçek seviye
   let localQuality = null;  // optimistik seçim (state güncellenene kadar)
   let open = false;
@@ -80,6 +91,12 @@ export function createSettings(root, ctx, moneyWrap) {
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     }
     qNow.textContent = q === 'auto' && resolvedLevel ? STR.qualityAutoNow(STR.qualityOpts[resolvedLevel] || resolvedLevel) : '';
+    const ro = raidsOn();
+    raidSw.setAttribute('aria-checked', ro ? 'true' : 'false');
+    raidSw.classList.toggle('on', ro);
+    raidNow.textContent = ro ? STR.raidOn : STR.raidOff;
+    ngRaid.setAttribute('aria-checked', ngRaidOn ? 'true' : 'false');
+    ngRaid.classList.toggle('on', ngRaidOn);
     for (const r of ranges) {
       r.value = String(Math.round(val01(r.dataset.k) * 100));
       paintRange(r);
@@ -94,6 +111,12 @@ export function createSettings(root, ctx, moneyWrap) {
       syncFromState();
     });
   }
+  tap(raidSw, () => {
+    localRaids = !raidsOn();
+    bus.emit('settings:set', { key: 'raids', value: localRaids });
+    syncFromState();
+  });
+  tap(ngRaid, () => { ngRaidOn = !ngRaidOn; syncFromState(); });
   for (const r of ranges) {
     r.addEventListener('input', () => paintRange(r));
     // Kaydetme isteği spam olmasın: değer bırakınca gönderilir
@@ -104,6 +127,8 @@ export function createSettings(root, ctx, moneyWrap) {
   function resetConfirm() { clearTimeout(confirmTimer); ng.classList.remove('asking'); }
   tap(panel.querySelector('.danger.first'), () => {
     ng.classList.add('asking');
+    ngRaidOn = raidsOn();
+    syncFromState();
     clearTimeout(confirmTimer);
     confirmTimer = setTimeout(resetConfirm, CONFIRM_MS);
     panel.querySelector('.cancel').focus({ preventScroll: true });
@@ -112,6 +137,7 @@ export function createSettings(root, ctx, moneyWrap) {
   tap(panel.querySelector('.yes'), () => {
     if (!ng.classList.contains('asking')) return;
     resetConfirm();
+    bus.emit('settings:set', { key: 'raids', value: ngRaidOn }); // yeni oyun seçimi; ayar sıfırlamadan sonra da korunur
     bus.emit('save:reset', {});
   });
   tap(panel.querySelector('.close'), () => api.close());
@@ -123,7 +149,7 @@ export function createSettings(root, ctx, moneyWrap) {
     open() {
       if (open) return;
       open = true;
-      localQuality = null;
+      localQuality = null; localRaids = null;
       syncFromState();
       lastFocus = document.activeElement && document.activeElement.matches && document.activeElement.matches(':focus-visible') ? document.activeElement : null;
       backdrop.classList.add('open');

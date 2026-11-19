@@ -156,6 +156,7 @@ export function createBuildMode(root, ctx, opts) {
   let lastCmd = '';
   let hoverT = null;
   let dirty = true, catDirty = true, modeDirty = true;
+  let shownRaids = null;
   let shownHint = '', shownMoney = -1;
 
   const placedById = (id) => (state.placed || []).find((p) => p.id === id) || null;
@@ -395,6 +396,13 @@ export function createBuildMode(root, ctx, opts) {
       render(true);
     },
     toggle() { if (active) api.exit(); else api.enter(); },
+    /** Katalog sekmesini seç (raidOnly kategoriler mod kapalıyken yok sayılır). */
+    openCategory(id) {
+      const c = BUILD_CATS.find((x) => x.id === id);
+      if (!c || (c.raidOnly && !(state.settings && state.settings.raids))) return;
+      if (!active) api.enter();
+      cat = id; catDirty = true;
+    },
     onTap, onHover, onResult,
     markDirty() { dirty = true; },
     /** Esc: önce geçici durum (balon/onay/taşıma), sonra çıkış. */
@@ -435,8 +443,13 @@ export function createBuildMode(root, ctx, opts) {
       modeDirty = false;
       for (const m of MODES) { modeBtns[m].classList.toggle('on', m === mode); modeBtns[m].setAttribute('aria-pressed', m === mode ? 'true' : 'false'); }
     }
+    const raids = !!(state.settings && state.settings.raids);
+    if (raids !== shownRaids) { shownRaids = raids; catDirty = true; }
     if (catDirty) {
       catDirty = false;
+      const catOk = (id) => { const c = BUILD_CATS.find((x) => x.id === id); return !(c && c.raidOnly) || raids; };
+      if (!catOk(cat)) cat = BUILD_CATS.find((c) => !c.raidOnly).id;
+      for (const c of BUILD_CATS) { tabBtns[c.id].hidden = !catOk(c.id); }
       for (const c of BUILD_CATS) { const on = c.id === cat; tabBtns[c.id].classList.toggle('on', on); tabBtns[c.id].setAttribute('aria-selected', on ? 'true' : 'false'); }
       for (const id in cards) cards[id].el.hidden = PLACEABLES[id].cat !== cat;
       list.scrollLeft = 0;
