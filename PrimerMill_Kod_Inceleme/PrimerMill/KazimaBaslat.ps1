@@ -4677,7 +4677,8 @@ function Yuva-Git {
 
 function Yuva-Yaklas {
     if (-not (Hazir-Hareket 'Yaklaş')) { return }
-    if ($script:YuvaSecili -ne 'Sensör' -and [Eding]::CncGetCurrentToolNumber() -ne 0) { [Kayit]::Show('İş milinde freze varken yuvaya inilemez (çarpar). Önce bırak (T0) ya da pensi açıp frezi elle çıkar.', 'Yaklaş', 'OK', 'Warning') | Out-Null; return }
+    # K7 (GV-03): Sensör dahil her noktada iş milinde frez varken inilmez (#4001 sensör ölçüm aralığının çok altında: frez sensöre basar)
+    if ([Eding]::CncGetCurrentToolNumber() -ne 0) { [Kayit]::Show("İş milinde freze varken $($script:YuvaSecili) noktasına inilemez (çarpar / sensöre basar). Önce bırak (T0) ya da pensi açıp frezi elle çıkar.", 'Yaklaş', 'OK', 'Warning') | Out-Null; return }
     $z = [Eding]::CncGetVariable(4001)
     if (-not (Onay "İş mili yaklaşma yüksekliğine (Z $(Sayi $z)) yavaşça inecek ve frezeye değmeden duracak. Devam?" 'Yaklaş')) { return }
     if (Satirlar-Gonder 'Yaklaş' @("G90 G53 G1 Z$(Sayi $z) F300") 60) { $lblYuvaDurum.Text = "Yaklaşma yüksekliğinde. İnce ayar için 0.1 / 0.01 adımla Z− kullan." }
