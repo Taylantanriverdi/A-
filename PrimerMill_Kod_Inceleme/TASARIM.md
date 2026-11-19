@@ -26,7 +26,7 @@ Gerekçe:
 
 | # | Ekran | İçerik |
 | --- | --- | --- |
-| 0 | **Kabuk** (her ekranda) | Üst şerit: marka, durum hapı, bağlantı, saat, **ACİL STOP** (sağ üst, 96 px, her zaman erişilebilir). Sol menü (ikon + yazı, 88 px genişlik). Alt şerit: son mesaj/alarm (dokununca Kayıtlar). |
+| 0 | **Kabuk** (her ekranda) | Üst şerit: marka, durum hapı, bağlantı, saat, **ACİL STOP** (sağ üst, 96 px, her zaman erişilebilir). Sol menü (ikon + yazı, 88 px genişlik); menünün en altında güç simgeli **Kapat** (cihazı kapat / yeniden başlat, `sistem.kapat`). Alt şerit: son mesaj/alarm (dokununca Kayıtlar). |
 | 1 | **Üretim** (ana ekran) | İş kartı (dosya, blok, ilerleme, geçen/kalan süre, satır), takım kartı, simülasyon, eksen konumları, hız ayarı, 6 büyük işlem düğmesi. |
 | 2 | **Takımlar** | 6 yuva + sensör + manuel nokta kartları; seçili yuvaya git / yaklaş / al / kaydet; takım değiştir (T0–T6), takım ölç, aşınma kontrolü, pens aç, frez bırak, manuel/otomatik frez modu, jog paneli. |
 | 3 | **Kalibrasyon** | Kart menüsü: Disk kalibrasyonu (sihirbaz), Otomatik kalibrasyon (sihirbaz + prob testi), Z alma / #4000, G54 üretici farkı ve geri dönüş, yedekten yükle. |

@@ -118,6 +118,8 @@ namespace PrimerUI
         public string Mesgul;
         public string MakineAdi;
         public string Surum;
+        /// <summary>Kiosk modu açık (kiosk.on, DEMO değil): Ayarlar › Genel › Kiosk satırı.</summary>
+        public bool Kiosk;
 
         // --- eksenler (iş = G54'e göre, M* = makine)
         public double X, Y, Z, A, B;

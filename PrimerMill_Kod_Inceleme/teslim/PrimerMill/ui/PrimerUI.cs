@@ -377,7 +377,7 @@ namespace PrimerUI
         Yok, Oynat, Duraklat, Durdur, Klasor, Takim, Temizlik, Ev, Park, Ayar, Liste, Hedef, Uzak,
         Uretim, Uyari, Bilgi, Kilit, KilitAcik, Arti, Eksi, Sol, Sag, Yukari, Asagi, Tamam, Kapat,
         Klavye, Buyut, Disk, Olcum, Pens, Hava, Yenile, Prob, Kaydet, Terminal, Telefon, IsMili, Yedek,
-        Saat, Blok, Konum, Hiz
+        Saat, Blok, Konum, Hiz, Guc
     }
 
     public static class Ikon
@@ -575,6 +575,10 @@ namespace PrimerUI
                     case Simge.Saat:
                         g.DrawEllipse(p, X(.1f), Y(.1f), m * .8f, m * .8f);
                         g.DrawLines(p, new[] { new PointF(X(.5f), Y(.26f)), new PointF(X(.5f), Y(.5f)), new PointF(X(.68f), Y(.62f)) });
+                        break;
+                    case Simge.Guc:
+                        g.DrawArc(p, X(.16f), Y(.18f), m * .68f, m * .68f, -50, 280);
+                        g.DrawLine(p, X(.5f), Y(.08f), X(.5f), Y(.46f));
                         break;
                     case Simge.Konum:
                         g.DrawEllipse(p, X(.3f), Y(.12f), m * .4f, m * .4f);
@@ -800,6 +804,8 @@ namespace PrimerUI
         public string BasKomut, BasArg, BirakKomut, BirakArg;
         /// <summary>true: Komut yalnız izin anahtarıdır; tıklama yalnız Tiklandi olayını çağırır (komutu olay sahibi gönderir).</summary>
         public bool YalnizOlay;
+        /// <summary>false: pasifken neden metni düğmenin içinde gösterilmez (dar düğmeler; dokununca alt şeritte yine görünür).</summary>
+        public bool NedenIcinde = true;
         public event EventHandler Tiklandi;
 
         public TouchButton() { Cursor = Cursors.Hand; MinimumSize = new Size(40, 40); }
@@ -912,7 +918,7 @@ namespace PrimerUI
 
             // içerik
             string alt = altMetin;
-            if (pasif && !string.IsNullOrEmpty(neden) && Height >= Tema.Px(72)) alt = neden;
+            if (pasif && NedenIcinde && !string.IsNullOrEmpty(neden) && Height >= Tema.Px(72)) alt = neden;
             float pad = Tema.PxF(10);
             var ic = new RectangleF(pad, Tema.PxF(4), Width - 2 * pad, Height - Tema.PxF(8));
             Font fAlt = Tema.F(Math.Max(8.5f, YaziPt * 0.62f));
@@ -3399,7 +3405,7 @@ namespace PrimerUI
         readonly Dictionary<string, SecimGrubu> secimler = new Dictionary<string, SecimGrubu>();
         readonly Dictionary<string, DegerKutusu> degerler = new Dictionary<string, DegerKutusu>();
         readonly SecimGrubu tema;
-        readonly AyarSatiri edingYol, uzakAdres, sonYedek;
+        readonly AyarSatiri edingYol, uzakAdres, sonYedek, kioskSatiri;
         readonly DegerKutusu[] g54 = new DegerKutusu[5];
         readonly Yazi[] g92 = new Yazi[5];
         readonly DegerKutusu[] prm = new DegerKutusu[7];
@@ -3446,6 +3452,11 @@ namespace PrimerUI
             pk.Ekle(Dugme("KÜÇÜLT", Simge.Eksi, Rol.Normal, "panel.kucult", ""), 0, 0).YaziPt = 11f;
             pk.Ekle(Dugme("KAPAT", Simge.Kapat, Rol.TehlikeCizgi, "panel.kapat", ""), 1, 0).YaziPt = 11f;
             g.Ekle(new AyarSatiri("Panel penceresi", "Simge durumuna al ya da paneli kapat (çalışırken onay istenir).", pk, 300), 62);
+            var kk = new Izgara(2, 1).Sutunlar(-58, -42); kk.Bosluk = 10;
+            kk.Ekle(Dugme("WINDOWS'A GEÇ", Simge.Kilit, Rol.Normal, "kiosk.windows", ""), 0, 0).YaziPt = 11f;
+            kk.Ekle(Dugme("PIN", Simge.KilitAcik, Rol.Normal, "kiosk.pin", ""), 1, 0).YaziPt = 11f;
+            kioskSatiri = new AyarSatiri("Kiosk modu", "Kapalı", kk, 330);
+            g.Ekle(kioskSatiri, 62);
 
             // İş akışı
             var w = Sayfa(1);
@@ -3613,6 +3624,7 @@ namespace PrimerUI
             edingYol.Aciklama = (ey ?? "—") + "   ·   eding_yolu.txt ile değiştirilebilir";
             uzakAdres.Aciklama = (d.UzakAcik ? (d.UzakAdres ?? "") : "Kapalı") + (string.IsNullOrEmpty(d.UzakPin) ? "   ·   PIN yok" : "   ·   PIN " + d.UzakPin);
             sonYedek.Aciklama = string.IsNullOrEmpty(d.SonYedek) ? "Bu oturumda yedek alınmadı" : d.SonYedek;
+            kioskSatiri.Aciklama = d.Kiosk ? "AÇIK · Windows gizli; geçiş ve panel kapatma PIN ister" : "KAPALI · KIOSK_KUR.bat ile kurulur";
             if (d.G54 != null && d.G54.Length >= 5)
                 for (int i = 0; i < 5; i++) if (!g54[i].Kirli) g54[i].Deger = d.G54[i];
             if (d.G92 != null && d.G92.Length >= 5)
@@ -4025,10 +4037,13 @@ namespace PrimerUI
         public bool Hata;
         public bool Sayisal = true;
         public float Pt = 26f;
+        /// <summary>true: yazı yerine her karakter için ● (PIN).</summary>
+        public bool Gizli;
         public string Metin { get { return metin; } set { metin = value ?? ""; Invalidate(); } }
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics; Tema.Hazirla(g);
+            string metin = Gizli ? new string('\u25CF', this.metin.Length) : this.metin;
             var r = new RectangleF(1, 1, Width - 3, Height - 3);
             Tema.YuvarlakDoldur(g, r, Tema.PxF(10), Tema.Zemin);
             Tema.YuvarlakCiz(g, r, Tema.PxF(10), Hata ? Tema.Alarm : Tema.Marka, Math.Max(1.5f, Tema.PxF(2)));
@@ -4455,13 +4470,16 @@ namespace PrimerUI
         // ------------------------------------------------------------------ Metin girişi (ekran klavyesi)
         /// <summary>Ekran klavyesiyle metin. sadeceRakam: yalnız 0–9. enCok: 0 = sınırsız. null = vazgeç.</summary>
         public static string MetinGir(string baslik, string mevcut) { return MetinGir(baslik, mevcut, false, 0); }
-        public static string MetinGir(string baslik, string mevcut, bool sadeceRakam, int enCok)
+        public static string MetinGir(string baslik, string mevcut, bool sadeceRakam, int enCok) { return MetinGir(baslik, mevcut, sadeceRakam, enCok, false); }
+        /// <summary>PIN girişi: rakam tuş takımı, yazılan rakamlar ● olarak görünür. null = vazgeç.</summary>
+        public static string PinGir(string baslik, int enCok) { return MetinGir(baslik, "", true, enCok, true); }
+        public static string MetinGir(string baslik, string mevcut, bool sadeceRakam, int enCok, bool gizli)
         {
             var f = new DiyalogFormu(baslik, Simge.Klavye, Color.Empty, 2);
             string metin = mevcut ?? "";
             int imlec = metin.Length;
             bool buyuk = true;
-            var gos = new GirisGostergesi(); gos.Sayisal = false; gos.Pt = 20f; gos.Metin = metin; gos.Imlec = imlec;
+            var gos = new GirisGostergesi(); gos.Sayisal = false; gos.Pt = 20f; gos.Gizli = gizli; gos.Metin = metin; gos.Imlec = imlec;
             var tuslar = new List<TouchButton>();
             Action yenile = () => { gos.Metin = metin; gos.Imlec = imlec; };
             Action<string> ekle = s =>
@@ -4802,6 +4820,8 @@ namespace PrimerUI
         readonly SaatKontrol saat;
         readonly EStopButton acil;
         readonly NavRail menu;
+        readonly Izgara solSutun;
+        readonly TouchButton kapatDugme;
         readonly Panel icerik;
         readonly MessageBar mesaj;
         readonly TouchButton mesajDugme;
@@ -4845,7 +4865,13 @@ namespace PrimerUI
             // orta: menü + içerik
             orta = new Izgara(2, 1).Sutunlar(88, -100); orta.Bosluk = 0;
             kok.Ekle(orta, 0, 1);
-            menu = orta.Ekle(new NavRail(), 0, 0);
+            // sol sütun: menü + en altta CİHAZI KAPAT (her ekranda; komut sistem.kapat, onayı denetleyici açar)
+            solSutun = new Izgara(1, 2).Satirlar(-100, 84); solSutun.Bosluk = 0;
+            orta.Ekle(solSutun, 0, 0);
+            menu = solSutun.Ekle(new NavRail(), 0, 0);
+            kapatDugme = new TouchButton("Kapat", Simge.Guc, Rol.Sessiz, "sistem.kapat", "");
+            kapatDugme.Dikey = true; kapatDugme.YaziPt = 9.5f; kapatDugme.Kalin = false; kapatDugme.NedenIcinde = false;
+            solSutun.Ekle(kapatDugme, 0, 1);
             menu.Ekle("uretim", "Üretim", Simge.Uretim);
             menu.Ekle("takimlar", "Takımlar", Simge.Takim);
             menu.Ekle("kalibrasyon", "Kalibrasyon", Simge.Hedef);
@@ -4954,6 +4980,7 @@ namespace PrimerUI
             ust.BackColor = Tema.Kart;
             mesaj.BackColor = mesaj.AlarmModu ? Tema.Alarm : Tema.Kart;
             mesajDugme.BackColor = mesaj.BackColor;
+            solSutun.BackColor = Tema.Menu; kapatDugme.BackColor = Tema.Menu;
             Kayitlar.TemaYenile();
             Invalidate(true);
         }

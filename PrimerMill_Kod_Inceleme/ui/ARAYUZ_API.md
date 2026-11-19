@@ -59,7 +59,10 @@ Sütunlar: **Ad** · **Arg** · **Nereden** · **Önerilen onay** (TASARIM §6; 
 | `acilstop.kaldir` | — | Alt şerit (alarm bandı) "KİLİDİ KALDIR", Üretim bakım şeridi (acil stop varken) | Normal |
 | `makine.reset` | — | Alt şerit "ALARMI TEMİZLE" (Durum=Alarm), Üretim "ALARMI TEMİZLE" | Normal (çalışırken) |
 | `ekran` | ekran adı | Ekran değişti (bilgi) | — |
-| `panel.kucult` / `panel.kapat` | — | Ayarlar › Genel › Panel penceresi | kapat: Normal (çalışırken uyarılı) |
+| `panel.kucult` / `panel.kapat` | — | Ayarlar › Genel › Panel penceresi | kapat: Normal (çalışırken uyarılı); **kiosk modunda** KÜÇÜLT pasif, KAPAT (ve pencere kapatma / Alt+F4) kiosk PIN'i ister, kapanınca Windows masaüstü açılır |
+| `sistem.kapat` | — | Sol menünün en altı, güç simgesi "Kapat" (her ekranda) | `Diyalog.Secim` KAPAT / YENİDEN BAŞLAT / VAZGEÇ (Enter hiçbir şey yapmaz). İş sürerken / duraklıyken / makine hareket ederken / panel işlemi sürerken pasif (izin tablosu). Eding ayarları kaydederek kapanır (≤ 15 sn), sonra `shutdown.exe /s` (ya da `/r`) `/t 0 /f`. DEMO'da bilgisayar kapanmaz: "DEMO: cihaz kapatılmaz", panel kapanır |
+| `kiosk.windows` | — | Ayarlar › Genel › Kiosk modu › WINDOWS'A GEÇ | Kiosk PIN'i (`Diyalog.PinGir`, maskeli; 5 yanlış → 60 sn kilit). Kiosk kapalıyken ve iş sürerken pasif. Klavye kilidi kalkar, explorer.exe açılır, panel simge durumuna küçülür; panel geri açılınca kiosk geri gelir |
+| `kiosk.pin` | — | Ayarlar › Genel › Kiosk modu › PIN | Mevcut PIN, yeni PIN (4–8 rakam) iki kez → `panel_ayarlar.ini` `KioskPin` |
 
 ### 3.2 Üretim
 
@@ -185,6 +188,7 @@ Tüm alanlar düz (public field). Listeler kurucuda boş oluşturulur; `null` ve
 | `ExtErr` | bool | (bilgi; denetleyici alarm metniyle verir) |
 | `Mesgul` | string | Doluysa meşgul katmanı (ör. "Home alınıyor…") |
 | `MakineAdi`, `Surum` | string | Üst şerit, Ayarlar |
+| `Kiosk` | bool | Kiosk modu açık (kiosk.on, DEMO değil): Ayarlar › Genel › Kiosk modu satırının açıklaması |
 | `X,Y,Z,A,B` / `MX,MY,MZ,MA,MB` | double | İş / makine konumu (ikisi birlikte; KU-24) |
 | `KoordMakine` | bool | Makine konumu büyük gösterilsin (ya da `Ayarlar["Koordinat"]`) |
 | `Takim`, `TakimAciklama` | int, string | Takım kartı (0 = boş) |
@@ -234,7 +238,8 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | `ListeSec(baslik, string[] ogeler, string[] aciklamalar, string ekDugme)` | int (-1 vazgeç, -2 ek düğme) | Dokunmatik, sürüklenebilir liste (iş dosyası seçici, yedek seçici). |
 | `TakimSec(int mevcut, string[] aciklamalar /*0..6*/)` | int 0–6 / -1 | T1–T6 + BOŞALT (T0). |
 | `SayiGir(baslik, mevcut, min, max [, ondalik=3])` | double? | Tuş takımı; `,` ve `.` kabul edilir, `.`'ya çevrilir, `InvariantCulture` ile ayrıştırılır; aralık dışı/geçersizde TAMAM pasif ve kırmızı uyarı. İlk tuş mevcut değeri siler. Fiziksel klavye de çalışır. |
-| `MetinGir(baslik, mevcut [, sadeceRakam, enCok])` | string / null | Türkçe ekran klavyesi (Ğ Ü Ş İ Ö Ç, G-kod simgeleri `- # = [ ] / * + _ :`, ⇧, ◀ ▶, BOŞLUK, TEMİZLE); `sadeceRakam` → rakam tuş takımı (PIN). |
+| `PinGir(baslik, enCok)` | string / null | Rakam tuş takımı, girilen rakamlar ● olarak görünür (kiosk PIN'i). Denetleyici kapısı `Ui-Pin` değeri günlüğe yazmaz. |
+| `MetinGir(baslik, mevcut [, sadeceRakam, enCok [, gizli]])` | string / null | Türkçe ekran klavyesi (Ğ Ü Ş İ Ö Ç, G-kod simgeleri `- # = [ ] / * + _ :`, ⇧, ◀ ▶, BOŞLUK, TEMİZLE); `sadeceRakam` → rakam tuş takımı (PIN). |
 | `GeriSayim(metin, saniye [, sureBitinceOnay=false])` | bool | Halka sayaç; İPTAL → false, ŞİMDİ BAŞLA → true. Süre bitince varsayılan **iptal**. Eski panelde süre bitince home başlıyordu: denetleyici eski davranışı korumak için `sureBitinceOnay=true` vermeli (**MAKİNEDE DOĞRULA**). |
 | `ManuelFrezAdimi(adimNo, metin, string[] dugmeler [, baslik])` | int (-1 = Esc/ACİL STOP) | Büyük, kehribar bant, ses çalar; "DURDUR" içeren düğme kırmızı çerçeve, son düğme yeşil. |
 | `YeniBlok(isim, kalinlik, derinlik, dosyaSecili, bekleyenVar)` | `BlokSonucu {Secim, Isim, Kalinlik, Derinlik}` | Secim: -1 vazgeç, 0 kazı+başla, 1 sadece isim, 2 yeni hazır, 3 kullanılmış, 4 bekleyeni iptal. |
@@ -566,6 +571,8 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | 15.1 | Panel kapanırken | Arka plan (`Kabuk.FormClosing`) | — |
 | 15.2 | Kapat onayı | Ayarlar › Genel › KAPAT → denetleyici onayı (çalışırken uyarılı) | `panel.kapat` |
 | 15.3 | Eding'i ayar kaydederek kapatma | Ayarlar › Eding › KAPAT; EdingKapat.bat | `eding.kapat` |
+| 15.4 (yeni) | Cihazı kapat / yeniden başlat | Sol menü altı "Kapat" (her ekranda) | `sistem.kapat` |
+| 15.5 (yeni) | Kiosk modu: Windows'a geçiş (PIN), kiosk PIN'i | Ayarlar › Genel › Kiosk modu; kurulum `KIOSK_KUR.bat` / `KIOSK_KALDIR.bat`, kabuk `Kabuk.ps1` | `kiosk.windows`, `kiosk.pin`, `Kiosk` |
 
 Bölüm 16 (değişken kullanımı) ve 17 (macro.cnc eşlemesi) arayüz özelliği değildir; değişkenlerin görünür olanları Ayarlar › Makine değişkenleri ve Kalibrasyon bilgi şeridindedir.
 

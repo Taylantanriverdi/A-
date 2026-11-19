@@ -1,4 +1,4 @@
-// PrimerMill 2 — ekran görüntüsü aracı (yalnız geliştirme; makineye kurulmaz).
+﻿// PrimerMill 2 — ekran görüntüsü aracı (yalnız geliştirme; makineye kurulmaz).
 // Mono + Xvfb altında Kabuk'u sahte (demo) verilerle doldurur, her ekranı / sihirbaz adımını /
 // önemli diyalogları açar ve Graphics.CopyFromScreen ile PNG kaydeder.
 // Derleme ve çalıştırma: tests/ui/ekran_goruntusu_al.sh
@@ -126,7 +126,7 @@ static class EkranGoruntusu
             {
                 if (!kucuk && i != 0 && i != 6) continue;
                 int s = i;
-                Ekle(no() + "_ayarlar_" + sekme[i] + r + ".png", W, H, true, () => { Uygula(Hazir(), IzinHazir()); Git("ayarlar." + s); });
+                Ekle(no() + "_ayarlar_" + sekme[i] + r + ".png", W, H, true, () => { var d = Hazir(); d.Kiosk = s == 0; Uygula(d, IzinHazir()); Git("ayarlar." + s); });
             }
             Ekle(no() + "_kayitlar" + r + ".png", W, H, true, () => { Calisiyor(); Git("kayitlar"); });
             Ekle(no() + "_uzaktan" + r + ".png", W, H, true, () => { Uygula(Hazir(), IzinHazir()); Git("uzaktan"); });
@@ -145,6 +145,8 @@ static class EkranGoruntusu
                 Ekle(no() + "_diyalog_takim_sec" + r + ".png", W, H, true, () => { Uygula(Hazir(), IzinHazir()); Git("uretim"); Diyalog.TakimSec(2, new[] { "", "Ø2.0 küre", "Ø1.0 küre", "Ø0.6 küre", "Ø2.5 düz", "", "Ø1.0 düz" }); });
                 Ekle(no() + "_diyalog_devam" + r + ".png", W, H, true, () => { Uygula(Hazir(), IzinHazir()); Git("uretim"); Diyalog.Devam("ZY2_45.nc", "%64 yapılmıştı · 18.11.2026 14:31\nİş sürerken panel/elektrik kapandı · satır 44 812", 2); });
                 Ekle(no() + "_diyalog_is_sec" + r + ".png", W, H, true, () => { Uygula(Hazir(), IzinHazir()); Git("uretim"); Diyalog.ListeSec("İş seç", new[] { "ZY2_45.nc", "ZY2_44.nc", "Kron_A12.nc", "Kopru_3uye.nc", "Test_disk.nc", "ZY1_90.nc", "Abutment_7.nc" }, new[] { "bugün 14:02 · 69 751 satır · ~1:06", "bugün 09:40 · 52 120 satır", "dün 17:12", "dün 11:05", "16.11.2026", "15.11.2026", "14.11.2026" }, "GÖZAT…"); });
+                Ekle(no() + "_diyalog_cihaz_kapat" + r + ".png", W, H, true, () => { Uygula(Hazir(), IzinHazir()); Git("uretim"); Diyalog.Secim("Cihazı kapat", "Cihaz kapatılacak: Eding ayarlarını (G54, kalıcı değişkenler) kaydederek kapanır, sonra bilgisayar kapanır.\nYENİDEN BAŞLAT: bilgisayar kapanıp yeniden açılır.", new[] { "KAPAT", "YENİDEN BAŞLAT", "VAZGEÇ" }); });
+                Ekle(no() + "_diyalog_kiosk_pin" + r + ".png", W, H, true, () => { var d = Hazir(); d.Kiosk = true; Uygula(d, IzinHazir()); Git("ayarlar.0"); Diyalog.PinGir("Windows'a geç", 8); var g = Diyalog.SonForm; if (g != null) foreach (var c in Tum(g)) { var gg = c as GirisGostergesi; if (gg != null) gg.Metin = "24"; } });
                 Ekle(no() + "_diyalog_bilgi_uyarilar" + r + ".png", W, H, true, () => { var d = Hazir(); d.IsUyarilari.Add("T3 konumu HENÜZ AYARLANMADI. Alırken kırılabilir."); d.IsUyarilari.Add("T6 bu işte kullanılmıyor ama iş milinde."); Uygula(d, IzinHazir()); Git("uretim"); Diyalog.Bilgi("Dosya kontrolü · ZY2_45.nc", "UYARILAR:\n•  T3 konumu HENÜZ AYARLANMADI. Alırken kırılabilir.\n•  Tahmini süre 1:06:00 (hızlı hareket 4000 mm/dk varsayımı)."); });
             }
         }
@@ -154,6 +156,11 @@ static class EkranGoruntusu
         Ekle(no() + "_takimlar_acik_1024.png", 1024, 768, false, () => { Uygula(Hazir(), IzinHazir()); Git("takimlar"); k.Takimlar.SekmeGoster(0); k.Takimlar.Sec("T2"); });
         Ekle(no() + "_kal_oto_adim4_acik_1024.png", 1024, 768, false, () => { var d = Hazir(); Oto(d, 3); Uygula(d, IzinHazir()); Git("kalibrasyon"); k.Kalibrasyon.Sayfa("oto"); });
         Ekle(no() + "_uretim_acik_1920.png", 1920, 1080, false, () => { Calisiyor(); Git("uretim"); });
+    }
+
+    static IEnumerable<Control> Tum(Control k)
+    {
+        foreach (Control c in k.Controls) { yield return c; foreach (var x in Tum(c)) yield return x; }
     }
 
     static void Git(string ekran)
@@ -188,6 +195,8 @@ static class EkranGoruntusu
                                   "yedek.yukle", "degisken.kaydet", "eding.yeniden", "frez.modu" })
             n[c] = "İş çalışırken kullanılamaz";
         n["mdi.gonder"] = "İş sürerken MDI kilitli";
+        n["sistem.kapat"] = "İş sürüyor: yalnız DURAKLAT, DURDUR, ACİL STOP ve hız";
+        n["kiosk.windows"] = "İş sürüyor: yalnız DURAKLAT, DURDUR, ACİL STOP ve hız";
         n["makine.reset"] = "Alarm yok";
         n["is.devam"] = "İş duraklatılmadı";
         return n;
