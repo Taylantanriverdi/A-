@@ -3568,22 +3568,29 @@ function Acil-Stop([string]$kaynak) {
     $belirsiz = $false; try { $belirsiz = Takim-Degisimi-Suruyor-Mu } catch { $belirsiz = $true }   # GV-08: kesmeden önce bak
     $ilk = -not [Eding]::AcilKilit
     [Eding]::AcilKilit = $true
-    $estop.Latched = $true
-    if ($ilk) { [Kayit]::Yaz("!!! ACİL STOP ($kaynak) !!!") }
-    $script:Tercih.AcilStop = '1'; try { Tercih-Yaz } catch { }
-    if ($script:ApiHazir -and $script:Bagli) {
-        try { [Kayit]::Yaz("ACİL STOP: işi kes -> $([Eding]::RCText([Eding]::CncAbortJob()))") } catch { }
+    # ED-08: önce makine durdurulur (abort, çıkışlar), tercih dosyası EN SON yazılır; bağlı değilse bir kez bağlanmayı dener
+    $bagli = $false
+    if ($script:ApiHazir) { $bagli = $script:Bagli; if (-not $bagli) { try { $bagli = Baglan } catch { $bagli = $false } } }
+    if ($bagli) {
+        $rcAbort = -1
+        try { $rcAbort = [Eding]::CncAbortJob() } catch { }
         try { [void][Eding]::CncSetOutput(4, 0) } catch { }    # iş mili çıkışı
         try { [void][Eding]::CncSetOutput(11, 0) } catch { }   # hava üfleme (AUX4)
+        try { [Kayit]::Yaz("!!! ACİL STOP ($kaynak): işi kes -> $([Eding]::RCText($rcAbort))") } catch { }
         Start-Sleep -Milliseconds 250
         try { [void][Eding]::CncAbortJob() } catch { }
         try {
+            # MAKİNEDE DOĞRULA (ED-08): CncReset sürücüleri yeniden enerjilendiriyor olabilir (Btn-Home: "sürücüler açılıyor (reset)").
+            # Acil stoptan sonra reset gerekli mi / sürücüler enerjili mi kalıyor, makinede doğrulanmadan bu çağrı kaldırılmadı.
             [void][Eding]::CncReset()
             foreach ($l in @('M5', 'M9', 'M55 P4')) { [Kayit]::Yaz("ACİL STOP: $l -> $([Eding]::RCText([Eding]::CncRunSingleLineZorla($l)))") }
         } catch { }
+        try { [Kayit]::Yaz("ACİL STOP: sonra Eding durumu $(Eding-Durum), çalışıyor=$([Eding]::CncGetRunningStatus())") } catch { }
     } else {
-        [Kayit]::Yaz('ACİL STOP: Eding bağlı değil, sadece panel kilitlendi')
+        [Kayit]::Yaz("!!! ACİL STOP ($kaynak): Eding'e bağlanılamadı, sadece panel kilitlendi")
     }
+    try { $estop.Latched = $true } catch { }
+    $script:Tercih.AcilStop = '1'; try { Tercih-Yaz } catch { }
     $script:IsAktif = $false
     $script:TakipSonu = 'kullanici'
     if ($belirsiz) { Takim-Belirsiz-Isaretle "ACİL STOP ($kaynak)" }
