@@ -4625,7 +4625,7 @@ function Kal-NC-Uret([double]$T, [double]$D, [int]$k = 1) {
     & $L 'M3 S18000'
     $cep = {
         param($c, [bool]$ters, [double]$hedefZ)
-        $rmax = [math]::Max(0, $c.R - $rt)
+        $rmax = [math]::Max(0.0, $c.R - $rt)   # 0.0 (KL-03): tamsayı Max cep çapını yuvarlıyordu
         $halkalar = @(); $rr = $rmax; while ($rr -gt 0.05) { $halkalar += $rr; $rr -= [math]::Max(0.3, $D * 0.4) }; $halkalar += 0
         $p0 = Kal-Nokta $c.X $c.Y $guv $c.A $ters
         & $L "G0 X$(& $f $p0[0]) Y$(& $f $p0[1]) Z$(& $f $p0[2])"
@@ -5165,11 +5165,11 @@ function OtoKal-Hesapla-Ic([hashtable]$z, [double]$T, [hashtable]$ofs, [double]$
             $s = 0; for ($i = 0; $i -lt $N; $i++) { $s += $jak[$a1][$i] * $res[$i] }; $v[$a1] = $s
         }
         $dq = OkCoz $M $v
-        $buyukAdim = 0
+        $buyukAdim = 0.0   # 0.0: [math]::Max(0, double) tamsayı aşırı yüklemesini seçer (KL-02)
         for ($j = 0; $j -lt $P; $j++) { $q[$j] += $dq[$j]; $buyukAdim = [math]::Max($buyukAdim, [math]::Abs($dq[$j])) }
         if ($buyukAdim -lt 1e-7) { break }
     }
-    $f0 = & $model $q; $ss = 0; $artikMax = 0
+    $f0 = & $model $q; $ss = 0; $artikMax = 0.0
     for ($i = 0; $i -lt $N; $i++) { $e = $z[$i] - $f0[$i]; $ss += $e * $e; $artikMax = [math]::Max($artikMax, [math]::Abs($e)) }
     $rms = [math]::Sqrt($ss / $N)
     # --- 3) Düzeltmeler (iş koordinatından G54'e)
@@ -5323,7 +5323,7 @@ function OtoKal-Oku {
     if (-not $script:Tercih.OkKimlik -or "$id" -ne "$($script:Tercih.OkKimlik)") { [Kayit]::Show('Bu ölçüme ait sonuç yok. Önce ölçümü hazırla ve BAŞLAT ile çalıştır.', 'Otomatik kalibrasyon', 'OK', 'Information') | Out-Null; return }
     if ([Eding]::CncGetVariable(4100) -ne 1) { [Kayit]::Show('Ölçüm yarıda kalmış (hata ya da durdurma). Eding mesajına bak, sorunu gider, BAŞLAT ile tekrar çalıştır.', 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
     $T = Metin-Sayi $script:Tercih.OkT
-    $z = @{}; $farkMax = 0
+    $z = @{}; $farkMax = 0.0
     for ($i = 0; $i -lt $OkNoktalar.Count; $i++) {
         $a = [Eding]::CncGetVariable(4101 + 2 * $i); $b = [Eding]::CncGetVariable(4102 + 2 * $i)
         $z[$i] = ($a + $b) / 2; $farkMax = [math]::Max($farkMax, [math]::Abs($a - $b))
