@@ -2296,6 +2296,75 @@ function Takim-Bildir([int]$n, [string]$islem) {
     return $true
 }
 
+# ================= TAKIM DURUMU BELİRSİZ (GV-08) =================
+# ACİL STOP / DURDUR / RESET takım değişimi sırasında gelirse Eding'in bildiği takım iş milindekinden farklı olabilir.
+# Operatör iş milindeki frezi söyleyene (hareketsiz bildirim) kadar BAŞLAT ve M6 engellenir. Panel kapanıp açılsa da sürer.
+$script:TakimKomutuAni = [datetime]::MinValue   # panelden M6 / takım makrosu gönderildiği an (bitince sıfırlanır)
+function Takim-Komutu-Mu([string]$l) { return ($l -match '(?i)\bM0*6\b|gosub\s+(pm_|user_1|is_empty_tool|change_tool|manual_change|droptool|picktool)') }
+function Takim-Degisimi-Suruyor-Mu {
+    # Kesmeden ÖNCE çağrılır: takım değişimi sürüyor olabilir mi?
+    if (-not $script:ApiHazir -or -not $script:Bagli) { return [bool]$script:IsAktif }
+    try {
+        $d = Eding-Durum
+        if ($d -eq 'RUN-SUB') { return $true }
+        if ([Eding]::CncGetVariable(4034) -ne 0) { return $true }
+        if ($script:TakimKomutuAni -ne [datetime]::MinValue -and ((Get-Date) - $script:TakimKomutuAni).TotalSeconds -lt 300 -and ((Mesgul $d) -or $d -like 'PAUSE*')) { return $true }
+    } catch { return $true }
+    return $false
+}
+function Takim-Belirsiz-Isaretle([string]$neden) {
+    if (-not $script:TakimBelirsiz) { [Kayit]::Yaz("TAKIM BELİRSİZ: $neden sırasında takım değişimi sürüyor olabilirdi") }
+    $script:TakimBelirsiz = $true
+    $script:Tercih.TakimBelirsiz = '1'; try { Tercih-Yaz } catch { }
+    try { Yaz "DİKKAT: takım değişimi yarıda kesilmiş olabilir ($neden). BAŞLAT ya da frez değişiminden önce iş milindeki frez sorulacak." } catch { }
+}
+function Takim-Belirsiz-Coz([string]$islem) {
+    # $true: belirsizlik yok / giderildi. $false: çağıran durmalı.
+    if (-not $script:TakimBelirsiz) { return $true }
+    $tkE = -1; try { $tkE = [Eding]::CncGetCurrentToolNumber() } catch { }
+    $f = New-Object System.Windows.Forms.Form
+    $f.Text = 'Takım durumu belirsiz'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.TopMost = $true
+    $f.MaximizeBox = $false; $f.MinimizeBox = $false; $f.ShowInTaskbar = $false
+    $f.BackColor = $cZemin; $f.ForeColor = $cYazi; $f.Font = New-Object System.Drawing.Font('Segoe UI', 11)
+    $f.ClientSize = New-Object System.Drawing.Size(640, 300)
+    $lb = New-Object System.Windows.Forms.Label
+    $lb.Text = 'İş milinde hangi frez var?'; $lb.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 16); $lb.ForeColor = $cAltinAc; $lb.SetBounds(24, 14, 592, 34); $f.Controls.Add($lb)
+    $lm = New-Object System.Windows.Forms.Label
+    $lm.Text = "Son ACİL STOP / DURDUR / RESET bir takım değişimi sırasında gelmiş olabilir.`r`nEding'e göre iş milinde: T$tkE.`r`n`r`nKapağı açıp iş milini GÖZÜNLE kontrol et ve takılı olanı seç (makine hareket etmez)."
+    $lm.SetBounds(24, 54, 592, 100); $f.Controls.Add($lm)
+    $f.Tag = $null
+    for ($n = 0; $n -le 6; $n++) {
+        $b = New-Object System.Windows.Forms.Button
+        $b.Text = $(if ($n -eq 0) { "Boş`r`n(T0)" } else { "T$n" }); $b.Tag = $n
+        $b.FlatStyle = 'Flat'; $b.BackColor = $cPanel; $b.ForeColor = $cYazi; $b.FlatAppearance.BorderColor = $cAltin
+        $b.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 12); $b.SetBounds(24 + $n * 85, 166, 78, 64)
+        $b.Add_Click({ param($s2, $e2) $fm = $s2.FindForm(); $fm.Tag = $s2.Tag; $fm.Close() })
+        $f.Controls.Add($b)
+    }
+    $bv = New-Object System.Windows.Forms.Button
+    $bv.Text = 'Vazgeç'; $bv.FlatStyle = 'Flat'; $bv.BackColor = $cZemin; $bv.ForeColor = $cSoluk; $bv.SetBounds(496, 246, 120, 36)
+    $bv.Add_Click({ param($s2, $e2) $s2.FindForm().Close() }); $f.Controls.Add($bv)
+    $f.AcceptButton = $bv; $f.KeyPreview = $true
+    $f.Add_KeyDown({ param($s2, $e2) if ($e2.KeyCode -eq 'Escape') { $e2.Handled = $true; $s2.Tag = $null; $s2.Close(); Acil-Stop 'Esc (takım belirsiz)' } })
+    [void]$f.ShowDialog($form)
+    $sec = $f.Tag; $f.Dispose()
+    [Kayit]::Yaz("TAKIM BELİRSİZ: operatör seçimi '$sec' (Eding T$tkE)")
+    if ($null -eq $sec) { Yaz "$islem yapılmadı: iş milindeki frez bildirilmedi."; return $false }
+    $n = [int]$sec
+    if ($n -ne $tkE) {
+        if (-not (Hazir-Mi $islem)) { return $false }
+        if (-not (Takim-Bildir $n $islem)) { return $false }
+    }
+    $script:TakimBelirsiz = $false; $script:Tercih.TakimBelirsiz = '0'; Tercih-Yaz
+    Yaz "Takım durumu netleşti: iş milinde T$n."
+    return $true
+}
+function Takim-Kapisi([string]$islem) {
+    # BAŞLAT ve panelden M6 / takım ölçme öncesi ortak kontrol
+    if (-not (Takim-Belirsiz-Coz $islem)) { return $false }
+    return $true
+}
+
 function Manuel-Istek {
     # Bekleyen operatör isteği: @{ Faz = 1 (pens açılacak) | 2 (tak, pens kapanacak) | 3 (hava bekleniyor); T; Eski; Seq } ya da $null
     # #4034 iş başlarken ve RESET'te sıfırlanır, bu yüzden 1000+ değer hep o anki işe aittir.
@@ -2735,6 +2804,7 @@ function Yeni-Blok {
     }
     # Sadece isim: kendi küçük programı, sonunda frezi magazine bırakır (T0)
     if (-not (Hazir-Hareket 'Yeni blok')) { return }
+    if (-not (Takim-Kapisi 'Yeni blok')) { return }
     try {
         $L = New-Object System.Collections.Generic.List[string]
         $L.Add('%'); $L.Add('GOSUB CHECK_EMPTY_TOOL')
@@ -2808,6 +2878,7 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
             if (-not (Baglan)) { return 'HATA: Eding bağlı değil' }
             if ([Eding]::CncGetEMStopActive() -ne 0) { return 'HATA: Acil stop basılı' }
             if ([Eding]::CncGetAllAxesHomed() -eq 0) { return 'HATA: Makine home alınmamış' }
+            if ($script:TakimBelirsiz) { return 'HATA: Takım durumu belirsiz (değişim yarıda kesildi). Makinede iş milindeki frez bildirilmeli.' }
             if ((Durakli-Mi)) {
                 Yaz "Uzaktan ($ip): DEVAM"
                 if (Rc-Tamam ([Eding]::CncRunOrResumeJob())) { return 'OK: Devam ediyor' } else { return 'HATA: Devam ettirilemedi' }
@@ -3101,8 +3172,10 @@ function Bos-Ismili-Hazirla {
     }
     if (-not (Onay "İş milinde T$tk takılı görünüyor.`r`nMakinenin programı işe boş iş miliyle başlar (yoksa hata verip durur).`r`n`r`nT$tk kendi yuvasına bırakılsın mı?`r`n(Yuvası boş olmalı.)" 'Başlat')) { return $false }
     Yaz "Başlat öncesi: T$tk yuvasına bırakılıyor (M6 T0)..."
+    $script:TakimKomutuAni = Get-Date
     if (-not (Komut-Sonucu 'Frez bırak (M6 T0)' ([Eding]::CncRunSingleLine('M6 T0')))) { return $false }
     if (-not (Hareket-Bitene-Kadar-Bekle 120)) { Yaz 'Frez bırakma bitmedi.'; return $false }
+    $script:TakimKomutuAni = [datetime]::MinValue
     if ([Eding]::CncGetCurrentToolNumber() -ne 0) { [Kayit]::Show('Frez bırakılamadı; iş başlatılmadı.', 'Başlat', 'OK', 'Warning') | Out-Null; return $false }
     return $true
 }
@@ -3135,6 +3208,7 @@ function Btn-Baslat-Ic {
     if (-not (Hazir-Mi 'Başlat')) { return }
     if ((Calisiyor-Mu)) { [Kayit]::Show('Makine şu an çalışıyor.', 'Başlat', 'OK', 'Warning') | Out-Null; return }
     if (-not (Makro-Hazir-Mi 'Başlat')) { return }
+    if (-not (Takim-Kapisi 'Başlat')) { return }
 
     # Bu dosyanın yarım kalmış kaydı varsa: kaldığı yerden mi, baştan mı?
     $dk = Devam-Oku
@@ -3225,6 +3299,7 @@ function Btn-Baslat-Ic {
             Devam-Kaydet 1 'calisiyor' 0
             $script:ModOnayliDosya = $null
             $script:TakipSonu = ''
+            $script:TakimKomutuAni = [datetime]::MinValue
             $script:IsAktif = $true
             $script:Gecen   = [TimeSpan]::Zero
             $script:SonTik  = Get-Date
@@ -3247,7 +3322,9 @@ function Btn-Durdur([bool]$sor = $false) {
     if ($sor -and (Is-Suruyor)) {
         if (-not (Onay "Kazıma DURDURULACAK (iş iptal edilir).`r`n`r`nKaldığı yerden devam ancak BAŞLAT › KALDIĞI YERDEN DEVAM ile yapılabilir.`r`nAcil bir durumsa ACİL STOP'a bas.`r`n`r`nDurdurulsun mu?" 'Durdur')) { return }
     }
+    $belirsiz = Takim-Degisimi-Suruyor-Mu
     if (Komut-Sonucu 'Durdur' ([Eding]::CncAbortJob())) {
+        if ($belirsiz) { Takim-Belirsiz-Isaretle 'DURDUR' }
         if ($script:IsAktif) { Devam-Kaydet $script:SonGecerliSatir 'durduruldu' $bar.Value }
         $script:TakipSonu = 'kullanici'
         $script:IsAktif = $false
@@ -3259,9 +3336,11 @@ function Btn-Durdur([bool]$sor = $false) {
 function Btn-FrezBirak {
     if (-not (Hazir-Mi 'Frez Bırak')) { return }
     if ((Calisiyor-Mu)) { [Kayit]::Show('Makine çalışırken frez bırakılamaz. Önce DURDUR.', 'Frez Bırak', 'OK', 'Warning') | Out-Null; return }
+    if (-not (Takim-Kapisi 'Frez Bırak')) { return }
     $tk = [Eding]::CncGetCurrentToolNumber()
     if ($tk -eq 0) { [Kayit]::Show('Yazılıma göre iş milinde freze yok (T0).', 'Frez Bırak', 'OK', 'Information') | Out-Null; return }
     if (-not (Onay "İş milindeki T$tk kendi yuvasına bırakılacak.`r`n`r`nT$tk yuvası BOŞ mu ve kompresör açık mı?" 'Frez Bırak')) { return }
+    $script:TakimKomutuAni = Get-Date
     [void](Komut-Sonucu 'Frez Bırak (M6 T0)' ([Eding]::CncRunSingleLine('M6 T0')))
 }
 
@@ -3424,6 +3503,7 @@ function Panel-Sifirla {
 # Fiziksel buton yok: panel işi keser, iş milini ve havayı kapatır, kilitlenir.
 # Kilit kalkana kadar panelden hiçbir hareket komutu Eding'e gitmez; Eding'de biri BAŞLAT'a basarsa iş yine kesilir.
 function Acil-Stop([string]$kaynak) {
+    $belirsiz = $false; try { $belirsiz = Takim-Degisimi-Suruyor-Mu } catch { $belirsiz = $true }   # GV-08: kesmeden önce bak
     $ilk = -not [Eding]::AcilKilit
     [Eding]::AcilKilit = $true
     $estop.Latched = $true
@@ -3444,6 +3524,7 @@ function Acil-Stop([string]$kaynak) {
     }
     $script:IsAktif = $false
     $script:TakipSonu = 'kullanici'
+    if ($belirsiz) { Takim-Belirsiz-Isaretle "ACİL STOP ($kaynak)" }
     $bar.Dancing = $false
     $lblSure.Text = 'ACİL STOP ile durduruldu'; $lblSure.ForeColor = $cKirmizi
     Durum-Yaz 'ACİL STOP  ·  kaldırmak için RESET' $cKirmizi
@@ -3476,7 +3557,9 @@ function Btn-Reset {
     if ((Is-Suruyor)) {
         if (-not (Onay 'Makine çalışıyor ya da duraklatılmış bir iş var. RESET işi durdurur. Devam edilsin mi?' 'Reset')) { return }
     }
+    $belirsiz = Takim-Degisimi-Suruyor-Mu
     if (Komut-Sonucu 'Reset' ([Eding]::CncReset())) {
+        if ($belirsiz) { Takim-Belirsiz-Isaretle 'RESET' }
         $script:PensAcik = $false
         $btnPens.Text = 'PENS AÇ'
         Panel-Sifirla
@@ -3833,6 +3916,7 @@ try {
     $script:OzelMakro = ($mt -match '(?im)^\s*sub\s+manual_change\b')
 } catch { }
 if ($script:Tercih.AcilStop -eq '1') { [Eding]::AcilKilit = $true; $script:AcilisDurum = 'iptal' }
+$script:TakimBelirsiz = ($script:Tercih.TakimBelirsiz -eq '1')   # GV-08
 if ($script:Tercih.OtomatikHazirlik -ne '1') { $script:AcilisDurum = 'iptal' }
 
 function Hazir-Hareket([string]$islem) {
@@ -3843,11 +3927,13 @@ function Hazir-Hareket([string]$islem) {
 
 function Satirlar-Gonder([string]$ad, [string[]]$satirlar, [int]$bekle = 60) {
     foreach ($l in $satirlar) {
+        if (Takim-Komutu-Mu $l) { $script:TakimKomutuAni = Get-Date }   # GV-08
         $rc = [Eding]::CncRunSingleLine($l)
         [Kayit]::Yaz("KOMUT> $l   -> $([Eding]::RCText($rc))")
         if (-not (Rc-Tamam $rc)) { [void](Komut-Sonucu "$ad ($l)" $rc); return $false }
         if (-not (Hareket-Bitene-Kadar-Bekle $bekle)) { Yaz "$ad : '$l' zamanında bitmedi."; return $false }
     }
+    $script:TakimKomutuAni = [datetime]::MinValue
     Yaz "$ad : tamam"
     return $true
 }
@@ -3909,6 +3995,7 @@ function Yukari-Kaldir {
 
 function Takim-Degistir([int]$n) {
     if (-not (Hazir-Hareket 'Takım değiştir')) { return }
+    if (-not (Takim-Kapisi 'Takım değiştir')) { return }
     $simdiki = [Eding]::CncGetCurrentToolNumber()
     $m = if ($n -eq 0) { "İş milindeki T$simdiki yuvasına bırakılacak.`r`nYuvası boş mu?" } else { "İş milindeki T$simdiki bırakılıp T$n alınacak, sonra boyu ölçülecek.`r`nT$n yuvasında freze var mı, T$simdiki'in yuvası boş mu?" }
     if (-not (Onay $m 'Takım değiştir')) { return }
@@ -3917,6 +4004,7 @@ function Takim-Degistir([int]$n) {
 
 function Takim-Olc {
     if (-not (Hazir-Hareket 'Takım boyu ölç')) { return }
+    if (-not (Takim-Kapisi 'Takım boyu ölç')) { return }
     if ([Eding]::CncGetCurrentToolNumber() -eq 0) { [Kayit]::Show('İş milinde freze yok (T0). Önce bir takım al.', 'Takım boyu ölç', 'OK', 'Information') | Out-Null; return }
     if (-not (Onay 'İş mili sensöre gidip takım boyunu ölçecek (G92 Z güncellenir). Devam?' 'Takım boyu ölç')) { return }
     [void](Satirlar-Gonder 'Takım boyu ölç' @('gosub user_1') 120)
