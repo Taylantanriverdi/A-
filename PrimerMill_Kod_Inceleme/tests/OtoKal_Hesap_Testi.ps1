@@ -249,8 +249,8 @@ $rB = OtoKal-Hesapla-Ic $zB 10.02 $Ofs $P4002 @(0, 0, 0, 0, 0) 0 'duz' 1.5
 $gercek = 0.0; for ($i = 0; $i -lt 18; $i++) { $gercek = [math]::Max($gercek, [math]::Abs($zB[$i] - (OkModel $rB.Q $i 10.02 'duz' 1.5))) }
 $d = 'GECTI'; if ([math]::Abs($rB.ArtikMax - $gercek) -gt 1e-9) { $d = 'KALDI' }
 T-Kaydet $d 'ArtikMax = gerçek en büyük artık (P1 +0.02 mm)' 'P1 +0.02' "ArtikMax=$($rB.ArtikMax) ($($rB.ArtikMax.GetType().Name)) gerçek=$(F $gercek '0.000000')" '-' 'uyarı eşiği 0.01 / BÜYÜK eşiği 0.05'
-# OtoKal-Oku satır 5329 ifadesi (Eding'e bağlı fonksiyonun içinde; ifade birebir kopya)
-$farkMax = 0; foreach ($ab in @(@(5.000, 5.004), @(7.210, 7.199))) { $a = $ab[0]; $b = $ab[1]; $farkMax = [math]::Max($farkMax, [math]::Abs($a - $b)) }
+# OtoKal-Oku farkMax ifadesi, K9 düzeltmesi sonrası (Eding'e bağlı fonksiyonun içinde; ifade birebir kopya)
+$farkMax = 0.0; foreach ($ab in @(@(5.000, 5.004), @(7.210, 7.199))) { $a = $ab[0]; $b = $ab[1]; $farkMax = [math]::Max($farkMax, [math]::Abs($a - $b)) }
 $d = 'GECTI'; if ([math]::Abs($farkMax - 0.011) -gt 1e-9) { $d = 'KALDI' }
 T-Kaydet $d 'OtoKal-Oku çift ölçüm farkı (satır 5329 ifadesi)' 'fark 0.004 ve 0.011' "farkMax=$farkMax" '-' 'beklenen 0.011 (uyarı eşiği 0.01)'
 
