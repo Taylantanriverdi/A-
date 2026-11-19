@@ -462,8 +462,13 @@ function Devam-Kaydet([int]$satir, [string]$durum, [double]$yuzde) {
     try {
         $gecici = $DevamDosyasi + '.tmp'
         [System.IO.File]::WriteAllText($gecici, (ConvertTo-Json $o -Compress))
-        if ([System.IO.File]::Exists($DevamDosyasi)) { [System.IO.File]::Replace($gecici, $DevamDosyasi, $null) } else { [System.IO.File]::Move($gecici, $DevamDosyasi) }
-    } catch { }
+        # DÜZELTME: PowerShell .NET'e $null'u "" olarak geçirir; File.Replace(…, "") hata verir ve catch sessizce yutuyordu.
+        # Sonuç: devam.json ilk yazımdan (satır 1) sonra hiç güncellenmiyor, "kaldığı yerden" iş başından başlıyordu.
+        if ([System.IO.File]::Exists($DevamDosyasi)) {
+            try { [System.IO.File]::Replace($gecici, $DevamDosyasi, [NullString]::Value) }
+            catch { [System.IO.File]::Copy($gecici, $DevamDosyasi, $true); [System.IO.File]::Delete($gecici) }
+        } else { [System.IO.File]::Move($gecici, $DevamDosyasi) }
+    } catch { if (-not $script:DevamYazmaHatasi) { $script:DevamYazmaHatasi = $true; [Kayit]::Yaz("DEVAM: devam.json yazılamadı: $($_.Exception.Message)") } }
     $script:DevamSonYazma = Get-Date
 }
 
@@ -498,6 +503,10 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
         $an = $null; try { $an = [NcAnaliz]::Oku([string]$k.Kaynak, 4000.0) } catch { }
         $d = Devam-NC-Uret ([string]$k.Kaynak) ([int]$k.Satir) $mod $an
         Yaz "Devam programı: $($d.Yol)  (asıl dosyada satır $($d.Satir)'den, T$($d.Takim); tekrar edilecek kısım ~$(Sade-Sure $d.Tekrar))"
+        # Operatör hareketten ÖNCE devam noktasını görür ve onaylar (yanlış noktadan başlamaya karşı son kontrol)
+        $yzD = ''; try { if ($an -and $an.Toplam -gt 0 -and $an.Kumulatif.Length -ge $d.Satir) { $yzD = "  (%$([math]::Round(100.0 * $an.Kumulatif[[math]::Max(0, $d.Satir - 2)] / $an.Toplam, 1)))" } } catch { }
+        $kipD = switch ($mod) { 'tam' { 'durduğu yerin ~10 sn gerisinden' } 'yakin' { 'durduğu yerin ~1 dk gerisinden' } default { 'işlemin başından (son güvenli nokta)' } }
+        if (-not (Onay "Kaldığı yerden devam:`r`n`r`nİş durduğu satır: $($k.Satir)`r`nDevamın başlayacağı satır: $($d.Satir)$yzD`r`n($kipD; ~$(Sade-Sure $d.Tekrar) yeniden kesilir)`r`n`r`nMakine önce güvenli yüksekliğe kalkar, T$($d.Takim) frezini kullanır, noktanın üstüne gelip yavaşça iner.`r`nElini makineden çek, kapağı kapat.`r`n`r`nBaşlatılsın mı?" 'Kaldığı yerden devam')) { Yaz 'Devam: operatör vazgeçti.'; return }
         Dosyayi-Kontrol-Et $d.Yol
         if ($script:Engel) { (Ui-Kutu "Devam programı kontrolden geçemedi:`r`n$($script:SonHatalar -join "`r`n")" 'Devam' 'OK' 'Error') | Out-Null; return }
         Hata-Temizle 'Devam'
