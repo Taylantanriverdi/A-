@@ -20,6 +20,10 @@ import { createWorkerPanel, hudPortrait } from './workerPanel.js';
 import { createMachinePanel } from './machinePanel.js';
 import { createFinancePanel, createSeasonCard, financeBadge } from './financePanel.js';
 import { createBuildMode } from './buildMode.js';
+import { createSoldierPanel } from './soldierPanel.js';
+import { createRaidHud } from './raidHud.js';
+import { createRaidReport } from './raidReport.js';
+import './raid.css';
 import { createWeatherStrip } from './weatherStrip.js';
 import { createEventCard, createFestivalPanel } from './eventCard.js';
 import { formatMoney } from './hud.js';
@@ -98,6 +102,23 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
     closeAll: () => { panels.close(); if (toolbar.isPickerOpen) toolbar.closePicker(); if (card.isOpen) card.close(); if (settings.isOpen) settings.close(); toolbar.select('hand'); },
     toast: toasts.push,
   });
+  // ---- Gece İstilası (K29): asker paneli, uyarı bandı, gece HUD, sabah raporu ----
+  const solPanel = createSoldierPanel(ctx);
+  panels.register(solPanel);
+  const raidHud = createRaidHud(root, left, ctx, {
+    openPanel: (id) => { if (build.active) build.exit(); panels.open(id); },
+    openDefense: () => { panels.close(); build.openCategory('defense'); },
+  });
+  const raidReport = createRaidReport(root, ctx);
+  on('raid:warning', raidHud.onWarn);
+  on('raid:start', raidHud.onStart);
+  on('raid:end', raidHud.onEnd);
+  on('monster:killed', raidHud.onKilled);
+  on('raid:report', (p) => { if (state.settings && state.settings.raids) raidReport.show(p); });
+  on('soldiers:changed', solPanel.markDirty);
+  on('defense:changed', solPanel.markDirty);
+  on('money:changed', solPanel.markDirty);
+  let raidModeShown = null;
   panels.onChange((id) => {
     if (!id) return;
     if (build.active) build.exit();
@@ -182,7 +203,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   on('ui:open', (p) => {
     const id = p && p.panel;
     if (build.active) build.exit();
-    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building' || id === 'worker' || id === 'machine' || id === 'finance') openPanel(id, p);
+    if (id === 'inventory' || id === 'market' || id === 'shop' || id === 'building' || id === 'worker' || id === 'machine' || id === 'finance' || id === 'soldier') openPanel(id, p);
   });
   on('workers:changed', () => wrkPanel.markDirty());
   on('worker:result', (p) => { wrkPanel.markDirty(); if (p && p.ok === false && p.reason) toasts.push({ text: String(p.reason), kind: 'bad' }); });
@@ -316,6 +337,12 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
   loop.add(panels.render);
   loop.add(build.render);
   loop.add(() => {
+    const r = !!(state.settings && state.settings.raids);
+    if (r !== raidModeShown) { raidModeShown = r; panels.setRaidMode(r); if (!r) raidReport.close(); }
+    raidHud.render();
+    raidReport.render();
+  });
+  loop.add(() => {
     if (letterboxPending) {
       const p = letterboxPending; letterboxPending = null;
       const ms = Math.max(150, Math.min(2000, Number(p.duration) || 600));
@@ -390,6 +417,7 @@ export function mountUI({ state, bus, calendar = defaultCalendar, debug = false 
       window.removeEventListener('pointercancel', onCancel, true);
       clearTimeout(outsideTimer);
       clearTimeout(spoil.timer);
+      raidHud.destroy(); raidReport.destroy(); solPanel.destroy();
       wxStrip.destroy(); evCard.destroy(); festPanel.destroy();
       seasonCard.destroy(); build.destroy(); toolbar.destroy(); notes.destroy(); celebrate.destroy();
       shopPanel.destroy(); panels.destroy();

@@ -1,0 +1,90 @@
+/* Gece İstilası (K29) arayüzü: uyarı bandı, gece HUD, sabah raporu, asker paneli, onar şeridi, ayar anahtarı */
+#ui [hidden] { display: none !important; }
+#ui .raid-band {
+  position: absolute; z-index: 24;
+  top: calc(var(--gap) + var(--sa-t) + 64px); left: 50%;
+  width: min(560px, calc(100vw - 2 * var(--gap) - var(--sa-l) - var(--sa-r)));
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px 10px 14px; pointer-events: auto;
+  background: rgba(46, 24, 52, 0.72); border-color: rgba(190, 140, 255, 0.4);
+  opacity: 0; transform: translate(-50%, -10px); transition: opacity .28s var(--ease), transform .28s var(--ease);
+}
+#ui .raid-band.show { opacity: 1; transform: translate(-50%, 0); }
+#ui .raid-band.blood { background: rgba(84, 18, 24, 0.78); border-color: rgba(255, 110, 100, 0.55); box-shadow: var(--shadow), 0 0 22px rgba(255, 70, 60, 0.28); }
+#ui .rb-moon { width: 26px; height: 26px; border-radius: 50%; flex: none; background: radial-gradient(circle at 38% 36%, #fff2cf, #e9c885 70%); box-shadow: 0 0 12px rgba(255, 230, 160, .55); }
+#ui .raid-band.blood .rb-moon { background: radial-gradient(circle at 38% 36%, #ffb3a0, #d0402f 72%); box-shadow: 0 0 14px rgba(255, 80, 60, .7); }
+#ui .rb-tx { flex: 1 1 180px; font-weight: 650; font-size: 14px; line-height: 1.3; }
+#ui .rb-acts { display: flex; gap: 6px; }
+#ui .rb-acts button { min-height: var(--hit); padding: 0 14px; }
+
+#ui .raid-hud {
+  display: flex; flex-direction: column; gap: 6px; width: 210px; padding: 10px 12px;
+  background: rgba(32, 20, 44, 0.62); border-color: rgba(190, 140, 255, 0.28);
+  animation: ui-toast-in .3s var(--ease) both;
+}
+#ui .raid-hud.blood { background: rgba(70, 16, 22, 0.66); border-color: rgba(255, 110, 100, 0.45); }
+#ui .rh-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+#ui .rh-top b { font-size: 15px; }
+#ui .rh-tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--bad); }
+#ui .rh-row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-dim); }
+#ui .rh-house { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+#ui .rh-house .bar { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,244,220,.14); overflow: hidden; }
+#ui .rh-house .bar i { display: block; height: 100%; width: 100%; border-radius: 4px; transition: width .3s; }
+#ui .rh-loot { font-weight: 700; color: var(--accent); font-size: 14px; }
+#ui .rh-loot.pulse { animation: rh-pulse .5s var(--ease); }
+@keyframes rh-pulse { 0% { transform: scale(1.22); } 100% { transform: none; } }
+
+#ui .raid-report {
+  position: absolute; z-index: 27; left: 50%; top: 50%;
+  width: min(400px, calc(100vw - 2 * var(--gap) - var(--sa-l) - var(--sa-r)));
+  max-height: calc(100dvh - 2 * var(--gap) - var(--sa-t) - var(--sa-b)); overflow: auto;
+  display: flex; flex-direction: column; gap: 12px; padding: 16px; pointer-events: auto;
+  background: var(--glass-strong); opacity: 0; transform: translate(-50%, -46%) scale(.97);
+  transition: opacity .26s var(--ease), transform .26s var(--ease);
+}
+#ui .raid-report.show { opacity: 1; transform: translate(-50%, -50%); }
+#ui .raid-report header small { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+#ui .raid-report header b { font-size: 20px; }
+#ui .rr-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#ui .rr-stats > div { padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.06); display: flex; flex-direction: column; gap: 2px; }
+#ui .rr-stats span { font-size: 12px; color: var(--text-dim); }
+#ui .rr-stats b { font-size: 18px; }
+#ui .rr-stats .good { color: var(--good); }
+#ui .rr-sec h4 { margin: 0 0 6px; font-size: 13px; color: var(--text-dim); font-weight: 650; }
+#ui .rr-list { display: flex; flex-direction: column; gap: 6px; max-height: 32vh; overflow: auto; }
+#ui .rr-row, #ui .rr-house { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 10px; border-radius: 12px; background: rgba(255,255,255,.05); }
+#ui .rr-n { flex: 1; font-size: 14px; }
+#ui .rr-tag { font-size: 12px; color: var(--accent); }
+#ui .rr-row.ruined .rr-tag { color: var(--bad); }
+#ui .rr-row.fixed { opacity: .55; }
+#ui .rr-row button, #ui .rr-house button { padding: 0 12px; font-size: 13px; white-space: nowrap; }
+#ui .rr-ht { flex: 1; font-size: 14px; }
+#ui .rr-pen { margin: 0; font-size: 13px; color: var(--bad); }
+#ui .rr-close { min-height: var(--hit); }
+
+#ui .repair-strip { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-radius: 12px; background: rgba(242,184,75,.12); border: 1px solid rgba(242,184,75,.35); }
+#ui .repair-strip.ruined { background: rgba(255,122,107,.12); border-color: rgba(255,122,107,.45); }
+#ui .rs-tx { flex: 1; font-size: 13px; font-weight: 600; }
+#ui .rs-btn { padding: 0 14px; font-size: 13px; white-space: nowrap; }
+
+#ui .sold .sd-card { display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.05); }
+#ui .sold .sd-card + .sd-card { margin-top: 8px; }
+#ui .sd-head, #ui .sd-row { display: flex; align-items: center; gap: 10px; }
+#ui .sd-row { padding: 6px 0; }
+#ui .sd-row + .sd-row { border-top: 1px solid var(--edge); }
+#ui .sd-pic { width: 48px; height: 48px; flex: none; }
+#ui .sd-pic.sm { width: 40px; height: 40px; }
+#ui .sd-pic svg { width: 100%; height: 100%; display: block; }
+#ui .sd-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+#ui .sd-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-dim); }
+#ui .sd-stats b { color: var(--text); }
+#ui .sd-row .sbar { height: 6px; border-radius: 3px; background: rgba(255,244,220,.12); overflow: hidden; display: block; }
+#ui .sd-row .sbar i { display: block; height: 100%; }
+#ui .sd-row .sf { min-width: 76px; min-height: var(--hit); padding: 0 10px; font-size: 13px; }
+#ui .sd-row .sf.armed { color: var(--bad); border-color: var(--bad); }
+#ui .sold .why { font-size: 12px; color: var(--bad); }
+#ui .sold .why:empty { display: none; }
+
+#ui .s-raid { display: flex; flex-direction: column; gap: 8px; }
+#ui .sd-row .sub, #ui .sd-tx .wrk-small { display: block; }
+#ui .sd-row .sf { flex: none; width: 88px; }
