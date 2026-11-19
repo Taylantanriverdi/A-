@@ -1849,6 +1849,22 @@ function Durakli-Mi { return ((Eding-Durum) -like 'PAUSE*') }
 function Mesgul([string]$d) { return ($d -like 'RUN*' -or @('SEARCHING', 'AXISJOG', 'IPJOG') -contains $d) }
 function Hatali([string]$d) { return ($d -like '*ERR*') }
 function Calisiyor-Mu { return (Mesgul (Eding-Durum)) }
+# K1 (GV-01): duraklatılmış iş de "sürüyor" sayılır. İş sürerken ya da duraklıyken yalnız DEVAM, DURDUR, ACİL STOP ve hız serbest;
+# jog, M6, pens, MDI, G54/#4000-#4199 yazma, iş yükleme, Eding'i yeniden başlatma yasak (iş mili duraklamada dönmeye devam eder).
+function Is-Suruyor {
+    if ($script:IsAktif) { return $true }
+    if (-not $script:ApiHazir -or -not $script:Bagli) { return $false }
+    $d = Eding-Durum
+    if ((Mesgul $d) -or $d -like 'PAUSE*') { return $true }
+    try { if ([Eding]::CncGetPauseStatus() -ne 0) { return $true } } catch { }
+    return $false
+}
+function Is-Suruyor-Uyari([string]$islem) {
+    if (-not (Is-Suruyor)) { return $false }
+    [Kayit]::Yaz("ENGEL: '$islem' iş sürerken / duraklıyken reddedildi")
+    [Kayit]::Show("Bir iş çalışıyor ya da DURAKLATILMIŞ bekliyor.`r`n`r`nİş sürerken ve duraklıyken yalnız DEVAM, DURDUR, ACİL STOP ve hız ayarı kullanılabilir (duraklamada iş mili dönmeye devam eder).`r`nBu işlem için önce işin bitmesini bekle ya da DURDUR.", $islem, 'OK', 'Warning') | Out-Null
+    return $true
+}
 
 # Eding hata ya da iptal durumundaysa komut kabul etmez: önce sıfırla
 function Hata-Temizle([string]$islem) {
@@ -2029,6 +2045,7 @@ function Hazir-Mi([string]$islem) {
         [Kayit]::Show("Eding CNC'ye bağlanılamadı. Önce Eding CNC programını aç.", $islem, 'OK', 'Warning') | Out-Null
         return $false
     }
+    if (Is-Suruyor-Uyari $islem) { return $false }
     if ([Eding]::CncGetEMStopActive() -ne 0) {
         # EXTERR / acil stop sinyali: makineden gelir (hava basıncı düşük, iş mili sürücüsü hatası, acil stop butonu)
         if (-not (Onay "Makine hata sinyali veriyor (EXTERR / acil stop).`r`n`r`nEn sık sebep: hava basıncı düşük (kompresör kapalı ya da basınç yetersiz).`r`nDiğerleri: iş mili sürücüsü hatası, acil stop butonu basılı.`r`n`r`nKompresörü ve basıncı kontrol ettiysen RESET yapılsın mı?" $islem)) { return $false }
@@ -2053,7 +2070,7 @@ function Onay([string]$metin, [string]$baslik) {
 
 # ---------------- Butonlar ----------------
 function Btn-DosyaSec {
-    if ($script:IsAktif) { [Kayit]::Show('Kazıma sürerken yeni dosya seçilemez.', 'Dosya Seç', 'OK', 'Warning') | Out-Null; return }
+    if ((Is-Suruyor)) { [Kayit]::Show('Kazıma sürerken yeni dosya seçilemez.', 'Dosya Seç', 'OK', 'Warning') | Out-Null; return }
     $dlg = New-Object System.Windows.Forms.OpenFileDialog
     $dlg.Filter = 'NC dosyaları (*.nc)|*.nc|Tüm dosyalar (*.*)|*.*'
     $dlg.Title  = 'Kazınacak .nc dosyasını seç'
@@ -2090,6 +2107,7 @@ $script:ManuelDiyalogAcik = $false
 function Frez-Manuel-Mi { try { return ([Eding]::CncGetVariable(4030) -eq 1) } catch { return $false } }
 
 function Frez-Modu-Yaz([bool]$manuel) {
+    if (Is-Suruyor-Uyari 'Frez modu') { return $false }
     $v = if ($manuel) { 1 } else { 0 }
     $ok = Degisken-Yaz 4030 $v
     if ($ok) { Yaz "Frez değişimi: $(if ($manuel) { 'MANUEL (elle)' } else { 'OTOMATİK (magazin)' })" }
@@ -2545,6 +2563,7 @@ function Blok-Cip-Guncelle {
     $lnkMod.Invalidate()
 }
 function Yeni-Blok {
+    if (Is-Suruyor-Uyari 'Yeni blok') { return }
     $f = New-Object System.Windows.Forms.Form
     $f.Text = 'Yeni blok'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.MinimizeBox = $false
     $f.TopMost = $true; $f.ShowInTaskbar = $false
@@ -2669,7 +2688,7 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
     [Kayit]::Yaz("UZAK ($ip): $ad $arg")
     switch ($ad) {
         'sec' {
-            if ($script:IsAktif -or (Calisiyor-Mu) -or (Durakli-Mi)) { return 'HATA: Kazıma sürerken iş değiştirilemez' }
+            if ((Is-Suruyor)) { return 'HATA: Kazıma sürerken / duraklıyken iş değiştirilemez' }
             Yaz "Uzaktan ($ip) iş seçildi: $arg"
             return (Uzak-Is-Sec $arg)
         }
@@ -2708,7 +2727,7 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
             if (-not $metin) { return 'HATA: Blok ismi boş (rakam, harf, - . /)' }
             if ($null -eq $T -or $T -lt 10 -or $T -gt 30) { return 'HATA: Kalınlık 10–30 mm olmalı' }
             if ($null -eq $D -or $D -lt 0.05 -or $D -gt 0.5) { return 'HATA: Derinlik 0.05–0.5 mm olmalı' }
-            if ($script:IsAktif -or (Calisiyor-Mu)) { return 'HATA: Kazıma sürerken blok ismi değiştirilemez' }
+            if ((Is-Suruyor)) { return 'HATA: Kazıma sürerken / duraklıyken blok ismi değiştirilemez' }
             $script:Tercih.SadeKalinlik = "$T"; $script:Tercih.SadeDerinlik = "$D"; Tercih-Yaz
             $taraf = if ($script:Tercih.SadeTaraf -eq '3') { '3' } else { '9' }
             $script:BekleyenBlok = @{ Metin = $metin; T = $T; Takim = 2; Cap = 1.0; Yuk = 4.0; Konum = $taraf; Cizgi = $true; Derin = $D }
@@ -3136,7 +3155,7 @@ function Btn-Home([bool]$sor = $true) {
     if ([Eding]::AcilKilit) { [Kayit]::Show("ACİL STOP basılı.`r`nKaldırmak için RESET'e (ya da ACİL STOP butonuna) bas.", 'Home', 'OK', 'Warning') | Out-Null; return }
     if (-not (Baglan)) { [Kayit]::Show("Makineye bağlanılamadı. Eding birkaç saniye içinde açılmazsa programı yeniden başlat.", 'Home', 'OK', 'Warning') | Out-Null; return }
     if ([Eding]::CncGetEMStopActive() -ne 0) { [Kayit]::Show('Önce makinedeki acil stop butonunu bırak.', 'Home', 'OK', 'Warning') | Out-Null; return }
-    if ((Calisiyor-Mu)) { [Kayit]::Show('Makine çalışıyor. Önce DURDUR.', 'Home', 'OK', 'Warning') | Out-Null; return }
+    if (Is-Suruyor-Uyari 'Home') { return }
     if ($sor -and -not $script:Sade -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra C kol düz, sonra X, Y, A, B.`r`n`r`nİş milinde freze olmamalı, kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
 
     $form.Cursor = 'WaitCursor'
@@ -3238,7 +3257,7 @@ function Acilis-Hazirla {
         if ($script:AcilisDurum -ne 'acilstop') { Yaz 'Açılış: acil stop basılı. Bırakınca hazırlık otomatik devam edecek.'; $script:AcilisDurum = 'acilstop' }
         return
     }
-    if (Mesgul $d) { Yaz "Açılış: Eding meşgul ($d), otomatik hazırlık atlandı."; $script:AcilisDurum = 'tamam'; return }
+    if ((Mesgul $d) -or $d -like 'PAUSE*') { Yaz "Açılış: Eding meşgul ya da duraklı ($d), otomatik hazırlık atlandı."; $script:AcilisDurum = 'tamam'; return }
     $script:AcilisDurum = 'calisiyor'
     try {
         Yaz 'Açılış: otomatik hazırlık başladı.'
@@ -3340,8 +3359,8 @@ function Btn-Reset {
     if ([Eding]::AcilKilit) { Acil-Stop-Kaldir; return }
     if (-not (Baglan)) { [Kayit]::Show("Eding CNC'ye bağlanılamadı.", 'Reset', 'OK', 'Warning') | Out-Null; return }
     if ([Eding]::CncGetEMStopActive() -ne 0) { [Kayit]::Show('Önce makinedeki acil stop butonunu bırak, sonra RESET.', 'Reset', 'OK', 'Warning') | Out-Null; return }
-    if ((Calisiyor-Mu)) {
-        if (-not (Onay 'Makine çalışıyor. RESET işi durdurur. Devam edilsin mi?' 'Reset')) { return }
+    if ((Is-Suruyor)) {
+        if (-not (Onay 'Makine çalışıyor ya da duraklatılmış bir iş var. RESET işi durdurur. Devam edilsin mi?' 'Reset')) { return }
     }
     if (Komut-Sonucu 'Reset' ([Eding]::CncReset())) {
         $script:PensAcik = $false
@@ -3366,7 +3385,7 @@ function Mdi-Gonder {
     $komut = $txtMdi.Text.Trim()
     if (-not $komut) { return }
     if (-not (Baglan)) { Yaz 'MDI: makine bağlı değil.'; return }
-    if ((Calisiyor-Mu)) { Yaz 'MDI: makine çalışırken komut gönderilemez.'; return }
+    if ((Is-Suruyor)) { Yaz 'MDI: iş sürerken ya da duraklıyken komut gönderilemez.'; return }
     Yaz "MDI> $komut"
     $rc = [Eding]::CncRunSingleLine($komut)
     Yaz ("     " + [Eding]::RCText($rc))
@@ -3822,6 +3841,7 @@ function Hava-Ufle {
 }
 
 function Pens-Ac-T0([string]$ad = 'Pens aç') {
+    if (Is-Suruyor-Uyari $ad) { return $false }
     # Pens açılınca frez elle çıkarılır: Eding'deki takım numarası da T0 yapılır (macro: gosub pm_pens_t0, hareket yok).
     $yol = [System.IO.Path]::Combine($EdingKlasor, 'macro.cnc'); $var = $false
     try {
@@ -3911,6 +3931,7 @@ $RafVarsayilan = @{ X = -125.557; Y1 = -89.166; A = 23.0; B = 0.0; AlmaZ = -45.0
 $script:RafKontrolTamam = $false
 
 function Degisken-Yaz([int]$nr, [double]$v) {
+    if ((Is-Suruyor)) { [Kayit]::Yaz("DEĞİŞKEN> #$nr yazılmadı: iş sürüyor / duraklı (K1)"); return $false }
     $rc = [Eding]::CncRunSingleLine("#$nr=$(Sayi $v)")
     [Kayit]::Yaz("DEĞİŞKEN> #$nr=$(Sayi $v)   -> $([Eding]::RCText($rc))")
     return (Rc-Tamam $rc)
@@ -4135,7 +4156,7 @@ function Eding-Gizle {
     [Kayit]::Yaz('EDING: pencere tekrar arka planda')
 }
 function Eding-Yeniden {
-    if ((Calisiyor-Mu)) { [Kayit]::Show('Makine çalışıyor. Önce DURDUR.', 'Eding', 'OK', 'Warning') | Out-Null; return }
+    if (Is-Suruyor-Uyari 'Eding yeniden başlat') { return }
     if (-not (Onay "Eding tamamen kapatılıp yeniden açılacak (macro.cnc ve cnc.ini yeniden okunur).`r`nSonra makine yeniden home alır. Devam?" 'Eding yeniden başlat')) { return }
     try { [void][Eding]::CncDisConnectServer() } catch { }
     $script:Bagli = $false
@@ -4774,7 +4795,7 @@ function Kal-Test-Hazirla {
     $T = Metin-Sayi $txtKalT.Text; $D = Metin-Sayi $txtKalD.Text
     if ($null -eq $T -or $T -lt 10 -or $T -gt 30) { [Kayit]::Show('Disk kalınlığını kumpasla ölçüp yaz (10–30 mm).', 'Test bloğu', 'OK', 'Warning') | Out-Null; return }
     if ($null -eq $D -or $D -lt 0.5 -or $D -gt 3) { [Kayit]::Show('T1 frez çapını yaz (genelde 2.0 mm).', 'Test bloğu', 'OK', 'Warning') | Out-Null; return }
-    if ($script:IsAktif) { [Kayit]::Show('Kazıma sürerken test hazırlanamaz.', 'Test bloğu', 'OK', 'Warning') | Out-Null; return }
+    if (Is-Suruyor-Uyari 'Test bloğu') { return }
     $k = $cmbKalTest.SelectedIndex + 1
     $dzK = Kal-Duzen $k
     $m = "Kalibrasyon testi $k / 4 hazırlanacak ve seçilecek:`r`n`r`n" +
@@ -5310,7 +5331,7 @@ function OtoKal-Hazirla {
     $ucD = Metin-Sayi $txtOkUcD.Text
     if ($null -eq $ucD -or $ucD -lt 0.5 -or $ucD -gt 6) { [Kayit]::Show('Temas ucunun çapını yaz (pim genelde 3.00, frez 2.00).', 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
     if ($null -eq $T -or $T -lt 8 -or $T -gt 30) { [Kayit]::Show('Titanyum diskin kalınlığını mikrometreyle ölçüp yaz (ör. 10.02).', 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
-    if ($script:IsAktif) { [Kayit]::Show('Kazıma sürerken ölçüm hazırlanamaz.', 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
+    if (Is-Suruyor-Uyari 'Otomatik kalibrasyon') { return }
     if (-not (Baglan)) { [Kayit]::Show("Eding'e bağlanılamadı.", 'Otomatik kalibrasyon', 'OK', 'Warning') | Out-Null; return }
     $aktif = OtoKal-Prob-Aktif-Mi
     if ($aktif -eq $true) {
@@ -5582,7 +5603,7 @@ if ($script:Sade) {
     $script:Manuel = $this.Checked
     $script:Tercih.FrezModu = if ($this.Checked) { 'MANUEL' } else { 'OTOMATIK' }; Tercih-Yaz
     Yaz "Frez değişimi: $($script:Tercih.FrezModu) (kaydedildi)"
-    if ($script:OzelMakro -and $script:Bagli -and -not (Calisiyor-Mu)) { try { [void](Frez-Modu-Yaz $script:Manuel) } catch { } }
+    if ($script:OzelMakro -and $script:Bagli -and -not (Is-Suruyor)) { try { [void](Frez-Modu-Yaz $script:Manuel) } catch { } }
 })
 
 A-Baslik 'GÖRÜNÜM' 24 80
