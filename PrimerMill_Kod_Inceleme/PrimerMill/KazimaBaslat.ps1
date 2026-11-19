@@ -3378,7 +3378,7 @@ function Btn-Pens {
     if (-not (Hazir-Mi 'Pens')) { return }
     if ((Calisiyor-Mu)) { [Kayit]::Show('Makine çalışırken pens açılamaz.', 'Pens', 'OK', 'Warning') | Out-Null; return }
     if (-not $script:PensAcik) {
-        if (-not $script:Sade -and -not (Onay "Pens hava ile AÇILACAK ve takım T0 yapılacak.`r`n`r`nİş milinde freze varsa düşebilir, elinle tut.`r`nDevam edilsin mi?" 'Pens Aç')) { return }
+        # Onay Pens-Ac-T0 içinde (K2: bütün "Pens aç" düğmeleri aynı onayı ve M5 beklemesini kullanır)
         if (Pens-Ac-T0 'Pens aç') { $script:PensAcik = $true; $btnPens.Text = 'PENS KAPAT' }
     } else {
         if (Komut-Sonucu 'Pens kapat (M55 P2)' ([Eding]::CncRunSingleLine('M55 P2'))) { $script:PensAcik = $false; $btnPens.Text = 'PENS AÇ' }
@@ -3846,8 +3846,29 @@ function Hava-Ufle {
     [void](Komut-Sonucu 'Hava kapat' ([Eding]::CncRunSingleLine('M55 P4')))
 }
 
+# K2 (GV-02/KU-01): pens açılmadan önce iş mili durdurulur (M5) ve durduğu Eding'den okunur (en fazla 8 sn).
+# MAKİNEDE DOĞRULA: CncGetActualSpeed'in birimi (devir/dk mı, oran mı) ve M5 sonrası gerçekten 0'a indiği.
+function Ismili-Durdur-Bekle([string]$ad) {
+    $rc = [Eding]::CncRunSingleLine('M5')
+    [Kayit]::Yaz("PENS: önce iş mili durduruluyor: M5 -> $([Eding]::RCText($rc))")
+    if (-not (Rc-Tamam $rc)) { [void](Komut-Sonucu "$ad (M5)" $rc); return $false }
+    [void](Hareket-Bitene-Kadar-Bekle 5)
+    $son = (Get-Date).AddSeconds(8); $hiz = [double]::NaN
+    do {
+        [System.Windows.Forms.Application]::DoEvents()
+        try { $hiz = [double][Eding]::CncGetActualSpeed() } catch { $hiz = [double]::NaN }
+        if (-not [double]::IsNaN($hiz) -and [math]::Abs($hiz) -lt 1) { [Kayit]::Yaz("PENS: iş mili durdu (hız $hiz)"); return $true }
+        Start-Sleep -Milliseconds 200
+    } while ((Get-Date) -lt $son)
+    [Kayit]::Yaz("PENS: iş mili 8 sn içinde durmadı / hız okunamadı (son okunan $hiz), pens AÇILMADI")
+    [Kayit]::Show("İş mili durdurulamadı ya da durduğu okunamadı (Eding'in bildirdiği hız: $hiz).`r`n`r`nPens AÇILMADI. İş milinin tamamen durduğunu gözünle kontrol et, sonra tekrar dene.", $ad, 'OK', 'Warning') | Out-Null
+    return $false
+}
+
 function Pens-Ac-T0([string]$ad = 'Pens aç') {
     if (Is-Suruyor-Uyari $ad) { return $false }
+    if (-not (Onay "Pens hava ile AÇILACAK ve takım T0 yapılacak.`r`nÖnce iş mili durdurulur (M5) ve durması beklenir.`r`n`r`nİş milinde freze varsa düşebilir, elinle tut.`r`nDevam edilsin mi?" $ad)) { return $false }
+    if (-not (Ismili-Durdur-Bekle $ad)) { return $false }
     # Pens açılınca frez elle çıkarılır: Eding'deki takım numarası da T0 yapılır (macro: gosub pm_pens_t0, hareket yok).
     $yol = [System.IO.Path]::Combine($EdingKlasor, 'macro.cnc'); $var = $false
     try {
