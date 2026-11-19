@@ -136,6 +136,8 @@ Sub home_c
 Endsub
 
 sub home_all
+	;PrimerMill (MC-04): kalici "pens elle acildi" bayragi takili kalmasin
+	#4039 = 0
 	gosub home_z
 	gosub home_x
 	gosub home_y
@@ -847,6 +849,8 @@ sub azxy_safe
 endsub
 
 sub check_empty_tool
+	;PrimerMill (MC-04): is basinda kalici bayrak sifirlanir, T1 M6 gercek degisim yapar
+	#4039 = 0
 	if[#5008 <> 0]
 		errmsg "error the spindle must not be clampe tool before the program is run."
 	endif
