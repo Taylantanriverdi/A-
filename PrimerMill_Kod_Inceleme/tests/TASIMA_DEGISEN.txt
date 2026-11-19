@@ -38,7 +38,7 @@ Acil-Stop | DEGISTI | E-stop düğmesi / lamba / çubuk yazıları kaldırıldı
 Acil-Stop-Kaldir | DEGISTI | E-stop düğmesi ve PENS düğmesi yazısı kaldırıldı
 Btn-Reset | DEGISTI | PENS düğmesi yazısı kaldırıldı
 Btn-Pens | DEGISTI | düğme yazısı kaldırıldı (yeni arayüzde PENS AÇ / PENS KAPAT ayrı komut: pens.ac -> Btn-Pens-Ac, pens.kapat -> Tek-Komut M55 P2)
-Mdi-Gonder | DEGISTI | satır komut argümanı; Onay -> Ui-Tehlikeli-Onay; G10/G92/#4xxx/#5xxx satırında önce ayar yedeği (yeni, güvenlik)
+Mdi-Gonder | DEGISTI | satır komut argümanı; Onay -> Ui-Tehlikeli-Onay; G10/G92/#4xxx/#5xxx satırında (boşluksuz yazım dahil, Mdi-Ayar-Yazar-Mi) önce ayar yedeği (yeni, güvenlik)
 Btn-Temizlik | DEGISTI | TEMİZLİK ve PARK ayrı düğme (KU-13): $adim parametresi; Z / A-B / G30 satırları ve beklemeler aynı
 Konuma-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
 Yuvaya-Git | DEGISTI | etiket -> $script:YuvaDurumMetni

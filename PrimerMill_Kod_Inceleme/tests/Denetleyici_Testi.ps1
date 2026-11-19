@@ -239,6 +239,12 @@ Dogru (($script:UiKayit -join "`n") -match 'TEHLIKELI \[MDI\]') 'MDI tehlikeli o
 $script:UiKayit.Clear()
 [void](Komut-Isle 'mdi.gonder' '#5221=1')
 Dogru (($script:UiKayit -join "`n") -match 'yedek: .*ayar_') 'MDI #5xxx satırında yedek alınır ve onayda görünür'
+# SK-05: boşluksuz / küçük harfli / boşluklu yazımlar da ayar yazan satır sayılır (önce yedek)
+foreach ($s in @('G10L2P1X0', 'g10 l2 p1 x0', 'G10 L2 P1 X0', 'G92X0', 'g92.1', '#5221=1', '# 4002 = 1', '#[4002]=1', 'N10G10L2')) { Dogru (Mdi-Ayar-Yazar-Mi $s) "MDI ayar yazar: '$s'" }
+foreach ($s in @('G1 X10', 'G01 X10', 'G100', 'G0 X10 Y10', 'M10', '#5221', 'T10 M6')) { Dogru (-not (Mdi-Ayar-Yazar-Mi $s)) "MDI ayar yazmaz: '$s'" }
+$script:UiKayit.Clear()
+[void](Komut-Isle 'mdi.gonder' 'G10L2P1X0')
+Dogru (($script:UiKayit -join "`n") -match '(?s)TEHLIKELI \[MDI\].*yedek: .*ayar_') 'MDI G10L2P1X0 (boşluksuz): yedek alınır ve onayda görünür'
 $script:SahteOnay = $true
 $script:UiKayit.Clear()
 $sonuc = Komut-Isle 'degisken.kaydet' ('5221={0};5222={1};5223={2};5224={3};5225={4};4000=-46.9;4001=-26;4002=32.5;4003=-1;4004=-14;4005=0.2;4006=1' -f (Sayi ([Eding]::CncGetVariable(5221))), (Sayi ([Eding]::CncGetVariable(5222))), (Sayi ([Eding]::CncGetVariable(5223))), (Sayi ([Eding]::CncGetVariable(5224))), (Sayi ([Eding]::CncGetVariable(5225))))

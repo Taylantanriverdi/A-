@@ -934,6 +934,10 @@ function Btn-Pens {
     }
 }
 
+# SK-05: MDI satırı G54 / G92 / kalıcı değişken yazıyor mu (önce ayar yedeği alınır). Boşluksuz ve küçük harfli yazımlar da:
+# G10L2P1X0, g10 l2, G92X0, #5221=1, # 4002 = 1, #[4002]=1. G100 gibi başka kodlar eşleşmez.
+function Mdi-Ayar-Yazar-Mi([string]$satir) { return ([string]$satir -match '(?i)G\s*0*10(?![\d.])|G\s*0*92|#\s*\[?\s*[45]\d{3}\s*\]?\s*=') }
+
 function Mdi-Gonder([string]$satir) {
     $komut = ([string]$satir).Trim()
     if (-not $komut) { return }
@@ -942,7 +946,7 @@ function Mdi-Gonder([string]$satir) {
     # KU-03: MDI satırı makineyi doğrudan hareket ettirebilir; tam satır gösterilip onay alınır (varsayılan HAYIR)
     # TASARIM §6: MDI tehlikeli onay. G10 / G92 / #4xxx / #5xxx yazan satırda önce ayar yedeği alınır (KL-04 ile aynı yol).
     $ek = ''; $yedek = ''
-    if ($komut -match '(?i)\bG10\b|\bG92|#\s*[45]\d{3}\s*=') {
+    if (Mdi-Ayar-Yazar-Mi $komut) {
         if (-not (Ayar-Yedekle $true)) { Yaz "MDI: yedek alınamadı, gönderilmedi ($komut)"; return }
         $yedek = $script:SonYedekDosya
         $ek = "`r`n`r`nDİKKAT: bu satır G54 / G92 / kalıcı değişkenleri (#4xxx/#5xxx) değiştirir."
