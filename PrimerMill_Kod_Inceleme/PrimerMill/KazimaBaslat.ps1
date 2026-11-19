@@ -4140,6 +4140,7 @@ function Ayar-Kaydet {
          (($ParamTanim.Keys | ForEach-Object { "#$_ $($ParamTanim[$_]): $(Sayi $p[$_])" }) -join "`r`n") +
          "`r`n`r`nBu değerler takım değişimini VE parça kazımayı etkiler. Devam?"
     if (-not (Onay $m 'Ayar kaydet')) { return }
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04
     $ok = (Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $g.X) Y$(Sayi $g.Y) Z$(Sayi $g.Z) A$(Sayi $g.A) B$(Sayi $g.B)")))
     foreach ($nr in $ParamTanim.Keys) { if ($ok) { $ok = (Komut-Sonucu "#$nr" ([Eding]::CncRunSingleLine("#$nr=$(Sayi $p[$nr])"))) } }
     Start-Sleep -Milliseconds 500
@@ -4210,7 +4211,7 @@ function Konumu-Sensor-Yap {
     $m = "İş mili şu an frez boyu sensörünün tam ortasında mı?`r`n`r`nYeni sensör konumu:  X $(Sayi $p.X)   Y $(Sayi $p.Y)`r`n(eski: X $(Sayi $eX)   Y $(Sayi $eY))`r`n`r`n" +
          "Frez yuvaları ve G54 (disk sıfırı) değişmez.`r`nKaydedilsin mi?"
     if (-not (Onay $m 'Sensör kaydet')) { return }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = (Degisken-Yaz 4020 $p.X) -and (Degisken-Yaz 4021 $p.Y)
     Start-Sleep -Milliseconds 300
     Ayar-Oku
@@ -4246,7 +4247,7 @@ function Konumu-Yuva-Yap([int]$n) {
     if ($p.Z -lt ($yaklas - 3)) {
         $zDe = Onay "İş mili alma yüksekliğinde görünüyor (Z $(Sayi $p.Z)).`r`nBu Z, alma yüksekliği (#4000) olarak da kaydedilsin mi?`r`nBırakma 1 mm yukarıda yapılır." "T$n kaydet"
     }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     if ($n -eq 1) {
         $ok = (Degisken-Yaz 4010 $p.X) -and (Degisken-Yaz 4011 $p.Y) -and (Degisken-Yaz 4017 $p.A) -and (Degisken-Yaz 4018 $p.B)
         if ($ok -and $hepsi) {
@@ -4274,6 +4275,7 @@ function Z-Alma-Yap {
     if (-not (Hazir-Hareket 'Alma yüksekliği')) { return }
     $p = [Eding]::MachinePos()
     if (-not (Onay "Şu anki Z ($(Sayi $p.Z)) frezeyi alma yüksekliği (#4000) olarak kaydedilsin mi?`r`nPens bu yükseklikte frezeyi kavrar." 'Alma yüksekliği')) { return }
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04
     if (Komut-Sonucu '#4000' ([Eding]::CncRunSingleLine("#4000=$(Sayi $p.Z)"))) { Start-Sleep -Milliseconds 500; Ayar-Oku }
 }
 
@@ -4301,7 +4303,7 @@ function G54-Ureticiye-Don {
          "G92 kaydırmaları da sıfırlanır (frez boyu bir sonraki frez değişiminde yeniden ölçülür).`r`n" +
          "Frez yuvaları değişmez. Önce otomatik yedek alınır. Devam?"
     if (-not (Onay $m 'Üretici kalibrasyonu')) { return }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = Komut-Sonucu 'G54 üretici' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $UreticiG54.X) Y$(Sayi $UreticiG54.Y) Z$(Sayi $UreticiG54.Z) A$(Sayi $UreticiG54.A) B$(Sayi $UreticiG54.B)"))
     if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
     if ($ok) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')) }
@@ -4323,21 +4325,37 @@ function G54-Ureticiye-Don {
 function G92-Sifirla {
     if (-not (Hazir-Hareket 'G92 sıfırla')) { return }
     if (-not (Onay "Tüm G92 kaydırmaları sıfırlanacak (G92.1).`r`nTakım boyu ölçümü de silinir; bir sonraki takım değişiminde yeniden ölçülür. Devam?" 'G92 sıfırla')) { return }
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04
     if (Komut-Sonucu 'G92 sıfırla (G92.1)' ([Eding]::CncRunSingleLine('G92.1'))) { Start-Sleep -Milliseconds 400; Ayar-Oku }
 }
 
 $YedekKlasoru = [System.IO.Path]::Combine($ScriptKlasor, 'yedekler')
+# KL-04: yalnız dosya yazılıp geri okunabildiyse $true döner; G54 / #4000-#4199 yazan her işlem $false'ta hiçbir şey yazmadan durur.
+# Yedekte G92 kaydırmaları (#5211-#5215) da bulunur (yalnız bilgi; Yedekten yükle G92'yi geri yazmaz).
 function Ayar-Yedekle([bool]$sessiz = $false) {
-    if (-not (Baglan)) { return }
-    [void][System.IO.Directory]::CreateDirectory($YedekKlasoru)
-    $dosya = [System.IO.Path]::Combine($YedekKlasoru, 'ayar_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '.txt')
-    $satirlar = @("; PrimerMill ayar yedeği  $(Get-Date)  Eding: $EdingKlasor")
-    foreach ($nr in @(5221, 5222, 5223, 5224, 5225) + @($ParamTanim.Keys | ForEach-Object { [int]$_ }) + @($RafTanim.Keys | ForEach-Object { [int]$_ }) + @(5161, 5162, 5163, 5164, 5165, 5181, 5182, 5183, 5184, 5185)) {
-        $satirlar += "#$nr=$(Sayi ([Eding]::CncGetVariable($nr)))"
+    if (-not (Baglan)) {
+        Yaz 'Ayar yedeği alınamadı: Eding bağlı değil.'
+        [Kayit]::Show("Ayar yedeği alınamadı: Eding'e bağlanılamadı.`r`nHiçbir ayar değiştirilmedi.", 'Yedekle', 'OK', 'Warning') | Out-Null
+        return $false
     }
-    [System.IO.File]::WriteAllLines($dosya, $satirlar)
+    $dosya = [System.IO.Path]::Combine($YedekKlasoru, 'ayar_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '.txt')
+    try {
+        [void][System.IO.Directory]::CreateDirectory($YedekKlasoru)
+        $satirlar = @("; PrimerMill ayar yedeği  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  Eding: $EdingKlasor")
+        foreach ($nr in @(5221, 5222, 5223, 5224, 5225) + @($ParamTanim.Keys | ForEach-Object { [int]$_ }) + @($RafTanim.Keys | ForEach-Object { [int]$_ }) + @(5161, 5162, 5163, 5164, 5165, 5181, 5182, 5183, 5184, 5185) + @(5211, 5212, 5213, 5214, 5215)) {
+            $satirlar += "#$nr=$(Sayi ([Eding]::CncGetVariable($nr)))"
+        }
+        [System.IO.File]::WriteAllLines($dosya, [string[]]$satirlar, (New-Object System.Text.UTF8Encoding($false)))
+        $geri = [System.IO.File]::ReadAllLines($dosya, [System.Text.Encoding]::UTF8)
+        if (($geri -join "`n") -ne ($satirlar -join "`n")) { throw 'yazılan dosya geri okunduğunda farklı' }
+    } catch {
+        Yaz "Ayar yedeği ALINAMADI: $($_.Exception.Message)"
+        [Kayit]::Show("Ayar yedeği alınamadı:`r`n$($_.Exception.Message)`r`n`r`n$dosya`r`n`r`nHiçbir ayar değiştirilmedi.", 'Yedekle', 'OK', 'Error') | Out-Null
+        return $false
+    }
     Yaz "Ayarlar yedeklendi: $dosya"
     if (-not $sessiz) { [Kayit]::Show("Ayarlar yedeklendi:`r`n$dosya", 'Yedekle', 'OK', 'Information') | Out-Null }
+    return $true
 }
 
 function Ayar-Geri-Yukle {
@@ -4354,6 +4372,7 @@ function Ayar-Geri-Yukle {
     $m = "Yedekten yüklenecek (G54 ve takım değiştirici parametreleri):`r`n`r`nG54  X $($d[5221])  Y $($d[5222])  Z $($d[5223])  A $($d[5224])  B $($d[5225])`r`n" +
          (($ParamTanim.Keys | Where-Object { $d.ContainsKey([int]$_) } | ForEach-Object { "#$_ = $($d[[int]$_])" }) -join '   ') + "`r`n`r`nDevam?"
     if (-not (Onay $m 'Yedekten yükle')) { return }
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: şu anki değerler de yedeklenir
     $ok = (Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$($d[5221]) Y$($d[5222]) Z$($d[5223]) A$($d[5224]) B$($d[5225])")))
     foreach ($nr in @($ParamTanim.Keys) + @($RafTanim.Keys)) { if ($ok -and $d.ContainsKey([int]$nr)) { $ok = (Komut-Sonucu "#$nr" ([Eding]::CncRunSingleLine("#$nr=$($d[[int]$nr])"))) } }
     Start-Sleep -Milliseconds 500; Ayar-Oku
@@ -4724,7 +4743,7 @@ function Yuva-Kaydet {
     $ad = @{ 4000 = 'alma Z'; 4010 = 'yuva X'; 4011 = 'T1 Y'; 4012 = 'T2 Y'; 4013 = 'T3 Y'; 4014 = 'T4 Y'; 4015 = 'T5 Y'; 4016 = 'T6 Y'; 4017 = 'yuva A'; 4018 = 'yuva B'; 4020 = 'sensör X'; 4021 = 'sensör Y'; 4031 = 'değişim X'; 4032 = 'değişim Y'; 4033 = 'değişim Z' }
     $ozet = (@($yaz.Keys | ForEach-Object { "{0,-10} {1,10}   (eski {2})" -f $ad[[int]$_], (Sayi $yaz[$_]), (Sayi ([Eding]::CncGetVariable([int]$_))) }) -join "`r`n")
     if (-not (Onay "Şu değerler kaydedilecek:`r`n`r`n$ozet`r`n`r`nÖnce otomatik yedek alınır. Kaydedilsin mi?" 'Yuva kaydet')) { return }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = $true
     foreach ($nr in $yaz.Keys) { if ($ok) { $ok = (Degisken-Yaz ([int]$nr) ([double]$yaz[$nr])) } }
     if ($ok) {
@@ -4751,7 +4770,7 @@ function Yuva-Varsayilan {
     if (-not (Hazir-Hareket 'Doğrulanmış değerler')) { return }
     $m = "Frez yuvaları 22.10.2026'da doğrulanan değerlere dönecek:`r`n`r`nX $(Sayi $RafVarsayilan.X)   T1 Y $(Sayi $RafVarsayilan.Y1)   A $(Sayi $RafVarsayilan.A)   B $(Sayi $RafVarsayilan.B)   alma Z $(Sayi $RafVarsayilan.AlmaZ)`r`nT2..T6: T1'e göre +12 / +24 / +54 / +66 / +78 mm`r`n`r`nSensör değişmez. Önce otomatik yedek alınır. Devam?"
     if (-not (Onay $m 'Doğrulanmış değerler')) { return }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = (Degisken-Yaz 4010 $RafVarsayilan.X)
     for ($n = 1; $n -le 6; $n++) { if ($ok) { $ok = (Degisken-Yaz (4010 + $n) ($RafVarsayilan.Y1 + $RafAralik[$n])) } }
     if ($ok) { $ok = (Degisken-Yaz 4017 $RafVarsayilan.A) }
@@ -5107,7 +5126,7 @@ function Kal-Uygula {
          $(if ($g92.Count) { "X/Y/A/B'deki G92 kaydırmaları da sıfırlanacak.`r`n" } else { '' }) +
          "Önce otomatik yedek alınır. Sonra bir frez değişimi yap (Z yeniden ölçülsün). Devam?"
     if (-not (Onay $m 'Disk kalibrasyonu')) { return }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = $true
     if ($g92.Count) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
     if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
@@ -5654,7 +5673,7 @@ function OtoKal-Uygula {
          "G92 kaydırmaları sıfırlanır (frez boyu yeniden ölçülmeli). Önce otomatik yedek alınır. Devam?"
     if (-not (Onay $m 'Otomatik kalibrasyon')) { return }
     if ($r.Buyuk -and -not (Onay "Sonuç beklenenden büyük ya da ölçüm güvenilmez görünüyor.`r`nYine de kaydedilsin mi? (Yanlışsa: KALİBRASYON > Yedekten yükle)" 'Otomatik kalibrasyon')) { return }
-    Ayar-Yedekle $true
+    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
     if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
     if ($ok) { $ok = Degisken-Yaz 4002 $r.P4002 }
@@ -5788,7 +5807,7 @@ $cmbYuva.Add_SelectedIndexChanged({ $btnYuvaKaydet.Text = "Şu anki konum = $($c
 [void](A-Buton 'Şu anki Z = alma yüksekliği' 530 284 200 38 { Z-Alma-Yap })
 [void](A-Buton 'G92 sıfırla' 736 284 120 38 { G92-Sifirla })
 A-Baslik 'YEDEK' 24 340
-[void](A-Buton 'Ayarları yedekle' 24 366 170 38 { Ayar-Yedekle })
+[void](A-Buton 'Ayarları yedekle' 24 366 170 38 { [void](Ayar-Yedekle) })
 [void](A-Buton 'Yedekten yükle' 200 366 170 38 { Ayar-Geri-Yukle })
 [void](A-Buton 'Yedek klasörü' 376 366 150 38 { Klasor-Ac $YedekKlasoru })
 [void](A-Buton 'Disk sıfırı: üretici değerine dön' 560 366 300 38 { G54-Ureticiye-Don })
