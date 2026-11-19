@@ -8,7 +8,7 @@ KOK="$(cd "$(dirname "$0")/../.." && pwd)"
 T="${1:-$KOK/teslim/PrimerMill}"
 OUT="$(mktemp -d)"; trap 'rm -rf "$OUT"' EXIT
 REF="-r:System.Windows.Forms -r:System.Drawing -r:System.Core"
-ORTAK="$T/ui/PrimerVeri.cs $T/ui/PrimerUI.cs $T/lib/Kayit.cs $T/lib/NcAnaliz.cs $T/lib/SimGorunum.cs $T/lib/WebSunucu.cs $T/lib/EkranYakala.cs $T/lib/Pencere.cs"
+ORTAK="$T/ui/PrimerVeri.cs $T/ui/PrimerUI.cs $T/lib/Kayit.cs $T/lib/NcAnaliz.cs $T/lib/SimGorunum.cs $T/lib/WebSunucu.cs $T/lib/EkranYakala.cs $T/lib/Pencere.cs $T/lib/Kiosk.cs"
 hata=0
 for takim in EdingSim EdingApi; do
   if mcs -langversion:5 -target:library -nowarn:414,219,169,649 $REF -out:"$OUT/$takim.dll" $ORTAK "$T/lib/$takim.cs" >"$OUT/$takim.txt" 2>&1; then

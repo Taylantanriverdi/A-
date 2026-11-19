@@ -21,7 +21,7 @@ if ($sinir -eq 0) { Write-Host '  [KALDI] önyüklemede modül yükleme bölüm�
 $onc = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Extent.StartLineNumber -lt $sinir }, $true) | ForEach-Object { Norm $_.Left.Extent.Text } | Sort-Object -Unique)
 # Bilinçli istisnalar: değeri koruyan ya da zararsız sıfırlamalar
 $izinli = @('Kapi:$HataSayisi', 'Denetleyici:$Demo', 'Demo:$Demo')
-foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'Kalibrasyon', 'Uzak', 'Denetleyici', 'ArayuzKapisi', 'Demo')) {
+foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'Kalibrasyon', 'Uzak', 'Kiosk', 'Denetleyici', 'ArayuzKapisi', 'Demo')) {
     $f = [System.IO.Path]::Combine($lib, "$m.ps1"); if (-not (Test-Path -LiteralPath $f)) { continue }
     $ma = [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$t, [ref]$e)
     foreach ($s in $ma.EndBlock.Statements) {

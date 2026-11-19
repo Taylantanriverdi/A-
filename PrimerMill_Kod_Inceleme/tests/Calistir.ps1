@@ -59,6 +59,8 @@ if ($teslimMi) {
     foreach ($bat in @(Get-ChildItem -LiteralPath $Kaynak -Filter '*.bat' -Recurse -File)) {
         $bb = [System.IO.File]::ReadAllBytes($bat.FullName)
         if (@($bb | Where-Object { $_ -gt 127 }).Count) { $sorun += "$($bat.Name) : ASCII dışı karakter var (.bat ASCII olmalı)" }
+        $lfSay = 0; for ($i = 0; $i -lt $bb.Length; $i++) { if ($bb[$i] -eq 10 -and ($i -eq 0 -or $bb[$i - 1] -ne 13)) { $lfSay++ } }
+        if ($lfSay -gt 0) { $sorun += "$($bat.Name) : $lfSay satır CRLF değil (.bat CRLF olmalı)" }
     }
 }
 $durum = 'GECTI'; if ($sorun.Count) { $durum = 'KALDI' }

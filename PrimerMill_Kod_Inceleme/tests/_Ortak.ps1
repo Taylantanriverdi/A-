@@ -297,7 +297,7 @@ function Ozet([string]$baslik = '') {
 # $script:SahteListe (Ui-Liste-Sec: seçilecek öğe adı), $script:SahteDiyalog (açık diyalog sayısı), $script:SahteGeriSayim.
 function Ui-Sahte-Yukle {
     $script:UiKayit = New-Object System.Collections.Generic.List[string]
-    $script:SahteOnay = $true; $script:SahteSecim = -1; $script:SahteListe = ''; $script:SahteDiyalog = 0; $script:SahteGeriSayim = $false
+    $script:SahteOnay = $true; $script:SahteSecim = -1; $script:SahteListe = ''; $script:SahteDiyalog = 0; $script:SahteGeriSayim = $false; $script:SahtePinler = New-Object System.Collections.Generic.List[object]; $script:SahtePencereAcik = $true
     $script:SonDurumNesnesi = $null; $script:SonIzinTablosu = @{}
     function script:Ui-Not([string]$m) { $script:UiKayit.Add($m) }
     function script:Ui-Onay([string]$baslik, [string]$metin) { Ui-Not "ONAY [$baslik] $metin"; return [bool]$script:SahteOnay }
@@ -308,6 +308,9 @@ function Ui-Sahte-Yukle {
     function script:Ui-Liste-Sec([string]$baslik, [string[]]$ogeler, [string[]]$aciklamalar, [string]$ek = '') { Ui-Not "LISTE [$baslik] $($ogeler -join ',')"; return [array]::IndexOf($ogeler, [string]$script:SahteListe) }
     function script:Ui-Sayi([string]$baslik, [double]$mevcut, [double]$min, [double]$max, [int]$ondalik = 3) { return $null }
     function script:Ui-Metin([string]$baslik, [string]$mevcut, [bool]$sadeceRakam = $false, [int]$enCok = 0) { return $null }
+    function script:Ui-Pin([string]$baslik) { Ui-Not "PIN [$baslik]"; if ($script:SahtePinler -and $script:SahtePinler.Count) { $p = $script:SahtePinler[0]; $script:SahtePinler.RemoveAt(0); return $p }; return $null }
+    function script:Ui-Kiosk-Pencere([bool]$kiosk) { Ui-Not "KIOSK PENCERE $kiosk"; $script:SahtePencereAcik = $kiosk }
+    function script:Ui-Pencere-Acik { return [bool]$script:SahtePencereAcik }
     function script:Ui-Takim-Sec([int]$mevcut, [string[]]$aciklamalar) { return -1 }
     function script:Ui-Geri-Sayim([string]$metin, [int]$saniye) { Ui-Not "GERISAYIM $metin"; return [bool]$script:SahteGeriSayim }
     function script:Ui-Manuel-Adim([int]$adim, [string]$metin, [string[]]$dugmeler, [string]$baslik) { Ui-Not "MANUEL $adim $baslik"; return -1 }
