@@ -47,9 +47,9 @@ function Yuva-Hedef([string]$ad) {
 
 function Yuva-Liste-Yenile {
     if (-not $script:ApiHazir -or -not $script:Bagli) { return }
+    # Yeni arayüz: liste MakineDurumu.Yuvalar (Takımlar › Yuva ayarı tablosu + yuva kartları) olarak verilir
     try {
-        $lvYuva.BeginUpdate()
-        $lvYuva.Items.Clear()
+        $liste = New-Object System.Collections.Generic.List[object]
         foreach ($ad in $script:YuvaAdlari) {
             $k = Yuva-Kayitli $ad
             $kTxt = if ($k.Var) { "X $(Sayi $k.X)  Y $(Sayi $k.Y)" } else { 'kayıt yok' }
@@ -59,20 +59,13 @@ function Yuva-Liste-Yenile {
                 $yTxt = if ($ad -eq 'T1' -or $ad -eq 'Sensör' -or $ad -eq 'Değişim') { "X $(Sayi $y.X)  Y $(Sayi $y.Y)" } else { "Y $(Sayi $y.Y)" }
                 if ($k.Var) { $dTxt = "ΔY $(Sayi ($y.Y - $k.Y))" } else { $dTxt = 'yeni' }
             }
-            $it = New-Object System.Windows.Forms.ListViewItem($ad)
-            [void]$it.SubItems.Add($kTxt); [void]$it.SubItems.Add($yTxt); [void]$it.SubItems.Add($dTxt)
-            if ($script:YuvaYeni.ContainsKey($ad)) { $it.ForeColor = $cYesil }
-            [void]$lvYuva.Items.Add($it)
-            if ($ad -eq $script:YuvaSecili) { $it.Selected = $true }
+            $liste.Add(@{ Ad = $ad; Kayitli = [bool]$k.Var; KayitMetni = $kTxt; Yeni = $yTxt; Fark = $dTxt; X = [double]$k.X; Y = [double]$k.Y; A = [double]$k.A; B = [double]$k.B; Z = $k.Z })
         }
-        $lvYuva.EndUpdate()
+        $script:YuvaListesi = $liste
         $t1 = Yuva-Kayitli 'T1'
-        $lblYuvaOrtak.Text = "Kayıtlı ortak değerler:  A $(Sayi $t1.A)   B $(Sayi $t1.B)   alma Z $(Sayi ([Eding]::CncGetVariable(4000)))   yaklaşma Z $(Sayi ([Eding]::CncGetVariable(4001)))" +
+        $script:YuvaOrtakMetni = "Kayıtlı ortak değerler:  A $(Sayi $t1.A)   B $(Sayi $t1.B)   alma Z $(Sayi ([Eding]::CncGetVariable(4000)))   yaklaşma Z $(Sayi ([Eding]::CncGetVariable(4001)))" +
                              $(if ($script:YuvaYeni.Count -gt 0) { "      ·      $($script:YuvaYeni.Count) yeni değer KAYDEDİLMEDİ" } else { '' })
-        $lblYuvaOrtak.ForeColor = if ($script:YuvaYeni.Count -gt 0) { $cAltinAc } else { $cSoluk }
-        $lblYuvaSecili.Text = "Seçili: $script:YuvaSecili"
-        $btnYuvaAl.Text = "BU KONUMU AL  ($script:YuvaSecili)"
-    } catch { try { $lvYuva.EndUpdate() } catch { } }
+    } catch { }
 }
 
 function Yuva-Git {
@@ -85,7 +78,7 @@ function Yuva-Git {
     $sat = @('G90 G53 G0 Z[#5163]', "G53 G0 A$(Sayi $h.A) B$(Sayi $h.B)", "G53 G0 X$(Sayi $h.X) Y$(Sayi $h.Y)")
     if ($ad -eq 'Değişim' -and $h.Z -and $h.Z -ne 0) { $sat += "G53 G0 Z$(Sayi $h.Z)" }
     $ok = Satirlar-Gonder "$ad noktasına git" $sat 90
-    if ($ok) { $lblYuvaDurum.Text = "İş mili $ad üstünde (en üstte). Şimdi X/Y ile ortala, gerekirse aşağı in." }
+    if ($ok) { $script:YuvaDurumMetni = "İş mili $ad üstünde (en üstte). Şimdi X/Y ile ortala, gerekirse aşağı in." }
 }
 
 function Yuva-Yaklas {
@@ -93,8 +86,8 @@ function Yuva-Yaklas {
     # K7 (GV-03): Sensör dahil her noktada iş milinde frez varken inilmez (#4001 sensör ölçüm aralığının çok altında: frez sensöre basar)
     if ([Eding]::CncGetCurrentToolNumber() -ne 0) { (Ui-Kutu "İş milinde freze varken $($script:YuvaSecili) noktasına inilemez (çarpar / sensöre basar). Önce bırak (T0) ya da pensi açıp frezi elle çıkar." 'Yaklaş' 'OK' 'Warning') | Out-Null; return }
     $z = [Eding]::CncGetVariable(4001)
-    if (-not (Onay "İş mili yaklaşma yüksekliğine (Z $(Sayi $z)) yavaşça inecek ve frezeye değmeden duracak. Devam?" 'Yaklaş')) { return }
-    if (Satirlar-Gonder 'Yaklaş' @("G90 G53 G1 Z$(Sayi $z) F300") 60) { $lblYuvaDurum.Text = "Yaklaşma yüksekliğinde. İnce ayar için 0.1 / 0.01 adımla Z− kullan." }
+    if (-not (Ui-Tehlikeli-Onay 'Yaklaş' "İş mili yaklaşma yüksekliğine (Z $(Sayi $z)) yavaşça inecek ve frezeye değmeden duracak. Devam?" $null $null $null)) { return }
+    if (Satirlar-Gonder 'Yaklaş' @("G90 G53 G1 Z$(Sayi $z) F300") 60) { $script:YuvaDurumMetni = "Yaklaşma yüksekliğinde. İnce ayar için 0.1 / 0.01 adımla Z− kullan." }
 }
 
 function Yuva-Al {
@@ -113,7 +106,7 @@ function Yuva-Al {
         $script:YuvaYeni[$ad] = @{ X = $p.X; Y = $p.Y }
     } elseif ($ad -eq 'T1') {
         $e = @{ X = $p.X; Y = $p.Y; A = $p.A; B = $p.B }
-        if ($chkYuvaZ.Checked) {
+        if ($script:YuvaZ) {
             if ($p.Z -gt ([Eding]::CncGetVariable(4001) - 3)) {
                 if (-not (Onay "Z $(Sayi $p.Z) alma yüksekliği için fazla yukarıda görünüyor.`r`nYine de alma yüksekliği olarak alınsın mı?" 'Konumu al')) { return }
             }
@@ -131,7 +124,7 @@ function Yuva-Al {
         $script:YuvaYeni[$ad] = @{ Y = $p.Y }
     }
     [Kayit]::Yaz("YUVA AYARI: $ad alındı (kaydedilmedi): X $(Sayi $p.X) Y $(Sayi $p.Y) Z $(Sayi $p.Z) A $(Sayi $p.A) B $(Sayi $p.B)")
-    $lblYuvaDurum.Text = "$ad alındı. Diğer yuvalara geç ya da KAYDET."
+    $script:YuvaDurumMetni = "$ad alındı. Diğer yuvalara geç ya da KAYDET."
     # Sıradakini seç
     $i = [array]::IndexOf($script:YuvaAdlari, $ad)
     if ($i -ge 0 -and $i -lt $script:YuvaAdlari.Count - 1) { $script:YuvaSecili = $script:YuvaAdlari[$i + 1] }
@@ -163,8 +156,8 @@ function Yuva-Kaydet {
     if ($script:YuvaYeni.ContainsKey('Değişim')) { $yaz[4031] = $script:YuvaYeni['Değişim'].X; $yaz[4032] = $script:YuvaYeni['Değişim'].Y; $yaz[4033] = $script:YuvaYeni['Değişim'].Z }
     $ad = @{ 4000 = 'alma Z'; 4010 = 'yuva X'; 4011 = 'T1 Y'; 4012 = 'T2 Y'; 4013 = 'T3 Y'; 4014 = 'T4 Y'; 4015 = 'T5 Y'; 4016 = 'T6 Y'; 4017 = 'yuva A'; 4018 = 'yuva B'; 4020 = 'sensör X'; 4021 = 'sensör Y'; 4031 = 'değişim X'; 4032 = 'değişim Y'; 4033 = 'değişim Z' }
     $ozet = (@($yaz.Keys | ForEach-Object { "{0,-10} {1,10}   (eski {2})" -f $ad[[int]$_], (Sayi $yaz[$_]), (Sayi ([Eding]::CncGetVariable([int]$_))) }) -join "`r`n")
-    if (-not (Onay "Şu değerler kaydedilecek:`r`n`r`n$ozet`r`n`r`nÖnce otomatik yedek alınır. Kaydedilsin mi?" 'Yuva kaydet')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
+    $eski = @($yaz.Keys | ForEach-Object { "#$_ $($ad[[int]$_])=$(Sayi ([Eding]::CncGetVariable([int]$_)))" }); $yeni = @($yaz.Keys | ForEach-Object { "#$_ $($ad[[int]$_])=$(Sayi $yaz[$_])" })
+    if (-not (Yedekli-Onay 'Yuva kaydet' "Şu değerler kaydedilecek:`r`n`r`n$ozet`r`n`r`nKaydedilsin mi?" $eski $yeni)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = $true
     foreach ($nr in $yaz.Keys) { if ($ok) { $ok = (Degisken-Yaz ([int]$nr) ([double]$yaz[$nr])) } }
     if ($ok) {
@@ -182,7 +175,7 @@ function Yuva-Sifirla {
     if ($script:YuvaYeni.Count -gt 0 -and -not (Onay "Alınan $($script:YuvaYeni.Count) değer silinecek, kalibrasyona baştan başlanacak.`r`nEding'deki kayıtlı değerler DEĞİŞMEZ. Devam?" 'Baştan başla')) { return }
     $script:YuvaYeni = @{}
     $script:YuvaSecili = 'T1'
-    $lblYuvaDurum.Text = 'Baştan başlandı. T1 seçili: "Yuvaya git" ile başla.'
+    $script:YuvaDurumMetni = 'Baştan başlandı. T1 seçili: "Yuvaya git" ile başla.'
     [Kayit]::Yaz('YUVA AYARI: baştan başlandı')
     Yuva-Liste-Yenile
 }
@@ -208,7 +201,8 @@ function Yuva-Varsayilan {
     $m = "Frez yuvaları 22.10.2026'da doğrulanan değerlere dönecek. Yazılacak değerler (makine koordinatı):`r`n`r`n$ozet`r`n`r`n" +
          $(if ($ek.Count) { "Ayrıca: $($ek -join ', ').`r`n" } else { "Kayıtlı sensör ve değişim noktası değişmez.`r`n" }) +
          "Yedek alındı. Bu değerler takım alma / bırakma konumlarını belirler. Yazılsın mı?"
-    if (-not (Onay $m 'Doğrulanmış değerler')) { return }
+    $eski = @($yaz.Keys | ForEach-Object { "#$_ $($ad[[int]$_])=$(Sayi ([Eding]::CncGetVariable([int]$_)))" }); $yeni = @($yaz.Keys | ForEach-Object { "#$_ $($ad[[int]$_])=$(Sayi $yaz[$_])" })
+    if (-not (Ui-Tehlikeli-Onay 'Doğrulanmış değerler' $m $eski $yeni ([string]$script:SonYedekDosya))) { return }
     $ok = $true
     foreach ($nr in $yaz.Keys) { if ($ok) { $ok = (Degisken-Yaz ([int]$nr) ([double]$yaz[$nr])) } }
     $script:YuvaYeni = @{}
@@ -223,17 +217,18 @@ function Yuva-Test([int]$n) {
 }
 
 function Kal-Degerleri-Goster {
-    if (-not $script:ApiHazir -or -not $script:Bagli) { $lblKalSimdi.Text = 'Eding bağlı değil'; return }
+    if (-not $script:ApiHazir -or -not $script:Bagli) { $script:KalSimdiMetni = 'Eding bağlı değil'; return }
     $g = @(5221, 5222, 5223, 5224, 5225 | ForEach-Object { Sayi ([Eding]::CncGetVariable($_)) })
-    $lblKalSimdi.Text = "Şu an  G54  X $($g[0])  Y $($g[1])  Z $($g[2])  A $($g[3])  B $($g[4])   ·   #4002 $(Sayi ([Eding]::CncGetVariable(4002)))"
+    $script:KalSimdiMetni = "Şu an  G54  X $($g[0])  Y $($g[1])  Z $($g[2])  A $($g[3])  B $($g[4])   ·   #4002 $(Sayi ([Eding]::CncGetVariable(4002)))"
 }
 
 function Kal-Test-Hazirla {
+    $txtKalT = @{ Text = $(if ($script:Tercih.KalT) { [string]$script:Tercih.KalT } else { '16.00' }) }; $txtKalD = @{ Text = $(if ($script:Tercih.KalD) { [string]$script:Tercih.KalD } else { '2.00' }) }   # Kalibrasyon › Disk ② kutuları (ayar.kaydet KalT/KalD)
     $T = Metin-Sayi $txtKalT.Text; $D = Metin-Sayi $txtKalD.Text
     if ($null -eq $T -or $T -lt 10 -or $T -gt 30) { (Ui-Kutu 'Disk kalınlığını kumpasla ölçüp yaz (10–30 mm).' 'Test bloğu' 'OK' 'Warning') | Out-Null; return }
     if ($null -eq $D -or $D -lt 0.5 -or $D -gt 3) { (Ui-Kutu 'T1 frez çapını yaz (genelde 2.0 mm).' 'Test bloğu' 'OK' 'Warning') | Out-Null; return }
     if (Is-Suruyor-Uyari 'Test bloğu') { return }
-    $k = $cmbKalTest.SelectedIndex + 1
+    $k = [int]$script:DiskTestNo
     $dzK = Kal-Duzen $k
     $m = "Kalibrasyon testi $k / 4 hazırlanacak ve seçilecek:`r`n`r`n" +
          "• T1 (Ø$(Sayi $D)) ile, disk $(Sayi $T) mm`r`n• Bir diske 4 test sığar. Test ${k}: dış cepler saat $($dzK.Sag.Saat)'ten başlar, iç grup $($KalGrupYer[$k])`r`n" +
@@ -253,26 +248,26 @@ function Kal-Test-Hazirla {
         [System.IO.File]::WriteAllText($hedef, $metin)
         [System.IO.File]::Copy($hedef, [System.IO.Path]::Combine($IsKlasor, $AktifIsAdi), $true)
         $script:SeciliDosya = $hedef
-        $lblDosya.Text = "PM_kalibrasyon_testi_$k"; $lblDosya.ForeColor = $cYazi
+        $script:DosyaMetni = "PM_kalibrasyon_testi_$k"
         Yaz "Kalibrasyon testi hazırlandı: $hedef  (disk $(Sayi $T), T1 Ø$(Sayi $D))"
         Dosyayi-Kontrol-Et $hedef
         $script:Tercih.KalT = $txtKalT.Text; $script:Tercih.KalD = $txtKalD.Text; $script:Tercih.KalTest = "$k"; Tercih-Yaz
         $script:ModOnayliDosya = $hedef
-        $lblKalDurum.Text = if ($mod -eq 'MANUEL') { "Test $k seçildi, frez MANUEL. Ana ekranda BAŞLAT: iş mili ortaya gelince T1'i tak, sonunda çıkar. Bitince diski çıkar, ölç." } else { "Test $k seçildi, frez OTOMATİK. Ana ekranda BAŞLAT. Bitince diski çıkar, ölç, değerleri sağa yaz." }
+        $script:DiskDurumMetni = if ($mod -eq 'MANUEL') { "Test $k seçildi, frez MANUEL. Ana ekranda BAŞLAT: iş mili ortaya gelince T1'i tak, sonunda çıkar. Bitince diski çıkar, ölç." } else { "Test $k seçildi, frez OTOMATİK. Ana ekranda BAŞLAT. Bitince diski çıkar, ölç, değerleri sağa yaz." }
     } catch { (Ui-Kutu "Test programı yazılamadı: $($_.Exception.Message)" 'Test bloğu' 'OK' 'Error') | Out-Null }
 }
 
 function Kal-Hesapla {
-    $T = Metin-Sayi $txtKalT.Text
+    $T = Metin-Sayi $(if ($script:Tercih.KalT) { [string]$script:Tercih.KalT } else { '16.00' })
     $o = @{}
     foreach ($k in $KalOlcumTanim.Keys) {
-        $v = Metin-Sayi $script:KalKutu[$k].Text
+        $v = Metin-Sayi ([string]$script:DiskOlcum[$k])   # Kalibrasyon › Disk ③ kutuları (kal.disk.olcum)
         if ($null -eq $v) { (Ui-Kutu "Ölçüm eksik: $($KalOlcumTanim[$k][0])" 'Hesapla' 'OK' 'Warning') | Out-Null; return }
         $o[$k] = $v
     }
     if ($null -eq $T) { (Ui-Kutu 'Disk kalınlığı eksik.' 'Hesapla' 'OK' 'Warning') | Out-Null; return }
-    $sA = if ($chkKalA.Checked) { -1 } else { 1 }; $sB = if ($chkKalB.Checked) { -1 } else { 1 }; $sY = if ($chkKalY.Checked) { -1 } else { 1 }
-    $k = $cmbKalTest.SelectedIndex + 1
+    $sA = if ($script:Tercih.KalSA -eq '1') { -1 } else { 1 }; $sB = if ($script:Tercih.KalSB -eq '1') { -1 } else { 1 }; $sY = if ($script:Tercih.KalSY -eq '1') { -1 } else { 1 }
+    $k = [int]$script:DiskTestNo
     $dz = Kal-Duzen $k
     $th = $dz.Th * [math]::PI / 180
     # (PowerShell değişken adları büyük/küçük harf ayırmaz: eğimler $egX/$egY, yön işaretleri $sA/$sB/$sY)
@@ -303,9 +298,21 @@ function Kal-Hesapla {
     if ([math]::Abs($mOrta) -gt 0.1) { $sonucMetni += "`r`n`r`nNOT: disk ortası B ekseninden $(Sayi $mOrta) mm kaçık. Bu yazılımla düzeltilemez: disk tutucuya tam oturmuş mu, kalınlığı CAM'deki ile aynı mı?" }
     $buyuk = ([math]::Abs($dx) -gt 2 -or [math]::Abs($dy) -gt 3 -or [math]::Abs($h) -gt 2 -or [math]::Abs($dA) -gt 4 -or [math]::Abs($dB) -gt 4)
     if ($buyuk) { $sonucMetni += "`r`n`r`nDİKKAT: düzeltmelerden biri çok büyük. Ölçümleri ve cepleri (çaplarına göre) tekrar kontrol et." }
-    $lblKalSonuc.Text = $sonucMetni
-    $lblKalSonuc.ForeColor = if ($buyuk) { $cKirmizi } else { $cYazi }
-    $btnKalUygula.Enabled = $true
+    $script:DiskSonucMetni = $sonucMetni
+    # Yeni arayüz: ④ sonuç tablosu (eski / düzeltme / yeni / ✓) ve uyarılar
+    $rs = $script:KalSonuc
+    $script:DiskSonucSatirlari = @(
+        @{ Eksen = 'X'; Eski = (Sayi $g.X); Duzeltme = (Sayi $dx); Yeni = (Sayi $rs.X); Iyi = ([math]::Abs($dx) -le 0.02) },
+        @{ Eksen = 'Y'; Eski = (Sayi $g.Y); Duzeltme = (Sayi ($sY * $dy)); Yeni = (Sayi $rs.Y); Iyi = ([math]::Abs($dy) -le 0.02) },
+        @{ Eksen = 'Z (#4002)'; Eski = (Sayi $p4002); Duzeltme = (Sayi (-$h)); Yeni = (Sayi $rs.P4002); Iyi = ([math]::Abs($h) -le 0.02) },
+        @{ Eksen = 'A'; Eski = (Sayi $g.A); Duzeltme = (Sayi ($sA * $dA)); Yeni = (Sayi $rs.A); Iyi = ([math]::Abs($dA) -le 0.05) },
+        @{ Eksen = 'B'; Eski = (Sayi $g.B); Duzeltme = (Sayi ($sB * $dB)); Yeni = (Sayi $rs.B); Iyi = ([math]::Abs($dB) -le 0.05) })
+    $script:DiskUyarilar = @()
+    $script:DiskUyarilar += "Web $(Sayi $web) mm (olması gereken 2.000)"
+    if ([math]::Abs($mOrta) -gt 0.1) { $script:DiskUyarilar += "Disk ortası B ekseninden $(Sayi $mOrta) mm kaçık. Bu yazılımla düzeltilemez: disk tutucuya tam oturmuş mu, kalınlığı CAM'deki ile aynı mı?" }
+    if ($buyuk) { $script:DiskUyarilar += 'DİKKAT: düzeltmelerden biri çok büyük. Ölçümleri ve cepleri (çaplarına göre) tekrar kontrol et.' }
+    $script:DiskBuyuk = $buyuk
+    $script:DiskSonucHazir = $true
     [Kayit]::Yaz("DİSK KALİBRASYONU hesap (test $k): dx $(Sayi $dx) dy $(Sayi ($sY*$dy)) h $(Sayi $h) dA $(Sayi ($sA*$dA)) dB $(Sayi ($sB*$dB)) m $(Sayi $mOrta)  ölçümler: " + (($KalOlcumTanim.Keys | ForEach-Object { "$_=$($o[$_])" }) -join ' '))
 }
 
@@ -317,8 +324,9 @@ function Kal-Uygula {
     $m = "Yeni disk kalibrasyonu kaydedilecek:`r`n`r`nG54  X $(Sayi $r.X)   Y $(Sayi $r.Y)   A $(Sayi $r.A)   B $(Sayi $r.B)`r`n#4002 (Z sıfırı) $(Sayi $r.P4002)`r`n`r`nEski: $($r.Eski)`r`n`r`n" +
          $(if ($g92.Count) { "X/Y/A/B'deki G92 kaydırmaları da sıfırlanacak.`r`n" } else { '' }) +
          "Önce otomatik yedek alınır. Sonra bir frez değişimi yap (Z yeniden ölçülsün). Devam?"
-    if (-not (Onay $m 'Disk kalibrasyonu')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
+    $eski = @("G54 X=$(Sayi ([Eding]::CncGetVariable(5221)))", "G54 Y=$(Sayi ([Eding]::CncGetVariable(5222)))", "G54 A=$(Sayi ([Eding]::CncGetVariable(5224)))", "G54 B=$(Sayi ([Eding]::CncGetVariable(5225)))", "#4002=$(Sayi ([Eding]::CncGetVariable(4002)))")
+    $yeni = @("G54 X=$(Sayi $r.X)", "G54 Y=$(Sayi $r.Y)", "G54 A=$(Sayi $r.A)", "G54 B=$(Sayi $r.B)", "#4002=$(Sayi $r.P4002)")
+    if (-not (Yedekli-Onay 'Disk kalibrasyonu' $m $eski $yeni)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = $true
     if ($g92.Count) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
     if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
@@ -337,7 +345,7 @@ function Kal-Uygula {
     try { Ayar-Oku } catch { }
     if ($ok) {
         Yaz "Disk kalibrasyonu kaydedildi: G54 X $(Sayi $r.X) Y $(Sayi $r.Y) A $(Sayi $r.A) B $(Sayi $r.B), #4002 $(Sayi $r.P4002)"
-        $script:KalSonuc = $null
+        $script:KalSonuc = $null; $script:DiskSonucHazir = $false
         (Ui-Kutu "Kaydedildi (geçmiş: kalibrasyon_gecmisi.csv).`r`n`r`n1. Bir frez değişimi yap ya da 'Frez boyunu ölç'`r`n2. YENİ bir diskte testi tekrar kaz`r`n3. Bütün satırlarda ✓ görünene kadar tekrarla`r`n`r`nBir eksenin hatası küçülmek yerine büyüdüyse o eksenin 'yönü ters' kutusunu işaretle." 'Disk kalibrasyonu' 'OK' 'Information') | Out-Null
     } else {
         (Ui-Kutu 'Kaydetme yarıda kaldı. KALİBRASYON > Yedekten yükle ile geri dönebilirsin.' 'Disk kalibrasyonu' 'OK' 'Warning') | Out-Null
@@ -345,9 +353,9 @@ function Kal-Uygula {
 }
 
 function Kal-Yerlesim-Yaz {
-    $k = $cmbKalTest.SelectedIndex + 1; if ($k -lt 1) { return }
+    $k = [int]$script:DiskTestNo; if ($k -lt 1) { return }
     $dz = Kal-Duzen $k
-    $lblKalYerlesim.Text = "Test $k (üstten bakış, ön = saat 6)`r`n" +
+    $script:DiskYerlesimMetni = "Test $k (üstten bakış, ön = saat 6)`r`n" +
         "Dış cepler, kenara yakın:`r`n" +
         "   Ø5 saat $($dz.Sag.Saat)   Ø8 saat $($dz.On.Saat)   Ø7 saat $($dz.Sol.Saat)   Ø4 saat $($dz.Arka.Saat)`r`n" +
         "İç grup, $($KalGrupYer[$k]):`r`n" +
@@ -357,12 +365,13 @@ function Kal-Yerlesim-Yaz {
 }
 
 function OtoKal-Goster {
-    if (-not $script:ApiHazir -or -not $script:Bagli) { $lblOkSimdi.Text = 'Eding bağlı değil'; return }
+    if (-not $script:ApiHazir -or -not $script:Bagli) { $script:OtoSimdiMetni = 'Eding bağlı değil'; return }
     $g = @(5221, 5222, 5223, 5224, 5225 | ForEach-Object { Sayi ([Eding]::CncGetVariable($_)) })
-    $lblOkSimdi.Text = "Şu an  G54  X $($g[0])  Y $($g[1])  Z $($g[2])  A $($g[3])  B $($g[4])   ·   #4002 $(Sayi ([Eding]::CncGetVariable(4002)))"
+    $script:OtoSimdiMetni = "Şu an  G54  X $($g[0])  Y $($g[1])  Z $($g[2])  A $($g[3])  B $($g[4])   ·   #4002 $(Sayi ([Eding]::CncGetVariable(4002)))"
     $id = [int]([Eding]::CncGetVariable(4199))
     if (-not $script:OkSonuc -and $script:Tercih.OkKimlik -and "$id" -eq "$($script:Tercih.OkKimlik)" -and [Eding]::CncGetVariable(4100) -eq 1) {
-        $lblOkDurum.Text = 'Bitmiş bir ölçüm var: SONUÇLARI OKU''ya bas.'
+        $script:OtoOlcumBitti = $true
+        $script:OtoDurumMetni = 'Bitmiş bir ölçüm var: SONUÇLARI OKU''ya bas.'
     }
 }
 
@@ -371,10 +380,35 @@ $script:OkProbTaban = $null
 
 function OtoKal-Prob-Testi {
     if (-not (Baglan)) { (Ui-Kutu "Eding'e bağlanılamadı." 'Prob testi' 'OK' 'Warning') | Out-Null; return }
-    if ($tmrProb.Enabled) { $tmrProb.Stop(); $btnOkProb.Text = 'Prob testini başlat'; return }
+    if ($script:ProbAktif) { $script:ProbAktif = $false; return }
     $script:OkProbTaban = $null
-    $btnOkProb.Text = 'Testi durdur'
-    $tmrProb.Start()
+    $script:ProbAktif = $true   # eski 120 ms zamanlayıcı yerine ana zamanlayıcı her tıkta Prob-Tik çağırır
+}
+
+# Eski $tmrProb gövdesi (hangi giriş değişiyor? Eding ekranı gizli olduğu için buradan izlenir). Hareket yok, yalnız CncGetInput.
+$script:ProbAktif = $false
+$script:ProbMetni = '—'
+$script:ProbTemasVar = $false
+function Prob-Tik {
+    if (-not $script:ProbAktif) { return }
+    try {
+        if (-not $script:Bagli) { $script:ProbAktif = $false; return }
+        $durum = @{}; foreach ($i in 1..160) { $durum[$i] = [Eding]::CncGetInput($i) }
+        if (-not $script:OkProbTaban) { $script:OkProbTaban = $durum; return }
+        $id = 0; [void][int]::TryParse("$($script:Tercih.ProbIo)", [ref]$id)
+        if ($id -le 0) {
+            $degisen = @(1..160 | Where-Object { $durum[$_] -ne $script:OkProbTaban[$_] })
+            if ($degisen.Count -ge 1) {
+                $id = $degisen[0]
+                $script:Tercih.ProbIo = "$id"; $script:Tercih.ProbAktif = "$($durum[$id])"; Tercih-Yaz
+                Yaz "Prob girişi öğrenildi: giriş $id (temasta değer $($durum[$id]))"
+            } else { $script:ProbMetni = 'Kablonun ucunu iş miline / pime değdir...'; $script:ProbTemasVar = $false; return }
+        }
+        $temas = ("$($durum[$id])" -eq "$($script:Tercih.ProbAktif)")
+        if ($temas) { $script:ProbTemasAni = Get-Date }   # K8: bu oturumda temas görüldü
+        $script:ProbMetni = if ($temas) { "TEMAS VAR   (giriş $id)" } else { "TEMAS YOK   (giriş $id)" }
+        $script:ProbTemasVar = $temas
+    } catch { $script:ProbAktif = $false; $script:ProbMetni = "Giriş okunamadı: $($_.Exception.Message)"; $script:ProbTemasVar = $false }
 }
 
 # K8 (KL-01): otomatik kalibrasyon yalnız bu oturumda, son 10 dakika içinde prob testinde TEMAS görüldüyse ve şu an temas YOKSA hazırlanır / başlar
@@ -398,6 +432,7 @@ function OtoKal-Prob-Aktif-Mi {
 }
 
 function OtoKal-Hazirla {
+    $txtOkT = @{ Text = $(if ($script:Tercih.OkT) { [string]$script:Tercih.OkT } else { '10.00' }) }; $txtOkUcD = @{ Text = $(if ($script:Tercih.OkUcD) { [string]$script:Tercih.OkUcD } else { '3.00' }) }   # Oto ① kutuları (ayar.kaydet OkT/OkUcD)
     $T = Metin-Sayi $txtOkT.Text
     $ucD = Metin-Sayi $txtOkUcD.Text
     if ($null -eq $ucD -or $ucD -lt 0.5 -or $ucD -gt 6) { (Ui-Kutu 'Temas ucunun çapını yaz (pim genelde 3.00, frez 2.00).' 'Otomatik kalibrasyon' 'OK' 'Warning') | Out-Null; return }
@@ -428,14 +463,14 @@ function OtoKal-Hazirla {
         # Aynı programın simülasyon kopyası (X5 Canlı Simülasyon'da izlemek için, satır satır senkron)
         try { [System.IO.File]::WriteAllText([System.IO.Path]::Combine($IsKlasor, 'PM_kalibrasyon_otomatik_SIM.nc'), (OtoKal-Sim-Uret $metin $T)) } catch { }
         $script:SeciliDosya = $hedef
-        $lblDosya.Text = 'PM_kalibrasyon_otomatik'; $lblDosya.ForeColor = $cYazi
+        $script:DosyaMetni = 'PM_kalibrasyon_otomatik'
         Dosyayi-Kontrol-Et $hedef
         $script:Tercih.OkT = $txtOkT.Text; $script:Tercih.OkKimlik = "$kimlik"
-        $script:Tercih.OkUc = if ($cmbOkUc.SelectedIndex -eq 1) { 'kure' } else { 'duz' }; $script:Tercih.OkUcD = $txtOkUcD.Text; Tercih-Yaz
+        $script:Tercih.OkUc = if ($script:Tercih.OkUc -eq 'kure') { 'kure' } else { 'duz' }; $script:Tercih.OkUcD = $txtOkUcD.Text; Tercih-Yaz
         $script:ModOnayliDosya = $hedef
-        $script:OkSonuc = $null; $lblOkSonuc.Text = ''; $btnOkUygula.Enabled = $false
+        $script:OkSonuc = $null; $script:OtoSonucMetni = ''; $script:OtoSonucHazir = $false; $script:OtoOlcumBitti = $false
         Yaz "Otomatik kalibrasyon ölçümü hazırlandı: $hedef (disk $(Sayi $T), kimlik $kimlik)"
-        $lblOkDurum.Text = "Hazır. Ana ekranda BAŞLAT. Bitince buraya dön: SONUÇLARI OKU."
+        $script:OtoDurumMetni = "Hazır. Ana ekranda BAŞLAT. Bitince buraya dön: SONUÇLARI OKU."
     } catch { (Ui-Kutu "Ölçüm programı yazılamadı: $($_.Exception.Message)" 'Otomatik kalibrasyon' 'OK' 'Error') | Out-Null }
 }
 
@@ -485,10 +520,27 @@ function OtoKal-Oku {
     if ($buyuk) { $uyari += 'DİKKAT: sonuç beklenenden çok büyük ya da ölçüm güvenilmez. Kurulumu kontrol et, ölçümü tekrarla.' }
     $r.Buyuk = $buyuk
     if ($uyari.Count) { $metin += "`r`n`r`n" + ($uyari -join "`r`n") }
-    $lblOkSonuc.Text = $metin
-    $lblOkSonuc.ForeColor = if ($buyuk) { $cKirmizi } elseif ($uyari.Count) { $cAltinAc } else { $cYazi }
-    $btnOkUygula.Enabled = $true
-    $lblOkDurum.Text = 'Sonuç hazır. Uygunsa UYGULA VE KAYDET.'
+    $script:OtoSonucMetni = $metin
+    # Yeni arayüz: ④ sonuç ve kalite tabloları, uyarılar
+    $script:OtoSonucSatirlari = @(
+        @{ Eksen = 'X'; Eski = (Sayi ([Eding]::CncGetVariable(5221))); Duzeltme = (Sayi $r.dX); Yeni = (Sayi $r.X); Iyi = ([math]::Abs($r.dX) -le 0.01) },
+        @{ Eksen = 'Y'; Eski = (Sayi ([Eding]::CncGetVariable(5222))); Duzeltme = (Sayi $r.dY); Yeni = (Sayi $r.Y); Iyi = ([math]::Abs($r.dY) -le 0.01) },
+        @{ Eksen = 'Z (#4002)'; Eski = (Sayi $p4002); Duzeltme = (Sayi (-$r.dZ)); Yeni = (Sayi $r.P4002); Iyi = ([math]::Abs($r.dZ) -le 0.01) },
+        @{ Eksen = 'A'; Eski = (Sayi ([Eding]::CncGetVariable(5224))); Duzeltme = (Sayi (-$r.dA)); Yeni = (Sayi $r.A); Iyi = ([math]::Abs($r.dA) -le 0.02) },
+        @{ Eksen = 'B'; Eski = (Sayi ([Eding]::CncGetVariable(5225))); Duzeltme = (Sayi (-$r.dB)); Yeni = (Sayi $r.B); Iyi = ([math]::Abs($r.dB) -le 0.02) })
+    $tk = { param($kosul) if ($kosul) { 'Basari' } else { 'Uyari' } }
+    $script:OtoKaliteSatirlari = @(
+        @{ Ad = 'Tekrar'; Deger = "$(Sayi $r.Tekrar) mm"; Tur = (& $tk ($r.Tekrar -le 0.01)) },
+        @{ Ad = 'Çift ölçüm farkı'; Deger = "≤ $(Sayi $r.Fark) mm"; Tur = (& $tk ($r.Fark -le 0.01)) },
+        @{ Ad = 'Model uyumu (ortalama)'; Deger = "$(Sayi $r.Rms) mm"; Tur = (& $tk ($r.Rms -le 0.01)) },
+        @{ Ad = 'Model uyumu (en büyük)'; Deger = "$(Sayi $r.ArtikMax) mm"; Tur = (& $tk ($r.ArtikMax -le 0.01)) },
+        @{ Ad = 'Açı ölçeği A / B'; Deger = "%$('{0:0.0}' -f (100 * $r.OlcA)) / %$('{0:0.0}' -f (100 * $r.OlcB))"; Tur = (& $tk ([math]::Abs($r.OlcA - 1) -le 0.01 -and [math]::Abs($r.OlcB - 1) -le 0.01)) },
+        @{ Ad = 'Disk ortası (B eksenine)'; Deger = "$(Sayi $r.M) mm"; Tur = (& $tk ([math]::Abs($r.M) -le 0.1)) },
+        @{ Ad = 'Yüzler arası açı / takma eğikliği'; Deger = "$(Sayi $r.Kama)° / $(Sayi $r.DiskEgikA)°"; Tur = (& $tk ([math]::Abs($r.Kama) -le 0.1 -and [math]::Abs($r.DiskEgikA) -le 0.05)) })
+    $script:OtoUyarilar = @($uyari)
+    $script:OtoBuyuk = $buyuk
+    $script:OtoSonucHazir = $true
+    $script:OtoDurumMetni = 'Sonuç hazır. Uygunsa UYGULA VE KAYDET.'
     [Kayit]::Yaz("OTO KALİBRASYON sonuç (kimlik $id): dX $(Sayi $r.dX) dY $(Sayi $r.dY) dZ $(Sayi $r.dZ) dA $(Sayi $r.dA) dB $(Sayi $r.dB) ölçek A $(Sayi $r.OlcA) B $(Sayi $r.OlcB) tekrar $(Sayi $r.Tekrar) z: " + ((0..($OkNoktalar.Count - 1) | ForEach-Object { Sayi $z[$_] }) -join ' '))
 }
 
@@ -498,9 +550,10 @@ function OtoKal-Uygula {
     if (-not (Hazir-Hareket 'Otomatik kalibrasyon')) { return }
     $m = "Yeni kalibrasyon kaydedilecek:`r`n`r`nG54  X $(Sayi $r.X)   Y $(Sayi $r.Y)   A $(Sayi $r.A)   B $(Sayi $r.B)`r`n#4002 (Z sıfırı) $(Sayi $r.P4002)`r`n`r`nEski: $($r.Eski)`r`n`r`n" +
          "G92 kaydırmaları sıfırlanır (frez boyu yeniden ölçülmeli). Önce otomatik yedek alınır. Devam?"
-    if (-not (Onay $m 'Otomatik kalibrasyon')) { return }
+    $eski = @("G54 X=$(Sayi ([Eding]::CncGetVariable(5221)))", "G54 Y=$(Sayi ([Eding]::CncGetVariable(5222)))", "G54 A=$(Sayi ([Eding]::CncGetVariable(5224)))", "G54 B=$(Sayi ([Eding]::CncGetVariable(5225)))", "#4002=$(Sayi ([Eding]::CncGetVariable(4002)))")
+    $yeni = @("G54 X=$(Sayi $r.X)", "G54 Y=$(Sayi $r.Y)", "G54 A=$(Sayi $r.A)", "G54 B=$(Sayi $r.B)", "#4002=$(Sayi $r.P4002)")
+    if (-not (Yedekli-Onay 'Otomatik kalibrasyon' $m $eski $yeni)) { return }   # KL-04: yedek önce (eskiden ikinci sorudan sonra alınırdı)
     if ($r.Buyuk -and -not (Onay "Sonuç beklenenden büyük ya da ölçüm güvenilmez görünüyor.`r`nYine de kaydedilsin mi? (Yanlışsa: KALİBRASYON > Yedekten yükle)" 'Otomatik kalibrasyon')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
     if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
     if ($ok) { $ok = Degisken-Yaz 4002 $r.P4002 }
@@ -519,8 +572,8 @@ function OtoKal-Uygula {
     try { Ayar-Oku } catch { }
     if ($ok) {
         Yaz "Otomatik kalibrasyon kaydedildi: G54 X $(Sayi $r.X) Y $(Sayi $r.Y) A $(Sayi $r.A) B $(Sayi $r.B), #4002 $(Sayi $r.P4002)"
-        $script:OkSonuc = $null; $btnOkUygula.Enabled = $false
-        $lblOkDurum.Text = 'Kaydedildi. Doğrulamak için ölçümü bir kez daha çalıştır: düzeltmeler ~0 çıkmalı.'
+        $script:OkSonuc = $null; $script:OtoSonucHazir = $false; $script:OtoOlcumBitti = $false
+        $script:OtoDurumMetni = 'Kaydedildi. Doğrulamak için ölçümü bir kez daha çalıştır: düzeltmeler ~0 çıkmalı.'
         (Ui-Kutu "Kaydedildi (geçmiş: oto_kalibrasyon_gecmisi.csv).`r`n`r`n1. Doğrulama: ölçümü bir kez daha çalıştır; bütün satırlarda ✓ görmelisin`r`n2. Disk kablosunu sök, izolasyon bandını çıkar`r`n3. İlk işten önce frez boyu ölçülür (frez değişiminde otomatik)" 'Otomatik kalibrasyon' 'OK' 'Information') | Out-Null
     } else {
         (Ui-Kutu 'Kaydetme yarıda kaldı. KALİBRASYON > Yedekten yükle ile geri dönebilirsin.' 'Otomatik kalibrasyon' 'OK' 'Warning') | Out-Null

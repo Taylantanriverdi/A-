@@ -24,12 +24,8 @@ function Eding-Exe-Bul {
         Where-Object { $_.Name -notmatch '(?i)server|setup|unins|update|install|driver|vcredist|python|notepad' })
     if ($exeler.Count -eq 1) { return $exeler[0].FullName }
     # 3) Bulunamazsa bir kez kullanıcıya sor
-    $dlg = New-Object System.Windows.Forms.OpenFileDialog
-    $dlg.Title = 'Eding CNC programını seç (bir kez sorulur)'
-    $dlg.Filter = 'Programlar (*.exe)|*.exe'
-    $dlg.InitialDirectory = $EdingKlasor
-    $script:ModalSayac++; try { $sn = $dlg.ShowDialog($form) } finally { $script:ModalSayac-- }
-    if ($sn -eq 'OK') { return $dlg.FileName }
+    $script:ModalSayac++; try { $sec = Ui-Dosya-Ac 'Eding CNC programını seç (bir kez sorulur)' 'Programlar (*.exe)|*.exe' $EdingKlasor } finally { $script:ModalSayac-- }
+    if ($sec) { return $sec }
     return $null
 }
 
@@ -74,11 +70,7 @@ function Eding-Gizle-Tik {
                 }
                 # Eding öne çıkmışsa panel tekrar öne gelsin
                 # Açık bir soru penceresi (blok, frez modu vb.) varsa onu öne al; paneli değil (yoksa pencere tıklanamaz olur)
-                try {
-                    $acik = @([System.Windows.Forms.Application]::OpenForms | Where-Object { $_ -ne $form -and $_.Visible -and $_.Modal })
-                    if ($acik.Count -gt 0) { $acik[$acik.Count - 1].Activate() }
-                    elseif ($form.Visible -and $form.WindowState -ne 'Minimized' -and $form.Enabled) { $form.Activate() }
-                } catch { }
+                try { Ui-One-Al } catch { }
             }
         }
     } catch { }
@@ -196,7 +188,7 @@ function Baglanti-Bekcisi {
         try { [void][Eding]::CncDisConnectServer() } catch { }
         $script:Bagli = $false
         $script:MakroKontrolTamam = $false
-        if ($script:IsAktif) { $script:IsAktif = $false; $bar.Dancing = $false; $lblSure.Text = 'Eding kapandı'; $lblSure.ForeColor = $cKirmizi }
+        if ($script:IsAktif) { $script:IsAktif = $false; $script:SureMetni = 'Eding kapandı'; $script:SureTur = $cKirmizi }
     }
     if (((Get-Date) - $script:SonEdingBaslatma).TotalSeconds -ge 30) {
         # İlk açılışta Eding'i başlatan da burası; panel açıldıktan sonra kapanıp yeniden açılan Eding için otomatik home yok (GV-09)
@@ -212,7 +204,7 @@ function Baglan {
     if (-not $script:ApiHazir) { return $false }
     if ($script:Bagli) { return $true }
     # Sunucu kapalıysa bağlanma; yoksa DLL Eding'i arayüzsüz başlatabilir
-    if (-not (Get-Process -Name 'CncServer' -ErrorAction Ignore)) { return $false }
+    if (-not (Eding-Sunucu-Acik)) { return $false }
     if (-not (Eding-Pencere-Acik)) { return $false }
     try {
         $rc = [Eding]::CncConnectServer('')
@@ -351,7 +343,7 @@ function Macro-Yaz([string]$yol, [string]$metin, $enc, [string]$ne) {
 
 function Eding-Goster {
     $script:EdingGosteriliyor = $true
-    $form.TopMost = $false
+    Ui-Ustte $false
     $n = 0
     foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) { $n += [Pencere]::Goster($pr.Id) }
     if ($n -eq 0) {
@@ -362,7 +354,7 @@ function Eding-Goster {
 }
 function Eding-Gizle {
     $script:EdingGosteriliyor = $false
-    if ($script:Tercih.TamEkran -ne '0') { $form.TopMost = $true }
+    if ($script:Tercih.TamEkran -ne '0') { Ui-Ustte $true }
     $script:EdingGizlendiYazildi = $false
     Eding-Gizle-Tik
     [Kayit]::Yaz('EDING: pencere tekrar arka planda')
@@ -384,8 +376,7 @@ function Eding-Yeniden {
     $script:AcilisDurum = 'bekliyor'
 }
 
-# ================= WINDOWS BAŞLANGICI ve TAM EKRAN =================
-# ================= WINDOWS BAŞLANGICI ve TAM EKRAN =================
+# ================= WINDOWS BAŞLANGICI =================
 # Windows'un Başlangıç klasörüne KazimaBaslat.bat kısayolu: oturum açılınca panel (ve onunla Eding) kendiliğinden başlar
 function Windows-Baslangic-Ayarla {
     try {

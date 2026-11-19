@@ -36,10 +36,10 @@
           '# Fonksiyonlar düzeltilmiş eski panelden taşındı; arayüze yalnız kapı fonksiyonlarıyla (Ui-*, Yaz) ulaşılır.',
           '# Değişen fonksiyonlar ve gerekçeleri: tests/TASIMA_DEGISEN.txt. PowerShell 5.1 (32 bit) uyumlu.', '')
   Oge = @('L:2005-2012','','F:Dosyayi-Kontrol-Et','','F:Hazir-Mi','','F:Btn-DosyaSec','','F:Dosya-Ozeti','',
-          'L:2142-2148','','F:Frez-Manuel-Mi','','F:Otomatik-Gecis-Uygun-Mu','F:Frez-Modu-Yaz','','F:Frez-Modu-Sor','','F:Manuel-Macro-Kontrol','','F:Takim-Bildir','',
+          'L:2142-2148','','F:Frez-Manuel-Mi','','F:Otomatik-Gecis-Uygun-Mu','F:Frez-Modu-Yaz','','F:Frez-Modu-Goster','','F:Frez-Modu-Sor','','F:Manuel-Macro-Kontrol','','F:Takim-Bildir','',
           'L:2342-2345','F:Takim-Komutu-Mu','F:Takim-Degisimi-Suruyor-Mu','F:Takim-Belirsiz-Isaretle','F:Takim-Belirsiz-Coz','F:Takim-Kapisi','',
           'F:Manuel-Istek','','F:Manuel-Istek-Tahmin','','F:Manuel-Devam','','F:Manuel-Diyalog','','L:2494-2495','F:Manuel-Izle','',
-          'L:2776-2779','F:Yeni-Blok','',
+          'L:2776-2779','F:Blok-Cip-Guncelle','F:Yeni-Blok','',
           'F:Devam-Kaydet','','F:Devam-Diyalog','','F:Devam-Baslat','','F:Devam-Acilis','','F:Is-Calistir','','F:Bos-Ismili-Hazirla','',
           'L:3248-3249','F:Btn-Baslat','F:Btn-Baslat-Ic','','F:Btn-Duraklat','','F:Btn-Durdur','','F:Btn-FrezBirak','','F:Btn-Home','',
           'L:3440-3442','F:Hiz-Oku','F:Hiz-Ayarla','','L:3469-3472','','F:Geri-Sayim','','F:Acilis-Hazirla','','F:Panel-Sifirla','',
@@ -65,6 +65,7 @@
           '# panelden taşındı; değişenler: tests/TASIMA_DEGISEN.txt. PowerShell 5.1 (32 bit) uyumlu.', '')
   Oge = @('L:2901-2902','F:Uzak-Engel','F:Uzak-Is-Sec','F:Uzak-Komut','F:Uzak-Durum','L:3006-3006','','F:Uzak-Baslat','F:Uzak-Etiket-Guncelle')
 }
+'AnaTik.ps1' = @{ Bas = @(); Oge = @('F:Ana-Tik') }
 'Kapi.ps1' = @{
   Bas = @('# Kapi.ps1 - mantık tarafındaki arayüz kapısı yardımcıları: Yaz (günlük + mesaj geçmişi), Onay, Ui-Kutu (eski mesaj kutusu',
           '# anlamını Ui-Onay / Ui-Bilgi / Ui-Hata / Ui-Secim kapılarına çevirir), Durum-Yaz, Hatalari-Kaydet, Klasor-Ac.',

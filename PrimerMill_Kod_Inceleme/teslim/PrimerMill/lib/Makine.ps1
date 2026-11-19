@@ -41,13 +41,9 @@ function Dosyayi-Kontrol-Et([string]$yol) {
     $script:Engel    = ($hatalar.Count -gt 0)
     $script:SonHatalar = @($hatalar | Select-Object -First 5)
     $script:Uyarilar = @($uyarilar)
-    $bar.Value = 0
-    $bar.Caption = ''
-    $bar.Dancing = $false
-    $bar.Animal = if ($script:Tercih.Dansci -eq '1') { Get-Random -Minimum 0 -Maximum ([Hayvanlar]::Adlar.Length) } else { -1 }
-    $sim.SetData($a)
-    $simBuyuk.SetData($a)
-    if ($bar.Animal -ge 0) { Yaz "Bu işin dansçısı: $([Hayvanlar]::Adlar[$bar.Animal])" }
+    $script:Yuzde = 0
+    $script:IsTamamlandi = $false
+    Ui-Sim-Veri $a
     Dosya-Ozeti
 }
 
@@ -79,38 +75,54 @@ function Hazir-Mi([string]$islem) {
 # ---------------- Butonlar ----------------
 function Btn-DosyaSec {
     if ((Is-Suruyor)) { (Ui-Kutu 'Kazıma sürerken yeni dosya seçilemez.' 'Dosya Seç' 'OK' 'Warning') | Out-Null; return }
-    $dlg = New-Object System.Windows.Forms.OpenFileDialog
-    $dlg.Filter = 'NC dosyaları (*.nc)|*.nc|Tüm dosyalar (*.*)|*.*'
-    $dlg.Title  = 'Kazınacak .nc dosyasını seç'
-    $script:ModalSayac++; try { $sonuc = $dlg.ShowDialog($form) } finally { $script:ModalSayac-- }
-    [Kayit]::Yaz("DOSYA SEÇİMİ: $sonuc  $($dlg.FileName)")
+    $script:ModalSayac++; try { $secilen = Is-Dosyasi-Sec } finally { $script:ModalSayac-- }
+    $sonuc = if ($secilen) { 'OK' } else { 'Cancel' }
+    [Kayit]::Yaz("DOSYA SEÇİMİ: $sonuc  $secilen")
     if ($sonuc -ne 'OK') { return }
 
-    $form.Cursor = 'WaitCursor'
+    Ui-Mesgul 'Dosya kontrol ediliyor…'
     try {
         [void][System.IO.Directory]::CreateDirectory($IsKlasor)
-        $ad    = [System.IO.Path]::GetFileName($dlg.FileName)
+        $ad    = [System.IO.Path]::GetFileName($secilen)
         $hedef = [System.IO.Path]::Combine($IsKlasor, $ad)
-        if ($dlg.FileName -ne $hedef) { [System.IO.File]::Copy($dlg.FileName, $hedef, $true) }
+        if ($secilen -ne $hedef) { [System.IO.File]::Copy($secilen, $hedef, $true) }
         [System.IO.File]::Copy($hedef, [System.IO.Path]::Combine($IsKlasor, $AktifIsAdi), $true)
         $script:SeciliDosya = $hedef
-        $lblDosya.Text = [System.IO.Path]::GetFileNameWithoutExtension($ad)
-        $lblDosya.ForeColor = $cYazi
+        $script:DosyaMetni = [System.IO.Path]::GetFileNameWithoutExtension($ad)
         Yaz "Kaydedildi: $hedef"
         Dosyayi-Kontrol-Et $hedef
     } catch {
         Yaz "HATA: $($_.Exception.Message)"
         (Ui-Kutu "Hata: $($_.Exception.Message)" 'Dosya Seç' 'OK' 'Error') | Out-Null
-    } finally { $form.Cursor = 'Default' }
+    } finally { Ui-Mesgul $null }
+}
+
+# Yeni arayüz: İŞLER klasöründeki .nc dosyaları dokunmatik listede (en yeni üstte), "GÖZAT…" ile başka klasör (OpenFileDialog).
+# Panelin kendi ürettiği ara dosyalar (AKTIF_IS.nc, *_blok*, *_devam.nc, *_SIM.nc) listelenmez.
+function Is-Dosyasi-Sec {
+    $dosyalar = @()
+    try {
+        if ([System.IO.Directory]::Exists($IsKlasor)) {
+            $dosyalar = @(Get-ChildItem -LiteralPath $IsKlasor -Filter '*.nc' -File -ErrorAction Ignore |
+                Where-Object { $_.Name -ne $AktifIsAdi -and $_.Name -notlike '*_blok*' -and $_.Name -notlike '*_devam.nc' -and $_.Name -notlike '*_SIM.nc' } |
+                Sort-Object LastWriteTime -Descending | Select-Object -First 200)
+        }
+    } catch { }
+    $ad = @($dosyalar | ForEach-Object { $_.Name })
+    $ac = @($dosyalar | ForEach-Object { '{0}   ·   {1} KB' -f $_.LastWriteTime.ToString('dd.MM.yyyy HH:mm'), [math]::Ceiling($_.Length / 1024) })
+    $i = Ui-Liste-Sec 'İş seç' ([string[]]$ad) ([string[]]$ac) 'GÖZAT…'
+    if ($i -ge 0 -and $i -lt $dosyalar.Count) { return $dosyalar[$i].FullName }
+    if ($i -eq -2) { return (Ui-Dosya-Ac 'Kazınacak .nc dosyasını seç' 'NC dosyaları (*.nc)|*.nc|Tüm dosyalar (*.*)|*.*' $IsKlasor) }
+    return $null
 }
 
 function Dosya-Ozeti {
     # Dosya seçildikten sonra ana ekrandaki sade özet
-    if (-not $script:Analiz) { $lblSure.Text = ''; return }
-    if ($script:Engel) { $lblSure.Text = 'Dosya uygun değil  ·  ayrıntı için Detaylar'; $lblSure.ForeColor = $cKirmizi; return }
-    $lblSure.ForeColor = $cSoluk
+    if (-not $script:Analiz) { $script:SureMetni = ''; return }
+    if ($script:Engel) { $script:SureMetni = 'Dosya uygun değil  ·  ayrıntı: uyarı düğmesi / Kayıtlar'; $script:SureTur = $cKirmizi; return }
+    $script:SureTur = $cSoluk
     $ek = if ($script:Uyarilar.Count -gt 0) { '   ·   dikkat gerektiriyor' } else { '' }
-    $lblSure.Text = "Tahmini süre  $(Sade-Sure $script:Analiz.Toplam)$ek"
+    $script:SureMetni = "Tahmini süre  $(Sade-Sure $script:Analiz.Toplam)$ek"
 }
 
 # ================= MANUEL FREZ DEĞİŞİMİ =================
@@ -141,37 +153,21 @@ function Frez-Modu-Yaz([bool]$manuel) {
     return $ok
 }
 
+function Frez-Modu-Goster {
+    if ($script:Sade) { return }
+    if (-not $script:ApiHazir -or -not $script:Bagli) { $script:FrezModuMetni = 'Frez: —'; return }
+    $m = Frez-Manuel-Mi
+    $script:FrezModuMetni = if ($m) { 'Frez: Manuel' } else { 'Frez: Otomatik' }
+}
+
 function Frez-Modu-Sor {
     # BAŞLAT'ta: manuel mi otomatik mi? Seçilen döner ('MANUEL' / 'OTOMATIK') ya da $null (vazgeç)
     $simdi = Frez-Manuel-Mi
-    $f = New-Object System.Windows.Forms.Form
-    $f.Text = 'Frez değişimi'; $f.StartPosition = 'CenterParent'; $f.FormBorderStyle = 'FixedDialog'
-    $f.MaximizeBox = $false; $f.MinimizeBox = $false; $f.BackColor = $cZemin; $f.ClientSize = New-Object System.Drawing.Size(560, 250)
-    $l = New-Object System.Windows.Forms.Label
-    $l.Text = "Bu işte frezeler nasıl değişsin?`r`nŞu anki ayar: $(if ($simdi) { 'MANUEL' } else { 'OTOMATİK' })"
-    $l.ForeColor = $cYazi; $l.Font = New-Object System.Drawing.Font('Segoe UI', 13); $l.SetBounds(24, 18, 512, 60)
-    $f.Controls.Add($l)
-    $mk = {
-        param($t, $alt, $x, $renk, $deger)
-        $b = New-Object System.Windows.Forms.Button
-        $b.Text = "$t`r`n$alt"; $b.FlatStyle = 'Flat'; $b.BackColor = $cPanel; $b.ForeColor = $renk
-        $b.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 12)
-        $b.FlatAppearance.BorderColor = $renk; $b.FlatAppearance.BorderSize = 2
-        $b.SetBounds($x, 92, 246, 100)
-        $b.Tag = $deger
-        $b.Add_Click({ param($s2, $e2) $fm = $s2.FindForm(); $fm.Tag = $s2.Tag; [Kayit]::Yaz("TUŞ: Frez modu -> $($s2.Tag)"); $fm.Close() })
-        $f.Controls.Add($b); return $b
-    }
-    $bo = & $mk 'OTOMATİK' '(magazinden alır / bırakır)' 24 $cAltinAc 'OTOMATIK'
-    $bm = & $mk 'MANUEL' '(frezeleri ben takarım)' 290 $cYesil 'MANUEL'
-    $iptal = New-Object System.Windows.Forms.Button
-    $iptal.Text = 'Vazgeç'; $iptal.FlatStyle = 'Flat'; $iptal.ForeColor = $cSoluk; $iptal.BackColor = $cZemin
-    $iptal.SetBounds(440, 204, 96, 30); $iptal.Add_Click({ param($s2, $e2) $s2.FindForm().Close() })
-    $f.Controls.Add($iptal)
-    $f.AcceptButton = if ($simdi) { $bm } else { $bo }
-    $f.Add_Shown({ param($s2, $e2) $s2.Activate(); $s2.AcceptButton.Focus() })
-    [void]$f.ShowDialog($form)
-    if ($f.Tag) { return [string]$f.Tag } else { return $null }
+    # Yeni arayüz: Diyalog.Secim (eski özel pencere yerine). Esc = ACİL STOP + vazgeç.
+    $s = Ui-Secim 'Frez değişimi' "Bu işte frezeler nasıl değişsin?`r`nŞu anki ayar: $(if ($simdi) { 'MANUEL' } else { 'OTOMATİK' })" @('OTOMATİK  (magazinden alır / bırakır)', 'MANUEL  (frezeleri ben takarım)')
+    $sec = $null; if ($s -eq 0) { $sec = 'OTOMATIK' } elseif ($s -eq 1) { $sec = 'MANUEL' }
+    [Kayit]::Yaz("TUŞ: Frez modu -> $sec")
+    return $sec
 }
 
 # Manuel mod sadece yeni macro.cnc Eding'e YÜKLÜYSE çalışır. Eski macro yüklüyse makine frezi magazinden almaya kalkar.
@@ -272,32 +268,10 @@ function Takim-Belirsiz-Coz([string]$islem) {
     # $true: belirsizlik yok / giderildi. $false: çağıran durmalı.
     if (-not $script:TakimBelirsiz) { return $true }
     $tkE = -1; try { $tkE = [Eding]::CncGetCurrentToolNumber() } catch { }
-    $f = New-Object System.Windows.Forms.Form
-    $f.Text = 'Takım durumu belirsiz'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.TopMost = $true
-    $f.MaximizeBox = $false; $f.MinimizeBox = $false; $f.ShowInTaskbar = $false
-    $f.BackColor = $cZemin; $f.ForeColor = $cYazi; $f.Font = New-Object System.Drawing.Font('Segoe UI', 11)
-    $f.ClientSize = New-Object System.Drawing.Size(640, 300)
-    $lb = New-Object System.Windows.Forms.Label
-    $lb.Text = 'İş milinde hangi frez var?'; $lb.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 16); $lb.ForeColor = $cAltinAc; $lb.SetBounds(24, 14, 592, 34); $f.Controls.Add($lb)
-    $lm = New-Object System.Windows.Forms.Label
-    $lm.Text = "Son ACİL STOP / DURDUR / RESET bir takım değişimi sırasında gelmiş olabilir.`r`nEding'e göre iş milinde: T$tkE.`r`n`r`nKapağı açıp iş milini GÖZÜNLE kontrol et ve takılı olanı seç (makine hareket etmez)."
-    $lm.SetBounds(24, 54, 592, 100); $f.Controls.Add($lm)
-    $f.Tag = $null
-    for ($n = 0; $n -le 6; $n++) {
-        $b = New-Object System.Windows.Forms.Button
-        $b.Text = $(if ($n -eq 0) { "Boş`r`n(T0)" } else { "T$n" }); $b.Tag = $n
-        $b.FlatStyle = 'Flat'; $b.BackColor = $cPanel; $b.ForeColor = $cYazi; $b.FlatAppearance.BorderColor = $cAltin
-        $b.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 12); $b.SetBounds(24 + $n * 85, 166, 78, 64)
-        $b.Add_Click({ param($s2, $e2) $fm = $s2.FindForm(); $fm.Tag = $s2.Tag; $fm.Close() })
-        $f.Controls.Add($b)
-    }
-    $bv = New-Object System.Windows.Forms.Button
-    $bv.Text = 'Vazgeç'; $bv.FlatStyle = 'Flat'; $bv.BackColor = $cZemin; $bv.ForeColor = $cSoluk; $bv.SetBounds(496, 246, 120, 36)
-    $bv.Add_Click({ param($s2, $e2) $s2.FindForm().Close() }); $f.Controls.Add($bv)
-    $f.AcceptButton = $bv; $f.KeyPreview = $true
-    $f.Add_KeyDown({ param($s2, $e2) if ($e2.KeyCode -eq 'Escape') { $e2.Handled = $true; $s2.Tag = $null; $s2.Close(); Acil-Stop 'Esc (takım belirsiz)' } })
-    [void]$f.ShowDialog($form)
-    $sec = $f.Tag; $f.Dispose()
+    # Yeni arayüz: Diyalog.Secim (Boş/T1..T6). Esc = ACİL STOP + vazgeç (eskisi gibi).
+    $m = "Son ACİL STOP / DURDUR / RESET bir takım değişimi sırasında gelmiş olabilir.`r`nEding'e göre iş milinde: T$tkE.`r`n`r`nKapağı açıp iş milini GÖZÜNLE kontrol et ve takılı olanı seç (makine hareket etmez)."
+    $s = Ui-Secim 'İş milinde hangi frez var?' $m @('Boş (T0)', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6')
+    $sec = $null; if ($s -ge 0 -and $s -le 6) { $sec = $s }
     [Kayit]::Yaz("TAKIM BELİRSİZ: operatör seçimi '$sec' (Eding T$tkE)")
     if ($null -eq $sec) { Yaz "$islem yapılmadı: iş milindeki frez bildirilmedi."; return $false }
     $n = [int]$sec
@@ -364,32 +338,13 @@ function Manuel-Diyalog($ist) {
             $tamam = if ($yeni -gt 0) { "TAKTIM  ·  PENS'İ KAPAT" } else { "ÇIKARDIM  ·  PENS'İ KAPAT" }
         }
         [Kayit]::Yaz("MANUEL: istek faz $($ist.Faz)  T$eski -> T$yeni")
-        [System.Media.SystemSounds]::Exclamation.Play()
-        $f = New-Object System.Windows.Forms.Form
-        $f.Text = 'Manuel frez değişimi'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.TopMost = $true
-        $f.MaximizeBox = $false; $f.MinimizeBox = $false; $f.ControlBox = $false
-        $f.BackColor = $cZemin; $f.ClientSize = New-Object System.Drawing.Size(640, 340)
-        $lb = New-Object System.Windows.Forms.Label
-        $lb.Text = $baslik; $lb.ForeColor = $cAltinAc; $lb.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 20)
-        $lb.SetBounds(24, 16, 592, 44); $f.Controls.Add($lb)
-        $lm = New-Object System.Windows.Forms.Label
-        $lm.Text = $metin; $lm.ForeColor = $cYazi; $lm.Font = New-Object System.Drawing.Font('Segoe UI', 13)
-        $lm.SetBounds(24, 70, 592, 150); $f.Controls.Add($lm)
+        # Yeni arayüz: Diyalog.ManuelFrezAdimi (büyük, ses çalar, Esc / küçük ACİL STOP = ACİL STOP). Son düğme = onay.
+        $durdurMetni = if ($ist.Faz -eq 2) { "İŞİ DURDUR`r`n(pens AÇIK kalır)" } else { 'İŞİ DURDUR' }
+        $s = Ui-Manuel-Adim ([int]$ist.Faz) $metin @($durdurMetni, $tamam) $baslik
         $sonuc = @{ V = '' }
-        $bt = New-Object System.Windows.Forms.Button
-        $bt.Text = $tamam; $bt.FlatStyle = 'Flat'; $bt.BackColor = $cPanel; $bt.ForeColor = $cYesil
-        $bt.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 14); $bt.FlatAppearance.BorderColor = $cYesil; $bt.FlatAppearance.BorderSize = 2
-        $bt.SetBounds(24, 236, 392, 80); $bt.Add_Click({ $sonuc.V = 'tamam'; $f.Close() }.GetNewClosure()); $f.Controls.Add($bt)
-        $bd = New-Object System.Windows.Forms.Button
-        $bd.Text = if ($ist.Faz -eq 2) { "İşi durdur`r`n(pens AÇIK kalır)" } else { 'İşi durdur' }
-        $bd.FlatStyle = 'Flat'; $bd.BackColor = $cZemin; $bd.ForeColor = $cKirmizi; $bd.FlatAppearance.BorderColor = $cKirmizi
-        $bd.SetBounds(432, 236, 184, 80); $bd.Add_Click({ $sonuc.V = 'durdur'; $f.Close() }.GetNewClosure()); $f.Controls.Add($bd)
-        $f.KeyPreview = $true
-        $f.Add_KeyDown({ param($s, $e) if ($e.KeyCode -eq 'Escape') { $e.Handled = $true; $sonuc.V = 'acil'; $f.Close() } }.GetNewClosure())
-        $f.Add_Shown({ $f.Activate() })
-        [void]$f.ShowDialog($form)
+        if ($s -eq 1) { $sonuc.V = 'tamam' } elseif ($s -eq 0) { $sonuc.V = 'durdur' } else { $sonuc.V = 'acil' }
         [Kayit]::Yaz("MANUEL: operatör -> $($sonuc.V)")
-        if ($sonuc.V -eq 'acil') { Acil-Stop 'Esc (manuel frez)'; return }
+        if ($sonuc.V -eq 'acil') { if (-not [Eding]::AcilKilit) { Acil-Stop 'Esc (manuel frez)' }; return }   # diyalog ACİL STOP'u zaten çağırmış olabilir
         if ($sonuc.V -eq 'durdur') {
             if (Onay 'İş durdurulsun mu?' 'Manuel frez') { Btn-Durdur; return }
             $script:ManuelSonSeq = ''; return   # tekrar sorulsun
@@ -440,48 +395,20 @@ function Manuel-Izle {
 # Alt satırdaki "Yeni blok" → isim yaz → saat 9 yönüne T2 ile isim + referans çentiği, sonra iş durmadan devam eder.
 $script:BekleyenBlok = $null
 $script:BlokHazir = $false     # makinede "blok takıldı" onayı (uzaktan BAŞLAT bunu ister, her işte sıfırlanır)
-function Yeni-Blok {
+function Blok-Cip-Guncelle {
+    if (-not $script:Sade) { return }
+    # Yeni arayüz: Üretim › bakım şeridi blok yazısı (MakineDurumu.BlokDurum)
+    if ($script:BekleyenBlok) { $script:BlokDurumMetni = "Blok: $($script:BekleyenBlok.Metin)$(if ($script:BlokHazir) { ' ✓' })" }
+    elseif ($script:BlokHazir) { $script:BlokDurumMetni = 'Blok hazır ✓' }
+    else { $script:BlokDurumMetni = '' }
+}
+# Yeni arayüz: "YENİ BLOK" diyaloğunu görünüm açar (Diyalog.YeniBlok) ve seçimi komutla gönderir; eski pencerenin
+# seçimden sonraki kodu aynen burada. $sec: 'is' (kazı ve işe başla), 'tek' (sadece ismi kazı), 'hazir' (yeni blok hazır),
+# 'eski' (kullanılmış blok), 'sil' (bekleyeni iptal). $isim / $kalinlik / $derinlik: diyalog kutularının metni.
+function Yeni-Blok([string]$sec, [string]$isim = '', [string]$kalinlik = '', [string]$derinlik = '') {
     if (Is-Suruyor-Uyari 'Yeni blok') { return }
-    $f = New-Object System.Windows.Forms.Form
-    $f.Text = 'Yeni blok'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.MinimizeBox = $false
-    $f.TopMost = $true; $f.ShowInTaskbar = $false
-    $f.BackColor = $cZemin; $f.ForeColor = $cYazi; $f.Font = New-Object System.Drawing.Font('Segoe UI', 11)
-    $f.ClientSize = New-Object System.Drawing.Size(560, 380)
-    $lb = New-Object System.Windows.Forms.Label
-    $lb.Text = 'Blok takıldı'; $lb.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 16); $lb.ForeColor = $cAltinAc; $lb.SetBounds(24, 14, 500, 34); $f.Controls.Add($lb)
-    $la = New-Object System.Windows.Forms.Label
-    $la.Text = 'İsim ve referans çentiği saat 9 yönüne, T2 frezle kazınır.'; $la.ForeColor = $cSoluk; $la.SetBounds(24, 50, 520, 24); $f.Controls.Add($la)
-    $e1 = New-Object System.Windows.Forms.Label; $e1.Text = 'Blok ismi'; $e1.ForeColor = $cSoluk; $e1.SetBounds(24, 98, 150, 26); $f.Controls.Add($e1)
-    $tAd = New-Object System.Windows.Forms.TextBox; $tAd.BackColor = $cPanel; $tAd.ForeColor = $cYazi; $tAd.BorderStyle = 'FixedSingle'
-    $tAd.Font = New-Object System.Drawing.Font('Consolas', 16); $tAd.MaxLength = 10; $tAd.SetBounds(180, 92, 220, 34); $tAd.Text = "$(Blok-Sonraki-No)"; $f.Controls.Add($tAd)
-    $e2 = New-Object System.Windows.Forms.Label; $e2.Text = 'Blok kalınlığı (mm)'; $e2.ForeColor = $cSoluk; $e2.SetBounds(24, 146, 150, 26); $f.Controls.Add($e2)
-    $tT = New-Object System.Windows.Forms.TextBox; $tT.BackColor = $cPanel; $tT.ForeColor = $cYazi; $tT.BorderStyle = 'FixedSingle'
-    $tT.Font = New-Object System.Drawing.Font('Consolas', 16); $tT.SetBounds(180, 140, 100, 34)
-    $tT.Text = $(if ($script:Tercih.SadeKalinlik) { $script:Tercih.SadeKalinlik } else { '18' }); $f.Controls.Add($tT)
-    $e3 = New-Object System.Windows.Forms.Label; $e3.Text = 'Derinlik (mm)'; $e3.ForeColor = $cSoluk; $e3.SetBounds(300, 146, 110, 26); $f.Controls.Add($e3)
-    $tD = New-Object System.Windows.Forms.TextBox; $tD.BackColor = $cPanel; $tD.ForeColor = $cYazi; $tD.BorderStyle = 'FixedSingle'
-    $tD.Font = New-Object System.Drawing.Font('Consolas', 16); $tD.SetBounds(414, 140, 100, 34)
-    $tD.Text = $(if ($script:Tercih.SadeDerinlik) { $script:Tercih.SadeDerinlik } else { '0.15' }); $f.Controls.Add($tD)
-    $f.Tag = $null
-    $mk = { param($t, $x, $w, $renk, $deger)
-        $b = New-Object System.Windows.Forms.Button; $b.Text = $t; $b.FlatStyle = 'Flat'; $b.BackColor = $cPanel; $b.ForeColor = $renk
-        $b.FlatAppearance.BorderColor = $renk; $b.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11)
-        $b.SetBounds($x, 200, $w, 76); $b.Tag = $deger
-        $b.Add_Click({ param($s2, $e2) $fm = $s2.FindForm(); $fm.Tag = $s2.Tag; $fm.Close() })
-        $f.Controls.Add($b); $b }
-    $isVar = [bool]$script:SeciliDosya
-    $bIs = & $mk $(if ($isVar) { "KAZI VE İŞE BAŞLA`r`n$([System.IO.Path]::GetFileName($script:SeciliDosya))" } else { "Önce iş dosyasını seç`r`n(DOSYA SEÇ)" }) 24 250 $cYesil 'is'
-    $bIs.Enabled = $isVar
-    [void](& $mk "SADECE`r`nİSMİ KAZI" 284 150 $cAltinAc 'tek')
-    [void](& $mk 'Vazgeç' 444 92 $cSoluk 'iptal')
-    $bH = & $mk "YENİ BLOK HAZIR`r`n(işi bilgisayardan başlatacağım)" 24 250 $cYesil 'hazir'; $bH.Top = 286; $bH.Height = 70
-    $bE = & $mk "KULLANILMIŞ BLOK`r`n(isim yok) hazır" 284 252 $cAltinAc 'eski'; $bE.Top = 286; $bE.Height = 70
-    if ($script:BekleyenBlok) {
-        $bk = & $mk 'Bekleyen bloğu iptal et' 24 160 $cKirmizi 'sil'; $bk.SetBounds(414, 92, 130, 34); $bk.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
-    }
-    $f.Add_Shown({ param($s2, $e2) $s2.Activate(); $tAd.Focus(); $tAd.SelectAll() })
-    [void]$f.ShowDialog($form)
-    $sec = [string]$f.Tag
+    $tAd = @{ Text = $isim }; $tT = @{ Text = $kalinlik }; $tD = @{ Text = $derinlik }
+    if ($sec -eq 'is' -and -not $script:SeciliDosya) { (Ui-Kutu 'Önce iş dosyasını seç (İŞ SEÇ).' 'Yeni blok' 'OK' 'Warning') | Out-Null; return }
     [Kayit]::Yaz("YENİ BLOK: seçim '$sec'  isim '$($tAd.Text)'")
     if ($sec -eq 'sil') { $script:BekleyenBlok = $null; Blok-Cip-Guncelle; Yaz 'Bekleyen blok iptal edildi.'; return }
     if ($sec -eq 'eski') { $script:BekleyenBlok = $null; $script:BlokHazir = $true; Blok-Cip-Guncelle; Yaz 'Kullanılmış blok takıldı: iş uzaktan başlatılabilir.'; return }
@@ -538,41 +465,23 @@ function Devam-Kaydet([int]$satir, [string]$durum, [double]$yuzde) {
 }
 
 function Devam-Diyalog($k) {
-    $f = New-Object System.Windows.Forms.Form
-    $f.Text = 'Yarım kalan iş'; $f.StartPosition = 'CenterScreen'; $f.FormBorderStyle = 'FixedDialog'; $f.MaximizeBox = $false; $f.MinimizeBox = $false
-    $f.TopMost = $true; $f.ShowInTaskbar = $false
-    $f.BackColor = $cZemin; $f.ForeColor = $cYazi; $f.Font = New-Object System.Drawing.Font('Segoe UI', 11)
-    $f.ClientSize = New-Object System.Drawing.Size(620, 400)
+    # Yeni arayüz: Diyalog.Devam (KALDIĞI YERDEN / YAKIN NOKTADAN / BAŞTAN / VAZGEÇ + iş milindeki frez)
     $neden = switch ([string]$k.Durum) { 'calisiyor' { 'iş sürerken panel/elektrik kapandı' } 'hata' { 'Eding hatasıyla durdu (basınç / acil stop vb.)' } 'durduruldu' { 'DURDUR ile durduruldu' } default { 'yarıda kaldı' } }
-    $lb = New-Object System.Windows.Forms.Label; $lb.Text = 'Yarım kalan iş'; $lb.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 16); $lb.ForeColor = $cAltinAc; $lb.SetBounds(24, 14, 570, 34); $f.Controls.Add($lb)
-    $li = New-Object System.Windows.Forms.Label; $li.ForeColor = $cYazi; $li.SetBounds(24, 54, 570, 72)
-    $li.Text = "$([System.IO.Path]::GetFileNameWithoutExtension([string]$k.Dosya))   ·   %$($k.Yuzde) yapılmıştı`r`n$($k.Zaman)  ·  $neden`r`nSatır $($k.Satir)"
-    $f.Controls.Add($li)
-    $lt = New-Object System.Windows.Forms.Label; $lt.Text = 'İş milinde şu an takılı frez:'; $lt.ForeColor = $cSoluk; $lt.SetBounds(24, 136, 230, 26); $f.Controls.Add($lt)
-    $cT = New-Object System.Windows.Forms.ComboBox; $cT.DropDownStyle = 'DropDownList'; $cT.BackColor = $cPanel; $cT.ForeColor = $cYazi; $cT.FlatStyle = 'Flat'
-    foreach ($n in 0..6) { [void]$cT.Items.Add($(if ($n -eq 0) { 'Yok (T0)' } else { "T$n" })) }
-    $t0 = [int]$k.Takim; if ($t0 -lt 0 -or $t0 -gt 6) { $t0 = 0 }; $cT.SelectedIndex = $t0; $cT.SetBounds(260, 132, 120, 30); $f.Controls.Add($cT)
-    $ln = New-Object System.Windows.Forms.Label; $ln.Text = 'Kapağı açıp iş milindeki frezi kontrol et; listeden doğrusunu seç.'; $ln.ForeColor = $cSoluk; $ln.Font = New-Object System.Drawing.Font('Segoe UI', 9.5); $ln.SetBounds(24, 166, 570, 22); $f.Controls.Add($ln)
-    $f.Tag = $null
-    $mk = { param($t, $x, $y, $w, $h, $renk, $deger)
-        $b = New-Object System.Windows.Forms.Button; $b.Text = $t; $b.FlatStyle = 'Flat'; $b.BackColor = $cPanel; $b.ForeColor = $renk
-        $b.FlatAppearance.BorderColor = $renk; $b.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11)
-        $b.SetBounds($x, $y, $w, $h); $b.Tag = $deger
-        $b.Add_Click({ param($s2, $e2) $fm = $s2.FindForm(); $fm.Tag = $s2.Tag; $fm.Close() })
-        $f.Controls.Add($b); $b }
-    [void](& $mk "KALDIĞI YERDEN DEVAM`r`n(son güvenli noktadan, önerilen)" 24 200 300 80 $cYesil 'guvenli')
-    [void](& $mk "YAKIN NOKTADAN`r`n(~1 dk geriden, yukarıdan iner)" 334 200 262 80 $cAltinAc 'yakin')
-    [void](& $mk 'BAŞTAN BAŞLAT' 24 296 300 56 $cSoluk 'bastan')
-    [void](& $mk 'Vazgeç' 334 296 262 56 $cSoluk 'iptal')
-    $lu = New-Object System.Windows.Forms.Label; $lu.Text = 'Blok tutucudan sökülmediyse devam doğru yerden kesilir.'; $lu.ForeColor = $cSoluk; $lu.Font = New-Object System.Drawing.Font('Segoe UI', 9.5); $lu.SetBounds(24, 362, 570, 24); $f.Controls.Add($lu)
-    [void]$f.ShowDialog($form)
-    return @{ Sec = [string]$f.Tag; Takim = $cT.SelectedIndex }
+    $bilgi = "%$($k.Yuzde) yapılmıştı`r`n$($k.Zaman)  ·  $neden`r`nSatır $($k.Satir)`r`nKapağı açıp iş milindeki frezi kontrol et. Blok tutucudan sökülmediyse devam doğru yerden kesilir."
+    $t0 = [int]$k.Takim; if ($t0 -lt 0 -or $t0 -gt 6) { $t0 = 0 }
+    $r = Ui-Devam ([System.IO.Path]::GetFileNameWithoutExtension([string]$k.Dosya)) $bilgi $t0
+    $sec = 'iptal'; $tk = $t0
+    if ($r) { $sec = [string]$r.Secim; $tk = [int]$r.Takim }
+    if (@('guvenli', 'yakin', 'bastan', 'iptal') -notcontains $sec) { $sec = 'iptal' }
+    if ($tk -lt 0 -or $tk -gt 6) { $sec = 'iptal' }
+    [Kayit]::Yaz("DEVAM: seçim '$sec', iş milinde T$tk")
+    return @{ Sec = $sec; Takim = $tk }
 }
 
 function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
     if (-not (Hazir-Mi 'Devam')) { return }
     if ((Calisiyor-Mu)) { (Ui-Kutu 'Makine şu an çalışıyor.' 'Devam' 'OK' 'Warning') | Out-Null; return }
-    $form.Cursor = 'WaitCursor'
+    Ui-Mesgul 'Kaldığı yerden devam hazırlanıyor…'
     try {
         # Eding'in bildiği frez, gerçekte takılı olanla aynı olsun (hareketsiz; macro'daki pens/T0 eki ile)
         # K6/GV-04: önce Eding'deki makro sürümü (#4038), sonra bayrak (#4039 / #4900) yazılıp geri okunur; her adım denetlenir
@@ -597,9 +506,10 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
             $script:BlokHazir = $false; if ($script:Sade) { Blok-Cip-Guncelle }
             $script:TakipSonu = ''; $script:IsAktif = $true; $script:Gecen = [TimeSpan]::Zero; $script:SonTik = Get-Date
             $script:BaslamaAni = Get-Date; $script:SonGecerliSatir = 0; $script:CalistiGoruldu = $false
+            $script:IsTamamlandi = $false; $script:Yuzde = 0; $script:SureMetni = ''
             Yaz "Kaldığı yerden devam ediyor: $([System.IO.Path]::GetFileName([string]$k.Dosya))"
         }
-    } finally { $form.Cursor = 'Default' }
+    } finally { Ui-Mesgul $null }
 }
 
 # Açılışta yarım iş varsa dosyasını seçili getir (BAŞLAT'a basınca "kaldığı yerden" sorulur)
@@ -610,10 +520,10 @@ function Devam-Acilis {
     if (-not [System.IO.File]::Exists($dosya)) { $dosya = [string]$k.Kaynak }
     try {
         $script:SeciliDosya = $dosya
-        $lblDosya.Text = [System.IO.Path]::GetFileNameWithoutExtension($dosya); $lblDosya.ForeColor = $cYazi
+        $script:DosyaMetni = [System.IO.Path]::GetFileNameWithoutExtension($dosya)
         Dosyayi-Kontrol-Et $dosya
         Yaz "YARIM KALAN İŞ: $([System.IO.Path]::GetFileName($dosya))  %$($k.Yuzde)  ($($k.Zaman)). Kaldığı yerden devam için BAŞLAT'a bas."
-        $lblSure.Text = "Yarım kalan iş  ·  %$($k.Yuzde)  ·  devam için BAŞLAT"; $lblSure.ForeColor = $cAltinAc
+        $script:SureMetni = "Yarım kalan iş  ·  %$($k.Yuzde)  ·  devam için BAŞLAT"; $script:SureTur = $cAltinAc
     } catch { }
 }
 
@@ -753,7 +663,7 @@ function Btn-Baslat-Ic {
     if (-not $script:Sade) { if (-not (Onay $k 'Kazımayı başlat')) { return } }
     if ($script:Sade -and -not (Bos-Ismili-Hazirla)) { return }
 
-    $form.Cursor = 'WaitCursor'
+    Ui-Mesgul 'İş yükleniyor…'
     try {
         Hata-Temizle 'Başlat'
         try { if ([Eding]::CncGetVariable(4034) -ne 0) { [void][Eding]::CncRunSingleLine('#4034=0'); [void](Hareket-Bitene-Kadar-Bekle 3) } } catch { }
@@ -777,8 +687,9 @@ function Btn-Baslat-Ic {
             $script:BaslamaAni = Get-Date
             $script:SonGecerliSatir = 0
             $script:CalistiGoruldu = $false
+            $script:IsTamamlandi = $false; $script:Yuzde = 0; $script:SureMetni = ''
         }
-    } finally { $form.Cursor = 'Default' }
+    } finally { Ui-Mesgul $null }
 }
 
 function Btn-Duraklat {
@@ -796,11 +707,11 @@ function Btn-Durdur([bool]$sor = $false) {
     $belirsiz = Takim-Degisimi-Suruyor-Mu
     if (Komut-Sonucu 'Durdur' ([Eding]::CncAbortJob())) {
         if ($belirsiz) { Takim-Belirsiz-Isaretle 'DURDUR' }
-        if ($script:IsAktif) { Devam-Kaydet $script:SonGecerliSatir 'durduruldu' $bar.Value }
+        if ($script:IsAktif) { Devam-Kaydet $script:SonGecerliSatir 'durduruldu' $script:Yuzde }
         $script:TakipSonu = 'kullanici'
         $script:IsAktif = $false
-        $lblSure.Text = 'Durduruldu'
-        $lblSure.ForeColor = $cSoluk
+        $script:SureMetni = 'Durduruldu'
+        $script:SureTur = $cSoluk
     }
 }
 
@@ -810,7 +721,7 @@ function Btn-FrezBirak {
     if (-not (Takim-Kapisi 'Frez Bırak')) { return }
     $tk = [Eding]::CncGetCurrentToolNumber()
     if ($tk -eq 0) { (Ui-Kutu 'Yazılıma göre iş milinde freze yok (T0).' 'Frez Bırak' 'OK' 'Information') | Out-Null; return }
-    if (-not (Onay "İş milindeki T$tk kendi yuvasına bırakılacak.`r`n`r`nT$tk yuvası BOŞ mu ve kompresör açık mı?" 'Frez Bırak')) { return }
+    if (-not (Ui-Tehlikeli-Onay 'Frez Bırak' "İş milindeki T$tk kendi yuvasına bırakılacak.`r`n`r`nT$tk yuvası BOŞ mu ve kompresör açık mı?" $null $null $null)) { return }
     $script:TakimKomutuAni = Get-Date
     [void](Komut-Sonucu 'Frez Bırak (M6 T0)' ([Eding]::CncRunSingleLine('M6 T0')))
 }
@@ -823,7 +734,7 @@ function Btn-Home([bool]$sor = $true) {
     # GV-09: "iş milinde freze olmamalı" sorusu sade sürümde de atlanmaz (açılıştaki geri sayım penceresi aynı soruyu sorar)
     if ($sor -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra C kol düz, sonra X, Y, A, B.`r`n`r`nİş milinde freze olmamalı (Eding'e göre: T$([Eding]::CncGetCurrentToolNumber())), kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
 
-    $form.Cursor = 'WaitCursor'
+    Ui-Mesgul 'Home alınıyor…'
     try {
         # Sürücüleri aç (Eding'deki RESET ile aynı)
         Yaz "Home: sürücüler açılıyor (reset): $([Eding]::RCText([Eding]::CncReset()))"
@@ -839,7 +750,7 @@ function Btn-Home([bool]$sor = $true) {
         }
         if ([Eding]::CncGetAllAxesHomed() -ne 0 -and -not (Hatali (Eding-Durum))) { Yaz 'Home tamamlandı.' }
         else { Yaz 'Home tamamlanmadı; Detaylar kaydına bak.'; (Ui-Kutu 'Home tamamlanamadı. Detaylar penceresindeki kayda bak.' 'Home' 'OK' 'Warning') | Out-Null }
-    } finally { $form.Cursor = 'Default' }
+    } finally { Ui-Mesgul $null }
 }
 
 # ---------------- Kazıma hızı (Eding feed override) ----------------
@@ -868,7 +779,7 @@ function Hiz-Ayarla([int]$yuzde) {
     if ([math]::Abs($okunan - $yuzde) -gt 2) {
         (Ui-Kutu "Eding hız ayarını kabul etmedi (şu an %$okunan).`r`nEding'in ayarlarında hız kaynağı (feed override source) panel yerine başka bir kaynağa (örneğin makinedeki düğmeye) bağlı olabilir." 'Kazıma hızı' 'OK' 'Warning') | Out-Null
     }
-    $lblHiz.Text = "%$okunan"
+    $script:HizYuzde = $okunan
 }
 
 # ---------------- Açılışta otomatik hazırlık ----------------
@@ -877,43 +788,11 @@ $script:AcilisYeniden = $false     # Eding panel açıkken yeniden başlatıldı
 $script:EdingBirKezBaglandi = $false
 
 function Geri-Sayim([int]$saniye, [string]$metin) {
-    $f = New-Object System.Windows.Forms.Form
-    $f.Text = 'PrimerMill'
-    $f.ClientSize = New-Object System.Drawing.Size(460, 190)
-    $f.StartPosition = 'CenterParent'
-    $f.FormBorderStyle = 'FixedDialog'
-    $f.ControlBox = $false
-    $f.TopMost = $true
-    $f.BackColor = $cZemin; $f.ForeColor = $cYazi
-    $f.Font = New-Object System.Drawing.Font('Segoe UI', 10)
-    $l = New-Object System.Windows.Forms.Label
-    $l.SetBounds(20, 16, 420, 70); $l.Text = $metin
-    $f.Controls.Add($l)
-    $sayac = New-Object System.Windows.Forms.Label
-    $sayac.SetBounds(20, 86, 420, 40); $sayac.TextAlign = 'MiddleCenter'
-    $sayac.Font = New-Object System.Drawing.Font('Segoe UI Light', 22); $sayac.ForeColor = $cAltinAc
-    $sayac.Text = "$saniye  ·  sonra iptal"
-    $f.Controls.Add($sayac)
-    $iptal = New-Object System.Windows.Forms.Button
-    $iptal.Text = 'İptal'; $iptal.SetBounds(240, 138, 100, 34); $iptal.FlatStyle = 'Flat'
-    $iptal.ForeColor = $cYazi; $iptal.BackColor = $cPanel; $iptal.DialogResult = 'Cancel'
-    $f.Controls.Add($iptal)
-    $f.AcceptButton = $iptal; $f.ActiveControl = $iptal
-    $simdi = New-Object System.Windows.Forms.Button
-    $simdi.Text = 'Şimdi başla'; $simdi.SetBounds(120, 138, 110, 34); $simdi.FlatStyle = 'Flat'
-    $simdi.ForeColor = $cAltinAc; $simdi.BackColor = $cPanel; $simdi.DialogResult = 'OK'
-    $f.Controls.Add($simdi)
-    $f.CancelButton = $iptal
-    $script:GsKalan = $saniye
-    $t = New-Object System.Windows.Forms.Timer
-    $t.Interval = 1000
-    # GV-09/ED-06: süre dolunca İPTAL (hareket yok); hareket yalnız "Şimdi başla" ile
-    $t.Add_Tick({ $script:GsKalan--; $sayac.Text = "$($script:GsKalan)  ·  sonra iptal"; if ($script:GsKalan -le 0) { $f.DialogResult = 'Cancel' } })
-    $t.Start()
-    $r = $f.ShowDialog($form)
-    $t.Stop(); $t.Dispose(); $f.Dispose()
-    [Kayit]::Yaz("GERİ SAYIM [$($metin.Split("`n")[0])] -> $r")
-    return ($r -eq 'OK')
+    # Yeni arayüz: Diyalog.GeriSayim (halka sayaç, İPTAL / ŞİMDİ BAŞLA).
+    # GV-09/ED-06: süre dolunca İPTAL (hareket yok); hareket yalnız "Şimdi başla" ile (sureBitinceOnay = false)
+    $r = Ui-Geri-Sayim $metin $saniye
+    [Kayit]::Yaz("GERİ SAYIM [$($metin.Split("`n")[0])] -> $(if ($r) { 'OK' } else { 'Cancel' })")
+    return [bool]$r
 }
 
 # Zamanlayıcıdan çağrılır: bağlantı kurulduktan sonra bir kez çalışır
@@ -950,7 +829,6 @@ function Acilis-Hazirla {
         }
         if ([Eding]::CncGetAllAxesHomed() -ne 0 -and -not (Hatali (Eding-Durum))) {
             Yaz 'Açılış: makine hazır. Dosya seçip kazımaya başlayabilirsin.'
-            if (-not $script:SeciliDosya) { $lblDosya.Text = 'Makine hazır  ·  bir dosya seçin' }
         }
     } finally { if ($script:AcilisDurum -eq 'calisiyor') { $script:AcilisDurum = 'tamam' } }
 }
@@ -970,16 +848,12 @@ function Panel-Sifirla {
     $script:DetayIlerleme = ''
     $script:SonYuzdeLog = -1
     $script:SonGecerliSatir = 0
-    $bar.Dancing = $false
-    $bar.Animal = -1
-    $bar.Caption = ''
-    $bar.Value = 0
-    $lblSure.Text = ''
-    $lblSure.ForeColor = $cSoluk
-    $lblDosya.Text = 'Bir dosya seçin'
-    $lblDosya.ForeColor = $cSoluk
-    $sim.SetData($null)
-    $simBuyuk.SetData($null)
+    $script:IsTamamlandi = $false
+    $script:Yuzde = 0
+    $script:SureMetni = ''
+    $script:SureTur = $cSoluk
+    $script:DosyaMetni = ''
+    Ui-Sim-Veri $null
     Yaz 'Panel sıfırlandı.'
 }
 
@@ -1011,29 +885,24 @@ function Acil-Stop([string]$kaynak) {
     } else {
         [Kayit]::Yaz("!!! ACİL STOP ($kaynak): Eding'e bağlanılamadı, sadece panel kilitlendi")
     }
-    try { $estop.Latched = $true } catch { }
     $script:Tercih.AcilStop = '1'; try { Tercih-Yaz } catch { }
     $script:IsAktif = $false
     $script:TakipSonu = 'kullanici'
     if ($belirsiz) { Takim-Belirsiz-Isaretle "ACİL STOP ($kaynak)" }
-    $bar.Dancing = $false
-    $lblSure.Text = 'ACİL STOP ile durduruldu'; $lblSure.ForeColor = $cKirmizi
-    Durum-Yaz 'ACİL STOP  ·  kaldırmak için RESET' $cKirmizi
-    $lamba.LampColor = [System.Drawing.Color]::FromArgb(230, 20, 20)
+    $script:SureMetni = 'ACİL STOP ile durduruldu'; $script:SureTur = $cKirmizi
+    Durum-Yaz 'ACİL STOP  ·  kaldırmak için KİLİDİ KALDIR' $cKirmizi
 }
 
 function Acil-Stop-Kaldir {
     if (-not [Eding]::AcilKilit) { return }
     if (-not (Onay "ACİL STOP kaldırılacak.`r`n`r`n• Makinenin içinde el, alet ya da sıkışmış parça yok mu?`r`n• Kapak kapalı mı?`r`n`r`nKaldırınca makine kendiliğinden HAREKET ETMEZ; işe yeniden BAŞLAT ile başlarsın." 'Acil stop kaldır')) { return }
     [Eding]::AcilKilit = $false
-    $estop.Latched = $false
     $script:Tercih.AcilStop = '0'; try { Tercih-Yaz } catch { }
     [Kayit]::Yaz('ACİL STOP kaldırıldı')
     if (Baglan) {
         try { [Kayit]::Yaz("ACİL STOP kaldır: reset -> $([Eding]::RCText([Eding]::CncReset()))") } catch { }
     }
     $script:PensAcik = $false
-    $btnPens.Text = 'PENS AÇ'
     Panel-Sifirla
     Yaz 'Acil stop kaldırıldı. Makine hazır.'
 }
@@ -1049,7 +918,6 @@ function Btn-Reset {
     if (Komut-Sonucu 'Reset' ([Eding]::CncReset())) {
         if ($belirsiz) { Takim-Belirsiz-Isaretle 'RESET' }
         $script:PensAcik = $false
-        $btnPens.Text = 'PENS AÇ'
         Panel-Sifirla
     }
 }
@@ -1060,48 +928,55 @@ function Btn-Pens {
     if ((Calisiyor-Mu)) { (Ui-Kutu 'Makine çalışırken pens açılamaz.' 'Pens' 'OK' 'Warning') | Out-Null; return }
     if (-not $script:PensAcik) {
         # Onay Pens-Ac-T0 içinde (K2: bütün "Pens aç" düğmeleri aynı onayı ve M5 beklemesini kullanır)
-        if (Pens-Ac-T0 'Pens aç') { $script:PensAcik = $true; $btnPens.Text = 'PENS KAPAT' }
+        if (Pens-Ac-T0 'Pens aç') { $script:PensAcik = $true }
     } else {
-        if (Komut-Sonucu 'Pens kapat (M55 P2)' ([Eding]::CncRunSingleLine('M55 P2'))) { $script:PensAcik = $false; $btnPens.Text = 'PENS AÇ' }
+        if (Komut-Sonucu 'Pens kapat (M55 P2)' ([Eding]::CncRunSingleLine('M55 P2'))) { $script:PensAcik = $false }
     }
 }
 
-function Mdi-Gonder {
-    $komut = $txtMdi.Text.Trim()
+function Mdi-Gonder([string]$satir) {
+    $komut = ([string]$satir).Trim()
     if (-not $komut) { return }
     if (-not (Baglan)) { Yaz 'MDI: makine bağlı değil.'; return }
     if ((Is-Suruyor)) { Yaz 'MDI: iş sürerken ya da duraklıyken komut gönderilemez.'; return }
     # KU-03: MDI satırı makineyi doğrudan hareket ettirebilir; tam satır gösterilip onay alınır (varsayılan HAYIR)
-    if (-not (Onay "Şu satır Eding'e gönderilecek (MDI):`r`n`r`n    $komut`r`n`r`nMakine bu satırı hemen çalıştırır. Gönderilsin mi?" 'MDI')) { Yaz "MDI: vazgeçildi ($komut)"; return }
+    # TASARIM §6: MDI tehlikeli onay. G10 / G92 / #4xxx / #5xxx yazan satırda önce ayar yedeği alınır (KL-04 ile aynı yol).
+    $ek = ''; $yedek = ''
+    if ($komut -match '(?i)\bG10\b|\bG92|#\s*[45]\d{3}\s*=') {
+        if (-not (Ayar-Yedekle $true)) { Yaz "MDI: yedek alınamadı, gönderilmedi ($komut)"; return }
+        $yedek = $script:SonYedekDosya
+        $ek = "`r`n`r`nDİKKAT: bu satır G54 / G92 / kalıcı değişkenleri (#4xxx/#5xxx) değiştirir."
+    }
+    if (-not (Ui-Tehlikeli-Onay 'MDI' "Şu satır Eding'e gönderilecek (MDI):`r`n`r`n    $komut`r`n`r`nMakine bu satırı hemen çalıştırır. Gönderilsin mi?$ek" $null $null $yedek)) { Yaz "MDI: vazgeçildi ($komut)"; return }
     Yaz "MDI> $komut"
     $rc = [Eding]::CncRunSingleLine($komut)
     Yaz ("     " + [Eding]::RCText($rc))
-    $txtMdi.Clear()
 }
 
 $script:TemizlikDuz = $false
-function Btn-Temizlik {
-    # 1. basış: iş mili yukarı, C kol yatay (temizlik).  2. basış: iş mili yukarı, park konumu (G30, home sonrası durduğu yer).
+function Btn-Temizlik([string]$adim = 'temizlik') {
+    # 'temizlik': iş mili yukarı, C kol yatay (temizlik).  'park': iş mili yukarı, park konumu (G30, home sonrası durduğu yer).
+    # (Eski panelde aynı düğmenin 1. ve 2. basışıydı; yeni arayüzde TEMİZLİK ve PARK ayrı düğme, KU-13.)
     if (-not (Hazir-Mi 'Temizlik')) { return }
     if ((Calisiyor-Mu)) { (Ui-Kutu 'Makine çalışıyor. Önce DURDUR.' 'Temizlik' 'OK' 'Warning') | Out-Null; return }
-    $form.Cursor = 'WaitCursor'
+    Ui-Mesgul $(if ($adim -eq 'park') { 'Park konumuna gidiliyor…' } else { 'Temizlik konumuna gidiliyor…' })
     try {
         if (-not (Komut-Sonucu 'Z en üste' ([Eding]::CncRunSingleLine('G53 G0 Z[#5163]')))) { return }
         if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Z hareketi bitmedi, kol döndürülmedi.'; return }
-        if (-not $script:TemizlikDuz) {
+        if ($adim -ne 'park') {
             if (Komut-Sonucu 'Kol yatay' ([Eding]::CncRunSingleLine('G53 G0 A[#5224] B[#5225]'))) {
                 if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Kol hareketi bitmedi ya da durum okunamadı.'; return }
-                $script:TemizlikDuz = $true; $btnTemizlik.Text = 'PARK'
+                $script:TemizlikDuz = $true
                 Yaz 'Temizlik: kol yatay. Bitince PARK''a bas.'
             }
         } else {
             if (Komut-Sonucu 'Park konumu (G30)' ([Eding]::CncRunSingleLine('G30'))) {
                 if (-not (Hareket-Bitene-Kadar-Bekle 60)) { Yaz 'Park hareketi bitmedi ya da durum okunamadı.'; return }
-                $script:TemizlikDuz = $false; $btnTemizlik.Text = 'TEMİZLİK'
+                $script:TemizlikDuz = $false
                 Yaz 'Park konumuna dönüldü.'
             }
         }
-    } finally { $form.Cursor = 'Default'; $btnTemizlik.Invalidate() }
+    } finally { Ui-Mesgul $null }
 }
 
 $script:AdimMm = 1.0
@@ -1141,7 +1016,7 @@ function Jog([string]$eksen, [int]$yon) {
 function Konuma-Git([string]$ad, [string[]]$satirlar, [string]$soru) {
     if (-not (Hazir-Hareket $ad)) { return }
     if ($soru -and -not (Onay $soru $ad)) { return }
-    if (Satirlar-Gonder $ad $satirlar 120) { $lblYuva.Text = "Konum: $ad" }
+    if (Satirlar-Gonder $ad $satirlar 120) { $script:YuvaDurumMetni = "Konum: $ad" }
 }
 
 # --- TAKIM ---
@@ -1166,20 +1041,20 @@ function Yuvaya-Git([string]$ad) {
             'G53 G0 A[#5224] B[#5225]',
             "G53 G0 X[#5221-$($script:YuvaX)] Y[#5222$ofsTxt]") 90
     }
-    if ($ok) { $script:SonYuva = $ad; $lblYuva.Text = "İş mili $ad üstünde (yukarıda)" }
+    if ($ok) { $script:SonYuva = $ad; $script:YuvaDurumMetni = "İş mili $ad üstünde (yukarıda)" }
 }
 
 function Yuvaya-Yaklas {
     if (-not $script:SonYuva) { (Ui-Kutu 'Önce bir yuvanın üstüne git.' 'Yaklaş' 'OK' 'Information') | Out-Null; return }
     if (-not (Hazir-Hareket 'Yaklaş')) { return }
     if ([Eding]::CncGetCurrentToolNumber() -ne 0) { (Ui-Kutu 'İş milinde freze varken yuvaya yaklaşılamaz (çarpar). Önce FREZ BIRAK.' 'Yaklaş' 'OK' 'Warning') | Out-Null; return }
-    if (-not (Onay "İş mili $($script:SonYuva) yuvasının yaklaşma yüksekliğine (#4001) inecek.`r`nFrezeye değmeden üstünde duracak. Devam?" 'Yaklaş')) { return }
-    if (Satirlar-Gonder 'Yaklaş' @('G90 G53 G1 Z[#4001] F300') 60) { $lblYuva.Text = "İş mili $($script:SonYuva) üstünde, yaklaşma yüksekliğinde" }
+    if (-not (Ui-Tehlikeli-Onay 'Yaklaş' "İş mili $($script:SonYuva) yuvasının yaklaşma yüksekliğine (#4001) inecek.`r`nFrezeye değmeden üstünde duracak. Devam?" $null $null $null)) { return }
+    if (Satirlar-Gonder 'Yaklaş' @('G90 G53 G1 Z[#4001] F300') 60) { $script:YuvaDurumMetni = "İş mili $($script:SonYuva) üstünde, yaklaşma yüksekliğinde" }
 }
 
 function Yukari-Kaldir {
     if (-not (Hazir-Hareket 'Yukarı')) { return }
-    if (Satirlar-Gonder 'Z en üste' @('G90 G53 G0 Z[#5163]') 60) { $lblYuva.Text = 'İş mili en üstte' }
+    if (Satirlar-Gonder 'Z en üste' @('G90 G53 G0 Z[#5163]') 60) { $script:YuvaDurumMetni = 'İş mili en üstte' }
 }
 
 function Takim-Degistir([int]$n) {
@@ -1216,9 +1091,9 @@ function Bos-Mu {
 }
 
 # --- İŞ MİLİ VE HAVA ---
-function Ismili-Calistir {
+function Ismili-Calistir([string]$devir = '') {
     if (-not (Hazir-Hareket 'İş mili')) { return }
-    $d = Metin-Sayi $txtDevir.Text
+    $d = Metin-Sayi $devir
     if ($null -eq $d -or $d -lt 1000 -or $d -gt 24000) { (Ui-Kutu 'Devir 1000 ile 24000 arasında olmalı.' 'İş mili' 'OK' 'Warning') | Out-Null; return }
     if ([Eding]::CncGetCurrentToolNumber() -eq 0) {
         if (-not (Onay "İş milinde freze yok. Boş pensle döndürmek pense zarar verebilir.`r`nYine de $([int]$d) devirde çalıştırılsın mı?" 'İş mili')) { return }
@@ -1254,7 +1129,7 @@ function Ismili-Durdur-Bekle([string]$ad) {
 
 function Pens-Ac-T0([string]$ad = 'Pens aç') {
     if (Is-Suruyor-Uyari $ad) { return $false }
-    if (-not (Onay "Pens hava ile AÇILACAK ve takım T0 yapılacak.`r`nÖnce iş mili durdurulur (M5) ve durması beklenir.`r`n`r`nİş milinde freze varsa düşebilir, elinle tut.`r`nDevam edilsin mi?" $ad)) { return $false }
+    if (-not (Ui-Tehlikeli-Onay $ad "Pens hava ile AÇILACAK ve takım T0 yapılacak.`r`nÖnce iş mili durdurulur (M5) ve durması beklenir.`r`n`r`nİş milinde freze varsa düşebilir, elinle tut.`r`nDevam edilsin mi?" $null $null $null)) { return $false }
     if (-not (Ismili-Durdur-Bekle $ad)) { return $false }
     # Pens açılınca frez elle çıkarılır: Eding'deki takım numarası da T0 yapılır (macro: gosub pm_pens_t0, hareket yok).
     $yol = [System.IO.Path]::Combine($EdingKlasor, 'macro.cnc'); $var = $false
@@ -1297,20 +1172,19 @@ $script:ParamKutu = @{}
 
 function Ayar-Oku {
     if (-not (Baglan)) { return }
-    foreach ($k in @('X', 'Y', 'Z', 'A', 'B')) {
-        $nr = @{ X = 5221; Y = 5222; Z = 5223; A = 5224; B = 5225 }[$k]
-        $script:G54Kutu[$k].Text = Sayi ([Eding]::CncGetVariable($nr))
-    }
-    foreach ($nr in $ParamTanim.Keys) { $script:ParamKutu[$nr].Text = Sayi ([Eding]::CncGetVariable([int]$nr)) }
+    # Yeni arayüz: değerler MakineDurumu.G54 / Param / G92 ile Ayarlar › Makine değişkenleri ve Kalibrasyon ekranına gider
+    $script:G54Deger = [double[]]@(5221, 5222, 5223, 5224, 5225 | ForEach-Object { [Eding]::CncGetVariable($_) })
+    $script:ParamDeger = [double[]]@($ParamTanim.Keys | ForEach-Object { [Eding]::CncGetVariable([int]$_) })
+    $script:G92Deger = [double[]]@(5211, 5212, 5213, 5214, 5215 | ForEach-Object { [Eding]::CncGetVariable($_) })
+    $script:DegiskenlerOkundu = $true
     $g92 = @(5211, 5212, 5213, 5214, 5215 | ForEach-Object { Sayi ([Eding]::CncGetVariable($_)) })
-    $lblG92.Text = "G92 kaydırması:  X $($g92[0])   Y $($g92[1])   Z $($g92[2])   A $($g92[3])   B $($g92[4])   (Z, takım boyu ölçümünden gelir)"
+    $script:G92Metni = "G92 kaydırması:  X $($g92[0])   Y $($g92[1])   Z $($g92[2])   A $($g92[3])   B $($g92[4])   (Z, takım boyu ölçümünden gelir)"
     $g92xyab = @(5211, 5212, 5214, 5215 | Where-Object { [math]::Abs([Eding]::CncGetVariable($_)) -gt 0.0005 })
-    if ($g92xyab.Count -gt 0) { $lblG92.Text += "   ·   DİKKAT: X/Y/A/B'de G92 var, kazıma konumu kayar"; $lblG92.ForeColor = $cKirmizi } else { $lblG92.ForeColor = $cSoluk }
-    try { $lblRaf.Text = Raf-Metni } catch { }
+    if ($g92xyab.Count -gt 0) { $script:G92Metni += "   ·   DİKKAT: X/Y/A/B'de G92 var, kazıma konumu kayar" }
+    try { $script:RafMetni = Raf-Metni } catch { }
     try {
         $fk = G54-Uretici-Fark
-        $lblUretici.Text = if ($fk.Count) { "G54 üretici değerinden farklı:  " + ($fk -join '   ·   ') } else { 'G54 üretici değerlerinde.' }
-        $lblUretici.ForeColor = if ($fk.Count) { $cAltinAc } else { $cSoluk }
+        $script:UreticiFarkMetni = if ($fk.Count) { "G54 üretici değerinden farklı:  " + ($fk -join '   ·   ') } else { 'G54 üretici değerlerinde.' }
     } catch { }
 }
 
@@ -1324,8 +1198,9 @@ function Ayar-Kaydet {
     $m = "Şu değerler kaydedilecek:`r`n`r`nG54  X $(Sayi $g.X)   Y $(Sayi $g.Y)   Z $(Sayi $g.Z)   A $(Sayi $g.A)   B $(Sayi $g.B)`r`n" +
          (($ParamTanim.Keys | ForEach-Object { "#$_ $($ParamTanim[$_]): $(Sayi $p[$_])" }) -join "`r`n") +
          "`r`n`r`nBu değerler takım değişimini VE parça kazımayı etkiler. Devam?"
-    if (-not (Onay $m 'Ayar kaydet')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04
+    $eski = @(@('X', 'Y', 'Z', 'A', 'B') | ForEach-Object { "G54 $_=$(Sayi ([Eding]::CncGetVariable(@{ X = 5221; Y = 5222; Z = 5223; A = 5224; B = 5225 }[$_])))" }) + @($ParamTanim.Keys | ForEach-Object { "#$_=$(Sayi ([Eding]::CncGetVariable([int]$_)))" })
+    $yeni = @(@('X', 'Y', 'Z', 'A', 'B') | ForEach-Object { "G54 $_=$(Sayi $g[$_])" }) + @($ParamTanim.Keys | ForEach-Object { "#$_=$(Sayi $p[$_])" })
+    if (-not (Yedekli-Onay 'Ayar kaydet' $m $eski $yeni)) { return }   # KL-04: yedek önce, adı onayda
     $ok = (Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $g.X) Y$(Sayi $g.Y) Z$(Sayi $g.Z) A$(Sayi $g.A) B$(Sayi $g.B)")))
     foreach ($nr in $ParamTanim.Keys) { if ($ok) { $ok = (Komut-Sonucu "#$nr" ([Eding]::CncRunSingleLine("#$nr=$(Sayi $p[$nr])"))) } }
     Start-Sleep -Milliseconds 500
@@ -1385,8 +1260,7 @@ function Konumu-Sensor-Yap {
     $eX = [Eding]::CncGetVariable(4020); $eY = [Eding]::CncGetVariable(4021)
     $m = "İş mili şu an frez boyu sensörünün tam ortasında mı?`r`n`r`nYeni sensör konumu:  X $(Sayi $p.X)   Y $(Sayi $p.Y)`r`n(eski: X $(Sayi $eX)   Y $(Sayi $eY))`r`n`r`n" +
          "Frez yuvaları ve G54 (disk sıfırı) değişmez.`r`nKaydedilsin mi?"
-    if (-not (Onay $m 'Sensör kaydet')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
+    if (-not (Yedekli-Onay 'Sensör kaydet' $m @("#4020=$(Sayi $eX)", "#4021=$(Sayi $eY)") @("#4020=$(Sayi $p.X)", "#4021=$(Sayi $p.Y)"))) { return }   # KL-04: yedek yoksa yazma yok
     $ok = (Degisken-Yaz 4020 $p.X) -and (Degisken-Yaz 4021 $p.Y)
     Start-Sleep -Milliseconds 300
     Ayar-Oku
@@ -1449,8 +1323,7 @@ function Konumu-Yuva-Yap([int]$n) {
 function Z-Alma-Yap {
     if (-not (Hazir-Hareket 'Alma yüksekliği')) { return }
     $p = [Eding]::MachinePos()
-    if (-not (Onay "Şu anki Z ($(Sayi $p.Z)) frezeyi alma yüksekliği (#4000) olarak kaydedilsin mi?`r`nPens bu yükseklikte frezeyi kavrar." 'Alma yüksekliği')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04
+    if (-not (Yedekli-Onay 'Alma yüksekliği' "Şu anki Z ($(Sayi $p.Z)) frezeyi alma yüksekliği (#4000) olarak kaydedilsin mi?`r`nPens bu yükseklikte frezeyi kavrar." @("#4000=$(Sayi ([Eding]::CncGetVariable(4000)))") @("#4000=$(Sayi $p.Z)"))) { return }   # KL-04
     if (Komut-Sonucu '#4000' ([Eding]::CncRunSingleLine("#4000=$(Sayi $p.Z)"))) { Start-Sleep -Milliseconds 500; Ayar-Oku }
 }
 
@@ -1474,8 +1347,9 @@ function G54-Ureticiye-Don {
          "Şu an farklı olanlar:`r`n" + $(if ($fark.Count) { ($fark -join "`r`n") } else { '(yok)' }) + "`r`n`r`n" +
          "G92 kaydırmaları da sıfırlanır (frez boyu bir sonraki frez değişiminde yeniden ölçülür).`r`n" +
          "Frez yuvaları değişmez. Önce otomatik yedek alınır. Devam?"
-    if (-not (Onay $m 'Üretici kalibrasyonu')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
+    $eski = @(@($UreticiG54.Keys) | ForEach-Object { "G54 $_=$(Sayi ([Eding]::CncGetVariable(@{ X = 5221; Y = 5222; Z = 5223; A = 5224; B = 5225 }[$_])))" })
+    $yeni = @(@($UreticiG54.Keys) | ForEach-Object { "G54 $_=$(Sayi $UreticiG54[$_])" })
+    if (-not (Yedekli-Onay 'Üretici kalibrasyonu' $m $eski $yeni)) { return }   # KL-04: yedek yoksa yazma yok
     $ok = Komut-Sonucu 'G54 üretici' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $UreticiG54.X) Y$(Sayi $UreticiG54.Y) Z$(Sayi $UreticiG54.Z) A$(Sayi $UreticiG54.A) B$(Sayi $UreticiG54.B)"))
     if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
     if ($ok) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')) }
@@ -1496,8 +1370,9 @@ function G54-Ureticiye-Don {
 
 function G92-Sifirla {
     if (-not (Hazir-Hareket 'G92 sıfırla')) { return }
-    if (-not (Onay "Tüm G92 kaydırmaları sıfırlanacak (G92.1).`r`nTakım boyu ölçümü de silinir; bir sonraki takım değişiminde yeniden ölçülür. Devam?" 'G92 sıfırla')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04
+    $ad5 = @('X', 'Y', 'Z', 'A', 'B')
+    $eski = @(0..4 | ForEach-Object { "G92 $($ad5[$_])=$(Sayi ([Eding]::CncGetVariable(5211 + $_)))" }); $yeni = @(0..4 | ForEach-Object { "G92 $($ad5[$_])=0.000" })
+    if (-not (Yedekli-Onay 'G92 sıfırla' "Tüm G92 kaydırmaları sıfırlanacak (G92.1).`r`nTakım boyu ölçümü de silinir; bir sonraki takım değişiminde yeniden ölçülür. Devam?" $eski $yeni)) { return }   # KL-04
     if (Komut-Sonucu 'G92 sıfırla (G92.1)' ([Eding]::CncRunSingleLine('G92.1'))) { Start-Sleep -Milliseconds 400; Ayar-Oku }
 }
 
@@ -1510,6 +1385,7 @@ function Ayar-Yedekle([bool]$sessiz = $false) {
         return $false
     }
     $dosya = [System.IO.Path]::Combine($YedekKlasoru, 'ayar_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + '.txt')
+    $ek = 2; while ([System.IO.File]::Exists($dosya)) { $dosya = [System.IO.Path]::Combine($YedekKlasoru, 'ayar_' + (Get-Date -Format 'yyyy-MM-dd_HH-mm-ss') + "_$ek.txt"); $ek++ }
     try {
         [void][System.IO.Directory]::CreateDirectory($YedekKlasoru)
         $satirlar = @("; PrimerMill ayar yedeği  $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  Eding: $EdingKlasor")
@@ -1524,6 +1400,7 @@ function Ayar-Yedekle([bool]$sessiz = $false) {
         (Ui-Kutu "Ayar yedeği alınamadı:`r`n$($_.Exception.Message)`r`n`r`n$dosya`r`n`r`nHiçbir ayar değiştirilmedi." 'Yedekle' 'OK' 'Error') | Out-Null
         return $false
     }
+    $script:SonYedekDosya = $dosya
     Yaz "Ayarlar yedeklendi: $dosya"
     if (-not $sessiz) { (Ui-Kutu "Ayarlar yedeklendi:`r`n$dosya" 'Yedekle' 'OK' 'Information') | Out-Null }
     return $true
@@ -1531,23 +1408,41 @@ function Ayar-Yedekle([bool]$sessiz = $false) {
 
 function Ayar-Geri-Yukle {
     if (-not (Hazir-Hareket 'Yedekten yükle')) { return }
-    $dlg = New-Object System.Windows.Forms.OpenFileDialog
-    $dlg.InitialDirectory = $YedekKlasoru; $dlg.Filter = 'Ayar yedeği (*.txt)|*.txt'
-    $script:ModalSayac++; try { $sn = $dlg.ShowDialog($form) } finally { $script:ModalSayac-- }
-    if ($sn -ne 'OK') { return }
+    $script:ModalSayac++; try { $secilen = Yedek-Dosyasi-Sec } finally { $script:ModalSayac-- }
+    if (-not $secilen) { return }
     $d = @{}
-    foreach ($l in [System.IO.File]::ReadAllLines($dlg.FileName)) {
+    foreach ($l in [System.IO.File]::ReadAllLines($secilen)) {
         $m = [regex]::Match($l, '^#(\d+)=(-?[0-9.]+)')
         if ($m.Success) { $d[[int]$m.Groups[1].Value] = $m.Groups[2].Value }
     }
     if (-not ($d.ContainsKey(5221) -and $d.ContainsKey(5225))) { (Ui-Kutu 'Dosya geçerli bir ayar yedeği değil.' 'Yedekten yükle' 'OK' 'Warning') | Out-Null; return }
     $m = "Yedekten yüklenecek (G54 ve takım değiştirici parametreleri):`r`n`r`nG54  X $($d[5221])  Y $($d[5222])  Z $($d[5223])  A $($d[5224])  B $($d[5225])`r`n" +
          (($ParamTanim.Keys | Where-Object { $d.ContainsKey([int]$_) } | ForEach-Object { "#$_ = $($d[[int]$_])" }) -join '   ') + "`r`n`r`nDevam?"
-    if (-not (Onay $m 'Yedekten yükle')) { return }
-    if (-not (Ayar-Yedekle $true)) { return }   # KL-04: şu anki değerler de yedeklenir
+    $eski = @(@(5221, 5222, 5223, 5224, 5225) + @($ParamTanim.Keys | ForEach-Object { [int]$_ }) | Where-Object { $d.ContainsKey([int]$_) } | ForEach-Object { "#$_=$(Sayi ([Eding]::CncGetVariable([int]$_)))" })
+    $yeni = @(@(5221, 5222, 5223, 5224, 5225) + @($ParamTanim.Keys | ForEach-Object { [int]$_ }) | Where-Object { $d.ContainsKey([int]$_) } | ForEach-Object { "#$_=$($d[[int]$_])" })
+    if (-not (Yedekli-Onay 'Yedekten yükle' ("Seçilen yedek: $([System.IO.Path]::GetFileName($secilen))`r`n" + $m) $eski $yeni)) { return }   # KL-04: şu anki değerler de yedeklenir
     $ok = (Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$($d[5221]) Y$($d[5222]) Z$($d[5223]) A$($d[5224]) B$($d[5225])")))
     foreach ($nr in @($ParamTanim.Keys) + @($RafTanim.Keys)) { if ($ok -and $d.ContainsKey([int]$nr)) { $ok = (Komut-Sonucu "#$nr" ([Eding]::CncRunSingleLine("#$nr=$($d[[int]$nr])"))) } }
     Start-Sleep -Milliseconds 500; Ayar-Oku
+}
+
+# Yedek dosyası seçici (eski OpenFileDialog yerine dokunmatik liste; en yeni üstte, "GÖZAT…" ile başka yer)
+function Yedek-Dosyasi-Sec {
+    $dosyalar = @()
+    try { if ([System.IO.Directory]::Exists($YedekKlasoru)) { $dosyalar = @(Get-ChildItem -LiteralPath $YedekKlasoru -Filter 'ayar_*.txt' -File -ErrorAction Ignore | Sort-Object LastWriteTime -Descending | Select-Object -First 200) } } catch { }
+    $ad = @($dosyalar | ForEach-Object { $_.Name })
+    $ac = @($dosyalar | ForEach-Object { $_.LastWriteTime.ToString('dd.MM.yyyy HH:mm:ss') })
+    $i = Ui-Liste-Sec 'Yedekten yükle: yedek seç' ([string[]]$ad) ([string[]]$ac) 'GÖZAT…'
+    if ($i -ge 0 -and $i -lt $dosyalar.Count) { return $dosyalar[$i].FullName }
+    if ($i -eq -2) { return (Ui-Dosya-Ac 'Ayar yedeği seç' 'Ayar yedeği (*.txt)|*.txt' $YedekKlasoru) }
+    return $null
+}
+
+# Tehlikeli yazma onayı (TASARIM §6): önce ayar yedeği alınır (KL-04; alınamazsa $false, hiçbir şey sorulmaz / yazılmaz),
+# sonra Diyalog.TehlikeliOnay eski / yeni değerleri ve yedek dosyasının adını gösterir. Varsayılan VAZGEÇ.
+function Yedekli-Onay([string]$baslik, [string]$metin, $eski, $yeni) {
+    if (-not (Ayar-Yedekle $true)) { return $false }
+    return [bool](Ui-Tehlikeli-Onay $baslik $metin ([string[]]@($eski)) ([string[]]@($yeni)) ([string]$script:SonYedekDosya))
 }
 
 function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
@@ -1585,8 +1480,7 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         }
     }
     $satir = $script:SonGecerliSatir
-    $sim.SetLine($satir)
-    if ($simForm.Visible) { $simBuyuk.SetLine($satir) }
+    Ui-Sim-Satir $satir
     $i = [math]::Max(0, [math]::Min($a.Kumulatif.Length - 1, $satir - 1))
     $yapilan = $a.Kumulatif[$i]
     $yuzde = 100.0 * $yapilan / $a.Toplam
@@ -1610,7 +1504,7 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         $script:BitisSayac++
         $sonDurum0 = Eding-Durum
         if ($script:BitisSayac -lt 5 -and -not (Hatali $sonDurum0) -and $sonDurum0 -ne 'ABORTED') {
-            $bar.Value = $yuzde
+            $script:Yuzde = $yuzde
             return
         }
         [Kayit]::Yaz("İLERLEME: iş sonu algılandı (durum=$sonDurum0, satır $satir / $toplamSatir, yüzde $([math]::Round($yuzde,1)))")
@@ -1622,18 +1516,18 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         if ($yuzde -gt 97 -and -not (Hatali $sonDurum) -and -not $disHata) { Devam-Sil; $script:DevamHarita = $null }
         else { Devam-Kaydet $satir $(if ((Hatali $sonDurum) -or $disHata) { 'hata' } else { 'durduruldu' }) $yuzde; Yaz 'İş yarım kaldı: kaldığı yerden devam için BAŞLAT''a bas (aynı dosya seçiliyken).' }
         if ($disHata -and -not [Eding]::AcilKilit) {
-            $bar.Dancing = $false; $lblSure.Text = 'Makine hata sinyali (EXTERR)  ·  basıncı kontrol et, RESET'; $lblSure.ForeColor = $cKirmizi
+            $script:SureMetni = 'Makine hata sinyali (EXTERR)  ·  basıncı kontrol et, RESET'; $script:SureTur = $cKirmizi
             Yaz "Kazıma makinenin hata sinyaliyle (EXTERR / acil stop) durdu, satır $satir. En sık sebep: hava basıncı düşük."
             (Ui-Kutu "Kazıma makinenin HATA SİNYALİYLE durdu (EXTERR).`r`n`r`nEn sık sebep: hava basıncı düşük (kompresör kapalı ya da basınç yetersiz).`r`nDiğerleri: iş mili sürücüsü hatası, acil stop butonu.`r`n`r`n1. Kompresörü / basıncı kontrol et.`r`n2. RESET'e bas.`r`n3. BAŞLAT → KALDIĞI YERDEN DEVAM." 'Makine hatası' 'OK' 'Error') | Out-Null
             return
         }
         if (Hatali $sonDurum) {
-            $script:IsAktif = $false; $bar.Dancing = $false
-            $lblSure.Text = 'Eding hatası ile durdu'
-            $lblSure.ForeColor = $cKirmizi
+            $script:IsAktif = $false
+            $script:SureMetni = 'Eding hatası ile durdu'
+            $script:SureTur = $cKirmizi
             $fark = [Eding]::CncGetVariable(4099); $sinir = [Eding]::CncGetVariable(4005); $tk = [Eding]::CncGetCurrentToolNumber()
             if ($fark -gt $sinir -and $sinir -gt 0) {
-                $lblSure.Text = "Freze hatası  ·  T$tk"
+                $script:SureMetni = "Freze hatası  ·  T$tk"
                 Yaz "FREZE HATASI: T$tk boyu $(Sayi $fark) mm değişmiş (sınır $(Sayi $sinir) mm), satır $satir. Kazıma durduruldu."
                 (Ui-Kutu "FREZE HATASI`r`n`r`nT$tk frezesinin boyu iş sonrası ölçümde $(Sayi $fark) mm değişmiş (izin verilen: $(Sayi $sinir) mm).`r`nFreze kırılmış, aşınmış ya da pensin içinde kaymış olabilir.`r`n`r`nKazıma bir sonraki frezeye geçmeden durduruldu.`r`n`r`n1. Frezeyi kontrol et, gerekirse değiştir.`r`n2. RESET'e bas.`r`n3. Parçayı kontrol et; kaldığı yerden devam için Eding'de satır arama gerekir." 'Freze hatası' 'OK' 'Error') | Out-Null
                 return
@@ -1643,25 +1537,23 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
             return
         }
         if ($yuzde -gt 97) {
-            $bar.Value = 100; $bar.Caption = ''; $bar.Dancing = $true
-            $lblSure.Text = "Tamamlandı  ·  $(Sade-Sure $script:Gecen.TotalSeconds)"
+            $script:Yuzde = 100; $script:IsTamamlandi = $true; $script:KalanSn = 0
+            $script:SureMetni = "Tamamlandı  ·  $(Sade-Sure $script:Gecen.TotalSeconds)"; $script:SureTur = $cYesil
             Yaz "Kazıma tamamlandı. Süre: $(Sure $script:Gecen.TotalSeconds)"
         } else {
-            $bar.Dancing = $false
-            $lblSure.Text = 'Durdu'
+            $script:SureMetni = 'Durdu'
             Yaz "Kazıma durdu (satır $satir)."
         }
         return
     }
-    $bar.Value = $yuzde
-    $bar.Caption = ''
+    $script:Yuzde = $yuzde
     $dilim = [math]::Floor($yuzde / 5) * 5
     if ($dilim -ne $script:SonYuzdeLog) { $script:SonYuzdeLog = $dilim; [Kayit]::Yaz("İLERLEME: %$dilim  satır $satir  geçen $(Sure $script:Gecen.TotalSeconds)  kalan ~$(Sure $kalan)") }
-    $bar.Dancing = ($calisiyor -and -not $durakli)
-    $lblSure.ForeColor = $cSoluk
+    $script:SureTur = $cSoluk
     $bitis = (Get-Date).AddSeconds($kalan).ToString('HH:mm')
     $gecenTxt = Sade-Sure $script:Gecen.TotalSeconds
-    $lblSure.Text = if ($durakli) { "Duraklatıldı   ·   Kazıma  $gecenTxt" } else { "Kazıma  $gecenTxt   ·   Kalan  $(Sade-Sure $kalan)   ·   Bitiş  $bitis" }
+    $script:KalanSn = [int]$kalan; $script:BitisSaati = $bitis; $script:IsSatir = $satir; $script:IsToplamSatir = $a.Kumulatif.Length
+    $script:SureMetni = if ($durakli) { "Duraklatıldı   ·   Kazıma  $gecenTxt" } else { "Kazıma  $gecenTxt   ·   Kalan  $(Sade-Sure $kalan)   ·   Bitiş  $bitis" }
     $script:DetayIlerleme = "Satır: $satir / $($a.Kumulatif.Length)   ·   Geçen: $(Sure $script:Gecen.TotalSeconds)   ·   Kalan (tahmini): $(Sure $kalan)"
 }
 
