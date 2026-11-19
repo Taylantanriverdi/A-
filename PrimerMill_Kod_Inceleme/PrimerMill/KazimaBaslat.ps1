@@ -2361,7 +2361,8 @@ function Takim-Belirsiz-Coz([string]$islem) {
 }
 function Takim-Kapisi([string]$islem) {
     # BAŞLAT ve panelden M6 / takım ölçme öncesi ortak kontrol
-    if (-not (Takim-Belirsiz-Coz $islem)) { return $false }
+    if (-not (Raf-Hazir-Mi $islem)) { return $false }        # K5
+    if (-not (Takim-Belirsiz-Coz $islem)) { return $false }  # GV-08
     return $true
 }
 
@@ -2878,6 +2879,7 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
             if (-not (Baglan)) { return 'HATA: Eding bağlı değil' }
             if ([Eding]::CncGetEMStopActive() -ne 0) { return 'HATA: Acil stop basılı' }
             if ([Eding]::CncGetAllAxesHomed() -eq 0) { return 'HATA: Makine home alınmamış' }
+            if ($script:OzelMakro -and $script:RafEksik) { return 'HATA: Takım yuvaları/sensör kayıtlı değil (makinede Ayarlar › Yuva ayarı)' }
             if ($script:TakimBelirsiz) { return 'HATA: Takım durumu belirsiz (değişim yarıda kesildi). Makinede iş milindeki frez bildirilmeli.' }
             if ((Durakli-Mi)) {
                 Yaz "Uzaktan ($ip): DEVAM"
@@ -4152,9 +4154,14 @@ function Ayar-Kaydet {
 $RafTanim = [ordered]@{ 4010 = 'Yuva X'; 4011 = 'T1 Y'; 4012 = 'T2 Y'; 4013 = 'T3 Y'; 4014 = 'T4 Y'; 4015 = 'T5 Y'; 4016 = 'T6 Y'; 4017 = 'Yuva A'; 4018 = 'Yuva B'; 4020 = 'Sensör X'; 4021 = 'Sensör Y'; 4030 = 'Frez modu (1 manuel)'; 4031 = 'Değişim X'; 4032 = 'Değişim Y'; 4033 = 'Değişim Z (0 en üst)' }
 # Yuva aralığı (T1'e göre, mm): Bloomden X5 magazini
 $RafAralik = @{ 1 = 0; 2 = 12; 3 = 24; 4 = 54; 5 = 66; 6 = 78 }
-# İlk kurulumda yazılacak değerler: 22.10.2026'da makinede doğrulanan T1 noktası
+# "Doğrulanmış değerlere dön" ile (yalnız operatör onayıyla) yazılacak değerler: 22.10.2026'da makinede doğrulanan T1 noktası.
+# MAKİNEDE DOĞRULA (K5/MC-02): bu değerler üreticinin macro_X5_orijinal.cnc PickTool1 değerlerinden farklı
+#   (orijinal T1: Y -88.966, A 23.2, B -1) ve alma Z -45, cnc.ini'deki #4000 = -46.9'dan farklı. Sayılar bilerek değiştirilmedi.
 $RafVarsayilan = @{ X = -125.557; Y1 = -89.166; A = 23.0; B = 0.0; AlmaZ = -45.0 }
+$RafSensorXFark = 72.25                                     # sensör varsayılanı: G54 X - 72.25, G54 Y
+$RafDegisimVarsayilan = @{ X = -64.25; Y = -52.0; Z = 0.0 }  # manuel değişim noktası varsayılanı (makinenin ortası, en üst)
 $script:RafKontrolTamam = $false
+$script:RafEksik = $false
 
 function Degisken-Yaz([int]$nr, [double]$v) {
     if ((Is-Suruyor)) { [Kayit]::Yaz("DEĞİŞKEN> #$nr yazılmadı: iş sürüyor / duraklı (K1)"); return $false }
@@ -4172,31 +4179,31 @@ function Raf-Metni {
     return $t
 }
 
-# Açılışta bir kez: yuva değişkenleri boşsa doğrulanmış değerleri yaz (macro artık bunları kullanıyor)
+# K5 (GV-07/ED-05/MC-01): Raf-Kontrol hiçbir şey YAZMAZ. 0 okunan yuva/sensör/değişim değişkeni "kayıtlı değil" sayılır
+# (Eding henüz yüklememiş ya da okuma hatası da 0 döndürür); günlüğe yazılır, durum satırında uyarı çıkar ve
+# BAŞLAT / M6 / Takım değiştir / Takım ölç engellenir. Varsayılanlar yalnız "Doğrulanmış değerlere dön" düğmesiyle yazılır.
+$RafZorunlu = @(4010, 4011, 4020, 4021, 4031, 4032)
+function Raf-Eksik-Listesi { return @($RafZorunlu | Where-Object { [Eding]::CncGetVariable([int]$_) -eq 0 }) }
 function Raf-Kontrol {
-    if ($script:RafKontrolTamam) { return }
-    try {
-        $ok = $true
-        # Sensör: boşsa bugünkü yerini (G54 X-72.25, G54 Y) yaz; ölçüm aynen eskisi gibi devam eder
-        if ([Eding]::CncGetVariable(4020) -eq 0 -or [Eding]::CncGetVariable(4021) -eq 0) {
-            $sx = [Eding]::CncGetVariable(5221) - 72.25; $sy = [Eding]::CncGetVariable(5222)
-            [Kayit]::Yaz("SENSÖR: #4020/#4021 boş, mevcut konum yazılıyor: X $(Sayi $sx) Y $(Sayi $sy)")
-            $ok = (Degisken-Yaz 4020 $sx) -and (Degisken-Yaz 4021 $sy)
-        }
-        # Manuel frez değişim noktası: boşsa makinenin ortası, en üstte
-        if ($ok -and ([Eding]::CncGetVariable(4031) -eq 0 -or [Eding]::CncGetVariable(4032) -eq 0)) {
-            [Kayit]::Yaz('MANUEL: değişim noktası boş, makinenin ortası yazılıyor (X -64.25 Y -52, Z en üst)')
-            $ok = (Degisken-Yaz 4031 -64.25) -and (Degisken-Yaz 4032 -52.0) -and (Degisken-Yaz 4033 0)
-        }
-        if ([Eding]::CncGetVariable(4010) -ne 0 -and [Eding]::CncGetVariable(4011) -ne 0) { if ($ok) { $script:RafKontrolTamam = $true }; return }
-        [Kayit]::Yaz('YUVALAR: #4010-#4018 boş, doğrulanmış T1 değerleri yazılıyor')
-        if ($ok) { $ok = (Degisken-Yaz 4010 $RafVarsayilan.X) }
-        for ($n = 1; $n -le 6; $n++) { if ($ok) { $ok = (Degisken-Yaz (4010 + $n) ($RafVarsayilan.Y1 + $RafAralik[$n])) } }
-        if ($ok) { $ok = (Degisken-Yaz 4017 $RafVarsayilan.A) }
-        if ($ok) { $ok = (Degisken-Yaz 4018 $RafVarsayilan.B) }
-        if ($ok) { $ok = (Degisken-Yaz 4000 $RafVarsayilan.AlmaZ) }
-        if ($ok) { $script:RafKontrolTamam = $true; Yaz "Frez yuvaları kaydedildi: $((Raf-Metni) -replace "`r`n", '  ·  ')" }
-    } catch { [Kayit]::Yaz("YUVALAR: yazılamadı: $($_.Exception.Message)") }
+    # Ana zamanlayıcıdan (PrimerMill makrosu, Eding hazır): bayrağı günceller, ilk eksiklikte bir kez günlüğe yazar
+    try { $eksik = @(Raf-Eksik-Listesi) } catch { return }
+    $script:RafEksik = ($eksik.Count -gt 0)
+    if ($script:RafEksik) { $script:RafEksikSayac++ } else { $script:RafEksikSayac = 0 }
+    if ($script:RafEksikSayac -eq 3 -and -not $script:RafKontrolTamam) {   # 3 tık üst üste: Eding'in değişkenleri yüklemesi beklenir
+        [Kayit]::Yaz("YUVALAR: kayıtlı değil (0 okundu): $(($eksik | ForEach-Object { "#$_" }) -join ' ')  -- hiçbir şey yazılmadı")
+        Yaz 'Takım yuvaları/sensör kayıtlı değil: Ayarlar › Yuva ayarı'
+    }
+    if ($script:RafEksikSayac -ge 3 -or -not $script:RafEksik) { $script:RafKontrolTamam = $true }
+}
+$script:RafEksikSayac = 0
+function Raf-Hazir-Mi([string]$islem) {
+    if (-not $script:OzelMakro) { return $true }   # orijinal makro bu değişkenleri kullanmaz
+    $eksik = @(0); try { $eksik = @(Raf-Eksik-Listesi) } catch { }
+    $script:RafEksik = ($eksik.Count -gt 0)
+    if (-not $script:RafEksik) { return $true }
+    [Kayit]::Yaz("YUVALAR: '$islem' reddedildi, kayıtlı değil: $(($eksik | ForEach-Object { "#$_" }) -join ' ')")
+    [Kayit]::Show("Takım yuvaları / sensör / değişim noktası Eding'de kayıtlı değil (0 okundu: $(($eksik | ForEach-Object { "#$_" }) -join ' ')).`r`n`r`n$islem yapılmadı.`r`n`r`nAyarlar › YUVA AYARI: yuvaları ölçüp KAYDET ya da 'Doğrulanmış değerlere dön'.", $islem, 'OK', 'Warning') | Out-Null
+    return $false
 }
 
 function Konumu-Sensor-Yap {
@@ -4767,17 +4774,32 @@ function Yuva-Sifirla {
 }
 
 function Yuva-Varsayilan {
+    # K5: varsayılanların yazıldığı TEK yer. Önce yedek (başarılı olmalı), sonra yazılacak değerlerin tamamı gösterilip onay alınır.
     if (-not (Hazir-Hareket 'Doğrulanmış değerler')) { return }
-    $m = "Frez yuvaları 22.10.2026'da doğrulanan değerlere dönecek:`r`n`r`nX $(Sayi $RafVarsayilan.X)   T1 Y $(Sayi $RafVarsayilan.Y1)   A $(Sayi $RafVarsayilan.A)   B $(Sayi $RafVarsayilan.B)   alma Z $(Sayi $RafVarsayilan.AlmaZ)`r`nT2..T6: T1'e göre +12 / +24 / +54 / +66 / +78 mm`r`n`r`nSensör değişmez. Önce otomatik yedek alınır. Devam?"
-    if (-not (Onay $m 'Doğrulanmış değerler')) { return }
+    $yaz = [ordered]@{ 4010 = $RafVarsayilan.X }
+    for ($n = 1; $n -le 6; $n++) { $yaz[4010 + $n] = $RafVarsayilan.Y1 + $RafAralik[$n] }
+    $yaz[4017] = $RafVarsayilan.A; $yaz[4018] = $RafVarsayilan.B; $yaz[4000] = $RafVarsayilan.AlmaZ
+    $ek = @()
+    if ([Eding]::CncGetVariable(4020) -eq 0 -or [Eding]::CncGetVariable(4021) -eq 0) {
+        $gx = [Eding]::CncGetVariable(5221); $gy = [Eding]::CncGetVariable(5222)
+        if ($gx -eq 0 -or $gy -eq 0) { [Kayit]::Show("Sensör kayıtlı değil ve G54 X/Y okunamadı (0). Sensör varsayılanı hesaplanamaz.`r`nÖnce Eding'in tam açıldığından emin ol.", 'Doğrulanmış değerler', 'OK', 'Warning') | Out-Null; return }
+        $yaz[4020] = $gx - $RafSensorXFark; $yaz[4021] = $gy; $ek += 'sensör (kayıtlı değildi: G54 X - 72.25, G54 Y)'
+    }
+    if ([Eding]::CncGetVariable(4031) -eq 0 -or [Eding]::CncGetVariable(4032) -eq 0) {
+        $yaz[4031] = $RafDegisimVarsayilan.X; $yaz[4032] = $RafDegisimVarsayilan.Y; $yaz[4033] = $RafDegisimVarsayilan.Z; $ek += 'manuel değişim noktası (kayıtlı değildi)'
+    }
+    $ad = @{ 4000 = 'alma Z'; 4010 = 'yuva X'; 4011 = 'T1 Y'; 4012 = 'T2 Y'; 4013 = 'T3 Y'; 4014 = 'T4 Y'; 4015 = 'T5 Y'; 4016 = 'T6 Y'; 4017 = 'yuva A'; 4018 = 'yuva B'; 4020 = 'sensör X'; 4021 = 'sensör Y'; 4031 = 'değişim X'; 4032 = 'değişim Y'; 4033 = 'değişim Z' }
+    $ozet = (@($yaz.Keys | ForEach-Object { "#{0} {1,-10} {2,10}   (şu an {3})" -f $_, $ad[[int]$_], (Sayi $yaz[$_]), (Sayi ([Eding]::CncGetVariable([int]$_))) }) -join "`r`n")
     if (-not (Ayar-Yedekle $true)) { return }   # KL-04: yedek yoksa yazma yok
-    $ok = (Degisken-Yaz 4010 $RafVarsayilan.X)
-    for ($n = 1; $n -le 6; $n++) { if ($ok) { $ok = (Degisken-Yaz (4010 + $n) ($RafVarsayilan.Y1 + $RafAralik[$n])) } }
-    if ($ok) { $ok = (Degisken-Yaz 4017 $RafVarsayilan.A) }
-    if ($ok) { $ok = (Degisken-Yaz 4018 $RafVarsayilan.B) }
-    if ($ok) { $ok = (Degisken-Yaz 4000 $RafVarsayilan.AlmaZ) }
+    $m = "Frez yuvaları 22.10.2026'da doğrulanan değerlere dönecek. Yazılacak değerler (makine koordinatı):`r`n`r`n$ozet`r`n`r`n" +
+         $(if ($ek.Count) { "Ayrıca: $($ek -join ', ').`r`n" } else { "Kayıtlı sensör ve değişim noktası değişmez.`r`n" }) +
+         "Yedek alındı. Bu değerler takım alma / bırakma konumlarını belirler. Yazılsın mı?"
+    if (-not (Onay $m 'Doğrulanmış değerler')) { return }
+    $ok = $true
+    foreach ($nr in $yaz.Keys) { if ($ok) { $ok = (Degisken-Yaz ([int]$nr) ([double]$yaz[$nr])) } }
     $script:YuvaYeni = @{}
-    Yaz $(if ($ok) { 'Yuvalar doğrulanmış değerlere döndü.' } else { 'Doğrulanmış değerler yazılamadı.' })
+    Yaz $(if ($ok) { 'Yuvalar doğrulanmış değerlere döndü.' } else { 'Doğrulanmış değerler yazılamadı (yedekten geri dönülebilir).' })
+    try { Raf-Kontrol } catch { }
     Yuva-Liste-Yenile
 }
 
@@ -6127,6 +6149,7 @@ $zamanlayici.Add_Tick({
         elseif ($durakli)   { Durum-Yaz "Duraklatıldı$tStr" $cAltinAc;    $lamba.LampColor = [System.Drawing.Color]::FromArgb(230, 160, 0) }
         elseif ($calisiyor) { Durum-Yaz $(if ($script:IsAktif) { "Kazınıyor$tStr" } else { "Hareket ediyor$tStr" }) $cYesil;         $lamba.LampColor = [System.Drawing.Color]::FromArgb(20, 200, 90) }
         elseif (-not $homeTamam) { Durum-Yaz 'Home alınmadı' $cAltinAc;          $lamba.LampColor = [System.Drawing.Color]::FromArgb(230, 160, 0) }
+        elseif ($script:OzelMakro -and $script:RafEksik) { Durum-Yaz 'Takım yuvaları/sensör kayıtlı değil: Ayarlar › Yuva ayarı' $cAltinAc; $lamba.LampColor = [System.Drawing.Color]::FromArgb(230, 160, 0) }
         else                { Durum-Yaz "Hazır$tStr" $cSoluk;             $lamba.LampColor = [System.Drawing.Color]::FromArgb(235, 210, 0) }
 
         $btnBaslat.Text = if ($durakli) { 'DEVAM' } else { 'BAŞLAT' }
@@ -6153,7 +6176,7 @@ $zamanlayici.Add_Tick({
             $mt = switch ($ist.Faz) { 1 { "MANUEL FREZ: T$($ist.Eski) → T$($ist.T)  ·  frezi tut, PENS'İ AÇ" } 2 { "MANUEL FREZ: T$($ist.T) TAK  ·  sonra TAKTIM" } 4 { "MANUEL FREZ: T$($ist.T) hazır  ·  KAZIMAYI BAŞLAT onayı bekleniyor" } default { "MANUEL FREZ: hava basıncı yok  ·  KOMPRESÖRÜ AÇ (pens havayla açılır)" } }
             Durum-Yaz $mt $(if ($ist.Faz -eq 3) { $cKirmizi } else { $cAltinAc })
         }
-        if ($script:OzelMakro -and -not $script:RafKontrolTamam -and -not $calisiyor -and -not $hatali -and $durum -ne 'POWERUP') { Raf-Kontrol }
+        if ($script:OzelMakro -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '') { Raf-Kontrol }
         if ($script:AcilisDurum -ne 'tamam' -and $script:AcilisDurum -ne 'iptal' -and $script:AcilisDurum -ne 'calisiyor') { Acilis-Hazirla }
         elseif (-not $script:MakroKontrolTamam -and -not $calisiyor -and -not $durakli -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '' -and -not $script:IsAktif) { Makro-Baslangic-Kontrol }
     } catch { Durum-Yaz 'Durum okunamadı' $cKirmizi; $lblTeknik.Text = $_.Exception.Message }
