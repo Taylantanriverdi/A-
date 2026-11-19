@@ -1810,6 +1810,8 @@ function Eding-Baslat {
     $script:EdingGizlendiYazildi = $false
     $stil = if ($script:Tercih.EdingGizli -ne '0' -and -not $script:EdingGosteriliyor) { 'Hidden' } else { 'Minimized' }
     Start-Process -FilePath $exe -WorkingDirectory ([System.IO.Path]::GetDirectoryName($exe)) -WindowStyle $stil
+    $script:MakroYamaBekliyor = $false   # Eding yeni açıldı: macro.cnc baştan okunur
+    $script:MakroKontrolTamam = $false
 }
 
 # Eding durumu: IDLE, READY, ABORTED, RUNNING, AXISJOG, IPJOG, SEARCHING, PAUSE
@@ -1905,6 +1907,7 @@ function Baglanti-Bekcisi {
         Yaz 'Eding kapandı: bağlantı kesildi.'
         try { [void][Eding]::CncDisConnectServer() } catch { }
         $script:Bagli = $false
+        $script:MakroKontrolTamam = $false
         if ($script:IsAktif) { $script:IsAktif = $false; $bar.Dancing = $false; $lblSure.Text = 'Eding kapandı'; $lblSure.ForeColor = $cKirmizi }
     }
     if (((Get-Date) - $script:SonEdingBaslatma).TotalSeconds -ge 30) {
@@ -2175,21 +2178,121 @@ function Manuel-Macro-Kontrol {
         [Kayit]::Show("Manuel frez değişimi için yeni macro.cnc gerekli, ama şu dosya eski:`r`n$yol`r`n`r`n1. Eding'i kapat`r`n2. Paketteki macro.cnc'yi bu klasöre kopyala (eskisini yedekle)`r`n3. Paneli yeniden aç`r`n`r`nİş başlatılmadı.", 'Manuel frez', 'OK', 'Warning') | Out-Null
         return $false
     }
-    # Dosya yeni; Eding de yeni macro'yu mu kullanıyor? (macro Eding açılırken okunur)
-    $yuklu = $false
-    try {
-        [void][Eding]::CncRunSingleLine('#4038=0')
-        [void](Hareket-Bitene-Kadar-Bekle 5)
-        $rc = [Eding]::CncRunSingleLine('gosub pm_surum')
-        if (Rc-Tamam $rc) { [void](Hareket-Bitene-Kadar-Bekle 5) }
-        $yuklu = ([Eding]::CncGetVariable(4038) -ge 2)
-    } catch { }
+    # Dosya yeni; Eding de yeni macro'yu mu kullanıyor? (macro Eding açılırken okunur). K6: sürüm tam olarak beklenen olmalı.
+    $surum = Makro-Surum-Oku
+    $yuklu = ($surum -eq $BeklenenMakroSurum)
     if (-not $yuklu) {
-        [Kayit]::Yaz('MANUEL: Eding eski macro ile çalışıyor (pm_surum yok)')
+        [Kayit]::Yaz("MANUEL: Eding'deki makro sürümü $surum, beklenen $BeklenenMakroSurum")
         Hata-Temizle 'Manuel kontrol'
-        if (Onay "macro.cnc dosyası yeni, ama Eding hâlâ ESKİ macro'yu kullanıyor (Eding macro'yu sadece açılırken okur).`r`nBu haliyle makine frezi magazinden almaya çalışır.`r`n`r`nEding şimdi yeniden başlatılsın mı? (Sonra home alır; işi yeniden BAŞLAT ile başlatırsın.)" 'Manuel frez') { Eding-Yeniden }
+        if (Onay "Eding'de yüklü makro sürümü $surum, panelin beklediği $BeklenenMakroSurum (Eding macro'yu sadece açılırken okur).`r`nBu haliyle makine frezi magazinden almaya çalışabilir.`r`n`r`nEding şimdi yeniden başlatılsın mı? (Sonra home alır; işi yeniden BAŞLAT ile başlatırsın.)" 'Manuel frez') { Eding-Yeniden }
         return $false
     }
+    return $true
+}
+
+# ================= MAKRO SÜRÜMÜ VE #4039 BAYRAĞI (K6) =================
+# macro.cnc 'sub pm_surum' -> #4038 = 4. Makroda değişiklik yapılırsa ikisi birlikte güncellenir.
+$BeklenenMakroSurum = 4
+$script:MakroKontrolTamam = $false   # bu Eding bağlantısında sürüm kontrolü ve bayrak sıfırlama yapıldı mı
+$script:MakroSurumUyumsuz = $false
+$script:MakroKontrolSon = [datetime]::MinValue
+$script:MakroYamaBekliyor = $false   # orijinal makroya yama yapıldı ama Eding henüz yeniden açılmadı
+function Makro-Surum-Oku {
+    # Eding'e YÜKLÜ makronun sürümü (dosyanın değil). Okunamazsa -1.
+    try {
+        if (-not (Rc-Tamam ([Eding]::CncRunSingleLine('#4038=0')))) { return -1 }
+        if (-not (Hareket-Bitene-Kadar-Bekle 5)) { return -1 }
+        if ([Eding]::CncGetVariable(4038) -ne 0) { return -1 }
+        $rc = [Eding]::CncRunSingleLine('gosub pm_surum')
+        if (-not (Rc-Tamam $rc)) { Hata-Temizle 'Makro sürümü'; return 0 }   # pm_surum yok: eski makro
+        if (-not (Hareket-Bitene-Kadar-Bekle 5)) { return -1 }
+        return [int][Eding]::CncGetVariable(4038)
+    } catch { return -1 }
+}
+function Bayrak-Sifirla([string]$islem) {
+    # MC-04/GV-04: hareketsiz takım bildirimi bayrağı kalıcıdır; 1 kalırsa sonraki işin M6'sı frez almadan/ölçmeden geçer.
+    $nr = if ($script:OzelMakro) { 4039 } else { 4900 }
+    $rc = [Eding]::CncRunSingleLine("#$nr=0")
+    if (Rc-Tamam $rc) { [void](Hareket-Bitene-Kadar-Bekle 3) }
+    $v = [double]::NaN; try { $v = [Eding]::CncGetVariable($nr) } catch { }
+    if (-not (Rc-Tamam $rc) -or $v -ne 0) {
+        [Kayit]::Yaz("BAYRAK: #$nr sıfırlanamadı ($islem): rc $rc, okunan $v")
+        return $false
+    }
+    [Kayit]::Yaz("BAYRAK: #$nr = 0 ($islem)")
+    return $true
+}
+function Makro-Baslangic-Kontrol {
+    # Bağlantı kurulunca bir kez (ana zamanlayıcıdan): #4039/#4900 sıfırlanır, PrimerMill makrosunun Eding'deki sürümü denetlenir
+    if ($script:MakroKontrolTamam -or [Eding]::AcilKilit) { return }
+    if (((Get-Date) - $script:MakroKontrolSon).TotalSeconds -lt 30) { return }   # okunamadıysa 30 sn'de bir dene
+    $script:MakroKontrolSon = Get-Date
+    $script:MakroKontrolTamam = $true
+    if (-not (Bayrak-Sifirla 'açılış')) { Yaz 'Açılış: takım bildirim bayrağı (#4039) sıfırlanamadı; iş başlatılırken yeniden denenecek.' }
+    if (-not $script:OzelMakro) { return }
+    $s = Makro-Surum-Oku
+    if ($s -eq -1) { $script:MakroKontrolTamam = $false; return }   # okunamadı: sonra tekrar
+    $script:MakroSurumUyumsuz = ($s -ne $BeklenenMakroSurum)
+    if ($script:MakroSurumUyumsuz) {
+        Yaz "UYARI: Eding'de yüklü makro sürümü $s, panelin beklediği $BeklenenMakroSurum. Eding yeniden başlatılmalı."
+        [Kayit]::Show("Eding'de yüklü macro.cnc sürümü $s, panelin beklediği $BeklenenMakroSurum.`r`n`r`nmacro.cnc güncellendiyse Eding'i yeniden başlat (Ayarlar › PANEL › Eding'i yeniden başlat).`r`nO zamana kadar iş başlatılamaz.", 'Makro sürümü', 'OK', 'Warning') | Out-Null
+    } else { [Kayit]::Yaz("MAKRO: Eding'deki sürüm $s (beklenen)") }
+}
+function Makro-Hazir-Mi([string]$islem) {
+    # BAŞLAT / takım bildirimi öncesi: PrimerMill makrosu Eding'de beklenen sürümde mi (uyumsuzsa yeniden okunur)
+    if (-not $script:OzelMakro) { return $true }
+    if ($script:MakroKontrolTamam -and -not $script:MakroSurumUyumsuz) { return $true }
+    $s = Makro-Surum-Oku
+    $script:MakroSurumUyumsuz = ($s -ne $BeklenenMakroSurum); $script:MakroKontrolTamam = $true
+    if (-not $script:MakroSurumUyumsuz) { return $true }
+    [Kayit]::Yaz("MAKRO: $islem reddedildi, Eding'deki sürüm $s (beklenen $BeklenenMakroSurum)")
+    if (Onay "Eding'de yüklü macro.cnc sürümü $(if ($s -lt 0) { 'okunamadı' } else { $s }), panelin beklediği $BeklenenMakroSurum.`r`n$islem yapılmadı.`r`n`r`nEding şimdi yeniden başlatılsın mı? (macro.cnc yeniden okunur; sonra HOME gerekir)" $islem) { Eding-Yeniden }
+    return $false
+}
+function Takim-Bildir([int]$n, [string]$islem) {
+    # Eding'e iş milindeki frezi HAREKETSİZ bildirir: #4039 = 1 (orijinal makroda #4900) -> M6 Tn -> #4039 = 0.
+    # Her adım denetlenir; bir şey ters giderse $false (çağıran durmalı).
+    $bayrak = if ($script:OzelMakro) { 4039 } else { 4900 }
+    if ($script:OzelMakro) {
+        $s = Makro-Surum-Oku
+        if ($s -ne $BeklenenMakroSurum) {
+            [Kayit]::Show("Eding'de yüklü macro.cnc sürümü $(if ($s -lt 0) { 'okunamadı' } else { $s }), beklenen $BeklenenMakroSurum.`r`nBu haliyle M6 T$n gerçek takım değişimi yapabilir; frez Eding'e bildirilmedi.`r`n`r`nEding'i yeniden başlat (Ayarlar › PANEL), sonra tekrar dene. $islem yapılmadı.", $islem, 'OK', 'Warning') | Out-Null
+            return $false
+        }
+    } else {
+        $yamali = $false
+        try { $yamali = ([System.IO.File]::ReadAllText([System.IO.Path]::Combine($EdingKlasor, 'macro.cnc')) -match '(?im)^\s*sub\s+pm_pens_t0\b') } catch { }
+        if (-not $yamali -or $script:MakroYamaBekliyor) {
+            [Kayit]::Show("Orijinal macro.cnc'nin hareketsiz takım bildirimi eki Eding'e yüklü değil (Eding yeniden başlatılmalı).`r`nBu haliyle M6 T$n gerçek takım değişimi yapar. $islem yapılmadı.", $islem, 'OK', 'Warning') | Out-Null
+            return $false
+        }
+    }
+    Yaz "$islem : Eding'e iş milindeki frez T$n bildiriliyor (hareket yok)."
+    $hata = ''
+    $rc = [Eding]::CncRunSingleLine("#$bayrak=1")
+    if (-not (Rc-Tamam $rc)) { $hata = "#$bayrak=1 gönderilemedi ($([Eding]::RCText($rc)))" }
+    elseif (-not (Hareket-Bitene-Kadar-Bekle 5)) { $hata = "#$bayrak=1 sonrası Eding hazır olmadı" }
+    elseif ([Eding]::CncGetVariable($bayrak) -ne 1) { $hata = "#$bayrak geri okunduğunda 1 değil ($([Eding]::CncGetVariable($bayrak)))" }
+    if ($hata) {
+        [void](Bayrak-Sifirla $islem)
+        [Kayit]::Yaz("TAKIM BİLDİR: $hata")
+        [Kayit]::Show("Frez Eding'e bildirilemedi: $hata.`r`nM6 gönderilmedi. $islem yapılmadı.", $islem, 'OK', 'Warning') | Out-Null
+        return $false
+    }
+    $rc = [Eding]::CncRunSingleLine("M6 T$n")
+    $bitti = $false
+    if (Rc-Tamam $rc) { $bitti = Hareket-Bitene-Kadar-Bekle 20 } else { $hata = "M6 T$n gönderilemedi ($([Eding]::RCText($rc)))" }
+    $sifir = Bayrak-Sifirla $islem
+    $tk = -1; try { $tk = [Eding]::CncGetCurrentToolNumber() } catch { }
+    if (-not $hata -and -not $bitti) { $hata = "M6 T$n bitmedi ya da Eding hata verdi" }
+    if (-not $hata -and $tk -ne $n) { $hata = "Eding'deki takım T$tk (beklenen T$n)" }
+    if (-not $hata -and -not $sifir) { $hata = "#$bayrak tekrar 0 yapılamadı" }
+    if ($hata) {
+        [Kayit]::Yaz("TAKIM BİLDİR: $hata")
+        [Kayit]::Show("Frez Eding'e bildirilemedi: $hata.`r`nEding eski macro ile açık olabilir: Eding'i yeniden başlat. $islem yapılmadı.", $islem, 'OK', 'Warning') | Out-Null
+        return $false
+    }
+    [Kayit]::Yaz("TAKIM BİLDİR: Eding'deki takım T$n")
     return $true
 }
 
@@ -2642,6 +2745,8 @@ function Yeni-Blok {
         [System.IO.File]::WriteAllLines($yol, $L)
     } catch { [Kayit]::Show("Program yazılamadı: $($_.Exception.Message)", 'Yeni blok', 'OK', 'Error') | Out-Null; return }
     Hata-Temizle 'Yeni blok'
+    if (-not (Makro-Hazir-Mi 'Yeni blok')) { return }
+    if (-not (Bayrak-Sifirla 'Yeni blok')) { [Kayit]::Show("Takım bildirim bayrağı (#4039) sıfırlanamadı. Blok ismi kazınmadı.", 'Yeni blok', 'OK', 'Warning') | Out-Null; return }
     if (-not (Komut-Sonucu 'Blok ismi yükle' ([Eding]::CncLoadJobA($yol)))) { return }
     if (Komut-Sonucu 'Blok ismi kazı' ([Eding]::CncRunOrResumeJob())) {
         Blok-Kaydet $b '(sadece isim)'; Blok-Cip-Guncelle
@@ -2676,7 +2781,7 @@ function Macro-Yaz([string]$yol, [string]$metin, $enc, [string]$ne) {
     [System.IO.File]::Copy($yol, $yedek, $true)
     [System.IO.File]::WriteAllText($yol, $metin, $enc)
     [Kayit]::Yaz("MACRO: $ne eki yapıldı (yedek: $yedek)")
-    if (@(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue).Count -gt 0) { Yaz "macro.cnc güncellendi ($ne). Eding kapatılıp açılınca etkin olur (EdingKapat.bat, sonra KazimaBaslat.bat)." }
+    if (@(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue).Count -gt 0) { $script:MakroYamaBekliyor = $true; Yaz "macro.cnc güncellendi ($ne). Eding kapatılıp açılınca etkin olur (EdingKapat.bat, sonra KazimaBaslat.bat)." }
 }
 
 # ================= UZAKTAN ERİŞİM =================
@@ -2929,17 +3034,13 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
     $form.Cursor = 'WaitCursor'
     try {
         # Eding'in bildiği frez, gerçekte takılı olanla aynı olsun (hareketsiz; macro'daki pens/T0 eki ile)
+        # K6/GV-04: önce Eding'deki makro sürümü (#4038), sonra bayrak (#4039 / #4900) yazılıp geri okunur; her adım denetlenir
+        $script:MakroKontrolTamam = $false   # Devam'da sürüm her seferinde Eding'den yeniden okunur
+        if (-not (Makro-Hazir-Mi 'Devam')) { return }
         $tkE = [Eding]::CncGetCurrentToolNumber()
         if ($tkE -ne $takimSimdi) {
-            $bayrak = if ($script:OzelMakro) { 4039 } else { 4900 }
-            Yaz "Devam: Eding'deki frez T$tkE, iş milinde T$takimSimdi; Eding'e bildiriliyor (hareket yok)."
-            [void][Eding]::CncRunSingleLine("#$bayrak = 1"); [void](Hareket-Bitene-Kadar-Bekle 5)
-            [void][Eding]::CncRunSingleLine("M6 T$takimSimdi"); [void](Hareket-Bitene-Kadar-Bekle 20)
-            [void][Eding]::CncRunSingleLine("#$bayrak = 0"); [void](Hareket-Bitene-Kadar-Bekle 5)
-            if ([Eding]::CncGetCurrentToolNumber() -ne $takimSimdi) {
-                [Kayit]::Show("Eding'e iş milindeki frez (T$takimSimdi) bildirilemedi.`r`nEding eski macro ile açık olabilir: EdingKapat.bat ile kapatıp yeniden aç.`r`nDevam başlatılmadı.", 'Devam', 'OK', 'Warning') | Out-Null
-                return
-            }
+            Yaz "Devam: Eding'deki frez T$tkE, iş milinde T$takimSimdi."
+            if (-not (Takim-Bildir $takimSimdi 'Devam')) { return }
         }
         $an = $null; try { $an = [NcAnaliz]::Oku([string]$k.Kaynak, 4000.0) } catch { }
         $d = Devam-NC-Uret ([string]$k.Kaynak) ([int]$k.Satir) $mod $an
@@ -2947,6 +3048,7 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
         Dosyayi-Kontrol-Et $d.Yol
         if ($script:Engel) { [Kayit]::Show("Devam programı kontrolden geçemedi:`r`n$($script:SonHatalar -join "`r`n")", 'Devam', 'OK', 'Error') | Out-Null; return }
         Hata-Temizle 'Devam'
+        if (-not (Bayrak-Sifirla 'Devam')) { [Kayit]::Show("Takım bildirim bayrağı (#4039) sıfırlanamadı. Devam başlatılmadı.", 'Devam', 'OK', 'Warning') | Out-Null; return }
         if (-not (Komut-Sonucu 'Devam programı yükleme' ([Eding]::CncLoadJobA($d.Yol)))) { return }
         $rc = Is-Calistir
         if (Komut-Sonucu 'Devam başlat' $rc) {
@@ -3032,6 +3134,7 @@ function Btn-Baslat-Ic {
     if ($script:Engel) { [Kayit]::Show('Dosyada hata var (aşağıdaki listeye bak). Kazıma başlatılmadı.', 'Başlat', 'OK', 'Error') | Out-Null; return }
     if (-not (Hazir-Mi 'Başlat')) { return }
     if ((Calisiyor-Mu)) { [Kayit]::Show('Makine şu an çalışıyor.', 'Başlat', 'OK', 'Warning') | Out-Null; return }
+    if (-not (Makro-Hazir-Mi 'Başlat')) { return }
 
     # Bu dosyanın yarım kalmış kaydı varsa: kaldığı yerden mi, baştan mı?
     $dk = Devam-Oku
@@ -3109,6 +3212,7 @@ function Btn-Baslat-Ic {
     try {
         Hata-Temizle 'Başlat'
         try { if ([Eding]::CncGetVariable(4034) -ne 0) { [void][Eding]::CncRunSingleLine('#4034=0'); [void](Hareket-Bitene-Kadar-Bekle 3) } } catch { }
+        if (-not (Bayrak-Sifirla 'Başlat')) { [Kayit]::Show("Takım bildirim bayrağı (#4039) sıfırlanamadı. Kazıma başlatılmadı.", 'Başlat', 'OK', 'Warning') | Out-Null; return }
         $script:ManuelSonSeq = ''
         Yaz "Eding'e yükleniyor: $($script:SeciliDosya)"
         if (-not (Komut-Sonucu 'Dosya yükleme' ([Eding]::CncLoadJobA($yuklenecek)))) { return }
@@ -5944,6 +6048,7 @@ $zamanlayici.Add_Tick({
         }
         if ($script:OzelMakro -and -not $script:RafKontrolTamam -and -not $calisiyor -and -not $hatali -and $durum -ne 'POWERUP') { Raf-Kontrol }
         if ($script:AcilisDurum -ne 'tamam' -and $script:AcilisDurum -ne 'iptal' -and $script:AcilisDurum -ne 'calisiyor') { Acilis-Hazirla }
+        elseif (-not $script:MakroKontrolTamam -and -not $calisiyor -and -not $durakli -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '' -and -not $script:IsAktif) { Makro-Baslangic-Kontrol }
     } catch { Durum-Yaz 'Durum okunamadı' $cKirmizi; $lblTeknik.Text = $_.Exception.Message }
 })
 
