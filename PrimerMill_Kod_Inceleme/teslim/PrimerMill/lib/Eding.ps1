@@ -139,7 +139,7 @@ function Is-Suruyor {
     if (-not $script:ApiHazir -or -not $script:Bagli) { return $false }
     $d = Eding-Durum
     if ((Mesgul $d) -or $d -like 'PAUSE*') { return $true }
-    try { if ([Eding]::CncGetPauseStatus() -ne 0) { return $true } } catch { }
+    # CncGetPauseStatus() bu Eding'de iş yokken (READY) de 0 dışı dönebiliyor (dizüstü denemesi): yalnız durum metni PAUSE* kullanılır
     return $false
 }
 function Is-Suruyor-Uyari([string]$islem) {

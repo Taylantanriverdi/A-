@@ -1889,7 +1889,7 @@ function Is-Suruyor {
     if (-not $script:ApiHazir -or -not $script:Bagli) { return $false }
     $d = Eding-Durum
     if ((Mesgul $d) -or $d -like 'PAUSE*') { return $true }
-    try { if ([Eding]::CncGetPauseStatus() -ne 0) { return $true } } catch { }
+    # CncGetPauseStatus() bu Eding'de iş yokken (READY) de 0 dışı dönebiliyor (dizüstü denemesi): yalnız durum metni PAUSE* kullanılır
     return $false
 }
 function Is-Suruyor-Uyari([string]$islem) {
@@ -2941,7 +2941,7 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
             if ($script:TakimBelirsiz) { return 'HATA: Takım durumu belirsiz (değişim yarıda kesildi). Makinede iş milindeki frez bildirilmeli.' }
             # K3: duraklatılmış iş (elle frez değişimi adımı dahil) uzaktan ASLA devam ettirilmez
             $pz = 0; try { $pz = [Eding]::CncGetPauseStatus() } catch { }
-            if ((Durakli-Mi) -or $pz -ne 0) { return "HATA: Duraklatılmış iş uzaktan devam ettirilemez; makinede DEVAM'a basın" }
+            if ((Durakli-Mi) -or ($pz -ne 0 -and (Calisiyor-Mu))) { return "HATA: Duraklatılmış iş uzaktan devam ettirilemez; makinede DEVAM'a basın" }
             if ((Calisiyor-Mu)) { return 'HATA: Makine zaten çalışıyor' }
             if (-not $script:SeciliDosya) { return 'HATA: Önce bir iş seç' }
             if ($script:Engel) { return 'HATA: Dosyada hata var, başlatılmadı' }

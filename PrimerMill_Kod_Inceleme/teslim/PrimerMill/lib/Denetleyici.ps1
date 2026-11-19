@@ -99,7 +99,7 @@ function Okuma-Yap {
         $d = Eding-Durum
         $h.Durum = $d
         $pz = 0; try { $pz = [Eding]::CncGetPauseStatus() } catch { }
-        $h.Durakli = ($d -like 'PAUSE*') -or ($pz -ne 0)
+        $h.Durakli = ($d -like 'PAUSE*') -or ((Mesgul $d) -and $pz -ne 0)   # READY iken PauseStatus 0 dışı olabiliyor
         $h.Calisiyor = (Mesgul $d)
         $h.Hatali = (Hatali $d)
         $h.Acil = ([Eding]::CncGetEMStopActive() -ne 0)
