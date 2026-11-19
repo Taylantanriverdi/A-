@@ -3890,7 +3890,8 @@ function Koord-Guncelle {
 
 $koordZaman = New-Object System.Windows.Forms.Timer
 $koordZaman.Interval = 50
-$koordZaman.Add_Tick({ Koord-Guncelle })
+$script:KoordMesgul = $false
+$koordZaman.Add_Tick({ if ($script:KoordMesgul) { return }; $script:KoordMesgul = $true; try { Koord-Guncelle } finally { $script:KoordMesgul = $false } })   # ED-07
 
 # ---------------- Büyük simülasyon penceresi ----------------
 $simForm = New-Object System.Windows.Forms.Form
@@ -6220,7 +6221,22 @@ $script:AdaySayac = 0
 $script:SonEdingDurum = ''
 $zamanlayici = New-Object System.Windows.Forms.Timer
 $zamanlayici.Interval = 1000
+# ED-07: tık iç içe çalışmaz (bayrak + finally). Uzun işler (açılış home'u, makro sürüm kontrolü) bayrak bırakıldıktan sonra
+# çalışır ve kendi durumlarıyla (AcilisDurum = 'calisiyor', MakroKontrolTamam) tekrar girmeyi önler; durum satırı bu sırada güncellenir.
+$script:TikMesgul = $false
+$script:TikSonraki = ''
 $zamanlayici.Add_Tick({
+    if ($script:TikMesgul) { return }
+    $script:TikMesgul = $true
+    $script:TikSonraki = ''
+    try { Ana-Tik } finally { $script:TikMesgul = $false }
+    $sonraki = $script:TikSonraki; $script:TikSonraki = ''
+    try {
+        if ($sonraki -eq 'acilis') { Acilis-Hazirla }
+        elseif ($sonraki -eq 'makro') { Makro-Baslangic-Kontrol }
+    } catch { [Kayit]::Yaz("ZAMANLAYICI ($sonraki): $($_.Exception.Message)") }
+})
+function Ana-Tik {
     Hatalari-Kaydet
     Baglanti-Bekcisi
     if (-not $script:ApiHazir) { Durum-Yaz 'Önizleme modu' $cSoluk; $lblTeknik.Text = "Bu bilgisayarda $EdingKlasor\cncapi.dll yok. Sadece dosya kontrolü yapılabilir."; return }
@@ -6275,10 +6291,10 @@ $zamanlayici.Add_Tick({
             Durum-Yaz $mt $(if ($ist.Faz -eq 3) { $cKirmizi } else { $cAltinAc })
         }
         if ($script:OzelMakro -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '') { Raf-Kontrol }
-        if ($script:AcilisDurum -ne 'tamam' -and $script:AcilisDurum -ne 'iptal' -and $script:AcilisDurum -ne 'calisiyor') { Acilis-Hazirla }
-        elseif (-not $script:MakroKontrolTamam -and -not $calisiyor -and -not $durakli -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '' -and -not $script:IsAktif) { Makro-Baslangic-Kontrol }
+        if ($script:AcilisDurum -ne 'tamam' -and $script:AcilisDurum -ne 'iptal' -and $script:AcilisDurum -ne 'calisiyor') { $script:TikSonraki = 'acilis' }
+        elseif (($script:AcilisDurum -eq 'tamam' -or $script:AcilisDurum -eq 'iptal') -and -not $script:MakroKontrolTamam -and -not $calisiyor -and -not $durakli -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '' -and -not $script:IsAktif) { $script:TikSonraki = 'makro' }
     } catch { Durum-Yaz 'Durum okunamadı' $cKirmizi; $lblTeknik.Text = $_.Exception.Message }
-})
+}
 
 # Esc = ACİL STOP (ana pencere, Ayarlar, Detaylar, Simülasyon)
 foreach ($fx in @($form, $ayar, $detay, $simForm)) {
@@ -6288,7 +6304,8 @@ foreach ($fx in @($form, $ayar, $detay, $simForm)) {
 
 $manuelZaman = New-Object System.Windows.Forms.Timer
 $manuelZaman.Interval = 400
-$manuelZaman.Add_Tick({ Manuel-Izle })
+$script:ManuelTikMesgul = $false
+$manuelZaman.Add_Tick({ if ($script:ManuelTikMesgul) { return }; $script:ManuelTikMesgul = $true; try { Manuel-Izle } finally { $script:ManuelTikMesgul = $false } })   # ED-07
 
 $form.Add_Shown({
     $edingGizleZaman.Start()
@@ -6318,6 +6335,9 @@ $form.Add_FormClosing({
     try { foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue)) { [void][Pencere]::Goster($pr.Id) } } catch { }
     $zamanlayici.Stop()
     $koordZaman.Stop()
+    try { $manuelZaman.Stop() } catch { }   # ED-07: bütün zamanlayıcılar durur
+    try { $tmrProb.Stop() } catch { }
+    if ($script:ApiHazir -and $script:Bagli) { try { [void][Eding]::CncDisConnectServer() } catch { }; $script:Bagli = $false }
     Hatalari-Kaydet
     [Kayit]::Yaz('=== PANEL KAPATILDI ===')
     [Kayit]::Kapat()
