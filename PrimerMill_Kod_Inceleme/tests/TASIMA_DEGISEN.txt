@@ -89,3 +89,4 @@ A-Secim | KALDIRILDI | eski Ayarlar penceresi yapımı
 Sekme-Goster | KALDIRILDI | eski Ayarlar sekmeleri; yeni: ekran komutu (Ekran-Degisti aynı okumaları yapar)
 Adim-Isaretle | KALDIRILDI | eski jog adım düğmeleri; yeni: jog komut argümanı
 Tam-Ekran-Uygula | KALDIRILDI | ölçek döngüsü gereksiz (akışkan yerleşim); tam ekran / TopMost önyüklemede (KazimaBaslat.ps1)
+Komut-Sonucu | DEGISTI | Eding hata kutusuna "ne yapmali" aciklamasi eklendi (dizustu denemesi: CNC_RC_ERR / CPU is not enabled); davranis ayni

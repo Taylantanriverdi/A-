@@ -320,13 +320,16 @@ namespace PrimerUI
         public static void Yaz(Graphics g, string s, Font f, Color c, RectangleF r, StringAlignment yatay, StringAlignment dikey, bool tekSatir)
         {
             if (string.IsNullOrEmpty(s) || r.Width <= 2 || r.Height <= 2) return;
-            using (var sf = new StringFormat())
+            // Olc() ile aynı biçim (GenericTypographic): Windows GDI+ varsayılan biçimi her iki yana dolgu ekler,
+            // ölçülen kutuya sığmaz ve 'HOME' -> 'HO...' kesilirdi (Mono'da görünmez).
+            using (var sf = new StringFormat(StringFormat.GenericTypographic))
             using (var b = new SolidBrush(c))
             {
                 sf.Alignment = yatay; sf.LineAlignment = dikey;
                 sf.Trimming = StringTrimming.EllipsisCharacter;
-                if (tekSatir) sf.FormatFlags |= StringFormatFlags.NoWrap;
-                else sf.FormatFlags |= StringFormatFlags.LineLimit;
+                // GenericTypographic'in LineLimit/NoClip/FitBlackBox bayraklari atilir (dolgusuz yerlesim kalir):
+                // LineLimit tek satirda kutu yuksekligi satirdan azsa metni hic cizmez.
+                sf.FormatFlags = tekSatir ? StringFormatFlags.NoWrap : StringFormatFlags.LineLimit;
                 g.DrawString(s, f, b, r, sf);
             }
         }
@@ -951,7 +954,7 @@ namespace PrimerUI
                 float th = z.Height + altH;
                 float ty = ic.Y + (ic.Height - th) / 2;
                 StringAlignment hiz = sm == Simge.Yok ? StringAlignment.Center : StringAlignment.Near;
-                float tw = sm == Simge.Yok ? ic.Width : Math.Max(yaziW, altW) + 2;
+                float tw = sm == Simge.Yok ? ic.Width : Math.Min(ic.Right - tx, Math.Max(yaziW, altW) + Tema.PxF(6));
                 float txx = sm == Simge.Yok ? ic.X : tx;
                 Tema.Yaz(g, metin, f, yazi, new RectangleF(txx, ty, tw, z.Height + 2), hiz, StringAlignment.Near, true);
                 if (altH > 0) Tema.Yaz(g, alt, fAlt, pasif ? yazi : Tema.Karistir(yazi, dolgu, 0.3f), new RectangleF(txx, ty + z.Height, tw, altH + 2), hiz, StringAlignment.Near, true);
