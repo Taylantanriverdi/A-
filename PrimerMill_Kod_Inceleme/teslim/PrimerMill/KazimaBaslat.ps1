@@ -43,7 +43,7 @@ if (-not $MakineBilgisayari) {
 
 # SK-04 (KU-07): DPI farkındalığı. Herhangi bir pencere (tek kopya sorusu dahil) açılmadan ÖNCE bildirilmeli; yoksa Windows
 # %125/%150 ölçekte paneli bit eşlem olarak büyütür (bulanık), DpiX 96 döner, ekran görüntüsü sanal boyutta alınır.
-# Görünüm AutoScaleMode.Dpi ile ölçeklenir. Windows Vista+ (user32 SetProcessDPIAware); başka sistemde / hata olursa atlanır.
+# Görünüm elle ölçeklenir (Tema.Px = v × S × DpiX/96; formlar AutoScaleMode.None, SK-14). Windows Vista+ (user32 SetProcessDPIAware); başka sistemde / hata olursa atlanır.
 try {
     if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and [Environment]::OSVersion.Version.Major -ge 6) {
         if (-not ('PrimerMillDpi.Yerel' -as [type])) {

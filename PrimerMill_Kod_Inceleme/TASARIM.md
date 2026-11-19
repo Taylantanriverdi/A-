@@ -16,7 +16,7 @@ Gerekçe:
 
 - Atölyede makine başındaki operatör; dokunmatik ekran. En küçük dokunma alanı **56 px** (ana düğmeler 96–120 px yükseklik).
 - 3 m'den okunabilir: durum, kalan süre, takım, alarm.
-- En az 1024×768'de bozulmadan; 1920×1080'de alanı dolduran **akışkan yerleşim** (TableLayoutPanel + Dock, mutlak konum yok). DPI farkında (`AutoScaleMode.Dpi`).
+- En az 1024×768'de bozulmadan; 1920×1080'de alanı dolduran **akışkan yerleşim** (TableLayoutPanel + Dock, mutlak konum yok). DPI farkında (süreç DPI-aware; ölçekleme elle `Tema.S × Tema.Dpi`, `AutoScaleMode.None`).
 - Koyu (varsayılan, atölye) ve açık tema; tek renk sistemi.
 - Ana ekranda günlük iş tek dokunuş: İş seç, Başlat/Devam, Duraklat, Durdur, Takım değişimi, Temizlik.
 - Kalibrasyon ve ayarlar ikinci seviye (sol menü).

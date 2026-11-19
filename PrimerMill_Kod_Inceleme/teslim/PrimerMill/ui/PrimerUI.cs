@@ -4813,8 +4813,9 @@ namespace PrimerUI
         public Kabuk()
         {
             Text = "PrimerMill 2";
-            AutoScaleDimensions = new SizeF(96F, 96F);
-            AutoScaleMode = AutoScaleMode.Dpi;
+            // SK-14: bütün ölçekleme elle (Tema.S × Tema.Dpi, Tema.Px); süreç DPI-aware (SetProcessDPIAware) olduğundan
+            // WinForms otomatik ölçeklemesi de açık olursa %125/%150'de çift ölçeklenirdi. Diyaloglar ve katmanlar gibi None.
+            AutoScaleMode = AutoScaleMode.None;
             KeyPreview = true;
             DoubleBuffered = true;
             StartPosition = FormStartPosition.CenterScreen;

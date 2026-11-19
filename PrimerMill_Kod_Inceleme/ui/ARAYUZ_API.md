@@ -45,7 +45,7 @@ Sayılar görünümde her yerde `InvariantCulture` ile biçimlenir; komut argüm
 | `SonDurum`, `EtkinEkran`, `UstSeritYuksekligi`, `AcilStopEkranda` | Bilgi. |
 | Esc tuşu | Her yerde `acilstop` (ana pencere, MDI kutusu dahil). |
 
-Yerleşim akışkandır (TableLayoutPanel + Dock, `AutoScaleMode.Dpi`). Katsayı `Tema.S = min(W/1024, H/768)` (0.8–1.7): 1024×768'de 1.0, 1920×1080'de ≈1.4; yazılar ve satır yükseklikleri buna göre ölçeklenir.
+Yerleşim akışkandır (TableLayoutPanel + Dock; ölçekleme elle, `AutoScaleMode.None`: piksel ölçüleri `Tema.Px = v × S × Dpi`, yazılar pt × S). Katsayı `Tema.S = min(W/1024, H/768)` (0.8–1.7): 1024×768'de 1.0, 1920×1080'de ≈1.4; yazılar ve satır yükseklikleri buna göre ölçeklenir.
 
 ## 3. Komutlar
 
@@ -590,4 +590,4 @@ Bölüm 16 (değişken kullanımı) ve 17 (macro.cnc eşlemesi) arayüz özelli�
 - ClearType yalnız Windows; Mono'da gri tonlu kenar yumuşatma.
 - Çok satırlı düğme yazılarında Mono satırları sola yaslayabilir (Windows ortalar).
 - `ToolTip` Windows'ta normal; ekran görüntüsü aracında kapatılır (`TemelKontrol.IpuculariGoster=false`).
-- DPI: Windows'ta `AutoScaleMode.Dpi` + `Tema.Dpi` (CreateGraphics DpiX/96) birlikte çalışır; %125/%150'de makinede kontrol edilmeli.
+- DPI: süreç DPI-aware (`SetProcessDPIAware`, önyükleme); ölçekleme yalnız elle (`Tema.Dpi` = CreateGraphics DpiX/96, `Tema.Px`), Kabuk dahil bütün formlar `AutoScaleMode.None` (SK-14: çift ölçekleme olmasın). %125/%150'de Windows'ta kontrol edilmeli.
