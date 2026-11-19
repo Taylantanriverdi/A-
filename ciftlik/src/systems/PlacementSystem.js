@@ -14,6 +14,7 @@ import { canRemove as inventoryCanRemove, recomputeCapacity } from './InventoryS
 import { canRemove as vehicleCanRemove, reassignVehicles } from './VehicleSystem.js';
 import * as occ from './world/occupancy.js';
 import { buildCostMult } from './events/mods.js';
+import { initHp } from './defense/combat.js';
 
 const BUILT_EVENT = (type) => type in BUILDINGS || type in MACHINES;
 let offs = [];
@@ -31,6 +32,7 @@ function nextId(state) {
 }
 function addPlaced(state, type, tx, ty) {
   const p = { id: nextId(state), type, tx, ty };
+  if (state.settings && state.settings.raids === true) initHp(p); // K29: yapı canı
   placedArr(state).push(p);
   return p;
 }
@@ -171,7 +173,10 @@ export function validate(state, onFix = () => {}) {
       && !(def.unique && seenUnique.has(p.type));
     if (!ok) { onFix('placed.item'); continue; }
     ids.add(p.id); if (def.unique) seenUnique.add(p.type);
-    kept.push({ id: p.id, type: p.type, tx: p.tx, ty: p.ty });
+    const k = { id: p.id, type: p.type, tx: p.tx, ty: p.ty };
+    if (Number.isFinite(p.maxHp) && Number.isFinite(p.hp)) { k.hp = p.hp; k.maxHp = p.maxHp; }   // K29
+    if (p.ruined === true) k.ruined = true;
+    kept.push(k);
   }
   state.placed.length = 0; state.placed.push(...kept);
   const dec = new Set();

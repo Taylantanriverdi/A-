@@ -11,6 +11,7 @@ import { isPlainObject } from '../core/GameState.js';
 import { createRng } from '../core/Rng.js';
 import { calendar } from '../core/timeUtils.js';
 import { transact } from './EconomySystem.js';
+import { isRuined } from './world/occupancy.js';
 import * as Inv from './InventorySystem.js';
 import {
   buildingId, placedIdOf, buildingOf, animalsIn, newBuilding, newAnimal, hourStep, dayStep, feedNeedPerDay, acceptedFeed, troughCap, boxCount,
@@ -197,7 +198,7 @@ function onHour(state, bus) {
   const ids = [];
   for (const b of state.buildings) {
     const list = animalsIn(state, b.id);
-    if (!list.length) continue;
+    if (!list.length || isRuined(state, b.placedId)) continue; // K29: harap bina işlevsiz
     hourStep(b, list);
     ids.push(b.id);
   }
@@ -209,7 +210,7 @@ function onDay(state, bus, ctx) {
   const ids = [];
   for (const b of state.buildings) {
     const list = animalsIn(state, b.id);
-    if (!list.length) continue;
+    if (!list.length || isRuined(state, b.placedId)) continue; // K29
     // arı bakım gideri (para yetmezse atlanır, ceza yok)
     for (const a of list) {
       const up = ANIMALS[a.type]?.upkeepPerDay;

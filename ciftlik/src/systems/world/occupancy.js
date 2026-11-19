@@ -3,6 +3,7 @@
 import { WORLD_TILES_X as GW, WORLD_TILES_Y as GH, TILE_W, TILE_H } from '../../core/constants.js';
 import { P1_BLOCKED, PARCELS, BLOCK_LABELS_TR, parcelAt } from '../../data/land.js';
 import { PLACEABLES } from '../../data/placeables.js';
+import { DEFENSES } from '../../data/defense.js';
 import { TREES, BUSHES } from '../../render/layout.js';
 
 const F_PLACED = 1;  // yerleştirilmiş, yürünemez
@@ -20,6 +21,16 @@ export const decorById = (id) => DECOR.find((d) => d.id === id) || null;
 
 const FIXED = [];
 for (const k in P1_BLOCKED) { const [x, y] = k.split(',').map(Number); FIXED.push({ x, y, kind: P1_BLOCKED[k] }); }
+
+// K29: kazık tuzağı yürünebilir; harap çit/duvar/telli çit de geçilebilir (canavar ve işçi için). Onarılınca yeniden engel.
+const walkableDefense = (p, def) => !!DEFENSES[p.type]?.trap || (p.ruined === true && (p.type === 'fence' || !!DEFENSES[p.type]?.blocks));
+/** Yapı harap mı (K29)? Hayvan binası/makine/kule işlevsizdir. */
+export function isRuined(state, placedId) {
+  const arr = state.placed;
+  if (!Array.isArray(arr)) return false;
+  for (let i = 0; i < arr.length; i++) if (arr[i].id === placedId) return arr[i].ruined === true;
+  return false;
+}
 
 const caches = new WeakMap();
 let versionSeq = 0;
@@ -51,7 +62,7 @@ function build(state) {
       for (let x = p.tx; x < p.tx + def.w; x++) {
         if (x < 0 || y < 0 || x >= GW || y >= GH) continue;
         const c = y * GW + x;
-        flags[c] |= def.walkable ? F_WALK : (def.covered ? (F_PLACED | F_GLASS) : F_PLACED);
+        flags[c] |= (def.walkable || walkableDefense(p, def)) ? F_WALK : (def.covered ? (F_PLACED | F_GLASS) : F_PLACED);
         owner[c] = i;
       }
     }
@@ -125,7 +136,9 @@ export function canPlace(state, type, tx, ty, ignoreId) {
     for (let x = tx; x < tx + def.w; x++) {
       const c = y * GW + x;
       const o = e.owner[c];
-      if (e.flags[c] & (F_FIXED | F_FIXWALK | F_DECOR)) return { ok: false, reason: 'Burası dolu' };
+      // K30: köy yolu karolarına 1×1 çit/patika/savunma konabilir (savunma halkası kapatılabilsin)
+      const roadOk = (e.flags[c] & F_FIXWALK) && def.w === 1 && def.h === 1 && (def.defense || type === 'fence' || type === 'path');
+      if (!roadOk && (e.flags[c] & (F_FIXED | F_FIXWALK | F_DECOR))) return { ok: false, reason: 'Burası dolu' };
       if (o >= 0 && e.placed[o].id !== ignoreId) return { ok: false, reason: 'Burası dolu' };
       const t = state.tiles?.[`${x},${y}`];
       if (t && (t.crop || (t.state && t.state !== 'grass' && !def.covered))) {

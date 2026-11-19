@@ -11,6 +11,7 @@ import { ITEMS } from '../data/items.js';
 import { isPlainObject } from '../core/GameState.js';
 import { calendar } from '../core/timeUtils.js';
 import { transact } from './EconomySystem.js';
+import { isRuined } from './world/occupancy.js';
 import * as Inv from './InventorySystem.js';
 import {
   QRANK, machineOf, machineIdOf, placedIdOf, newMachine, durationMin, isStopped, repairCost, powerCost, addOutput, outputCount,
@@ -181,7 +182,7 @@ function onMinute(state, bus) {
   let ids = null;
   for (const m of state.machines) {
     const head = m.queue[0];
-    if (!head || head.endMin == null || head.endMin > now) continue;
+    if (!head || head.endMin == null || head.endMin > now || isRuined(state, m.placedId)) continue; // K29: harap makine çalışmaz
     completeJobs(state, bus, m, now);
     autoFill(state, bus, m);
     (ids || (ids = [])).push(m.id);
@@ -192,7 +193,7 @@ function onMinute(state, bus) {
 function onHour(state, bus) {
   // Boşta kalan otomatik makineler (girdi sonradan geldi)
   const ids = [];
-  for (const m of state.machines) if (m.auto && !m.queue.length && autoFill(state, bus, m)) ids.push(m.id);
+  for (const m of state.machines) if (m.auto && !m.queue.length && !isRuined(state, m.placedId) && autoFill(state, bus, m)) ids.push(m.id);
   changed(bus, ids);
 }
 

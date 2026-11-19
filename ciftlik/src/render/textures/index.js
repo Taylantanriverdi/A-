@@ -13,6 +13,7 @@ import { genMachines } from './machines.js';
 import { genWorker } from './worker.js';
 import { genPlaced } from './placed.js';
 import { genWeather } from './weather.js';
+import { genDefense } from './defense.js';
 
 const DONE_KEY = '__ciftlik_textures_v1';
 
@@ -31,7 +32,7 @@ export function generateTextures(scene, onProgress) {
   genProps(scene, step);                 // 3 adım
   genSoil(scene); genFieldFx(scene); step();
   genCrops(scene); genMarket(scene); genBuildings(scene); genAnimals(scene); genMachines(scene); genWorker(scene); genPlaced(scene); step();
-  genWeather(scene);
+  genWeather(scene); genDefense(scene);
   for (const p of PATHS) { const b = pathBox(p); genPath(scene, p.key, p.pts.map(([x, y]) => [x - b.x, y - b.y]), p.width, b.w, b.h); }
   { const c = document.createElement('canvas'); c.width = c.height = 1; tm.addCanvas(DONE_KEY, c); }
   onProgress?.(1);

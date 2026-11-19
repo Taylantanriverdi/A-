@@ -18,6 +18,7 @@ import BankSystem from './systems/BankSystem.js';
 import ContractSystem from './systems/ContractSystem.js';
 import LandSystem from './systems/LandSystem.js';
 import VehicleSystem from './systems/VehicleSystem.js';
+import DefenseSystem from './systems/DefenseSystem.js';
 import WorkerSystem, { followTarget, debugSummary } from './systems/WorkerSystem.js';
 import { QUALITY } from './data/farming.js';
 import BootScene from './scenes/BootScene.js';
@@ -40,7 +41,7 @@ const MarketSystem = optionalSystem('MarketSystem.js', 'market');
 const EconomySystem = optionalSystem('EconomySystem.js', 'economy');
 const ProgressionSystem = optionalSystem('ProgressionSystem.js', 'progression');
 // Kayıt sırası (PLAN §9): Time → Inventory → Farm → Market → Economy → Progression
-const SYSTEMS = [TimeSystem, WeatherSystem, EventSystem, InventorySystem, PlacementSystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, BankSystem, ContractSystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ LandSystem, VehicleSystem, WorkerSystem].filter(Boolean);
+const SYSTEMS = [TimeSystem, WeatherSystem, EventSystem, InventorySystem, PlacementSystem, FarmSystem, AnimalSystem, ProductionSystem, MarketSystem, EconomySystem, BankSystem, ContractSystem, /* ProgressionSystem — K20: seviye sistemi kaldırıldı */ LandSystem, VehicleSystem, DefenseSystem, WorkerSystem].filter(Boolean);
 
 const RECOVER_FLAG = 'altin-saat-ciftligi:recovered';
 const params = new URLSearchParams(window.location.search);
@@ -166,6 +167,10 @@ bus.on('settings:set', (p) => {
     const v = Number(value);
     if (!Number.isFinite(v)) return;
     state.settings[key] = Math.max(0, Math.min(1, v));
+  } else if (key === 'raids') {
+    if (typeof value !== 'boolean') return;
+    state.settings.raids = value;
+    bus.emit('defense:mode', { on: value });   // K29: DefenseSystem yapı canlarını kurar / gece durumunu sıfırlar
   } else {
     state.settings[key] = value;
   }
@@ -280,6 +285,20 @@ const debug = {
   addItem(id, qty = 10, q = 'B') { bus.emit('inventory:add', { itemId: id, qty: Number(qty) || 0, quality: q }); },
   grow(days) { debug.skip(Math.max(0, Number(days) || 0) * MIN_PER_DAY); },
   tool(t) { bus.emit('tool:select', { tool: t }); },
+  /** K29: Gece İstilası modunu aç/kapat. */
+  raidsOn(on = true) { bus.emit('settings:set', { key: 'raids', value: !!on }); return state.settings.raids; },
+  /** K29: modu açar, saati 20:55'e alır ve bu gece baskın kurar (kızıl ay isteğe bağlı). */
+  raid(bloodMoon = false) {
+    debug.raidsOn(true);
+    const dayIndex = Math.floor(state.time.totalMinutes / MIN_PER_DAY);
+    state.time.totalMinutes = dayIndex * MIN_PER_DAY + 20 * 60 + 55;
+    registry.resetFraction();
+    const now = calendar(state.time.totalMinutes);
+    registry.ctx.now = now;
+    registry.get('defense').forceRaid(state, bus, !!bloodMoon);
+    bus.emit('time:hour', now);
+    bus.emit('time:minute', now);
+  },
   speeds: SPEEDS,
 };
 

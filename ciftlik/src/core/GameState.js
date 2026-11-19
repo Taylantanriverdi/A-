@@ -3,6 +3,7 @@ import { START_MINUTES, SAVE_VERSION, TILE_W, TILE_H } from './constants.js';
 import { START_MONEY } from '../data/economy.js';
 import { INVENTORY } from '../data/progression.js';
 import { DONKEY } from '../data/workers.js';
+import { DAMAGE } from '../data/defense.js';
 
 /** Arazi parselleri (sahiplik). Fiyat/kilit değerleri data/land.js'e aittir. */
 import { PARCELS } from '../data/land.js';
@@ -41,7 +42,13 @@ export function createInitialState(seed = randomSeed()) {
     market: { prices: {}, history: {}, activeEvents: [] },
     contracts: { offers: [], active: [], history: [] }, // PLAN §13
     stats: { harvested: {}, sold: {}, earned: 0, spent: 0 },
-    settings: { quality: 'auto', sound: 0.8, music: 0.5 },
+    settings: { quality: 'auto', sound: 0.8, music: 0.5, raids: false }, // raids: Gece İstilası modu (PLAN §16)
+    defense: {         // PLAN §16 (+ iç alanlar: active, endAt, pending, waveSize, reportPending, trampled, nightDamaged, nightKills, nightLoot, houseHpStart, hpInit)
+      nightPlanned: false, bloodMoon: false, active: false, wave: 0, wavesLeft: 0, waveSize: 0, pending: 0, nextWaveMin: null, endAt: 0,
+      reportPending: false, houseHp: DAMAGE.houseHp, houseMax: DAMAGE.houseHp, houseHpStart: DAMAGE.houseHp,
+      monsters: [], monsterSeq: 0, soldiers: [], trampled: [], nightDamaged: [], nightKills: 0, nightLoot: 0, hpInit: false,
+      stats: { nights: 0, kills: 0, lootTotal: 0 }, lastReport: null,
+    },
     flags: {}, // tek seferlik bayraklar (ör. farmInitialized, firstHarvest:{potato:true}) — sistemler yazar
     camera: null, // {x, y, zoom} — CameraDirector yazar
   };
