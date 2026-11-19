@@ -3131,8 +3131,12 @@ function Btn-Duraklat {
     [void](Komut-Sonucu 'Duraklat' ([Eding]::CncPauseJob()))
 }
 
-function Btn-Durdur {
+function Btn-Durdur([bool]$sor = $false) {
     if (-not (Baglan)) { return }
+    # KU-02: ana ekrandaki DURDUR iş sürerken / duraklıyken onay ister (varsayılan HAYIR). Uzaktan ve manuel diyalogdan gelen çağrı sormaz.
+    if ($sor -and (Is-Suruyor)) {
+        if (-not (Onay "Kazıma DURDURULACAK (iş iptal edilir).`r`n`r`nKaldığı yerden devam ancak BAŞLAT › KALDIĞI YERDEN DEVAM ile yapılabilir.`r`nAcil bir durumsa ACİL STOP'a bas.`r`n`r`nDurdurulsun mu?" 'Durdur')) { return }
+    }
     if (Komut-Sonucu 'Durdur' ([Eding]::CncAbortJob())) {
         if ($script:IsAktif) { Devam-Kaydet $script:SonGecerliSatir 'durduruldu' $bar.Value }
         $script:TakipSonu = 'kullanici'
@@ -3386,6 +3390,8 @@ function Mdi-Gonder {
     if (-not $komut) { return }
     if (-not (Baglan)) { Yaz 'MDI: makine bağlı değil.'; return }
     if ((Is-Suruyor)) { Yaz 'MDI: iş sürerken ya da duraklıyken komut gönderilemez.'; return }
+    # KU-03: MDI satırı makineyi doğrudan hareket ettirebilir; tam satır gösterilip onay alınır (varsayılan HAYIR)
+    if (-not (Onay "Şu satır Eding'e gönderilecek (MDI):`r`n`r`n    $komut`r`n`r`nMakine bu satırı hemen çalıştırır. Gönderilsin mi?" 'MDI')) { Yaz "MDI: vazgeçildi ($komut)"; return }
     Yaz "MDI> $komut"
     $rc = [Eding]::CncRunSingleLine($komut)
     Yaz ("     " + [Eding]::RCText($rc))
@@ -3490,7 +3496,7 @@ $btnHome     = Yumurta 'HOME'       ([string][char]0xE80F) 1 @(80, 100, 135) @(2
 $btnDosya    = Yumurta 'DOSYA SEÇ'  ([string][char]0xE8B7) 0 @(37, 70, 160) @(10, 22, 60)  { Btn-DosyaSec }
 $btnBaslat   = Yumurta 'BAŞLAT'     ([string][char]0xE768) 2 @(16, 140, 95) @(3, 44, 30)   { Btn-Baslat }
 $btnDuraklat = Yumurta 'DURAKLAT'   ([string][char]0xE769) 3 @(200, 120, 20) @(70, 32, 4)  { Btn-Duraklat }
-$btnDurdur   = Yumurta 'DURDUR'     ([string][char]0xE71A) 4 @(200, 35, 35) @(70, 10, 10)  { Btn-Durdur }
+$btnDurdur   = Yumurta 'DURDUR'     ([string][char]0xE71A) 4 @(200, 35, 35) @(70, 10, 10)  { Btn-Durdur $true }
 $btnReset    = Yumurta 'RESET'      ([string][char]0xE72C) 5 @(190, 160, 60) @(70, 55, 10)  { Btn-Reset }
 $btnFrez     = Yumurta 'FREZ BIRAK' ([string][char]0xE896) 6 @(95, 105, 120) @(17, 24, 39) { Btn-FrezBirak }
 $btnPens     = Yumurta 'PENS AÇ'    ([string][char]0xE785) 7 @(14, 116, 144) @(8, 47, 73)   { Btn-Pens }
