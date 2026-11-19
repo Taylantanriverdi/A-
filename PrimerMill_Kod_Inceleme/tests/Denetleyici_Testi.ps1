@@ -317,6 +317,22 @@ $script:SahteOnay = $false; [void](Komut-Isle 'park' ''); $script:SahteOnay = $t
 $r = Yaklas-Dene 'ayar:T3'
 Dogru ($r.Red) 'sihirbaz: park sonrası YAKLAŞ reddedilir' $r.Metin
 
+# ------------------------------------------------------------------ SK-13: gerçek kapının yedek argümanı C#'a gerçekten null gider
+# Testler sahte Ui-Tehlikeli-Onay kullanır; gerçek kapıdaki argüman hazırlığı (Ui-Yedek-Arg) ArayuzKapisi.ps1'den AST ile alınır,
+# aynı imzalı (string[], string) bir C# yöntemine verilir: $null düz verilseydi C# "" görürdü.
+Bolum 'Tehlikeli onay: yedek argümanı (SK-13)'
+$akAst = [System.Management.Automation.Language.Parser]::ParseFile([System.IO.Path]::Combine($lib, 'ArayuzKapisi.ps1'), [ref]$null, [ref]$null)
+$akF = $akAst.Find({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq 'Ui-Yedek-Arg' }, $true)
+Dogru ($null -ne $akF) 'ArayuzKapisi.ps1: Ui-Yedek-Arg var'
+. ([scriptblock]::Create($akF.Extent.Text))
+if (-not ('PmNullSonda' -as [type])) { Add-Type -TypeDefinition 'public static class PmNullSonda { public static string Al(string baslik, string metin, string[] e, string[] y, string yedek) { return yedek == null ? "<null>" : "[" + yedek + "]"; } }' }
+$v = Ui-Yedek-Arg $null; Esit '<null>' ([PmNullSonda]::Al('b', 'm', $null, $null, $v)) 'yedek gerekmez ($null): C# gerçek null alır (satır gösterilmez)'
+$v = $null; Esit '[]' ([PmNullSonda]::Al('b', 'm', $null, $null, $v)) 'karşılaştırma: düz $null C#''a "" gider (SK-13 nedeni)'
+$v = Ui-Yedek-Arg ''; Esit '[]' ([PmNullSonda]::Al('b', 'm', $null, $null, $v)) 'yedek alınmadı (""): "Yedek: alınmadı"'
+$v = Ui-Yedek-Arg ([System.IO.Path]::Combine('yedekler', 'ayar_1.txt')); Esit '[ayar_1.txt]' ([PmNullSonda]::Al('b', 'm', $null, $null, $v)) 'yedek yolu: dosya adı'
+$gercek = [System.IO.File]::ReadAllText([System.IO.Path]::Combine($lib, 'ArayuzKapisi.ps1'))
+Dogru ($gercek -match '\$yd = Ui-Yedek-Arg \$yedek') 'Ui-Tehlikeli-Onay Diyalog.TehlikeliOnay''a Ui-Yedek-Arg sonucunu geçirir'
+
 # ------------------------------------------------------------------ 8) SK-01: zamanlayıcı koruması içinde pencere / komut yok
 Bolum 'Zamanlayıcı koruması: erteleme (SK-01) ve DURDUR (SK-09)'
 $script:EtkinEkran = 'uretim'; $script:KomutKuyrugu.Clear(); $script:TikSonrasiKutular.Clear()
