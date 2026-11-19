@@ -1,9 +1,10 @@
 # PrimerMill — İnceleme Raporu
 
-Durum: **2. aşama (inceleme) tamamlandı. Henüz hiçbir kod değiştirilmedi.**
-Satır numaraları aksi yazılmadıkça `PrimerMill/KazimaBaslat.ps1` içindir (orijinal sürüm, commit `35a684f`).
+Durum: **Tamamlandı (19.11.2026).** İnceleme, düzeltmeler, yeni arayüz, testler ve bağımsız son kontrol bitti.
+Satır numaraları aksi yazılmadıkça orijinal `PrimerMill/KazimaBaslat.ps1` içindir (commit `35a684f`).
+Bu ortamda Windows ve makine yoktu: hiçbir değişiklik makinede ya da Windows'ta **çalıştırılmadı**. Mantık, testlerle ve sahte Eding (EdingSim) üzerinde denendi. Arayüz kodu derleyiciden geçti ve ekran görüntüleri arayüz kodundan alındı. Önce `KURULUM_VE_DENEME.md`'deki sırayla deneyin.
 
-## Özet
+## 1. Özet
 
 | Alan | KRİTİK | YÜKSEK | ORTA | DÜŞÜK |
 | --- | --- | --- | --- | --- |
@@ -15,44 +16,113 @@ Satır numaraları aksi yazılmadıkça `PrimerMill/KazimaBaslat.ps1` içindir (
 | 6. Otomatik kalibrasyon | 1 | 3 | 7 | 5 |
 | 7. Sayı, kültür, kodlama | 0 | 1 | 5 | 13 |
 | 8. Kullanılabilirlik | 1 | 13 | 14 | 5 |
+| Son kontrol (yeni kod) | 0 | 0 | 4 | 8 |
 
-Not: Alanlar arasında örtüşen bulgular var (ör. uzaktan devam GV-06 = ED-01 = UZ-02; Raf-Kontrol GV-07 = ED-05 = MC-01). Aşağıdaki birleşik listede bir kez sayıldı.
+Alanlar arasında örtüşen bulgular var. Örneğin uzaktan devam GV-06 = ED-01 = UZ-02, Raf-Kontrol GV-07 = ED-05 = MC-01. Birleşik listede bunlar bir kez sayıldı.
 
-## Birleşik öncelik listesi (KRİTİK — önce bunlar düzeltilecek)
+## 2. KRİTİK bulgular ve ne yapıldı
 
-Orkestratör tarafından kaynak kodda ayrıca doğrulananlar ✔ ile işaretli.
+| # | Konu | Kaynak | Ne yapıldı | Commit |
+| --- | --- | --- | --- | --- |
+| K1 | Duraklatılmış iş "meşgul" sayılmıyordu: duraklamada jog, M6, pens, MDI, G54 yazma serbestti | GV-01 | `Is-Suruyor`. Duraklamada yalnız DEVAM / DURDUR / ACİL STOP / hız kullanılabilir. Yeni arayüzde izin tablosu bunu her düğmede uygular | d75648e |
+| K2 | Pens iş mili dönerken açılabiliyordu | GV-02, MC-05, KU-01 | Panel M5 gönderip devrin <1 olmasını bekler (8 sn). Makroda `m5 m9 g4 p3`. Her "Pens aç" onay ister | cd99fe5, dc09a7a |
+| K3 | Uzaktan BAŞLAT duraklı işi kontrolsüz devam ettiriyordu | GV-06, ED-01, UZ-02 | Duraklı iş uzaktan devam ettirilemez. Diyalog veya işlem açıkken uzak komut reddedilir | f0cf74b |
+| K4 | Telefondan fare/klavye kontrolü (yönetici yetkisiyle komut çalıştırmaya kadar) | UZ-01 | `/api/tikla` ve `/api/tus` kaldırıldı (403). Telefon yalnız izleme yapar | f0cf74b |
+| K5 | Raf-Kontrol onaysız ve yedeksiz, üreticiden farklı varsayılan yazıyordu | GV-07, ED-05, MC-01 | Kendiliğinden yazma yok. Eksikse uyarır ve BAŞLAT/M6'yı engeller. Yazma yalnız düğmeyle yapılır, önce yedek ve onay alınır. **Sayılar değiştirilmedi** (MAKİNEDE DOĞRULA) | 46ea5d2 |
+| K6 | #4039 bayrağı takılı kalırsa takım değişimi sessizce atlanıyordu | MC-04, GV-04 | Panel bağlantıda ve iş başında sıfırlar. Makro home_all/check_empty_tool'da sıfırlar. Devam'da makro sürümü ve bayrak geri okunur | 9ff46c9, 6d2e859 |
+| K7 | "Yaklaş" sensör seçiliyken frezi sensöre bastırabiliyordu | GV-03 | Milde frez varken hiçbir noktada inmez. Ayrıca yalnız son GİT yapılan yuvada çalışır (SK-02) | a444a81, a837c83 |
+| K8 | Prob temas etmezse pim diske 6–8.7 mm dalabilir | KL-01 | Son 10 dk içinde başarılı prob testi zorunlu. **Arama mesafesi değiştirilmedi** (öneri) | 3ed61cd |
+| K9 | `[math]::Max(0,x)` tamsayıya yuvarlıyordu: kalibrasyon kalite kontrolleri çalışmıyordu, Ø5/Ø7 cepleri Ø6 kesiliyordu | KL-02, KL-03 | `0.0` ile düzeltildi. Testler geçiyor. Cep çapları değişti (MAKİNEDE DOĞRULA) | 95d6e3d |
 
-| # | Konu | Kaynak bulgular | Doğrulama |
-| --- | --- | --- | --- |
-| K1 | Duraklatılmış iş "meşgul" sayılmıyor: duraklamada jog, M6, pens aç, MDI, G54 yazma, kalibrasyon uygulama, başka iş yükleme serbest; iş mili duraklamada dönmeye devam ediyor (cnc.ini `stopSpindleOnPause = 0`) | GV-01 | ✔ `Mesgul` (1822) PAUSE içermiyor |
-| K2 | Pens, iş mili dönerken açılabiliyor (panel ve `pm_pens_t0` M5 göndermiyor; Ayarlar'daki "Pens aç" onaysız) | GV-02, MC-05, KU-01 | ✔ macro.cnc 341–347 doğrudan `M54 P2` |
-| K3 | Uzaktan BAŞLAT duraklı işi hiçbir kontrol yapmadan devam ettiriyor (elle takım değişimi adımında operatörün eli pensteyken) | GV-06, ED-01, UZ-02 | ✔ 2654–2657 |
-| K4 | Uzaktan `/api/tikla` ve `/api/tus`: telefondan makine bilgisayarının fare/klavyesi tam kontrol; panel yönetici olarak çalıştığı için bilgisayarda komut çalıştırmaya kadar gider | UZ-01 | ✔ 1460–1485, 1595–1605 |
-| K5 | Raf-Kontrol: okunan 0'ı "boş" sayıp onaysız ve yedeksiz varsayılan yazıyor; varsayılanlar üretici makrosundan farklı (T1: Y −89.166 / A 23 / B 0 ↔ orijinal Y −88.966 / A 23.2 / B −1; #4000 −46.9 → −45) | GV-07, ED-05, MC-01, MC-02 | ✔ 3878–3923, macro_X5_orijinal PickTool1 |
-| K6 | #4039 bayrağı kalıcı; 1 kalırsa sonraki işin `T1 M6`'sı takım almadan/ölçmeden geçer | MC-04, GV-04 | — |
-| K7 | YUVA AYARI "Yaklaş" sensör seçiliyken iş milinde frez olsa da Z −26'ya iniyor | GV-03 | ✔ 4375–4381 |
-| K8 | Otomatik kalibrasyonda prob temas etmezse pim diske 6–8.7 mm dalabilir (hata kontrolü hareketten sonra) | KL-01 | ✔ 4981 |
-| K9 | `[math]::Max(0, x)` tamsayı aşırı yüklemesini seçiyor: kalibrasyon kalite kontrolleri (artık hata, çift dokunuş farkı) hiç tetiklenmiyor; manuel disk kalibrasyonunda cep çapları yanlış (Ø5 ve Ø7 cepleri Ø6 kesiliyor) | KL-02, KL-03 | ✔ pwsh'de `[math]::Max(0,0.3)` → 0; satır 5168, 5172, 5326, 4628 |
+YÜKSEK önemdeki düzeltmelerin tamamı ve her birinin commit'i Ek B'de (düzeltme kayıtları) listelidir. Başlıcaları şunlar:
+- Diyalog açıkken ACİL STOP (Esc ve kırmızı düğme)
+- Bağlantı koparsa "hareket bitti" sayılmaması
+- Yarıda kalan takım değişiminin işaretlenmesi
+- Eding yeniden açılınca kendiliğinden home yapılmaması
+- Zamanlayıcıların iç içe çalışmaması
+- 6 haneli PIN, deneme sınırı, CORS'un kaldırılması
+- Yükleme kısıtları
+- Yedek alınamazsa yazmama
+- Makro koruma denetimleri (MC-03/06/07)
+- Virgüllü sayı denetimi
 
-YÜKSEK önemdeki başlıca maddeler: mesaj pencereleri açıkken yazılım ACİL STOP'a ulaşılamaması (GV-05), ACİL STOP'un sonunda `CncReset` çağırması (ED-08), bağlantı koptuğunda "hareket bitti" sayılması (ED-02), takım değişimi yarıda kesilince takım durumunun belirsiz kalması (GV-08), Eding yeniden açıldığında kendiliğinden home (GV-09, ED-06), zamanlayıcıların iç içe çalışması (ED-07), zayıf PIN ve her siteye açık CORS (UZ-03/04), yüklenen dosyanın kontrol edilmiş işin üstüne yazılması (UZ-05), yedek alınamasa da G54'e yazılması (KL-04), manuelden otomatiğe geçişte T>6 ile çarpışma (MC-06), prob tetiklenmezse yine G92 yazılması (MC-07), Eding'deki makro sürümünün yalnız manuel modda denetlenmesi (MC-08), `.nc` dosyasında virgüllü sayıların fark edilmemesi (KD-01), arayüzde durum renklerinin tutarsızlığı ve uzaktan okunamaması, sabit 1000×640 yerleşim, gerçek alarm ekranının olmaması (KU-02…KU-12).
+## 3. Yeni arayüz (PrimerMill 2)
 
-## MAKİNEDE DOĞRULA
+- Tasarım: `TASARIM.md`. Kullanıcı onay yetkisini devrettiği için süreci yürüten tarafından onaylandı.
+- Görünüm `ui/PrimerUI.cs` (C# 5 WinForms), mantık `teslim/PrimerMill/lib/*.ps1`, demo modu `lib/EdingSim.cs`. Komut sözleşmesi: `ui/ARAYUZ_API.md`.
+- Özellik eşitliği (`OZELLIK_ENVANTERI.md`): 229 madde tam, 3 kısmi, 3 yok:
+  - Kısmi: basılı tutarak jog, M7/M8 göstergesi, dans eden hayvan yerine parıltı.
+  - Yok: ölü blok sorusu (5.6/11.7) ve bilinçli olarak kaldırılan CORS.
+- Eski (düzeltilmiş) panel `KazimaBaslat_Klasik.bat` olarak teslimde duruyor.
+- Ekran görüntüleri: `teslim/ekran_goruntuleri/` (65 adet; koyu/açık, 1024×768 ve 1920×1080). Bunlar arayüz kodundan örnek verilerle Mono üzerinde alındı. Windows'ta gerçek demo modundan görüntü almak için `tests/Demo_Ekran_Testi.ps1` kullanılabilir.
 
-Bu liste 4. aşamada (uygulama) yapılan her makine hareketi değişikliğiyle doldurulacak. İnceleme sırasında koddan kesinleştirilemeyen ve makinede bakılması gereken davranışlar alan raporlarında "BELİRSİZ – makinede doğrula" / "MAKİNEDE DOĞRULA: evet" ile işaretlidir. Başlıcaları:
-- Makinede fiziksel acil stop var mı (koddaki yorum: "Fiziksel buton yok", 3264)?
-- Elle takım değişimi adımında (M0) Eding `CncGetState` ne döndürüyor: PAUSE mı?
-- `errmsg` makroyu nasıl durduruyor, M56 bekliyor mu, MDI'den başlatılan makroda M0 davranışı.
-- Raf (takım yuvası) koordinatları: T1–T6 gerçek yuva konumları ve #4000 (−46.9) doğru değer mi?
-- Eding açılışta POWERUP'tan çıktığında #4xxx ve G54 değerleri hazır mı?
-- PS 5.1'de `$b=0; [math]::Max($b,0.3)` 0 mı yazıyor (pwsh 7.4'te 0)?
+## 4. Testler
 
-## Uygulanmayan öneriler
+`tests/README.md`. Linux'ta pwsh 7.4 ile, teslim klasörüne karşı **10/10 test grubu geçti**:
 
-4. aşama sonunda doldurulacak.
+| Test | Kapsam |
+| --- | --- |
+| Sözdizimi | 24 dosya ayrıştırıcıdan hatasız, BOM, CRLF, .bat ASCII |
+| GKod_Altin | 6 üretici, 24 varyant: 20'si orijinalle bayt bayt aynı. 4 Kal-NC-Uret farkı K9'dan beklenen fark |
+| OtoKal_Hesap | Sentetik ölçümden 10 parametre geri bulunuyor (gürültüsüz 1e-6) |
+| Kal_NC_Cep | Disk kalibrasyonu cep çapları |
+| Sayi_Kultur | tr-TR, zh-CN, de-DE altında sayı biçimi ve aynı G-kod |
+| Ayar | Ayar dosyası ve yedek okuma/yazma |
+| EdingSim | Sahte Eding, gerçek sınıfla aynı üyeler |
+| Denetleyici | İzin tablosu, komut dağıtımı, demo iş akışı (179 madde) |
+| Tasima | Eski → yeni fonksiyon taşıma farklarının gerekçeli listesi |
+| Demo_Ekran | Windows'ta paneli demo açıp her ekranı kaydeder (Linux'ta atlanır) |
+
+Windows PowerShell 5.1 ile çalıştırılmadı. İlk iş olarak Windows'ta çalıştırılmalı.
+
+## 5. MAKİNEDE DOĞRULA
+
+Önce Eding simülasyon modunda, sonra %10–30 ilerleme hızıyla ve el acil stoptayken (bkz. `KURULUM_VE_DENEME.md` §4).
+
+| # | Değişiklik / soru | Nasıl doğrulanır |
+| --- | --- | --- |
+| 1 | K9: disk kalibrasyonu test programında cep çapları değişti (Ø5/Ø7 artık doğru) | Programı üret, cepleri kumpasla ölç (Ø4/5/6/7/8) |
+| 2 | K2: Pens aç öncesi M5 + `CncGetActualSpeed`<1 beklemesi; makroda `g4 p3` | S10000–24000 M3 çalışırken Pens aç. İş mili tamamen durmadan pens açılmamalı. Durma süresini ölç, 3 sn yetmiyorsa artır |
+| 3 | K5: yuva varsayılanları üreticiden farklı (T1 Y −89.166/A 23/B 0 ↔ −88.966/23.2/−1; #4000 −45 ↔ −46.9) | Yuva ayarıyla gerçek konumları ölç. "Doğrulanmış değerlere dön"e basmadan karşılaştır |
+| 4 | K6 / GV-08: Devam'da ve yarıda kalan takım değişiminde takım bildirimi (`#4039=1; M6 Tn`) | Eding T2'deyken devamda T3 seç: eksenler kıpırdamamalı |
+| 5 | K7 / SK-02: Yaklaş yalnız son GİT yapılan yuvada; sensörde frezliyken inmiyor | T2'ye GİT → T5 seç → YAKLAŞ reddedilmeli. Sensörde boş pens burnu ile boşluk kalıyor mu? |
+| 6 | K8: prob arama derinliği hâlâ 6–8.7 mm | İlk ölçümü yalıtkan sahte yüzeyle, %50 hızla yap |
+| 7 | MC-07: prob tetiklenmezse makro `errmsg` ile duruyor, G92 yazılmıyor | Frezsiz takım ölç: hata çıkmalı, G92 Z değişmemeli. Makine sensör üstünde kalır, Z'yi elle kaldır |
+| 8 | MC-03 / MC-06: yuva değişkeni boşsa ya da milde T>6 varsa değişim hareketsiz duruyor | Simülasyonda #4013=0 yapıp `M6 T3`: hareketsiz hata |
+| 9 | MC-04: home_all / check_empty_tool #4039'u sıfırlıyor | #4039=1 → check_empty_tool → 0 olmalı |
+| 10 | ED-08: ACİL STOP sonrası `CncReset` sürücüleri enerjilendiriyor mu? | ACİL STOP'a bas, sürücü durumunu gözle. Enerjiliyorsa reset çağrısı kaldırılmalı (öneri) |
+| 11 | GV-09: geri sayım dolunca home yapılmıyor; Eding yeniden açılınca kendiliğinden home yok | Paneli aç, bekle. Eding'i görev yöneticisinden kapat |
+| 12 | SK-09: işlem (home / takım değişimi) sürerken DURDUR artık çalışıyor | Home sırasında DURDUR → hareket kesilmeli, takım durumu belirsiz işaretlenmeli |
+| 13 | Yeni panel: TEMİZLİK ve PARK ayrı düğmeler, YUVAYA GİT / YUKARI / konum düğmeleri onay soruyor | Her düğme eski paneldekiyle aynı hedefe gidiyor mu? |
+| 14 | ED-24: EdingKapat ikinci API istemcisi olarak bağlanıyor | Panel açıkken EdingKapat; iş sürerken kapatmamalı |
+| 15 | Fiziksel acil stop var mı? (koddaki yorum: "Fiziksel buton yok") | Yoksa yazılım ACİL STOP'u tek yol; Esc ve diyalog düğmesini dene |
+| 16 | Elle frez değişiminde (M0) `CncGetState` metni PAUSE mı? | Elle modda bir iş, adım pencereleri |
+
+## 6. Uygulanmayan öneriler
+
+Kural gereği makine hareketini değiştirdikleri ve doğru değer makinede bilinmeden yazılamayacakları için uygulanmadı:
+
+- **KL-01:** Prob arama mesafesini kısaltmak (ilk temas T/2−2 F60, diğerleri beklenen −1.5 mm) ve ilerlemeyi düşürmek.
+- **MC-01 / MC-02:** Yuva koordinatlarını üreticiyle eşitlemek, yuva başına A/B/Z değişkenleri.
+- **MC-07 / MC-10:** `errmsg` öncesi Z'yi güvenli yüksekliğe kaldırmak.
+- **MC-11:** `check_pressure` zaman aşımı.
+- **MC-12:** m100 davranışını değiştirmek.
+- **ED-08:** ACİL STOP'tan `CncReset`'i kaldırmak (makinede doğrulandıktan sonra).
+- **GV-03 ek:** Sensör yaklaşma hedefini #4003 yapmak.
+- **GV-04 ek:** Takım bildirimi sırasında konum değişirse işi iptal etmek.
+- **KU / tasarım:**
+  - Basılı tutarak jog.
+  - Uzaktan izin düzeyleri.
+  - M7/M8 ve gerçek pens çıkışı göstergesi (çıkış numaraları bilinmiyor).
+- **Diğer:** ORTA/DÜŞÜK bulguların bir kısmı. Ayrıntısı alan raporlarında ve Ek B'nin "Uygulanmayanlar" bölümlerinde.
+
+Bilinen sınırlar:
+- Yedek dosyası 3 ondalık yazıyor; geri yüklemede G54 0.0005 mm kayabilir.
+- Ana zamanlayıcı tık süresi zayıf makinede ölçülmeli.
 
 ---
 
-# Ek: Alan raporları (alt ajanların ayrıntılı bulguları)
+# Ek A: Alan raporları (inceleme aşaması, değişiklikten önce)
 
 
 ## 01 - PowerShell 5.1 / 32 bit uyumu ve sözdizimi (Faz 2 incelemesi, salt okunur)
