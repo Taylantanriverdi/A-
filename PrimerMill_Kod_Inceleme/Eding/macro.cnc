@@ -227,6 +227,15 @@ sub change_tool
 		if [[#5011] > 6 ]
 			errmsg "error please select a tool from 1 to 6."
 		else
+			;PrimerMill (MC-06): milde 0..6 disi takim (ornek manuelde takilan T7) varsa DropTool yok,
+			;  pens kapali kalir ve Pick yuvaya frezle iner -> hareketten once dur
+			if [[#5008 < 0] or [#5008 > 6]]
+				errmsg "error tool in spindle is not T0..T6: no auto change, open collet by hand (PENS AC) first"
+			endif
+			if [#5011 < 0]
+				errmsg "error please select a tool from 1 to 6."
+			endif
+
 			;PrimerMill (MC-03): yuva degiskenleri ve Z sirasi hareketten once denetlenir
 			gosub pm_yuva_kontrol
 
