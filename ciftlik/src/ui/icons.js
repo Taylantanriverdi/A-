@@ -55,6 +55,7 @@ export const ICON = {
   plus: svg('<path d="M6 12h12M12 6v12" stroke-width="2.2"/>'),
   trophy: svg('<path d="M8 4.5h8v5a4 4 0 0 1-8 0z" fill="currentColor" fill-opacity=".25"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/>'),
   chart: svg('<path d="M4 20V4M4 20h16"/><path d="M8 16v-4M12.5 16V8M17 16v-6" stroke-width="2.4"/><path d="M7 8.5l4-3 3 2 5-4" stroke-width="1.5"/>'),
+  zombie: svg('<path d="M12 3.5a7 7 0 0 0-7 7v3.2c0 1 .8 1.8 1.8 1.8H8v3h8v-3h1.2c1 0 1.8-.8 1.8-1.8v-3.2a7 7 0 0 0-7-7z" fill="currentColor" fill-opacity=".22"/><circle cx="9.2" cy="11" r="1.5" fill="currentColor"/><circle cx="14.8" cy="11" r="1.5" fill="currentColor"/><path d="M10 18.5v-2M12 18.5v-2M14 18.5v-2"/>'),
   shield: svg('<path d="M12 3.2l7 2.6v5.6c0 4.4-3 8-7 9.6-4-1.6-7-5.2-7-9.6V5.8z" fill="currentColor" fill-opacity=".22"/><path d="M12 7.5v8M8.8 11h6.4"/>'),
   check: svg('<path d="M5 12.5l4.2 4.2L19 7"/>'),
 };

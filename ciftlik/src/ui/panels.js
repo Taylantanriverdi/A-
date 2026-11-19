@@ -69,6 +69,29 @@ export function createPanelHost(root, ctx, navParent) {
   tap(sbtn, () => api.toggle('soldier'));
   nav.appendChild(sbtn);
   navBtns.soldier = sbtn;
+  // K31: Zombi Modu düğmesi — her zaman görünür; basınca mod açılır ve bu gece baskın gelir, tekrar basınca kapanır
+  const zbtn = h('button', 'nav-btn zombie-btn glass interactive', `<span class="ic">${ICON.zombie}</span><span class="lbl">${STR.nav.zombie}</span>`);
+  zbtn.type = 'button';
+  zbtn.title = STR.nav.zombie;
+  zbtn.setAttribute('aria-label', STR.nav.zombie);
+  shield(zbtn);
+  tap(zbtn, () => {
+    const bus = ctx.bus;
+    if (state.settings?.raids === true) {
+      bus.emit('settings:set', { key: 'raids', value: false });
+      bus.emit('toast', { text: 'Zombi Modu kapandı. Geceler yine sakin.', kind: 'info' });
+    } else {
+      bus.emit('settings:set', { key: 'raids', value: true });
+      bus.emit('raid:planTonight', {});
+      bus.emit('toast', { text: 'Zombi Modu açıldı! Bu gece canavarlar geliyor — savunmanı kur.', kind: 'event' });
+    }
+    zbtn.classList.toggle('on', state.settings?.raids === true);
+    zbtn.setAttribute('aria-pressed', String(state.settings?.raids === true));
+  });
+  zbtn.classList.toggle('on', state.settings?.raids === true);
+  zbtn.setAttribute('aria-pressed', String(state.settings?.raids === true));
+  nav.appendChild(zbtn);
+  navBtns.zombie = zbtn;
   const fbadge = fbtn.querySelector('.nbadge');
   navParent.insertBefore(nav, navParent.firstChild);
 
@@ -126,6 +149,7 @@ export function createPanelHost(root, ctx, navParent) {
     nav,
     /** Gece İstilası modu açık/kapalı: Askerler düğmesi + açık panel kapanır. */
     setRaidMode(on) {
+      zbtn.classList.toggle('on', !!on); zbtn.setAttribute('aria-pressed', String(!!on));
       if (sbtn.hidden === !on) return;
       sbtn.hidden = !on;
       if (!on && current === 'soldier') api.close();

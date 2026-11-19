@@ -88,3 +88,13 @@
 #ui .s-raid { display: flex; flex-direction: column; gap: 8px; }
 #ui .sd-row .sub, #ui .sd-tx .wrk-small { display: block; }
 #ui .sd-row .sf { flex: none; width: 88px; }
+
+/* K31: Zombi Modu düğmesi — açıkken yeşilimsi parıltı */
+.nav-btn.zombie-btn.on { color: #c8ff8a; border-color: rgba(160, 230, 110, 0.55); box-shadow: 0 0 0 1px rgba(160, 230, 110, 0.25), 0 0 14px rgba(140, 220, 90, 0.35); }
+.nav-btn.zombie-btn.on .ic { filter: drop-shadow(0 0 4px rgba(170, 255, 110, 0.8)); }
+
+/* K31: üst menü kalabalıklaştı — orta genişlikte (≤1500px) yalnız ikon; etiket title/aria-label'da */
+@media (max-width: 1500px) {
+  .hud-nav .nav-btn .lbl, .hud-nav .nav-btn .kbd { display: none; }
+  .hud-nav .nav-btn { padding-left: 10px; padding-right: 10px; }
+}

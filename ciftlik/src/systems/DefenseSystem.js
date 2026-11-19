@@ -258,6 +258,15 @@ const DefenseSystem = {
     ctxRef = registry.ctx;
     validate(state, () => {});
     syncGrid(state);
+    // K31: HUD "Zombi Modu" düğmesi — bu gece baskın (gündüzse 21:00'de, geceyse hemen)
+    offs.push(bus.on('raid:planTonight', () => {
+      if (!on(state)) return;
+      const D = state.defense;
+      if (D.active) return;
+      const min = state.time.totalMinutes % MIN_PER_DAY, h = Math.floor(min / 60);
+      forceRaid(state, bus, false);
+      if ((h >= RAID_SCHEDULE.startHour || min < RAID_SCHEDULE.endMin - 90) && ctxRef) { startRaid(state, bus, ctxRef); nextWave(state, bus, ctxRef); }
+    }));
     offs.push(bus.on('defense:repair', (p) => repair(state, bus, p)));
     offs.push(bus.on('defense:repairHouse', () => repairHouse(state, bus)));
     offs.push(bus.on('soldier:hire', (p) => hire(state, bus, p)));

@@ -510,6 +510,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K28 | Rüzgâr salınımları ayrı yavaş saatle (env.wt = gerçek zaman × 0.42): ekin, ağaç, orman şeridi, ön plan çimi, tente, tabela | Kullanıcı: normal hızda bile salınım çok hızlı |
 | K29 | 'Gece İstilası' modu (isteğe bağlı): gece canavar baskınları, savunma yapıları, kiralık askerler; aile dostu ürkütücü-sevimli tarz, kimse ölmez (bayılır) | Kullanıcı isteği |
 | K30 | İstila dengesi: ev 600 hp, yağma cezası en fazla 1.500 ₺, kule hasarı 9, dalga artışı yavaş; canavarlar kuzey şeridine (evin arkası) giremez; 1×1 savunma/çit köy yoluna konabilir | sim-defense: savunmalı oyuncu bile evi kaybediyordu (ev kuzey sınırda savunmasızdı, yol çit halkasında boşluk bırakıyordu) |
+| K31 | Üst menüde her zaman görünen 'Zombi Modu' düğmesi: basınca mod açılır ve bu gece baskın planlanır (geceyse hemen başlar), tekrar basınca kapanır; ≤1500px'te üst menü yalnız ikon | Kullanıcı isteği |
 | K18 | Hayvan ürününde A için mutluluk ≥ 90 (sevme gerekir); tavuk 400 ₺, yumurta 15 ₺ | sim-animals: kümes ve ahır yatırımı ~47 günde geri döner |
 | K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 

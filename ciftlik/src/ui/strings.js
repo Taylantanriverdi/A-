@@ -94,7 +94,7 @@ export const STR = {
   harvestNote: (qty, name, q) => (q ? `+${qty} ${name} · ${q}` : `+${qty} ${name}`),
 
   // ---- Aşama 3: envanter / pazar / mağaza / seviye ----
-  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', worker: 'Çalışan', finance: 'Finans', soldier: 'Askerler' },
+  nav: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', worker: 'Çalışan', finance: 'Finans', soldier: 'Askerler', zombie: 'Zombi Modu' },
   navKey: (name, k) => `${name} (${k})`,
   panelTitle: { inventory: 'Envanter', market: 'Pazar', shop: 'Mağaza', building: 'Çiftlik binası', machine: 'Atölye', worker: 'Çalışan', finance: 'Finans', soldier: 'Askerler' },
   slotsUsed: (u, c) => `${u}/${c} yuva`,
