@@ -118,9 +118,11 @@ function Okuma-Yap {
 # Eski ana zamanlayıcının gövdesi (1 sn). Etiket / lamba / düğme yazıları yerine durum değişkenleri; mantık aynı:
 # ACİL STOP bekçisi (kilitliyken Eding hareket ederse tekrar keser), durum satırı, hız, simülasyon, ilerleme, manuel istek,
 # yuva denetimi, açılış hazırlığı / makro denetimi sırası (TikSonraki).
+# SK-01: Baglanti-Bekcisi (Eding'i başlatma, program seçme penceresi, KillCNC beklemesi) artık burada değil: Zamanlayici-Tik onu
+# ana korumanın DIŞINDA, Ana-Tik'ten hemen önce çalıştırır. Buradan açılan bilgi/hata pencereleri (iş sonu EXTERR / freze / Eding
+# hatası) Ui-Kutu'da ertelenir ve korumadan sonra gösterilir (Tik-Sonrasi-Calistir).
 function Ana-Tik {
     Hatalari-Kaydet
-    if (-not $script:EdingKapatildi) { Baglanti-Bekcisi }
     $script:ManuelMesajMetni = ''; $script:HavaYok = $false
     if (-not $script:ApiHazir) { Durum-Yaz 'Önizleme modu' $cSoluk; $script:TeknikMetni = "Bu bilgisayarda $EdingKlasor\cncapi.dll yok. Sadece dosya kontrolü yapılabilir."; return }
     if (-not (Baglan)) { Durum-Yaz 'Makine bağlı değil' $cKirmizi; $script:TeknikMetni = "Eding CNC kapalı ya da bağlanılamadı."; return }
@@ -175,12 +177,30 @@ function Ana-Tik {
 }
 
 # ------------------------------------------------------------------ ana zamanlayıcı (200 ms)
+# SK-01 kuralları:
+#  - Korumalı blok (Ana-Tik, Eding-Gizle-Tik, Okuma-Yap, Durum-Yenile) modal pencere açmaz, uzun iş yapmaz. İçinden gelen
+#    Ui-Kutu bilgi/hata pencereleri ($script:TikSonrasiKutular) ve kullanıcı komutları ($script:KomutKuyrugu) ertelenir.
+#  - Korumalı bloğun içinden (Yaz -> Ui-Olaylar -> DoEvents) iç içe gelen tık HİÇBİR ŞEY çalıştırmaz: uzaktan komut, manuel
+#    izleme, açılış hazırlığı korumanın içinde başlayamaz.
+#  - Diyalog açabilen / uzun işler (bekçi, prob, uzak, manuel, açılış, ertelenenler) korumanın DIŞINDA: o diyalog açıkken
+#    gelen tıklar korumalı bloğu çalıştırır, ekran (durum, konum, izinler) ve ACİL STOP bekçisi işlemeye devam eder.
+$script:BekciMesgul = $false
+$script:KuyrukMesgul = $false
+$script:KomutKuyrugu = New-Object System.Collections.Generic.List[object]
 function Zamanlayici-Tik {
     $script:TikNo++
+    if ($script:TikMesgul) { return }   # korumalı bloğun içinden iç içe gelen tık
+    $anaTik = (($script:TikNo % 5) -eq 1)
+    if ($anaTik -and -not $script:EdingKapatildi -and -not $script:BekciMesgul) {
+        # eski Ana-Tik'in ilk satırı (Baglanti-Bekcisi): kendi koruması ve işlem bayrağıyla (iç içe açılış / manuel başlamasın)
+        $script:BekciMesgul = $true
+        try { Islem-Calistir 'Eding bağlantısı' { Baglanti-Bekcisi } } catch { try { [Kayit]::Yaz("BEKÇİ: $($_.Exception.Message)") } catch { } }
+        finally { $script:BekciMesgul = $false }
+    }
     if (-not $script:TikMesgul) {
         $script:TikMesgul = $true
         try {
-            if (($script:TikNo % 5) -eq 1) { $script:TikSonraki = ''; Ana-Tik }   # eski ana zamanlayıcı: 1 sn
+            if ($anaTik) { $script:TikSonraki = ''; Ana-Tik }   # eski ana zamanlayıcı: 1 sn
             try { Eding-Gizle-Tik } catch { }                                     # eski: 250 ms
             Okuma-Yap                                                              # eski koordinat: 50 ms
             Durum-Yenile
@@ -202,6 +222,31 @@ function Zamanlayici-Tik {
             elseif ($sonraki -eq 'makro') { Islem-Calistir 'Makro denetimi' { Makro-Baslangic-Kontrol } }
         } catch { [Kayit]::Yaz("ZAMANLAYICI ($sonraki): $($_.Exception.Message)") }
     }
+    Tik-Sonrasi-Calistir
+}
+
+# SK-01: korumalı blok sırasında gelen komutlar ve ertelenen pencereler, koruma bırakıldıktan hemen sonra.
+# Komutlar her zamanki Komut-Isle denetiminden geçer (o an bir işlem sürüyorsa doğrudan basılmış gibi reddedilir);
+# 3 sn'den eski komut çalıştırılmaz (bekletilmiş bir hareket geç başlamasın). Pencereler tek tek (iç içe değil) gösterilir.
+function Tik-Sonrasi-Calistir {
+    if ($script:TikMesgul -or $script:BekciMesgul) { return }
+    while ($script:KomutKuyrugu.Count -gt 0) {
+        $k = $script:KomutKuyrugu[0]; $script:KomutKuyrugu.RemoveAt(0)
+        if (((Get-Date) - $k.Zaman).TotalSeconds -gt 3) {
+            [Kayit]::Yaz("KOMUT ZAMAN AŞIMI (ertelenmişti): $($k.Ad) $($k.Arg)")
+            Ui-Bildir "Komut zamanında işlenemedi, yeniden basın: $($k.Ad)" 'Uyari'
+            continue
+        }
+        try { [void](Komut-Isle $k.Ad $k.Arg $k.Kaynak) } catch { try { [Kayit]::Yaz("ERTELENEN KOMUT: $($_.Exception.Message)") } catch { } }
+    }
+    if ($script:KuyrukMesgul -or $script:TikSonrasiKutular.Count -eq 0) { return }
+    $script:KuyrukMesgul = $true
+    try {
+        while ($script:TikSonrasiKutular.Count -gt 0) {
+            $p = $script:TikSonrasiKutular[0]; $script:TikSonrasiKutular.RemoveAt(0)
+            try { [void](Ui-Kutu $p.Metin $p.Baslik $p.Dugme $p.Simge) } catch { try { [Kayit]::Yaz("ERTELENEN PENCERE: $($_.Exception.Message)") } catch { } }
+        }
+    } finally { $script:KuyrukMesgul = $false }
 }
 
 # Komut sonrası ve her tıkta: durum nesnesi ve izin tablosu görünüme
@@ -312,6 +357,13 @@ function Komut-Isle([string]$ad, [string]$arg = '', [string]$kaynak = 'yerel') {
         try { Acil-Stop $(if ($kaynak -eq 'yerel') { 'buton' } else { $kaynak }) } finally { try { Durum-Yenile } catch { } }
         return $true
     }
+    # SK-01: ana zamanlayıcının korumalı bloğu ya da bağlantı bekçisi sürerken (DoEvents ile) gelen komut iç içe çalışmaz:
+    # sıraya alınır, koruma bırakılınca Tik-Sonrasi-Calistir çalıştırır. ACİL STOP (yukarıda) ve DURDUR beklemez.
+    if (($script:TikMesgul -or $script:BekciMesgul) -and $ad -ne 'is.durdur') {
+        $script:KomutKuyrugu.Add(@{ Ad = $ad; Arg = $arg; Kaynak = $kaynak; Zaman = (Get-Date) })
+        [Kayit]::Yaz("KOMUT ERTELENDİ (zamanlayıcı işi sürüyor): $ad $arg")
+        return $true
+    }
     $t = $script:Komutlar[$ad]
     if (-not $t) { $n = "Bilinmeyen komut: $ad"; [Kayit]::Yaz("KOMUT: $n"); Ui-Bildir $n 'Uyari'; return $n }
     $mesgul = $script:IslemSuruyor -or $script:UzakMesgul -or $script:ManuelTikMesgul
@@ -332,7 +384,7 @@ function Komut-Isle([string]$ad, [string]$arg = '', [string]$kaynak = 'yerel') {
         $sonuc = "HATA: $($_.Exception.Message)"
         Yaz "HATA ($ad): $($_.Exception.Message)"
         try { Ui-Hata 'Komut işlenemedi' "$ad : $($_.Exception.Message)" 'Ayrıntı Kayıtlar ekranında ve log dosyasında.' } catch { }
-    } finally { try { Ui-Mesgul $null; Durum-Yenile } catch { } }
+    } finally { try { if (-not $script:IslemSuruyor) { Ui-Mesgul $null }; if (-not $script:TikMesgul) { Durum-Yenile } } catch { } }   # iç içe (DURDUR, ekran) dıştaki işlemin meşgul yazısını silmesin
     return $sonuc
 }
 
@@ -530,7 +582,10 @@ Komut-Tanimla 'is.sec' 'serbest' { Btn-DosyaSec } -Ek { param($a, $c) if ($c.Sur
 Komut-Tanimla 'is.baslat' 'hareket' { Btn-Baslat } -Raf -Makro -Ek { param($a, $c) if (-not $script:SeciliDosya) { return $script:IzinMetni.Dosya }; if ($script:Engel) { return $script:IzinMetni.Engel }; return '' }
 Komut-Tanimla 'is.devam' 'is' { Btn-Baslat } -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if ($c.Acil) { return $script:IzinMetni.Acil }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not $c.Durak) { return 'Duraklatılmış iş yok' }; return '' }
 Komut-Tanimla 'is.duraklat' 'is' { Btn-Duraklat } -IcIce -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not ($c.Calis -and -not $c.Durak)) { return $script:IzinMetni.Yok }; return '' }
-Komut-Tanimla 'is.durdur' 'is' { Btn-Durdur $true } -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not $c.Suruyor) { return $script:IzinMetni.Yok }; return '' }
+# SK-09 (MAKİNEDE DOĞRULA): DURDUR (CncAbortJob) panelden başlayan bir işlem (home, takım değişimi, yuvaya git ...) sürerken de
+# çalışır (-IcIce); Btn-Durdur yalnız onay + CncAbortJob yapar, yeni uzun işlem başlatmaz. Dıştaki işlemin bekleyişi Eding'in
+# durumunu görüp kendi hata yoluyla biter.
+Komut-Tanimla 'is.durdur' 'is' { Btn-Durdur $true } -IcIce -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not $c.Suruyor) { return $script:IzinMetni.Yok }; return '' }
 Komut-Tanimla 'takim.degistir' 'hareket' { param($a) $n = 0; if (-not [int]::TryParse($a, [ref]$n) -or $n -lt 0 -or $n -gt 6) { Ui-Bildir "Geçersiz takım: $a" 'Uyari'; return }; Takim-Degistir $n } -Raf
 Komut-Tanimla 'temizlik' 'hareket' { if (Normal-Onay 'Temizlik' "İş mili en üste çıkacak, kol yatay konuma dönecek (temizlik).`r`nDevam?") { Btn-Temizlik 'temizlik' } }
 Komut-Tanimla 'park' 'hareket' { if (Normal-Onay 'Park' "İş mili en üste çıkacak, sonra park konumuna (G30) gidecek.`r`nDevam?") { Btn-Temizlik 'park' } }

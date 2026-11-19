@@ -317,5 +317,61 @@ $script:SahteOnay = $false; [void](Komut-Isle 'park' ''); $script:SahteOnay = $t
 $r = Yaklas-Dene 'ayar:T3'
 Dogru ($r.Red) 'sihirbaz: park sonrası YAKLAŞ reddedilir' $r.Metin
 
+# ------------------------------------------------------------------ 8) SK-01: zamanlayıcı koruması içinde pencere / komut yok
+Bolum 'Zamanlayıcı koruması: erteleme (SK-01) ve DURDUR (SK-09)'
+$script:EtkinEkran = 'uretim'; $script:KomutKuyrugu.Clear(); $script:TikSonrasiKutular.Clear()
+# korumalı blok sürerken (DoEvents ile) gelen dokunuş: sıraya alınır, koruma bırakılınca çalışır
+$script:TikMesgul = $true
+Esit $true (Komut-Isle 'ekran' 'kalibrasyon') 'tık içinde gelen komut kabul edildi (sırada)'
+Esit 'uretim' $script:EtkinEkran 'tık içinde komut çalışmadı'
+Esit 1 $script:KomutKuyrugu.Count 'komut sırada'
+# korumalı bloğun içinden iç içe gelen tık hiçbir şey çalıştırmaz (açılış / uzak / manuel / sıra)
+$script:TikSonraki = 'makro'
+Zamanlayici-Tik
+Esit 'makro' $script:TikSonraki 'iç içe tık açılış/makro işini başlatmadı'
+Esit 1 $script:KomutKuyrugu.Count 'iç içe tık sırayı boşaltmadı'
+# iş sonu hata penceresi (Ilerleme-Guncelle -> Ui-Kutu Error) tık içinde ertelenir
+$script:UiKayit.Clear()
+[void](Ui-Kutu "Deneme hata.`r`n`r`nRESET'e bas." 'Deneme hatası' 'OK' 'Error')
+Dogru (-not (($script:UiKayit -join "`n") -match 'HATA \[Deneme hatası\]')) 'tık içinde hata penceresi açılmadı (ertelendi)'
+Esit 1 $script:TikSonrasiKutular.Count 'pencere sırada'
+# ACİL STOP ve DURDUR sırayı beklemez
+Esit $true (Komut-Isle 'acilstop' '') 'tık içinde ACİL STOP'
+Dogru ([Eding]::AcilKilit) 'ACİL STOP sırayı beklemeden kilitledi'
+Esit 1 $script:KomutKuyrugu.Count 'ACİL STOP sıraya girmedi'
+$r = Komut-Isle 'is.durdur' ''
+Dogru ($r -ne $true -or $script:KomutKuyrugu.Count -eq 1) 'tık içinde DURDUR hemen işlendi (sıraya girmedi)' "$r"
+Esit 1 $script:KomutKuyrugu.Count 'DURDUR sıraya girmedi'
+$script:TikMesgul = $false; $script:TikSonraki = ''
+Tik 1
+Esit 'kalibrasyon' $script:EtkinEkran 'koruma bırakılınca sıradaki komut çalıştı'
+Esit 0 $script:KomutKuyrugu.Count 'sıra boş'
+Dogru (($script:UiKayit -join "`n") -match 'HATA \[Deneme hatası\] Deneme hata\.') 'ertelenen hata penceresi koruma bırakılınca gösterildi'
+Esit 0 $script:TikSonrasiKutular.Count 'pencere sırası boş'
+$script:SahteOnay = $true; [void](Komut-Isle 'acilstop.kaldir' ''); Dogru (-not [Eding]::AcilKilit) 'ACİL STOP kaldırıldı'
+# eski komut (3 sn'den fazla beklemiş) çalıştırılmaz
+$script:TikMesgul = $true; [void](Komut-Isle 'ekran' 'ayarlar'); $script:TikMesgul = $false
+$script:KomutKuyrugu[0].Zaman = (Get-Date).AddSeconds(-10)
+$script:UiKayit.Clear(); Tik 1
+Esit 'kalibrasyon' $script:EtkinEkran 'zaman aşımına uğrayan komut çalışmadı'
+Dogru (($script:UiKayit -join "`n") -match 'zamanında işlenemedi') 'zaman aşımı bildirildi'
+$script:EtkinEkran = 'uretim'
+# SK-09: panelden bir işlem sürerken DURDUR çalışır, başka komut reddedilir
+[void](Bekle-Kosul { Okuma-Yap; -not $script:Hizli.Calisiyor } 10)
+[Eding]::SimHizCarpani = 1.0
+[void][Eding]::CncRunSingleLine('G91 G1 X20 F60')
+Dogru (Bekle-Kosul { Okuma-Yap; $script:Hizli.Calisiyor } 5) 'uzun hareket başladı'
+$script:IslemSuruyor = $true; $script:IslemAdi = 'Deneme işlemi'
+$r = Komut-Isle 'park' ''
+Dogru ("$r" -like 'Önceki işlem sürüyor*') 'işlem sürerken PARK reddedilir' "$r"
+$script:SahteOnay = $true
+$r = Komut-Isle 'is.durdur' ''
+Esit $true $r 'işlem sürerken DURDUR çalıştı (SK-09)'
+Dogru (Bekle-Kosul { Okuma-Yap; -not $script:Hizli.Calisiyor } 5) 'DURDUR hareketi kesti (CncAbortJob)'
+Dogru ($script:IslemSuruyor -and $script:IslemAdi -eq 'Deneme işlemi') 'DURDUR dıştaki işlemin bayrağını bozmadı'
+$script:IslemSuruyor = $false; $script:IslemAdi = ''
+[void][Eding]::CncRunSingleLine('G90'); [void](Komut-Isle 'makine.reset' '')
+[Eding]::SimHizCarpani = 25.0
+
 try { Remove-Item -LiteralPath $kok -Recurse -Force -ErrorAction SilentlyContinue } catch { }
 Ozet 'Denetleyici'

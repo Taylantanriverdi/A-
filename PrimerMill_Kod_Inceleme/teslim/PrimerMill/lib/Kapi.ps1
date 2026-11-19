@@ -47,7 +47,18 @@ function Mesaj-Ekle([string]$metin, [string]$tur = '') {
 # Eski [Kayit]::Show(metin, başlık, düğmeler, simge) karşılığı (taşınan fonksiyonlarda mekanik olarak bu çağrılır).
 # Dönüş eskisi gibi: 'Yes' / 'No' / 'Cancel' / 'OK'. Esc / ACİL STOP / pencere kapandı -> güvenli taraf
 # (YesNo -> 'No', YesNoCancel -> 'Cancel'). Pencere metni ve cevabı kabuk kapısında (Ui-*) günlüğe yazılır.
+# SK-01: ana zamanlayıcının korumalı bloğundan (TikMesgul) açılan bilgi/hata pencereleri ertelenir (cevabı yok: 'OK');
+# Denetleyici Tik-Sonrasi-Calistir koruma bırakılınca gösterir. Soru pencereleri ertelenemez (cevap gerekir): günlüğe uyarı.
+$script:TikSonrasiKutular = New-Object System.Collections.Generic.List[object]
 function Ui-Kutu([string]$metin, [string]$baslik, [string]$dugme = 'OK', [string]$simge = 'Information') {
+    if ($script:TikMesgul) {
+        if ($dugme -ne 'YesNo' -and $dugme -ne 'YesNoCancel') {
+            $script:TikSonrasiKutular.Add(@{ Metin = $metin; Baslik = $baslik; Dugme = $dugme; Simge = $simge })
+            [Kayit]::Yaz("PENCERE ERTELENDİ [$baslik] (zamanlayıcıdan sonra gösterilecek)")
+            return 'OK'
+        }
+        [Kayit]::Yaz("UYARI: zamanlayıcı içinden soru penceresi [$baslik]")
+    }
     if ($dugme -eq 'YesNo') {
         if (Ui-Onay $baslik $metin) { return 'Yes' }
         return 'No'
