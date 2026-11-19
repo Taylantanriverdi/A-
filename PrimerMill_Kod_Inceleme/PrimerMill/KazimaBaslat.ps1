@@ -1301,7 +1301,8 @@ function Eding-Exe-Bul {
     $dlg.Title = 'Eding CNC programını seç (bir kez sorulur)'
     $dlg.Filter = 'Programlar (*.exe)|*.exe'
     $dlg.InitialDirectory = $EdingKlasor
-    if ($dlg.ShowDialog($form) -eq 'OK') { return $dlg.FileName }
+    $script:ModalSayac++; try { $sn = $dlg.ShowDialog($form) } finally { $script:ModalSayac-- }
+    if ($sn -eq 'OK') { return $dlg.FileName }
     return $null
 }
 
@@ -1443,7 +1444,10 @@ using System.Windows.Forms;
 public class UzakIstek {
     public string Ad, Arg, Ip, Sonuc;
     public ManualResetEvent Bitti = new ManualResetEvent(false);
+    public DateTime Zaman = DateTime.Now;   // UZ-08: bekleme süresini aşan istek geç çalıştırılmaz
+    public volatile bool Iptal;
 }
+class PinDeneme { public int Yanlis; public DateTime Kilit = DateTime.MinValue; }
 public static class WebSunucu {
     public static string Pin = "";
     public static string SayfaYolu = "";
@@ -1456,14 +1460,15 @@ public static class WebSunucu {
     static volatile bool calis;
     static readonly Queue<UzakIstek> kuyruk = new Queue<UzakIstek>();
     public static DateTime SonUzakGirdi = DateTime.MinValue;
+    // UZ-05: panel her saniye günceller. İş sürerken / duraklıyken yükleme yok; seçili iş dosyasının üstüne yazılmaz.
+    public static volatile bool YuklemeKilit = false;
+    public static volatile string SeciliAd = "";
+    // UZ-03: IP başına yanlış PIN sayacı (5 yanlış -> 60 sn kilit)
+    static readonly Dictionary<string, PinDeneme> denemeler = new Dictionary<string, PinDeneme>();
+    const int KuyrukOmruSn = 30;
 
-    // ---- Ekran yansıtma: makinedeki ekranın aynısı (JPEG), tıklama ve tuşlar makineye gider ----
-    [DllImport("user32.dll")] static extern void mouse_event(uint f, int x, int y, uint d, UIntPtr e);
-    [DllImport("user32.dll")] static extern uint SendInput(uint n, INPUT[] i, int size);
-    [StructLayout(LayoutKind.Sequential)] struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr extra; }
-    [StructLayout(LayoutKind.Sequential)] struct MOUSEINPUT { public int dx; public int dy; public uint data; public uint flags; public uint time; public IntPtr extra; }
-    [StructLayout(LayoutKind.Explicit)] struct INPUTU { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; }
-    [StructLayout(LayoutKind.Sequential)] struct INPUT { public uint type; public INPUTU u; }
+    // ---- Ekran yansıtma: makinedeki ekranın aynısı (JPEG), yalnız izleme ----
+    // K4 (UZ-01): uzaktan fare / klavye (tıklama, tuş) kaldırıldı; /api/tikla ve /api/tus 403 döner.
     static readonly object ekranKilit = new object();
     static byte[] sonKare; static DateTime sonKareAni = DateTime.MinValue;
     static ImageCodecInfo jpeg;
@@ -1484,32 +1489,6 @@ public static class WebSunucu {
             sonKareAni = DateTime.Now; return sonKare;
         }
     }
-    public static void Tikla(double nx, double ny) {
-        SonUzakGirdi = DateTime.Now;
-        int ax = (int)Math.Round(Math.Max(0, Math.Min(1, nx)) * 65535), ay = (int)Math.Round(Math.Max(0, Math.Min(1, ny)) * 65535);
-        mouse_event(0x8001, ax, ay, 0, UIntPtr.Zero);            // MOVE | ABSOLUTE
-        Thread.Sleep(30);
-        mouse_event(0x8002, ax, ay, 0, UIntPtr.Zero); Thread.Sleep(40);   // LEFTDOWN
-        mouse_event(0x8004, ax, ay, 0, UIntPtr.Zero);            // LEFTUP
-        lock (ekranKilit) sonKare = null;
-    }
-    static void Tus(ushort vk, ushort scan, uint flags) {
-        INPUT[] i = new INPUT[2];
-        i[0].type = 1; i[0].u.ki.wVk = vk; i[0].u.ki.wScan = scan; i[0].u.ki.dwFlags = flags;
-        i[1] = i[0]; i[1].u.ki.dwFlags = flags | 2;  // KEYUP
-        SendInput(2, i, Marshal.SizeOf(typeof(INPUT)));
-    }
-    public static void Yazi(string t, string ozel) {
-        SonUzakGirdi = DateTime.Now;
-        if (!string.IsNullOrEmpty(ozel)) {
-            ushort vk = 0;
-            switch (ozel) { case "Enter": vk = 0x0D; break; case "Backspace": vk = 0x08; break; case "Escape": vk = 0x1B; break; case "Tab": vk = 0x09; break;
-                case "Delete": vk = 0x2E; break; case "ArrowLeft": vk = 0x25; break; case "ArrowRight": vk = 0x27; break; case "ArrowUp": vk = 0x26; break; case "ArrowDown": vk = 0x28; break; }
-            if (vk != 0) Tus(vk, 0, 0);
-        }
-        if (!string.IsNullOrEmpty(t)) foreach (char c in t) Tus(0, c, 4);   // KEYEVENTF_UNICODE
-        lock (ekranKilit) sonKare = null;
-    }
 
     public static bool Baslat(int port) {
         int[] portlar = { port, port + 1, port + 2, port + 3, port + 4, 18080, 28080 };
@@ -1526,7 +1505,47 @@ public static class WebSunucu {
     }
     public static void Durdur() { calis = false; try { if (dinleyici != null) dinleyici.Stop(); } catch { } }
 
-    public static UzakIstek Al() { lock (kuyruk) { return kuyruk.Count > 0 ? kuyruk.Dequeue() : null; } }
+    // UZ-08: süresi dolmuş (ya da istemcisi vazgeçmiş) istekler çalıştırılmadan atılır
+    public static UzakIstek Al() {
+        lock (kuyruk) {
+            while (kuyruk.Count > 0) {
+                UzakIstek i = kuyruk.Dequeue();
+                if (i.Iptal || (DateTime.Now - i.Zaman).TotalSeconds > KuyrukOmruSn) { i.Sonuc = "HATA: Komut zaman asimina ugradi, calistirilmadi"; i.Bitti.Set(); continue; }
+                return i;
+            }
+            return null;
+        }
+    }
+
+    // UZ-04 (DNS rebinding): Host başlığı yalnız IP, localhost ya da bu bilgisayarın adı olabilir
+    static bool HostUygun(string host) {
+        if (string.IsNullOrEmpty(host)) return false;
+        string h = host.Trim();
+        if (h.StartsWith("[")) { int k = h.IndexOf(']'); if (k < 0) return false; h = h.Substring(1, k - 1); }
+        else { int c = h.LastIndexOf(':'); if (c >= 0 && h.IndexOf(':') == c) h = h.Substring(0, c); }
+        IPAddress ipa;
+        if (IPAddress.TryParse(h, out ipa)) return true;
+        if (h.Equals("localhost", StringComparison.OrdinalIgnoreCase)) return true;
+        try { if (h.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase) || h.Equals(Dns.GetHostName(), StringComparison.OrdinalIgnoreCase)) return true; } catch { }
+        return false;
+    }
+    // UZ-03: true = kilitli (429). Doğru PIN sayacı sıfırlar.
+    static bool PinKilitli(string ip) {
+        lock (denemeler) { PinDeneme d; return denemeler.TryGetValue(ip, out d) && d.Kilit > DateTime.Now; }
+    }
+    static void PinSonuc(string ip, bool dogru) {
+        lock (denemeler) {
+            PinDeneme d;
+            if (!denemeler.TryGetValue(ip, out d)) { if (dogru) return; d = new PinDeneme(); denemeler[ip] = d; }
+            if (dogru) { d.Yanlis = 0; return; }
+            d.Yanlis++;
+            if (d.Yanlis >= 5) { d.Yanlis = 0; d.Kilit = DateTime.Now.AddSeconds(60); }
+        }
+    }
+    static bool Ayrilmis(string ad) {
+        return ad.Equals("AKTIF_IS.nc", StringComparison.OrdinalIgnoreCase) || ad.StartsWith("PM_", StringComparison.OrdinalIgnoreCase) ||
+               ad.EndsWith("_devam.nc", StringComparison.OrdinalIgnoreCase);
+    }
 
     public static string[] Adresler() {
         List<string> l = new List<string>();
@@ -1559,10 +1578,11 @@ public static class WebSunucu {
     }
 
     static void Gonder(Stream s, int kod, string tur, byte[] govde) {
-        string durum = kod == 200 ? "OK" : kod == 204 ? "No Content" : kod == 401 ? "Unauthorized" : kod == 404 ? "Not Found" : "Error";
+        string durum = kod == 200 ? "OK" : kod == 204 ? "No Content" : kod == 400 ? "Bad Request" : kod == 401 ? "Unauthorized" : kod == 403 ? "Forbidden" :
+                       kod == 404 ? "Not Found" : kod == 409 ? "Conflict" : kod == 429 ? "Too Many Requests" : kod == 503 ? "Service Unavailable" : "Error";
+        // UZ-04: CORS başlıkları yok (başka sitelerden gelen tarayıcı istekleri cevabı okuyamaz)
         string h = "HTTP/1.1 " + kod + " " + durum + "\r\nContent-Type: " + tur + "\r\nContent-Length: " + govde.Length +
-                   "\r\nCache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Headers: X-Pin, Content-Type\r\n" +
-                   "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Private-Network: true\r\nConnection: close\r\n\r\n";
+                   "\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n";
         byte[] hb = Encoding.ASCII.GetBytes(h);
         s.Write(hb, 0, hb.Length); s.Write(govde, 0, govde.Length); s.Flush();
     }
@@ -1600,7 +1620,9 @@ public static class WebSunucu {
                 long uzunluk = 0; string cl; if (bas.TryGetValue("Content-Length", out cl)) long.TryParse(cl, out uzunluk);
                 string ip = ((IPEndPoint)c.Client.RemoteEndPoint).Address.ToString();
 
-                // Tarayıcı ön kontrolü (başka cihazın portal sayfasından gelen istekler)
+                string host; bas.TryGetValue("Host", out host);
+                if (!HostUygun(host)) { Json(s, 403, "{\"hata\":\"Adres kabul edilmedi (makineye IP adresiyle baglanin)\"}"); return; }
+                // Tarayıcı ön kontrolü: CORS izni verilmez (UZ-04)
                 if (yontem == "OPTIONS") { Gonder(s, 204, "text/plain", new byte[0]); return; }
                 if (yol == "/" || yol == "/index.html" || yol == "/portal" || yol == "/tek") {
                     string ad = yol == "/tek" ? "uzak.html" : "portal.html";
@@ -1609,9 +1631,15 @@ public static class WebSunucu {
                     Gonder(s, 200, "text/html; charset=utf-8", sayfa); return;
                 }
                 if (!yol.StartsWith("/api/")) { Gonder(s, 404, "text/plain", Encoding.ASCII.GetBytes("yok")); return; }
+                // UZ-03: PIN her zaman gerekli (en az 6 hane; panel kısa/boş PIN'i yenisiyle değiştirir). PIN başlıkta (X-PIN);
+                // sorgu parametresi yalnız GET (ekran görüntüsü / durum) için kabul edilir. 5 yanlış -> 60 sn kilit.
+                if (PinKilitli(ip)) { Json(s, 429, "{\"hata\":\"Cok fazla yanlis PIN: 1 dakika bekleyin\"}"); return; }
+                string beklenen = Pin ?? "";
+                if (beklenen.Length < 6) { Json(s, 503, "{\"hata\":\"Makinede uzaktan erisim PIN'i ayarli degil\"}"); return; }
                 string pin; bas.TryGetValue("X-Pin", out pin);
-                if (string.IsNullOrEmpty(pin)) par.TryGetValue("pin", out pin);
-                if (Pin.Length > 0 && pin != Pin) { Json(s, 401, "{\"hata\":\"PIN yanlis\"}"); return; }
+                if (string.IsNullOrEmpty(pin) && yontem == "GET") par.TryGetValue("pin", out pin);
+                if (pin != beklenen) { PinSonuc(ip, false); Json(s, 401, "{\"hata\":\"PIN yanlis\"}"); return; }
+                PinSonuc(ip, true);
 
                 if (yol == "/api/durum") { Json(s, 200, DurumJson); return; }
                 if (yol == "/api/ekran") {
@@ -1619,17 +1647,7 @@ public static class WebSunucu {
                     try { k = Ekran(); } catch (Exception ex) { Json(s, 500, "{\"hata\":\"Ekran alinamadi (makine kilitli olabilir): " + Kacis(ex.Message) + "\"}"); return; }
                     Gonder(s, 200, "image/jpeg", k); return;
                 }
-                if (yol == "/api/tikla" && yontem == "POST") {
-                    string xs, ys; double x, y;
-                    par.TryGetValue("x", out xs); par.TryGetValue("y", out ys);
-                    if (double.TryParse(xs, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out x) &&
-                        double.TryParse(ys, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out y)) Tikla(x, y);
-                    Json(s, 200, "{\"sonuc\":\"OK\"}"); return;
-                }
-                if (yol == "/api/tus" && yontem == "POST") {
-                    string t, o; par.TryGetValue("t", out t); par.TryGetValue("k", out o);
-                    Yazi(t, o); Json(s, 200, "{\"sonuc\":\"OK\"}"); return;
-                }
+                if (yol == "/api/tikla" || yol == "/api/tus") { Json(s, 403, "{\"hata\":\"Uzaktan tıklama kapalı\"}"); return; }   // K4
                 if (yol == "/api/dosyalar") {
                     StringBuilder sb = new StringBuilder("[");
                     if (Directory.Exists(IsKlasor)) {
@@ -1652,6 +1670,10 @@ public static class WebSunucu {
                     ad = Path.GetFileName(ad ?? "");
                     if (!ad.EndsWith(".nc", StringComparison.OrdinalIgnoreCase) || ad.Length < 4) { Json(s, 400, "{\"hata\":\"Sadece .nc dosyasi yuklenebilir\"}"); return; }
                     if (uzunluk <= 0 || uzunluk > 200L * 1024 * 1024) { Json(s, 400, "{\"hata\":\"Dosya bos ya da cok buyuk\"}"); return; }
+                    if (Ayrilmis(ad)) { Json(s, 400, "{\"hata\":\"Bu dosya adi panele ayrilmis (AKTIF_IS, PM_..., ..._devam): dosyanin adini degistirin\"}"); return; }
+                    if (YuklemeKilit) { Json(s, 409, "{\"hata\":\"Makinede is suruyor ya da duraklatilmis: yukleme yapilamaz\"}"); return; }
+                    string secili = SeciliAd ?? "";
+                    if (secili.Length > 0 && ad.Equals(secili, StringComparison.OrdinalIgnoreCase)) { Json(s, 409, "{\"hata\":\"Bu ad makinede secili isin dosyasi: uzerine yazilamaz, adini degistirin\"}"); return; }
                     Directory.CreateDirectory(IsKlasor);
                     string gecici = Path.Combine(IsKlasor, ad + ".yukleniyor");
                     using (FileStream fs = new FileStream(gecici, FileMode.Create)) {
@@ -1669,7 +1691,9 @@ public static class WebSunucu {
                     par.TryGetValue("ad", out ist.Ad); par.TryGetValue("arg", out ist.Arg); ist.Ip = ip;
                     if (ist.Arg == null) ist.Arg = "";
                     lock (kuyruk) kuyruk.Enqueue(ist);
-                    string sonuc = ist.Bitti.WaitOne(45000) ? ist.Sonuc : "HATA: Panel cevap vermedi (makinedeki ekranda bir pencere acik olabilir)";
+                    string sonuc;
+                    if (ist.Bitti.WaitOne(45000)) sonuc = ist.Sonuc;
+                    else { ist.Iptal = true; sonuc = "HATA: Panel cevap vermedi (makinedeki ekranda bir pencere acik olabilir)"; }
                     Json(s, 200, "{\"sonuc\":\"" + Kacis(sonuc) + "\"}"); return;
                 }
                 Gonder(s, 404, "text/plain", Encoding.ASCII.GetBytes("yok"));
@@ -2083,7 +2107,7 @@ function Btn-DosyaSec {
     $dlg = New-Object System.Windows.Forms.OpenFileDialog
     $dlg.Filter = 'NC dosyaları (*.nc)|*.nc|Tüm dosyalar (*.*)|*.*'
     $dlg.Title  = 'Kazınacak .nc dosyasını seç'
-    $sonuc = $dlg.ShowDialog($form)
+    $script:ModalSayac++; try { $sonuc = $dlg.ShowDialog($form) } finally { $script:ModalSayac-- }
     [Kayit]::Yaz("DOSYA SEÇİMİ: $sonuc  $($dlg.FileName)")
     if ($sonuc -ne 'OK') { return }
 
@@ -2856,6 +2880,16 @@ function Macro-Yaz([string]$yol, [string]$metin, $enc, [string]$ne) {
 }
 
 # ================= UZAKTAN ERİŞİM =================
+$script:ModalSayac = 0   # açık dosya seçme penceresi vb. (OpenForms'ta görünmeyen modal pencereler)
+# K3 (GV-06/ED-01/UZ-02): makinede bir pencere / sihirbaz / manuel frez değişimi açıkken uzaktan başlat, seç, blok reddedilir
+function Uzak-Engel {
+    if ([Kayit]::AcikPencere -gt 0 -or $script:ModalSayac -gt 0) { return 'makinede bir mesaj / seçim penceresi açık' }
+    if ($script:ManuelDiyalogAcik) { return 'makinede manuel frez değişimi bekleniyor' }
+    try { if (@([System.Windows.Forms.Application]::OpenForms | Where-Object { $_ -ne $form -and $_.Visible -and $_.Modal }).Count -gt 0) { return 'makinede bir pencere açık' } } catch { }
+    try { if ($ayar.Visible) { return 'makinede Ayarlar penceresi açık' } } catch { }
+    if ($script:ApiHazir -and $script:Bagli) { try { if ($null -ne (Manuel-Istek)) { return 'makinede manuel frez değişimi bekleniyor' } } catch { } }
+    return ''
+}
 function Uzak-Is-Sec([string]$ad) {
     $hedef = [System.IO.Path]::Combine($IsKlasor, [System.IO.Path]::GetFileName($ad))
     if (-not [System.IO.File]::Exists($hedef)) { return "HATA: $ad bulunamadı" }
@@ -2868,9 +2902,14 @@ function Uzak-Is-Sec([string]$ad) {
 }
 function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
     [Kayit]::Yaz("UZAK ($ip): $ad $arg")
+    if (@('baslat', 'sec', 'blok', 'blokiptal') -contains $ad) {
+        $engel = Uzak-Engel
+        if ($engel) { [Kayit]::Yaz("UZAK ($ip): $ad reddedildi: $engel"); return "HATA: Uzaktan yapılamaz: $engel" }
+    }
     switch ($ad) {
         'sec' {
             if ((Is-Suruyor)) { return 'HATA: Kazıma sürerken / duraklıyken iş değiştirilemez' }
+            if ([System.IO.Path]::GetFileName($arg) -like 'PM_kalibrasyon*') { return 'HATA: Kalibrasyon programları uzaktan seçilemez' }   # UZ-05
             Yaz "Uzaktan ($ip) iş seçildi: $arg"
             return (Uzak-Is-Sec $arg)
         }
@@ -2881,10 +2920,9 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
             if ([Eding]::CncGetAllAxesHomed() -eq 0) { return 'HATA: Makine home alınmamış' }
             if ($script:OzelMakro -and $script:RafEksik) { return 'HATA: Takım yuvaları/sensör kayıtlı değil (makinede Ayarlar › Yuva ayarı)' }
             if ($script:TakimBelirsiz) { return 'HATA: Takım durumu belirsiz (değişim yarıda kesildi). Makinede iş milindeki frez bildirilmeli.' }
-            if ((Durakli-Mi)) {
-                Yaz "Uzaktan ($ip): DEVAM"
-                if (Rc-Tamam ([Eding]::CncRunOrResumeJob())) { return 'OK: Devam ediyor' } else { return 'HATA: Devam ettirilemedi' }
-            }
+            # K3: duraklatılmış iş (elle frez değişimi adımı dahil) uzaktan ASLA devam ettirilmez
+            $pz = 0; try { $pz = [Eding]::CncGetPauseStatus() } catch { }
+            if ((Durakli-Mi) -or $pz -ne 0) { return "HATA: Duraklatılmış iş uzaktan devam ettirilemez; makinede DEVAM'a basın" }
             if ((Calisiyor-Mu)) { return 'HATA: Makine zaten çalışıyor' }
             if (-not $script:SeciliDosya) { return 'HATA: Önce bir iş seç' }
             if ($script:Engel) { return 'HATA: Dosyada hata var, başlatılmadı' }
@@ -2941,6 +2979,10 @@ function Uzak-Durum {
         ad = [string]$script:Tercih.MakineAdi; mod = [string]$script:Tercih.FrezModu
     }
     [WebSunucu]::DurumJson = (ConvertTo-Json $o -Compress -Depth 3)
+    # UZ-05: iş sürerken yükleme yok, seçili iş dosyasının üstüne yazılmaz
+    [WebSunucu]::YuklemeKilit = [bool](Is-Suruyor)
+    $sa = ''; try { if ($script:SeciliDosya) { $sa = [System.IO.Path]::GetFileName([string]$script:SeciliDosya) } } catch { }
+    [WebSunucu]::SeciliAd = $sa
 }
 $script:UzakMesgul = $false; $script:UzakSayac = 0
 $uzakZaman = New-Object System.Windows.Forms.Timer
@@ -2967,14 +3009,14 @@ function Uzak-Baslat {
     if ([WebSunucu]::Baslat(8080)) {
         $adr = @([WebSunucu]::Adresler() | ForEach-Object { "http://$($_):$([WebSunucu]::Port)" }) -join '   '
         $script:UzakAdres = $adr
-        Yaz "Uzaktan erişim açık: $adr   (PIN $($script:Tercih.WebPin))"
+        Yaz "Uzaktan erişim açık: $adr   (PIN: Ayarlar › PANEL)"
         $uzakZaman.Start()
     } else { $script:UzakAdres = ''; $script:UzakHata = [WebSunucu]::SonHata; Yaz "Uzaktan erişim açılamadı: $([WebSunucu]::SonHata)" }
     Uzak-Etiket-Guncelle
 }
 function Uzak-Etiket-Guncelle {
     try {
-        $lblUzak.Text = if ($script:Tercih.Uzak -ne '1') { 'Kapalı' } elseif ($script:UzakAdres) { "Adres:  $($script:UzakAdres)`r`nPIN:  $(if ($script:Tercih.WebPin) { $script:Tercih.WebPin } else { 'yok (sorulmaz)' })" } else { "Açılamadı: $($script:UzakHata)`r`nYoneticiKurulum.bat bir kez çalıştırılıp bilgisayar yeniden başlatılmalı" }
+        $lblUzak.Text = if ($script:Tercih.Uzak -ne '1') { 'Kapalı' } elseif ($script:UzakAdres) { "Adres:  $($script:UzakAdres)`r`nPIN:  $($script:Tercih.WebPin)" } else { "Açılamadı: $($script:UzakHata)`r`nYoneticiKurulum.bat bir kez çalıştırılıp bilgisayar yeniden başlatılmalı" }
     } catch { }
 }
 
@@ -3907,7 +3949,16 @@ Tercih-Oku
 if ($script:Sade) { $script:Tercih.ModSor = '0'; $script:Tercih.BlokSor = '0'; $script:Tercih.EdingSifirla = '0' }
 if (-not $script:Tercih.ContainsKey('Uzak')) { $script:Tercih.Uzak = $(if ($script:Sade) { '1' } else { '0' }) }
 if (-not $script:Tercih.ContainsKey('UzakKilit')) { $script:Tercih.UzakKilit = '1' }
-if (-not $script:Tercih.ContainsKey('WebPin')) { $script:Tercih.WebPin = "$(Get-Random -Minimum 1000 -Maximum 9999)"; Tercih-Yaz }
+# UZ-03: uzaktan erişim PIN'i en az 6 hane; boş PIN asla "PIN'siz" demek değildir. Kısa/boşsa rastgele yenisi üretilir.
+function Yeni-Pin {
+    $r = New-Object System.Security.Cryptography.RNGCryptoServiceProvider
+    $b = New-Object byte[] 4; $r.GetBytes($b)
+    return ([BitConverter]::ToUInt32($b, 0) % 900000 + 100000).ToString([System.Globalization.CultureInfo]::InvariantCulture)
+}
+if ([string]$script:Tercih.WebPin -notmatch '^\d{6,8}$') {
+    $script:Tercih.WebPin = Yeni-Pin; Tercih-Yaz
+    [Kayit]::Yaz("UZAK: PIN boş ya da 6 haneden kısaydı, yeni 6 haneli PIN üretildi (Ayarlar › PANEL'de görünür)")
+}
 # Frez değişimi: OTOMATİK (magazin) / MANUEL (frezleri elle takarım) — Ayarlar › PANEL'den bir kez seçilir, kayıtlı kalır
 if (@('OTOMATIK', 'MANUEL') -notcontains [string]$script:Tercih.FrezModu) { $script:Tercih.FrezModu = 'OTOMATIK' }
 $script:Manuel = ($script:Tercih.FrezModu -eq 'MANUEL')
@@ -4370,7 +4421,8 @@ function Ayar-Geri-Yukle {
     if (-not (Hazir-Hareket 'Yedekten yükle')) { return }
     $dlg = New-Object System.Windows.Forms.OpenFileDialog
     $dlg.InitialDirectory = $YedekKlasoru; $dlg.Filter = 'Ayar yedeği (*.txt)|*.txt'
-    if ($dlg.ShowDialog($form) -ne 'OK') { return }
+    $script:ModalSayac++; try { $sn = $dlg.ShowDialog($form) } finally { $script:ModalSayac-- }
+    if ($sn -ne 'OK') { return }
     $d = @{}
     foreach ($l in [System.IO.File]::ReadAllLines($dlg.FileName)) {
         $m = [regex]::Match($l, '^#(\d+)=(-?[0-9.]+)')
@@ -5929,9 +5981,9 @@ $txtPin = A-Kutu 644 536 110
 $txtPin.Text = [string]$script:Tercih.WebPin
 [void](A-Buton 'PIN kaydet' 762 534 130 30 {
     $v = $txtPin.Text.Trim()
-    if ($v -and $v -notmatch '^\d{4,8}$') { [Kayit]::Show('PIN 4–8 rakam olmalı (boş bırakılırsa PIN sorulmaz).', 'PIN', 'OK', 'Warning') | Out-Null; return }
+    if ($v -notmatch '^\d{6,8}$') { [Kayit]::Show('PIN 6–8 rakam olmalı (PIN''siz uzaktan erişim yok).', 'PIN', 'OK', 'Warning') | Out-Null; $txtPin.Text = [string]$script:Tercih.WebPin; return }
     $script:Tercih.WebPin = $v; Tercih-Yaz; [WebSunucu]::Pin = $v; Uzak-Etiket-Guncelle
-    Yaz $(if ($v) { "Uzaktan erişim PIN'i değiştirildi." } else { 'Uzaktan erişim PIN''siz (aynı ağdaki herkes bağlanabilir).' })
+    Yaz "Uzaktan erişim PIN'i değiştirildi."
 })
 Uzak-Etiket-Guncelle
 
