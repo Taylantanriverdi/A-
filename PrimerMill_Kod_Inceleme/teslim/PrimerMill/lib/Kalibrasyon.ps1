@@ -78,7 +78,7 @@ function Yuva-Git {
     $sat = @('G90 G53 G0 Z[#5163]', "G53 G0 A$(Sayi $h.A) B$(Sayi $h.B)", "G53 G0 X$(Sayi $h.X) Y$(Sayi $h.Y)")
     if ($ad -eq 'Değişim' -and $h.Z -and $h.Z -ne 0) { $sat += "G53 G0 Z$(Sayi $h.Z)" }
     $ok = Satirlar-Gonder "$ad noktasına git" $sat 90
-    if ($ok) { $script:YuvaDurumMetni = "İş mili $ad üstünde (en üstte). Şimdi X/Y ile ortala, gerekirse aşağı in." }
+    if ($ok) { $script:SonAyarYuva = $ad; $script:YuvaDurumMetni = "İş mili $ad üstünde (en üstte). Şimdi X/Y ile ortala, gerekirse aşağı in." }
 }
 
 function Yuva-Yaklas {

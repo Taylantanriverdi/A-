@@ -198,7 +198,7 @@ function Zamanlayici-Tik {
     if ($sonraki -and -not $script:IslemSuruyor) {
         $script:TikSonraki = ''
         try {
-            if ($sonraki -eq 'acilis') { Islem-Calistir 'Açılış hazırlığı' { Acilis-Hazirla } }
+            if ($sonraki -eq 'acilis') { Yuva-Hedefi-Unut $true; Islem-Calistir 'Açılış hazırlığı' { Acilis-Hazirla } }
             elseif ($sonraki -eq 'makro') { Islem-Calistir 'Makro denetimi' { Makro-Baslangic-Kontrol } }
         } catch { [Kayit]::Yaz("ZAMANLAYICI ($sonraki): $($_.Exception.Message)") }
     }
@@ -321,6 +321,9 @@ function Komut-Isle([string]$ad, [string]$arg = '', [string]$kaynak = 'yerel') {
     }
     $n = Izin-Neden $ad $arg
     if ($n) { [Kayit]::Yaz("İZİN YOK: $ad $arg -> $n"); Ui-Bildir $n 'Uyari'; return $n }
+    # SK-02: makineye dokunan her komut (hareket etmeyenler listede) son YUVAYA GİT hedefini unutturur; jog yalnız
+    # Takım değişimi sayfasınınkini (Yuva ayarı sihirbazında GİT'ten sonra X/Y/Z ile ortalamak işin parçası)
+    if ($t.Tur -ne 'serbest' -and $script:YuvaKoruyanKomutlar -notcontains $ad) { Yuva-Hedefi-Unut ($ad -ne 'jog') }
     $sonuc = $true
     try {
         if ($t.Tur -eq 'serbest' -or $t.IcIce) { [void](& $t.Is $arg) }
@@ -344,6 +347,39 @@ function Yuva-Adi([string]$ad) {
     return $a
 }
 function Normal-Onay([string]$baslik, [string]$metin) { return [bool](Ui-Onay $baslik $metin) }
+
+# ------------------------------------------------------------------ SK-02: YAKLAŞ hedefi (MAKİNEDE DOĞRULA)
+# YAKLAŞ iş milini O ANKİ X/Y'de yaklaşma yüksekliğine indirir. Yalnız seçili yuva = son YUVAYA GİT yapılan yuva ise
+# ve o GİT'ten sonra başka hareket olmadıysa izin verilir. Takım değişimi sayfası: komut listesine ek olarak makine konumu
+# GİT bittiği andakiyle aynı olmalı (Eding'den / dışarıdan yapılan hareket de yakalanır). Yuva ayarı sihirbazı: jog serbest.
+$script:SonYuvaKonum = $null   # Yuvaya-Git bitince makine konumu (X, Y, Z, A, B)
+$script:SonAyarYuva = $null    # Yuva ayarı sihirbazında (ve MANUEL noktasında) son GİT yapılan nokta (Yuva-Git atar)
+$script:YuvaKoruyanKomutlar = @('yuva.git', 'yuva.yaklas', 'pens.ac', 'pens.kapat', 'hava.ufle', 'ismili.calistir', 'ismili.durdur',
+    'sogutma.m7', 'sogutma.m8', 'sogutma.kapat', 'yuva.al', 'yuva.kaydet', 'degisken.oku', 'yedek.al', 'hiz.azalt', 'hiz.artir', 'hiz.normal')
+function Yuva-Hedefi-Unut([bool]$ayarDa = $true) {
+    $script:SonYuva = $null; $script:SonYuvaKonum = $null
+    if ($ayarDa) { $script:SonAyarYuva = $null }
+}
+function Makine-Konum {
+    try { $m = [Eding]::MachinePos(); return @([double]$m.X, [double]$m.Y, [double]$m.Z, [double]$m.A, [double]$m.B) } catch { return $null }
+}
+function Yuva-Gorunen-Adi([string]$ad) { switch ($ad) { 'Sensör' { return 'SENSÖR' } 'Değişim' { return 'MANUEL' } default { return $ad } } }
+# '' = YAKLAŞ yapılabilir; değilse Türkçe neden
+function Yaklas-Neden([string]$ad, [bool]$ayar) {
+    $g = Yuva-Gorunen-Adi $ad
+    $son = $(if ($ayar) { $script:SonAyarYuva } else { $script:SonYuva })
+    if (-not $ad -or -not $son -or $son -ne $ad) {
+        return "Önce bu yuvaya GİT: $g.`r`nYAKLAŞ iş milini olduğu yerde indirir; yalnız son YUVAYA GİT yapılan yuvada ve araya başka hareket (jog, park, temizlik, home, takım değişimi, MDI, iş) girmeden çalışır." +
+            $(if ($son) { "`r`nSon GİT yapılan: $(Yuva-Gorunen-Adi $son)" } else { '' })
+    }
+    if ($ayar) { return '' }
+    $k = Makine-Konum; $s = $script:SonYuvaKonum
+    if ($null -eq $k -or $null -eq $s) { return "Önce bu yuvaya GİT: $g.`r`nMakine konumu okunamadı." }
+    for ($i = 0; $i -lt 5; $i++) {
+        if ([math]::Abs($k[$i] - $s[$i]) -gt 0.05) { return "Önce bu yuvaya GİT: $g.`r`nSon YUVAYA GİT'ten sonra makine hareket etti (iş mili artık $g üstünde olmayabilir)." }
+    }
+    return ''
+}
 
 # Tercih anahtarları (Ayarlar ve sihirbaz kutuları). Eski pencere kutularının olaylarındaki kod aynen.
 function Tercih-Kaydet([string]$arg) {
@@ -522,14 +558,21 @@ Komut-Tanimla 'yuva.git' 'hareket' {
     if (@('T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'Sensör', 'Değişim') -notcontains $ad) { Ui-Bildir "Geçersiz yuva: $a" 'Uyari'; return }
     # TASARIM §6: eksen hareketi tehlikeli onay (eski panelde soru yoktu)
     if (-not (Ui-Tehlikeli-Onay 'Yuvaya git' "İş mili önce en üste çıkacak, sonra $ad noktasının üstüne gidecek (frezeye dokunmaz).`r`nDevam?" $null $null $null)) { return }
+    Yuva-Hedefi-Unut $true
     if (([string]$a) -like 'ayar:*' -or $ad -eq 'Değişim') { $script:YuvaSecili = $ad; Yuva-Git }   # Yuva ayarı sihirbazı: kaydedilmemiş yeni değerlerle
-    else { Yuvaya-Git $ad }                                                                         # Takım değişimi sayfası (eski TAKIM sekmesi)
+    else {                                                                                          # Takım değişimi sayfası (eski TAKIM sekmesi)
+        Yuvaya-Git $ad
+        if ($script:SonYuva -eq $ad) { $script:SonYuvaKonum = Makine-Konum }   # SK-02: YAKLAŞ yalnız bu konumda
+    }
     try { Yuva-Liste-Yenile } catch { }
 }
 Komut-Tanimla 'yuva.yaklas' 'hareket' {
     param($a)
     $ad = Yuva-Adi $a
-    if (([string]$a) -like 'ayar:*' -or $ad -eq 'Değişim') { $script:YuvaSecili = $ad; Yuva-Yaklas } else { Yuvaya-Yaklas }
+    $ayar = (([string]$a) -like 'ayar:*' -or $ad -eq 'Değişim')
+    $n = Yaklas-Neden $ad $ayar   # SK-02
+    if ($n) { [Kayit]::Yaz("YAKLAŞ REDDİ: '$a' (son GİT: $(if ($ayar) { $script:SonAyarYuva } else { $script:SonYuva }))"); (Ui-Kutu $n 'Yaklaş' 'OK' 'Warning') | Out-Null; return }
+    if ($ayar) { $script:YuvaSecili = $ad; Yuva-Yaklas } else { Yuvaya-Yaklas }
 }
 Komut-Tanimla 'eksen.yukari' 'hareket' { if (Normal-Onay 'Yukarı' "İş mili en üste (Z makine sınırı) çıkacak.`r`nDevam?") { Yukari-Kaldir } }
 Komut-Tanimla 'pens.ac' 'hareket' { Btn-Pens-Ac }

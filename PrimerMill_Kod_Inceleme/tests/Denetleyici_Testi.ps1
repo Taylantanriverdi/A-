@@ -258,5 +258,64 @@ Esit $once4000 ([Eding]::CncGetVariable(4000)) 'Z alma: vazgeçince yazılmaz'
 $script:SahteOnay = $true
 Dogru ((Neden 'kal.disk.uygula') -like 'Önce*HESAPLA*') 'hesaplanmadan disk UYGULA pasif'
 
+# ------------------------------------------------------------------ 7) SK-02: YAKLAŞ yalnız son GİT yapılan yuvada, araya hareket girmeden
+Bolum 'YAKLAŞ hedefi (SK-02)'
+[Eding]::SimHizCarpani = 25.0
+[void](Bekle-Kosul { Okuma-Yap; -not $script:Hizli.Calisiyor } 10)
+function Yaklas-Dene([string]$arg) {
+    $script:UiKayit.Clear(); $script:SahteOnay = $false
+    [void](Komut-Isle 'yuva.yaklas' $arg)
+    $script:SahteOnay = $true
+    $k = ($script:UiKayit -join "`n")
+    return @{ Red = ($k -match 'Önce bu yuvaya GİT'); Gecti = ($k -match 'TEHLIKELI \[Yaklaş\]|freze varken'); Metin = $k }
+}
+Yuva-Hedefi-Unut $true
+$r = Yaklas-Dene 'T5'
+Dogru ($r.Red -and -not $r.Gecti) 'GİT yapılmadan YAKLAŞ T5 reddedilir' $r.Metin
+Esit $true (Komut-Isle 'yuva.git' 'T2') 'YUVAYA GİT T2'
+Esit 'T2' $script:SonYuva 'SonYuva = T2'
+Dogru ($null -ne $script:SonYuvaKonum) 'GİT sonrası konum kaydedildi'
+$zOnce = (Makine-Konum)[2]
+$r = Yaklas-Dene 'T5'
+Dogru ($r.Red -and -not $r.Gecti -and $r.Metin -match 'T5') 'T2''ye GİT, T5 seçili: YAKLAŞ reddedilir (Önce bu yuvaya GİT: T5)' $r.Metin
+Yakin $zOnce (Makine-Konum)[2] 0.5 'reddedilen YAKLAŞ Z''yi indirmedi' 
+$r = Yaklas-Dene 'T2'
+Dogru ($r.Gecti -and -not $r.Red) 'aynı yuva, araya hareket yok: YAKLAŞ onaya gelir' $r.Metin
+[void](Komut-Isle 'jog' 'X+|1|300')
+Dogru ($null -eq $script:SonYuva) 'jog SonYuva''yı unutturur'
+$r = Yaklas-Dene 'T2'
+Dogru ($r.Red) 'jog sonrası YAKLAŞ T2 reddedilir' $r.Metin
+[void](Komut-Isle 'yuva.git' 'T2')
+[void][Eding]::CncRunSingleLine('G91 G0 X1'); [void][Eding]::CncRunSingleLine('G90')
+[void](Bekle-Kosul { Okuma-Yap; -not $script:Hizli.Calisiyor } 10)
+$r = Yaklas-Dene 'T2'
+Dogru ($r.Red -and $r.Metin -match 'hareket etti') 'GİT''ten sonra dışarıdan hareket (konum değişti): YAKLAŞ reddedilir' $r.Metin
+[void](Komut-Isle 'yuva.git' 'T2')
+foreach ($k in @('park', 'temizlik', 'home', 'mdi.gonder', 'konum.koldz', 'takim.degistir', 'eksen.yukari', 'is.baslat')) {
+    $script:SonYuva = 'T2'; $script:SonAyarYuva = 'T3'
+    $script:SahteOnay = $false; [void](Komut-Isle $k ''); $script:SahteOnay = $true
+    Dogru ($null -eq $script:SonYuva -and $null -eq $script:SonAyarYuva) "'$k' YAKLAŞ hedefini unutturur"
+}
+[void](Komut-Isle 'is.durdur' '')
+Dogru (Bekle-Kosul { Okuma-Yap; -not $script:Hizli.Calisiyor -and -not $script:IsAktif } 15) 'başlatılan iş durduruldu'
+[void](Komut-Isle 'makine.reset' '')
+$script:SonYuva = 'T2'; [void](Komut-Isle 'pens.kapat' '')
+Esit 'T2' $script:SonYuva 'pens kapat (eksen hareketi yok) hedefi korur'
+# Yuva ayarı sihirbazı: jog serbest (ortalama), başka hareket ve farklı nokta reddedilir
+Yuva-Hedefi-Unut $true
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Red) 'sihirbazda GİT yapılmadan YAKLAŞ reddedilir' $r.Metin
+Esit $true (Komut-Isle 'yuva.git' 'ayar:T3') 'sihirbaz YUVAYA GİT T3'
+Esit 'T3' $script:SonAyarYuva 'SonAyarYuva = T3'
+[void](Komut-Isle 'jog' 'X+|0.1|300')
+Esit 'T3' $script:SonAyarYuva 'sihirbazda jog hedefi korur (ortalama)'
+$r = Yaklas-Dene 'ayar:T4'
+Dogru ($r.Red -and $r.Metin -match 'T4') 'sihirbaz: T3''e GİT, T4 seçili: YAKLAŞ reddedilir' $r.Metin
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Gecti -and -not $r.Red) 'sihirbaz: aynı nokta, yalnız jog: YAKLAŞ onaya gelir' $r.Metin
+$script:SahteOnay = $false; [void](Komut-Isle 'park' ''); $script:SahteOnay = $true
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Red) 'sihirbaz: park sonrası YAKLAŞ reddedilir' $r.Metin
+
 try { Remove-Item -LiteralPath $kok -Recurse -Force -ErrorAction SilentlyContinue } catch { }
 Ozet 'Denetleyici'

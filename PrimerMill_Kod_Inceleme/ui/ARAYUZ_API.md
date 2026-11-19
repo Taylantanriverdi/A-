@@ -97,7 +97,7 @@ Kalan kartında dosya uyarı/hata sayısı (`⚠ 2 UYARI`) dokunulunca görünü
 | `takim.asinma` | — | AŞINMA KONTROLÜ (M100) | Normal |
 | `takim.bosmu` | — | İŞ MİLİ BOŞ MU? | Normal |
 | `yuva.git` | `T1`…`T6`, `SENSÖR`, `MANUEL`; Yuva ayarı sayfasından `ayar:` önekiyle (`ayar:T3`) | YUVAYA GİT, Yuva ayarı › GİT | **Tehlikeli** (hareket). Önek yok: eski TAKIM sekmesi (`Yuvaya-Git`), `ayar:`: yuva ayarı sihirbazı (`Yuva-Git`, kaydedilmemiş yeni değerlerle) |
-| `yuva.yaklas` | aynı | YAKLAŞ (#4001) | **Tehlikeli** |
+| `yuva.yaklas` | aynı | YAKLAŞ (#4001) | **Tehlikeli**. Denetleyici argümanı denetler (SK-02): seçili yuva son YUVAYA GİT yapılan yuva değilse ya da o GİT'ten sonra başka hareket olduysa (Takım değişimi sayfasında konum da karşılaştırılır; sihirbazda jog serbest) "Önce bu yuvaya GİT" ile reddeder |
 | `eksen.yukari` | — | YUKARI / İŞ MİLİ EN ÜSTE | Normal |
 | `pens.ac` | — | PENS AÇ (her yerde kırmızı çerçeveli) | **Tehlikeli** (KU-01) |
 | `pens.kapat` | — | PENS KAPAT | yok |

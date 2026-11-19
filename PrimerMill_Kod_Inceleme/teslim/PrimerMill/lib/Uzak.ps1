@@ -124,6 +124,7 @@ function Uzak-Tik {
     try {
         $ist = [WebSunucu]::Al()
         if ($ist) {
+            Yuva-Hedefi-Unut $true   # SK-02: uzaktan komut (iş başlatma vb.) sonrası YAKLAŞ için yeniden YUVAYA GİT
             try { $ist.Sonuc = Uzak-Komut $ist.Ad $ist.Arg $ist.Ip } catch { $ist.Sonuc = "HATA: $($_.Exception.Message)" }
             finally { [void]$ist.Bitti.Set() }
             Uzak-Cihaz-Ekle $ist.Ip "$($ist.Ad) $($ist.Arg)".Trim() $ist.Sonuc

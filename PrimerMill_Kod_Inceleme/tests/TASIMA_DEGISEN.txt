@@ -57,7 +57,7 @@ Ayar-Geri-Yukle | DEGISTI | OpenFileDialog -> dokunmatik liste (Yedek-Dosyasi-Se
 Eding-Goster | DEGISTI | $form.TopMost -> Ui-Ustte
 Eding-Gizle | DEGISTI | $form.TopMost -> Ui-Ustte
 Yuva-Liste-Yenile | DEGISTI | ListView yerine $script:YuvaListesi (MakineDurumu.Yuvalar)
-Yuva-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
+Yuva-Git | DEGISTI | etiket -> $script:YuvaDurumMetni; başarılıysa $script:SonAyarYuva (SK-02: YAKLAŞ hedef denetimi)
 Yuva-Yaklas | DEGISTI | Onay -> Ui-Tehlikeli-Onay; etiket -> durum değişkeni
 Yuva-Al | DEGISTI | onay kutusu ($chkYuvaZ) yerine $script:YuvaZ (yuva.zal); etiket -> durum değişkeni
 Yuva-Kaydet | DEGISTI | Onay + yedek -> Yedekli-Onay
