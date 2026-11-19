@@ -227,6 +227,9 @@ sub change_tool
 		if [[#5011] > 6 ]
 			errmsg "error please select a tool from 1 to 6."
 		else
+			;PrimerMill (MC-03): yuva degiskenleri ve Z sirasi hareketten once denetlenir
+			gosub pm_yuva_kontrol
+
 			;Drop current tool
 			g53 g90 g0 z[#5163]
 			g53 g90 g0 a[#5224] b[#5225]
@@ -337,6 +340,55 @@ EndSub
 sub sensor_check
 	if [[#4020 == 0] or [#4021 == 0]]
 		errmsg "error tool sensor not set (#4020 #4021): PrimerMill > Ayarlar > KALIBRASYON"
+	endif
+endsub
+
+;PrimerMill (MC-03): otomatik degisimde kullanilacak yuvalarin degiskenleri dolu mu, Z sirasi dogru mu
+;  sadece denetim, hareket yok; hata varsa errmsg ile hareketten once durur
+;  #4018 (yuva B) denetlenmez: 0 gecerli bir deger (panel varsayilani B 0.0)
+sub pm_yuva_kontrol
+	if [#4010 == 0]
+		errmsg "error tool rack X not set (#4010): PrimerMill > Ayarlar > YUVA AYARI"
+	endif
+	if [#4017 == 0]
+		errmsg "error tool rack A not set (#4017): PrimerMill > Ayarlar > YUVA AYARI"
+	endif
+	if [#4011 == 0]
+		if [[#5008 == 1] or [#5011 == 1]]
+			errmsg "error T1 rack Y not set (#4011): PrimerMill > Ayarlar > YUVA AYARI"
+		endif
+	endif
+	if [#4012 == 0]
+		if [[#5008 == 2] or [#5011 == 2]]
+			errmsg "error T2 rack Y not set (#4012): PrimerMill > Ayarlar > YUVA AYARI"
+		endif
+	endif
+	if [#4013 == 0]
+		if [[#5008 == 3] or [#5011 == 3]]
+			errmsg "error T3 rack Y not set (#4013): PrimerMill > Ayarlar > YUVA AYARI"
+		endif
+	endif
+	if [#4014 == 0]
+		if [[#5008 == 4] or [#5011 == 4]]
+			errmsg "error T4 rack Y not set (#4014): PrimerMill > Ayarlar > YUVA AYARI"
+		endif
+	endif
+	if [#4015 == 0]
+		if [[#5008 == 5] or [#5011 == 5]]
+			errmsg "error T5 rack Y not set (#4015): PrimerMill > Ayarlar > YUVA AYARI"
+		endif
+	endif
+	if [#4016 == 0]
+		if [[#5008 == 6] or [#5011 == 6]]
+			errmsg "error T6 rack Y not set (#4016): PrimerMill > Ayarlar > YUVA AYARI"
+		endif
+	endif
+	;alma Z (#4000) yaklasma Z (#4001) altinda, yaklasma Z guvenli Z (#5163) altinda olmali
+	if [[#4000 > #4001] or [#4000 == #4001]]
+		errmsg "error rack Z order wrong: pick Z #4000 must be below approach Z #4001"
+	endif
+	if [[#4001 > #5163] or [#4001 == #5163]]
+		errmsg "error rack Z order wrong: approach Z #4001 must be below safe Z #5163"
 	endif
 endsub
 
