@@ -1943,19 +1943,25 @@ function Komut-Sonucu([string]$ad, [int]$rc) {
     return $false
 }
 
+# ED-02: durum okunamazsa ('' = bağlantı koptu / API hatası), Eding hata verirse ya da süre dolarsa $false döner;
+# "bitti" yalnız Eding açıkça meşgul değil ve hatasız durumdayken sayılır. Güvenlik kararı veren her çağıran $false'ta durmalı.
 function Hareket-Bitene-Kadar-Bekle([int]$saniye) {
     $son = (Get-Date).AddSeconds($saniye)
     Start-Sleep -Milliseconds 400
     while ((Get-Date) -lt $son) {
         [System.Windows.Forms.Application]::DoEvents()
-        if (-not (Calisiyor-Mu)) {
+        $d = Eding-Durum
+        if ($d -eq '') { Yaz 'Eding durumu okunamadı (bağlantı koptu?): hareket bitti sayılmadı.'; return $false }
+        if (-not (Mesgul $d)) {
             Start-Sleep -Milliseconds 200
             $d = Eding-Durum
+            if ($d -eq '') { Yaz 'Eding durumu okunamadı (bağlantı koptu?): hareket bitti sayılmadı.'; return $false }
             if (Hatali $d) { Yaz "Eding hata verdi ($d). Açıklaması Eding penceresinin mesaj kısmında."; return $false }
-            return $true
+            if (-not (Mesgul $d)) { return $true }
         }
         Start-Sleep -Milliseconds 200
     }
+    [Kayit]::Yaz("BEKLEME: $saniye sn içinde hareket bitmedi (durum $(Eding-Durum))")
     return $false
 }
 
@@ -3409,13 +3415,13 @@ function Btn-Temizlik {
         if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Z hareketi bitmedi, kol döndürülmedi.'; return }
         if (-not $script:TemizlikDuz) {
             if (Komut-Sonucu 'Kol yatay' ([Eding]::CncRunSingleLine('G53 G0 A[#5224] B[#5225]'))) {
-                [void](Hareket-Bitene-Kadar-Bekle 30)
+                if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Kol hareketi bitmedi ya da durum okunamadı.'; return }
                 $script:TemizlikDuz = $true; $btnTemizlik.Text = 'PARK'
                 Yaz 'Temizlik: kol yatay. Bitince PARK''a bas.'
             }
         } else {
             if (Komut-Sonucu 'Park konumu (G30)' ([Eding]::CncRunSingleLine('G30'))) {
-                [void](Hareket-Bitene-Kadar-Bekle 60)
+                if (-not (Hareket-Bitene-Kadar-Bekle 60)) { Yaz 'Park hareketi bitmedi ya da durum okunamadı.'; return }
                 $script:TemizlikDuz = $false; $btnTemizlik.Text = 'TEMİZLİK'
                 Yaz 'Park konumuna dönüldü.'
             }
@@ -4105,9 +4111,10 @@ function G54-Ureticiye-Don {
     if (-not (Onay $m 'Üretici kalibrasyonu')) { return }
     Ayar-Yedekle $true
     $ok = Komut-Sonucu 'G54 üretici' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $UreticiG54.X) Y$(Sayi $UreticiG54.Y) Z$(Sayi $UreticiG54.Z) A$(Sayi $UreticiG54.A) B$(Sayi $UreticiG54.B)"))
-    if ($ok) { [void](Hareket-Bitene-Kadar-Bekle 5); $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')) }
+    if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
+    if ($ok) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')) }
+    if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
     if ($ok) {
-        [void](Hareket-Bitene-Kadar-Bekle 5)
         $sx = $UreticiG54.X - 72.25; $sy = $UreticiG54.Y
         if (Onay "Frez boyu sensörü de üreticinin konumuna dönsün mü?`r`n(X $(Sayi $sx)  Y $(Sayi $sy), şu an X $(Sayi ([Eding]::CncGetVariable(4020)))  Y $(Sayi ([Eding]::CncGetVariable(4021))))`r`n`r`nSensör ölçümü G54 A açısında yapıldığı için üretici A ile birlikte önerilir." 'Üretici kalibrasyonu') {
             $ok = (Degisken-Yaz 4020 $sx) -and (Degisken-Yaz 4021 $sy)
@@ -4910,8 +4917,8 @@ function Kal-Uygula {
     if (-not (Onay $m 'Disk kalibrasyonu')) { return }
     Ayar-Yedekle $true
     $ok = $true
-    if ($g92.Count) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { [void](Hareket-Bitene-Kadar-Bekle 5) } }
-    if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { [void](Hareket-Bitene-Kadar-Bekle 5) } }
+    if ($g92.Count) { $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
+    if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
     if ($ok) { $ok = Degisken-Yaz 4002 $r.P4002 }
     try {
         if (-not [System.IO.File]::Exists($KalGecmis)) {
@@ -5456,8 +5463,8 @@ function OtoKal-Uygula {
     if (-not (Onay $m 'Otomatik kalibrasyon')) { return }
     if ($r.Buyuk -and -not (Onay "Sonuç beklenenden büyük ya da ölçüm güvenilmez görünüyor.`r`nYine de kaydedilsin mi? (Yanlışsa: KALİBRASYON > Yedekten yükle)" 'Otomatik kalibrasyon')) { return }
     Ayar-Yedekle $true
-    $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { [void](Hareket-Bitene-Kadar-Bekle 5) }
-    if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { [void](Hareket-Bitene-Kadar-Bekle 5) } }
+    $ok = Komut-Sonucu 'G92 sıfırla' ([Eding]::CncRunSingleLine('G92.1')); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 }
+    if ($ok) { $ok = Komut-Sonucu 'G54' ([Eding]::CncRunSingleLine("G10 L2 P1 X$(Sayi $r.X) Y$(Sayi $r.Y) A$(Sayi $r.A) B$(Sayi $r.B)")); if ($ok) { $ok = Hareket-Bitene-Kadar-Bekle 5 } }
     if ($ok) { $ok = Degisken-Yaz 4002 $r.P4002 }
     if ($ok) { [void](Degisken-Yaz 4100 0) }
     try {
