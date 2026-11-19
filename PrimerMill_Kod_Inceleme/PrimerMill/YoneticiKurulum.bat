@@ -13,6 +13,13 @@ if errorlevel 1 (
 ) else (
   echo Tamam: Windows acilinca PrimerMill yonetici olarak baslayacak.
 )
+rem PS-01: schtasks gorevi varsayilan olarak 72 saat sonra durdurur; sure siniri kaldirilir (PT0S)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$t = Get-ScheduledTask -TaskName 'PrimerMill' -ErrorAction Stop; $t.Settings.ExecutionTimeLimit = 'PT0S'; Set-ScheduledTask -InputObject $t -ErrorAction Stop | Out-Null"
+if errorlevel 1 (
+  echo UYARI: gorev sure siniri kaldirilamadi. Gorev Zamanlayici - PrimerMill - Ayarlar: Gorev su kadar uzun calisirsa durdur kutusunu kaldir.
+) else (
+  echo Tamam: gorevin calisma suresi siniri kaldirildi.
+)
 del "%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\PrimerMill.lnk" >nul 2>&1
 netsh advfirewall firewall delete rule name="PrimerMill Uzak" >nul 2>&1
 netsh advfirewall firewall add rule name="PrimerMill Uzak" dir=in action=allow protocol=TCP localport=8080-8084,18080,28080 remoteip=localsubnet profile=any >nul
