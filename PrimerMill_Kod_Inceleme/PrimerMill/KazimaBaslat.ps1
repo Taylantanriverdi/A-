@@ -1074,6 +1074,8 @@ public class NcAnaliz {
     static readonly Regex Tok = new Regex(@"([A-Z])\s*(-?\d*\.?\d+)", RegexOptions.Compiled);
     static readonly Regex TakimRx = new Regex(@"T(\d+)\s*M0?6", RegexOptions.Compiled);
     static readonly Regex GosubRx = new Regex(@"GOSUB\s+(\w+)", RegexOptions.Compiled);
+    // KD-01: virgüllü ondalık (X1,5): Tok "X1" okur, ",5" kaybolur; Eding'in yorumu bilinmiyor -> hata (iş başlatılmaz)
+    static readonly Regex VirgulRx = new Regex(@"\d\s*,\s*\d", RegexOptions.Compiled);
 
     public static NcAnaliz Oku(string yol, double hizliMmDk) {
         NcAnaliz a = new NcAnaliz();
@@ -1082,12 +1084,13 @@ public class NcAnaliz {
         List<byte> lf = new List<byte>(1000000);
         float[] mnx = { 1e9f, 1e9f }, mny = { 1e9f, 1e9f }, mxx = { -1e9f, -1e9f }, mxy = { -1e9f, -1e9f };
         double x = 0, y = 0, z = 0, A = 0, B = 0, F = 1000, t = 0;
-        int mode = 0; bool rel = false;
+        int mode = 0; bool rel = false; int virgul = 0;
         foreach (string ham in File.ReadLines(yol)) {
             a.Satir++;
             string u = ham.ToUpperInvariant();
             int sc = u.IndexOf(';'); if (sc >= 0) u = u.Substring(0, sc);
             int pr = u.IndexOf('('); if (pr >= 0) u = u.Substring(0, pr);
+            if (u.IndexOf(',') >= 0 && VirgulRx.IsMatch(Regex.Replace(u, "\"[^\"]*\"", ""))) { virgul++; if (virgul <= 5) a.Hatalar.Add("Satır " + a.Satir + ": virgüllü ondalık sayı (nokta olmalı, örn. X1.5): " + ham.Trim()); }
 
             if (u.Contains("GOSUB")) {
                 Match gm = GosubRx.Match(u);
@@ -1139,6 +1142,7 @@ public class NcAnaliz {
             x = nx; y = ny; z = nz; A = nA; B = nB;
             kum.Add(t); lx.Add((float)x); ly.Add((float)y); lz.Add((float)z); lf.Add(face);
         }
+        if (virgul > 5) a.Hatalar.Add("Toplam " + virgul + " satırda virgüllü ondalık sayı var: CAM çıktısının ondalık ayırıcısı nokta olmalı.");
         a.Kumulatif = kum.ToArray();
         a.PX = lx.ToArray(); a.PY = ly.ToArray(); a.PZ = lz.ToArray(); a.PF = lf.ToArray();
         for (int f = 0; f < 2; f++) {
@@ -3100,7 +3104,9 @@ function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
     $fmt = { param($v) ([double]$v).ToString('0.####', $ci) }
     $C = New-Object System.Collections.Generic.List[string]
     $C.Add('%')
-    $C.Add("(PrimerMill DEVAM: $([System.IO.Path]::GetFileName($kaynak)) satir $($son + 1) / $($L.Length), mod $mod)")
+    # KD-04: dosya adındaki ( ) ; ve ASCII dışı karakterler yorumu erken kapatıp kalıntıyı Eding'e kod olarak gönderebilir
+    $adGuvenli = [regex]::Replace([System.IO.Path]::GetFileName($kaynak), '[^A-Za-z0-9_.\- ]', '_')
+    $C.Add("(PrimerMill DEVAM: $adGuvenli satir $($son + 1) / $($L.Length), mod $mod)")
     $C.Add('G0 G17 G40 G49 G54 G80 G90')
     $C.Add('M9'); $C.Add('M5')
     $C.Add('GOSUB Z_SAFE'); $C.Add('GOSUB AZXY_SAFE')
