@@ -1155,17 +1155,19 @@ public class NcAnaliz {
 [Kayit]::Yaz("=== PANEL BAŞLADI ===  Bilgisayar: $env:COMPUTERNAME  Kullanıcı: $env:USERNAME  PowerShell: $($PSVersionTable.PSVersion)  32bit: $([IntPtr]::Size -eq 4)")
 [Kayit]::Yaz("Eding klasörü: $EdingKlasor   Kayıt klasörü: $IsKlasor   Eding bulundu: $MakineBilgisayari")
 $script:HataSayisi = 0
+# ED-10: $Error en fazla 256 kayıt tutar; sayı orada takılınca yeni hatalar hiç loglanmıyordu. Artık her okumadan sonra
+# liste boşaltılır (panelde $Error'ı başka okuyan yok). Sık yoklamalar (Get-Process) -ErrorAction Ignore ile $Error'a yazmaz.
 function Hatalari-Kaydet {
-    if ($global:Error.Count -gt $script:HataSayisi) {
-        $yeni = $global:Error.Count - $script:HataSayisi
-        for ($i = $yeni - 1; $i -ge 0; $i--) {
-            $h = $global:Error[$i]
-            # "işlem bulunamadı" (Get-Process ... SilentlyContinue) zararsız; Windows dili ne olursa olsun atla
-            if ("$($h.FullyQualifiedErrorId)" -like 'NoProcessFoundForGivenName*' -or "$($h.Exception.Message)" -like '*Cannot find a process*') { continue }
-            [Kayit]::Yaz("PROGRAM HATASI: $($h.Exception.Message)  @ $($h.InvocationInfo.PositionMessage)")
-        }
-        $script:HataSayisi = $global:Error.Count
+    $yeni = $global:Error.Count
+    if ($yeni -le 0) { return }
+    for ($i = $yeni - 1; $i -ge 0; $i--) {
+        $h = $global:Error[$i]
+        # "işlem bulunamadı" (Get-Process) zararsız; Windows dili ne olursa olsun atla
+        if ("$($h.FullyQualifiedErrorId)" -like 'NoProcessFoundForGivenName*' -or "$($h.Exception.Message)" -like '*Cannot find a process*') { continue }
+        [Kayit]::Yaz("PROGRAM HATASI: $($h.Exception.Message)  @ $($h.InvocationInfo.PositionMessage)")
     }
+    try { $global:Error.Clear() } catch { }
+    $script:HataSayisi = 0
 }
 
 # ---------------- Eding API (cncapi.dll, stdcall) ----------------
@@ -1293,7 +1295,7 @@ function Eding-Exe-Bul {
     # 2) Eding klasöründe arayüz programını ara (sunucu ve kurulum dosyaları hariç)
     $aday = [System.IO.Path]::Combine($EdingKlasor, 'cnc.exe')
     if ([System.IO.File]::Exists($aday)) { return $aday }
-    $exeler = @(Get-ChildItem -LiteralPath $EdingKlasor -Filter '*.exe' -ErrorAction SilentlyContinue |
+    $exeler = @(Get-ChildItem -LiteralPath $EdingKlasor -Filter '*.exe' -ErrorAction Ignore |
         Where-Object { $_.Name -notmatch '(?i)server|setup|unins|update|install|driver|vcredist|python|notepad' })
     if ($exeler.Count -eq 1) { return $exeler[0].FullName }
     # 3) Bulunamazsa bir kez kullanıcıya sor
@@ -1308,8 +1310,8 @@ function Eding-Exe-Bul {
 
 $script:EdingExeAd = 'cnc'
 try { if ([System.IO.File]::Exists($AyarDosyasi)) { $kx = ([System.IO.File]::ReadAllText($AyarDosyasi)).Trim(); if ($kx) { $script:EdingExeAd = [System.IO.Path]::GetFileNameWithoutExtension($kx) } } } catch { }
-function Eding-Pencere-Acik { return [bool](Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue) }
-function Eding-Sunucu-Acik { return [bool](Get-Process -Name 'CncServer' -ErrorAction SilentlyContinue) }
+function Eding-Pencere-Acik { return [bool](Get-Process -Name $script:EdingExeAd -ErrorAction Ignore) }
+function Eding-Sunucu-Acik { return [bool](Get-Process -Name 'CncServer' -ErrorAction Ignore) }
 
 # Pencere olmadan kalan sunucuyu temizle (önceki oturumdan kalan, POWERUP'ta takılı sunucu)
 function Eding-Temizle {
@@ -1320,7 +1322,7 @@ function Eding-Temizle {
         Yaz 'Eding: geride kalan sunucu kapatılıyor (KillCNC).'
         Start-Process -FilePath $kill -WorkingDirectory $EdingKlasor -Wait -WindowStyle Hidden
     } else {
-        Get-Process -Name 'CncServer' -ErrorAction SilentlyContinue | ForEach-Object { try { $_.Kill() } catch { } }
+        Get-Process -Name 'CncServer' -ErrorAction Ignore | ForEach-Object { try { $_.Kill() } catch { } }
     }
     Start-Sleep -Seconds 1
 }
@@ -1788,7 +1790,7 @@ public static class Pencere {
 
 $script:EdingGosteriliyor = $false
 function Eding-Kapat-Nazik {
-    foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue)) {
+    foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) {
         $n = 0; try { $n = [Pencere]::Kapat($pr.Id) } catch { }
         if ($n -eq 0) { try { $pr.CloseMainWindow() | Out-Null } catch { } }
     }
@@ -1797,7 +1799,7 @@ function Eding-Kapat-Nazik {
 function Eding-Gizle-Tik {
     if ($script:Tercih.EdingGizli -eq '0' -or $script:EdingGosteriliyor) { return }
     try {
-        foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue)) {
+        foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) {
             $n = [Pencere]::Gizle($pr.Id)
             [void][Pencere]::UyarilariOneAl($pr.Id)
             if ($n -gt 0) {
@@ -1857,7 +1859,7 @@ function Acilis-Eding-Sifirla {
         Eding-Kapat-Nazik
         $son = (Get-Date).AddSeconds(10)
         while ((Eding-Pencere-Acik) -and (Get-Date) -lt $son) { [System.Windows.Forms.Application]::DoEvents(); Start-Sleep -Milliseconds 200 }
-        Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue | ForEach-Object { try { $_.Kill() } catch { } }
+        Get-Process -Name $script:EdingExeAd -ErrorAction Ignore | ForEach-Object { try { $_.Kill() } catch { } }
         Eding-Temizle
     }
     for ($i = 15; $i -ge 1; $i--) {
@@ -1949,7 +1951,7 @@ function Baglan {
     if (-not $script:ApiHazir) { return $false }
     if ($script:Bagli) { return $true }
     # Sunucu kapalıysa bağlanma; yoksa DLL Eding'i arayüzsüz başlatabilir
-    if (-not (Get-Process -Name 'CncServer' -ErrorAction SilentlyContinue)) { return $false }
+    if (-not (Get-Process -Name 'CncServer' -ErrorAction Ignore)) { return $false }
     if (-not (Eding-Pencere-Acik)) { return $false }
     try {
         $rc = [Eding]::CncConnectServer('')
@@ -2880,7 +2882,7 @@ function Macro-Yaz([string]$yol, [string]$metin, $enc, [string]$ne) {
     [System.IO.File]::Copy($yol, $yedek, $true)
     [System.IO.File]::WriteAllText($yol, $metin, $enc)
     [Kayit]::Yaz("MACRO: $ne eki yapıldı (yedek: $yedek)")
-    if (@(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue).Count -gt 0) { $script:MakroYamaBekliyor = $true; Yaz "macro.cnc güncellendi ($ne). Eding kapatılıp açılınca etkin olur (EdingKapat.bat, sonra KazimaBaslat.bat)." }
+    if (@(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore).Count -gt 0) { $script:MakroYamaBekliyor = $true; Yaz "macro.cnc güncellendi ($ne). Eding kapatılıp açılınca etkin olur (EdingKapat.bat, sonra KazimaBaslat.bat)." }
 }
 
 # ================= UZAKTAN ERİŞİM =================
@@ -4471,7 +4473,7 @@ function Eding-Goster {
     $script:EdingGosteriliyor = $true
     $form.TopMost = $false
     $n = 0
-    foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue)) { $n += [Pencere]::Goster($pr.Id) }
+    foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) { $n += [Pencere]::Goster($pr.Id) }
     if ($n -eq 0) {
         $sh = New-Object -ComObject WScript.Shell
         if (-not $sh.AppActivate('CNC V4')) { [Kayit]::Show('Eding penceresi bulunamadı (Eding kapalı olabilir).', 'Eding', 'OK', 'Information') | Out-Null }
@@ -6332,7 +6334,7 @@ $form.Add_FormClosing({
     $edingGizleZaman.Stop()
     try { $uzakZaman.Stop(); [WebSunucu]::Durdur() } catch { }
     # Panel kapanınca Eding görünmez kalmasın
-    try { foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction SilentlyContinue)) { [void][Pencere]::Goster($pr.Id) } } catch { }
+    try { foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) { [void][Pencere]::Goster($pr.Id) } } catch { }
     $zamanlayici.Stop()
     $koordZaman.Stop()
     try { $manuelZaman.Stop() } catch { }   # ED-07: bütün zamanlayıcılar durur
