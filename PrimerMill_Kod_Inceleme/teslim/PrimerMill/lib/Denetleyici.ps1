@@ -421,11 +421,14 @@ function Normal-Onay([string]$baslik, [string]$metin) { return [bool](Ui-Onay $b
 # GİT bittiği andakiyle aynı olmalı (Eding'den / dışarıdan yapılan hareket de yakalanır). Yuva ayarı sihirbazı: jog serbest.
 $script:SonYuvaKonum = $null   # Yuvaya-Git bitince makine konumu (X, Y, Z, A, B)
 $script:SonAyarYuva = $null    # Yuva ayarı sihirbazında (ve MANUEL noktasında) son GİT yapılan nokta (Yuva-Git atar)
+$script:SonAyarKonum = $null   # SK-16: o GİT bitince makine konumu (X, Y, Z, A, B)
+$script:AyarXYSinir = 2.0      # SK-16: sihirbazda GİT'ten sonra ortalama jog'u: GİT noktasından XY uzaklığı en çok (mm)
+$script:AyarZABSinir = 0.05    # SK-16: Z / A / B değişmemiş olmalı (mm / °; Z aşağı inmiş olamaz)
 $script:YuvaKoruyanKomutlar = @('yuva.git', 'yuva.yaklas', 'pens.ac', 'pens.kapat', 'hava.ufle', 'ismili.calistir', 'ismili.durdur',
     'sogutma.m7', 'sogutma.m8', 'sogutma.kapat', 'yuva.al', 'yuva.kaydet', 'degisken.oku', 'yedek.al', 'hiz.azalt', 'hiz.artir', 'hiz.normal')
 function Yuva-Hedefi-Unut([bool]$ayarDa = $true) {
     $script:SonYuva = $null; $script:SonYuvaKonum = $null
-    if ($ayarDa) { $script:SonAyarYuva = $null }
+    if ($ayarDa) { $script:SonAyarYuva = $null; $script:SonAyarKonum = $null }
 }
 function Makine-Konum {
     try { $m = [Eding]::MachinePos(); return @([double]$m.X, [double]$m.Y, [double]$m.Z, [double]$m.A, [double]$m.B) } catch { return $null }
@@ -439,7 +442,18 @@ function Yaklas-Neden([string]$ad, [bool]$ayar) {
         return "Önce bu yuvaya GİT: $g.`r`nYAKLAŞ iş milini olduğu yerde indirir; yalnız son YUVAYA GİT yapılan yuvada ve araya başka hareket (jog, park, temizlik, home, takım değişimi, MDI, iş) girmeden çalışır." +
             $(if ($son) { "`r`nSon GİT yapılan: $(Yuva-Gorunen-Adi $son)" } else { '' })
     }
-    if ($ayar) { return '' }
+    if ($ayar) {
+        # SK-16 (MAKİNEDE DOĞRULA): jog hangi sekmeden ya da Eding'den gelirse gelsin konum sınırı. Yalnız ortalama payı:
+        # XY'de GİT noktasına uzaklık <= AyarXYSinir, Z / A / B GİT'tekiyle aynı (aşağı inilmiş ya da kol dönmüş olamaz).
+        $k = Makine-Konum; $s = $script:SonAyarKonum
+        if ($null -eq $k -or $null -eq $s) { return "Önce bu yuvaya yeniden GİT: $g.`r`nMakine konumu okunamadı." }
+        $xy = [math]::Sqrt(($k[0] - $s[0]) * ($k[0] - $s[0]) + ($k[1] - $s[1]) * ($k[1] - $s[1]))
+        if ($xy -gt $script:AyarXYSinir) { return "Önce bu yuvaya yeniden GİT: $g.`r`nGİT'ten sonra X/Y $(Sayi ([math]::Round($xy, 2))) mm kaydı (ortalama için en çok $(Sayi $script:AyarXYSinir) mm)." }
+        for ($i = 2; $i -lt 5; $i++) {
+            if ([math]::Abs($k[$i] - $s[$i]) -gt $script:AyarZABSinir) { return "Önce bu yuvaya yeniden GİT: $g.`r`nGİT'ten sonra $(@('X', 'Y', 'Z', 'A', 'B')[$i]) ekseni hareket etti (YAKLAŞ yalnız GİT yüksekliğinden ve açısından iner)." }
+        }
+        return ''
+    }
     $k = Makine-Konum; $s = $script:SonYuvaKonum
     if ($null -eq $k -or $null -eq $s) { return "Önce bu yuvaya GİT: $g.`r`nMakine konumu okunamadı." }
     for ($i = 0; $i -lt 5; $i++) {
@@ -629,7 +643,10 @@ Komut-Tanimla 'yuva.git' 'hareket' {
     # TASARIM §6: eksen hareketi tehlikeli onay (eski panelde soru yoktu)
     if (-not (Ui-Tehlikeli-Onay 'Yuvaya git' "İş mili önce en üste çıkacak, sonra $ad noktasının üstüne gidecek (frezeye dokunmaz).`r`nDevam?" $null $null $null)) { return }
     Yuva-Hedefi-Unut $true
-    if (([string]$a) -like 'ayar:*' -or $ad -eq 'Değişim') { $script:YuvaSecili = $ad; Yuva-Git }   # Yuva ayarı sihirbazı: kaydedilmemiş yeni değerlerle
+    if (([string]$a) -like 'ayar:*' -or $ad -eq 'Değişim') {                                         # Yuva ayarı sihirbazı: kaydedilmemiş yeni değerlerle
+        $script:YuvaSecili = $ad; Yuva-Git
+        if ($script:SonAyarYuva -eq $ad) { $script:SonAyarKonum = Makine-Konum }   # SK-16: YAKLAŞ yalnız bu konumun yakınında
+    }
     else {                                                                                          # Takım değişimi sayfası (eski TAKIM sekmesi)
         Yuvaya-Git $ad
         if ($script:SonYuva -eq $ad) { $script:SonYuvaKonum = Makine-Konum }   # SK-02: YAKLAŞ yalnız bu konumda

@@ -267,7 +267,7 @@ function Yaklas-Dene([string]$arg) {
     [void](Komut-Isle 'yuva.yaklas' $arg)
     $script:SahteOnay = $true
     $k = ($script:UiKayit -join "`n")
-    return @{ Red = ($k -match 'Önce bu yuvaya GİT'); Gecti = ($k -match 'TEHLIKELI \[Yaklaş\]|freze varken'); Metin = $k }
+    return @{ Red = ($k -match 'Önce bu yuvaya (yeniden )?GİT'); Gecti = ($k -match 'TEHLIKELI \[Yaklaş\]|freze varken'); Metin = $k }
 }
 Yuva-Hedefi-Unut $true
 $r = Yaklas-Dene 'T5'
@@ -313,6 +313,28 @@ $r = Yaklas-Dene 'ayar:T4'
 Dogru ($r.Red -and $r.Metin -match 'T4') 'sihirbaz: T3''e GİT, T4 seçili: YAKLAŞ reddedilir' $r.Metin
 $r = Yaklas-Dene 'ayar:T3'
 Dogru ($r.Gecti -and -not $r.Red) 'sihirbaz: aynı nokta, yalnız jog: YAKLAŞ onaya gelir' $r.Metin
+# SK-16: sihirbaz yolunda konum sınırı (XY <= 2 mm, Z/A/B değişmemiş), jog hangi sekmeden gelirse gelsin
+Dogru ($null -ne $script:SonAyarKonum) 'sihirbaz GİT sonrası konum kaydedildi'
+[void](Komut-Isle 'jog' 'Y+|1|300')
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Gecti -and -not $r.Red) 'sihirbaz: XY ~1.0 mm ortalama: YAKLAŞ onaya gelir' $r.Metin
+[void](Komut-Isle 'jog' 'X+|1|300'); [void](Komut-Isle 'jog' 'X+|1|300')
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Red -and $r.Metin -match 'yeniden GİT' -and $r.Metin -match 'X/Y') 'sihirbaz: XY > 2 mm kaydı: YAKLAŞ reddedilir (yeniden GİT)' $r.Metin
+Esit $true (Komut-Isle 'yuva.git' 'ayar:T3') 'sihirbaz yeniden GİT T3'
+[void](Komut-Isle 'jog' 'Z-|0.1|300')
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Red -and $r.Metin -match 'Z ekseni') 'sihirbaz: GİT''ten sonra Z inmiş: YAKLAŞ reddedilir' $r.Metin
+[void](Komut-Isle 'yuva.git' 'ayar:T3')
+[void](Komut-Isle 'jog' 'A+|0.1|300')
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Red -and $r.Metin -match 'A ekseni') 'sihirbaz: GİT''ten sonra kol (A) dönmüş: YAKLAŞ reddedilir' $r.Metin
+[void](Komut-Isle 'yuva.git' 'ayar:T3')
+[void][Eding]::CncRunSingleLine('G91 G0 X5'); [void][Eding]::CncRunSingleLine('G90')
+[void](Bekle-Kosul { Okuma-Yap; -not $script:Hizli.Calisiyor } 10)
+$r = Yaklas-Dene 'ayar:T3'
+Dogru ($r.Red) 'sihirbaz: dışarıdan (Eding) 5 mm hareket: YAKLAŞ reddedilir' $r.Metin
+[void](Komut-Isle 'yuva.git' 'ayar:T3')
 $script:SahteOnay = $false; [void](Komut-Isle 'park' ''); $script:SahteOnay = $true
 $r = Yaklas-Dene 'ayar:T3'
 Dogru ($r.Red) 'sihirbaz: park sonrası YAKLAŞ reddedilir' $r.Metin

@@ -186,7 +186,7 @@ Bu belge mevcut panelin (`PrimerMill/KazimaBaslat.ps1`, 6028 satır) yaptığı 
 |---|---|---|---|---|---|
 | 8.3.1 | Yuva listesi | T1–T6, Sensör, Değişim; kayıtlı (makine), yeni alınan, fark; seçim | `$lvYuva`, `Yuva-Liste-Yenile`, `Yuva-Kayitli`, `Yuva-Hedef` | 4496–4513, 4332–4360, 4296–4311, 4313–4330 | [x] Yuva ayarı › Yuva listesi tablosu (kayıtlı / yeni / fark; dokunarak seç) (`Yuvalar[].Yeni/Fark`) |
 | 8.3.2 | Yuvaya git ⚠ HAREKET | Seçili hedefe (yeni T1 alındıysa kaydırılmış tahmine); frez takılıysa onay; Değişim'de Z'ye de iner | `Yuva-Git` | 4517, 4362–4373 | [x] GİT (`yuva.git`) |
-| 8.3.3 | Yaklaş (#4001) ⚠ | İş mili boşsa onayla `G53 G1 Z#4001 F300` | `Yuva-Yaklas` | 4518, 4375–4381 | [x] YAKLAŞ (`yuva.yaklas`) — YAKLAŞ yalnız sihirbazda son GİT yapılan noktada (jog serbest; SK-02, MAKİNEDE DOĞRULA) |
+| 8.3.3 | Yaklaş (#4001) ⚠ | İş mili boşsa onayla `G53 G1 Z#4001 F300` | `Yuva-Yaklas` | 4518, 4375–4381 | [x] YAKLAŞ (`yuva.yaklas`) — YAKLAŞ yalnız sihirbazda son GİT yapılan noktada; GİT'ten sonra yalnız ortalama jog'u (XY ≤ 2 mm, Z/A/B değişmemiş) (SK-02/SK-16, MAKİNEDE DOĞRULA) |
 | 8.3.4 | Yukarı ⚠ | Z en üst | `Yukari-Kaldir` | 4519 | [x] YUKARI (`eksen.yukari`) |
 | 8.3.5 | İnce adım + jog ⚠ HAREKET | Adım 0.01/0.05/0.1/0.5/1; X/Y/Z/A/B ± | `Jog` | 4521–4532 | [x] İnce ayar kartı: adım 0.01/0.05/0.1/0.5/1, X/Y/Z/A/B ± (`jog`) |
 | 8.3.6 | Pens aç / Pens kapat / Hava üfle | `Pens-Ac-T0`, `M55 P2`, `M54 P4`+`M55 P4` | `Pens-Ac-T0`, `Tek-Komut`, `Hava-Ufle` | 4536–4538 | [x] İnce ayar kartı (`pens.ac`, `pens.kapat`, `hava.ufle`) |
