@@ -12,7 +12,7 @@ teslim/
     KazimaBaslat_Klasik.bat  düzeltilmiş eski panel (geri dönüş)
     EdingKapat.bat, HataBul.bat, YoneticiKurulum.bat, portal.html, uzak.html, eding_yolu.txt
     lib/  ui/  demo/
-  P_CNC_icin/macro.cnc   → makinede P:\CNC\macro.cnc (makro sürüm 4)
+  P_CNC_icin/macro.cnc   → makinede P:\CNC\macro.cnc (makro sürüm 5)
   ekran_goruntuleri/     → yeni arayüzün görüntüleri
 ```
 
@@ -43,12 +43,12 @@ teslim/
 4. `teslim\P_CNC_icin\macro.cnc` → `P:\CNC\macro.cnc`.
 5. `eding_yolu.txt` yalnız açıklama satırları içerir; makinede `P:\CNC` kendiliğinden bulunur. Farklı bir klasör gerekiyorsa dosyaya tek satır yol yazın.
 6. Başlangıç görevi ve güvenlik duvarı için `YoneticiKurulum.bat`'ı **yönetici olarak** bir kez çalıştırın (görev artık yeni `KazimaBaslat.bat`'ı açar ve 72 saat sınırı kaldırılır).
-7. Paneli açın. Açılışta panel Eding'deki makro sürümünü kontrol eder; **4** değilse uyarır ve iş başlatmaz. Bu durumda Eding'i kapatıp açın.
+7. Paneli açın. Açılışta panel Eding'deki makro sürümünü kontrol eder; **5** değilse uyarır ve iş başlatmaz. Bu durumda Eding'i kapatıp açın.
 8. Takım yuvaları ve sensör değişkenleri (#4010–#4021, #4031–#4032) boşsa panel artık **kendiliğinden yazmaz**. Uyarı verir ve BAŞLAT/M6'yı engeller. Ayarlar › Yuva ayarı'ndan gerçek konumları ölçüp kaydedin. "Doğrulanmış değerlere dön" düğmesinin değerleri üreticininkinden farklıdır (bkz. `INCELEME_RAPORU.md` › MAKİNEDE DOĞRULA).
 
 ## 3. Eski sürüme geri dönme
 
-- **Hızlı:** Aynı klasörde `KazimaBaslat_Klasik.bat` (düzeltilmiş eski panel; aynı ayar dosyalarını ve makro sürüm 4'ü kullanır). İki panel aynı anda açılmaz.
+- **Hızlı:** Aynı klasörde `KazimaBaslat_Klasik.bat` (düzeltilmiş eski panel; aynı ayar dosyalarını ve makro sürüm 5'i kullanır). İki panel aynı anda açılmaz.
 - **Tam geri dönüş (orijinal yazılım):** Eding'i kapatın, `PrimerMill_eski_<tarih>` klasörünü ve `macro_yedek_<tarih>.cnc` dosyasını geri koyun, Eding'i açın. Orijinal panel makro sürüm 3 bekler; yeni makro ile orijinal panel birlikte kullanılmamalıdır.
 - Başlangıç görevinin klasik paneli açması için `KazimaBaslat.bat`'ın içeriğini `KazimaBaslat_Klasik.bat` ile değiştirmek yeterlidir.
 

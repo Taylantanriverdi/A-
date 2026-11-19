@@ -302,6 +302,9 @@ function Manuel-Istek {
 # istenen frezi Eding'in kendi takım değişkenlerinden çıkar (#5011 yeni, #5008 eski; pens çıkışı açıksa 2. adım)
 function Manuel-Istek-Tahmin {
     if (-not (Frez-Manuel-Mi)) { return $null }
+    # PrimerMill makrosu (#4034 istek değişkeni var) yüklüyken tahmin yapılmaz: sürüm 5'te pens KAPALI iken de
+    # değişim noktasında M0 (KAZIMAYA BAŞLA) bekleniyor; tahmin bunu yanlışlıkla 'PENS'İ AÇ' sanardı.
+    if ($script:OzelMakro) { return $null }
     $p = [Eding]::MachinePos()
     $dx = [Eding]::CncGetVariable(4031); $dy = [Eding]::CncGetVariable(4032)
     if ([math]::Abs($p.X - $dx) -gt 0.05 -or [math]::Abs($p.Y - $dy) -gt 0.05) { return $null }
@@ -325,16 +328,16 @@ function Manuel-Diyalog($ist) {
     try {
         $eski = $ist.Eski; $yeni = $ist.T
         if ($ist.Faz -eq 4) {
-            $baslik = "T$yeni HAZIR  ·  SON ONAY"
-            $metin = "T$yeni takıldı ve sensörde ölçüldü.`r`n`r`n1.  Elini makineden çek, kapağı kapat.`r`n2.  KAZIMAYI BAŞLAT'a bas."
-            $tamam = 'KAZIMAYI BAŞLAT'
+            $baslik = "T$yeni TAKILDI  ·  KAZIMAYA BAŞLA"
+            $metin = "T$yeni takıldı, pens kapandı.`r`n`r`n1.  Elini makineden çek, kapağı kapat.`r`n2.  KAZIMAYA BAŞLA'ya bas: makine yukarı kalkar, frezi sensöre dokundurup ölçer ve ONAY SORMADAN doğrudan kazımaya başlar."
+            $tamam = 'KAZIMAYA BAŞLA'
         } elseif ($ist.Faz -eq 1) {
             $baslik = "FREZ DEĞİŞİMİ   T$eski  →  T$yeni"
             $metin = if ($eski -gt 0) { "1.  İş milindeki T$eski frezini parmaklarınla tut.`r`n2.  PENS'İ AÇ'a bas: pens havayla açılır, frezi çıkar.`r`n`r`nSonra takılacak frez:  T$yeni" } else { "1.  T$yeni frezini eline al.`r`n2.  PENS'İ AÇ'a bas: pens havayla açılır.`r`n`r`nKompresör açık olmalı." }
             $tamam = "PENS'İ AÇ"
         } else {
             $baslik = if ($yeni -gt 0) { "T$yeni FREZİNİ TAK" } else { "FREZİ ÇIKAR" }
-            $metin = if ($yeni -gt 0) { "1.  Eski frezi çıkar (varsa).`r`n2.  T$yeni frezini sonuna kadar it ve tut.`r`n3.  TAKTIM'a bas: pens kapanır, makine frezi sensörde ölçer ve kazımaya devam eder." } else { "1.  Frezi çıkar.`r`n2.  ÇIKARDIM'a bas: pens kapanır." }
+            $metin = if ($yeni -gt 0) { "1.  Eski frezi çıkar (varsa).`r`n2.  T$yeni frezini sonuna kadar it ve tut.`r`n3.  TAKTIM'a bas: pens kapanır (makine hareket etmez; sonra KAZIMAYA BAŞLA sorulur)." } else { "1.  Frezi çıkar.`r`n2.  ÇIKARDIM'a bas: pens kapanır." }
             $tamam = if ($yeni -gt 0) { "TAKTIM  ·  PENS'İ KAPAT" } else { "ÇIKARDIM  ·  PENS'İ KAPAT" }
         }
         [Kayit]::Yaz("MANUEL: istek faz $($ist.Faz)  T$eski -> T$yeni")

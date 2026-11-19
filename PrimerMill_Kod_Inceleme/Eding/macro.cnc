@@ -317,14 +317,7 @@ sub change_tool
 		if [#5011 <> 0]
 			;G43  ;we use tool-length compensation.
 			goSub user_1
-			;PrimerMill: manuel modda olcumden sonra kazimaya baslamadan son onay
-			if [#4030 == 1]
-				#4037 = [#4037 + 1]
-				#4034 = [4000 + #5011]
-				msg "MANUAL: T"#5011" inserted and measured, RUN starts milling"
-				m0
-				#4034 = 0
-			endif
+			;PrimerMill surum 5: manuel modda son onay olcumden ONCE (manual_change sonunda); olcumden sonra dogrudan kazima
 			;else
 			;G49  ;tool length compensation off for tool 0.
 		endif
@@ -403,7 +396,7 @@ endsub
 
 ;PrimerMill: panel bu macronun yuklu oldugunu buradan anlar
 sub pm_surum
-	#4038 = 4
+	#4038 = 5
 endsub
 
 ;PrimerMill: panelden PENS AC -> pens acilir, makine frezin cikarildigini bilir (T0)
@@ -422,7 +415,7 @@ endsub
 
 ;PrimerMill MANUEL FREZ DEGISIMI (#4030 = 1)
 ;  #4031 #4032 degisim noktasi X Y (G53), #4033 Z (0 = en ust)
-;  #4034 panele istek: 1000+T = pens acilacak, 2000+T = pens kapanacak, 3000+T = hava bekleniyor, 4000+T = olculdu, baslamak icin son onay, 0 = yok
+;  #4034 panele istek: 1000+T = pens acilacak, 2000+T = pens kapanacak, 3000+T = hava bekleniyor, 4000+T = pens kapandi, olcum + kazima icin son onay, 0 = yok
 ;  #4036 eski takim, #4037 sayac (panel her istegi bir kez gosterir)
 ;  Panel yoksa: Eding ekranindaki mesaji oku ve RUN (devam) ile ilerle.
 sub manual_change
@@ -464,6 +457,15 @@ sub manual_change
 	m0
 	m55p2
 	g4p1
+
+	;3) Son onay (PrimerMill surum 5): operator elini ceker, KAZIMAYA BASLA -> makine Z'yi kaldirir,
+	;   frezi sensorde olcer (user_1) ve onay sormadan dogrudan kazimaya baslar
+	if [#5011 <> 0]
+		#4037 = [#4037 + 1]
+		#4034 = [4000 + #5011]
+		msg "MANUAL: T"#5011" inserted, RUN measures the tool and starts milling"
+		m0
+	endif
 	#4034 = 0
 	g53 g90 g0 z[#5163]
 	#5015 = 1 ; toolchange succes

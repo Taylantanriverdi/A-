@@ -161,7 +161,7 @@ function Ana-Tik {
         Frez-Modu-Goster
         $ist = $null; try { $ist = Manuel-Istek } catch { }
         if ($ist -and -not [Eding]::AcilKilit) {
-            $mt = switch ($ist.Faz) { 1 { "MANUEL FREZ: T$($ist.Eski) → T$($ist.T)  ·  frezi tut, PENS'İ AÇ" } 2 { "MANUEL FREZ: T$($ist.T) TAK  ·  sonra TAKTIM" } 4 { "MANUEL FREZ: T$($ist.T) hazır  ·  KAZIMAYI BAŞLAT onayı bekleniyor" } default { "MANUEL FREZ: hava basıncı yok  ·  KOMPRESÖRÜ AÇ (pens havayla açılır)" } }
+            $mt = switch ($ist.Faz) { 1 { "MANUEL FREZ: T$($ist.Eski) → T$($ist.T)  ·  frezi tut, PENS'İ AÇ" } 2 { "MANUEL FREZ: T$($ist.T) TAK  ·  sonra TAKTIM" } 4 { "MANUEL FREZ: T$($ist.T) takıldı  ·  KAZIMAYA BAŞLA onayı bekleniyor" } default { "MANUEL FREZ: hava basıncı yok  ·  KOMPRESÖRÜ AÇ (pens havayla açılır)" } }
             Durum-Yaz $mt $(if ($ist.Faz -eq 3) { $cKirmizi } else { $cAltinAc })
             $script:ManuelMesajMetni = ($mt -replace '^MANUEL FREZ:\s*', ''); $script:HavaYok = ($ist.Faz -eq 3)
         }

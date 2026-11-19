@@ -29,7 +29,7 @@ public static class Eding {
     public static volatile bool AcilKilit = false;
     // Test/demo ayarları (gerçek sınıfta yok)
     public static double SimHizCarpani = 1.0;     // simüle zamanın hızı (testlerde büyütülür)
-    public static int SimMakroSurum = 4;          // gosub pm_surum -> #4038
+    public static int SimMakroSurum = 5;          // gosub pm_surum -> #4038
     public static int SimSimulasyonModu = 0;      // CncGetSimulationMode() dönüşü
     public static double SimSatirHizi = 400.0;    // iş: saniyede satır (%100 hızda)
 

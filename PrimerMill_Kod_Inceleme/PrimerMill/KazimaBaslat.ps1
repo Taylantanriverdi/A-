@@ -2234,8 +2234,8 @@ function Manuel-Macro-Kontrol {
 }
 
 # ================= MAKRO SÜRÜMÜ VE #4039 BAYRAĞI (K6) =================
-# macro.cnc 'sub pm_surum' -> #4038 = 4. Makroda değişiklik yapılırsa ikisi birlikte güncellenir.
-$BeklenenMakroSurum = 4
+# macro.cnc 'sub pm_surum' -> #4038 = 5. Makroda değişiklik yapılırsa ikisi birlikte güncellenir.
+$BeklenenMakroSurum = 5
 $script:MakroKontrolTamam = $false   # bu Eding bağlantısında sürüm kontrolü ve bayrak sıfırlama yapıldı mı
 $script:MakroSurumUyumsuz = $false
 $script:MakroKontrolSon = [datetime]::MinValue
@@ -2421,6 +2421,9 @@ function Manuel-Istek {
 # istenen frezi Eding'in kendi takım değişkenlerinden çıkar (#5011 yeni, #5008 eski; pens çıkışı açıksa 2. adım)
 function Manuel-Istek-Tahmin {
     if (-not (Frez-Manuel-Mi)) { return $null }
+    # PrimerMill makrosu (#4034 istek değişkeni var) yüklüyken tahmin yapılmaz: sürüm 5'te pens KAPALI iken de
+    # değişim noktasında M0 (KAZIMAYA BAŞLA) bekleniyor; tahmin bunu yanlışlıkla 'PENS'İ AÇ' sanardı.
+    if ($script:OzelMakro) { return $null }
     $p = [Eding]::MachinePos()
     $dx = [Eding]::CncGetVariable(4031); $dy = [Eding]::CncGetVariable(4032)
     if ([math]::Abs($p.X - $dx) -gt 0.05 -or [math]::Abs($p.Y - $dy) -gt 0.05) { return $null }
@@ -2444,16 +2447,16 @@ function Manuel-Diyalog($ist) {
     try {
         $eski = $ist.Eski; $yeni = $ist.T
         if ($ist.Faz -eq 4) {
-            $baslik = "T$yeni HAZIR  ·  SON ONAY"
-            $metin = "T$yeni takıldı ve sensörde ölçüldü.`r`n`r`n1.  Elini makineden çek, kapağı kapat.`r`n2.  KAZIMAYI BAŞLAT'a bas."
-            $tamam = 'KAZIMAYI BAŞLAT'
+            $baslik = "T$yeni TAKILDI  ·  KAZIMAYA BAŞLA"
+            $metin = "T$yeni takıldı, pens kapandı.`r`n`r`n1.  Elini makineden çek, kapağı kapat.`r`n2.  KAZIMAYA BAŞLA'ya bas: makine yukarı kalkar, frezi sensöre dokundurup ölçer ve ONAY SORMADAN doğrudan kazımaya başlar."
+            $tamam = 'KAZIMAYA BAŞLA'
         } elseif ($ist.Faz -eq 1) {
             $baslik = "FREZ DEĞİŞİMİ   T$eski  →  T$yeni"
             $metin = if ($eski -gt 0) { "1.  İş milindeki T$eski frezini parmaklarınla tut.`r`n2.  PENS'İ AÇ'a bas: pens havayla açılır, frezi çıkar.`r`n`r`nSonra takılacak frez:  T$yeni" } else { "1.  T$yeni frezini eline al.`r`n2.  PENS'İ AÇ'a bas: pens havayla açılır.`r`n`r`nKompresör açık olmalı." }
             $tamam = "PENS'İ AÇ"
         } else {
             $baslik = if ($yeni -gt 0) { "T$yeni FREZİNİ TAK" } else { "FREZİ ÇIKAR" }
-            $metin = if ($yeni -gt 0) { "1.  Eski frezi çıkar (varsa).`r`n2.  T$yeni frezini sonuna kadar it ve tut.`r`n3.  TAKTIM'a bas: pens kapanır, makine frezi sensörde ölçer ve kazımaya devam eder." } else { "1.  Frezi çıkar.`r`n2.  ÇIKARDIM'a bas: pens kapanır." }
+            $metin = if ($yeni -gt 0) { "1.  Eski frezi çıkar (varsa).`r`n2.  T$yeni frezini sonuna kadar it ve tut.`r`n3.  TAKTIM'a bas: pens kapanır (makine hareket etmez; sonra KAZIMAYA BAŞLA sorulur)." } else { "1.  Frezi çıkar.`r`n2.  ÇIKARDIM'a bas: pens kapanır." }
             $tamam = if ($yeni -gt 0) { "TAKTIM  ·  PENS'İ KAPAT" } else { "ÇIKARDIM  ·  PENS'İ KAPAT" }
         }
         [Kayit]::Yaz("MANUEL: istek faz $($ist.Faz)  T$eski -> T$yeni")
@@ -6305,7 +6308,7 @@ function Ana-Tik {
         Frez-Modu-Goster
         $ist = $null; try { $ist = Manuel-Istek } catch { }
         if ($ist -and -not [Eding]::AcilKilit) {
-            $mt = switch ($ist.Faz) { 1 { "MANUEL FREZ: T$($ist.Eski) → T$($ist.T)  ·  frezi tut, PENS'İ AÇ" } 2 { "MANUEL FREZ: T$($ist.T) TAK  ·  sonra TAKTIM" } 4 { "MANUEL FREZ: T$($ist.T) hazır  ·  KAZIMAYI BAŞLAT onayı bekleniyor" } default { "MANUEL FREZ: hava basıncı yok  ·  KOMPRESÖRÜ AÇ (pens havayla açılır)" } }
+            $mt = switch ($ist.Faz) { 1 { "MANUEL FREZ: T$($ist.Eski) → T$($ist.T)  ·  frezi tut, PENS'İ AÇ" } 2 { "MANUEL FREZ: T$($ist.T) TAK  ·  sonra TAKTIM" } 4 { "MANUEL FREZ: T$($ist.T) takıldı  ·  KAZIMAYA BAŞLA onayı bekleniyor" } default { "MANUEL FREZ: hava basıncı yok  ·  KOMPRESÖRÜ AÇ (pens havayla açılır)" } }
             Durum-Yaz $mt $(if ($ist.Faz -eq 3) { $cKirmizi } else { $cAltinAc })
         }
         if ($script:OzelMakro -and -not $hatali -and $durum -ne 'POWERUP' -and $durum -ne '') { Raf-Kontrol }

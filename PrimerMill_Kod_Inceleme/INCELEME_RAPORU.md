@@ -99,6 +99,7 @@ Windows PowerShell 5.1 ile çalıştırılmadı. İlk iş olarak Windows'ta çal
 | 16 | Elle frez değişiminde (M0) `CncGetState` metni PAUSE mı? | Elle modda bir iş, adım pencereleri |
 | 17 | SK-16: yuva ayarı sihirbazında YAKLAŞ yalnız GİT noktasından X/Y ≤ 2 mm, Z/A/B ≤ 0.05 sapmada | GİT → 1 mm jog ile ortala → YAKLAŞ iner; 3 mm jog ya da Z− sonrası reddedilmeli |
 | 18 | Yeni panel, ekran ölçeği %125/%150 | Windows'ta ekran turu: bulanıklık, taşma yok |
+| 19 | Elle frez değişimi yeni sıra (kullanıcı isteği, makro sürüm 5): 1) PENS'İ AÇ 2) TAKTIM · pens kapanır, hareket yok 3) KAZIMAYA BAŞLA 4) makine Z'yi kaldırır, sensörde ölçer ve onay sormadan kazımaya başlar | Simülasyonda ve makinede elle modda bir iş: TAKTIM'dan sonra makine KIPIRDAMAMALI; KAZIMAYA BAŞLA'dan sonra ölçüm ve kazıma kesintisiz olmalı |
 
 ## 6. Uygulanmayan öneriler
 
