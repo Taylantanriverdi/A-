@@ -227,7 +227,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | `int AcikSayisi` | — | Açık diyalog sayısı (uzaktan komut kuyruğu için). |
 | `Form Sahip` | — | Kabuk kendini atar. |
 | `Onay(baslik, metin [, evetMetni])` | bool | VAZGEÇ / EVET. **Enter = VAZGEÇ.** |
-| `TehlikeliOnay(baslik, metin, string[] eski, string[] yeni, string yedekDosyasi)` | bool | Kırmızı bant "TEHLİKELİ İŞLEM — …", eski→yeni tablo (öğeler `"Ad=değer"` ya da değer; değişenler kehribar), "Yedek alındı: …" (boşsa kehribar "Yedek: alınmadı"), VAZGEÇ / **EVET, UYGULA**. **Enter hiçbir şey yapmaz.** Kısa sürüm: `TehlikeliOnay(baslik, metin)`. |
+| `TehlikeliOnay(baslik, metin, string[] eski, string[] yeni, string yedekDosyasi)` | bool | Kırmızı bant "TEHLİKELİ İŞLEM — …", eski→yeni tablo (öğeler `"Ad=değer"` ya da değer; değişenler kehribar), "Yedek alındı: …" (`""` ise kehribar "Yedek: alınmadı"; `null` = bu işlemde yedek gerekmez, ör. yalnız hareket onayları: satır gösterilmez), VAZGEÇ / **EVET, UYGULA**. **Enter hiçbir şey yapmaz.** Kısa sürüm: `TehlikeliOnay(baslik, metin)`. |
 | `Bilgi(baslik, metin)` | — | TAMAM. |
 | `Hata(neOldu, neYapmali)` / `Hata(baslik, neOldu, neYapmali)` | — | "NE OLDU" / "NE YAPMALI" (KU-10). |
 | `Secim(baslik, metin, string[] secenekler)` | int (-1 = vazgeç/Esc) | >4 seçenekte 2 sütun. "Vazgeç…" ile başlayan seçenek yoksa VAZGEÇ eklenir. |

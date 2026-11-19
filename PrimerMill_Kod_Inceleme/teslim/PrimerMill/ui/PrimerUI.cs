@@ -4246,9 +4246,13 @@ namespace PrimerUI
                 t.Ayarla(satir);
                 y.Ekle(t, Math.Min(300, th));
             }
-            var yd = new Yazi(string.IsNullOrEmpty(yedekDosyasi) ? "Yedek: alınmadı" : "Yedek alındı:  " + yedekDosyasi, 11.5f, true, YaziRol.Ozel);
-            yd.OzelRenk = string.IsNullOrEmpty(yedekDosyasi) ? Tema.Duraklatildi : Tema.Hazir; yd.Simge = Simge.Kaydet; yd.Kucult = true;
-            y.Ekle(yd, 28);
+            // yedekDosyasi: null = bu işlemde yedek gerekmez (yalnız hareket): satır yok; "" = gerekirdi ama alınmadı (kehribar)
+            if (yedekDosyasi != null)
+            {
+                var yd = new Yazi(yedekDosyasi.Length == 0 ? "Yedek: alınmadı" : "Yedek alındı:  " + yedekDosyasi, 11.5f, true, YaziRol.Ozel);
+                yd.OzelRenk = yedekDosyasi.Length == 0 ? Tema.Duraklatildi : Tema.Hazir; yd.Simge = Simge.Kaydet; yd.Kucult = true;
+                y.Ekle(yd, 28);
+            }
             f.DugmeEkle(0, "VAZGEÇ", Rol.Normal, Simge.Kapat, 0);
             f.DugmeEkle(1, "EVET, UYGULA", Rol.Tehlike, Simge.Uyari, 1);
             f.EnterSonuc = int.MinValue;

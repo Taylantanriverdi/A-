@@ -15,12 +15,13 @@ function Ui-Onay([string]$baslik, [string]$metin) {
 }
 
 # TASARIM §6 tehlikeli onay: kırmızı şerit, eski -> yeni değerler, yedek dosyası; varsayılan VAZGEÇ, Enter onaylamaz
-function Ui-Tehlikeli-Onay([string]$baslik, [string]$metin, $eski = $null, $yeni = $null, [string]$yedek = '') {
+# SK-08: $yedek = $null -> yedek bu işlemde gerekmez (yalnız hareket: satır gösterilmez); '' -> "Yedek: alınmadı"; yol -> "Yedek alındı"
+function Ui-Tehlikeli-Onay([string]$baslik, [string]$metin, $eski = $null, $yeni = $null, $yedek = $null) {
     Ui-Log-Pencere "TEHLİKELİ: $baslik" ("$metin" + $(if ($yeni) { "  yeni: " + (@($yeni) -join ' ') } else { '' }) + $(if ($yedek) { "  yedek: $yedek" } else { '' }))
     $e = $null; $y = $null
     if ($null -ne $eski) { $e = [string[]]@($eski) }
     if ($null -ne $yeni) { $y = [string[]]@($yeni) }
-    $yd = $null; if ($yedek) { $yd = [System.IO.Path]::GetFileName($yedek) }
+    $yd = $null; if ($null -ne $yedek) { $yd = $(if ("$yedek") { [System.IO.Path]::GetFileName([string]$yedek) } else { '' }) }
     $r = [bool][PrimerUI.Diyalog]::TehlikeliOnay($baslik, $metin, $e, $y, $yd)
     Ui-Log-Cevap "TEHLİKELİ: $baslik" $(if ($r) { 'Yes' } else { 'No' })
     return $r

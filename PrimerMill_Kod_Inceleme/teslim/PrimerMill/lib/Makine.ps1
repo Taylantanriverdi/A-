@@ -945,7 +945,7 @@ function Mdi-Gonder([string]$satir) {
     if ((Is-Suruyor)) { Yaz 'MDI: iş sürerken ya da duraklıyken komut gönderilemez.'; return }
     # KU-03: MDI satırı makineyi doğrudan hareket ettirebilir; tam satır gösterilip onay alınır (varsayılan HAYIR)
     # TASARIM §6: MDI tehlikeli onay. G10 / G92 / #4xxx / #5xxx yazan satırda önce ayar yedeği alınır (KL-04 ile aynı yol).
-    $ek = ''; $yedek = ''
+    $ek = ''; $yedek = $null   # SK-08: yedek gerekmeyen (yalnız hareket) satırda onayda yedek satırı yok
     if (Mdi-Ayar-Yazar-Mi $komut) {
         if (-not (Ayar-Yedekle $true)) { Yaz "MDI: yedek alınamadı, gönderilmedi ($komut)"; return }
         $yedek = $script:SonYedekDosya
