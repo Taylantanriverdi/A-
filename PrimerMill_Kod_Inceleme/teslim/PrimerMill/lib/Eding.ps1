@@ -5,8 +5,9 @@
 # PowerShell 5.1 (32 bit) uyumlu.
 
 # ---------------- Eding API (cncapi.dll, stdcall) ----------------
-$script:ApiHazir = $false
-$script:Bagli    = $false
+# Onyuklemede (KazimaBaslat.ps1) ayarlanmis olabilir: modul yuklenirken EZILMEZ (yoksa Eding bulunsa da 'onizleme' modu acilir)
+if ($null -eq $script:ApiHazir) { $script:ApiHazir = $false }
+if ($null -eq $script:Bagli) { $script:Bagli = $false }
 
 # ---------------- Eding'i otomatik başlat ----------------
 $AyarDosyasi = [System.IO.Path]::Combine($ScriptKlasor, 'ayarlar.txt')
