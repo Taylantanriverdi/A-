@@ -210,6 +210,7 @@ function Zamanlayici-Tik {
     # Diyalog açabilen işler ana korumanın DIŞINDA ve kendi korumalarıyla (ED-07): diyalog açıkken ekran güncellenmeye devam eder
     try { Prob-Tik } catch { }                                                     # eski: 120 ms
     try { Uzak-Tik } catch { }                                                     # eski: 200 ms
+    if ($script:Kiosk) { try { Kiosk-Tik } catch { } }                             # kiosk: panele dönüş (lib/Kiosk.ps1)
     if ($script:OzelMakro -and (($script:TikNo % 2) -eq 0) -and -not $script:ManuelTikMesgul -and -not $script:IslemSuruyor) {   # eski: 400 ms
         $script:ManuelTikMesgul = $true
         try { Islem-Calistir 'Manuel frez değişimi' { Manuel-Izle } } finally { $script:ManuelTikMesgul = $false }
@@ -278,6 +279,9 @@ $script:IzinMetni = @{
     Engel = 'Dosyada hata var: iş kartındaki uyarı düğmesine bakın'
     Yok = 'Çalışan iş yok'
     Sade = 'Sade akışta kapalı (yerine YENİ BLOK ve Ayarlar › İş akışı)'
+    Islem = 'Panel işlemi sürüyor ({0}): bitmesini bekleyin'
+    Kiosk = "Kiosk modunda küçültülemez: Windows için Ayarlar › Genel › WINDOWS'A GEÇ"
+    KioskYok = 'Kiosk modu kapalı: Windows zaten erişilebilir (kurulum: KIOSK_KUR.bat)'
 }
 function Makro-Neden { return "Eding'deki macro.cnc sürümü uyumsuz (beklenen $BeklenenMakroSurum): Ayarlar › Eding › YENİDEN BAŞLAT" }
 
@@ -399,7 +403,7 @@ function Komut-Isle([string]$ad, [string]$arg = '', [string]$kaynak = 'yerel') {
         $sonuc = "HATA: $($_.Exception.Message)"
         Yaz "HATA ($ad): $($_.Exception.Message)"
         try { Ui-Hata 'Komut işlenemedi' "$ad : $($_.Exception.Message)" 'Ayrıntı Kayıtlar ekranında ve log dosyasında.' } catch { }
-    } finally { try { if (-not $script:IslemSuruyor) { Ui-Mesgul $null }; if (-not $script:TikMesgul) { Durum-Yenile } } catch { } }   # iç içe (DURDUR, ekran) dıştaki işlemin meşgul yazısını silmesin
+    } finally { try { if (-not $script:IslemSuruyor -and -not $script:SistemKapaniyor) { Ui-Mesgul $null }; if (-not $script:TikMesgul) { Durum-Yenile } } catch { } }   # iç içe (DURDUR, ekran) dıştaki işlemin meşgul yazısını silmesin
     return $sonuc
 }
 
@@ -518,6 +522,7 @@ function Degisken-Kaydet([string]$arg) {
 }
 
 function Panel-Kapat {
+    if ($script:Kiosk) { Kiosk-Panel-Kapat; return }   # kiosk: PIN ister (lib/Kiosk.ps1)
     $msg = if ((Calisiyor-Mu)) { "Makine ÇALIŞIYOR. Panel kapanırsa takip durur (Eding işi sürdürür).`r`n`r`nYine de kapatılsın mı?" } else { "PrimerMill kapatılsın mı?" }
     if (Onay $msg 'Kapat') { Ui-Kapat }
 }
@@ -604,8 +609,24 @@ Komut-Tanimla 'acilstop' 'serbest' { Acil-Stop 'buton' } -IcIce
 Komut-Tanimla 'acilstop.kaldir' 'serbest' { Acil-Stop-Kaldir } -Ek { param($a, $c) if (-not $c.Acil) { return 'ACİL STOP basılı değil' }; return '' }
 Komut-Tanimla 'makine.reset' 'makine' { Btn-Reset }
 Komut-Tanimla 'ekran' 'serbest' { param($a) Ekran-Degisti $a } -IcIce
-Komut-Tanimla 'panel.kucult' 'serbest' { Ui-Kucult } -IcIce
+Komut-Tanimla 'panel.kucult' 'serbest' { Ui-Kucult } -IcIce -Ek { param($a, $c) if ($script:Kiosk) { return $script:IzinMetni.Kiosk }; return '' }
 Komut-Tanimla 'panel.kapat' 'serbest' { Panel-Kapat }
+# Kiosk modu ve CİHAZI KAPAT (lib/Kiosk.ps1). Kapatma makineye dokunmaz ama iş / panel işlemi sürerken yapılmaz.
+Komut-Tanimla 'sistem.kapat' 'serbest' { Sistem-Kapat } -Ek {
+    param($a, $c)
+    if ($script:SistemKapaniyor) { return 'Cihaz kapatılıyor' }
+    if ($c.Calis) { if ($c.IsAktif) { return $script:IzinMetni.Calis }; return $script:IzinMetni.Hareket }
+    if ($c.Durak) { return $script:IzinMetni.Durak }
+    if ($script:IslemSuruyor) { return ($script:IzinMetni.Islem -f $script:IslemAdi) }
+    return ''
+}
+Komut-Tanimla 'kiosk.windows' 'serbest' { Windows-Gec } -Ek {
+    param($a, $c)
+    if (-not $script:Kiosk) { return $script:IzinMetni.KioskYok }
+    if ($c.Suruyor) { if ($c.Durak) { return $script:IzinMetni.Durak }; return $script:IzinMetni.Calis }
+    return ''
+}
+Komut-Tanimla 'kiosk.pin' 'serbest' { Kiosk-Pin-Degistir }
 # Üretim
 Komut-Tanimla 'is.sec' 'serbest' { Btn-DosyaSec } -Ek { param($a, $c) if ($c.Suruyor) { return 'Kazıma sürerken / duraklıyken yeni dosya seçilemez' }; if ($c.Acil) { return $script:IzinMetni.Acil }; return '' }
 Komut-Tanimla 'is.baslat' 'hareket' { Btn-Baslat } -Raf -Makro -Ek { param($a, $c) if (-not $script:SeciliDosya) { return $script:IzinMetni.Dosya }; if ($script:Engel) { return $script:IzinMetni.Engel }; return '' }
@@ -758,6 +779,7 @@ function Durum-Topla {
     $d.Bagli = $bagli; $d.Demo = [bool]$script:Demo; $d.Onizleme = (-not $script:ApiHazir); $d.EdingSimulasyon = [bool]$script:EdingSim
     $d.AcilStop = $acil; $d.ExtErr = [bool]$h.Acil; $d.HomeAlindi = [bool]$h.Home
     $d.MakineAdi = [string]$script:Tercih.MakineAdi; $d.Surum = [string]$script:PanelSurum
+    $d.Kiosk = [bool]$script:Kiosk
     # durum (eski Ana-Tik sırası, 200 ms'de bir)
     if (-not $script:ApiHazir) { $d.Durum = [PrimerUI.Durum]::Pasif }
     elseif (-not $bagli) { if (((Get-Date) - $script:SonEdingBaslatma).TotalSeconds -lt 90 -and -not $script:EdingKapatildi) { $d.Durum = [PrimerUI.Durum]::Hazirlik } else { $d.Durum = [PrimerUI.Durum]::Alarm } }
@@ -886,6 +908,7 @@ function Durum-Topla {
         @('Takım durumu', $(if ($script:TakimBelirsiz) { 'BELİRSİZ (değişim yarıda kesildi)' } else { 'net' }), $(if ($script:TakimBelirsiz) { 'Uyari' } else { 'Bilgi' })),
         @('Ayrıntı', [string]$script:TeknikMetni, 'Bilgi'),
         @('Yönetici', $(if ($script:Yonetici) { 'evet' } else { 'hayır' }), 'Bilgi'),
+        @('Kiosk', $(if ($script:Kiosk) { 'AÇIK (kiosk.on)' } else { 'kapalı' }), 'Bilgi'),
         @('PowerShell', "$($PSVersionTable.PSVersion)  ·  $(if ([IntPtr]::Size -eq 4) { '32' } else { '64' }) bit", 'Bilgi'),
         @('Log', [string][Kayit]::Dosya, 'Bilgi'))
     foreach ($s in $tek) { $d.Teknik.Add((New-Object PrimerUI.BilgiSatiri([string]$s[0], [string]$s[1], (Tur-Enum $s[2])))) }
@@ -929,8 +952,8 @@ function Panel-Acilis {
 function Panel-Kapanis {
     try { [WebSunucu]::Durdur() } catch { }
     $script:UzakAcik = $false; $script:ProbAktif = $false
-    # Panel kapanınca Eding görünmez kalmasın
-    try { foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) { [void][Pencere]::Goster($pr.Id) } } catch { }
+    # Panel kapanınca Eding görünmez kalmasın (cihaz kapanırken gösterilmez: ekranda Windows / Eding görünmesin)
+    if (-not $script:SistemKapaniyor) { try { foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) { [void][Pencere]::Goster($pr.Id) } } catch { } }
     if ($script:ApiHazir -and $script:Bagli) { try { [void][Eding]::CncDisConnectServer() } catch { }; $script:Bagli = $false }
     Hatalari-Kaydet
     [Kayit]::Yaz('=== PANEL KAPATILDI ===')

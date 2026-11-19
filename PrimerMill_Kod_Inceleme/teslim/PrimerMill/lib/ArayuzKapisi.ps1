@@ -75,6 +75,14 @@ function Ui-Metin([string]$baslik, [string]$mevcut, [bool]$sadeceRakam = $false,
     return $r
 }
 
+# Kiosk PIN'i: rakam tuş takımı, maskeli. Girilen değer günlüğe YAZILMAZ (yalnız girildi / vazgeç). null = vazgeç.
+function Ui-Pin([string]$baslik) {
+    Ui-Log-Pencere $baslik 'PIN istendi'
+    $r = [PrimerUI.Diyalog]::PinGir($baslik, 8)
+    Ui-Log-Cevap $baslik $(if ($null -eq $r) { 'vazgeç' } else { '(PIN girildi)' })
+    return $r
+}
+
 function Ui-Takim-Sec([int]$mevcut, [string[]]$aciklamalar) { return [int][PrimerUI.Diyalog]::TakimSec($mevcut, $aciklamalar) }
 
 # GV-09: süre dolunca İPTAL (sureBitinceOnay = false); hareket yalnız ŞİMDİ BAŞLA ile
@@ -152,6 +160,19 @@ function Ui-Ustte([bool]$ustte) { try { $script:Kabuk.TopMost = $ustte } catch {
 function Ui-Tema([bool]$koyu) { try { $script:Kabuk.TemaUygula($koyu) } catch { } }
 function Ui-Kucult { try { $script:Kabuk.WindowState = 'Minimized' } catch { } }
 function Ui-Kapat { try { $script:Kabuk.Close() } catch { } }
+# Kiosk: $true -> çerçevesiz tam ekran, en üstte, öne al (simge durumundaysa geri aç); $false -> en üstte değil, simge durumu
+function Ui-Kiosk-Pencere([bool]$kiosk) {
+    try {
+        $f = $script:Kabuk
+        if ($kiosk) {
+            if ($f.WindowState -eq 'Minimized') { $f.WindowState = 'Normal' }
+            $f.FormBorderStyle = 'None'; $f.WindowState = 'Maximized'; $f.TopMost = $true
+            $f.Activate()
+        } else { $f.TopMost = $false; $f.WindowState = 'Minimized' }
+    } catch { [Kayit]::Yaz("KİOSK PENCERE: $($_.Exception.Message)") }
+}
+# Panel görünür ve simge durumunda değil mi (kullanıcı görev çubuğundan geri açtı)
+function Ui-Pencere-Acik { try { return ($script:Kabuk.Visible -and $script:Kabuk.WindowState -ne 'Minimized') } catch { return $false } }
 
 # Simülasyon (eski SimView; görünümün SimHost / SimHostBuyuk yuvalarında)
 function Ui-Sim-Veri($analiz) { try { if ($script:SimGorunum) { $script:SimGorunum.SetData($analiz) } } catch { } }

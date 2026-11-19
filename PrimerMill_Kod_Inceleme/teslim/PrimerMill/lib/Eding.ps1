@@ -382,6 +382,7 @@ function Eding-Yeniden {
 # ================= WINDOWS BAŞLANGICI =================
 # Windows'un Başlangıç klasörüne KazimaBaslat.bat kısayolu: oturum açılınca panel (ve onunla Eding) kendiliğinden başlar
 function Windows-Baslangic-Ayarla {
+    if ($script:Kiosk) { return }   # kiosk: paneli Kabuk.ps1 açar (lib/Kiosk.ps1)
     try {
         $klasor = [Environment]::GetFolderPath('Startup')
         $lnk = [System.IO.Path]::Combine($klasor, 'PrimerMill.lnk')

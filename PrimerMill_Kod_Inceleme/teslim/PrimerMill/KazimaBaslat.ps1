@@ -57,9 +57,20 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
+# Kiosk modu (KIOSK_KUR.bat -> kiosk.on): Windows görünmez, Windows'a geçiş PIN'li (lib/Kiosk.ps1). DEMO'da kiosk yok.
+$script:KioskBayragi = [System.IO.File]::Exists([System.IO.Path]::Combine($ScriptKlasor, 'kiosk.on')) -and -not $Demo
+
 # Tek kopya: panel ikinci kez açılmasın (başlangıç görevi + kısayol aynı anda çalışırsa)
 $script:TekYeni = $false
 $script:TekMutex = New-Object System.Threading.Mutex($true, 'Local\PrimerMillPanel', [ref]$script:TekYeni)
+# Masaüstü kısayolu / ikinci kopya açık paneli öne çağırır (kiosk: Windows'a geçildiyse panel kiosk olarak geri gelir)
+$script:OneAlOlayi = $null
+try { $script:OneAlOlayi = New-Object System.Threading.EventWaitHandle($false, [System.Threading.EventResetMode]::AutoReset, 'Local\PrimerMillPanelOneAl') } catch { }
+if (-not $script:TekYeni -and $script:KioskBayragi) {
+    # Kiosk: soru yok, eskisini kapatma yok; açık panel öne gelir (Kabuk.ps1 çıkış kodu 12'yi tanır)
+    try { [void]$script:OneAlOlayi.Set() } catch { }
+    exit 12
+}
 if (-not $script:TekYeni) {
     # Arkada açık (görünmeyen / donmuş) bir kopya varsa sessizce çıkmak yerine sor
     $eski = @()
@@ -68,7 +79,7 @@ if (-not $script:TekYeni) {
     $sahte.TopMost = $true; $sahte.ShowInTaskbar = $false; $sahte.StartPosition = 'CenterScreen'; $sahte.Size = New-Object System.Drawing.Size(1, 1); $sahte.Show(); $sahte.Activate()
     $c = [System.Windows.Forms.MessageBox]::Show($sahte, "PrimerMill zaten açık (arkada çalışıyor$(if ($eski.Count) { ", $($eski.Count) kopya" })).`r`n`r`nEskisi kapatılıp PrimerMill yeniden açılsın mı?", 'PrimerMill', 'YesNo', 'Question')
     $sahte.Close()
-    if ($c -ne 'Yes') { exit }
+    if ($c -ne 'Yes') { try { [void]$script:OneAlOlayi.Set() } catch { }; exit 12 }
     foreach ($p in $eski) { try { Stop-Process -Id $p.ProcessId -Force -ErrorAction Stop } catch { } }
     try { $script:TekYeni = $script:TekMutex.WaitOne(8000) } catch [System.Threading.AbandonedMutexException] { $script:TekYeni = $true } catch { }
     if (-not $script:TekYeni) { [System.Windows.Forms.MessageBox]::Show('Eski PrimerMill kapatılamadı. Bilgisayarı yeniden başlatın.', 'PrimerMill') | Out-Null; exit }
@@ -103,7 +114,7 @@ if ($script:Demo) {
 }
 
 # ---------------- C# bileşenleri: görünüm (ui) + yardımcılar (lib) ----------------
-$csDosyalari = @('ui\PrimerVeri.cs', 'ui\PrimerUI.cs', 'lib\Kayit.cs', 'lib\NcAnaliz.cs', 'lib\SimGorunum.cs', 'lib\WebSunucu.cs', 'lib\EkranYakala.cs', 'lib\Pencere.cs')
+$csDosyalari = @('ui\PrimerVeri.cs', 'ui\PrimerUI.cs', 'lib\Kayit.cs', 'lib\NcAnaliz.cs', 'lib\SimGorunum.cs', 'lib\WebSunucu.cs', 'lib\EkranYakala.cs', 'lib\Pencere.cs', 'lib\Kiosk.cs')
 # [Eding]: demo -> sahte (EdingSim.cs); makine ve önizleme -> gerçek cncapi.dll sınıfı (önizlemede hiç çağrılmaz, ApiHazir = $false)
 if ($script:Demo) { $csDosyalari += 'lib\EdingSim.cs' } else { $csDosyalari += 'lib\EdingApi.cs' }
 try {
@@ -135,20 +146,32 @@ if ($MakineBilgisayari) {
 if ($script:Demo) { $script:ApiHazir = $true }
 
 # ---------------- Mantık modülleri ----------------
-foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'Kalibrasyon', 'Uzak', 'Denetleyici', 'ArayuzKapisi')) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', "$m.ps1")) }
+foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'Kalibrasyon', 'Uzak', 'Kiosk', 'Denetleyici', 'ArayuzKapisi')) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', "$m.ps1")) }
 if ($script:Demo) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', 'Demo.ps1')) }
 $script:PanelSurum = 'PrimerMill 2'
 
 Tercih-Baslangic
 if ($script:Demo) { Demo-Makine-Hazirla }
-try { Windows-Baslangic-Ayarla } catch { }
+$script:Kiosk = Kiosk-Algila
+if ($script:Kiosk) {
+    [Kayit]::Yaz('KİOSK MODU: kiosk.on var (tam ekran, en üstte, klavye kilidi, PIN''li çıkış)')
+    Kiosk-Kabuk-Onar
+    # Windows'a geçişte explorer başlangıç kısayolunu çalıştırıp paneli hemen geri çağırmasın
+    try {
+        $lnk = [System.IO.Path]::Combine([Environment]::GetFolderPath('Startup'), 'PrimerMill.lnk')
+        if ([System.IO.File]::Exists($lnk)) { [System.IO.File]::Delete($lnk); [Kayit]::Yaz('KİOSK: Windows başlangıç kısayolu kaldırıldı (paneli kabuk açar)') }
+    } catch { }
+} else {
+    # kiosk'ta panel Kabuk.ps1 ile açılır: Windows başlangıç kısayolu kurulmaz (explorer açılınca ikinci kopya başlatmasın)
+    try { Windows-Baslangic-Ayarla } catch { }
+}
 try { Eding-Baslangic-Kaldir } catch { [Kayit]::Yaz("BAŞLANGIÇ: Eding kaydı kontrol edilemedi: $($_.Exception.Message)") }
 
 # ---------------- Kabuk (görünüm) ----------------
 $script:Kabuk = New-Object PrimerUI.Kabuk
 $script:Kabuk.Text = $(if ($script:Demo) { 'PrimerMill 2  ·  DEMO' } else { 'PrimerMill 2' })
 if ($script:Tercih.Tema -eq 'acik') { $script:Kabuk.TemaUygula($false) }
-if ($script:Tercih.TamEkran -ne '0') {
+if ($script:Tercih.TamEkran -ne '0' -or $script:Kiosk) {
     # Eski Tam-Ekran-Uygula: çerçevesiz, ekranı kaplar, Eding ya da başka bir pencere önüne geçemez (yerleşim akışkan: ölçek döngüsü yok)
     $script:Kabuk.FormBorderStyle = 'None'; $script:Kabuk.WindowState = 'Maximized'; $script:Kabuk.TopMost = $true
 } else { $script:Kabuk.WindowState = 'Maximized' }
@@ -166,6 +189,7 @@ $script:AnaZaman = New-Object System.Windows.Forms.Timer
 $script:AnaZaman.Interval = 200
 $script:AnaZaman.Add_Tick({ Zamanlayici-Tik })
 $script:Kabuk.Add_Shown({
+    if ($script:Kiosk) { try { Kiosk-Uygula } catch { [Kayit]::Yaz("KİOSK: $($_.Exception.Message)") } }
     try { Panel-Acilis } catch { [Kayit]::Yaz("AÇILIŞ: $($_.Exception.Message)") }
     try { Okuma-Yap; Durum-Yenile } catch { }
     $script:AnaZaman.Start()
@@ -174,8 +198,18 @@ $script:Kabuk.Add_Shown({
     if ($script:Demo -and $ek) { try { Ekran-Turu-Baslat $ek } catch { [Kayit]::Yaz("EKRAN TURU: $($_.Exception.Message)") } }
 })
 $script:Kabuk.Add_FormClosing({
+    param($s, $e)
+    # Kiosk: pencereyi kapatmak (Alt+F4, KAPAT) PIN ister: kapanış iptal, panel.kapat komutu sıraya (Kiosk-Panel-Kapat)
+    if ($script:Kiosk -and -not $script:KapanisIzinli -and "$($e.CloseReason)" -eq 'UserClosing') {
+        $e.Cancel = $true
+        $script:KomutKuyrugu.Add(@{ Ad = 'panel.kapat'; Arg = ''; Kaynak = 'yerel'; Zaman = (Get-Date); Oncelikli = $false })
+        return
+    }
     $script:AnaZaman.Stop()   # ED-07: bütün işler tek zamanlayıcıda
+    Kiosk-Birak
     Panel-Kapanis
 })
 [System.Windows.Forms.Application]::Run($script:Kabuk)
+# Kabuk.ps1 için çıkış kodu: 0 normal, 10 cihaz kapanıyor, 11 kiosk'ta PIN ile kapatıldı (Windows açık)
+exit $script:CikisKodu
 
