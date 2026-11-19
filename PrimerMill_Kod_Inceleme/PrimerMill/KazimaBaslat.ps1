@@ -1867,6 +1867,7 @@ function Acilis-Eding-Sifirla {
     }
     Yaz 'Açılış: Eding açılıyor.'
     Durum-Yaz 'Eding açılıyor...' $cAltinAc
+    $script:EdingBirKezBaglandi = $false   # açılıştaki bilinçli sıfırlama: hâlâ "ilk açılış" sayılır
 }
 
 function Eding-Durum { try { return ([Eding]::StateText([Eding]::CncGetState())).Trim().ToUpper() } catch { return '' } }
@@ -1935,6 +1936,8 @@ function Baglanti-Bekcisi {
         if ($script:IsAktif) { $script:IsAktif = $false; $bar.Dancing = $false; $lblSure.Text = 'Eding kapandı'; $lblSure.ForeColor = $cKirmizi }
     }
     if (((Get-Date) - $script:SonEdingBaslatma).TotalSeconds -ge 30) {
+        # İlk açılışta Eding'i başlatan da burası; panel açıldıktan sonra kapanıp yeniden açılan Eding için otomatik home yok (GV-09)
+        if ($script:EdingBirKezBaglandi) { $script:AcilisYeniden = $true }
         Eding-Baslat
         if ($script:Tercih.OtomatikHazirlik -eq '1') { $script:AcilisDurum = 'bekliyor' }
     }
@@ -1952,6 +1955,7 @@ function Baglan {
         $rc = [Eding]::CncConnectServer('')
         # 0 = OK, 6 = sunucu zaten çalışıyor, 7 = zaten bağlı: hepsi bağlantı demek
         $script:Bagli = ($rc -eq 0 -or $rc -eq 6 -or $rc -eq 7)
+        if ($script:Bagli) { $script:EdingBirKezBaglandi = $true }
         if (-not $script:Bagli) { Yaz ("Eding'e bağlanılamadı: " + [Eding]::RCText($rc)) }
     } catch { Yaz "Bağlantı hatası: $($_.Exception.Message)"; $script:Bagli = $false }
     return $script:Bagli
@@ -3394,7 +3398,8 @@ function Btn-Home([bool]$sor = $true) {
     if (-not (Baglan)) { [Kayit]::Show("Makineye bağlanılamadı. Eding birkaç saniye içinde açılmazsa programı yeniden başlat.", 'Home', 'OK', 'Warning') | Out-Null; return }
     if ([Eding]::CncGetEMStopActive() -ne 0) { [Kayit]::Show('Önce makinedeki acil stop butonunu bırak.', 'Home', 'OK', 'Warning') | Out-Null; return }
     if (Is-Suruyor-Uyari 'Home') { return }
-    if ($sor -and -not $script:Sade -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra C kol düz, sonra X, Y, A, B.`r`n`r`nİş milinde freze olmamalı, kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
+    # GV-09: "iş milinde freze olmamalı" sorusu sade sürümde de atlanmaz (açılıştaki geri sayım penceresi aynı soruyu sorar)
+    if ($sor -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra C kol düz, sonra X, Y, A, B.`r`n`r`nİş milinde freze olmamalı (Eding'e göre: T$([Eding]::CncGetCurrentToolNumber())), kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
 
     $form.Cursor = 'WaitCursor'
     try {
@@ -3446,6 +3451,8 @@ function Hiz-Ayarla([int]$yuzde) {
 
 # ---------------- Açılışta otomatik hazırlık ----------------
 $script:AcilisDurum = 'bekliyor'   # bekliyor -> acilstop -> tamam / iptal
+$script:AcilisYeniden = $false     # Eding panel açıkken yeniden başlatıldı (otomatik hazırlık yapılmaz)
+$script:EdingBirKezBaglandi = $false
 
 function Geri-Sayim([int]$saniye, [string]$metin) {
     $f = New-Object System.Windows.Forms.Form
@@ -3463,12 +3470,13 @@ function Geri-Sayim([int]$saniye, [string]$metin) {
     $sayac = New-Object System.Windows.Forms.Label
     $sayac.SetBounds(20, 86, 420, 40); $sayac.TextAlign = 'MiddleCenter'
     $sayac.Font = New-Object System.Drawing.Font('Segoe UI Light', 22); $sayac.ForeColor = $cAltinAc
-    $sayac.Text = "$saniye"
+    $sayac.Text = "$saniye  ·  sonra iptal"
     $f.Controls.Add($sayac)
     $iptal = New-Object System.Windows.Forms.Button
     $iptal.Text = 'İptal'; $iptal.SetBounds(240, 138, 100, 34); $iptal.FlatStyle = 'Flat'
     $iptal.ForeColor = $cYazi; $iptal.BackColor = $cPanel; $iptal.DialogResult = 'Cancel'
     $f.Controls.Add($iptal)
+    $f.AcceptButton = $iptal; $f.ActiveControl = $iptal
     $simdi = New-Object System.Windows.Forms.Button
     $simdi.Text = 'Şimdi başla'; $simdi.SetBounds(120, 138, 110, 34); $simdi.FlatStyle = 'Flat'
     $simdi.ForeColor = $cAltinAc; $simdi.BackColor = $cPanel; $simdi.DialogResult = 'OK'
@@ -3477,7 +3485,8 @@ function Geri-Sayim([int]$saniye, [string]$metin) {
     $script:GsKalan = $saniye
     $t = New-Object System.Windows.Forms.Timer
     $t.Interval = 1000
-    $t.Add_Tick({ $script:GsKalan--; $sayac.Text = "$($script:GsKalan)"; if ($script:GsKalan -le 0) { $f.DialogResult = 'OK' } })
+    # GV-09/ED-06: süre dolunca İPTAL (hareket yok); hareket yalnız "Şimdi başla" ile
+    $t.Add_Tick({ $script:GsKalan--; $sayac.Text = "$($script:GsKalan)  ·  sonra iptal"; if ($script:GsKalan -le 0) { $f.DialogResult = 'Cancel' } })
     $t.Start()
     $r = $f.ShowDialog($form)
     $t.Stop(); $t.Dispose(); $f.Dispose()
@@ -3496,6 +3505,11 @@ function Acilis-Hazirla {
         return
     }
     if ((Mesgul $d) -or $d -like 'PAUSE*') { Yaz "Açılış: Eding meşgul ya da duraklı ($d), otomatik hazırlık atlandı."; $script:AcilisDurum = 'tamam'; return }
+    # GV-09/ED-06: Eding yeniden açıldıysa / bağlantı yeniden kurulduysa otomatik reset + home YOK
+    if ($script:AcilisYeniden) {
+        Yaz 'Eding yeniden açıldı: otomatik reset ve home yapılmadı. Kabini ve iş milini kontrol edip HOME''a bas.'
+        $script:AcilisDurum = 'iptal'; return
+    }
     $script:AcilisDurum = 'calisiyor'
     try {
         Yaz 'Açılış: otomatik hazırlık başladı.'
@@ -3504,9 +3518,12 @@ function Acilis-Hazirla {
         if ([Eding]::CncGetAllAxesHomed() -ne 0) {
             Yaz 'Açılış: makine zaten home alınmış.'
         } else {
-            $m = "Makine home alacak: Z, X, Y, A ve B eksenleri sırayla hareket edecek.`r`nKabinde elin olmasın, kapak kapalı olsun."
+            $tk0 = -1; try { $tk0 = [Eding]::CncGetCurrentToolNumber() } catch { }
+            $m = "Makine home alacak: Z, X, Y, A ve B eksenleri sırayla hareket edecek.`r`nİş milinde freze olmamalı (Eding'e göre T$tk0), kabinde elin olmasın, kapak kapalı olsun."
             $gs = [int]$script:Tercih.GeriSayim
-            if ($gs -le 0 -or (Geri-Sayim $gs $m)) { Btn-Home $false }
+            # GV-09: GeriSayim = 0 "her zaman sor" demektir (onaysız home yok); geri sayım dolarsa iptal
+            $basla = if ($gs -le 0) { Onay "$m`r`n`r`nHome şimdi alınsın mı?" 'Açılış' } else { Geri-Sayim $gs ($m + "`r`nBaşlamak için 'Şimdi başla'ya bas.") }
+            if ($basla) { Btn-Home $false }
             else { Yaz 'Açılış: home iptal edildi. HOME butonuyla elle başlatabilirsin.'; $script:AcilisDurum = 'iptal'; return }
         }
         if ([Eding]::CncGetAllAxesHomed() -ne 0 -and -not (Hatali (Eding-Durum))) {
@@ -4472,6 +4489,7 @@ function Eding-Yeniden {
     $script:Bagli = $false
     Start-Sleep -Seconds 1
     Yaz 'Eding yeniden başlatılıyor...'
+    $script:AcilisYeniden = $true   # GV-09: yeniden açılışta otomatik home yok
     Eding-Baslat
     $script:AcilisDurum = 'bekliyor'
 }
