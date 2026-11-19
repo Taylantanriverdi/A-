@@ -23,8 +23,7 @@ $ErrorActionPreference = 'Stop'
 # ------------------------------------------------------------------ 0) Kaynağı bul
 if (-not $Kaynak) {
     $adaylar = @(
-        [System.IO.Path]::Combine($PSScriptRoot, '..', 'PrimerMill', 'KazimaBaslat.ps1'),
-        '/home/user/A-/PrimerMill_Kod_Inceleme/PrimerMill/KazimaBaslat.ps1'
+        [System.IO.Path]::Combine($PSScriptRoot, '..', 'PrimerMill', 'KazimaBaslat.ps1')
     )
     foreach ($a in $adaylar) { if (Test-Path -LiteralPath $a) { $Kaynak = (Resolve-Path -LiteralPath $a).Path; break } }
 }

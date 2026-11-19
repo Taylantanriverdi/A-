@@ -4,7 +4,7 @@
 param([string]$Kaynak = '')
 $ErrorActionPreference = 'Stop'
 if (-not $Kaynak) {
-    foreach ($a in @([System.IO.Path]::Combine($PSScriptRoot, '..', 'PrimerMill', 'KazimaBaslat.ps1'), '/home/user/A-/PrimerMill_Kod_Inceleme/PrimerMill/KazimaBaslat.ps1')) { if (Test-Path -LiteralPath $a) { $Kaynak = (Resolve-Path -LiteralPath $a).Path; break } }
+    foreach ($a in @([System.IO.Path]::Combine($PSScriptRoot, '..', 'PrimerMill', 'KazimaBaslat.ps1'))) { if (Test-Path -LiteralPath $a) { $Kaynak = (Resolve-Path -LiteralPath $a).Path; break } }
 }
 # Kaynak klasörse (teslim/PrimerMill: fonksiyonlar lib/*.ps1 içinde) bütün .ps1 dosyaları (*_Klasik hariç) tek metin olarak ayrıştırılır
 if (Test-Path -LiteralPath $Kaynak -PathType Container) {

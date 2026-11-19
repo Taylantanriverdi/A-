@@ -16,7 +16,7 @@ Bu ortamda Windows ve makine yoktu: hiçbir değişiklik makinede ya da Windows'
 | 6. Otomatik kalibrasyon | 1 | 3 | 7 | 5 |
 | 7. Sayı, kültür, kodlama | 0 | 1 | 5 | 13 |
 | 8. Kullanılabilirlik | 1 | 13 | 14 | 5 |
-| Son kontrol (yeni kod) | 0 | 0 | 4 | 8 |
+| Son kontrol (yeni kod, iki tur) | 0 | 0 | 5 | 11 |
 
 Alanlar arasında örtüşen bulgular var. Örneğin uzaktan devam GV-06 = ED-01 = UZ-02, Raf-Kontrol GV-07 = ED-05 = MC-01. Birleşik listede bunlar bir kez sayıldı.
 
@@ -97,6 +97,8 @@ Windows PowerShell 5.1 ile çalıştırılmadı. İlk iş olarak Windows'ta çal
 | 14 | ED-24: EdingKapat ikinci API istemcisi olarak bağlanıyor | Panel açıkken EdingKapat; iş sürerken kapatmamalı |
 | 15 | Fiziksel acil stop var mı? (koddaki yorum: "Fiziksel buton yok") | Yoksa yazılım ACİL STOP'u tek yol; Esc ve diyalog düğmesini dene |
 | 16 | Elle frez değişiminde (M0) `CncGetState` metni PAUSE mı? | Elle modda bir iş, adım pencereleri |
+| 17 | SK-16: yuva ayarı sihirbazında YAKLAŞ yalnız GİT noktasından X/Y ≤ 2 mm, Z/A/B ≤ 0.05 sapmada | GİT → 1 mm jog ile ortala → YAKLAŞ iner; 3 mm jog ya da Z− sonrası reddedilmeli |
+| 18 | Yeni panel, ekran ölçeği %125/%150 | Windows'ta ekran turu: bulanıklık, taşma yok |
 
 ## 6. Uygulanmayan öneriler
 
@@ -426,8 +428,8 @@ Kapsam: `PrimerMill/KazimaBaslat.ps1` içindeki `OkRot` (5068), `OkModel` (5076)
 
 Test betikleri (sonra `tests/` klasörüne taşınacak):
 
-- `/tmp/claude-0/-home-user-A-/f0e04310-dd66-50d0-ba1a-5e49a35acb88/scratchpad/work6/OtoKal_Hesap_Testi.ps1`: ana test. AST ile çıkarım yapar, 66 kontrol içerir, yaklaşık 23 s sürer.
-- `/tmp/claude-0/-home-user-A-/f0e04310-dd66-50d0-ba1a-5e49a35acb88/scratchpad/work6/Kal_NC_Cep_Testi.ps1`: disk kalibrasyonu test programındaki cep çaplarını denetler.
+- `tests/OtoKal_Hesap_Testi.ps1`: ana test. AST ile çıkarım yapar, 66 kontrol içerir, yaklaşık 23 s sürer.
+- `tests/Kal_NC_Cep_Testi.ps1`: disk kalibrasyonu test programındaki cep çaplarını denetler.
 
 Çalıştırma: `pwsh -NoProfile -File tests/OtoKal_Hesap_Testi.ps1 [-MonteKarlo 40] [-Hizli] [-Csv sonuc.csv]`. Windows PowerShell 5.1'de de çalışır (`powershell -ExecutionPolicy Bypass -File ...`). Çıkış kodu başarısız test sayısıdır. Şu anki sonuç **3** başarısız test; üçü de KL-02 hatasından geliyor. Hata düzeltilince sonuç 0 olmalı. `Kal_NC_Cep_Testi.ps1` şu an 8 ile çıkıyor (KL-03).
 
@@ -575,7 +577,7 @@ Sonuç: hesap, bilinen hataları gürültüsüz veride 1e-6 mm/° düzeyinde ger
 ## 07 - Sayı, kültür ve metin kodlaması incelemesi (Faz 2, salt okunur)
 
 Kapsam: `PrimerMill/KazimaBaslat.ps1`, `EdingKapat.ps1`, `HataBul.ps1`, `.bat` dosyaları, `portal.html`, `uzak.html`, `Eding/macro.cnc`, `ornekler/*.nc`.
-Hiçbir proje dosyası değiştirilmedi. Deney betikleri: `/tmp/claude-0/-home-user-A-/f0e04310-dd66-50d0-ba1a-5e49a35acb88/scratchpad/work7/t1.ps1 ... t8.ps1`.
+Hiçbir proje dosyası değiştirilmedi. Deney betikleri: (geliştirme ortamındaki geçici yardımcı betikler, teslime dahil değil).
 
 **Deney ortamı ve sınırı:** pwsh 7.4.6 (.NET 8, ICU) ile `[cultureinfo]::CurrentCulture = 'tr-TR' / 'zh-CN'` ayarlanarak denendi. Hedef ortam Windows PowerShell 5.1 (.NET Framework 4.x) olduğu için, davranışı 5.1'de farklı olabilecek maddeler "BELİRSİZ" diye işaretlendi. 5.1 bu makinede çalıştırılamadı.
 
@@ -787,3 +789,348 @@ Mimari/test notları
 22. 1024x768, 1366x768, 1920x1080 ve DPI %100/%125/%150 için ekran görüntüsü karşılaştırma listesi (elle, makinede) teslimata eklenir.
 
 MAKİNEDE DOĞRULA listesi (arayüz değişikliklerinden hareket eden maddeler): KU-01 (PENS AÇ onayı, takım düşmesi), KU-03 (MDI G10 koruması), KU-13 (HOME/TEMİZLİK/PARK onay ve iptal), KU-16 (DEVAM onayı ve kapak durumu), KU-19 (basılı tutma jog), KU-29 (uzaktan komut kümesi).
+
+---
+
+# Ek B: Düzeltme kayıtları
+
+## Faz 4a düzeltmeleri — ajan A (KazimaBaslat.ps1, EdingKapat, HataBul, YoneticiKurulum, portal/uzak.html)
+
+Dal: `claude/exciting-allen-zzq037`. Her commit yalnız bu ajanın dosyalarını içerir, push edilmedi.
+Her değişiklikten sonra: PS ayrıştırıcı 0 hata, BOM (`efbbbf`) ve CRLF korundu; değişen C# `Add-Type` blokları
+`mcs -langversion:5` ile derlendi (WebSunucu ve NcAnaliz ayrıca mono ile çalıştırılıp denendi).
+
+| ID | Ne değişti (işlev) | Commit | MAKİNEDE DOĞRULA |
+| --- | --- | --- | --- |
+| K9 (KL-02/KL-03) | `OtoKal-Hesapla-Ic` `$buyukAdim`/`$artikMax` 0.0; `OtoKal-Oku` `$farkMax` 0.0; `Kal-NC-Uret` cep yarıçapı `Max(0.0, …)` | 95d6e3d | **evet**: Kal-NC-Uret cep çapları değişti (Ø5/Ø7 artık Ø6 değil). Eding simülasyonunda test 1 programını üretip cep çaplarını izle; makinede boş PMMA diskte %30 hızla kaz, cepleri kumpasla ölç (Ø4/5/6/7/8). |
+| GV-05 | C# `Kayit`: `AcilStop` kancası (PS: `Acil-Stop 'diyalog'`), KeyPreview Esc = ACİL STOP, küçük kırmızı ACİL STOP düğmesi, `CancelButton` yok; Enter = son tuş (HAYIR / VAZGEÇ, tek tuşta TAMAM); açık pencere sayacı | b6863ee | evet: bir onay penceresi açıkken (ör. hız %130) Esc ve kırmızı düğme işi kesiyor mu, pencere HAYIR ile kapanıyor mu (önce simülasyon). |
+| K1 (GV-01) | Yeni `Is-Suruyor` / `Is-Suruyor-Uyari` (RUN*, SEARCHING, AXISJOG, IPJOG, PAUSE*, `CncGetPauseStatus`≠0, `$script:IsAktif`). Kullanıldığı yerler: `Hazir-Mi` (→ `Hazir-Hareket`, tüm jog/M6/pens/G54/#4xxx yazanlar), `Mdi-Gonder`, `Pens-Ac-T0`, `Eding-Yeniden`, `Yeni-Blok`, `Btn-DosyaSec`, `Btn-Home`, `Frez-Modu-Yaz`, `Degisken-Yaz`, `Kal-Test-Hazirla`, `OtoKal-Hazirla`, uzaktan `sec`/`blok`, frez modu kutusu. RESET duraklamada da onay ister; `Acilis-Hazirla` duraklı işte atlar | d75648e | evet: iş DURAKLAT'ta iken jog, Pens aç, MDI, G54 kaydet, Eding yeniden başlat, Yeni blok, HOME reddediliyor; DEVAM, DURDUR, ACİL STOP, hız çalışıyor. Manuel frez M0 adımında `CncGetState` metni ne? |
+| KU-02 / KU-03 | `Btn-Durdur($sor)`: ana ekran düğmesi iş sürerken/duraklıyken onay (varsayılan HAYIR); uzaktan ve manuel diyalog sormaz. `Mdi-Gonder`: tam satırı gösteren onay | e55ec74 | hayır |
+| K2 (GV-02/KU-01) | Yeni `Ismili-Durdur-Bekle`: `M5`, sonra `CncGetActualSpeed()` |değer|<1 olana kadar en fazla 8 sn; olmazsa pens açılmaz. `Pens-Ac-T0` her çağrıda onay ister (ana ekran PENS AÇ, Ayarlar › İş mili, Yuva ayarı) | cd99fe5 | **evet**: `CncGetActualSpeed` birimi ve M5 sonrası gerçekten 0'a indiği bilinmiyor. Simülasyonda ve makinede S10000 M3 çalıştır, Pens aç'a bas: iş mili durana kadar beklemeli, pens ancak durunca açılmalı. Hız 0 okunmazsa açmayı reddettiğini gör (pense frez takılı değilken dene). |
+| ED-02 | `Hareket-Bitene-Kadar-Bekle`: durum `''` → false, meşgul değil iki kez teyit, zaman aşımı kaydı. Sonucu atan güvenlik çağrıları ($ok'a bağlandı): `G54-Ureticiye-Don`, `Kal-Uygula`, `OtoKal-Uygula`, Temizlik/Park | f8f202a | evet (dolaylı): MDI sonrası Eding'in RUNNING'e geçme süresi (400 ms varsayımı) değişmedi; Temizlik ve kalibrasyon UYGULA simülasyonda bir kez çalıştırılmalı. |
+| K6 (MC-04/GV-04/MC-08) | Yeni `Makro-Surum-Oku` (#4038=0, gosub pm_surum, #4038), `$BeklenenMakroSurum = 4`, `Bayrak-Sifirla` (#4039=0 ya da orijinal makroda #4900=0 + geri okuma), `Makro-Baslangic-Kontrol` (bağlantıdan sonra bir kez, tüm modlarda; uyumsuzsa uyarı), `Makro-Hazir-Mi` (BAŞLAT/Devam/Yeni blok öncesi; uyumsuzsa Eding'i yeniden başlatma önerisi), `Takim-Bildir` (#bayrak=1 rc+geri okuma → M6 Tn rc+bekleme → #bayrak=0 rc+geri okuma → takım no). `Manuel-Macro-Kontrol` == 4. `Devam-Baslat` sürümü her seferinde Eding'den okur. Orijinal makroda yama Eding'e yüklenmemişse (`MakroYamaBekliyor`) bildirim reddedilir | 9ff46c9 | **evet**: Devam'da "Eding'deki frez T_x, iş milinde T_y" durumunda HAREKET OLMAMALI. Simülasyonda Eding'i T2'de bırakıp Devam'da T3 seç: eksenler kıpırdamamalı, Eding T3 göstermeli, #4039 sonra 0. Makine üstünde ilk kez el ACİL STOP'ta, %30 hızla. Ayrıca Eding eski makroyla açıkken uyarının çıktığını gör. |
+| GV-08 | `Takim-Degisimi-Suruyor-Mu` (RUN-SUB, #4034≠0, panelden gönderilen M6/pm_*/user_1 sürerken), `Takim-Belirsiz-Isaretle` (ACİL STOP, DURDUR, RESET; `panel_ayarlar.ini` `TakimBelirsiz=1`), `Takim-Belirsiz-Coz` (T0–T6 seçimi → farklıysa `Takim-Bildir`), `Takim-Kapisi` (BAŞLAT, Takım değiştir/ölç, Frez bırak, Yeni blok). Uzaktan BAŞLAT bu durumda reddedilir | 4cc7b5a | **evet**: simülasyonda M6 T2 sırasında ACİL STOP → RESET → BAŞLAT: frez sorusu gelmeli, seçim Eding'den farklıysa hareketsiz bildirim (yukarıdaki K6 denetimi). |
+| KL-04 | `Ayar-Yedekle` bool döner, dosya yazılıp geri okunarak doğrulanır, #5211–#5215 de yedeklenir. Tüm çağıranlar `$false`'ta durur; `Ayar-Kaydet`, `Z-Alma-Yap`, `G92-Sifirla`, `Ayar-Geri-Yukle` da önce yedek alır | f6049d7 | hayır |
+| K5 (GV-07/ED-05/MC-01) | `Raf-Kontrol` hiçbir şey yazmaz: #4010/#4011/#4020/#4021/#4031/#4032 0 ise `$script:RafEksik`, 3 tık üst üste sürerse bir kez günlük + mesaj, durum satırında "Takım yuvaları/sensör kayıtlı değil: Ayarlar › Yuva ayarı". `Raf-Hazir-Mi` BAŞLAT/M6/Takım değiştir/Takım ölç/Frez bırak/Yeni blok'u engeller. `Yuva-Varsayilan` tek yazma yolu: önce yedek (başarılı olmalı), yazılacak tüm değerler gösterilir, onay; kayıtsızsa sensör (G54 X−72.25, G54 Y) ve değişim noktası (−64.25/−52/0) da eklenir | 46ea5d2 | **evet**: varsayılan sayılar DEĞİŞTİRİLMEDİ ama üreticiden farklı: T1 Y −89.166 / A 23 / B 0 (orijinal makro PickTool1: Y −88.966 / A 23.2 / B −1), alma Z −45 (cnc.ini #4000 = −46.9). "Doğrulanmış değerlere dön"e basmadan önce T1 yuvasının gerçek konumunu YUVA AYARI ile ölç; T1 al testini %30 hızla yap. |
+| K7 (GV-03) | `Yuva-Yaklas`: Sensör dahil her noktada iş milinde frez varsa inmez | a444a81 | **evet**: T0 iken sensör üstünde Yaklaş (#4001 = −26) boş pens burnu ile sensör arasında boşluk kalıyor mu? Kalmıyorsa sensör için yaklaşma hedefi #4003 olmalı (öneri, uygulanmadı). |
+| K8 (KL-01) | `OtoKal-Prob-Gecerli-Mi`: son 10 dk içinde prob testinde TEMAS görülmeli ve şu an TEMAS YOK okunmalı; `OtoKal-Hazirla` ve `PM_kalibrasyon_otomatik*` BAŞLAT bunu ister. `OtoKal-NC-Uret`'e KL-01 önerisini gösteren yorum | 3ed61cd | **evet**: prob G-kodu (6–8.7 mm arama, F120/F200) DEĞİŞMEDİ; ilk deneme yalıtkan sahte yüzeyle (köpük/ahşap), %50 ilerleme, el ACİL STOP'ta. |
+| K3 / K4 / UZ-03 / UZ-04 / UZ-05 / UZ-08 | C# `WebSunucu`: fare/klavye P/Invoke ve `Tikla`/`Yazi` silindi, `/api/tikla` `/api/tus` → 403 `{"hata":"Uzaktan tıklama kapalı"}`; CORS başlıkları yok; Host IP/localhost/makine adı değilse 403; PIN zorunlu (<6 hane → 503), IP başına 5 yanlış → 60 sn 429; PIN `X-PIN` başlığında, sorgu yalnız GET; `/api/yukle` ayrılmış ad, iş sürerken (`YuklemeKilit`) ve seçili dosya (`SeciliAd`) reddi; kuyrukta 30 sn'den eski/iptal istek çalıştırılmaz. PS: `Uzak-Engel` (Kayit penceresi, dosya seçme penceresi, modal form, Ayarlar, manuel diyalog, Manuel-Istek), uzak `baslat` duraklı işi devam ettirmez, `sec` PM_kalibrasyon_* reddi, `Yeni-Pin` (kısa/boş PIN → 6 haneli rastgele), PIN günlüğe yazılmaz, PIN kaydet 6–8 hane. portal.html/uzak.html: tıklama/klavye kaldırıldı, X-PIN, 429; portal başka cihazlar için yalnız ekran görüntüsü + cihaz sayfası bağlantısı | f0cf74b | evet: telefondan PIN ile izleme, dosya yükleme, BAŞLAT; makinede bir onay penceresi açıkken uzaktan BAŞLAT reddi; DURAKLAT'ta uzaktan BAŞLAT reddi. (mono ile yerel denendi: 403/401/429/400/409 kodları doğru.) |
+| GV-09 / ED-06 | `Geri-Sayim` süre dolunca İPTAL, Enter = İptal; `GeriSayim=0` → onay penceresi; `$script:AcilisYeniden` (Eding panel açıkken bağlantıdan sonra yeniden başlatıldıysa ya da `Eding-Yeniden`) → otomatik reset+home yok; açılış sorusu ve HOME düğmesi (sade dahil) "iş milinde freze olmamalı" sorusunu atlamaz | 0b426ef | evet: panel ilk açılışında geri sayım dolunca home YAPILMAMALI; Eding'i görev yöneticisinden kapat → panel yeniden açar, home kendiliğinden başlamamalı. |
+| ED-08 | `Acil-Stop`: önce abort + çıkışlar, bağlı değilse bir kez `Baglan`, sonra durum günlüğü, `Tercih-Yaz` en sonda. `CncReset` kaldırılmadı (yorum) | f97e1af | **evet**: ACİL STOP sonrası `CncReset` sürücüleri enerjilendiriyor mu? Enerjiliyse reset çağrısının kaldırılması önerilir (uygulanmadı). |
+| ED-07 | Ana tık gövdesi `Ana-Tik`'e alındı, `TikMesgul` bayrağı + finally; açılış home'u ve makro kontrolü bayrak bırakıldıktan sonra (`TikSonraki`); koordinat (50 ms) ve manuel (400 ms) zamanlayıcılarına koruma; FormClosing'de `$manuelZaman`, `$tmrProb` durur, Eding bağlantısı kapanır | bfac63c | hayır (dolaylı: açılış home'u yine tıktan başlar) |
+| ED-10 | Get-Process/Get-ChildItem `-ErrorAction Ignore`; `Hatalari-Kaydet` `$Error`'ı okuyup boşaltır | 5ed116d | hayır |
+| MC-06 | `Otomatik-Gecis-Uygun-Mu`: manuel→otomatik (Frez-Modu-Yaz ve Ayarlar kutusu) iş milinde T0..T6 dışı takım varsa reddedilir | 5f2c648 | hayır |
+| KD-01 / KD-04 | C# `NcAnaliz`: yorum ve tırnak içi atıldıktan sonra `rakam,rakam` → hata (ilk 5 satır + toplam); `Devam-NC-Uret` yorumdaki dosya adı `[^A-Za-z0-9_.\- ]` → `_` | 7dc9376 | evet (az): devam programında yalnız ilk yorum satırı değişir; parantezli adlı (ör. `is (1).nc`) bir dosyayla devam programı üretip Eding'de yükle. |
+| PS-02 / PS-09 | `Eding-Baslangic-Kaldir`: HKCU, HKLM 32 bit, HKLM 64 bit (`RegistryKey.OpenBaseKey(…, Registry64)`) Run; yedek `AppendAllText(UTF8)` | 87da94b | hayır |
+| PS-01 | `YoneticiKurulum.bat`: schtasks sonrası tek satır powershell ile `ExecutionTimeLimit = PT0S` | b3f176c | hayır (Windows'ta `schtasks /query /tn PrimerMill /xml` ile `<ExecutionTimeLimit>PT0S` görülmeli) |
+| ED-24 / PS-05/06/07/08 | `EdingKapat.ps1`: cncapi.dll ile Eding durumu (RUN*/PAUSE*/SEARCHING/AXISJOG/IPJOG/duraklama) → kapatmaz (çıkış 1), okunamazsa sorar; panel yalnız `powershell.exe`; süreç adı `ayarlar.txt`'ten (yoksa `cnc`); CRLF. `EdingKapat.bat`: SysWOW64 PowerShell, başarısızlıkta "KAPATILMADI" | d66c947 | evet: panel bağlıyken EdingKapat'ın ikinci API istemcisi olarak bağlanıp ayrılması paneli / Eding'i etkilemiyor mu; iş sürerken çalıştırınca kapatmamalı. |
+| (ED-10 sonrası) | `HataBul.ps1`: panel hatalarının log dosyasında olduğunu yazar | 490e5b1 | hayır |
+
+## Testler
+
+- `tests/Calistir.ps1` (pwsh 7.4): 7 testten 6'sı geçti (Sözdizimi, Ayar, EdingSim, GKod_Altin, Kal_NC_Cep, Sayi_Kultur).
+- `tests/Kal_NC_Cep_Testi.ps1`: 15/15 geçti (önce 9 kalıyordu).
+- `tests/OtoKal_Hesap_Testi.ps1 -Hizli`: 36 geçti, 1 kaldı (önce 3 kalıyordu). Kalan madde "OtoKal-Oku çift ölçüm farkı
+  (satır 5329 ifadesi)" panel kodunu değil, testin içine **birebir kopyalanmış eski ifadeyi** (`$farkMax = 0; …`) çalıştırıyor;
+  paneldeki ifade düzeltildi (`$farkMax = 0.0`). Test dosyasını düzenlemek bu ajanın işi değil: testte satır 253 `0.0` yapılmalı.
+
+## Uygulanmayanlar / sınırlar
+
+- **CncReset'in ACİL STOP'tan kaldırılması (ED-08 c):** karar gereği kaldırılmadı; sürücü enerjisine etkisi makinede doğrulanmalı.
+- **Prob G-kodu arama mesafesi/hızları (KL-01 öneri 2–3):** karar gereği değiştirilmedi, yalnız yorum.
+- **Yuva/sensör varsayılan sayıları (MC-02):** değiştirilmedi; üreticiden farkları yukarıda.
+- **Sensör için Yaklaş hedefinin #4003 olması (GV-03 öneri):** uygulanmadı (hareket hedefi değişikliği); frez varken artık hiç inmiyor.
+- **Takim-Bildir sırasında konum değişirse CncAbortJob (GV-04 öneri):** uygulanmadı; M6 bildiriminin hareketsiz olduğu yalnız sürüm (4) ve bayrak geri okumasıyla güvenceye alındı.
+- **Orijinal makro (#4900 yolu) için Eding'e yüklü yama doğrulanamıyor:** dosyada `pm_pens_t0` olması ve bu oturumda yama yapılıp Eding'in yeniden açılmamış olması kontrol ediliyor; Eding'e gerçekten yüklenip yüklenmediğini sorgulayan bir alt program orijinal makroda yok.
+- **Makro sürümü uyumsuzken BAŞLAT da engelleniyor** (karar yalnız Devam ve uyarı istiyordu): panel sürüm-4 makro davranışlarına (MC-03/06/07) güvendiği için uyumsuz makroyla iş başlatmak güvensiz sayıldı; operatöre Eding'i yeniden başlatma önerilir.
+- **K5 #4031/#4032 otomatik modda da zorunlu:** karar listesine uyuldu; otomatik modda değişim noktası kullanılmasa da BAŞLAT engellenir (Yuva-Varsayilan bunu tek basışta doldurur).
+- **Uzaktan erişim "sihirbaz" tanımı:** Ayarlar penceresi açıkken uzaktan başlat/seç/blok reddedilir (yuva ayarı sırasında operatör makinede olabilir).
+- **Portal çoklu cihaz:** CORS kaldırıldığı için portal sayfası yalnız kendisini yayınlayan makinenin durumunu okur/yükleme yapar; diğer cihazlarda yalnız ekran görüntüsü (GET, PIN sorguda) ve "Cihaz sayfası ↗" bağlantısı var.
+- **`/api/ekran` GET'te PIN sorgu parametresinde** kalıyor (img etiketinin başlık gönderememesi; karar "GET için sorgu kalsın").
+- **MC-05 (macro pm_pens_t0 başında m5):** makro ajanının işi; panel tarafı M5'i ayrıca gönderiyor.
+
+## macro.cnc düzeltmeleri (4. aşama)
+
+Dosya: `PrimerMill_Kod_Inceleme/Eding/macro.cnc` (CRLF ve saf ASCII olarak kaldı, 856 → 932 satır, 47 → 48 alt program).
+Temel: `35a684f`. Dal: `claude/exciting-allen-zzq037` (push yapılmadı).
+Denge denetimi: (geliştirme ortamındaki geçici yardımcı betikler, teslime dahil değil) (sub/endsub, if/else/endif, while/endwhile, köşeli parantez, tırnak, gosub hedefleri, yinelenen ad, ASCII, CRLF, LinuxCNC/Fanuc izleri). Her commit'ten sonra çalıştırıldı: **0 hata**, 0 ASCII dışı bayt, tek başına LF yok.
+Satır numaraları son sürüme göredir.
+
+| ID | Değişiklik (alt program, satır) | Commit | MAKİNEDE DOĞRULA |
+| --- | --- | --- | --- |
+| MC-05 / GV-02 (K2) | `pm_pens_t0` (410–416): `M54 P2`'den önce `m5`, `m9`, `g4 p3`. Makroda ve orijinalde M5 sonrası hazır bir durma beklemesi **yok** (change_tool yalnız `m5 m9`), bu yüzden 3 s varsayıldı. | `dc09a7a` | **EVET.** 1) Simülasyonda `gosub pm_pens_t0`: M5 → 3 s bekleme → pens aç → T0 sırasını gözle. 2) Makinede frezsiz/takılı ama boşta: `S24000 M3`, sonra PENS AÇ; iş milinin pens açılmadan önce **tamamen durduğunu** kronometreyle doğrula. 3 s yetmiyorsa `g4 p` değerini ölçülen süre + pay yap. |
+| MC-04 / GV-04 (K6) | `home_all` (145–146) ve `check_empty_tool` (919–920) başında `#4039 = 0`. `change_tool` içindeki `#4039` dalı değişmedi. | `6d2e859` | **EVET.** Simülasyonda `#4039 = 1`, sonra `gosub check_empty_tool` (T0'da) → `#4039` 0 olmalı; ardından `T2 M6` gerçek değişim akışına girmeli. Aynısını `gosub home_all` ile dene. Panelin Devam yolu (`#4039=1; M6 Tn; #4039=0`) hâlâ hareketsiz takım ataması yapmalı. |
+| MC-07 | `user_1` (31–39): `#5067 == 0` iken gerçek makinede (`#5380 == 0` ve `#5397 == 0`) `errmsg "error probe not triggered: no tool on the spindle, G92 not set"`; simülasyonda eski `warnmsg` korundu (simülasyonda prob tetiklenmediği için her değişim hata verirdi). | `a45b82d` | **EVET.** Akış: errmsg makroyu durdurursa sonraki `g0 z[#5063]`, `G92` ve Z kalkışı çalışmaz; makine prob sonu Z'sinde (#4004 = −14) sensör üstünde kalır. Makinede frezsiz `gosub user_1`: hata mesajı çıkmalı, G92 Z ofseti (Eding ekranındaki G92 değeri) **değişmemeli**, makine sensör üstünde durmalı (sonra elle Z'yi kaldır). `errmsg`'in gerçekten durdurduğu BELİRSİZ idi (rapor varsayımı) — burada kesinleştir. |
+| MC-03 / MC-14 | Yeni `sub pm_yuva_kontrol` (355–397), `change_tool` otomatik dalında ilk hareketten önce çağrılır (239–240). Denetim: `#4010 ≠ 0`, `#4017 ≠ 0`, değişimde kullanılan yuvaların (#5008 ve #5011, T1..T6) Y'si `#4011..#4016 ≠ 0`, `#4000 < #4001`, `#4001 < #5163`. Yalnız `errmsg`, hareket yok. `>=` Eding makrosunda hiç kullanılmadığından `[[a > b] or [a == b]]` biçimi seçildi. `#4018` (B) denetlenmez: 0 geçerli değer (panel varsayılanı B 0.0). | `2c51030` | **EVET** (yalnız durdurma, ama değişim akışına girildiği için). Simülasyonda: `#4013 = 0`, `M6 T3` → hareketsiz hata; `#4000 = -20` (> #4001 −26) → hareketsiz hata; doğru değerlerle (cnc.ini: −46.9 / −26 / 3.8) normal değişim. Mevcut kayıtlı değerlerle makinede bir değişimin hata vermeden geçtiğini kontrol et. |
+| MC-06 | `change_tool` otomatik dalı (230–237): `#5008 < 0` veya `> 6` ise `errmsg` (önce PENS AÇ ile T0 yapılmalı); `#5011 < 0` reddedilir. Hareketten önce. | `6defcee` | **EVET.** Simülasyonda `#4030 = 1`, `M6 T7`; sonra `#4030 = 0`, `M6 T2` → hareketsiz hata vermeli (bugün Drop atlanıp Pick yapılıyordu). |
+| MC-08 (sürüm) | `pm_surum` (406): `#4038 = 4`. Panel beklentisi KazimaBaslat.ps1'de ayrıca güncellenir. | `48505f1` | Hayır (hareket yok). Eding yeniden açıldıktan sonra panelden `gosub pm_surum` → `#4038 = 4`. |
+
+Not: Hata mesajlarından önce `change_tool` yalnız `TCAGuard off`, ZHC kapatma ve `m5 m9` yapıyor (hareket değil); MC-17'deki gibi hata sonrası TCAGuard/ZHC geri açılmıyor (değişmedi).
+
+## Makinede deneme sırası
+1. Eding simülasyon modunda yukarıdaki her senaryo (özellikle MC-03, MC-04, MC-06 hata yolları ve normal T1/T2 değişimi).
+2. Makinede düşük ilerleme (F override %10), önce frezsiz: `gosub pm_pens_t0` (iş mili dönerken), `gosub user_1` (frezsiz), tek bir otomatik `M6 T1`.
+3. Sonra frezli normal bir iş başı (`GOSUB CHECK_EMPTY_TOOL`, `T1 M6`).
+
+## Uygulanmayan öneriler
+| ID | Öneri | Neden uygulanmadı |
+| --- | --- | --- |
+| MC-01 / MC-02 (KRİTİK/YÜKSEK) | Yuva koordinatları/ortak X-A-B-Z; yuva başına A/B/Z değişkenleri, T1 için ayrı değerler | Koordinat ve hareket değişikliği; gerçek yuva konumları makinede ölçülmeden yazılamaz. Panel tarafındaki `RafVarsayilan` (#4000 −45) de ayrıca ele alınmalı. |
+| MC-07 (ek) | Prob tetiklenmezse `errmsg` öncesi Z'yi güvenliğe kaldırmak | Yeni hareket ekler; görev kuralı gereği yalnız öneri. Operatör hata sonrası Z'yi elle kaldırmalı. |
+| MC-10 | Her `errmsg` öncesi `g53 g90 g0 z[#5163]` | Yeni hareket. |
+| MC-11 | `check_pressure` zaman aşımı (sayaç, Z kalkışı, errmsg) | Hareketi ve bekleme davranışını değiştirir; `M56 P1`'in bloklayıcı olup olmadığı BELİRSİZ. |
+| MC-12 | m100 davranışı (mutlak fark + errmsg), `#4005 ≤ 0` denetimi | m100 davranışı bilinçli olarak korunuyor; ORTA önem, kapsam dışı bırakıldı. |
+| MC-05 (ek) | İş mili dönüş durumunu okuyup dönüyorsa `errmsg`; doğru durma süresi | Eding'de güvenilir dönüş durumu değişkeni BELİRSİZ; süre makinede ölçülmeli. |
+| MC-06 (ek) | Manuel modda (#4030 = 1) T aralığını sınırlamak | Manuel modda T7+ bilinçli kullanılabilir; panel tarafında otomatiğe geçişte T0 istenmesi daha uygun. |
+| MC-03 (ek) | "0 = ayarsız" yerine ayrı "kaydedildi" bayrağı; #4018 için de denetim | Yeni kalıcı değişken ve panel değişikliği gerektirir; B = 0 geçerli olduğundan sıfır denetimi yanlış hata üretir. |
+| MC-04 (ek) | Bayrağı kalıcı olmayan bir değişkene taşımak; panel iş başında #4039/#4900'ü sıfırlasın | Panel sözleşmesini değiştirir (KazimaBaslat.ps1 başka ajanda); #1–#999 kalıcılığı BELİRSİZ. |
+| MC-09, MC-13, MC-15…MC-23 | ORTA/DÜŞÜK | Görev kapsamı yalnız KRİTİK/YÜKSEK koruma denetimleri. |
+| Panel (`Macro-Pens-Yamasi`, KazimaBaslat.ps1:2601–2620) | Eski makrolara eklenen `pm_pens_t0` yamasında da `m5`/`g4` yok | Panel dosyası bu görevin kapsamı dışında; PrimerMill makrosunda `pm_pens_t0` olduğu için yama zaten atlanır. |
+
+## PrimerMill 2 — entegrasyon raporu (görünüm ↔ mantık, demo modu, teslim klasörü)
+
+Dal: `claude/exciting-allen-zzq037` (push yapılmadı). Proje: `/home/user/A-/PrimerMill_Kod_Inceleme`.
+
+## Commit'ler (sırayla)
+
+| Commit | İçerik |
+| --- | --- |
+| `f7aa424` | `ui/PrimerVeri.cs` ayrıldı (MakineDurumu vb., WinForms'suz); Yuva ayarı GİT/YAKLAŞ `ayar:` argümanı; geri sayım açıklaması düzeltildi |
+| `19c0e22` | **Mekanik taşıma**: `tests/tasima/tasi.ps1` eski panelden `lib/*.ps1` üretti (yalnız 3 mekanik dönüşüm); C# sınıfları `lib/*.cs` |
+| `047e088` | Taşınan kodun arayüz kapısına uyarlanması (bütün elle farklar bu commit'te okunabilir) |
+| `6011714` | `lib/Denetleyici.ps1` (tek zamanlayıcı, izin tablosu, dağıtıcı, MakineDurumu) + `lib/ArayuzKapisi.ps1` |
+| `f39d9a8` | Önyükleme `KazimaBaslat.ps1`, demo, başlatıcılar, klasik panel kopyası, `P_CNC_icin/macro.cnc` |
+| `140468a` | Testler: Denetleyici, Taşıma kanıtı, Demo ekran; eski testlerin klasör kaynağı |
+| `98f9782` | Demo makinesi yuvaları dolu + yavaş iş; ARAYUZ_API notları |
+
+`PrimerMill/` (düzeltilmiş eski panel) **hiç değiştirilmedi**.
+
+## Teslim klasörü `teslim/PrimerMill/`
+
+| Dosya | Not |
+| --- | --- |
+| `KazimaBaslat.bat` | Yeni panel; SysWOW64 PowerShell, `-STA -ExecutionPolicy Bypass`, `%*` geçer (`KazimaBaslat.bat /demo`) |
+| `KazimaBaslat.ps1` | İnce önyükleme (aşağıda) |
+| `KazimaBaslat_Klasik.bat/.ps1` | Düzeltilmiş eski panelin **bayt bayt** kopyası (geri dönüş) |
+| `EdingKapat.*`, `HataBul.*`, `YoneticiKurulum.bat`, `portal.html`, `uzak.html` | Kopya. Teslim kopyasında iki küçük değişiklik: `EdingKapat.ps1` klasik paneli de tanır (`*KazimaBaslat*.ps1*`), `HataBul.ps1` `lib\*.ps1`'i de ayrıştırır. `YoneticiKurulum.bat` zaten `KazimaBaslat.bat`'ı (artık yeni panel) başlatır, ASCII |
+| `eding_yolu.txt` | Yalnız yorum satırları (makinede P:\CNC kendiliğinden bulunur; `C:\CNC_X5` örneği yorumda) |
+| `ui/PrimerUI.cs`, `ui/PrimerVeri.cs` | Kanonik `ui/` kopyası (test eşitliği denetler) |
+| `lib/*.cs` | `EdingApi.cs` (gerçek [Eding], birebir), `EdingSim.cs` (kopya), `NcAnaliz.cs`, `SimGorunum.cs` (PartFace/PartModel/SimRenderer/SimView, birebir), `Pencere.cs` (birebir), `WebSunucu.cs` (ekran görüntüsü `EkranYakala.cs`'e ayrıldı + `YalnizYerel`), `EkranYakala.cs`, `Kayit.cs` (yalnız günlük) |
+| `lib/*.ps1` | Mantık modülleri (aşağıda) |
+| `demo/` | Demo için `macro.cnc` ve örnek iş (`ORNEK_ZY2_45_kisa.nc`) — demo veri klasörüne kopyalanır |
+| `../P_CNC_icin/macro.cnc` | `Eding/macro.cnc` bayt kopyası (sürüm 4) |
+
+Eski görsel C# sınıfları (EggButton, LuxProgress, Hayvanlar, EngravedTitle, eski EStopButton, Cip, HizCip, StatusLamp, DokunKlavye) alınmadı: yeni görünüm hepsinin karşılığını içeriyor (dokunmatik klavye → `Diyalog.MetinGir/SayiGir`).
+
+## Modül haritası (fonksiyon → dosya)
+
+- **lib/Cekirdek.ps1** (Eding'siz, saf): `Sayi, Metin-Sayi, Sure, Sade-Sure, Blok-Metin-Temizle, Blok-Kazima-NC, Blok-Sonraki-No, Blok-Birlesik-Uret, Blok-Kaydet, Kal-Saat, Kal-Duzen, Kal-Nokta, Kal-NC-Uret, OtoKal-NC-Uret, OkRot, OkModel, OkCoz, OtoKal-Hesapla-Ic, OtoKal-Sim-Uret, Devam-Oku, Devam-Sil, Devam-NC-Uret, Tercih-Oku, Tercih-Yaz, Yeni-Pin, Yuva-Geometrisi-Oku, Makro-AltProgramlari` + sabitler (`BlokFont, BlokKonumAci, KalGruplar, KalOlcumTanim, Ok*, ParamTanim, RafTanim, RafAralik, RafVarsayilan, RafZorunlu, UreticiG54, TakimY`, dosya yolları).
+- **lib/Eding.ps1**: `Eding-Exe-Bul, Eding-Pencere-Acik, Eding-Sunucu-Acik, Eding-Temizle, Eding-Kapat-Nazik, Eding-Gizle-Tik, Eding-Baslat, Acilis-Eding-Sifirla, Eding-Durum, Durakli-Mi, Mesgul, Hatali, Calisiyor-Mu, Is-Suruyor, Is-Suruyor-Uyari, Hata-Temizle, Baglanti-Bekcisi, Rc-Tamam, Baglan, Komut-Sonucu, Hareket-Bitene-Kadar-Bekle, Makro-Surum-Oku, Bayrak-Sifirla, Makro-Baslangic-Kontrol, Makro-Hazir-Mi, Macro-Pens-Yamasi, Macro-Yaz, Eding-Goster, Eding-Gizle, Eding-Yeniden, Windows-Baslangic-Ayarla, Eding-Baslangic-Kaldir`.
+- **lib/Makine.ps1**: dosya/iş (`Dosyayi-Kontrol-Et, Hazir-Mi, Btn-DosyaSec, Is-Dosyasi-Sec*, Dosya-Ozeti`), frez modu ve manuel değişim (`Frez-Manuel-Mi, Otomatik-Gecis-Uygun-Mu, Frez-Modu-Yaz, Frez-Modu-Goster, Frez-Modu-Sor, Manuel-Macro-Kontrol, Manuel-Istek, Manuel-Istek-Tahmin, Manuel-Devam, Manuel-Diyalog, Manuel-Izle`), takım (`Takim-Bildir, Takim-Komutu-Mu, Takim-Degisimi-Suruyor-Mu, Takim-Belirsiz-Isaretle, Takim-Belirsiz-Coz, Takim-Kapisi`), blok (`Blok-Cip-Guncelle, Yeni-Blok`), devam (`Devam-Kaydet, Devam-Diyalog, Devam-Baslat, Devam-Acilis`), iş kontrolü (`Is-Calistir, Bos-Ismili-Hazirla, Btn-Baslat, Btn-Baslat-Ic, Btn-Duraklat, Btn-Durdur, Btn-FrezBirak, Btn-Home, Hiz-Oku, Hiz-Ayarla, Geri-Sayim, Acilis-Hazirla, Panel-Sifirla, Acil-Stop, Acil-Stop-Kaldir, Btn-Reset, Btn-Pens, Mdi-Gonder, Btn-Temizlik`), hareket (`Hazir-Hareket, Satirlar-Gonder, Jog, Konuma-Git, Yuvaya-Git, Yuvaya-Yaklas, Yukari-Kaldir, Takim-Degistir, Takim-Olc, Asinma-Kontrol, Bos-Mu, Ismili-Calistir, Hava-Ufle, Ismili-Durdur-Bekle, Pens-Ac-T0, Tek-Komut`), değişkenler / yedek (`Ayar-Oku, Ayar-Kaydet, Degisken-Yaz, Raf-Metni, Raf-Eksik-Listesi, Raf-Kontrol, Raf-Hazir-Mi, Konumu-Sensor-Yap, Konumu-Yuva-Yap, Z-Alma-Yap, G54-Uretici-Fark, G54-Ureticiye-Don, G92-Sifirla, Ayar-Yedekle, Ayar-Geri-Yukle, Yedek-Dosyasi-Sec*, Yedekli-Onay*`), `Ilerleme-Guncelle`. (* yeni)
+- **lib/Kalibrasyon.ps1**: `Yuva-Kayitli, Yuva-Hedef, Yuva-Liste-Yenile, Yuva-Git, Yuva-Yaklas, Yuva-Al, Yuva-Kaydet, Yuva-Sifirla, Yuva-Varsayilan, Yuva-Test, Kal-Degerleri-Goster, Kal-Test-Hazirla, Kal-Hesapla, Kal-Uygula, Kal-Yerlesim-Yaz, OtoKal-Goster, OtoKal-Prob-Testi, Prob-Tik*, OtoKal-Prob-Gecerli-Mi, OtoKal-Prob-Aktif-Mi, OtoKal-Hazirla, OtoKal-Oku, OtoKal-Uygula`.
+- **lib/Uzak.ps1**: `Uzak-Engel, Uzak-Is-Sec, Uzak-Komut, Uzak-Durum, Uzak-Tik*, Uzak-Cihaz-Ekle*, Uzak-Baslat, Uzak-Etiket-Guncelle`.
+- **lib/Kapi.ps1** (mantık tarafı kapı yardımcıları): `Hatalari-Kaydet, Yaz, Mesaj-Ekle*, Mesaj-Turu*, Onay, Ui-Kutu*, Durum-Yaz, Klasor-Ac`.
+- **lib/Denetleyici.ps1** (yeni): `Tercih-Baslangic` (eski açılış satırları aynen), `Islem-Calistir, Okuma-Yap, Ana-Tik` (eski, uyarlanmış), `Zamanlayici-Tik, Durum-Yenile, Izin-Baglam, Izin-Neden, Izin-Hesapla, Komut-Isle, Durum-Topla`, komut tablosu (`Komut-Tanimla`, 95 komut), `Tercih-Kaydet, Frez-Modu-Ayarla, Degisken-Kaydet, Panel-Kapat, Eding-Kapat-Komut, Uzak-Ac-Kapat, Pin-Kaydet, Jog-Komut, Kal-Adim, Ekran-Degisti, Btn-Pens-Ac, Panel-Acilis, Panel-Kapanis`.
+- **lib/ArayuzKapisi.ps1** (kabuk): `Ui-Onay, Ui-Tehlikeli-Onay, Ui-Bilgi, Ui-Hata, Ui-Secim, Ui-Liste-Sec, Ui-Sayi, Ui-Metin, Ui-Takim-Sec, Ui-Geri-Sayim, Ui-Manuel-Adim, Ui-Devam, Ui-Dosya-Ac, Ui-Bildir, Ui-Olaylar, Ui-Mesgul, Ui-Uygula, Ui-Izin, Ui-Acik-Diyalog, Ui-One-Al, Ui-Ustte, Ui-Tema, Ui-Kucult, Ui-Kapat, Ui-Sim-Veri/Satir/Buyuk`. Testlerde `tests/_Ortak.ps1` `Ui-Sahte-Yukle` aynı adları sahteler.
+- **lib/Demo.ps1**: Eding programı/penceresi/Windows başlangıcı fonksiyonlarının zararsız sürümleri, `Demo-Makine-Hazirla`, `Ekran-Turu-Baslat`.
+
+## Birebir taşıma ve neyin neden değiştiği
+
+Kanıt: `tests/Tasima_Testi.ps1` + `tests/TASIMA_DEGISEN.txt`. Eski paneldeki **185 fonksiyondan 98'i birebir** (yalnız 3 mekanik dönüşüm: `[Kayit]::Show` → `Ui-Kutu`, `DoEvents` → `Ui-Olaylar`, `[Kayit]::AcikPencere` → `Ui-Acik-Diyalog`), **73'ü değişti**, **14'ü kaldırıldı** (13 eski WinForms yapım fonksiyonu + ölü `Blok-Sor`); her biri gerekçesiyle listede (`-Fark` satır satır gösterir). Değişiklik türleri:
+
+1. Eski etiket / düğme / ilerleme çubuğu / SimView yazmaları → durum değişkenleri (`$script:SureMetni, DosyaMetni, Yuzde, IsTamamlandi, YuvaDurumMetni, ...`) → `Durum-Topla` → `MakineDurumu`.
+2. Özel WinForms pencereleri → `PrimerUI.Diyalog` (Secim, ManuelFrezAdimi, Devam, GeriSayim, ListeSec). Dönüş değerleri aynı tutuldu.
+3. `OpenFileDialog` → dokunmatik liste (İŞLER / yedekler klasörü), "GÖZAT…" ile yine OpenFileDialog.
+4. TASARIM §6 onay düzeyleri: G54 / #4000–#4006 / #4002 / yuva yazan her işlemde (`Ayar-Kaydet, Z-Alma-Yap, G92-Sifirla, G54-Ureticiye-Don, Konumu-Sensor-Yap, Ayar-Geri-Yukle, Yuva-Kaydet, Kal-Uygula, OtoKal-Uygula`) yedek **önce** alınır (KL-04 aynı: yedek yoksa ne sorulur ne yazılır), `Ui-Tehlikeli-Onay` eski/yeni değerleri ve yedek dosyasının adını gösterir. `Yuva-Varsayilan` zaten önce yedek alıyordu. Pens aç, frez bırak, yaklaş, yuvaya git, MDI: tehlikeli onay.
+5. Eski panelde 6 zamanlayıcı vardı → tek 200 ms zamanlayıcı; eski gövdeler (`Ana-Tik` 1 sn, `Manuel-Izle` 400 ms, uzak 200 ms, prob, Eding gizleme) aynı sıklıklarla ve yeniden girişe karşı korumalı çağrılır.
+6. Korunan güvenlik denetimlerinin hepsi aynı yerde: `Is-Suruyor` (K1), `Ismili-Durdur-Bekle` M5 + hız beklemesi (K2), `Raf-Hazir-Mi` (K5), `Takim-Belirsiz-*` (GV-08), makro sürümü 4 (K6), prob testi kapısı (K8), `Ayar-Yedekle` başarı (KL-04), uzaktan kısıtlar (K3/K4/UZ-*), ACİL STOP: Esc ve her diyalogdaki ACİL STOP `Diyalog.AcilStop = Acil-Stop 'diyalog'`, açık diyalog sayacı (`Diyalog.AcikSayisi` + modal formlar) uzaktan reddi için.
+
+G-kod üreticileri birebir: `GKod_Altin_Testi` 20 varyant aynı, yalnız beklenen `Kal-NC-Uret/*` (KL-03) farkı.
+
+## İzin tablosu (Izin-Neden / Izin-Hesapla)
+
+Öncelik: Önizleme → ACİL STOP (yalnız `acilstop`, `acilstop.kaldir`, gezinme, tercih) → Eding bağlı değil → **iş sürüyor** (yalnız `is.duraklat`, `is.durdur`, `acilstop`, `hiz.*`) → **duraklatıldı** (yalnız `is.devam`, `is.durdur`, `acilstop`, `hiz.*`) → home alınmadı (hareket komutları) → yuvalar kayıtsız (`is.baslat, takim.degistir, takim.olc, frez.birak, yuva.test, blok.kazibasla, blok.sadeceisim`) → makro sürümü uyumsuz (`is.baslat, blok.*`) → komuta özgü (dosya yok/hatalı, hesap yok, prob testi geçilmedi → oto sihirbaz ②'den ileri yok). Panelden bir işlem sürerken ikinci komut çalışmaz (yalnız ACİL STOP, ekran, hız, duraklat). Uzaktan `sec/baslat/duraklat/durdur/blok` aynı tablodan da geçer. Desteklenmeyen: `jog.basla/jog.bitir` (basılı tutma jog), `uzak.izin` → pasif + Türkçe neden.
+
+## Eski (düzeltilmiş) panele göre davranış farkları
+
+Hareketle ilgili olanlar **MAKİNEDE DOĞRULA** etiketli; G-kod satırları, sıraları ve beklemeler hiçbirinde değişmedi.
+
+1. **TEMİZLİK ve PARK ayrı düğme** (KU-13). Eskiden aynı düğmenin 1./2. basışıydı. TEMİZLİK: `G53 G0 Z[#5163]` → `G53 G0 A[#5224] B[#5225]`; PARK: `G53 G0 Z[#5163]` → `G30` (aynı satırlar, aynı bekleme). Artık her ikisi önce normal onay sorar. **MAKİNEDE DOĞRULA**: iki düğmeyi ayrı ayrı dene, eski sıra ile aynı mı.
+2. **YUVAYA GİT** iki sayfada iki ayrı eski fonksiyona gider: Takımlar › Takım değişimi → `Yuvaya-Git` (eski TAKIM sekmesi; #4010.. kayıtlıysa onlar, değilse macro G53 / TakimY), Takımlar › Yuva ayarı → `Yuva-Git` (sihirbaz, kaydedilmemiş yeni değerlerle; MANUEL = değişim noktası). Görünüm bunu `ayar:` önekiyle ayırır. Her ikisi artık tehlikeli onay sorar (eskiden sorusuzdu). **MAKİNEDE DOĞRULA**: her sayfadan T1 ve SENSÖR'e git, hedef eski panelle aynı mı; yuvalar kayıtsızken sihirbaz yolu `RafVarsayilan` değerlerine gider (eskisi gibi).
+3. YUKARI, KOL DÜZ, TAKIM ALANI, BLOK DEĞİŞTİRME, PARK (G30), AŞINMA KONTROLÜ artık normal onay sorar (eskiden sorusuz). Hareket aynı. **MAKİNEDE DOĞRULA** (yalnız onaydan sonra aynı hareket).
+4. Panelden bir işlem sürerken (home, takım değişimi, yuvaya git ...) yerel ikinci komut reddedilir — **DURDUR dahil**; yalnız ACİL STOP. Eskiden bekleme döngüsünde başka düğmeye basılabiliyordu. (Uzaktan DURDUR/DURAKLAT eskisi gibi çalışır.) **MAKİNEDE DOĞRULA**: home sırasında ACİL STOP'un anında kestiğini gör.
+5. Duraklatılmış işte RESET (ALARMI TEMİZLE) pasif (TASARIM: duraklıyken yalnız DEVAM/DURDUR/ACİL STOP/hız). Eskiden onayla yapılabiliyordu. DURDUR kullanılır.
+6. EXTERR (makineden hata sinyali) izin tablosunda engellemez; eskisi gibi `Hazir-Mi` "RESET yapılsın mı?" diye sorar (yoksa basınç düşüklüğünden çıkış kalmazdı).
+7. Takım durumu belirsiz (GV-08): yerel düğmeler açık kalır, `Takim-Kapisi` eskisi gibi iş milindeki frezi sorar (artık Diyalog.Secim ile). Uzaktan BAŞLAT eskisi gibi reddedilir.
+8. MDI: tehlikeli onay; G10 / G92 / #4xxx= / #5xxx= satırlarında önce ayar yedeği alınır (yeni güvenlik).
+9. Yedek artık onaydan ÖNCE alınır: vazgeçilse de yedek dosyası kalır (zararsız). `OtoKal-Uygula`'da yedek "sonuç büyük" ikinci sorusundan önce. Aynı saniyede ikinci yedek `_2` ekiyle (önceden ezilebiliyordu: "Yedekten yükle" seçilen dosyayı aynı saniyede eziyordu).
+10. Uzaktan başlat/seç/blok ek olarak şunlarda reddedilir: panelde bir işlem sürerken; Takımlar / Kalibrasyon / Ayarlar ekranı açıkken (eski "Ayarlar penceresi açık" kuralının karşılığı — operatör yuva ayarı yapıyor olabilir).
+11. Manuel frez isteği izleme, panelde başka bir işlem / diyalog sürerken bekler (eskiden başka pencerenin üstüne açılabiliyordu). İş zaten M0'da bekler. **MAKİNEDE DOĞRULA**: manuel modda bir iş, adım pencerelerinin sırası ve Esc = ACİL STOP.
+12. Prob testi örneklemesi 120 ms → 200 ms; Kalibrasyon ekranından çıkınca durur (eskiden Ayarlar kapanınca).
+13. Yeni: Ayarlar › Eding › KAPAT (ayarları kaydederek kapat). Sonra bekçi Eding'i kendiliğinden yeniden AÇMAZ (YENİDEN BAŞLAT ya da panel yeniden açılınca açılır).
+14. Uzaktan erişim anahtarı (Uzaktan ekranı) sunucuyu hemen açar/kapatır (eskiden panel yeniden açılınca). PIN boş bırakılamaz (6–8 hane, UZ-03; görünümdeki "boş = PIN'siz" yazısı geçersiz).
+15. Ayarlar: ModSor / BlokSor / EdingSifirla Sade akışta pasif (eski panel her açılışta 0'a zorluyordu, kutuları da gizliydi).
+16. Tam ekran ölçek döngüsü yok (akışkan yerleşim); tercih açıksa çerçevesiz, ekranı kaplar, en üstte (eskisi gibi).
+17. Durum hapı 200 ms'de bir güncellenir (eski durum satırı 1 sn); durum satırı metinleri eskisiyle aynı ("RESET" yerine yeni düğme adları).
+18. Dans eden hayvan → ilerleme parıltısı (`Dansci`), dokunmatik klavye → Diyalog klavyeleri.
+
+## Yeni arayüzde bağlantısı eksik / kısmi olan envanter maddeleri
+
+- 8.1.3 basılı tutarak sürekli jog (`jog.basla/jog.bitir`): yok, pasif ("adım seçin").
+- 12.x uzaktan izin düzeyi (`uzak.izin`): yok, pasif; sunucu tarafı eskisi gibi (izleme + seç/başlat/duraklat/durdur/blok/yükleme, tıklama/klavye kapalı). Uzaktan ekranında düzey "tam" gösterilir.
+- 8.4.4 M7 / M8 durumu: komutlar çalışır ama `MakineDurumu.M7/M8` doldurulmuyor (çıkış numaraları bilinmiyor).
+- Pens açık göstergesi yalnız panelden verilen komuta göre (gerçek çıkış okunmuyor); iş mili devri `CncGetActualSpeed` (birim doğrulanmadı).
+- Yuva kartlarında "yuvada frez var mı" bilinmiyor (`Dolu` hep true); takım açıklaması yalnız "yuvası kayıtlı / değil".
+- "Son bağlanan cihazlar" yalnız komut gönderenleri listeler (izleme istekleri sunucuda sayılmıyor).
+- Eding programı seçimi (11.3) dokunmatik liste değil, OpenFileDialog.
+- `kal.konum.yuva T1` üçlü soru (diğer yuvalar da kaysın mı) normal seçim diyaloğu; tehlikeli onay biçimi değil (yedek yine yazmadan önce alınır).
+- 1.15 / 1.18 / 1.26 gibi açılış tercihleri eskisi gibi "panel yeniden açılınca" uygulanır.
+- 5.6 / 11.7 eski blok sorusu (ölü kod) yerleştirilmedi (önceden kararlaştırıldığı gibi).
+
+## Bilinen riskler (yalnız derleme / ayrıştırma ile denetlenebilenler)
+
+- **WinForms tarafı hiç çalıştırılamadı** (pwsh/Linux): `KazimaBaslat.ps1` önyüklemesi, `Add-Type -Path` (PS 5.1 csc, `-IgnoreWarnings`), `Kabuk.Komut` olayının PowerShell betik bloğuna bağlanması, `Diyalog.AcilStop` temsilcisi, `ArayuzKapisi.ps1`'in bütün `PrimerUI.Diyalog` çağrıları (aşırı yükleme seçimi, null diziler), SimView'in `SimHost`'a konması, ekran görüntüsü turu. C# takımı Mono `mcs -langversion:5` ile birlikte derleniyor; PowerShell tarafı ayrıştırıcıdan geçiyor; mantık + denetleyici EdingSim ile 111 maddelik testte koşuyor.
+- Başarım: pwsh'te bir tık ≈ 10–20 ms (Durum-Topla + izin tablosu). Zayıf makinede PS 5.1 32 bit ile birkaç kat yavaş olabilir; zamanlayıcı korumalı olduğu için tık düşer, donma beklenmez ama görülmeli.
+- `PrimerUI.cs`'in gerçek verilerle (uzun mesajlar, 500 satır kayıt) davranışı yalnız ekran görüntüsü aracıyla (Mono) görüldü.
+- EdingSim gerçek Eding değil: durum metinleri / RC kodları / M0 manuel adımları gerçek makinede farklı zamanlamada gelebilir (eski mantık aynı olduğu için risk eski panelle aynı).
+- `EdingKapat.ps1` teslim kopyası klasik paneli de kapatır (`*KazimaBaslat*.ps1*`); Windows'ta denenmedi.
+
+## Windows'ta deneme sırası
+
+1. **Testler** (proje klasöründe, 32 bit):
+   `%SystemRoot%\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File tests\Calistir.ps1 -Kaynak teslim\PrimerMill`
+   Hepsi GEÇTİ olmalı (Demo_Ekran_Testi burada paneli gerçekten açar, 17 PNG'yi `teslim\ekran_goruntuleri_demo\` altına yazar; açık panel varsa önce kapatın).
+2. **Demo** (makine bilgisayarında değil, ofis bilgisayarında): `teslim\PrimerMill\KazimaBaslat.bat /demo`. Üst şeritte DEMO görülmeli. Sıra: geri sayımda ŞİMDİ BAŞLA (home) → İŞ SEÇ (ORNEK_ZY2_45_kisa) → BAŞLAT (onaylar) → DURAKLAT (jog / pens / MDI / G54 kaydet pasif ve nedenli olmalı) → DEVAM → bitince "BİTTİ". Sonra her ekran: Takımlar (yuva kartları, GİT tehlikeli onay, jog), Kalibrasyon (disk sihirbazı ölçüm kutuları, oto sihirbazı prob testi olmadan ②'den ileri geçmemeli), Ayarlar › Makine değişkenleri (KAYDET → tehlikeli onayda eski/yeni ve yedek adı), Kayıtlar (MDI tehlikeli onay), Uzaktan (http://127.0.0.1:8080, PIN). Her diyalogda Esc = ACİL STOP, alt şeritte KİLİDİ KALDIR. Dosyalar `teslim\PrimerMill\demo_calisma\` altında; `loglar\Panel_*.log` içinde `PROGRAM HATASI` olmamalı.
+3. **Makine, Eding simülasyon modunda**: Eding'i simülasyon moduna al (üst şeritte SİMÜLASYON çipi), `KazimaBaslat.bat`. Açılış, home, yukarıdaki MAKİNEDE DOĞRULA maddeleri (1–4, 11), daha önce raporlanan düzeltme maddeleri (K2 pens/M5, K6 devam, GV-08, K8 prob) burada tekrar.
+4. **Makinede düşük ilerleme hızıyla** (%30, el fiziksel acil stopta): önce TEMİZLİK/PARK, YUVAYA GİT (iki sayfa), takım değiştir, sonra kısa bir iş.
+5. **Geri dönüş**: herhangi bir sorunda `KazimaBaslat_Klasik.bat` (aynı klasör, aynı ayar dosyaları: `panel_ayarlar.ini`, `devam.json`, `yedekler\`, `loglar\`). Başlangıç görevi (`YoneticiKurulum.bat`) `KazimaBaslat.bat`'ı açar; klasiğe kalıcı dönmek için o .bat'ı klasik içerikle değiştirmek yeterli. İki panel aynı anda açılmaz (ortak tek kopya kilidi).
+
+## Son kontrol düzeltmeleri
+
+Kaynak: `son_kontrol.md` (SK-01…SK-12). SK-03 (Windows'ta çalıştırma) yalnız deneme adımıdır, SK-12 atlandı (istenmedi).
+
+| ID | Değişiklik | Commit | MAKİNEDE DOĞRULA |
+| --- | --- | --- | --- |
+| SK-01 | `Zamanlayici-Tik` korumalı bloğu (Ana-Tik, Eding-Gizle-Tik, Okuma-Yap, Durum-Yenile) artık modal pencere açmaz, uzun iş yapmaz, iç içe komut çalıştırmaz. `Baglanti-Bekcisi` (Eding başlatma, program seçme penceresi, KillCNC) korumanın dışında, Ana-Tik'ten önce, `$script:BekciMesgul` + `Islem-Calistir`. Korumadan açılan `Ui-Kutu` bilgi/hata pencereleri (iş sonu EXTERR / freze hatası / Eding hatası) `$script:TikSonrasiKutular`'a ertelenir, koruma bırakılınca tek tek gösterilir (pencere açıkken ekran ve ACİL STOP bekçisi işler). Korumalı blok / bekçi sürerken (DoEvents) gelen komut `$script:KomutKuyrugu`'na alınır, hemen sonra normal `Komut-Isle` denetimiyle çalışır; 3 sn'den eski komut çalıştırılmaz (bildirim). ACİL STOP ve DURDUR beklemez. Korumanın içinden iç içe gelen tık hiçbir şey çalıştırmaz (uzak / manuel / açılış). İç içe komut dıştaki işlemin meşgul yazısını silmez. Test: Denetleyici_Testi bölüm 8. | `f27cc77` | Windows'ta: iş sonu hata penceresi açıkken konum/durum güncellenmeli; Eding programı seçme penceresinde ekran donmamalı |
+| SK-02 | `yuva.yaklas <ad>`: seçili yuva `$script:SonYuva` değilse ya da o GİT'ten sonra hareket olduysa "Önce bu yuvaya GİT: T5" ile red. `Komut-Isle` makineye dokunan her komutta (hareket etmeyen pens/hava/iş mili/soğutma/yuva.al/yuva.kaydet/değişken oku/yedek/hız hariç) hedefi unutturur; açılış hazırlığı ve uzaktan komut da. Takım değişimi sayfası ayrıca makine konumunu GİT bitişindekiyle karşılaştırır (0.05 mm/°; Eding'den yapılan hareket de yakalanır). Yuva ayarı sihirbazı (`ayar:`): aynı nokta kuralı, jog serbest (ortalama), `Yuva-Git` başarıda `$script:SonAyarYuva`. G-kod satırları aynı. Test: bölüm 7 (27 madde). | `a837c83` | **EVET**: T2'ye GİT → T5 seç → YAKLAŞ reddedilmeli; GİT T2 → YAKLAŞ T2 iner; GİT → jog → YAKLAŞ reddedilmeli; sihirbazda GİT → jog ile ortala → YAKLAŞ iner |
+| SK-04 | `KazimaBaslat.ps1`: ilk pencereden önce `SetProcessDPIAware` (Add-Type P/Invoke, yalnız Windows Vista+, try/catch); AutoScaleMode.Dpi kaldı. | `6f26149` | Hareket yok. Windows'ta %125/%150 ölçekte ekran turu (bulanıklık yok, yerleşim taşmıyor) |
+| SK-05 | `Mdi-Ayar-Yazar-Mi`: `(?i)G\s*0*10(?![\d.])\|G\s*0*92\|#\s*\[?\s*[45]\d{3}\s*\]?\s*=` — `G10L2P1X0`, `g10 l2`, `N10G10`, `#5221=`, `# 4002 =`, `#[4002]=` önce yedek alır; `G1 X10`, `G100` almaz. Test: 17 madde. | `32fd488` | Hayır (yalnız yedek alma) |
+| SK-06 | Tek kopya deseni `'KazimaBaslat(_Klasik)?\.ps1'` yeni önyüklemede; ayrı commit'te klasik panelde (`PrimerMill/KazimaBaslat.ps1` = `teslim/.../KazimaBaslat_Klasik.ps1`, bayt bayt). | `7f8e5be`, `2269767` | Hayır; Windows'ta: klasik açıkken yeni paneli aç → EVET → klasik kapanmalı |
+| SK-07 | "Eding bulunamadı — DEMO açılsın mı?" varsayılan HAYIR (Button2); metin DEMO'da hiçbir makinenin hareket etmediğini, makine bilgisayarında HAYIR denmesi gerektiğini söyler. | `f1ce2ed` | Hayır |
+| SK-08 | (Tek başına etkisizdi, SK-13 ile tamamlandı.) `Diyalog.TehlikeliOnay`: `yedekDosyasi == null` → yedek satırı yok (yalnız hareket onayları); `""` → kehribar "Yedek: alınmadı"; yol → "Yedek alındı". `Ui-Tehlikeli-Onay` `$null`'u korur; MDI ayar yazmayan satırda `$null`. Ekran görüntüleri değişmedi (turdaki onay yedekli). | `de55270` | Hayır |
+| SK-09 | `is.durdur` `-IcIce`: panelden başlayan işlem (home, takım değişimi, yuvaya git…) sürerken DURDUR (`Btn-Durdur` → onay + `CncAbortJob`) reddedilmez, yeni uzun işlem başlatmaz; korumalı tık sırasında da beklemez. Yukarıdaki "davranış farkları" madde 4 artık: işlem sürerken yalnız ACİL STOP **ve DURDUR**. Test: bölüm 8. | `f27cc77` | **EVET**: home sırasında ve takım değişimi sırasında DURDUR → hareket kesilmeli, panel "Home sırasında Eding hata verdi…" benzeri uyarı vermeli, takım durumu belirsiz işaretlenmeli (GV-08); sonra RESET + HOME |
+| SK-10 | `lib/EdingSim.cs` (kök ve teslim) BOM'lu UTF-8 + CRLF, içerik aynı. | `b1bfb3b` | Hayır |
+| SK-11 | `OZELLIK_ENVANTERI.md` "Yeni arayüzdeki yeri": 235 numaralı satır → 229 `[x]`, 3 `[~]` (basılı tutma jog, M7/M8 göstergesi, dans eden hayvan → parıltı), 3 `[ ]` (ölü blok sorusu 5.6/11.7, CORS UZ-04); 12.2/12.3 tablolarına durum notu. (Dosyanın 7. satırındaki özetle aynı. Tekrar kontroldeki "232 / 5 / 0" düz `grep -c` sayımı: açıklama satırı ve 12.2/12.3 notlarındaki işaretler de sayılmış, `[ ]` satır sonu deseni `\| \[ \] \|$` yeni hücrelerde eşleşmiyor; satır bazında `grep -E '^\| [0-9]' \| grep -cF '\| [x] '` = 229, `[~]` = 3, `[ ]` = 3.) | `2640665` | Hayır |
+
+Doğrulama (bu düzeltmelerden sonra): `tests/Calistir.ps1 -Kaynak teslim/PrimerMill` HEPSİ GEÇTİ (10; Denetleyici 111 → 179 madde), `tests/ui/demo_ekran_testi.sh` kaldı 0, statik PowerShell → C# taraması (Klasik hariç) demo kümesi 531 başvuru / 0 sorun, makine kümesinde yalnız beklenen `lib/Demo.ps1` `[Eding]::Sim*` (yalnız demoda yüklenir), PS7 sözdizimi taraması temiz, teslim/tests .ps1 BOM'lu, teslim .ps1 CRLF, .bat ASCII, `ui/` = `teslim/PrimerMill/ui/`.
+
+### Tekrar kontrol sonrası (SK-13…SK-16)
+
+| ID | Değişiklik | Commit | MAKİNEDE DOĞRULA |
+| --- | --- | --- | --- |
+| SK-13 | SK-08 etkisizdi: PowerShell .NET `string` parametresine `$null`'u `""` geçirir. `Ui-Yedek-Arg` (ArayuzKapisi.ps1): `$null` → `[NullString]::Value` (C#'a gerçek null), `''` → `''`, yol → dosya adı; `Ui-Tehlikeli-Onay` bunu geçirir. Test: Denetleyici_Testi fonksiyonu ArayuzKapisi.ps1'den AST ile alır, aynı imzalı (`string[]`, `string`) C# sondasına verir: `<null>` / `[]` / `[ayar_1.txt]`; karşılaştırma olarak düz `$null` → `[]`. | `dd24f14` | Hayır; Windows'ta YUVAYA GİT onayında yedek satırı görünmemeli, Ayar kaydet onayında "Yedek alındı" görünmeli |
+| SK-14 | Kabuk `AutoScaleMode.None` (DiyalogFormu ve katmanlar zaten None): ölçekleme yalnız elle (`Tema.Px = v × S × Dpi`, yazılar pt × S, GDI DPI'yi kendisi uygular) → DPI-aware süreçte çift ölçekleme yok. Mono ekran turu önce/sonra piksel karşılaştırması (65 PNG): fark yalnız saat ve ilerleme parıltısı, yerleşim aynı; PNG'ler yeniden üretilmedi. ARAYUZ_API.md, TASARIM.md güncellendi. | `8ff63d5` | Hareket yok. Windows'ta %100/%125/%150 ekran turu zorunlu (ACİL STOP düğmesi ve alt şerit ekranda kalmalı) |
+| SK-15 | Korumalı tık içinde (DoEvents) gelen DURDUR artık tık içinde onay sorusu açmaz: sıranın BAŞINA, öncelikli (3 sn zaman aşımı yok), koruma bırakılınca ilk o çalışır (bekçi sürerken de beklemez). Yalnız bekçi sürerken (korumanın dışında) gelen DURDUR hemen işlenir. ACİL STOP hiç beklemez. Test: sıra, öncelik, 10 sn beklemiş DURDUR'un yine işlenmesi, günlükte DURDUR'un sıradaki komuttan önce işlenmesi. | `99bb9f7` | DURDUR gecikmesi en çok bir korumalı blok süresi (ms); Windows'ta iş sürerken DURDUR onayı açıkken ekranın güncellendiğini gör |
+| SK-16 | Yuva ayarı sihirbazı YAKLAŞ: sihirbaz GİT'i bitince makine konumu kaydedilir (`$script:SonAyarKonum`); YAKLAŞ yalnız XY'de GİT noktasına uzaklık ≤ 2.0 mm (`$script:AyarXYSinir`, Öklid) ve Z / A / B ≤ 0.05 (`$script:AyarZABSinir`; Z aşağı inmemiş, kol dönmemiş) ise; değilse "Önce bu yuvaya yeniden GİT: T3" + neden. Jog hangi sekmeden (ya da Eding'den) gelirse gelsin konumla yakalanır. Test: 8 madde (1 mm geçer, 2.x mm / Z− / A / dışarıdan 5 mm reddedilir). | `8b18501` | **EVET**: sihirbazda GİT → 0.5–1 mm ortala → YAKLAŞ iner; GİT → Hareket sekmesinde X 10 mm → YAKLAŞ reddedilmeli; GİT → Z− 0.1 → YAKLAŞ reddedilmeli |
+
+Doğrulama (SK-13…16 sonrası): aşağıdaki bölümdeki komutlarla yeniden çalıştırıldı (sonuçlar teslim raporunda).
+
+## PrimerMill 2 — bağımsız son kontrol
+
+Kapsam: `teslim/PrimerMill/` (yeni panel: `KazimaBaslat.ps1`, `lib/*.ps1`, `lib/*.cs`, `ui/*.cs`; `KazimaBaslat_Klasik.*`), `teslim/P_CNC_icin/macro.cnc`, `35a684f..HEAD` commitleri.
+Yöntem: kural taraması (AST, BOM/CRLF/ASCII), C# derleme (`mcs -langversion:5`), derlenen DLL'in yansıma dökümüyle PowerShell başvurularının **statik çapraz denetimi**, test paketi, G-kod altınlarının orijinal koddan bağımsız yeniden üretimi, kod okuma (izin tablosu, ACİL STOP yolu, uzaktan erişim, demo ayrımı).
+Yardımcı betikler: (geliştirme ortamındaki geçici yardımcı betikler, teslime dahil değil) (`scan.ps1`, `ps7.ps1`, `dump.cs`, `perf.ps1`, `real_api.txt`, `demo_api.txt`, `tests.log`).
+
+**Özet:** KRİTİK 0 · YÜKSEK 0 · ORTA 4 · DÜŞÜK 8. Engelleyici (çarpışma / yanlış hareket / ACİL STOP'a ulaşamama) bir hata bulunmadı. PowerShell ↔ C# köprüsünde çözülemeyen başvuru yok. En büyük kalan risk: Windows'ta hiç çalıştırılmamış olması (SK-03) ve tek zamanlayıcıda modal pencere açılması (SK-01).
+
+## Bulgular
+
+| ID | Önem | Dosya:Satır | Açıklama | Önerilen düzeltme | Doğrulama |
+|---|---|---|---|---|---|
+| SK-01 | ORTA | `lib/Denetleyici.ps1:179-189` (Zamanlayici-Tik korumalı blok), `lib/Denetleyici.ps1:158` (Ana-Tik → Ilerleme-Guncelle), `lib/Denetleyici.ps1:318` (Komut-Isle meşgul denetimi), `lib/Makine.ps1:1521, 1532, 1536` (iş sonu hata pencereleri), `lib/Eding.ps1:196 → 27` (Baglanti-Bekcisi → Eding-Baslat → Eding-Exe-Bul → OpenFileDialog), `lib/Eding.ps1:114,121` (Ui-Olaylar döngüleri), `lib/Kapi.ps1:27` (Yaz → Ui-Olaylar) | Tek ana zamanlayıcıda `Ana-Tik`, `TikMesgul` korumasının İÇİNDE çalışıyor ve modal pencere açabiliyor (EXTERR / freze hatası / Eding hatası kutuları; Eding programı seçme penceresi) ya da `Yaz`/`Ui-Olaylar` ile mesaj döngüsünü işletiyor. Bu sürede her tıkta korumalı blok atlanır: `Okuma-Yap`, `Durum-Yenile`, `Eding-Gizle-Tik` çalışmaz → yerel ekran (durum, konum, izinler) donar, Eding'in kendi uyarıları öne alınmaz, ACİL STOP bekçisi (Ana-Tik) çalışmaz. Ayrıca `Yaz` içindeki DoEvents sırasında gelen dokunuş `Komut-Isle`'yi tık İÇİNDE çalıştırır (`IslemSuruyor` false, `TikMesgul` true): ör. HOME 240 sn sürer ve bu sürede ekran güncellenmez. Denetleyici.ps1:190 "Diyalog açabilen işler ana korumanın DIŞINDA" ilkesiyle çelişiyor; eski panelde koordinat/gizleme zamanlayıcıları ayrıydı ve donmuyordu (gerileme). ACİL STOP düğmesi ve diyaloglardaki ACİL STOP etkilenmez (doğrudan temsilci). | Ana-Tik'in pencere açan kısımlarını `TikSonraki` gibi korumanın dışına ertele (iş sonu mesajını bir değişkene yaz, tık sonunda göster); ya da `Okuma-Yap` + `Durum-Yenile` + `Eding-Gizle-Tik`'i ayrı bir koruma bayrağıyla Ana-Tik'ten bağımsız çalıştır. `Komut-Isle`'de `TikMesgul` iken IcIce olmayan komutları reddet/ertele. | Kod okuma (satırlar yanda). `Zamanlayici-Tik`: `if (-not $script:TikMesgul) { … Ana-Tik … Okuma-Yap; Durum-Yenile }`; Ilerleme-Guncelle Ana-Tik'ten çağrılıyor ve `Ui-Kutu … 'Error'` açıyor; `Komut-Isle` yalnız `IslemSuruyor/UzakMesgul/ManuelTikMesgul`'a bakıyor. |
+| SK-02 | ORTA (hareket; MAKİNEDE DOĞRULA önerisi) | `lib/Denetleyici.ps1:529-533` (`yuva.yaklas`), `lib/Makine.ps1:1047-1053` (Yuvaya-Yaklas), `ui/PrimerUI.cs:2712, 2883` | Takımlar › Takım değişimi sayfasındaki YAKLAŞ seçili yuvanın adını gönderiyor (`yuva.yaklas T5`), dağıtıcı bu argümanı yok sayıp `Yuvaya-Yaklas`'ı çağırıyor; o da `$script:SonYuva`'yı (son GİT yapılan yuva) kullanıp **o anki XY'de** `G90 G53 G1 Z[#4001] F300` iniyor. `SonYuva` jog, KOL DÜZ, PARK, takım değişimi, home sonrasında sıfırlanmıyor (yalnız Makine.ps1:1044'te atanıyor). Operatör T5 kartını seçip YAKLAŞ'a basınca makine T2 üstünde (ya da jog ile kaydırıldığı herhangi bir yerde) yaklaşma yüksekliğine iner; onay metni "T2" der ama seçim T5'tir. Jog sonrası iniş eski panelde de vardı (taşınmış davranış); seçim/argüman uyuşmazlığı yeni arayüzle geldi. | Dağıtıcıda `Yuva-Adi $a` ≠ `$script:SonYuva` ise reddet ("Önce YUVAYA GİT: T5"); `SonYuva`'yı her başka hareket komutunda (`Jog`, `Konuma-Git`, `Takim-Degistir`, `Btn-Home`, `Btn-Temizlik`) `$null` yap. Yuva ayarı sihirbazındaki `Yuva-Yaklas` için de aynı (makine seçili noktada mı) denetimi ekle. MAKİNEDE DOĞRULA. | `ui/PrimerUI.cs:2883`: `btnYaklas.KomutAyarla("yuva.yaklas", ad)`; Denetleyici: `else { Yuvaya-Yaklas }` (argümansız); `grep -n 'SonYuva *='` → yalnız Makine.ps1:984 (null) ve 1044. |
+| SK-03 | ORTA (doğrulama boşluğu) | `KazimaBaslat.ps1` (tamamı), `lib/ArayuzKapisi.ps1`, `ui/PrimerUI.cs:2277` (SolmaKatmani yalnız Windows), `tests/Demo_Ekran_Testi.ps1:24` | Önyükleme, `Add-Type -Path` (PS 5.1 CodeDom csc), `Kabuk.Komut` olayı, `Diyalog.AcilStop` temsilcisi, ArayuzKapisi'nin bütün `PrimerUI.Diyalog` çağrıları, ekran solma katmanı ve SimView yerleşimi **hiç çalışmadı**; Demo ekran testi Linux'ta atlandı (0.3 sn, "ATLANDI"). Statik çapraz denetimde sorun çıkmadı (aşağıda), ama WinForms çalışma zamanı davranışı (modal sahiplik, TopMost, DPI, solma için `DrawToBitmap`) yalnız Windows'ta görülebilir. | Makineden önce ofis bilgisayarında: `tests\Calistir.ps1` 32 bit PS 5.1 ile (Demo_Ekran_Testi dahil 17 PNG), sonra `KazimaBaslat.bat /demo` ile entegrasyon.md'deki deneme sırası; `loglar\Panel_*.log` içinde `PROGRAM HATASI` olmamalı. | Test çıktısı: `Demo_Ekran_Testi GECTI 0.3 sn … gecti 1` (atlandı); `Tema.Mono` koşulu PrimerUI.cs:2277. |
+| SK-04 | ORTA | `KazimaBaslat.ps1` / `KazimaBaslat.bat` (DPI bildirimi yok), `ui/PrimerUI.cs:4813, 4909` | INCELEME_RAPORU KU-07 (YÜKSEK) "DPI farkındalığı (PerMonitorV2) ve AutoScaleMode=Dpi" önerisinin yalnız ikinci yarısı yapılmış: süreç DPI-aware değil (`SetProcessDPIAware`/manifest yok). Windows %125/%150 ölçekte pencere bit eşlem olarak büyütülür (bulanık), `g.DpiX` 96 döner (Tema.Dpi = 1), `Screen.Bounds` sanal değer verir (uzaktan ekran görüntüsü `EkranYakala` etkilenebilir). | Önyüklemede kabuktan önce `[DllImport("user32.dll")] SetProcessDPIAware()` (C# yardımcıya ekle) çağır; Windows'ta %100/%125/%150'de ekran turunu tekrarla. | `grep -rn 'DPIAware\|DpiAware' teslim/` → sonuç yok. |
+| SK-05 | DÜŞÜK | `lib/Makine.ps1:945` (Mdi-Gonder) | G54/G92/#4xxx yazan MDI satırında önce yedek alınması (yeni güvenlik) `\bG10\b` ile arıyor; boşluksuz yazım `G10L2P1X0` yakalanmıyor → yedek alınmadan (yine tehlikeli onayla) gönderilir. | Desen: `(?i)G\s*10(?!\d)|G\s*92|#\s*\[?\s*[45]\d{3}\s*\]?\s*=`. | pwsh: `G10 L2 P1 X0 yedek: True`, `G10L2P1X0 yedek: False`, `#5221=1 True`, `G92 X0 True` (`review/perf.ps1`). |
+| SK-06 | DÜŞÜK | `KazimaBaslat.ps1:54` | Tek kopya denetimi süreç komut satırını `'KazimaBaslat\.ps1'` ile arıyor; `KazimaBaslat_Klasik.ps1` eşleşmez. Klasik panel arkada açıkken yeni panel açılırsa "Eskisi kapatılsın mı?" EVET → hiçbir süreç kapatılmaz, 8 sn sonra "Eski PrimerMill kapatılamadı. Bilgisayarı yeniden başlatın." (Tersi çalışır: klasiğin deseni yeni paneli bulur.) | `'KazimaBaslat(_Klasik)?\.ps1'`. | `'… KazimaBaslat_Klasik.ps1' -match 'KazimaBaslat\.ps1'` → False; ortak mutex `Local\PrimerMillPanel` (Klasik:45). |
+| SK-07 | DÜŞÜK | `KazimaBaslat.ps1:72` | cncapi.dll bulunamazsa "DEMO modunda açılsın mı?" sorusu varsayılan düğme EVET (MessageBox YesNo, Button1). Makine bilgisayarında P: sürücüsü açılış görevinde henüz hazır değilse Enter ile sahte makine açılır ve "Hazır" gösterir (hareket yok, DEMO çipi var; yanıltıcı). Eski davranış sorusuz önizlemeydi. Demo'nun gerçek makineyi oynatması mümkün değil (EdingApi.cs derlenmez, Demo.ps1 Eding/Windows başlangıç fonksiyonlarını zararsızlaştırır) — doğrulandı. | `[System.Windows.Forms.MessageBoxDefaultButton]::Button2` ile varsayılanı HAYIR (önizleme) yap. | Kod okuma; demo ayrımı: `$csDosyalari += 'lib\EdingSim.cs'` yalnız `$script:Demo`'da; `[Eding]::Sim*` başvuruları yalnız `lib/Demo.ps1`'de (statik tarama). |
+| SK-08 | DÜŞÜK | `lib/ArayuzKapisi.ps1:20-28`, `ui/PrimerUI.cs:4249-4250` | Yalnız hareket olan tehlikeli onaylarda (YUVAYA GİT, YAKLAŞ, PENS AÇ, FREZİ BIRAK, G10'suz MDI) `$yedek = $null` gider; diyalog her seferinde kehribar "Yedek: alınmadı" satırı gösterir. Yedek gerektirmeyen işlemde uyarı gibi görünür, operatörü bu satırı görmezden gelmeye alıştırır (ayar yazan işlemlerde anlamlı olan satır). | `yedekDosyasi == null` → satırı gösterme; `""` → "alınmadı" (ya da ayrı bayrak). | Kod okuma; çağrılar `Ui-Tehlikeli-Onay … $null $null $null`. |
+| SK-09 | DÜŞÜK | `lib/Denetleyici.ps1:318, 497` | DURDUR (`is.durdur`) IcIce değil: panelden başlayan bir işlem (HOME, takım değişimi, yuvaya git …) sürerken yerel DURDUR reddedilir, yalnız ACİL STOP kalır (ACİL STOP kilit + KİLİDİ KALDIR + reset ister). Belgelenmiş (entegrasyon #4, MAKİNEDE DOĞRULA), ama eski panelde MDI hareketini `CncAbortJob` ile yumuşak kesmek mümkündü. | `is.durdur`'u `-IcIce` yap (Btn-Durdur zaten onay soruyor). | Kod okuma; `Komut-Isle` `$mesgul -and -not $t.IcIce` → red. |
+| SK-10 | DÜŞÜK | `lib/EdingSim.cs` | BOM'suz ve LF (tek böyle .cs). PS 5.1 csc v4 BOM'suz dosyayı sistem ANSI kod sayfasıyla okur (Çince Windows'ta GBK): Türkçe istisna metinleri (`"sayı: "`, `"değer yok: "`) bozuk görünür. Yalnız demo. | BOM'lu UTF-8 + CRLF kaydet. | `head -c3` → `2f2f20`; diğer bütün .cs `efbbbf`. |
+| SK-11 | DÜŞÜK | `OZELLIK_ENVANTERI.md` | Kural 6 "teslimde her maddenin yeni arayüzde nerede olduğunu işaretle": envanterde 235 satır hâlâ `[ ]`. Eşleme `ui/ARAYUZ_API.md` §8'de (236 satır) var; envanterden oraya atıf yok. | Envanter onay kutularını işaretle ya da §8'e bağlantı ekle. | `grep -c '\[ \] *|$'` → 235. |
+| SK-12 | DÜŞÜK | `tests/*.ps1` | Test betikleri BOM'lu ama LF (teslim klasöründe değil; PS 5.1 LF'yi okur). Kural 2 yalnız BOM istiyor; bilgi. | İsteğe bağlı CRLF. | `grep -c $'\r$'` → 0. |
+
+## Statik çapraz denetim (PowerShell → C#)
+
+1. **C# 5 derleme:** `mcs -noconfig -langversion:5 -sdk:4.5 -r:mscorlib -r:System -r:System.Windows.Forms -r:System.Drawing -r:System.Core` — `ui/PrimerVeri.cs ui/PrimerUI.cs lib/Kayit.cs lib/NcAnaliz.cs lib/SimGorunum.cs lib/WebSunucu.cs lib/EkranYakala.cs lib/Pencere.cs` + `lib/EdingApi.cs` (makine) ve + `lib/EdingSim.cs` (demo) → ikisi de **rc=0**, yalnız kullanılmayan alan uyarıları (CS0219/CS0414). Önyüklemedeki tek `Add-Type -Path` ile aynı dosya kümesi; yinelenen tür adı yok (`Eding`, `Cart`, `Kayit` birer kez).
+2. **Yansıma dökümü** (`dump.cs`): 70 genel tür; `PrimerUI.Diyalog` 21 statik üye, `PrimerUI.Kabuk` (Komut olayı `EventHandler<KomutArgs>`, Uygula, IzinleriUygula ×3, Bildir, MesgulGoster, TemaUygula, EkranGoster, Uretim.SimHost/SimHostBuyuk), `MakineDurumu` 100 alan, satır sınıflarının kurucuları.
+3. **AST taraması** (`scan.ps1`): bütün teslim .ps1'lerinde `[Tür]::Üye(…)` (argüman sayısıyla aşırı yükleme eşleşmesi), `$script:Kabuk.Üye`, `$script:SimGorunum.Üye`, `New-Object PrimerUI.*/SimView` (kurucu argüman sayısı), `[PrimerUI.*]` tür sabitleri ve enum değerleri:
+   ```
+   === makine kümesi (EdingApi)
+   Demo.ps1:31: YOK  [Eding].SimSifirla      (… 11 satır, hepsi lib/Demo.ps1; yalnız demoda yüklenir)
+   KONTROL EDILEN BASVURU: 1062  (KazimaBaslat_Klasik.ps1 kendi iç türlerini kullandığı için hariç)
+   === demo kümesi (EdingSim)
+   KONTROL EDILEN BASVURU: 1062  SORUN: 0  (Klasik hariç)
+   ```
+   Sonuç: yeni panelde **çözülemeyen ya da yanlış argüman sayılı başvuru yok**; `[Eding]::Sim*` yalnız `lib/Demo.ps1`'de.
+4. **Elle denetlenenler:** `add_Komut({ param($s,$e) … })` → `EventHandler<KomutArgs>` (KomutArgs.Ad/Arg özellik, okunur); `[PrimerUI.Diyalog]::AcilStop = [System.Action]{ Acil-Stop 'diyalog' }` (Kabuk kurucusu yalnız null ise kendi temsilcisini atar; önyükleme sonra üzerine yazar — doğru sıra); `AcilStopTetikle` ve `KomutGeldi` istisnaları yakalıyor (PS hatası WinForms'u çökertmez); `Ui-Liste-Sec`'te `$null` → `""` dönüşümü C#'ta `IsNullOrEmpty` ile ele alınıyor; `SayiGir` `double?` dönüşü; `Sozluk-Str` `return ,$d` → tek argümanlı `IzinleriUygula(IDictionary<string,string>)`; `-STA` .bat'ta var; `Application.Run($script:Kabuk)`; FormClosing'de zamanlayıcı durur. Uzak sunucu iş parçacığı PowerShell betik bloğu çağırmıyor (`EkranKaynagi = [EkranYakala]::Kaynak()` C# temsilcisi) — "runspace yok" çökmesi riski yok.
+5. **Arayüz komutları ↔ dağıtıcı:** `PrimerUI.cs`'teki bütün komut dizgileri `Komut-Tanimla` tablosunda var (kalan farklar yalnız ekran adları ve izin anahtarı `blok.yeni`); dağıtıcıdaki her komutun görünümde bir kaynağı var (`home/park/temizlik/jog/kal.*.uygula/ileri/geri` değişkenle kuruluyor).
+
+## Kural ve güvenlik denetimleri (sorun bulunmayanlar)
+
+- **PS 7 sözdizimi/API:** AST'de `?:`, `??`, `?.`, `&&/||`, `clean`, `-Parallel`, `-AsHashtable`, `utf8NoBOM`, `::new(`, `$IsWindows` … teslim ve tests'te **0**. Bütün teslim .ps1 BOM'lu UTF-8 + CRLF; .bat'lar ASCII; `macro.cnc` ASCII + CRLF; `cnc.ini` ve `macro_X5_orijinal.cnc` `35a684f..HEAD` arasında değişmemiş. Kullanıcıya görünen İngilizce metin yok (yalnız HTTP durum satırı).
+- **Klasik geri dönüş:** `KazimaBaslat_Klasik.ps1` = `PrimerMill/KazimaBaslat.ps1` (bayt bayt, K1–K9 ve YÜKSEK düzeltmeleri içeren sürüm); `P_CNC_icin/macro.cnc` ve `demo/macro.cnc` = `Eding/macro.cnc` (sürüm 4; `$BeklenenMakroSurum = 4` her iki panelde). `EdingApi.cs` eski `[Eding]` sınıfıyla aynı; `WebSunucu.cs` farkı yalnız belgelenen iki madde (EkranKaynagi, YalnizYerel).
+- **K/YÜKSEK düzeltmeleri yeni panelde:** K1 `Is-Suruyor` + izin tablosu (duraklı = sürüyor); K2 `Pens-Ac-T0` → tehlikeli onay + `Ismili-Durdur-Bekle` (M5, 8 sn hız beklemesi) her pens yolunda; K3 `Uzak-Engel` + uzak BAŞLAT duraklı işte red; K4 `/api/tikla`, `/api/tus` 403; UZ-03 PIN ≥6, 5 yanlışta 60 sn kilit; UZ-04 CORS yok + Host denetimi; UZ-05 yükleme kilidi/ayrılmış adlar; K5 `Raf-Kontrol` yazmıyor; K6 makro sürümü (izin tablosu `-Makro`); K7 `Yuva-Yaklas` sensörde de T0 denetimi; K8 `OtoKal-Hazirla` prob kapısı + sihirbaz ②'den ileri yok; K9/KL-02/KL-03 `[math]::Max(0.0, …)`; KL-04 `Yedekli-Onay` (yedek yoksa ne sorulur ne yazılır); GV-05 her diyalogda ACİL STOP + Esc; GV-08 `Takim-Belirsiz-*`; GV-09 geri sayım süre dolunca iptal (her iki panelde aynı); ED-08 `Acil-Stop` önce durdurur.
+- **ACİL STOP her an:** `Komut-Isle` `acilstop`'u her denetimden önce işler (IslemSuruyor engellemez); diyaloglarda küçük düğme + Esc + Kabuk düğmesinin üstünde canlı katman doğrudan `Acil-Stop`'u çağırır; uzun bekleyişler (`Hareket-Bitene-Kadar-Bekle`, `Ismili-Durdur-Bekle`) `Ui-Olaylar` ile mesaj işletir. İstisna eski panelle aynı: OpenFileDialog açıkken ve birkaç sn'lik `Start-Sleep` bloklarında.
+- **Demo/gerçek ayrımı:** demoda gerçek `cncapi.dll` sınıfı derlenmez; veri `demo_calisma\` altında; sunucu yalnız 127.0.0.1; Windows/Eding başlangıç fonksiyonları zararsız sürümlerle değiştirilir; açılış görevi `/demo` geçmez.
+- **G-kod:** altınlar `35a684f`'teki orijinal `KazimaBaslat.ps1`'den bağımsız olarak yeniden üretildi → `tests/golden` ile `diff -r` farksız; yeni kodla karşılaştırmada yalnız `Kal-NC-Uret/*` 4 varyant farklı (KL-03, BEKLENEN_FARKLAR'da MAKİNEDE DOĞRULA). TEMİZLİK/PARK, KOL DÜZ, Yuvaya-Git, Jog, Takim-Degistir satırları eskisiyle aynı.
+- **Başarım (pwsh, EdingSim):** bir tık ort. 7.1 ms; 500 kayıtla `Durum-Topla` 18.5 ms; `Izin-Hesapla` 1.5 ms (PS 5.1 32 bitte birkaç kat yavaş olsa da 200 ms içinde).
+
+## Test paketi
+
+`pwsh -NoProfile -File tests/Calistir.ps1 -Exe <pwsh> -Kaynak teslim/PrimerMill` → **HEPSİ GEÇTİ (10)**: Sözdizimi 24 dosya 0 sorun · Ayar 204 · Demo_Ekran 1 (Linux'ta atlandı) · Denetleyici 111 · EdingSim 172 · G-kod altın 20 (+4 beklenen fark) · Kal_NC_Cep · OtoKal 37 · Sayı/kültür 258 · Taşıma 88 (98 fonksiyon birebir).
+
+## Teslim kararı
+
+Statik olarak teslim edilebilir; KRİTİK/YÜKSEK yok. Makineye geçmeden önce: SK-02 (YAKLAŞ hedef denetimi) ve SK-01 (tık içinde modal pencere) düzeltilmeli ya da bilinçli kabul edilmeli; SK-03'teki Windows adımları (32 bit PS 5.1 test paketi + demo + Eding simülasyon modu) mutlaka yapılmalı. Sorun çıkarsa `KazimaBaslat_Klasik.bat` aynı ayar dosyalarıyla hazır.
+
+## Tekrar kontrol (b1bfb3b..2640665, f27cc77)
+
+Yöntem: `git diff 98f9782 HEAD` satır satır; korumalı bloğun çağrı grafiği (`review/callgraph.ps1`: Ana-Tik / Eding-Gizle-Tik / Okuma-Yap / Durum-Yenile'den erişilen 64 fonksiyon içinde modal pencere açan çağrı aranır); C# 5 yeniden derleme + yansıma dökümü + PS→C# statik tarama; PS7 / BOM / CRLF / ASCII taraması; test paketi; PowerShell'in `$null` → .NET `string` dönüşümü için küçük deneme (`review/nulltest.ps1`).
+
+### SK maddeleri
+
+| ID | Karar | Not |
+|---|---|---|
+| SK-01 | **Düzeltildi** | Çağrı grafiği: korumalı bloktan modal pencereye giden tek yol `Ui-Kutu` (→ Ui-Bilgi/Ui-Hata/Ui-Onay/Ui-Secim) ve o `TikMesgul` iken bilgi/hata pencerelerini erteliyor (soru pencereleri ertelenmiyor, ama korumalı blokta YesNo çağrısı yok). `Baglanti-Bekcisi` korumanın dışında, `BekciMesgul` + `Islem-Calistir`. İç içe tık en başta döner. Kuyruk: `acilstop` her şeyden önce, `is.durdur` kuyruğu atlar; diğerleri sıraya girer, koruma bırakılınca aynı tıkta normal `Komut-Isle` denetiminden geçer, 3 sn'den eski olan çalıştırılmaz (bildirim) → bekletilmiş hareket geç başlamaz. Kilitlenme yok: `TikMesgul`, `BekciMesgul`, `KuyrukMesgul` hepsi `try/finally`; kuyruktan çalışan komut yeniden kuyruğa girmez (iki bayrak da false). Ertelenen pencere açıkken iç içe tıklar korumalı bloğu çalıştırır (ekran ve ACİL STOP bekçisi çalışır). Kalan küçük nokta SK-15. |
+| SK-02 | **Düzeltildi** (MAKİNEDE DOĞRULA) | `Yaklas-Neden`: seçili ≠ son GİT ise ya da (Takım değişimi sayfasında) makine konumu GİT bitişindekinden 0.05 mm/° farklıysa red. `Komut-Isle` makineye dokunan her komutta hedefi unutturuyor (yalnız XY'yi değiştirmeyen 17 komut hariç), açılış ve uzaktan komut da. G-kod satırları değişmedi (altın testi aynı). Sihirbaz yolu için SK-16. |
+| SK-03 | Açık (doğası gereği) | Windows'ta çalıştırma adımı; yeni değişiklikler (SK-01 kuyruğu, SK-04 DPI) bu ihtiyacı artırdı. |
+| SK-04 | **Uygulandı, yeni risk** | `SetProcessDPIAware` ilk pencereden önce, try/catch, Vista+ — doğru. Ama bkz. SK-14 (çift ölçekleme). |
+| SK-05 | **Düzeltildi** | Kendi denemem: `G10L2P1X0, g10 l2, N10G10, #5221=1, # 4002 = 1, #[4002]=1, G92.1` → yedek; `G1 X10, G100, G0 Z10, G10.1, T10 M6, N10 G1` → yedek yok. |
+| SK-06 | **Düzeltildi** | Desen `'KazimaBaslat(_Klasik)?\.ps1'` iki panelde; `KazimaBaslat_Klasik.ps1` = `PrimerMill/KazimaBaslat.ps1` (bayt bayt). |
+| SK-07 | **Düzeltildi** | `MessageBox.Show(metin, başlık, YesNo, Question, Button2)` (.NET 4 aşırı yüklemesi var); metin Türkçe. |
+| SK-08 | **Düzeltilmedi** | bkz. SK-13: PowerShell `$null`'u `string` parametresine `""` olarak geçirir; C#'taki yeni `null` dalı hiç çalışmaz. |
+| SK-09 | **Düzeltildi** (MAKİNEDE DOĞRULA) | `is.durdur -IcIce` + kuyruğu atlar; `Btn-Durdur` yalnız onay + `CncAbortJob`; GV-08 işaretlemesi (`Takim-Degisimi-Suruyor-Mu`) yerinde. İç içe DURDUR dıştaki işlemin meşgul katmanını silmiyor. |
+| SK-10 | **Düzeltildi** | `lib/EdingSim.cs` (kök = teslim) BOM'lu, 587/587 CRLF. |
+| SK-11 | **Düzeltildi** | Envanter: 232 `[x]`, 5 `[~]`, 0 `[ ]` (entegrasyon.md "229/3/3" diyor — küçük belge tutarsızlığı). |
+| SK-12 | Yapılmadı (istenmedi) | — |
+
+### Yeni bulgular
+
+| ID | Önem | Dosya:Satır | Açıklama | Önerilen düzeltme | Doğrulama |
+|---|---|---|---|---|---|
+| SK-13 | DÜŞÜK | `lib/ArayuzKapisi.ps1:24-25`, `ui/PrimerUI.cs:4249-4255` | SK-08 düzeltmesi etkisiz: `[PrimerUI.Diyalog]::TehlikeliOnay($baslik, $metin, $e, $y, $yd)` çağrısında `$yd = $null` PowerShell tarafından `String.Empty` yapılır (PS 5.1 ve 7 aynı). C# `yedekDosyasi != null` dalına girer, "Yedek: alınmadı" (kehribar) hâlâ her hareket onayında görünür. Testler sahte `Ui-Tehlikeli-Onay` kullandığı için yakalamadı. | `$yd` null ise `[NullString]::Value` geçir (PS 3+), ya da C#'a `bool yedekGerekli` parametreli aşırı yükleme / ayrı `TehlikeliOnay(baslik, metin, eski, yeni)` çağrısı. | `review/nulltest.ps1`: `string y` parametresine `$null` → `[]` (boş dizgi), `[NullString]::Value` → `NULL`; `string[]` için `$null` → `NULL` (diziler etkilenmez). |
+| SK-14 | ORTA | `KazimaBaslat.ps1:44-54` (yeni), `ui/PrimerUI.cs:4816-4817` (`AutoScaleDimensions 96` + `AutoScaleMode.Dpi`), `ui/PrimerUI.cs:225-226, 4913` (`Tema.Px = v*S*Dpi`, `Tema.Dpi = DpiX/96`) | SK-04'le süreç DPI-aware oldu; bundan önce `DpiX` her zaman 96 olduğu için Kabuk'taki iki ölçekleme mekanizması hiç birlikte çalışmamıştı. Artık %125/%150'de hem WinForms otomatik ölçeklemesi (AutoScaleMode.Dpi: alt kontrollerin boyut/konumu ve TableLayoutPanel mutlak satır/sütunları ×1.5) hem de elle ölçekleme (`Tema.Px` ×Dpi, OnHandleCreated'da) etkin → yerleşimde çift ölçekleme (×2.25) olasılığı. Diyaloglar ve ACİL STOP katmanı `AutoScaleMode.None` (yalnız elle) — Kabuk'la tutarsız. Mono'da denenemez. | Kabuk'ta da `AutoScaleMode = AutoScaleMode.None` (bütün ölçekleme zaten `Tema.S`/`Tema.Dpi` ile elle), ya da `Tema.Dpi`'yi 1'de bırak. Windows'ta %100/%125/%150 ekran turu zorunlu (ACİL STOP düğmesi ve alt şerit ekranda kalmalı). | Kod okuma (satırlar yanda); `grep AutoScaleMode` → Kabuk `Dpi`, DiyalogFormu ve katman `None`. |
+| SK-15 | DÜŞÜK | `lib/Denetleyici.ps1` Komut-Isle (`-and $ad -ne 'is.durdur'`), `lib/Kapi.ps1` Ui-Kutu (`UYARI: zamanlayıcı içinden soru penceresi`) | Korumalı blok içindeki DoEvents sırasında basılan DURDUR, tık İÇİNDE çalışır ve iş sürerken onay sorusunu (YesNo, ertelenemez) korumalı bloktan açar; soru açık kaldıkça iç içe tıklar en başta döndüğü için ekran ve ACİL STOP bekçisi durur (ACİL STOP düğmeleri çalışır). Olasılık düşük (korumalı blok ms mertebesinde, DoEvents yalnız `Yaz`'da). | `TikMesgul` iken DURDUR'u kuyruğun başına al (koruma ms içinde biter, aynı tıkta çalışır) ya da yalnız `BekciMesgul` iken kuyruğu atlat. | Kod okuma; Komut-Isle akışı. |
+| SK-16 | DÜŞÜK (MAKİNEDE DOĞRULA) | `lib/Denetleyici.ps1` `Yaklas-Neden` (`if ($ayar) { return '' }`), Komut-Isle (`Yuva-Hedefi-Unut ($ad -ne 'jog')`) | Yuva ayarı sihirbazı yolunda konum denetimi yok ve `jog` komutu hangi sekmeden gelirse gelsin (Takımlar › Hareket dahil, adım 10 mm'ye kadar) `SonAyarYuva`'yı korur; Eding penceresinden / dışarıdan yapılan hareket bu yolda yakalanmaz. Sihirbazda GİT → (Hareket sekmesinde X 10 mm) → YAKLAŞ, iş milini yuvadan uzakta yaklaşma Z'sine indirir. Takım değişimi sayfası yolu konum denetimiyle güvende. | Sihirbaz yolunda GİT konumundan izin verilen sapmayı sınırla (ör. XY ≤ 2 mm, A/B/Z değişmemiş) ya da yalnız yuva ayarı sayfasındaki jog'u (argümanda ayırt edici önek) koruyucu say. | Kod okuma. |
+
+### Yeniden çalıştırılanlar
+
+- **C# 5:** iki küme (`EdingApi` / `EdingSim`) `mcs -noconfig -langversion:5 -sdk:4.5` ile 0 hata.
+- **Statik PS→C# tarama:** `KONTROL EDILEN BASVURU: 1071`; makine kümesinde yalnız beklenen 11 `lib/Demo.ps1` `[Eding]::Sim*` (yalnız demoda yüklenir), demo kümesinde 0; geri kalan sayım `KazimaBaslat_Klasik.ps1`'in kendi iç türleri (taramadan hariç). Yeni `PrimerMillDpi.Yerel` aynı blokta `Add-Type -MemberDefinition` ile tanımlanıyor.
+- **PS7 sözdizimi / API:** teslim ve tests'te 0. Teslim .ps1 ve lib .cs BOM'lu + CRLF (ui/*.cs BOM'lu, LF — derleyici için sorun değil, değişmedi); .bat ve `P_CNC_icin/macro.cnc` ASCII; `Eding/` (cnc.ini, macro_X5_orijinal.cnc) değişmemiş; `ui/` = `teslim/PrimerMill/ui/`, `lib/EdingSim.cs` = teslim kopyası.
+- **Test paketi:** HEPSİ GEÇTİ (10) — Denetleyici 179 (önce 111), EdingSim 172, G-kod altın 20 + 4 beklenen fark (yalnız Kal-NC-Uret/KL-03), Taşıma 88, Sayı/kültür 258, Ayar 204, OtoKal 37; Demo_Ekran Linux'ta atlandı.
+
+### Tekrar kontrol kararı
+
+KRİTİK/YÜKSEK yok. SK-01, SK-02, SK-05, SK-06, SK-07, SK-09, SK-10, SK-11 doğru ve tam; ACİL STOP ve DURDUR beklemiyor, kuyruk her tıkta boşalıyor, bekletilmiş hareket 3 sn'den sonra çalışmıyor. SK-08 etkisiz (SK-13, kozmetik). SK-04'ün açtığı çift ölçekleme riski (SK-14) Windows'ta %125/%150'de görülmeden makineye geçilmemeli. Windows deneme adımları (SK-03) hâlâ zorunlu.
