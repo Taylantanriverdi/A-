@@ -28,8 +28,14 @@ Sub user_1
 	f50
 	g53 g90 g38.2 z[#4004]
 
+	;PrimerMill (MC-07): prob tetiklenmezse makinede errmsg ile durur, G92 yanlis konumdan yazilmaz
+	;  simulasyonda (#5380 / #5397) eskisi gibi yalniz uyari
 	if[#5067 == 0]
-		warnmsg "warn there is no tool on the spindle"
+		if[[#5380 == 0] and [#5397 == 0]]
+			errmsg "error probe not triggered: no tool on the spindle, G92 not set"
+		else
+			warnmsg "warn there is no tool on the spindle"
+		endif
 	endif
 
 	g90 g0 z[#5063]
