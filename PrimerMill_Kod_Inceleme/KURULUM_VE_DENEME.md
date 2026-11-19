@@ -11,6 +11,7 @@ teslim/
     KazimaBaslat.bat       yeni panel (KazimaBaslat.bat /demo = demo modu)
     KazimaBaslat_Klasik.bat  düzeltilmiş eski panel (geri dönüş)
     EdingKapat.bat, HataBul.bat, YoneticiKurulum.bat, portal.html, uzak.html, eding_yolu.txt
+    KIOSK_KUR.bat, KIOSK_KALDIR.bat, Kabuk.ps1   kiosk modu (§6, isteğe bağlı)
     lib/  ui/  demo/
   P_CNC_icin/macro.cnc   → makinede P:\CNC\macro.cnc (makro sürüm 5)
   ekran_goruntuleri/     → yeni arayüzün görüntüleri
@@ -82,3 +83,47 @@ Hız ayarı **%10–30**, el fiziksel acil stop düğmesinde (varsa), önce iş 
 - Panel açılmıyorsa: `HataBul.bat` ve `loglar\Panel_*.log`.
 - Panel yavaş ya da donuyor gibiyse: Kayıtlar › Teknik bilgide tık süresine bakın; geçici olarak klasik panele dönün.
 - Her durumda geri dönüş için §3.
+
+## 6. Kiosk modu (isteğe bağlı)
+
+Amaç: makine Windows tabanlı görünmesin. Açılışta, kullanımda ve kapanışta yalnız PRIMER ekranı görünür; Windows'a yalnız panelden, PIN ile geçilir. Kiosk **yalnız kurulduğu Windows hesabında** geçerlidir (HKCU); diğer hesaplar normal Windows'tur.
+
+### 6.1 Kurulum
+
+1. Önce paneli normal kurun ve deneyin (§2, §4). Kiosk, panel sorunsuz açılıyorsa kurulmalı.
+2. Operatör hesabında oturum açın (makinede her gün kullanılan hesap). En kolayı: operatör hesabı aynı zamanda yönetici olsun.
+3. `PrimerMill\KIOSK_KUR.bat` → sağ tık → **Yönetici olarak çalıştır**. Ekranda hangi hesaba kurulacağı yazar; UAC penceresine başka bir yöneticinin parolasını yazdıysanız o hesabın adı görünür: **H** deyin ve operatör hesabında yeniden deneyin.
+4. Yaptıkları (her adım ekrana yazılır):
+   - Bu hesabın kabuğu Windows Gezgini yerine `Kabuk.ps1` olur (`HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell`). Kabuk siyah ekranda PRIMER · Başlatılıyor… gösterir ve paneli açar.
+   - `kiosk.on` bayrağı: panel çerçevesiz tam ekran, en üstte açılır; klavye kilidi Win, Menü, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc, Alt+F4, Alt+Boşluk tuşlarını keser (tek başına **Esc = ACİL STOP çalışmaya devam eder**); KÜÇÜLT pasif; paneli kapatmak PIN ister.
+   - İlkeler: Görev Yöneticisi, ekran kilidi, parola değiştirme, oturum kapatma, hızlı kullanıcı değiştirme, kilit ekranı, ilk oturum animasyonu, "Hoş geldiniz / Kapatılıyor" yazıları, dokunmatik ekran kenar kaydırmaları, bildirimler kapatılır. Önceden var olan değerler `kiosk_yedek.txt`'ye yazılır.
+   - **Kapat / Yeniden başlat Windows menülerinden bilerek kaldırılmadı** (NoClose yok): doğru yol paneldeki **Kapat** düğmesidir (Eding ayarlarını kaydeder); Ctrl+Alt+Del ekranındaki güç düğmesi yalnız acil durum içindir.
+   - Açılış: `bcdedit /set {globalsettings} bootuxdisabled on` ve `bcdedit /set {current} quietboot on` (Windows logosu ve dönen noktalar görünmez, ekran siyah kalır). Önceki değerler yedeklenir.
+   - İsteğe bağlı otomatik oturum açma (varsayılan **hayır**). Kurulmazsa açılışta Windows giriş ekranı görünür. Kurulursa parola kayıt defterinde **düz metin** saklanır.
+   - `YoneticiKurulum.bat`'ın kurduğu "PrimerMill" başlangıç görevi kapatılır (paneli artık kabuk açar).
+5. Yeniden başlatın.
+
+Not: Bilgisayar üreticisinin (BIOS/UEFI) logosu donanım yazılımıdır; yalnız BIOS/UEFI ayarlarından (ör. "Quiet Boot", "Logo") kapatılabilir.
+
+Not: Kabuktan açılan panel yönetici değildir (UAC). Eding'i panel kendisi açtığı için gizleme yine çalışır; Eding ayrıca yönetici olarak açılmışsa gizlenemeyebilir, panel yine en üstte kalır (MAKİNEDE DOĞRULA).
+
+### 6.2 Kullanım
+
+- **Cihazı kapatma:** sol menünün en altındaki **Kapat** (her ekranda). KAPAT / YENİDEN BAŞLAT / VAZGEÇ. İş sürerken, duraklıyken ya da bir panel işlemi sürerken pasiftir. Eding ayarlarını kaydederek kapanır (en çok 15 sn beklenir), sonra bilgisayar kapanır. DEMO'da bilgisayar kapanmaz. Kiosk kurulu olmasa da çalışır.
+- **Windows'a geçiş:** Ayarlar › Genel › Kiosk modu › **WINDOWS'A GEÇ** → PIN **2457**. Klavye kilidi kalkar, Windows masaüstü açılır, panel simge durumuna küçülür ve çalışmaya devam eder. İş sürerken geçilemez.
+- **Panele dönüş:** görev çubuğundaki PrimerMill'e ya da masaüstündeki "PrimerMill 2" kısayoluna dokunun: panel tam ekran ve kilitli olarak geri gelir (kısayol ikinci panel açmaz, açık olanı öne çağırır).
+- **PIN değiştirme:** Ayarlar › Genel › Kiosk modu › **PIN** (önce mevcut PIN, sonra yeni PIN iki kez, 4–8 rakam). Ya da panel kapalıyken `panel_ayarlar.ini` içine `KioskPin=1234` satırı. 5 yanlış PIN → 60 sn bekleme. PIN günlüğe yazılmaz.
+- Paneli kapatmak (Ayarlar › Genel › KAPAT, Alt+F4) kiosk'ta PIN ister; kapanınca Windows masaüstü açık kalır. Yeniden kiosk için bilgisayarı yeniden başlatın.
+
+### 6.3 Kurtarma (bilgisayar hiçbir zaman kilitli kalmaz)
+
+1. **PIN ile:** WINDOWS'A GEÇ (yukarıda).
+2. **Panel çökerse:** kabuk paneli yeniden açar; 2 dakikada 3 kezden fazla çökerse Windows masaüstünü açar ve Türkçe açıklama gösterir (`loglar\kabuk.log`, `HataBul.bat`).
+3. **kiosk.on'u silmek:** `PrimerMill\kiosk.on` silinirse sonraki oturumda kabuk Windows masaüstünü ve paneli normal açar (kiosk kapalı). Bunu başka bir Windows hesabından, ağdan ya da Güvenli Moddan yapabilirsiniz.
+4. **Güvenli Mod:** Güvenli Modda kabuk paneli açmaz, doğrudan Windows masaüstünü açar. Güvenli Moda girmek: giriş ekranında Shift basılıyken Yeniden başlat → Sorun gider → Gelişmiş seçenekler → Başlangıç Ayarları → 4; ya da açılışta 3 kez üst üste elektriği kesip Windows Kurtarma Ortamı. Sonra `KIOSK_KALDIR.bat`.
+5. **Shift:** oturum açılırken (siyah PRIMER ekranının ilk 1,5 saniyesinde) Shift basılı tutulursa kabuk paneli açmaz, Windows masaüstünü açar. Zamanlaması tutmayabilir; asıl yollar yukarıdakilerdir. (Otomatik oturum açmada Shift ayrıca otomatik oturumu da atlatır.)
+6. Ctrl+Alt+Del yazılımla engellenemez; ekranında Görev Yöneticisi, Kilitle, Parola değiştir ve Kullanıcı değiştir kapalıdır, Oturumu kapat/güç düğmesi kalabilir (oturum yeniden açılınca yine kiosk gelir).
+
+### 6.4 Kaldırma
+
+Kiosk'un kurulduğu hesapta (önce WINDOWS'A GEÇ) `KIOSK_KALDIR.bat` → **Yönetici olarak çalıştır**. Kabuk Windows Gezgini olur, `kiosk.on` silinir, ilkeler kaldırılır (önceden var olanlar eski değerine döner), bcdedit değerleri geri yüklenir, KIOSK_KUR kurduysa otomatik oturum kapatılır ve kayıtlı parola silinir, "PrimerMill" başlangıç görevi yeniden açılır. Yeniden başlatın.
