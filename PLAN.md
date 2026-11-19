@@ -508,6 +508,7 @@ Her aşamanın sonunda: **qa-tester raporu → hatalar düzeltilir → kullanıc
 | K26 | Parsel sınırları organik (data/land.js parcelAt/tilesOfParcel: gürültüyle bükülmüş harita + çoğunluk filtresi); sahip olunan arazinin dış sınırı ahşap çit; dikdörtgen başlangıç çiti kaldırıldı | Kullanıcı isteği: kare/dikdörtgen değil, düzensiz sınırlar ve çit |
 | K27 | Yeni oyun bomboş arazide başlar: sürülmüş tarla, tezgâh, kuyu, sundurma, çit yok (yalnız çiftlik evi ve köy yolu sabit); tezgâh 600, kuyu 400, sundurma 500 ₺ ile kurulur | Kullanıcı isteği |
 | K28 | Rüzgâr salınımları ayrı yavaş saatle (env.wt = gerçek zaman × 0.42): ekin, ağaç, orman şeridi, ön plan çimi, tente, tabela | Kullanıcı: normal hızda bile salınım çok hızlı |
+| K29 | 'Gece İstilası' modu (isteğe bağlı): gece canavar baskınları, savunma yapıları, kiralık askerler; aile dostu ürkütücü-sevimli tarz, kimse ölmez (bayılır) | Kullanıcı isteği |
 | K18 | Hayvan ürününde A için mutluluk ≥ 90 (sevme gerekir); tavuk 400 ₺, yumurta 15 ₺ | sim-animals: kümes ve ahır yatırımı ~47 günde geri döner |
 | K17 | Toptancı ×0.95, çilek 16 ₺; fiyatlar ezilmedi | sim-economy optimal oyuncu ilk mevsim ≈12.4k ₺ (Aşama 3'te harcama yeri yok); gerçek oyuncu hedefi 7–9k korunur, Aşama 4'te kümes/hayvan yatırımıyla yeniden ölçülecek |
 
@@ -948,3 +949,39 @@ Beyin dosyaları: `data/workers.js` (WORKER_TYPES apprentice/experienced/master,
 - **Depolama:** depo +24, silo +12 envanter yuvası (yerleştirilince `inventory.capacity` artar; kaldırma yalnızca dolu yuva sayısı yeni kapasiteye sığıyorsa). Soğuk hava deposu varken tüm bozulma ×0.2 (8 kWh/gün); silo varken `noSpoil` eşyalar bozulmaz.
 - **Araçlar:** `shop:buyVehicle {vehicle}` (garaj gerekir; sağım makinesi ahır gerekir) → `state.vehicles = [{ id, type, garageId, condition }]`. Oyuncu araç çubuğunda Traktör seçerse çapa/ekim (seçili tohum) 3×3 alana uygulanır (her karo `farm:action`; yakıt `fuelPerTile` 'fuel'); Biçerdöver: 3×3 içindeki `crops` hasat ×1.25 verim. Sağım makinesi: her sabah 07:00 ahırdaki süt/keçi sütünü envantere taşır, %15 ihtimalle bir kalite üstü; 3 kWh/gün. Görsel için `vehicle:run {type, tiles:[...], driverId?}`.
 - **Çalışanlar:** iş ilanı panosu her 7 günde 3 aday (`HIRING`; tür, isim, yetenekler farm/animal/machine 1–5, maaş ±%15). `worker:hire {candidateId}` → `hireCost` 'wages' → çalışan. En fazla `MAX_WORKERS`. Çırak benzersiz ve eşekli kalır. Eylem süresi = `actionMinutes × (1.25 − 0.1 × yetenek) / speedMult`. Usta: hasat ettiği/baktığı ekinin careScore'una +10. Yeni görevler: `plow` (işaretli karo yok → oyuncunun işaretlediği "sürülecek" alan: araç çubuğunda yeni **İşaretle** aleti `farm:mark {tileId, plan:'plow'|'plant', itemId?}`), `plant` (işaretli karo + envanterde tohum). Traktör garajdaysa ve çalışanın makine yeteneği ≥ 3 ise 3×3 iş için traktörü alır. Çalışanlar birbirinin rezerve ettiği işi almaz.
+
+---
+
+## 16. Gece İstilası Modu (K29) — Sözleşme (bağlayıcı, kısa)
+
+Beyin dosyaları: `data/defense.js` (RAID_MODE, RAID_SCHEDULE, WAVES, MONSTERS, DAMAGE, DEFENSES, SOLDIERS, MAX_SOLDIERS, SOLDIER_NAMES), `placeables.js` (DEFENSES → 'defense' kategorisi, `BUILD_CATS` içinde `raidOnly`), economy.js (defense, repairs, soldiers, loot).
+Mod: `state.settings.raids` (boolean). Kapalıyken DefenseSystem hiçbir şey yapmaz, savunma kategorisi ve asker paneli gizlidir; mevcut savunma yapıları durur ama etkisizdir.
+
+| İşçi | Dosyalar |
+|---|---|
+| gameplay-dev | `systems/DefenseSystem.js` (+ `systems/defense/*`: raid.js, monsters.js, combat.js, soldiers.js), occupancy'ye savunma engelleri (canavar yolu için ayrı ızgara), Placement'a yapı hp'si ve onarım, `tools/sim-defense.mjs`, main.js kaydı |
+| visual-dev | `world/MonsterView.js`, `world/SoldierView.js`, `world/DefenseView.js` (telli çit, taş duvar, tuzak, meşale, kule), baskın atmosferi (kızıl ay, koyu mavi-mor gece tonu, yerden sis), savaş efektleri, hasar görselleri |
+| ui-dev | Mod seçimi (Ayarlar anahtarı + Yeni oyun onayında "Gece İstilası" seçeneği), baskın uyarı bandı (19:00), gece HUD (dalga, kalan canavar, ev canı), sabah hasar raporu kartı, `ui/soldierPanel.js` (kirala/çıkar/maaş), bina/makine panellerinde **Onar** düğmesi, İnşa kataloğunda 'Savunma' sekmesi (mod açıkken) |
+
+### State
+```js
+state.settings.raids = false
+state.defense = { nightPlanned: false, bloodMoon: false, wave: 0, wavesLeft: 0, nextWaveMin: null, houseHp, houseMax,
+                  monsters: [{ id, type, x, y, hp, targetId, state:'walk'|'attack', path }],
+                  soldiers: [{ id, type, name, hp, x, y, state:'sleep'|'patrol'|'fight'|'down', towerId? }],
+                  stats: { nights, kills, lootTotal }, lastReport: null | { day, kills, loot, damaged:[...], houseDamage } }
+state.placed[i].hp / .maxHp / .ruined   // savunma ve tüm yapılar (mod açıkken)
+```
+### Kurallar (gameplay-dev)
+- **Takvim:** her gün 19:00'da (mod açık, gün ≥ firstDay) baskın kararı: şans = min(max, base + gün × perDay); her 14. gün kızıl ay (kesin, canavar ×1.6). Karar varsa 19:00 `raid:warning {bloodMoon}`; 21:00 `raid:start`; WAVES.perNight dalga, aralarında gapMinutes; tüm canavarlar ölünce veya 04:30'da `raid:end` → sabah 06:00 `raid:report`.
+- **Doğma:** sahip olunan arazinin dışındaki karolardan (arazi sınırına 2–6 karo uzak, rastgele kenar), ctx.rng.
+- **Yapay zekâ:** hedef = `targets` önceliğine göre en yakın (ekin karosu, hayvan binası, ev, diğer yapı). Yol: canavar ızgarası (engel: duvar/telli çit/yapılar; hayalet engelleri yok sayar) üzerinde A*; yol yoksa en yakın engel (çit/duvar) hedef olur ve kırılır. Hareket oyun dakikası tabanlı; ekin karosuna basınca cropTrample hasarı (karo başına bir kez/gece).
+- **Savaş:** canavar saldırısı hedef hp'sini düşürür (`rate` × dakika); telli çite saldıran canavar contactDmg alır; tuzak karosuna giren trapDmg alır (uses azalır, 0 → kırık, Onar ile yenilenir); meşale yarıçapında zombi ×0.5 hız, hayalet yaklaşmaz (kaçar). Kule menzildeki en yakın canavara `dmg × rate` (içinde okçu varsa × mannedMult). Askerler gece 20:30–05:00 evin çevresinde devriye, en yakın canavara gider, menzildeyse vurur; okçu boş kuleye yerleşir. Asker hp 0 → `down` (sabah iyileşir). Öldürülen canavar `reward` ₺ (`transact(+,'loot')`), `monster:killed {x,y,reward}`.
+- **Hasar:** yapı hp 0 → `ruined` (işlevsiz: hayvan binası üretmez, makine çalışmaz, kule ateş etmez); ev hp 0 → sabah paranın %10'u kaybedilir. Onarım: `defense:repair {placedId}` → `transact(-maliyet,'repairs')`; ev: `defense:repairHouse`. Sabah raporu: öldürülen, ganimet, hasarlı/harap yapılar, ev hasarı.
+- **Askerler:** `soldier:hire {type}` (hireCost 'soldiers'), maaş her gün 20:00 'soldiers'; para yetmezse o gece nöbet tutmaz (toast). `soldier:fire`. En fazla MAX_SOLDIERS.
+- Olaylar: `raid:warning/start/wave/end/report`, `monster:spawned/killed`, `defense:changed`, `defense:hit {x,y,kind}`, `soldiers:changed`. Tüm rastgelelik ctx.rng; mod kapalıyken sistem erken döner.
+### Görsel (visual-dev)
+- Canavarlar sevimli-ürkütücü: **zombi** (yeşilimsi, kambur, kollar önde, sallanan yürüyüş), **iskelet** (krem kemikler, takırdayan hızlı yürüyüş), **hayalet** (yarı saydam, süzülen, kuyruklu); hepsinde parlayan gözler (bloom), gölge, depthForY; vurulunca beyaz flaş + geri itme; ölünce toz/duman + küçük sikke parıltısı (kan yok).
+- Askerler: bekçi (mızrak, deri zırh), okçu (yay, kapüşon), şövalye (zırh, kalkan); devriye/saldırı/bayılma (yere oturur, yıldızlar) animasyonları; okçu kulede.
+- Savunmalar: telli çit (direkler + dikenli tel, komşulara bağlanır), taş duvar (birleşen taş blok), kazık tuzağı (zemine gömülü), meşale (alev + ışık, bloom), gözcü kulesi (ahşap, çatılı, ok atış animasyonu: ok mermisi izi). Hasar: çatlak/is katmanı, harap: kırık/eğik + duman.
+- Atmosfer: baskın gecesi kızıl ay (kızıl ayda daha büyük ve kırmızı), ambient koyu mor-mavi, yerden sis, uzaktan gelen canavarların gözleri; şafakta yumuşak geçiş. 19:00 uyarısında gök hafif kızıllaşır.

@@ -4,15 +4,19 @@
 import { BUILDINGS } from './buildings.js';
 import { MACHINES } from './recipes.js';
 import { ANIMALS } from './animals.js';
+import { DEFENSES } from './defense.js';
 
 export const BUILD_CATS = [
   { id: 'animals', name: 'Hayvancılık' },
   { id: 'workshops', name: 'Atölyeler' },
   { id: 'fences', name: 'Çit ve Yol' },
   { id: 'farm', name: 'Çiftlik' },
+  { id: 'defense', name: 'Savunma', raidOnly: true },   // K29: yalnız Gece İstilası modunda görünür
 ];
 
 export const PLACEABLES = {
+  // K29: savunma yapıları (yalnız istila modunda katalogda)
+  ...Object.fromEntries(Object.entries(DEFENSES).map(([id, d]) => [id, { name: d.name, cat: 'defense', w: d.w, h: d.h, price: d.price, refund: 0.5, paint: !!d.paint, defense: true }])),
   coop:   { name: 'Kümes', cat: 'animals', w: 4, h: 3, price: BUILDINGS.coop.price, refund: 0.5, link: { panel: 'building', buildingType: 'coop' } },
   barn:   { name: 'Ahır',  cat: 'animals', w: 6, h: 4, price: BUILDINGS.barn.price, refund: 0.5, link: { panel: 'building', buildingType: 'barn' } },
   hive:   { name: 'Arı kovanı', cat: 'animals', w: 1, h: 1, price: ANIMALS.bee.price, refund: 0.5, link: { panel: 'building', buildingType: 'hive' } }, // fiyata arılar dahil
