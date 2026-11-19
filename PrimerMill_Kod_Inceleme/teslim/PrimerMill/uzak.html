@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrimerMill</title>
+<style>
+:root{--zemin:#0e0f12;--yazi:#e8e8e8;--soluk:#8a9099;--altin:#d9b968;--kirmizi:#e46a5e;--yesil:#78d28c}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--zemin);color:var(--yazi);font:14px "Segoe UI",system-ui,sans-serif;overflow:hidden}
+#sahne{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+#ekran{max-width:100%;max-height:100%;cursor:default;user-select:none;-webkit-user-drag:none;display:block}
+#bilgi{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:var(--soluk);text-align:center}
+#arac{position:fixed;top:10px;right:10px;display:flex;gap:8px;align-items:center;opacity:.35;transition:opacity .2s}
+#arac:hover{opacity:1}
+#arac button{font:inherit;background:rgba(30,33,38,.92);color:var(--yazi);border:1px solid #3a3f47;border-radius:8px;padding:8px 12px;cursor:pointer}
+#arac button:hover{border-color:var(--altin)}
+#nokta{width:10px;height:10px;border-radius:50%;background:var(--soluk)}
+#yuk{position:fixed;left:0;top:0;height:3px;background:var(--altin);width:0;transition:width .2s}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#22252b;border:1px solid var(--altin);padding:10px 16px;border-radius:8px;display:none;max-width:90%}
+#pinEkran{position:fixed;inset:0;background:rgba(10,11,13,.96);display:none;align-items:center;justify-content:center}
+#pinEkran div{background:#1c1f24;border:1px solid #2e333b;border-radius:10px;padding:22px;width:300px;text-align:center}
+#pinEkran input{font:22px Consolas,monospace;text-align:center;width:100%;padding:8px;background:#111317;color:var(--yazi);border:1px solid #2e333b;border-radius:6px}
+#pinEkran button{margin-top:14px;width:100%;font:inherit;padding:10px;background:#262a31;color:var(--altin);border:1px solid var(--altin);border-radius:8px;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="sahne"><img id="ekran" alt=""><div id="bilgi">Makine ekranı yükleniyor…</div></div>
+<div id="yuk"></div>
+<div id="arac">
+  <span id="nokta" title="bağlantı"></span>
+  <span style="color:var(--soluk);font-size:12px">yalnız izleme</span>
+  <button id="bYukle" title="Bu bilgisayardaki .nc dosyasını makineye gönderir ve seçer">⬆ Dosya yükle</button>
+  <button id="bTam" title="Tam ekran">⛶</button>
+</div>
+<input type="file" id="dosya" accept=".nc" style="display:none">
+<div id="toast"></div>
+<div id="pinEkran"><div><p style="color:var(--soluk);margin-top:0">PIN<br><small>Makinede: Ayarlar → PANEL → Uzaktan erişim</small></p>
+<input type="password" id="pinGir" inputmode="numeric" maxlength="8" placeholder="6 hane"><button id="bPin">Giriş</button></div></div>
+<script>
+let pin = ''; try { pin = localStorage.getItem('pm_pin') || ''; } catch (e) {}
+const $ = id => document.getElementById(id);
+const img = $('ekran');
+// Ekran yalnız izlenir: uzaktan tıklama / klavye makinede kapalı (K4). PIN X-PIN başlığıyla gönderilir.
+let sonUrl = null, pinBekle = false;
+function toast(t, hata) { const e = $('toast'); e.textContent = t; e.style.borderColor = hata ? 'var(--kirmizi)' : 'var(--altin)'; e.style.display = 'block'; clearTimeout(e._t); e._t = setTimeout(() => e.style.display = 'none', 5000); }
+function pinSor() { pinBekle = true; $('pinEkran').style.display = 'flex'; $('pinGir').focus(); }
+$('bPin').onclick = () => { pin = $('pinGir').value.trim(); try { localStorage.setItem('pm_pin', pin); } catch (e) {} $('pinEkran').style.display = 'none'; pinBekle = false; };
+$('pinGir').onkeydown = e => { if (e.key === 'Enter') $('bPin').click(); };
+
+async function kare() {
+  if (pinBekle || document.hidden) return setTimeout(kare, 500);
+  try {
+    const r = await fetch('/api/ekran?t=' + Date.now(), { headers: { 'X-PIN': pin } });
+    if (r.status === 401) { pinSor(); return setTimeout(kare, 500); }
+    if (r.status === 429) { $('bilgi').textContent = 'Çok fazla yanlış PIN: 1 dakika bekle'; $('bilgi').style.display = 'block'; $('nokta').style.background = 'var(--kirmizi)'; return setTimeout(kare, 10000); }
+    if (!r.ok) { const j = await r.json().catch(() => ({})); $('bilgi').textContent = j.hata || 'Ekran alınamadı'; $('bilgi').style.display = 'block'; $('nokta').style.background = 'var(--kirmizi)'; return setTimeout(kare, 2000); }
+    const b = await r.blob(); const u = URL.createObjectURL(b);
+    img.onload = () => { if (sonUrl) URL.revokeObjectURL(sonUrl); sonUrl = u; };
+    img.src = u; $('bilgi').style.display = 'none'; $('nokta').style.background = 'var(--yesil)';
+  } catch (e) { $('nokta').style.background = 'var(--kirmizi)'; $('bilgi').textContent = 'Makineye bağlanılamıyor'; $('bilgi').style.display = 'block'; return setTimeout(kare, 2000); }
+  setTimeout(kare, 300);
+}
+img.addEventListener('contextmenu', e => e.preventDefault());
+$('bTam').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); };
+$('bYukle').onclick = () => $('dosya').click();
+$('dosya').onchange = () => {
+  const f = $('dosya').files[0]; if (!f) return;
+  const x = new XMLHttpRequest();
+  x.open('POST', '/api/yukle?ad=' + encodeURIComponent(f.name)); x.setRequestHeader('X-PIN', pin);
+  x.upload.onprogress = e => { if (e.lengthComputable) $('yuk').style.width = (100 * e.loaded / e.total) + '%'; };
+  x.onload = async () => {
+    $('yuk').style.width = '0';
+    if (x.status === 401) { pinSor(); return; }
+    if (x.status === 429) { toast('Çok fazla yanlış PIN: 1 dakika bekle', true); return; }
+    let r = {}; try { r = JSON.parse(x.responseText); } catch (e) {}
+    if (r.hata) { toast(r.hata, true); return; }
+    toast(f.name + ' yüklendi, seçiliyor…');
+    const s = await fetch('/api/komut?ad=sec&arg=' + encodeURIComponent(r.ad), { method: 'POST', headers: { 'X-PIN': pin } }).then(q => q.json()).catch(() => ({}));
+    toast(s.sonuc || 'Seçilemedi', !s.sonuc || s.sonuc.startsWith('HATA'));
+  };
+  x.onerror = () => { $('yuk').style.width = '0'; toast('Yükleme başarısız', true); };
+  x.send(f); $('dosya').value = '';
+};
+if (!pin) pinSor();
+kare();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Eding klasorunu elle belirtme (istege bagli).
+# Bu dosyada # ile baslamayan ilk satir Eding klasoru olarak kullanilir; hic yoksa panel P:\CNC (makine) ve
+# C:\CNC_X5, C:\CNC4.03, C:\CNC4.04, C:\CNC4.02, C:\CNC klasorlerinde cncapi.dll arar.
+# Ornek (dizustu kopyasi icin basindaki # isaretini silin):
+# C:\CNC_X5
