@@ -2145,8 +2145,17 @@ $script:ManuelDiyalogAcik = $false
 
 function Frez-Manuel-Mi { try { return ([Eding]::CncGetVariable(4030) -eq 1) } catch { return $false } }
 
+# MC-06: manuelden otomatiğe geçişte iş milindeki takım 0..6 olmalı (magazinde T1-T6 var; T7+ ile M6 yuvaya çarpar)
+function Otomatik-Gecis-Uygun-Mu {
+    $tk = 0; try { if ($script:ApiHazir -and $script:Bagli) { $tk = [int][Eding]::CncGetCurrentToolNumber() } } catch { $tk = -1 }
+    if ($tk -ge 0 -and $tk -le 6) { return $true }
+    [Kayit]::Yaz("FREZ MODU: otomatiğe geçiş reddedildi, iş milinde T$tk")
+    [Kayit]::Show("Eding'e göre iş milinde T$tk var; magazinde yalnız T1–T6 yuvası var.`r`nBu haliyle OTOMATİK frez değişimi yuvaya çarpabilir.`r`n`r`nÖnce frezi elle çıkar (PENS AÇ → takım T0), sonra OTOMATİK'e geç.", 'Frez modu', 'OK', 'Warning') | Out-Null
+    return $false
+}
 function Frez-Modu-Yaz([bool]$manuel) {
     if (Is-Suruyor-Uyari 'Frez modu') { return $false }
+    if (-not $manuel -and -not (Otomatik-Gecis-Uygun-Mu)) { Frez-Modu-Goster; return $false }
     $v = if ($manuel) { 1 } else { 0 }
     $ok = Degisken-Yaz 4030 $v
     if ($ok) { Yaz "Frez değişimi: $(if ($manuel) { 'MANUEL (elle)' } else { 'OTOMATİK (magazin)' })" }
@@ -5968,6 +5977,7 @@ if ($script:Sade) {
         [Kayit]::Show("Bu makinenin macro.cnc'si manuel frez değişimini desteklemiyor (orijinal makro).`r`nManuel için PrimerMill makrosu (P_CNC_icin\macro.cnc) kurulu olmalı.", 'Frez değişimi', 'OK', 'Warning') | Out-Null
         $this.Checked = $false; return
     }
+    if (-not $this.Checked -and $script:Manuel -and -not (Otomatik-Gecis-Uygun-Mu)) { $this.Checked = $true; return }   # MC-06
     $script:Manuel = $this.Checked
     $script:Tercih.FrezModu = if ($this.Checked) { 'MANUEL' } else { 'OTOMATIK' }; Tercih-Yaz
     Yaz "Frez değişimi: $($script:Tercih.FrezModu) (kaydedildi)"
