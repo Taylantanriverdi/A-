@@ -41,6 +41,18 @@ if (-not $MakineBilgisayari) {
     if ([System.IO.File]::Exists([System.IO.Path]::Combine($ScriptKlasor, 'macro.cnc'))) { $EdingKlasor = $ScriptKlasor }
 }
 
+# SK-04 (KU-07): DPI farkındalığı. Herhangi bir pencere (tek kopya sorusu dahil) açılmadan ÖNCE bildirilmeli; yoksa Windows
+# %125/%150 ölçekte paneli bit eşlem olarak büyütür (bulanık), DpiX 96 döner, ekran görüntüsü sanal boyutta alınır.
+# Görünüm AutoScaleMode.Dpi ile ölçeklenir. Windows Vista+ (user32 SetProcessDPIAware); başka sistemde / hata olursa atlanır.
+try {
+    if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT -and [Environment]::OSVersion.Version.Major -ge 6) {
+        if (-not ('PrimerMillDpi.Yerel' -as [type])) {
+            Add-Type -Namespace PrimerMillDpi -Name Yerel -MemberDefinition '[System.Runtime.InteropServices.DllImport("user32.dll")] public static extern bool SetProcessDPIAware();'
+        }
+        [void][PrimerMillDpi.Yerel]::SetProcessDPIAware()
+    }
+} catch { }
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 [System.Windows.Forms.Application]::EnableVisualStyles()
