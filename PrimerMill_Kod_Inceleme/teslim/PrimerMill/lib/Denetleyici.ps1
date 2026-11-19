@@ -99,7 +99,7 @@ function Okuma-Yap {
         $d = Eding-Durum
         $h.Durum = $d
         $pz = 0; try { $pz = [Eding]::CncGetPauseStatus() } catch { }
-        $h.Durakli = ($d -like 'PAUSE*') -or ((Mesgul $d) -and $pz -ne 0)   # READY iken PauseStatus 0 dışı olabiliyor
+        $h.Durakli = ($d -like 'PAUSE*')   # CncGetPauseStatus() bu Eding'de READY'de de, kazırken de 0 dışı dönüyor (dizüstü denemesi): yalnız durum metni
         $h.Calisiyor = (Mesgul $d)
         $h.Hatali = (Hatali $d)
         $h.Acil = ([Eding]::CncGetEMStopActive() -ne 0)
