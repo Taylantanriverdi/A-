@@ -69,7 +69,8 @@ $PanelKlasor = $ScriptKlasor     # panel dosyaları (ui, lib, portal.html, uzak.
 $script:Demo = [bool]$Demo
 if (-not $script:Demo -and -not $MakineBilgisayari) {
     # Eding yok: eskisi gibi "önizleme" (yalnız dosya kontrolü) ya da DEMO (sahte makine, bütün ekranlar gezilebilir)
-    $c = [System.Windows.Forms.MessageBox]::Show("Eding bulunamadı (cncapi.dll yok: $($adaylar -join ', ')).`r`n`r`nDEMO modunda açılsın mı?`r`n`r`nEVET: sahte makine ile bütün ekranlar denenebilir (gerçek makine HAREKET ETMEZ).`r`nHAYIR: önizleme (yalnız dosya kontrolü).", 'PrimerMill 2', 'YesNo', 'Question')
+    # SK-07: varsayılan düğme HAYIR (önizleme). Makinede P: sürücüsü geç hazır olursa Enter ile sahte makine açılmasın.
+    $c = [System.Windows.Forms.MessageBox]::Show("Eding bulunamadı (cncapi.dll yok: $($adaylar -join ', ')).`r`nBu bir makine bilgisayarıysa HAYIR deyin, Eding klasörünü (P:\CNC) kontrol edip paneli yeniden açın.`r`n`r`nDEMO modunda açılsın mı?`r`n`r`nEVET: DEMO, sahte makine. Bütün ekranlar denenebilir; DEMO'da HİÇBİR MAKİNE HAREKET ETMEZ (Eding'e ve makineye bağlanılmaz).`r`nHAYIR (varsayılan): önizleme (yalnız dosya kontrolü).", 'PrimerMill 2', [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question, [System.Windows.Forms.MessageBoxDefaultButton]::Button2)
     if ("$c" -eq 'Yes') { $script:Demo = $true }
 }
 if ($script:Demo) {
