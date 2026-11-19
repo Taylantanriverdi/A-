@@ -1,0 +1,7 @@
+# GKod_Altin_Testi.ps1 - bilinçli (beklenen) G-kod farkları.
+# Her satır: Üretici/varyant   ya da   Üretici/*   (boşluktan sonrası açıklama olarak yok sayılır)
+# '#' ile başlayan satırlar yorumdur. Listedeki bir varyant altından farklı çıkarsa fark yazdırılır,
+# "beklenen fark" olarak sayılır ve testi düşürmez. Her girdinin gerekçesi INCELEME_RAPORU.md'de olmalı.
+# Örnek:
+#   Kal-NC-Uret/*   KL-03 [math]::Max(0, ...) tamsayı aşırı yüklemesi düzeltildi, cep çapları değişti
+Kal-NC-Uret/*   KL-03 [math]::Max(0, ...) tamsayi asiri yuklemesi duzeltildi, cep caplari degisti (MAKINEDE DOGRULA)
