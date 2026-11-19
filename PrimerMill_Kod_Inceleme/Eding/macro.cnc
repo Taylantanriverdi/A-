@@ -339,6 +339,11 @@ endsub
 
 ;PrimerMill: panelden PENS AC -> pens acilir, makine frezin cikarildigini bilir (T0)
 sub pm_pens_t0
+	;PrimerMill (MC-05): pens acilmadan once is mili durdurulur ve durmasi beklenir
+	;  macro/orijinalde hazir bir durma beklemesi yok; g4 p3 varsayim, sure makinede olculmeli
+	m5
+	m9
+	g4 p3
 	M54 P2
 	#4039 = 1
 	M6 T0
