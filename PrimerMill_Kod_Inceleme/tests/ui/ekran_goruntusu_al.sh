@@ -9,6 +9,6 @@ DERLE="$(mktemp -d)"
 trap 'rm -rf "$DERLE"' EXIT
 cd "$KOK"
 mcs -langversion:5 -nowarn:219,414 -r:System.Windows.Forms -r:System.Drawing -r:System.Core \
-    -out:"$DERLE/EkranGoruntusu.exe" ui/PrimerUI.cs tests/ui/EkranGoruntusu.cs
+    -out:"$DERLE/EkranGoruntusu.exe" ui/PrimerVeri.cs ui/PrimerUI.cs tests/ui/EkranGoruntusu.cs
 mkdir -p "$CIKIS"
 xvfb-run -a -s "-screen 0 1920x1080x24" mono "$DERLE/EkranGoruntusu.exe" "$CIKIS" ${2:+"$2"}
