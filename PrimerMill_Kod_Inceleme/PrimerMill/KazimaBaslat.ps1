@@ -90,10 +90,24 @@ public static class Kayit {
             try { w.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff") + "  " + (metin ?? "").Replace("\r\n", " | ").Replace("\n", " | ")); } catch { }
         }
     }
+    // GV-05: mesaj penceresi açıkken de yazılım ACİL STOP'una ulaşılsın (PowerShell tarafı Acil-Stop'u bağlar)
+    public static Action AcilStop;
+    // Açık Kayit.Show pencere sayısı (uzaktan komutlar pencere açıkken reddedilir, K3)
+    static int acikPencere = 0;
+    public static int AcikPencere { get { return acikPencere; } }
+    static void AcilCagir(Form f) {
+        Yaz("PENCERE: ACİL STOP (Esc / düğme)");
+        Action a = AcilStop;
+        if (a != null) { try { a(); } catch (Exception ex) { Yaz("PENCERE: ACİL STOP hatası: " + ex.Message); } }
+        try { f.DialogResult = DialogResult.Cancel; } catch { }
+    }
     // Mesaj kutusu: kendi penceremiz (her zaman en önde, ekran ortasında, dokunmatiğe uygun büyük tuşlar). Metin ve cevap kaydedilir.
+    // Varsayılan (Enter) her zaman güvenli seçenektir: HAYIR / VAZGEÇ. Esc = ACİL STOP.
     public static DialogResult Show(string text, string caption, MessageBoxButtons b, MessageBoxIcon i) {
         Yaz("PENCERE [" + caption + "] " + text);
         DialogResult r = DialogResult.None;
+        acikPencere++;
+        try {
         using (Form f = new Form()) {
             f.Text = caption; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.MaximizeBox = false; f.MinimizeBox = false;
             f.StartPosition = FormStartPosition.CenterScreen; f.TopMost = true; f.ShowInTaskbar = false;
@@ -110,22 +124,35 @@ public static class Kayit {
             else tus.Add(new KeyValuePair<string, DialogResult>("TAMAM", DialogResult.OK));
             if (b == MessageBoxButtons.YesNoCancel || b == MessageBoxButtons.OKCancel) tus.Add(new KeyValuePair<string, DialogResult>("VAZGEÇ", DialogResult.Cancel));
             int y = l.Bottom + 18, w = 150, x = 582 - tus.Count * (w + 10) + 10;
-            Button ilk = null;
+            Button son = null;
             foreach (KeyValuePair<string, DialogResult> t in tus) {
                 Button bt = new Button(); bt.Text = t.Key; bt.DialogResult = t.Value; bt.FlatStyle = FlatStyle.Flat;
                 bt.BackColor = Color.FromArgb(34, 38, 45); bt.ForeColor = t.Value == DialogResult.Yes || t.Value == DialogResult.OK ? vurgu : Color.FromArgb(200, 204, 212);
                 bt.FlatAppearance.BorderColor = bt.ForeColor; bt.Font = new Font("Segoe UI Semibold", 12f);
                 bt.SetBounds(x, y, w, 52); f.Controls.Add(bt); x += w + 10;
-                if (ilk == null) ilk = bt;
+                son = bt;
+            }
+            // Küçük kırmızı ACİL STOP (yalnız panel bağladıysa)
+            if (AcilStop != null) {
+                Button ac = new Button(); ac.Text = "ACİL STOP"; ac.FlatStyle = FlatStyle.Flat; ac.TabStop = false;
+                ac.BackColor = Color.FromArgb(150, 20, 20); ac.ForeColor = Color.White; ac.FlatAppearance.BorderColor = Color.FromArgb(230, 60, 60);
+                ac.Font = new Font("Segoe UI Semibold", 9f); ac.SetBounds(22, y, 84, 52);
+                ac.Click += delegate { AcilCagir(f); };
+                f.Controls.Add(ac);
             }
             f.ClientSize = new Size(604, y + 52 + 18);
-            f.AcceptButton = ilk;
-            if (tus.Count > 1) { f.CancelButton = (IButtonControl)f.Controls[f.Controls.Count - 1]; }
-            f.Shown += delegate { f.Activate(); f.BringToFront(); };
+            // Enter = son tuş (tek tuşta TAMAM, çok tuşta HAYIR / VAZGEÇ: güvenli taraf). CancelButton yok: Esc = ACİL STOP.
+            f.AcceptButton = son;
+            f.ActiveControl = son;
+            f.KeyPreview = true;
+            f.KeyDown += delegate(object s2, KeyEventArgs e2) { if (e2.KeyCode == Keys.Escape) { e2.Handled = true; e2.SuppressKeyPress = true; AcilCagir(f); } };
+            f.Shown += delegate { f.Activate(); f.BringToFront(); if (son != null) son.Focus(); };
             r = f.ShowDialog();
             if (r == DialogResult.Cancel && tus.Count == 1) r = DialogResult.OK;
             if (r == DialogResult.Cancel && (b == MessageBoxButtons.YesNo)) r = DialogResult.No;
+            if (r == DialogResult.None) r = (tus.Count == 1) ? DialogResult.OK : (b == MessageBoxButtons.YesNo ? DialogResult.No : DialogResult.Cancel);
         }
+        } finally { acikPencere--; }
         Yaz("CEVAP   [" + caption + "] " + r.ToString());
         return r;
     }
@@ -3305,6 +3332,9 @@ function Acil-Stop-Kaldir {
     Panel-Sifirla
     Yaz 'Acil stop kaldırıldı. Makine hazır.'
 }
+
+# GV-05: Kayit.Show pencerelerinde Esc ve kırmızı ACİL STOP düğmesi bu işlevi çağırır
+[Kayit]::AcilStop = [System.Action]{ Acil-Stop 'diyalog' }
 
 function Btn-Reset {
     if ([Eding]::AcilKilit) { Acil-Stop-Kaldir; return }
