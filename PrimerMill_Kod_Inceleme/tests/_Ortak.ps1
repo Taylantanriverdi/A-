@@ -324,7 +324,7 @@ function Ui-Sahte-Yukle {
     function script:Ui-Acik-Diyalog { return [int]$script:SahteDiyalog }
     function script:Ui-One-Al { }
     function script:Ui-Ustte([bool]$ustte) { }
-    function script:Ui-Tema([bool]$koyu) { }
+    function script:Ui-Tema([string]$mod) { $script:SonTema = $mod }
     function script:Ui-Kucult { }
     function script:Ui-Kapat { Ui-Not 'KAPAT' }
     function script:Ui-Sim-Veri($analiz) { }

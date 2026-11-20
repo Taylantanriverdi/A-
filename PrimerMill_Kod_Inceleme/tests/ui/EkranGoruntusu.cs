@@ -16,7 +16,7 @@ static class EkranGoruntusu
     {
         public string Dosya;
         public int W, H;
-        public bool Koyu = true;
+        public TemaModu Mod = TemaModu.Koyu;
         public Action Hazirla;
     }
 
@@ -64,8 +64,9 @@ static class EkranGoruntusu
         if (sira >= adimlar.Count) { t.Stop(); Console.WriteLine(adimlar.Count + " ekran görüntüsü: " + cikis); k.Close(); return; }
         var a = adimlar[sira];
         if (k.Size.Width != a.W || k.Size.Height != a.H) { k.Size = new Size(a.W, a.H); k.Location = Point.Empty; }
-        if (Tema.Koyu != a.Koyu) k.TemaUygula(a.Koyu);
+        if (Tema.Mod != a.Mod) k.TemaUygula(a.Mod);
         try { a.Hazirla(); } catch (Exception ex) { Console.WriteLine("HATA " + a.Dosya + ": " + ex); }
+        k.GecisiTamamla(); // Geçişli: yumuşak geçişi beklemeden hedef renk
         k.Refresh();
         bekle = 6; // ~600 ms: yerleşim, ilerleme animasyonu ve diyalog çizimi otursun
     }
@@ -83,7 +84,11 @@ static class EkranGoruntusu
 
     static void Ekle(string dosya, int w, int h, bool koyu, Action hazirla)
     {
-        adimlar.Add(new Adim { Dosya = dosya, W = w, H = h, Koyu = koyu, Hazirla = hazirla });
+        Ekle(dosya, w, h, koyu ? TemaModu.Koyu : TemaModu.Acik, hazirla);
+    }
+    static void Ekle(string dosya, int w, int h, TemaModu mod, Action hazirla)
+    {
+        adimlar.Add(new Adim { Dosya = dosya, W = w, H = h, Mod = mod, Hazirla = hazirla });
     }
 
     // -----------------------------------------------------------------------------------------
@@ -156,6 +161,13 @@ static class EkranGoruntusu
         Ekle(no() + "_takimlar_acik_1024.png", 1024, 768, false, () => { Uygula(Hazir(), IzinHazir()); Git("takimlar"); k.Takimlar.SekmeGoster(0); k.Takimlar.Sec("T2"); });
         Ekle(no() + "_kal_oto_adim4_acik_1024.png", 1024, 768, false, () => { var d = Hazir(); Oto(d, 3); Uygula(d, IzinHazir()); Git("kalibrasyon"); k.Kalibrasyon.Sayfa("oto"); });
         Ekle(no() + "_uretim_acik_1920.png", 1920, 1080, false, () => { Calisiyor(); Git("uretim"); });
+        // Geçişli tema: zemin iş ilerledikçe maviden (0) yeşile (1) döner
+        var G = TemaModu.Gecisli;
+        Ekle(no() + "_uretim_gecisli_0_1024.png", 1024, 768, G, () => { var d = Hazir(); Uygula(d, IzinHazir()); Git("uretim"); });
+        Ekle(no() + "_uretim_gecisli_50_1024.png", 1024, 768, G, () => { var d = Ornek(); d.Yuzde = 50; d.Satir = 34876; d.GecenSn = 33 * 60; d.KalanSn = 33 * 60; Uygula(d, IzinCalisiyor()); Git("uretim"); });
+        Ekle(no() + "_uretim_gecisli_100_1024.png", 1024, 768, G, () => { var d = Bitti(); Uygula(d, IzinHazir()); Git("uretim"); });
+        Ekle(no() + "_uretim_gecisli_64_1920.png", 1920, 1080, G, () => { Calisiyor(); Git("uretim"); });
+        Ekle(no() + "_ayarlar_genel_gecisli_1024.png", 1024, 768, G, () => { var d = Ornek(); d.Yuzde = 30; d.Kiosk = true; d.Ayarlar["Tema"] = "gecisli"; Uygula(d, IzinCalisiyor()); Git("ayarlar.0"); });
     }
 
     static IEnumerable<Control> Tum(Control k)
@@ -237,7 +249,7 @@ static class EkranGoruntusu
         d.X = -64.250; d.Y = -52.000; d.Z = -12.345; d.A = 23.000; d.B = 0.000;
         d.MX = -117.557; d.MY = -89.166; d.MZ = -12.345; d.MA = 23.000; d.MB = 0.000;
         d.Takim = 2; d.TakimAciklama = "Ø1.0 küre frez"; d.FrezModu = "OTOMATIK";
-        d.Dosya = "ZY2_45.nc"; d.Blok = "#142"; d.Satir = 44812; d.ToplamSatir = 69751; d.Yuzde = 64.2;
+        d.Dosya = "ZY2_45.nc"; d.Blok = "#142"; d.Satir = 44812; d.ToplamSatir = 69751; d.Yuzde = 64.2; d.IsAktif = true;
         d.GecenSn = 42 * 60 + 10; d.KalanSn = 23 * 60 + 51; d.TahminiSn = 66 * 60; d.BitisSaati = "14:56";
         d.IsTakimlari = "T1 · T2 · T3";
         d.Hiz = 100;
@@ -295,8 +307,18 @@ static class EkranGoruntusu
     static MakineDurumu Hazir()
     {
         var d = Ornek();
-        d.Durum = Durum.Hazir; d.DurumMetni = "Hazır"; d.Satir = 0; d.Yuzde = 0; d.GecenSn = 0; d.KalanSn = 0; d.BitisSaati = null;
+        d.Durum = Durum.Hazir; d.DurumMetni = "Hazır"; d.Satir = 0; d.Yuzde = 0; d.GecenSn = 0; d.KalanSn = 0; d.BitisSaati = null; d.IsAktif = false;
         d.SonMesaj = "Makine hazır · ZY2_45.nc seçili"; d.SonMesajTuru = MesajTuru.Bilgi;
+        return d;
+    }
+
+    /// <summary>İş bitti (IsTamamlandi, %100): Geçişli temada tam yeşil.</summary>
+    static MakineDurumu Bitti()
+    {
+        var d = Ornek();
+        d.Durum = Durum.Hazir; d.DurumMetni = "Hazır"; d.IsAktif = false; d.IsTamamlandi = true; d.Yuzde = 100;
+        d.Satir = d.ToplamSatir; d.GecenSn = 65 * 60 + 40; d.KalanSn = 0;
+        d.SonMesaj = "ZY2_45.nc tamamlandı · 1:05:40"; d.SonMesajTuru = MesajTuru.Basari;
         return d;
     }
 

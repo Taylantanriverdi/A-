@@ -147,6 +147,7 @@ Dogru ($null -ne $d) 'MakineDurumu üretildi'
 if ($d) {
     Esit ([PrimerUI.Durum]::Calisiyor) $d.Durum 'MakineDurumu.Durum = Calisiyor'
     Esit 'demo_is' $d.Dosya 'MakineDurumu.Dosya'
+    Dogru ($d.IsAktif -and -not $d.IsTamamlandi) 'MakineDurumu.IsAktif (Geçişli tema ilerlemesi)'
     Dogru ($d.Bagli -and $d.Demo -and $d.HomeAlindi) 'Bagli / Demo / HomeAlindi'
     Dogru ($d.ToplamSatir -ge 400) 'ToplamSatir' "$($d.ToplamSatir)"
     Dogru ($d.TahminiSn -gt 0) 'TahminiSn'
@@ -205,6 +206,7 @@ if ($d) {
     Dogru ($d.IsTamamlandi) 'MakineDurumu.IsTamamlandi'
     Yakin 100 $d.Yuzde 0.001 'MakineDurumu.Yuzde = 100'
     Esit ([PrimerUI.Durum]::Hazir) $d.Durum 'iş sonunda Hazir'
+    Dogru (-not $d.IsAktif) 'iş sonunda MakineDurumu.IsAktif = false (Geçişli: IsTamamlandi ile tam yeşil)'
 }
 Dogru (-not (Test-Path -LiteralPath $DevamDosyasi)) 'tamamlanan iş devam.json bırakmadı'
 
@@ -227,6 +229,24 @@ Bolum 'Çeşitli'
 Esit '18.50' $script:Tercih.KalT 'ayar.kaydet KalT'
 [void](Komut-Isle 'ayar.kaydet' 'Koordinat=1')
 Esit 'MAKINE' $script:Tercih.Koordinat 'ayar.kaydet Koordinat=1 -> MAKINE (eski dosya biçimi)'
+# tema: koyu | acik | gecisli (bilinmeyen -> koyu), panel_ayarlar.ini'ye yazılır, görünüme ve Ayarlar tablosuna gider
+foreach ($c in @(@('koyu', 'koyu'), @('acik', 'acik'), @('gecisli', 'gecisli'), @(' GECISLI ', 'gecisli'), @('', 'koyu'), @('mor', 'koyu'), @('acık', 'koyu'))) {
+    Esit $c[1] (Tema-Normalle $c[0]) "Tema-Normalle '$($c[0])' -> $($c[1])"
+}
+$script:SonTema = $null
+Esit $true (Komut-Isle 'ayar.kaydet' 'Tema=gecisli') 'ayar.kaydet Tema=gecisli'
+Esit 'gecisli' $script:Tercih.Tema 'Tercih.Tema = gecisli'
+Esit 'gecisli' $script:SonTema 'görünüme Ui-Tema gecisli gitti'
+Dogru (@([System.IO.File]::ReadAllLines($TercihDosyasi)) -contains 'Tema=gecisli') 'panel_ayarlar.ini: Tema=gecisli'
+$yedekTercih = $script:Tercih; $script:Tercih = @{}; Tercih-Oku; $okunanTema = $script:Tercih.Tema; $script:Tercih = $yedekTercih
+Esit 'gecisli' (Tema-Normalle $okunanTema) 'Tercih-Oku sonrası tema gecisli (açılışta uygulanır)'
+Esit 'gecisli' (Durum-Topla).Ayar('Tema', '') 'MakineDurumu.Ayarlar Tema = gecisli (Ayarlar › Genel seçimi)'
+[void](Komut-Isle 'ayar.kaydet' 'Tema=bilinmeyen')
+Esit 'koyu' $script:Tercih.Tema 'bilinmeyen tema -> koyu'
+Esit 'koyu' $script:SonTema 'bilinmeyen tema: görünüme koyu'
+[void](Komut-Isle 'ayar.kaydet' 'Tema=acik')
+Esit 'acik' $script:SonTema 'ayar.kaydet Tema=acik'
+[void](Komut-Isle 'ayar.kaydet' 'Tema=koyu')
 $t = Izin-Hesapla
 Dogru ($t.ContainsKey('ayar.kaydet:ModSor')) 'Sade akışta ModSor pasif'
 [void](Komut-Isle 'kal.disk.olcum' 'w=4.10')

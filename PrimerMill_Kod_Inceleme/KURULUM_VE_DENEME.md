@@ -29,6 +29,7 @@ teslim/
    - Açılış geri sayımı: süre dolunca **hiçbir şey yapmamalı** (yeni güvenlik); ŞİMDİ BAŞLA → home.
    - İŞ SEÇ → `ORNEK_ZY2_45_kisa` → BAŞLAT → DURAKLAT. Duraklıyken jog, pens aç, MDI, G54 kaydet **soluk ve nedenli** olmalı. DEVAM → iş biter.
    - Takımlar, Kalibrasyon (otomatik sihirbaz prob testi geçmeden ② adımından ileri gitmemeli), Ayarlar › Makine değişkenleri (KAYDET → kırmızı tehlikeli onay, eski/yeni değerler, yedek dosya adı), Kayıtlar (MDI onayı), Uzaktan (`http://127.0.0.1:8080`, 6 haneli PIN).
+   - Ayarlar › Genel › Tema › **Geçişli**: zemin maviye döner; iş başlatılınca yüzde ilerledikçe zemin ve kartlar sıçramadan camgöbeği üzerinden yeşile kaymalı, iş bitince tam yeşil kalmalı, yeni dosya seçilince yavaşça maviye dönmeli. Yazılar ve durum hapı her renkte okunur olmalı. Panel kapatılıp açılınca tema korunmalı (`panel_ayarlar.ini` `Tema=gecisli`). Koyu/Açık'a dönüş anında olmalı.
    - Herhangi bir diyalogda **Esc = ACİL STOP** olmalı.
    - `teslim\PrimerMill\loglar\Panel_*.log` içinde `PROGRAM HATASI` satırı olmamalı.
    Sorun görürseniz `HataBul.bat` çalıştırıp çıkan metni ve log dosyasını saklayın.
