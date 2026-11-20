@@ -100,9 +100,9 @@ function Ui-Manuel-Adim([int]$adim, [string]$metin, [string[]]$dugmeler, [string
     return $r
 }
 
-function Ui-Devam([string]$dosya, [string]$bilgi, [int]$takim) {
-    Ui-Log-Pencere 'Yarım kalan iş' "$dosya · $bilgi"
-    $r = [PrimerUI.Diyalog]::Devam($dosya, $bilgi, $takim)
+function Ui-Devam([string]$dosya, [string]$bilgi, [int]$takim, [int]$kirik = 0) {
+    Ui-Log-Pencere 'Yarım kalan iş' "$dosya · $bilgi$(if ($kirik -gt 0) { " · kırık T$kirik" })"
+    $r = [PrimerUI.Diyalog]::Devam($dosya, $bilgi, $takim, $kirik)
     Ui-Log-Cevap 'Yarım kalan iş' "$($r.Secim) T$($r.Takim)"
     return @{ Secim = [string]$r.Secim; Takim = [int]$r.Takim }
 }

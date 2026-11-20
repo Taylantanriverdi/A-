@@ -173,6 +173,8 @@ namespace PrimerUI
         /// (iptal sonrası kalan eski Yuzde MDI/home sırasında yüzeyi yeşile kaydırmasın).</summary>
         public bool IsAktif;
         public int Hiz = 100;
+        /// <summary>Kaldığı yerden devam kaydı (devam.json) özeti, örn. "Son kayıt: satır 44 812 (14:31:07)"; yoksa null. İş kartında soluk satır.</summary>
+        public string DevamKaydi;
 
         // --- blok
         public string BlokDurum;
@@ -282,7 +284,8 @@ namespace PrimerUI
     /// <summary>Yarım kalan iş diyaloğu sonucu.</summary>
     public class DevamSonucu
     {
-        /// <summary>"tam" (önerilen, ~10 sn geriden), "yakin", "guvenli" (işlem başı), "bastan" ya da "iptal".</summary>
+        /// <summary>"tam" (önerilen, ~10 sn geriden), "yakin", "guvenli" (işlem başı), "bastan" ya da "iptal".
+        /// Kırık frez kaydında (kirik &gt; 0) yalnız "frez" (kırık frezin işini baştan), "bastan" ya da "iptal".</summary>
         public string Secim = "iptal";
         /// <summary>İş milinde takılı frez (0 = yok).</summary>
         public int Takim;

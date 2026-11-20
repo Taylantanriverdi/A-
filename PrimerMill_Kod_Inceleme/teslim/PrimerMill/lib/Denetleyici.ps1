@@ -831,6 +831,9 @@ function Durum-Topla {
         $d.ToplamSatir = [int]$a.Satir; $d.TahminiSn = [int]$a.Toplam
         $d.IsTakimlari = (@($a.Takimlar | Where-Object { $_ -gt 0 } | Sort-Object -Unique | ForEach-Object { "T$_" }) -join ' · ')
     }
+    # Senaryo 1: devam kaydının tutulduğu görünsün ("Son kayıt: satır N (hh:mm:ss)")
+    $sk = $script:DevamSonKayit
+    if ($sk -and ($script:IsAktif -or $sk.Durum -ne 'calisiyor')) { $d.DevamKaydi = "Son kayıt: satır $(([int]$sk.Satir).ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('tr-TR'))) ($(([datetime]$sk.Zaman).ToString('HH:mm:ss')))" }
     if ($script:IsAktif -or $script:IsTamamlandi) {
         $d.Satir = [int]$script:SonGecerliSatir; $d.GecenSn = [int]$script:Gecen.TotalSeconds; $d.KalanSn = [int]$script:KalanSn; $d.BitisSaati = [string]$script:BitisSaati
     }
@@ -924,6 +927,7 @@ function Durum-Topla {
         @('Home', $(if ($h.Home) { 'tamam' } else { 'alınmadı' }), $(if ($h.Home) { 'Basari' } else { 'Uyari' })),
         @('Takım', "T$($h.Takim)", 'Bilgi'),
         @('Makro', $(if ($script:OzelMakro) { "PrimerMill makrosu · beklenen sürüm $BeklenenMakroSurum$(if ($script:MakroSurumUyumsuz) { ' · UYUMSUZ' })" } else { 'orijinal makro' }), $(if ($script:MakroSurumUyumsuz) { 'Hata' } else { 'Bilgi' })),
+        @('Devam kaydı', $(if ($script:DevamSonKayit) { "satır $($script:DevamSonKayit.Satir) · $(([datetime]$script:DevamSonKayit.Zaman).ToString('HH:mm:ss')) · $($script:DevamSonKayit.Durum)" } else { 'yok' }), 'Bilgi'),
         @('Takım durumu', $(if ($script:TakimBelirsiz) { 'BELİRSİZ (değişim yarıda kesildi)' } else { 'net' }), $(if ($script:TakimBelirsiz) { 'Uyari' } else { 'Bilgi' })),
         @('Ayrıntı', [string]$script:TeknikMetni, 'Bilgi'),
         @('Yönetici', $(if ($script:Yonetici) { 'evet' } else { 'hayır' }), 'Bilgi'),
@@ -969,6 +973,8 @@ function Panel-Acilis {
 }
 
 function Panel-Kapanis {
+    # Senaryo 1: iş sürerken panel kapanırsa son satır kaydedilir (Eding işi sürdürebilir; açılınca yarım iş sorulur)
+    if ($script:IsAktif) { try { Devam-Kaydet $script:SonGecerliSatir 'panel_kapandi' $script:Yuzde } catch { } }
     try { [WebSunucu]::Durdur() } catch { }
     $script:UzakAcik = $false; $script:ProbAktif = $false
     # Panel kapanınca Eding görünmez kalmasın (cihaz kapanırken gösterilmez: ekranda Windows / Eding görünmesin)

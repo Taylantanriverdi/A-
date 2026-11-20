@@ -229,6 +229,14 @@ function Frez-Omru-Sifirla([string]$arg) {
     $k = Frez-Omru-Kayit $n
     $om = if ([double]$k.Omur -gt 0) { " / $(Frez-Omru-Dk $k.Omur) dk ömür" } else { '' }
     if (-not (Normal-Onay 'Yeni frez' "T$n frezi değişti mi?`r`n`r`nKullanılan süre sıfırlanacak: şimdi $(Frez-Omru-Dk $k.Dakika) dk$om.`r`nÖmür ayarı ($(if ([double]$k.Omur -gt 0) { "$(Frez-Omru-Dk $k.Omur) dk" } else { 'girilmedi' })) korunur.`r`n`r`nSıfırlansın mı?")) { return }
+    Frez-Omru-Sifirla-Ic $n
+}
+
+# Onaysız sıfırlama (onayı çağıran sorar): Frez-Omru-Sifirla ve kırık frez devamı (Devam-Baslat, "Yeni frez takıldı")
+function Frez-Omru-Sifirla-Ic([int]$n) {
+    if ($n -lt 1) { return }
+    $k = Frez-Omru-Kayit $n
+    $om = if ([double]$k.Omur -gt 0) { " / $(Frez-Omru-Dk $k.Omur) dk ömür" } else { '' }
     $eski = [double]$k.Dakika
     $k.Dakika = 0.0
     $k.Sifirlama = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss', $script:FrezOmruIc)

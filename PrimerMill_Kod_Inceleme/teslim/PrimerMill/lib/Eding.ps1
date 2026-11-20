@@ -189,6 +189,8 @@ function Baglanti-Bekcisi {
         try { [void][Eding]::CncDisConnectServer() } catch { }
         $script:Bagli = $false
         $script:MakroKontrolTamam = $false
+        # Senaryo 1: Eding çöktü / kapandı: son geçerli satır kaydedilir (takım: son bilinen, kopuk sunucuya sorulmaz)
+        if ($script:IsAktif) { try { Devam-Kaydet $script:SonGecerliSatir 'eding_kapandi' $script:Yuzde } catch { } }
         if ($script:IsAktif) { $script:IsAktif = $false; $script:SureMetni = 'Eding kapandı'; $script:SureTur = $cKirmizi }
     }
     if (((Get-Date) - $script:SonEdingBaslatma).TotalSeconds -ge 30) {

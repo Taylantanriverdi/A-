@@ -2935,7 +2935,10 @@ namespace PrimerUI
             else
             {
                 string s = string.IsNullOrEmpty(d.IsTakimlari) ? "" : "Takımlar  " + d.IsTakimlari;
-                if (d.TahminiSn > 0 && sure) s += (s.Length > 0 ? "   ·   " : "") + "Tahmini " + Bicim.Sure(d.TahminiSn);
+                bool kayit = !string.IsNullOrEmpty(d.DevamKaydi);
+                // devam kaydı varken (senaryo 1: kaydın tutulduğu görünsün) "Tahmini" yerine, durumdan hemen sonra gösterilir
+                if (d.TahminiSn > 0 && sure && !kayit) s += (s.Length > 0 ? "   ·   " : "") + "Tahmini " + Bicim.Sure(d.TahminiSn);
+                if (kayit) s = d.DevamKaydi + (s.Length > 0 ? "   ·   " + s : "");
                 if (!string.IsNullOrEmpty(d.DurumMetni)) s = d.DurumMetni + (s.Length > 0 ? "   ·   " + s : "");
                 lblDurum.Metin = s; lblDurum.RenkRol = YaziRol.Soluk; lblDurum.Kalin = false;
                 isKart.Vurgu = nu > 0 ? Tema.Duraklatildi : Color.Empty;
@@ -5053,8 +5056,13 @@ namespace PrimerUI
 
         // ------------------------------------------------------------------ Yarım kalan iş
         /// <summary>Yarım kalan iş: "tam", "yakin", "guvenli", "bastan", "iptal" + iş milindeki takım.</summary>
-        public static DevamSonucu Devam(string dosya, string bilgi, int takim)
+        public static DevamSonucu Devam(string dosya, string bilgi, int takim) { return Devam(dosya, bilgi, takim, 0); }
+
+        /// <summary>kirik &gt; 0: kırık frez (takım boyu ölçümü). Yalnız "T{k}'NİN İŞİNİ BAŞTAN BAŞLAT" ("frez"), "TÜM İŞİ BAŞTAN" ("bastan"),
+        /// VAZGEÇ; kaldığı yerden / yakın / işlem başı seçenekleri gösterilmez (nerede kırıldığı bilinemez).</summary>
+        public static DevamSonucu Devam(string dosya, string bilgi, int takim, int kirik)
         {
+            if (kirik > 0) return DevamKirik(dosya, bilgi, takim, kirik);
             var r = new DevamSonucu { Takim = Math.Max(0, Math.Min(6, takim)) };
             var f = new DiyalogFormu("Yarım kalan iş · " + (dosya ?? ""), Simge.Oynat, Color.Empty, 1);
             f.TabanGenislik = 720; f.GovdeYukseklik = 290;
@@ -5074,6 +5082,33 @@ namespace PrimerUI
             iz.Ekle(mk("YAKIN NOKTADAN", "~1 dk geriden, yukarıdan iner", Rol.Vurgu, "yakin"), 1, 3);
             iz.Ekle(mk("İŞLEMİN BAŞINDAN", "son güvenli noktadan", Rol.Normal, "guvenli"), 0, 4);
             iz.Ekle(mk("BAŞTAN BAŞLAT", "", Rol.Normal, "bastan"), 1, 4);
+            f.DugmeEkle(0, "VAZGEÇ", Rol.Normal, Simge.Kapat, -1);
+            f.DugmeYukseklik = 60;
+            Goster(f);
+            return r;
+        }
+
+        static DevamSonucu DevamKirik(string dosya, string bilgi, int takim, int kirik)
+        {
+            string tk = "T" + kirik.ToString(Bicim.Inv);
+            var r = new DevamSonucu { Takim = Math.Max(0, Math.Min(6, takim)) };
+            var f = new DiyalogFormu("Kırık frez · " + tk + " · " + (dosya ?? ""), Simge.Takim, Tema.Alarm, 1);
+            f.Kenar = Tema.Alarm;
+            f.TabanGenislik = 760; f.GovdeYukseklik = 330;
+            var iz = new Izgara(2, 5).Satirlar(-100, 28, 52, 96, 60); iz.Bosluk = 10;
+            f.Govde.Controls.Add(iz); iz.Dock = DockStyle.Fill;
+            iz.Ekle(Paragraf(bilgi ?? "", 12.5f), 0, 0, 2, 1);
+            iz.Ekle(new Yazi("İş milinde şu an takılı frez (kırık " + tk + " PENS AÇ ile çıkarıldıysa: Yok):", 10.5f, true, YaziRol.Soluk), 0, 1, 2, 1);
+            var t = new SecimGrubu(new[] { "Yok", "T1", "T2", "T3", "T4", "T5", "T6" }, null, null, null); t.Secili = r.Takim;
+            iz.Ekle(t, 0, 2, 2, 1);
+            Func<string, string, Rol, string, TouchButton> mk = (m, alt, rol, sec) =>
+            {
+                var b = new TouchButton(m, Simge.Yok, rol, null, null); b.YaziPt = 14f; b.AltMetin = alt;
+                b.Tiklandi += delegate { r.Secim = sec; r.Takim = t.Secili; f.Sonuc = 1; f.Close(); };
+                return b;
+            };
+            iz.Ekle(mk(Bicim.BuyukHarf(tk + "'NİN İŞİNİ BAŞTAN BAŞLAT"), tk + "'nin bu işteki son takım değişiminden · yeni frez alınır ve ölçülür · önerilen", Rol.Basari, "frez"), 0, 3, 2, 1);
+            iz.Ekle(mk("TÜM İŞİ BAŞTAN", "bütün iş yeniden kesilir", Rol.Normal, "bastan"), 0, 4, 2, 1);
             f.DugmeEkle(0, "VAZGEÇ", Rol.Normal, Simge.Kapat, -1);
             f.DugmeYukseklik = 60;
             Goster(f);

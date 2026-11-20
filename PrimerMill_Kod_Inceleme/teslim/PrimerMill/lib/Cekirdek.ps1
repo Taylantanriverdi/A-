@@ -696,16 +696,60 @@ function Devam-Oku {
         return $k
     } catch { return $null }
 }
-function Devam-Sil { try { if ([System.IO.File]::Exists($DevamDosyasi)) { [System.IO.File]::Delete($DevamDosyasi) } } catch { } }
+function Devam-Sil { $script:DevamSonKayit = $null; try { if ([System.IO.File]::Exists($DevamDosyasi)) { [System.IO.File]::Delete($DevamDosyasi) } } catch { } }
 
 # Asıl programdan devam programı üretir. $mod:
 #   'tam'     (önerilen) durduğu yerin ~10 sn gerisinden: güvenli yükseklikte X/Y'ye gider, yavaşça o noktanın Z'sine iner
 #   'yakin'   ~1 dk geriden, aynı yaklaşma
 #   'guvenli' son GOSUB Z_SAFE satırından (işlem başı). Bu CAM çıktısında bir işlem 20 000+ satır sürebildiği için
 #             eskiden 'kaldığı yerden' seçilince işin büyük kısmı (ilk işlemde neredeyse baştan) yeniden kazınıyordu.
-function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
+#   'frez'    (senaryo 2: kırık frez) $frezNo'nun durduğu satırdan önceki SON takım değişiminden (T$frezNo M6 / M6 T$frezNo):
+#             frezin bu işteki o parçası baştan kesilir. Başlıkta T M6 / S M3 / M7 / F YOK: kopyalanan değişim satırı yeni frezi
+#             alır (otomatik: yuvadan; manuel: panel taktırır) ve makro (user_1) ölçer. Makronun change_tool'u m5 m9 yapıp
+#             f50 ile ölçtüğü için değişimden sonraki modal durum asıl işteki ile aynıdır (CAM değişimden sonra S… M3 / F yazar).
+#             Diğer kiplerin çıktısı değişmedi (altın testler).
+# MAKİNEDE DOĞRULA: 'frez' kipi gerçek takım değişimi yapar (bkz. INCELEME_RAPORU §5).
+
+# Kırık frezin işinin başladığı satır: $satir'dan (dahil) önceki son "T$takim M6" (aynı satırda ya da önceki T kelimesiyle M6).
+# Dönüş @{ Satir = 1 tabanlı değişim satırı (0 = bulunamadı); Aktif = dosyaya göre $satir'da etkin frez }
+function Devam-Frez-Satiri([string[]]$L, [int]$satir, [int]$takim) {
+    $idx = [math]::Min($L.Length - 1, [math]::Max(0, $satir - 1))
+    $sonT = $null; $aktif = 0; $bul = 0
+    for ($i = 0; $i -le $idx; $i++) {
+        $ln = ($L[$i] -replace '\(.*?\)', '' -replace ';.*$', '').Trim().ToUpperInvariant()
+        if (-not $ln -or $ln -match '^(N\d+\s*)?(GOSUB|SUB|MSG|IF|ENDIF|ELSE|%)') { continue }
+        $mt = [regex]::Match($ln, '(?<![A-Z])T\s*(\d+)')
+        if ($mt.Success) { $sonT = [int]$mt.Groups[1].Value }
+        if ($ln -match '(?<![A-Z])M\s*0*6(?!\d)' -and $null -ne $sonT) {
+            $aktif = $sonT
+            if ($sonT -eq $takim) { $bul = $i + 1 }
+        }
+    }
+    return @{ Satir = $bul; Aktif = $aktif }
+}
+
+function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz, [int]$frezNo = 0) {
     $L = [System.IO.File]::ReadAllLines($kaynak)
     $idx = [math]::Min($L.Length - 1, [math]::Max(0, $satir - 1))
+    if ($mod -eq 'frez') {
+        $fz = Devam-Frez-Satiri $L $satir $frezNo
+        if ($frezNo -lt 1 -or $fz.Satir -lt 1) { throw "T$frezNo takım değişimi (T$frezNo M6) satır $satir'den önce bulunamadı" }
+        $bas = $fz.Satir - 1
+        $C = New-Object System.Collections.Generic.List[string]
+        $C.Add('%')
+        $adGuvenli = [regex]::Replace([System.IO.Path]::GetFileName($kaynak), '[^A-Za-z0-9_.\- ]', '_')
+        $C.Add("(PrimerMill DEVAM: $adGuvenli satir $($bas + 1) / $($L.Length), mod frez T$frezNo)")
+        $C.Add('G0 G17 G40 G49 G54 G80 G90')
+        $C.Add('M9'); $C.Add('M5')
+        $C.Add('GOSUB Z_SAFE'); $C.Add('GOSUB AZXY_SAFE')
+        $C.Add('G0 B0.0')
+        $harita = @{ Bas = $C.Count + 1; Orijinal = $bas + 1 }
+        for ($i = $bas; $i -lt $L.Length; $i++) { $C.Add($L[$i]) }
+        $hedef = [System.IO.Path]::Combine($IsKlasor, ([System.IO.Path]::GetFileNameWithoutExtension($kaynak) -replace '_devam\d*$', '') + '_devam.nc')
+        [System.IO.File]::WriteAllLines($hedef, $C)
+        $tekrar = 0; if ($analiz -and $analiz.Kumulatif.Length -eq $L.Length) { $tekrar = $analiz.Kumulatif[$idx] - $analiz.Kumulatif[[math]::Max(0, $bas - 1)] }
+        return @{ Yol = $hedef; Harita = $harita; Takim = $frezNo; Satir = $bas + 1; Tekrar = $tekrar; Aktif = $fz.Aktif }
+    }
     # 1) güvenli başlangıç: durduğu satırdan önceki son GOSUB Z_SAFE
     $r = 0
     for ($i = $idx; $i -ge 0; $i--) { if ($L[$i] -match '(?i)^\s*(N\d+\s*)?GOSUB\s+Z_SAFE\b') { $r = $i; break } }

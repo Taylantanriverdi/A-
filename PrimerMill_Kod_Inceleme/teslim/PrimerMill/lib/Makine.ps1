@@ -454,11 +454,24 @@ function Yeni-Blok([string]$sec, [string]$isim = '', [string]$kalinlik = '', [st
     }
 }
 
-function Devam-Kaydet([int]$satir, [string]$durum, [double]$yuzde) {
-    if (-not $script:DevamKaynak -or $satir -lt 1) { return }
+# Senaryo 1: iş hangi sebeple durursa dursun son satır devam.json'a yazılır (asıl dosya koordinatında; _devam.nc çalışırken
+# DevamHarita ile çevrilir). $durum: calisiyor (2 sn'de bir; elektrik kesilirse son kayıt budur), durduruldu, acil, exterr,
+# hata, kirik, eding_kapandi, panel_kapandi, reset. Senaryo 2: $kirik > 0 = takım boyu ölçümünde kırık bulunan frez (Kirik, KirikSatir).
+$script:DevamSonTakim = 0
+$script:DevamSonKayit = $null   # @{ Satir; Zaman; Durum } ekranda "Son kayıt" için
+function Devam-Kaydet([int]$satir, [string]$durum, [double]$yuzde, [int]$kirik = 0, [double]$kirikFark = 0, [double]$kirikSinir = 0) {
+    if (-not $script:DevamKaynak) { return }
+    if ($satir -lt 1) { $satir = 1 }   # henüz satır okunmadan durdu: işin (devamda: devamın) başı, durum yine güncellenir
     if ($script:DevamHarita) { $satir = $script:DevamHarita.Orijinal + ($satir - $script:DevamHarita.Bas); if ($satir -lt $script:DevamHarita.Orijinal) { $satir = $script:DevamHarita.Orijinal } }
-    $tk = 0; try { $tk = [Eding]::CncGetCurrentToolNumber() } catch { }
+    # Eding kapandıysa / bağlı değilse son bilinen takım (kopuk sunucuya çağrı yapılmaz)
+    $tk = $script:DevamSonTakim
+    if ($script:Bagli) { try { $tk = [int][Eding]::CncGetCurrentToolNumber(); $script:DevamSonTakim = $tk } catch { } }
     $o = [ordered]@{ Dosya = $script:DevamDosya; Kaynak = $script:DevamKaynak; Satir = $satir; Takim = $tk; Yuzde = [math]::Round($yuzde, 1); Zaman = (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'); Durum = $durum }
+    if ($kirik -gt 0) {
+        $ci = [System.Globalization.CultureInfo]::InvariantCulture
+        $o.Kirik = $kirik; $o.KirikSatir = $satir; $o.KirikFark = ([math]::Round($kirikFark, 3)).ToString('0.###', $ci); $o.KirikSinir = ([math]::Round($kirikSinir, 3)).ToString('0.###', $ci)
+    }
+    $script:DevamSonKayit = @{ Satir = $satir; Zaman = (Get-Date); Durum = $durum }
     try {
         $gecici = $DevamDosyasi + '.tmp'
         [System.IO.File]::WriteAllText($gecici, (ConvertTo-Json $o -Compress))
@@ -472,12 +485,59 @@ function Devam-Kaydet([int]$satir, [string]$durum, [double]$yuzde) {
     $script:DevamSonYazma = Get-Date
 }
 
+function Devam-Neden([string]$durum) {
+    switch ($durum) {
+        'calisiyor' { return 'iş sürerken panel/elektrik kapandı' }
+        'hata' { return 'Eding hatasıyla durdu' }
+        'exterr' { return 'makinenin hata sinyaliyle durdu (EXTERR: hava basıncı / acil stop butonu)' }
+        'acil' { return 'ACİL STOP ile durduruldu' }
+        'durduruldu' { return 'DURDUR ile durduruldu' }
+        'reset' { return 'RESET ile durduruldu' }
+        'kirik' { return 'frez boyu ölçümünde kırık bulundu' }
+        'eding_kapandi' { return 'Eding kapandı / bağlantı koptu' }
+        'panel_kapandi' { return 'panel kapatıldı (iş sürüyordu)' }
+    }
+    return 'yarıda kaldı'
+}
+# devam.json'daki kırık frez kaydı (senaryo 2): 1..99, yoksa 0
+function Devam-Kirik($k) {
+    if (-not $k) { return 0 }
+    $n = 0; try { if ($null -ne $k.Kirik) { $n = [int]$k.Kirik } } catch { $n = 0 }
+    if ($n -lt 1 -or $n -gt 99) { return 0 }
+    return $n
+}
+
 function Devam-Diyalog($k) {
     # Yeni arayüz: Diyalog.Devam (KALDIĞI YERDEN / YAKIN NOKTADAN / BAŞTAN / VAZGEÇ + iş milindeki frez)
-    $neden = switch ([string]$k.Durum) { 'calisiyor' { 'iş sürerken panel/elektrik kapandı' } 'hata' { 'Eding hatasıyla durdu (basınç / acil stop vb.)' } 'durduruldu' { 'DURDUR ile durduruldu' } default { 'yarıda kaldı' } }
+    $neden = Devam-Neden ([string]$k.Durum)
+    $ad = [System.IO.Path]::GetFileNameWithoutExtension([string]$k.Dosya)
+    $kirik = Devam-Kirik $k
+    if ($kirik -gt 0) {
+        # Senaryo 2: kırık frez. Nerede kırıldığı bilinemez: yalnız T{k}'nin işini baştan (son T{k} M6 satırından) ya da tüm iş.
+        $fz = @{ Satir = 0; Aktif = 0 }
+        try { $fz = Devam-Frez-Satiri ([System.IO.File]::ReadAllLines([string]$k.Kaynak)) ([int]$k.Satir) $kirik } catch { }
+        if ($fz.Satir -lt 1) {
+            [Kayit]::Yaz("DEVAM: kırık T$kirik için takım değişimi satırı bulunamadı (satır $($k.Satir))")
+            $s = Ui-Secim "Kırık frez · T$kirik" "T$kirik frezi kırık kaydedildi ama işte satır $($k.Satir)'den önce T$kirik takım değişimi (T$kirik M6) bulunamadı.`r`nBu yüzden T$kirik'nin işi ayrıca başlatılamaz.`r`n`r`nTüm iş baştan başlatılsın mı?" @('TÜM İŞİ BAŞTAN', 'VAZGEÇ')
+            $sec = 'iptal'; if ($s -eq 0) { $sec = 'bastan' }
+            [Kayit]::Yaz("DEVAM: seçim '$sec' (kırık T$kirik)")
+            return @{ Sec = $sec; Takim = 0; Kirik = $kirik }
+        }
+        $aktifUyari = ''; if ($fz.Aktif -gt 0 -and $fz.Aktif -ne $kirik) { $aktifUyari = "`r`nDİKKAT: dosyaya göre satır $($k.Satir)'de etkin frez T$($fz.Aktif); Eding T$kirik bildirdi." }
+        $olcum = ''; if ($k.KirikFark) { $olcum = " (boy $($k.KirikFark) mm değişti, sınır $($k.KirikSinir) mm)" }
+        $bilgi = "T$kirik frezi KIRIK$olcum`r`n$($k.Zaman)  ·  iş satır $($k.Satir)'de durdu  ·  %$($k.Yuzde)`r`n" +
+                 "Nerede kırıldığı bilinemediği için T$kirik'nin bu işteki işi baştan kesilir: satır $($fz.Satir) (T$kirik takım değişimi).$aktifUyari"
+        $r = Ui-Devam $ad $bilgi 0 $kirik
+        $sec = 'iptal'; $tk = 0
+        if ($r) { $sec = [string]$r.Secim; $tk = [int]$r.Takim }
+        if (@('frez', 'bastan', 'iptal') -notcontains $sec) { $sec = 'iptal' }
+        if ($tk -lt 0 -or $tk -gt 6) { $sec = 'iptal' }
+        [Kayit]::Yaz("DEVAM: seçim '$sec', iş milinde T$tk (kırık T$kirik, değişim satırı $($fz.Satir))")
+        return @{ Sec = $sec; Takim = $tk; Kirik = $kirik }
+    }
     $bilgi = "%$($k.Yuzde) yapılmıştı`r`n$($k.Zaman)  ·  $neden`r`nSatır $($k.Satir)`r`nKapağı açıp iş milindeki frezi kontrol et. Blok tutucudan sökülmediyse devam doğru yerden kesilir."
     $t0 = [int]$k.Takim; if ($t0 -lt 0 -or $t0 -gt 6) { $t0 = 0 }
-    $r = Ui-Devam ([System.IO.Path]::GetFileNameWithoutExtension([string]$k.Dosya)) $bilgi $t0
+    $r = Ui-Devam $ad $bilgi $t0
     $sec = 'iptal'; $tk = $t0
     if ($r) { $sec = [string]$r.Secim; $tk = [int]$r.Takim }
     if (@('tam', 'guvenli', 'yakin', 'bastan', 'iptal') -notcontains $sec) { $sec = 'iptal' }
@@ -489,6 +549,7 @@ function Devam-Diyalog($k) {
 function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
     if (-not (Hazir-Mi 'Devam')) { return }
     if ((Calisiyor-Mu)) { (Ui-Kutu 'Makine şu an çalışıyor.' 'Devam' 'OK' 'Warning') | Out-Null; return }
+    $kirik = 0; if ($mod -eq 'frez') { $kirik = Devam-Kirik $k; if ($kirik -lt 1) { (Ui-Kutu 'Kırık frez kaydı yok; frezin işi baştan başlatılamaz.' 'Devam' 'OK' 'Warning') | Out-Null; return } }
     Ui-Mesgul 'Kaldığı yerden devam hazırlanıyor…'
     try {
         # Eding'in bildiği frez, gerçekte takılı olanla aynı olsun (hareketsiz; macro'daki pens/T0 eki ile)
@@ -496,30 +557,72 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
         $script:MakroKontrolTamam = $false   # Devam'da sürüm her seferinde Eding'den yeniden okunur
         if (-not (Makro-Hazir-Mi 'Devam')) { return }
         $tkE = [Eding]::CncGetCurrentToolNumber()
+        if ($kirik -gt 0) {
+            # Senaryo 2 (MAKİNEDE DOĞRULA): kırık frez Eding'de hâlâ iş milinde (#5008 = T{k}) görünüyorsa programdaki "T{k} M6"
+            # makroda "Tool already in spindle" olur: değişim yapılmaz, KIRIK frez ölçülüp onunla kesilirdi. Bu yüzden Eding T{k}
+            # derken başlatılmaz; operatör kırık frezin çıkarıldığını onaylarsa Eding'e T0 bildirilir (hareketsiz #4039 bildirimi).
+            if ($takimSimdi -eq $kirik) {
+                (Ui-Kutu "İş milinde kırık T$kirik seçildi.`r`n`r`nKırık frezle başlatılmaz: önce PENS AÇ ile kırık frezi çıkar (Eding T0 olur), sonra tekrar BAŞLAT." "T$kirik'nin işini baştan" 'OK' 'Warning') | Out-Null
+                Yaz "Devam (kırık T$kirik): iş milinde kırık frez seçildi, başlatılmadı."; return
+            }
+            if ($tkE -eq $kirik) {
+                if ($script:Manuel) {
+                    $m = "Eding'e göre iş milinde hâlâ kırık T$kirik var.`r`n`r`nEding'e iş milinin BOŞ (T0) olduğu bildirilecek (makine hareket etmez).`r`nT$kirik değişiminde panel manuel değişim adımlarını gösterir: pens açılınca kırık frezi çıkar, yeni T$kirik'yi tak.`r`n`r`nDevam edilsin mi?"
+                } else {
+                    $m = "Kırık frez iş milinden çıkarıldı mı? (PENS AÇ)`r`n`r`nEding'e göre iş milinde hâlâ kırık T$kirik var. Çıkarılmadıysa makine yeni frezi almaz, kırık frezi ölçüp onunla keser.`r`n`r`nEVET: kırık frez çıkarıldı, iş mili BOŞ. Eding'e T0 bildirilir (hareket yok), T$kirik değişiminde yeni frez yuvasından alınıp ölçülür.`r`nHAYIR: önce PENS AÇ ile kırık frezi çıkar."
+                }
+                if (-not (Onay $m "Kırık frez · T$kirik")) {
+                    if (-not $script:Manuel) { (Ui-Kutu "Başlatılmadı.`r`n`r`n1. Frezi tut, PENS AÇ'a bas, kırık T$kirik'yi çıkar (Eding T0 olur).`r`n2. Yeni T$kirik frezini yuvasına tak.`r`n3. BAŞLAT → T$kirik'NİN İŞİNİ BAŞTAN." "T$kirik'nin işini baştan" 'OK' 'Information') | Out-Null }
+                    Yaz "Devam (kırık T$kirik): Eding'de T$kirik iş milinde, operatör çıkarıldığını onaylamadı; başlatılmadı."; return
+                }
+                [Kayit]::Yaz("DEVAM: kırık T$kirik çıkarıldı onayı (Eding T$tkE -> T$takimSimdi bildirilecek)")
+            }
+        }
         if ($tkE -ne $takimSimdi) {
             Yaz "Devam: Eding'deki frez T$tkE, iş milinde T$takimSimdi."
             if (-not (Takim-Bildir $takimSimdi 'Devam')) { return }
         }
         $an = $null; try { $an = [NcAnaliz]::Oku([string]$k.Kaynak, 4000.0) } catch { }
-        $d = Devam-NC-Uret ([string]$k.Kaynak) ([int]$k.Satir) $mod $an
+        try { $d = Devam-NC-Uret ([string]$k.Kaynak) ([int]$k.Satir) $mod $an $kirik }
+        catch { (Ui-Kutu "Devam programı üretilemedi: $($_.Exception.Message)" 'Devam' 'OK' 'Error') | Out-Null; return }
         Yaz "Devam programı: $($d.Yol)  (asıl dosyada satır $($d.Satir)'den, T$($d.Takim); tekrar edilecek kısım ~$(Sade-Sure $d.Tekrar))"
         # Operatör hareketten ÖNCE devam noktasını görür ve onaylar (yanlış noktadan başlamaya karşı son kontrol)
-        $yzD = ''; try { if ($an -and $an.Toplam -gt 0 -and $an.Kumulatif.Length -ge $d.Satir) { $yzD = "  (%$([math]::Round(100.0 * $an.Kumulatif[[math]::Max(0, $d.Satir - 2)] / $an.Toplam, 1)))" } } catch { }
-        $kipD = switch ($mod) { 'tam' { 'durduğu yerin ~10 sn gerisinden' } 'yakin' { 'durduğu yerin ~1 dk gerisinden' } default { 'işlemin başından (son güvenli nokta)' } }
-        if (-not (Onay "Kaldığı yerden devam:`r`n`r`nİş durduğu satır: $($k.Satir)`r`nDevamın başlayacağı satır: $($d.Satir)$yzD`r`n($kipD; ~$(Sade-Sure $d.Tekrar) yeniden kesilir)`r`n`r`nMakine önce güvenli yüksekliğe kalkar, T$($d.Takim) frezini kullanır, noktanın üstüne gelip yavaşça iner.`r`nElini makineden çek, kapağı kapat.`r`n`r`nBaşlatılsın mı?" 'Kaldığı yerden devam')) { Yaz 'Devam: operatör vazgeçti.'; return }
+        $yzS = 0.0; $yzD = ''; try { if ($an -and $an.Toplam -gt 0 -and $an.Kumulatif.Length -ge $d.Satir) { $yzS = [math]::Round(100.0 * $an.Kumulatif[[math]::Max(0, $d.Satir - 2)] / $an.Toplam, 1); $yzD = "  (%$yzS)" } } catch { }
+        if ($kirik -gt 0) {
+            $degisim = if ($script:Manuel) { "programdaki T$kirik değişimini yapar: panel yeni T$kirik'yi taktırır, frez sensörde ölçülür" } else { "programdaki T$kirik değişimini yapar: yeni T$kirik yuvasından alınır ve sensörde ölçülür" }
+            $m = "T$kirik'NİN İŞİNİ BAŞTAN:`r`n`r`nİş durduğu satır (kırık ölçüldü): $($k.Satir)`r`nBaşlayacağı satır: $($d.Satir)$yzD  (T$kirik takım değişimi)`r`n(~$(Sade-Sure $d.Tekrar) yeniden kesilir)`r`n`r`nMakine önce güvenli yüksekliğe kalkar, $degisim, sonra T$kirik'nin bu işteki işini baştan keser.`r`nElini makineden çek, kapağı kapat.`r`n`r`nBaşlatılsın mı?"
+            if (-not (Onay $m "T$kirik'nin işini baştan")) { Yaz 'Devam: operatör vazgeçti.'; return }
+            # Yeni frez takıldı: ömür sayacı (lib/FrezOmru.ps1) sıfırlansın mı? Hareketle ilgisi yok.
+            try {
+                if (Get-Command Frez-Omru-Sifirla-Ic -ErrorAction Ignore) {
+                    if (Onay "Yeni frez takıldı: T$kirik ömrü sıfırlansın mı?`r`n`r`n(Kırık frezin kullanılan süresi silinir, ömür ayarı korunur.)" 'Frez ömrü') { Frez-Omru-Sifirla-Ic $kirik }
+                }
+            } catch { [Kayit]::Yaz("DEVAM: frez ömrü sıfırlanamadı: $($_.Exception.Message)") }
+        } else {
+            $kipD = switch ($mod) { 'tam' { 'durduğu yerin ~10 sn gerisinden' } 'yakin' { 'durduğu yerin ~1 dk gerisinden' } default { 'işlemin başından (son güvenli nokta)' } }
+            if (-not (Onay "Kaldığı yerden devam:`r`n`r`nİş durduğu satır: $($k.Satir)`r`nDevamın başlayacağı satır: $($d.Satir)$yzD`r`n($kipD; ~$(Sade-Sure $d.Tekrar) yeniden kesilir)`r`n`r`nMakine önce güvenli yüksekliğe kalkar, T$($d.Takim) frezini kullanır, noktanın üstüne gelip yavaşça iner.`r`nElini makineden çek, kapağı kapat.`r`n`r`nBaşlatılsın mı?" 'Kaldığı yerden devam')) { Yaz 'Devam: operatör vazgeçti.'; return }
+        }
         Dosyayi-Kontrol-Et $d.Yol
         if ($script:Engel) { (Ui-Kutu "Devam programı kontrolden geçemedi:`r`n$($script:SonHatalar -join "`r`n")" 'Devam' 'OK' 'Error') | Out-Null; return }
         Hata-Temizle 'Devam'
+        if ($kirik -gt 0) {
+            # Eski ölçüm farkı (#4099) Eding'de kalırsa sonraki başka bir Eding hatası da "freze hatası" sanılır; m100 her ölçümde
+            # zaten 0'dan başlar. Yalnız değişken yazma, hareket yok.
+            try { [Kayit]::Yaz("DEVAM: #4099=0 -> $([Eding]::RCText([Eding]::CncRunSingleLine('#4099=0')))"); [void](Hareket-Bitene-Kadar-Bekle 3) } catch { }
+        }
         if (-not (Bayrak-Sifirla 'Devam')) { (Ui-Kutu "Takım bildirim bayrağı (#4039) sıfırlanamadı. Devam başlatılmadı." 'Devam' 'OK' 'Warning') | Out-Null; return }
         if (-not (Komut-Sonucu 'Devam programı yükleme' ([Eding]::CncLoadJobA($d.Yol)))) { return }
         $rc = Is-Calistir
         if (Komut-Sonucu 'Devam başlat' $rc) {
             $script:DevamDosya = [string]$k.Dosya; $script:DevamKaynak = [string]$k.Kaynak; $script:DevamHarita = $d.Harita
+            # Kayıt hemen yenilenir (başlangıç satırı, asıl dosyaya göre): kırık frez kaydı (Kirik) böylece temizlenir
+            Devam-Kaydet 1 'calisiyor' $yzS
             $script:BlokHazir = $false; if ($script:Sade) { Blok-Cip-Guncelle }
             $script:TakipSonu = ''; $script:IsAktif = $true; $script:Gecen = [TimeSpan]::Zero; $script:SonTik = Get-Date
             $script:BaslamaAni = Get-Date; $script:SonGecerliSatir = 0; $script:CalistiGoruldu = $false
             $script:IsTamamlandi = $false; $script:Yuzde = 0; $script:SureMetni = ''
-            Yaz "Kaldığı yerden devam ediyor: $([System.IO.Path]::GetFileName([string]$k.Dosya))"
+            if ($kirik -gt 0) { Yaz "T$kirik'nin işi baştan başladı (satır $($d.Satir)): $([System.IO.Path]::GetFileName([string]$k.Dosya))" }
+            else { Yaz "Kaldığı yerden devam ediyor: $([System.IO.Path]::GetFileName([string]$k.Dosya))" }
         }
     } finally { Ui-Mesgul $null }
 }
@@ -534,8 +637,14 @@ function Devam-Acilis {
         $script:SeciliDosya = $dosya
         $script:DosyaMetni = [System.IO.Path]::GetFileNameWithoutExtension($dosya)
         Dosyayi-Kontrol-Et $dosya
-        Yaz "YARIM KALAN İŞ: $([System.IO.Path]::GetFileName($dosya))  %$($k.Yuzde)  ($($k.Zaman)). Kaldığı yerden devam için BAŞLAT'a bas."
-        $script:SureMetni = "Yarım kalan iş  ·  %$($k.Yuzde)  ·  devam için BAŞLAT"; $script:SureTur = $cAltinAc
+        $kr = Devam-Kirik $k
+        if ($kr -gt 0) {
+            Yaz "YARIM KALAN İŞ (KIRIK FREZ T$kr): $([System.IO.Path]::GetFileName($dosya))  %$($k.Yuzde)  ($($k.Zaman)). Kırık T$kr'yi çıkar, yenisini tak, BAŞLAT → T$kr'NİN İŞİNİ BAŞTAN."
+            $script:SureMetni = "Kırık frez T$kr  ·  yenisini tak, BAŞLAT → T$kr'nin işini baştan"; $script:SureTur = $cKirmizi
+        } else {
+            Yaz "YARIM KALAN İŞ: $([System.IO.Path]::GetFileName($dosya))  %$($k.Yuzde)  ($($k.Zaman)). Kaldığı yerden devam için BAŞLAT'a bas."
+            $script:SureMetni = "Yarım kalan iş  ·  %$($k.Yuzde)  ·  devam için BAŞLAT"; $script:SureTur = $cAltinAc
+        }
     } catch { }
 }
 
@@ -608,7 +717,7 @@ function Btn-Baslat-Ic {
     $dk = Devam-Oku
     if ($dk -and ([string]$dk.Dosya -eq $script:SeciliDosya -or [string]$dk.Kaynak -eq $script:SeciliDosya) -and -not $script:BekleyenBlok) {
         $ds = Devam-Diyalog $dk
-        if (@('tam', 'guvenli', 'yakin') -contains $ds.Sec) { Devam-Baslat $dk $ds.Sec $ds.Takim; return }
+        if (@('tam', 'guvenli', 'yakin', 'frez') -contains $ds.Sec) { Devam-Baslat $dk $ds.Sec $ds.Takim; return }
         if ($ds.Sec -ne 'bastan') { return }
         Devam-Sil
     }
@@ -848,6 +957,7 @@ function Acilis-Hazirla {
 
 # Paneli yeni açılmış hale getir
 function Panel-Sifirla {
+    if ($script:IsAktif) { try { Devam-Kaydet $script:SonGecerliSatir 'reset' $script:Yuzde } catch { } }   # RESET iş sürerken
     $script:TakipSonu = 'kullanici'
     $script:IsAktif = $false
     try { if ($script:Bagli -and [Eding]::CncGetVariable(4034) -ne 0) { [void][Eding]::CncRunSingleLine('#4034=0') } } catch { }
@@ -868,6 +978,8 @@ function Panel-Sifirla {
     $script:DosyaMetni = ''
     Ui-Sim-Veri $null
     Yaz 'Panel sıfırlandı.'
+    # Yarım kalan iş varsa (EXTERR / ACİL STOP / kırık frez sonrası RESET) dosyası yeniden seçili gelir: BAŞLAT devamı sorar
+    try { Devam-Acilis } catch { [Kayit]::Yaz("DEVAM (sıfırla): $($_.Exception.Message)") }
 }
 
 # ================= YAZILIM ACİL STOPU =================
@@ -898,6 +1010,8 @@ function Acil-Stop([string]$kaynak) {
     } else {
         [Kayit]::Yaz("!!! ACİL STOP ($kaynak): Eding'e bağlanılamadı, sadece panel kilitlendi")
     }
+    # Senaryo 1: ACİL STOP'ta da iş satırı kaydedilir (makine durdurulduktan SONRA; eskiden yalnız 2 sn'lik son kayıt kalıyordu)
+    if ($script:IsAktif) { try { Devam-Kaydet $script:SonGecerliSatir 'acil' $script:Yuzde } catch { } }
     $script:Tercih.AcilStop = '1'; try { Tercih-Yaz } catch { }
     $script:IsAktif = $false
     $script:TakipSonu = 'kullanici'
@@ -1503,7 +1617,9 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
     $yuzde = 100.0 * $yapilan / $a.Toplam
 
     $kalan = $a.Toplam - $yapilan
-    if (($calisiyor -or $durakli) -and ($simdi - $script:DevamSonYazma).TotalSeconds -ge 2) { Devam-Kaydet $satir 'calisiyor' $yuzde }
+    # Senaryo 1: 2 sn'de bir (duraklıyken ve manuel frez beklerken de); takım değişince hemen (değişimden sonraki ilk satır)
+    $tkSimdi = $script:DevamSonTakim; try { $tkSimdi = [int][Eding]::CncGetCurrentToolNumber() } catch { }
+    if (($calisiyor -or $durakli) -and (($simdi - $script:DevamSonYazma).TotalSeconds -ge 2 -or $tkSimdi -ne $script:DevamSonTakim)) { Devam-Kaydet $satir 'calisiyor' $yuzde }
     if ($yapilan -gt 60 -and $script:Gecen.TotalSeconds -gt 60) {
         $oran = [math]::Max(0.3, [math]::Min(5.0, $script:Gecen.TotalSeconds / $yapilan))
         $kalan = $kalan * $oran
@@ -1530,8 +1646,14 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         $script:TakipSonu = if ($yuzde -gt 97) { 'tamam' } else { 'durdu' }
         $sonDurum = Eding-Durum
         $disHata = $false; try { $disHata = ([Eding]::CncGetEMStopActive() -ne 0) } catch { }
+        # Senaryo 2: takım boyu ölçümü (macro m100: #4099 = |#4002 - ölçülen|, sınır #4005) errmsg ile durdurduysa frez kırık
+        $kirikT = 0; $fark = 0.0; $sinir = 0.0
+        if ((Hatali $sonDurum) -and -not $disHata) {
+            try { $fark = [double][Eding]::CncGetVariable(4099); $sinir = [double][Eding]::CncGetVariable(4005); if ($fark -gt $sinir -and $sinir -gt 0) { $kirikT = [int][Eding]::CncGetCurrentToolNumber() } } catch { }
+        }
         if ($yuzde -gt 97 -and -not (Hatali $sonDurum) -and -not $disHata) { Devam-Sil; $script:DevamHarita = $null }
-        else { Devam-Kaydet $satir $(if ((Hatali $sonDurum) -or $disHata) { 'hata' } else { 'durduruldu' }) $yuzde; Yaz 'İş yarım kaldı: kaldığı yerden devam için BAŞLAT''a bas (aynı dosya seçiliyken).' }
+        elseif ($kirikT -gt 0) { Devam-Kaydet $satir 'kirik' $yuzde $kirikT $fark $sinir }
+        else { Devam-Kaydet $satir $(if ($disHata) { 'exterr' } elseif (Hatali $sonDurum) { 'hata' } else { 'durduruldu' }) $yuzde; Yaz 'İş yarım kaldı: kaldığı yerden devam için BAŞLAT''a bas (aynı dosya seçiliyken).' }
         if ($disHata -and -not [Eding]::AcilKilit) {
             $script:SureMetni = 'Makine hata sinyali (EXTERR)  ·  basıncı kontrol et, RESET'; $script:SureTur = $cKirmizi
             Yaz "Kazıma makinenin hata sinyaliyle (EXTERR / acil stop) durdu, satır $satir. En sık sebep: hava basıncı düşük."
@@ -1542,11 +1664,12 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
             $script:IsAktif = $false
             $script:SureMetni = 'Eding hatası ile durdu'
             $script:SureTur = $cKirmizi
-            $fark = [Eding]::CncGetVariable(4099); $sinir = [Eding]::CncGetVariable(4005); $tk = [Eding]::CncGetCurrentToolNumber()
-            if ($fark -gt $sinir -and $sinir -gt 0) {
+            if ($kirikT -gt 0) {
+                $tk = $kirikT
                 $script:SureMetni = "Freze hatası  ·  T$tk"
-                Yaz "FREZE HATASI: T$tk boyu $(Sayi $fark) mm değişmiş (sınır $(Sayi $sinir) mm), satır $satir. Kazıma durduruldu."
-                (Ui-Kutu "FREZE HATASI`r`n`r`nT$tk frezesinin boyu iş sonrası ölçümde $(Sayi $fark) mm değişmiş (izin verilen: $(Sayi $sinir) mm).`r`nFreze kırılmış, aşınmış ya da pensin içinde kaymış olabilir.`r`n`r`nKazıma bir sonraki frezeye geçmeden durduruldu.`r`n`r`n1. Frezeyi kontrol et, gerekirse değiştir.`r`n2. RESET'e bas.`r`n3. Parçayı kontrol et; kaldığı yerden devam için Eding'de satır arama gerekir." 'Freze hatası' 'OK' 'Error') | Out-Null
+                Yaz "FREZE HATASI: T$tk boyu $(Sayi $fark) mm değişmiş (sınır $(Sayi $sinir) mm), satır $satir. Kazıma durduruldu. Kırık frez kaydedildi: T$tk'nin işi baştan başlatılabilir."
+                $yeni = if ($script:Manuel) { "Yeni T$tk frezini elinde hazırla (manuel mod: T$tk değişiminde panel taktıracak)." } else { "Yeni T$tk frezini T$tk yuvasına tak (otomatik mod)." }
+                (Ui-Kutu "FREZE HATASI`r`n`r`nT$tk frezesinin boyu iş sonrası ölçümde $(Sayi $fark) mm değişmiş (izin verilen: $(Sayi $sinir) mm).`r`nFreze kırılmış, aşınmış ya da pensin içinde kaymış olabilir. Kazıma bir sonraki frezeye geçmeden durduruldu.`r`n`r`n1. ALARMI TEMİZLE'ye bas.`r`n2. Frezi tut, PENS AÇ ile kırık frezi çıkar (dikkat: iş milinde kırık T$tk).`r`n3. $yeni`r`n4. BAŞLAT → T$tk'NİN İŞİNİ BAŞTAN: nerede kırıldığı bilinemediği için T$tk'nin bu işteki işi, T$tk'nin takım değişiminden itibaren yeniden kesilir." 'Freze hatası' 'OK' 'Error') | Out-Null
                 return
             }
             Yaz "Kazıma Eding hatasıyla durdu ($sonDurum), satır $satir. Hatanın açıklaması Eding penceresinin mesaj kısmında yazar."

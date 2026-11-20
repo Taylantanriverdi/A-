@@ -51,6 +51,9 @@ function Uzak-Komut([string]$ad, [string]$arg, [string]$ip) {
             if ((Durakli-Mi)) { return "HATA: Duraklatılmış iş uzaktan devam ettirilemez; makinede DEVAM'a basın" }
             if ((Calisiyor-Mu)) { return 'HATA: Makine zaten çalışıyor' }
             if (-not $script:SeciliDosya) { return 'HATA: Önce bir iş seç' }
+            # Senaryo 2: kırık frez kaydı varsa çıkarıldı onayı makinede verilmeli (uzaktan sorulamaz)
+            $dkU = Devam-Oku; $krU = Devam-Kirik $dkU
+            if ($krU -gt 0 -and ([string]$dkU.Dosya -eq $script:SeciliDosya -or [string]$dkU.Kaynak -eq $script:SeciliDosya)) { return "HATA: Kırık frez kaydı (T$krU): makinede kırık frezi çıkarıp yenisini takın, BAŞLAT'a makinede basın" }
             if ($script:Engel) { return 'HATA: Dosyada hata var, başlatılmadı' }
             if ($script:Tercih.UzakKilit -ne '0' -and -not $script:BlokHazir) { return 'HATA: Makinede "Blok takıldı" onayı yok. Bloğu takınca makinedeki Blok takıldı düğmesine bas.' }
             $izn = Izin-Neden 'is.baslat'; if ($izn) { return "HATA: $izn" }   # yerel düğmeyle aynı izin tablosu (GV-01/UZ-02)
