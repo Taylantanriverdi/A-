@@ -90,16 +90,31 @@ namespace PrimerUI
     /// <summary>Düğme / öğe renk rolü.</summary>
     public enum Rol { Normal, Basari, Uyari, Tehlike, TehlikeCizgi, Vurgu, Bilgi, Sessiz }
 
-    /// <summary>Tema modu: Koyu, Açık, Geçişli (koyu taban; yüzeyler işin ilerlemesine göre maviden yeşile kayar).</summary>
-    public enum TemaModu { Koyu, Acik, Gecisli }
+    /// <summary>Tema modu: Koyu, Açık ve iki ilerleme teması (koyu taban; yüzeyler işin ilerlemesine göre kayar):
+    /// Geçişli (maviden yeşile), Şafak (gece çivitinden şafak bakırına).</summary>
+    public enum TemaModu { Koyu, Acik, Gecisli, Safak }
+
+    /// <summary>İlerleme teması: yüzey belirteçlerinin iki uç paleti (t = 0 ve t = 1) ve ara renk yolu.
+    /// Sıra: Zemin, Kart, KartKenar, Dugme, DugmeKenar, Menu, Ayrac, Secili, Golge.</summary>
+    public class IlerlemePaleti
+    {
+        public readonly string Ad;
+        public readonly string[] Bas, Son;
+        /// <summary>true: OKLCh'de (ton açısı kısa yoldan döner; zıt tonlarda ara renk griye düşmez). false: OKLab'da doğrusal.</summary>
+        public readonly bool TonYolu;
+        internal double[][] LabA, LabB;
+        public IlerlemePaleti(string ad, string[] bas, string[] son, bool tonYolu) { Ad = ad; Bas = bas; Son = son; TonYolu = tonYolu; }
+    }
 
     public static class Tema
     {
-        /// <summary>Koyu taban mı (Koyu ve Geçişli: true). Karışım oranları buna bakar.</summary>
+        /// <summary>Koyu taban mı (Koyu, Geçişli, Şafak: true). Karışım oranları buna bakar.</summary>
         public static bool Koyu = true;
         public static TemaModu Mod = TemaModu.Koyu;
-        public static bool Gecisli { get { return Mod == TemaModu.Gecisli; } }
-        /// <summary>Geçişli temada o an çizilen konum (0 = mavi uç, 1 = yeşil uç).</summary>
+        /// <summary>İlerleme teması mı (Geçişli, Şafak): yüzeyler GecisT'ye göre hesaplanır, Kabuk yumuşak geçiş zamanlayıcısını çalıştırır.</summary>
+        public static bool Ilerlemeli { get { return IlerlemeliMi(Mod); } }
+        public static bool IlerlemeliMi(TemaModu m) { return m == TemaModu.Gecisli || m == TemaModu.Safak; }
+        /// <summary>İlerleme temasında o an çizilen konum (0 = iş yok / başında, 1 = iş bitti).</summary>
         public static float GecisT;
         /// <summary>Yerleşim katsayısı (1024×768 = 1.0, 1920×1080 ≈ 1.4).</summary>
         public static float S = 1f;
@@ -129,50 +144,56 @@ namespace PrimerUI
             return Color.FromArgb(255, (v >> 16) & 255, (v >> 8) & 255, v & 255);
         }
 
-        /// <summary>Ayar değeri ("koyu", "acik", "gecisli"; bilinmeyen = koyu) → mod.</summary>
+        /// <summary>Ayar değeri ("koyu", "acik", "gecisli", "safak"; bilinmeyen = koyu) → mod.</summary>
         public static TemaModu ModCoz(string s)
         {
             string v = (s ?? "").Trim().ToLowerInvariant();
             if (v == "acik" || v == "açık") return TemaModu.Acik;
             if (v == "gecisli" || v == "geçişli") return TemaModu.Gecisli;
+            if (v == "safak" || v == "şafak") return TemaModu.Safak;
             return TemaModu.Koyu;
         }
-        /// <summary>Mod → ayar değeri ("koyu", "acik", "gecisli").</summary>
+        /// <summary>Mod → ayar değeri ("koyu", "acik", "gecisli", "safak").</summary>
         public static string ModAdi(TemaModu m)
         {
-            return m == TemaModu.Acik ? "acik" : m == TemaModu.Gecisli ? "gecisli" : "koyu";
+            switch (m)
+            {
+                case TemaModu.Acik: return "acik";
+                case TemaModu.Gecisli: return "gecisli";
+                case TemaModu.Safak: return "safak";
+                default: return "koyu";
+            }
         }
 
-        // ---------- Geçişli tema: yüzey belirteçlerinin iki ucu (mavi: iş yok / başında, yeşil: iş bitti).
-        // Sıra: Zemin, Kart, KartKenar, Dugme, DugmeKenar, Menu, Ayrac, Secili, Golge.
-        // Yazı/kart kontrastı her noktada Koyu temadakinden düşük değil (Yazi #F3F4F6, Soluk #A0A7B4 ile; TASARIM.md §5).
-        static readonly string[] gecisMavi = { "#08142D", "#0F1F42", "#1E3466", "#16284F", "#27407A", "#0B1836", "#1A2D5A", "#152752", "#040A18" };
-        static readonly string[] gecisYesil = { "#071A11", "#0C281A", "#1B4D33", "#112F21", "#22593D", "#091F15", "#174230", "#123A27", "#030D08" };
-        static double[][] gecisLabA, gecisLabB;
+        // ---------- İlerleme temaları (TASARIM.md §5). Yazı/kart kontrastı her noktada Koyu temadakinden düşük değil
+        // (Yazi #F3F4F6, Soluk #A0A7B4 ile). Yeni bir ilerleme teması = yeni bir uç paleti çifti.
+        /// <summary>Geçişli: mavi (iş yok / başında) → camgöbeği → yeşil (iş bitti); OKLab'da doğrusal.</summary>
+        public static readonly IlerlemePaleti GecisliPalet = new IlerlemePaleti("Geçişli",
+            new[] { "#08142D", "#0F1F42", "#1E3466", "#16284F", "#27407A", "#0B1836", "#1A2D5A", "#152752", "#040A18" },
+            new[] { "#071A11", "#0C281A", "#1B4D33", "#112F21", "#22593D", "#091F15", "#174230", "#123A27", "#030D08" }, false);
+        /// <summary>Şafak: gece çiviti/mor (iş yok / başında) → erik → şafak bakırı (iş bitti; marka altınıyla uyumlu); OKLCh'de
+        /// (çivit ve bakır zıt tonlar: OKLab'da ortası griye düşerdi, ton açısı erik/kızıl üzerinden döner).</summary>
+        public static readonly IlerlemePaleti SafakPalet = new IlerlemePaleti("Şafak",
+            new[] { "#0E0B26", "#18133B", "#2C2563", "#211B4A", "#362E72", "#120E2F", "#272056", "#221C4D", "#06041A" },
+            new[] { "#1B1007", "#2A1A0D", "#57381C", "#352112", "#64421F", "#22150A", "#4A2F17", "#3A2513", "#0D0703" }, true);
 
-        /// <summary>Geçişli temada yüzey belirteçlerini t'ye (0..1) göre hesaplar (OKLab'da doğrusal: mavi → camgöbeği → yeşil, ara renklerin hepsi).
+        /// <summary>Etkin modun ilerleme paleti (ilerleme teması değilse null).</summary>
+        public static IlerlemePaleti EtkinPalet { get { return Mod == TemaModu.Safak ? SafakPalet : Mod == TemaModu.Gecisli ? GecisliPalet : null; } }
+
+        /// <summary>İlerleme temasında yüzey belirteçlerini t'ye (0..1) göre etkin paletin iki ucu arasından hesaplar (ara renklerin hepsi).
         /// Olay (Degisti) tetiklemez; çağıran yeniden boyar. Dönüş: 8 bitlik renklerden biri değişti mi (değişmediyse boyamaya gerek yok).</summary>
         public static bool GecisAyarla(float t)
         {
             if (t < 0) t = 0; if (t > 1) t = 1;
             GecisT = t;
-            if (gecisLabA == null)
-            {
-                gecisLabA = new double[gecisMavi.Length][]; gecisLabB = new double[gecisYesil.Length][];
-                for (int i = 0; i < gecisMavi.Length; i++) { gecisLabA[i] = OkLab(H(gecisMavi[i])); gecisLabB[i] = OkLab(H(gecisYesil[i])); }
-            }
-            var c = new Color[gecisMavi.Length];
-            for (int i = 0; i < c.Length; i++)
-            {
-                double[] a = gecisLabA[i], b = gecisLabB[i];
-                c[i] = OkLabRenk(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t);
-            }
+            var c = PaletRenkleri(EtkinPalet, t);
+            if (c == null) return false;
             bool degisti = Zemin != c[0] || Kart != c[1] || KartKenar != c[2] || Dugme != c[3] || DugmeKenar != c[4] || Menu != c[5] || Ayrac != c[6] || Secili != c[7] || Golge != c[8];
             Zemin = c[0]; Kart = c[1]; KartKenar = c[2]; Dugme = c[3]; DugmeKenar = c[4]; Menu = c[5]; Ayrac = c[6]; Secili = c[7]; Golge = c[8];
             return degisti;
         }
 
-        /// <summary>Geçişli tema ilerleme eşlemesi: iş bitti → 1; iş sürüyor / duraklatıldı → Yuzde/100; değilse 0.</summary>
+        /// <summary>İlerleme teması (Geçişli, Şafak) eşlemesi: iş bitti → 1; iş sürüyor / duraklatıldı → Yuzde/100; değilse 0.</summary>
         public static float GecisHedefi(MakineDurumu d)
         {
             if (d == null) return 0f;
@@ -184,6 +205,38 @@ namespace PrimerUI
                 return (float)y;
             }
             return 0f;
+        }
+
+        /// <summary>Paletin t noktasındaki 9 yüzey rengi (saf hesap; WinForms gerektirmez).</summary>
+        public static Color[] PaletRenkleri(IlerlemePaleti p, float t)
+        {
+            if (p == null) return null;
+            if (t < 0) t = 0; if (t > 1) t = 1;
+            if (p.LabA == null)
+            {
+                var la = new double[p.Bas.Length][]; var lb = new double[p.Son.Length][];
+                for (int i = 0; i < la.Length; i++) { la[i] = OkLab(H(p.Bas[i])); lb[i] = OkLab(H(p.Son[i])); }
+                p.LabB = lb; p.LabA = la;
+            }
+            var c = new Color[p.Bas.Length];
+            for (int i = 0; i < c.Length; i++)
+            {
+                double[] a = p.LabA[i], b = p.LabB[i];
+                double L = a[0] + (b[0] - a[0]) * t, x, y;
+                if (p.TonYolu)
+                {
+                    double ca = Math.Sqrt(a[1] * a[1] + a[2] * a[2]), cb = Math.Sqrt(b[1] * b[1] + b[2] * b[2]);
+                    double ha = Math.Atan2(a[2], a[1]), hb = Math.Atan2(b[2], b[1]);
+                    double dh = hb - ha;
+                    while (dh > Math.PI) dh -= 2 * Math.PI;
+                    while (dh < -Math.PI) dh += 2 * Math.PI;
+                    double C = ca + (cb - ca) * t, h = ha + dh * t;
+                    x = C * Math.Cos(h); y = C * Math.Sin(h);
+                }
+                else { x = a[1] + (b[1] - a[1]) * t; y = a[2] + (b[2] - a[2]) * t; }
+                c[i] = OkLabRenk(L, x, y);
+            }
+            return c;
         }
 
         static double[] OkLab(Color c)
@@ -239,7 +292,7 @@ namespace PrimerUI
                 Dugme = H("#F9FAFB"); DugmeKenar = H("#D1D5DB"); Menu = H("#FFFFFF");
                 Ayrac = H("#E5E7EB"); Secili = H("#EEF0F3"); Golge = H("#D1D5DB");
             }
-            if (mod == TemaModu.Gecisli)
+            if (IlerlemeliMi(mod))
             {
                 // Koyu temanın yazı/durum/marka renkleri; yazı bir tık parlak (renkli yüzeyde kontrast Koyu'dan düşmesin)
                 Yazi = H("#F3F4F6"); Soluk = H("#A0A7B4");
@@ -1109,8 +1162,8 @@ namespace PrimerUI
             float h = Math.Min(Height - 2, Tema.PxF(56));
             var r = new RectangleF(1, (Height - h) / 2, Width - 2, h);
             Tema.YuvarlakDoldur(g, r, h / 2, dolgu);
-            // Geçişli tema: renkli zeminde (ÇALIŞIYOR mavi / HAZIR yeşil zemin üstünde) hap ayrışsın diye ince açık çerçeve
-            if (Tema.Gecisli) Tema.YuvarlakCiz(g, r, h / 2, Tema.Alfa(Color.White, 90), Math.Max(1f, Tema.PxF(1.2f)));
+            // İlerleme teması (Geçişli, Şafak): renkli zeminde (ÇALIŞIYOR mavi zeminde, DURAKLATILDI bakır zeminde) hap ayrışsın diye ince açık çerçeve
+            if (Tema.Ilerlemeli) Tema.YuvarlakCiz(g, r, h / 2, Tema.Alfa(Color.White, 90), Math.Max(1f, Tema.PxF(1.2f)));
             Color yazi = yanik ? Tema.UstYazi(c) : Tema.Yazi;
             float nokta = h * 0.26f;
             float x = r.X + h * 0.36f;
@@ -1345,7 +1398,7 @@ namespace PrimerUI
             float yr = r.Height / 2;
             Tema.YuvarlakDoldur(g, r, yr, Tema.Ayrac);
             float w = (float)(r.Width * gosterilen / 100.0);
-            bool cerceve = Tema.Gecisli;
+            bool cerceve = Tema.Ilerlemeli;
             if (w > 1)
             {
                 Color c = renk.IsEmpty ? Tema.Calisiyor : renk;
@@ -1370,7 +1423,7 @@ namespace PrimerUI
                     g.Restore(st);
                 }
             }
-            // Geçişli tema: iz ve dolgu zeminle aynı renk ailesinde kalabilir (mavi dolgu / mavi zemin); ince açık çerçeve
+            // İlerleme teması: iz ve dolgu zeminle aynı renk ailesinde kalabilir (mavi dolgu / mavi zemin); ince açık çerçeve
             if (cerceve) Tema.YuvarlakCiz(g, new RectangleF(r.X + 0.5f, r.Y + 0.5f, r.Width - 1, r.Height - 1), yr, Tema.Alfa(Color.White, 70), Math.Max(1f, Tema.PxF(1f)));
         }
     }
@@ -3545,10 +3598,10 @@ namespace PrimerUI
 
             // Genel
             var g = Sayfa(0);
-            tema = new SecimGrubu(new[] { "Koyu", "Açık", "Geçişli" }, new[] { "koyu", "acik", "gecisli" }, "ayar.kaydet", "Tema");
+            tema = new SecimGrubu(new[] { "Koyu", "Açık", "Geçişli", "Şafak" }, new[] { "koyu", "acik", "gecisli", "safak" }, "ayar.kaydet", "Tema");
             tema.Secili = 0;
             tema.SecimDegisti += delegate { var h = TemaIstendi; if (h != null) h(tema.SeciliDeger); };
-            g.Ekle(new AyarSatiri("Tema", "Koyu atölye için önerilir. Geçişli: zemin iş ilerledikçe maviden yeşile döner.", tema, 340), 62);
+            g.Ekle(new AyarSatiri("Tema", "Geçişli / Şafak: zemin iş ilerledikçe renk değiştirir (mavi→yeşil, gece→şafak).", tema, 420), 62);
             var ad = new DegerKutusu { Metinsel = true, AyarAdi = "MakineAdi", EnCokKarakter = 30, Pt = 13f, Etiket = "Makine adı" };
             degerler["MakineAdi"] = ad;
             g.Ekle(new AyarSatiri("Makine adı", "Uzaktan portalda görünen ad.", ad, 280), 62);
@@ -3843,7 +3896,7 @@ namespace PrimerUI
             if (mdi.Parent != null) { MdiYerlestir((Panel)mdi.Parent); mdi.Parent.Invalidate(); }
         }
         public override void Olcekle() { TemaYenile(); }
-        /// <summary>Geçişli tema karesi: yalnız MDI kutusunun zemini (yazı tipi / yerleşim değişmez).</summary>
+        /// <summary>İlerleme teması karesi: yalnız MDI kutusunun zemini (yazı tipi / yerleşim değişmez).</summary>
         public void YuzeyYenile() { if (mdi.BackColor != Tema.Dugme) mdi.BackColor = Tema.Dugme; }
 
         void Klavye()
@@ -4939,7 +4992,7 @@ namespace PrimerUI
         readonly MesgulKatmani mesgul;
         readonly SolmaKatmani solma;
         readonly Timer saatZaman;
-        /// <summary>Geçişli tema: gösterilen t'yi hedefe yumuşakça yaklaştıran zamanlayıcı (yalnız fark varken çalışır).</summary>
+        /// <summary>İlerleme teması (Geçişli, Şafak): gösterilen t'yi hedefe yumuşakça yaklaştıran zamanlayıcı (yalnız fark varken çalışır).</summary>
         readonly Timer gecisZaman;
         float gecisHedef;
         DateTime gecisSonTik;
@@ -5093,21 +5146,21 @@ namespace PrimerUI
         /// <summary>Tema ayar değeriyle: "koyu", "acik", "gecisli" (bilinmeyen = koyu).</summary>
         public void TemaUygula(string mod) { TemaUygula(Tema.ModCoz(mod)); }
 
-        /// <summary>Tema modu (çalışırken). Geçişli: yüzeyler son durumun ilerlemesinden hemen hesaplanır (geçiş animasyonsuz başlar).</summary>
+        /// <summary>Tema modu (çalışırken). Geçişli / Şafak: yüzeyler son durumun ilerlemesinden hemen hesaplanır (geçiş animasyonsuz başlar).</summary>
         public void TemaUygula(TemaModu mod)
         {
             gecisZaman.Stop();
-            if (mod == TemaModu.Gecisli) { gecisHedef = Tema.GecisHedefi(SonDurum); Tema.GecisT = gecisHedef; }
+            if (Tema.IlerlemeliMi(mod)) { gecisHedef = Tema.GecisHedefi(SonDurum); Tema.GecisT = gecisHedef; }
             Tema.Uygula(mod);
             YuzeyleriBoya();
             Kayitlar.TemaYenile();
             Invalidate(true);
         }
 
-        /// <summary>Geçişli temada animasyonu beklemeden gösterilen rengi hedefe atlatır (ekran görüntüsü, test).</summary>
+        /// <summary>İlerleme temasında (Geçişli, Şafak) animasyonu beklemeden gösterilen rengi hedefe atlatır (ekran görüntüsü, test).</summary>
         public void GecisiTamamla()
         {
-            if (!Tema.Gecisli) return;
+            if (!Tema.Ilerlemeli) return;
             gecisZaman.Stop();
             if (Math.Abs(Tema.GecisT - gecisHedef) < 0.0001f) return;
             if (!Tema.GecisAyarla(gecisHedef)) return;
@@ -5116,11 +5169,11 @@ namespace PrimerUI
             Invalidate(true);
         }
 
-        /// <summary>Geçişli tema: hedef t (0..1; Tema.GecisHedefi). Fark varsa yumuşak geçiş zamanlayıcısını başlatır.</summary>
+        /// <summary>İlerleme teması: hedef t (0..1; Tema.GecisHedefi). Fark varsa yumuşak geçiş zamanlayıcısını başlatır.</summary>
         void GecisHedefAyarla(float t)
         {
             gecisHedef = t;
-            if (!Tema.Gecisli) { gecisZaman.Stop(); return; }
+            if (!Tema.Ilerlemeli) { gecisZaman.Stop(); return; }
             if (Math.Abs(Tema.GecisT - t) < 0.001f) return;
             if (!IsHandleCreated || !Visible) { GecisiTamamla(); return; }
             if (!gecisZaman.Enabled) { gecisSonTik = DateTime.Now; gecisZaman.Start(); }
@@ -5128,7 +5181,7 @@ namespace PrimerUI
 
         void GecisTik()
         {
-            if (!Tema.Gecisli) { gecisZaman.Stop(); return; }
+            if (!Tema.Ilerlemeli) { gecisZaman.Stop(); return; }
             // üstel yumuşatma, zaman sabiti ~0.45 s: 200 ms'lik Yuzde adımları tek akışa dönüşür (tik kaçsa da hız aynı)
             DateTime simdi = DateTime.Now;
             double dt = (simdi - gecisSonTik).TotalSeconds; gecisSonTik = simdi;

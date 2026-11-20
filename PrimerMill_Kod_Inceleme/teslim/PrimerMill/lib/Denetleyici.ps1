@@ -466,11 +466,13 @@ function Yaklas-Neden([string]$ad, [bool]$ayar) {
     return ''
 }
 
-# Tema ayarı: 'koyu' | 'acik' | 'gecisli' (Geçişli: koyu taban, yüzeyler iş ilerledikçe maviden yeşile). Bilinmeyen/boş -> 'koyu'.
+# Tema ayarı: 'koyu' | 'acik' | 'gecisli' | 'safak' (ilerleme temaları, koyu taban: yüzeyler iş ilerledikçe
+# Geçişli maviden yeşile, Şafak gece çivitinden şafak bakırına kayar). Bilinmeyen/boş -> 'koyu'.
 function Tema-Normalle([string]$v) {
     $k = "$v".Trim().ToLowerInvariant()
     if ($k -eq 'acik') { return 'acik' }
     if ($k -eq 'gecisli') { return 'gecisli' }
+    if ($k -eq 'safak') { return 'safak' }
     return 'koyu'
 }
 

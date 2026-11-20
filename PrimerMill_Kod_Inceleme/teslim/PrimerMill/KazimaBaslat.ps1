@@ -170,7 +170,7 @@ try { Eding-Baslangic-Kaldir } catch { [Kayit]::Yaz("BAŞLANGIÇ: Eding kaydı k
 # ---------------- Kabuk (görünüm) ----------------
 $script:Kabuk = New-Object PrimerUI.Kabuk
 $script:Kabuk.Text = $(if ($script:Demo) { 'PrimerMill 2  ·  DEMO' } else { 'PrimerMill 2' })
-$script:Kabuk.TemaUygula([string](Tema-Normalle $script:Tercih.Tema))   # koyu | acik | gecisli
+$script:Kabuk.TemaUygula([string](Tema-Normalle $script:Tercih.Tema))   # koyu | acik | gecisli | safak
 if ($script:Tercih.TamEkran -ne '0' -or $script:Kiosk) {
     # Eski Tam-Ekran-Uygula: çerçevesiz, ekranı kaplar, Eding ya da başka bir pencere önüne geçemez (yerleşim akışkan: ölçek döngüsü yok)
     $script:Kabuk.FormBorderStyle = 'None'; $script:Kabuk.WindowState = 'Maximized'; $script:Kabuk.TopMost = $true
