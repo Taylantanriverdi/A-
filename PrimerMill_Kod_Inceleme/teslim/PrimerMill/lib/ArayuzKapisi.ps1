@@ -157,7 +157,8 @@ function Ui-One-Al {
 }
 
 function Ui-Ustte([bool]$ustte) { try { $script:Kabuk.TopMost = $ustte } catch { } }
-function Ui-Tema([bool]$koyu) { try { $script:Kabuk.TemaUygula($koyu) } catch { } }
+# Tema modu: 'koyu' | 'acik' | 'gecisli' (Kabuk.TemaUygula(string); bilinmeyen = koyu)
+function Ui-Tema([string]$mod) { try { $script:Kabuk.TemaUygula([string]$mod) } catch { } }
 function Ui-Kucult { try { $script:Kabuk.WindowState = 'Minimized' } catch { } }
 function Ui-Kapat { try { $script:Kabuk.Close() } catch { } }
 # Kiosk: $true -> çerçevesiz tam ekran, en üstte, öne al (simge durumundaysa geri aç); $false -> en üstte değil, simge durumu

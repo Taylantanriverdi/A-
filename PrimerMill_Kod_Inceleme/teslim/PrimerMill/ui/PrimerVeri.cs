@@ -148,6 +148,9 @@ namespace PrimerUI
         public List<string> IsUyarilari = new List<string>();
         public List<string> IsHatalari = new List<string>();
         public bool IsTamamlandi;
+        /// <summary>Bir iş yüklenip başlatıldı ve sürüyor (duraklatılmış olabilir). Geçişli tema: Yuzde yalnız bu iken renge yansır
+        /// (iptal sonrası kalan eski Yuzde MDI/home sırasında yüzeyi yeşile kaydırmasın).</summary>
+        public bool IsAktif;
         public int Hiz = 100;
 
         // --- blok

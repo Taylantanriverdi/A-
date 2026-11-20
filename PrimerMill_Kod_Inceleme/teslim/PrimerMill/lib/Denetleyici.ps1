@@ -466,6 +466,14 @@ function Yaklas-Neden([string]$ad, [bool]$ayar) {
     return ''
 }
 
+# Tema ayarı: 'koyu' | 'acik' | 'gecisli' (Geçişli: koyu taban, yüzeyler iş ilerledikçe maviden yeşile). Bilinmeyen/boş -> 'koyu'.
+function Tema-Normalle([string]$v) {
+    $k = "$v".Trim().ToLowerInvariant()
+    if ($k -eq 'acik') { return 'acik' }
+    if ($k -eq 'gecisli') { return 'gecisli' }
+    return 'koyu'
+}
+
 # Tercih anahtarları (Ayarlar ve sihirbaz kutuları). Eski pencere kutularının olaylarındaki kod aynen.
 function Tercih-Kaydet([string]$arg) {
     $i = $arg.IndexOf('=')
@@ -473,7 +481,7 @@ function Tercih-Kaydet([string]$arg) {
     $k = $arg.Substring(0, $i).Trim(); $v = $arg.Substring($i + 1).Trim()
     $ac = ($v -eq '1')
     switch ($k) {
-        'Tema' { $script:Tercih.Tema = $(if ($v -eq 'acik') { 'acik' } else { 'koyu' }); Tercih-Yaz; Ui-Tema ($script:Tercih.Tema -ne 'acik') }
+        'Tema' { $script:Tercih.Tema = (Tema-Normalle $v); Tercih-Yaz; Ui-Tema $script:Tercih.Tema }
         'MakineAdi' { if ($v) { $script:Tercih.MakineAdi = $v; Tercih-Yaz } }
         'SanalKlavye' { $script:Tercih.SanalKlavye = $(if ($ac) { '1' } else { '0' }); Tercih-Yaz }
         'OtomatikHazirlik' { $script:Tercih.OtomatikHazirlik = $(if ($ac) { '1' } else { '0' }); Tercih-Yaz }
@@ -818,6 +826,7 @@ function Durum-Topla {
     }
     $d.Yuzde = [double]$script:Yuzde
     $d.IsTamamlandi = [bool]$script:IsTamamlandi
+    $d.IsAktif = [bool]$script:IsAktif
     if ($script:SeciliDosya) {
         $d.IsUyarilari = (Liste-Str $script:Uyarilar)
         if ($script:Engel) { $d.IsHatalari = (Liste-Str $script:SonHatalar) }
@@ -879,7 +888,7 @@ function Durum-Topla {
     # tercihler (görünüm anahtarları)
     $t = $script:Tercih
     $ayar = @{
-        Tema = $(if ($t.Tema -eq 'acik') { 'acik' } else { 'koyu' }); MakineAdi = [string]$t.MakineAdi; SanalKlavye = [string]$t.SanalKlavye; TamEkran = [string]$t.TamEkran
+        Tema = (Tema-Normalle $t.Tema); MakineAdi = [string]$t.MakineAdi; SanalKlavye = [string]$t.SanalKlavye; TamEkran = [string]$t.TamEkran
         WinBaslangic = [string]$t.WinBaslangic; Koordinat = $(if ($t.Koordinat -eq 'MAKINE') { '1' } else { '0' }); Dansci = [string]$t.Dansci; FrezModu = [string]$t.FrezModu
         OtomatikHazirlik = [string]$t.OtomatikHazirlik; GeriSayim = [string]$t.GeriSayim; SadeTaraf = $(if ($t.SadeTaraf -eq '3') { '3' } else { '9' })
         ModSor = [string]$t.ModSor; BlokSor = [string]$t.BlokSor; EdingGizli = $(if ($t.EdingGizli -eq '0') { '0' } else { '1' }); EdingSifirla = [string]$t.EdingSifirla
