@@ -209,6 +209,7 @@ Tüm alanlar düz (public field). Listeler kurucuda boş oluşturulur; `null` ve
 | `IsTamamlandi` | bool | KALAN yerine "BİTTİ" (yeşil); ilerleme temalarında uç renk (Geçişli tam yeşil, Şafak tam bakır; yeni dosya seçilene kadar) |
 | `IsAktif` | bool | İş başlatıldı ve sürüyor (duraklatılmış olabilir). İlerleme temaları (Geçişli, Şafak) `Yuzde`'yi yalnız bu iken renge yansıtır (iptalden kalan eski yüzde MDI/home sırasında zemini yeşile kaydırmaz) |
 | `Hiz` | int % | İlerleme oranı (>120 kırmızı, ≠100 yeşil) |
+| `DevamKaydi` | string | Kaldığı yerden devam kaydı özeti, ör. "Son kayıt: satır 44 812 (14:31:07)" (iş sürerken ve iş yarım kaldıktan sonra; yoksa null). İş kartının soluk durum satırında durum metninden hemen sonra ("Tahmini" yerine). Kayıtlar › Teknik'te "Devam kaydı" satırı (satır · saat · durum) |
 | `BlokDurum`, `BekleyenBlok`, `BlokSonrakiIsim`, `BlokKalinlik`, `BlokDerinlik` | | Bakım şeridi yazısı, Yeni blok diyaloğu varsayılanları |
 | `SonMesaj`, `SonMesajTuru`, `SonMesajZamani` | | Alt şerit; Hata ise Kayıtlar menüsünde rozet |
 | `Yuvalar` | List<YuvaBilgisi> | Takımlar kartları + yuva listesi; `TakimSec` açıklamaları |
@@ -248,7 +249,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | `GeriSayim(metin, saniye [, sureBitinceOnay=false])` | bool | Halka sayaç; İPTAL → false, ŞİMDİ BAŞLA → true. Süre bitince varsayılan **iptal**. Eski panelde süre bitince home başlıyordu: denetleyici eski davranışı korumak için `sureBitinceOnay=true` vermeli (**MAKİNEDE DOĞRULA**). |
 | `ManuelFrezAdimi(adimNo, metin, string[] dugmeler [, baslik])` | int (-1 = Esc/ACİL STOP) | Büyük, kehribar bant, ses çalar; "DURDUR" içeren düğme kırmızı çerçeve, son düğme yeşil. |
 | `YeniBlok(isim, kalinlik, derinlik, dosyaSecili, bekleyenVar)` | `BlokSonucu {Secim, Isim, Kalinlik, Derinlik}` | Secim: -1 vazgeç, 0 kazı+başla, 1 sadece isim, 2 yeni hazır, 3 kullanılmış, 4 bekleyeni iptal. |
-| `Devam(dosya, bilgi, takim)` | `DevamSonucu {Secim: guvenli|yakin|bastan|iptal, Takim}` | Yarım kalan iş + iş milindeki frez seçimi. |
+| `Devam(dosya, bilgi, takim [, kirik=0])` | `DevamSonucu {Secim: tam|yakin|guvenli|bastan|iptal, Takim}`; `kirik > 0` iken `frez|bastan|iptal` | Yarım kalan iş + iş milindeki frez seçimi. `kirik > 0` (senaryo 2, takım boyu ölçümünde kırık bulunan frez): kırmızı bantlı "Kırık frez · T{k}" penceresi, yalnız **T{k}'NİN İŞİNİ BAŞTAN BAŞLAT** (`frez`, önerilen), **TÜM İŞİ BAŞTAN** (`bastan`), VAZGEÇ; iş milindeki frez seçimi "Yok" varsayılanla. Denetleyici kapısı `Ui-Devam dosya bilgi takim [kirik]`. Kayıt `devam.json` (panel klasörü): `Dosya, Kaynak, Satir` (asıl dosya satırı), `Takim, Yuzde, Zaman, Durum` (calisiyor / durduruldu / acil / exterr / hata / kirik / eding_kapandi / panel_kapandi / reset) ve kırıkta `Kirik, KirikSatir, KirikFark, KirikSinir`. |
 | `OnizlemeModu`, `SonForm`, `HepsiniKapat()` | | Yalnız geliştirme (ekran görüntüsü). |
 
 ## 6. İzinler (`IzinleriUygula`)

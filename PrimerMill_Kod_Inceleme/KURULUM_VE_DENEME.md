@@ -66,6 +66,17 @@ Eding'i simülasyon moduna alın (panelde SİMÜLASYON çipi görünür), sonra 
 4. Yuva değişkenlerinden birini 0 yapıp `M6` → makro hareket etmeden hata vermeli (MC-03). Değeri geri yazın (yedekten yükle).
 5. "Kaldığı yerden devam": Eding T2'deyken devamda T3 seçin → eksenler **kıpırdamamalı**, Eding T3 göstermeli.
 6. ACİL STOP'u takım değişimi sırasında basın → RESET → BAŞLAT: panel iş milindeki frezi sormalı.
+6a. **Kaldığı yerden devam, senaryo 1 (her durma yolunda kayıt):** iş sürerken iş kartında soluk "Son kayıt: satır N (hh:mm:ss)" görünmeli (Kayıtlar › Teknik › "Devam kaydı" satırında durum da yazar). Sırayla deneyin, her birinden sonra BAŞLAT → KALDIĞI YERDEN DEVAM programın durduğu satırın ~10 sn gerisinden başlamalı:
+   - DURDUR (durum `durduruldu`), ACİL STOP → KİLİDİ KALDIR (`acil`), kompresörü kapatıp EXTERR → ALARMI TEMİZLE (`exterr`), bir Eding hatası (`hata`), iş sürerken RESET (`reset`).
+   - Eding'i görev yöneticisinden kapatın (`eding_kapandi`), iş sürerken paneli kapatın (`panel_kapandi`), elektrik kesintisi yerine bilgisayarı resetleyin (son 2 sn'lik `calisiyor` kaydı).
+   - Duraklatılmışken ve elle frez beklerken de kayıt zamanı ilerlemeli (Teknik satırındaki saat).
+   - ALARMI TEMİZLE / KİLİDİ KALDIR sonrası yarım işin dosyası kendiliğinden seçili gelmeli.
+6b. **Kaldığı yerden devam, senaryo 2 (kırık frez):** birden çok frez kullanan bir işte (ör. T1 → T2 → T5) T2'nin işinden sonraki M100 ölçümünde kırık oluşturun (simülasyonda #4005'i geçici olarak 0.001 yapın; denemeden sonra geri yazın). Beklenen:
+   - Eding errmsg ile durur, panelde **FREZE HATASI** penceresi: 1) ALARMI TEMİZLE 2) PENS AÇ ile kırık frezi çıkar (iş milinde kırık T2) 3) yeni T2'yi yuvasına tak (otomatik) / elinde hazırla (manuel) 4) BAŞLAT → T2'NİN İŞİNİ BAŞTAN.
+   - BAŞLAT'ta yalnız **T2'NİN İŞİNİ BAŞTAN BAŞLAT**, **TÜM İŞİ BAŞTAN**, VAZGEÇ (kaldığı yerden / yakın / işlem başı YOK; nerede kırıldığı bilinemez).
+   - PENS AÇ yapmadan seçerseniz (Eding hâlâ T2): "Kırık frez iş milinden çıkarıldı mı? (PENS AÇ)" sorusu; HAYIR → hiçbir şey kıpırdamaz. EVET → Eding T0 olur (hareketsiz).
+   - "Yeni frez takıldı: T2 ömrü sıfırlansın mı?" sorusu, sonra onay penceresinde başlayacağı satır = dosyadaki `T2 M6` satırı. Program güvenli Z'ye kalkar, T2'yi yuvasından alır, ölçer ve T2'nin işini baştan keser (MAKİNEDE DOĞRULA 30–31).
+   - Başladıktan sonra kırık kaydı silinir; iş biterse devam kaydı da silinir.
 7. Disk kalibrasyonu test programını üretin: cep çapları Ø4/5/6/7/8 olmalı (eski sürümde Ø5 ve Ø7 hatalı olarak Ø6 çıkıyordu).
 8. Telefondan: PIN ile izleme, dosya yükleme. Duraklıyken uzaktan BAŞLAT reddedilmeli.
 
