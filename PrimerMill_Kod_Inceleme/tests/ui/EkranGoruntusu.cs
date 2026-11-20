@@ -262,7 +262,7 @@ static class EkranGoruntusu
     {
         var d = new MakineDurumu();
         d.Durum = Durum.Calisiyor; d.DurumMetni = "Kazınıyor"; d.Bagli = true; d.Demo = true; d.HomeAlindi = true;
-        d.MakineAdi = "DENTMILL-X5";
+        d.MakineAdi = "DENTMILL-X5"; d.Surum = "v11";
         d.X = -64.250; d.Y = -52.000; d.Z = -12.345; d.A = 23.000; d.B = 0.000;
         d.MX = -117.557; d.MY = -89.166; d.MZ = -12.345; d.MA = 23.000; d.MB = 0.000;
         d.Takim = 2; d.TakimAciklama = "Ø1.0 küre frez"; d.FrezModu = "OTOMATIK";

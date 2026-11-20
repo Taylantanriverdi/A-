@@ -2786,20 +2786,18 @@ namespace PrimerUI
             koord.Secili = 0; koord.Pt = 10.5f;
             koord.SecimDegisti += delegate { KoordDegistir(koord.Secili == 1); };
 
-            // --- işlem düğmeleri (DURAKLAT ile DURDUR arası boşluklu)
-            var dg = new Izgara(7, 1).Sutunlar(-16.6f, -16.6f, -16.6f, 14, -16.6f, -16.6f, -16.6f);
+            // --- işlem düğmeleri: 1. satır günlük iş (İŞ SEÇ, BAŞLAT, DURAKLAT, DURDUR) eşit genişlikte;
+            //     2. satır HOME, PARK, RESET, YENİ BLOK, TAKIM, TEMİZLİK eşit genişlikte. İki satırın sol ve sağ
+            //     kenarları ve aralıkları aynı (simetrik).
+            var dg = new Izgara(4, 1).Sutunlar(-25, -25, -25, -25); dg.Bosluk = 10;
             ana.Ekle(dg, 0, 2);
             btnSec = dg.Ekle(BuyukDugme("İŞ SEÇ", Simge.Klasor, Rol.Normal, "is.sec", ""), 0, 0);
             btnBaslat = dg.Ekle(BuyukDugme("BAŞLAT", Simge.Oynat, Rol.Basari, "is.baslat", ""), 1, 0);
             btnDuraklat = dg.Ekle(BuyukDugme("DURAKLAT", Simge.Duraklat, Rol.Uyari, "is.duraklat", ""), 2, 0);
-            btnDurdur = dg.Ekle(BuyukDugme("DURDUR", Simge.Durdur, Rol.Tehlike, "is.durdur", ""), 4, 0);
-            btnTakim = dg.Ekle(BuyukDugme("TAKIM", Simge.Takim, Rol.Normal, "takim.degistir", ""), 5, 0);
-            btnTakim.YalnizOlay = true;
-            btnTakim.Tiklandi += delegate { TakimSec(); };
-            btnTemizlik = dg.Ekle(BuyukDugme("TEMİZLİK", Simge.Temizlik, Rol.Normal, "temizlik", ""), 6, 0);
+            btnDurdur = dg.Ekle(BuyukDugme("DURDUR", Simge.Durdur, Rol.Tehlike, "is.durdur", ""), 3, 0);
 
             // --- bakım şeridi
-            var bk = new Izgara(5, 1).Sutunlar(-16, -16, -20, -18, -30); bk.Bosluk = 10;
+            var bk = new Izgara(6, 1).Sutunlar(-16.67f, -16.67f, -16.67f, -16.67f, -16.67f, -16.67f); bk.Bosluk = 10;
             ana.Ekle(bk, 0, 3);
             btnHome = bk.Ekle(Dugme("HOME", Simge.Ev, Rol.Normal, "home", ""), 0, 0); btnHome.AltMetin = "";
             btnPark = bk.Ekle(Dugme("PARK", Simge.Park, Rol.Normal, "park", ""), 1, 0);
@@ -2807,8 +2805,12 @@ namespace PrimerUI
             btnBlok = bk.Ekle(Dugme("YENİ BLOK", Simge.Blok, Rol.Vurgu, "blok.yeni", ""), 3, 0);
             btnBlok.YalnizOlay = true;
             btnBlok.Tiklandi += delegate { YeniBlok(); };
-            lblBlok = bk.Ekle(Etiket("", 11f, false, YaziRol.Soluk), 4, 0); lblBlok.Kucult = true;
-            foreach (var b in new[] { btnHome, btnPark, btnReset, btnBlok }) b.YaziPt = 12f;
+            btnTakim = bk.Ekle(Dugme("TAKIM", Simge.Takim, Rol.Normal, "takim.degistir", ""), 4, 0);
+            btnTakim.YalnizOlay = true;
+            btnTakim.Tiklandi += delegate { TakimSec(); };
+            btnTemizlik = bk.Ekle(Dugme("TEMİZLİK", Simge.Temizlik, Rol.Normal, "temizlik", ""), 5, 0);
+            lblBlok = Etiket("", 11f, false, YaziRol.Soluk);   // blok durumu artık YENİ BLOK düğmesinin alt yazısında
+            foreach (var b in new[] { btnHome, btnPark, btnReset, btnBlok, btnTakim, btnTemizlik }) b.YaziPt = 12f;
 
             // --- büyük simülasyon sayfası
             buyuk = new Izgara(1, 2).Satirlar(64, -100); buyuk.Visible = false;
@@ -2982,6 +2984,7 @@ namespace PrimerUI
             string blok = d.BlokDurum ?? "";
             if (d.BekleyenBlok && blok.Length == 0) blok = "Bekleyen blok ismi var";
             lblBlok.Metin = blok;
+            btnBlok.AltMetin = blok;
             if (blok.Length > 0) lblBlok.Renk(Tema.Hazir); else lblBlok.RenkRol = YaziRol.Soluk;
 
             SimHost.Dosya = d.Dosya; SimHostBuyuk.Dosya = d.Dosya;
@@ -5168,6 +5171,8 @@ namespace PrimerUI
     /// <summary>Marka: altın elmas + PRIMER.</summary>
     public class MarkaKontrol : TemelKontrol
     {
+        /// <summary>Yazılım sürümü (SURUM.txt, ör. "v11"); marka altında gösterilir.</summary>
+        public static string SurumMetni = "";
         protected override void OnPaint(PaintEventArgs e)
         {
             var g = e.Graphics; Tema.Hazirla(g);
@@ -5180,7 +5185,7 @@ namespace PrimerUI
             Font f = Tema.F(19f, true);
             var z = Tema.Olc(g, "PRIMER", f);
             Tema.Yaz(g, "PRIMER", f, Tema.Yazi, new RectangleF(x, cy - z.Height * 0.62f, Width - x, z.Height), StringAlignment.Near, StringAlignment.Center, true);
-            Tema.Yaz(g, "MILL 2 · OPERATÖR", Tema.F(8f, true), Tema.Marka, new RectangleF(x + Tema.PxF(1), cy + z.Height * 0.30f, Width - x, Tema.PxF(16)), StringAlignment.Near, StringAlignment.Center, true);
+            Tema.Yaz(g, string.IsNullOrEmpty(SurumMetni) ? "MILL 2 · OPERATÖR" : "MILL 2 · " + SurumMetni, Tema.F(8f, true), Tema.Marka, new RectangleF(x + Tema.PxF(1), cy + z.Height * 0.30f, Width - x, Tema.PxF(16)), StringAlignment.Near, StringAlignment.Center, true);
         }
     }
 
@@ -5299,7 +5304,7 @@ namespace PrimerUI
             kok.Ekle(ustSerit, 0, 0);
             ust = new Izgara(5, 1).Sutunlar(196, 300, -100, 150, 108); ust.Bosluk = 8;
             ustSerit.Controls.Add(ust); ust.Dock = DockStyle.Fill;
-            ust.Ekle(new MarkaKontrol(), 0, 0);
+            marka = ust.Ekle(new MarkaKontrol(), 0, 0);
             hap = ust.Ekle(new StatusPill(), 1, 0);
             cipler = ust.Ekle(new BilgiCipleri(), 2, 0);
             saat = ust.Ekle(new SaatKontrol(), 3, 0);
@@ -5537,10 +5542,12 @@ namespace PrimerUI
 
         // ------------------------------------------------------------ durum
         /// <summary>Denetleyiciden gelen durumu tüm ekranlara uygular.</summary>
+        MarkaKontrol marka;
         public void Uygula(MakineDurumu d)
         {
             if (d == null) return;
             if (InvokeRequired) { BeginInvoke(new Action<MakineDurumu>(Uygula), d); return; }
+            string sv = d.Surum ?? ""; if (sv != MarkaKontrol.SurumMetni && marka != null) { MarkaKontrol.SurumMetni = sv; marka.Invalidate(); }
             SonDurum = d;
             GecisHedefAyarla(Tema.GecisHedefi(d));
             hap.Durum = d.AcilStop ? Durum.Alarm : d.Durum;

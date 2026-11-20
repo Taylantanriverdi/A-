@@ -149,6 +149,8 @@ if ($script:Demo) { $script:ApiHazir = $true }
 foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'FrezOmru', 'Kalibrasyon', 'Uzak', 'Kiosk', 'Denetleyici', 'ArayuzKapisi')) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', "$m.ps1")) }
 if ($script:Demo) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', 'Demo.ps1')) }
 $script:PanelSurum = 'PrimerMill 2'
+# Teslim paketi sürümü (ör. v11): SURUM.txt; ana ekranda marka altında "MILL 2 · v11" olarak görünür
+try { $sv = [System.IO.File]::ReadAllText([System.IO.Path]::Combine($PanelKlasor, 'SURUM.txt')).Trim(); if ($sv) { $script:PanelSurum = $sv } } catch { }
 
 Tercih-Baslangic
 if ($script:Demo) { Demo-Makine-Hazirla }
