@@ -615,7 +615,7 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
         if (-not (Komut-Sonucu 'Devam programı yükleme' ([Eding]::CncLoadJobA($d.Yol)))) { return }
         $rc = Is-Calistir
         if (Komut-Sonucu 'Devam başlat' $rc) {
-            $script:DevamDosya = [string]$k.Dosya; $script:DevamKaynak = [string]$k.Kaynak; $script:DevamHarita = $d.Harita
+            $script:DevamDosya = [string]$k.Dosya; $script:DevamKaynak = [string]$k.Kaynak; $script:DevamHarita = $d.Harita; $script:DevamAsilAnaliz = $an
             # Kayıt hemen yenilenir (başlangıç satırı, asıl dosyaya göre): kırık frez kaydı (Kirik) böylece temizlenir
             Devam-Kaydet 1 'calisiyor' $yzS
             $script:BlokHazir = $false; if ($script:Sade) { Blok-Cip-Guncelle }
@@ -800,7 +800,7 @@ function Btn-Baslat-Ic {
             if ($blok -and $blok -ne 'eski') { Blok-Kaydet $blok $script:SeciliDosya }
             if ($script:Sade -and $script:BekleyenBlok) { $script:BekleyenBlok = $null }
             $script:BlokHazir = $false; if ($script:Sade) { Blok-Cip-Guncelle }
-            $script:DevamDosya = $script:SeciliDosya; $script:DevamKaynak = $yuklenecek; $script:DevamHarita = $null
+            $script:DevamDosya = $script:SeciliDosya; $script:DevamKaynak = $yuklenecek; $script:DevamHarita = $null; $script:DevamAsilAnaliz = $null
             Devam-Kaydet 1 'calisiyor' 0
             $script:ModOnayliDosya = $null
             $script:TakipSonu = ''
@@ -1642,11 +1642,20 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
     $i = [math]::Max(0, [math]::Min($a.Kumulatif.Length - 1, $satir - 1))
     $yapilan = $a.Kumulatif[$i]
     $yuzde = 100.0 * $yapilan / $a.Toplam
+    # Kaldığı yerden devamda $a devam programının analizi: yüzde/satır gösterimi ve ilerleme temaları ASIL işe göre olsun
+    # (yoksa devamda %0'dan başlayıp tema yeniden maviye dönüyordu). İş sonu algısı yerel $yuzde ile kalır.
+    $yuzdeG = $yuzde; $script:GosterSatir = 0
+    if ($script:DevamHarita -and $script:DevamAsilAnaliz -and $script:DevamAsilAnaliz.Toplam -gt 0) {
+        $aa = $script:DevamAsilAnaliz
+        $so = [int]$script:DevamHarita.Orijinal + ($satir - [int]$script:DevamHarita.Bas); if ($so -lt [int]$script:DevamHarita.Orijinal) { $so = [int]$script:DevamHarita.Orijinal - 1 }
+        $io = [math]::Max(0, [math]::Min($aa.Kumulatif.Length - 1, $so - 1))
+        $yuzdeG = 100.0 * $aa.Kumulatif[$io] / $aa.Toplam; $script:GosterSatir = [math]::Max(1, $so)
+    }
 
     $kalan = $a.Toplam - $yapilan
     # Senaryo 1: 2 sn'de bir (duraklıyken ve manuel frez beklerken de); takım değişince hemen (değişimden sonraki ilk satır)
     $tkSimdi = $script:DevamSonTakim; try { $tkSimdi = [int][Eding]::CncGetCurrentToolNumber() } catch { }
-    if (($calisiyor -or $durakli) -and (($simdi - $script:DevamSonYazma).TotalSeconds -ge 2 -or $tkSimdi -ne $script:DevamSonTakim)) { Devam-Kaydet $satir 'calisiyor' $yuzde }
+    if (($calisiyor -or $durakli) -and (($simdi - $script:DevamSonYazma).TotalSeconds -ge 2 -or $tkSimdi -ne $script:DevamSonTakim)) { Devam-Kaydet $satir 'calisiyor' $yuzdeG }
     if ($yapilan -gt 60 -and $script:Gecen.TotalSeconds -gt 60) {
         $oran = [math]::Max(0.3, [math]::Min(5.0, $script:Gecen.TotalSeconds / $yapilan))
         $kalan = $kalan * $oran
@@ -1664,7 +1673,7 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         $script:BitisSayac++
         $sonDurum0 = Eding-Durum
         if ($script:BitisSayac -lt 5 -and -not (Hatali $sonDurum0) -and $sonDurum0 -ne 'ABORTED') {
-            $script:Yuzde = $yuzde
+            $script:Yuzde = $yuzdeG
             return
         }
         [Kayit]::Yaz("İLERLEME: iş sonu algılandı (durum=$sonDurum0, satır $satir / $toplamSatir, yüzde $([math]::Round($yuzde,1)))")
@@ -1678,9 +1687,9 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         if ((Hatali $sonDurum) -and -not $disHata) {
             try { $fark = [double][Eding]::CncGetVariable(4099); $sinir = [double][Eding]::CncGetVariable(4005); if ($fark -gt $sinir -and $sinir -gt 0) { $kirikT = [int][Eding]::CncGetCurrentToolNumber() } } catch { }
         }
-        if ($yuzde -gt 97 -and -not (Hatali $sonDurum) -and -not $disHata) { Devam-Sil; $script:DevamHarita = $null }
-        elseif ($kirikT -gt 0) { Devam-Kaydet $satir 'kirik' $yuzde $kirikT $fark $sinir }
-        else { Devam-Kaydet $satir $(if ($disHata) { 'exterr' } elseif (Hatali $sonDurum) { 'hata' } else { 'durduruldu' }) $yuzde; Yaz 'İş yarım kaldı: kaldığı yerden devam için BAŞLAT''a bas (aynı dosya seçiliyken).' }
+        if ($yuzde -gt 97 -and -not (Hatali $sonDurum) -and -not $disHata) { Devam-Sil; $script:DevamHarita = $null; $script:DevamAsilAnaliz = $null }
+        elseif ($kirikT -gt 0) { Devam-Kaydet $satir 'kirik' $yuzdeG $kirikT $fark $sinir }
+        else { Devam-Kaydet $satir $(if ($disHata) { 'exterr' } elseif (Hatali $sonDurum) { 'hata' } else { 'durduruldu' }) $yuzdeG; Yaz 'İş yarım kaldı: kaldığı yerden devam için BAŞLAT''a bas (aynı dosya seçiliyken).' }
         if ($disHata -and -not [Eding]::AcilKilit) {
             $script:SureMetni = 'Makine hata sinyali (EXTERR)  ·  basıncı kontrol et, RESET'; $script:SureTur = $cKirmizi
             Yaz "Kazıma makinenin hata sinyaliyle (EXTERR / acil stop) durdu, satır $satir. En sık sebep: hava basıncı düşük."
@@ -1713,7 +1722,7 @@ function Ilerleme-Guncelle([bool]$calisiyor, [bool]$durakli) {
         }
         return
     }
-    $script:Yuzde = $yuzde
+    $script:Yuzde = $yuzdeG
     $dilim = [math]::Floor($yuzde / 5) * 5
     if ($dilim -ne $script:SonYuzdeLog) { $script:SonYuzdeLog = $dilim; [Kayit]::Yaz("İLERLEME: %$dilim  satır $satir  geçen $(Sure $script:Gecen.TotalSeconds)  kalan ~$(Sure $kalan)") }
     $script:SureTur = $cSoluk

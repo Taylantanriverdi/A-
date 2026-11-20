@@ -103,6 +103,11 @@ $anz = [NcAnaliz]::Oku($kaynakIs, 4000.0)
 function Geri-Sn([int]$bas, [int]$dur) { return $anz.Kumulatif[$dur - 1] - $anz.Kumulatif[$bas - 1] }
 Dogru ($bas -gt (Son-ZSafe ([int]$k.Satir)) -and $bas -le [int]$k.Satir -and (Geri-Sn $bas ([int]$k.Satir)) -le 15) "asıl işte satır $bas'den sürüyor: durduğu $($k.Satir), ~$([math]::Round((Geri-Sn $bas ([int]$k.Satir)),1)) sn geriden (eski davranış: satır $(Son-ZSafe ([int]$k.Satir)))"
 Esit $L[$bas - 1] $dv[$script:DevamHarita.Bas - 1] 'devam dosyası asıl işin o satırıyla sürüyor'
+Tik 5
+$beklenenYz = 100.0 * $anz.Kumulatif[$bas - 2] / $anz.Toplam
+Dogru ($script:Yuzde -ge $beklenenYz - 1.0) "devamda yüzde asıl işe göre (%$([math]::Round($script:Yuzde,1)) >= ~%$([math]::Round($beklenenYz,1))); ilerleme teması maviye dönmez"
+Tik 1; $dd = $script:SonDurumNesnesi
+if ($dd) { Dogru ($dd.ToplamSatir -eq $L.Length -and $dd.Satir -ge $bas - 1) "devamda satır gösterimi asıl işe göre ($($dd.Satir) / $($dd.ToplamSatir))" }
 
 Bolum '2) Devam ederken ikinci kez yarıda kalırsa: satır asıl dosyaya göre kaydedilir'
 Is-Calistir-Satira ($script:DevamHarita.Bas + 2000)

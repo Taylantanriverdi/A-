@@ -741,6 +741,7 @@ function OtoKal-Sim-Uret([string]$nc, [double]$T) {
 # Elektrik kesilirse / basınç düşüp iş yarıda kalırsa: panel işin hangi satırda olduğunu sürekli devam.json'a yazar.
 # Sonra BAŞLAT'ta "kaldığı yerden" seçilince işin o noktasından devam eden yeni bir program üretilir.
 $DevamDosyasi = [System.IO.Path]::Combine($ScriptKlasor, 'devam.json')
+$script:DevamAsilAnaliz = $null   # devam programı çalışırken asıl işin analizi (yüzde / satır gösterimi asıl işe göre)
 $script:DevamHarita = $null      # devam programı çalışırken: @{ Bas = devam dosyasında asıl işin başladığı satır; Orijinal = asıl dosyadaki karşılığı }
 $script:DevamSonYazma = [DateTime]::MinValue
 function Devam-Oku {

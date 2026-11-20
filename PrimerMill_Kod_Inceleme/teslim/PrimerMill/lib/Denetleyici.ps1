@@ -855,7 +855,9 @@ function Durum-Topla {
     $sk = $script:DevamSonKayit
     if ($sk -and ($script:IsAktif -or $sk.Durum -ne 'calisiyor')) { $d.DevamKaydi = "Son kayıt: satır $(([int]$sk.Satir).ToString('N0', [System.Globalization.CultureInfo]::GetCultureInfo('tr-TR'))) ($(([datetime]$sk.Zaman).ToString('HH:mm:ss')))" }
     if ($script:IsAktif -or $script:IsTamamlandi) {
-        $d.Satir = [int]$script:SonGecerliSatir; $d.GecenSn = [int]$script:Gecen.TotalSeconds; $d.KalanSn = [int]$script:KalanSn; $d.BitisSaati = [string]$script:BitisSaati
+        $d.Satir = [int]$script:SonGecerliSatir
+        if ($script:DevamHarita -and $script:DevamAsilAnaliz -and $script:GosterSatir -gt 0) { $d.Satir = [int]$script:GosterSatir; $d.ToplamSatir = [int]$script:DevamAsilAnaliz.Satir; $d.TahminiSn = [int]$script:DevamAsilAnaliz.Toplam }
+        $d.GecenSn = [int]$script:Gecen.TotalSeconds; $d.KalanSn = [int]$script:KalanSn; $d.BitisSaati = [string]$script:BitisSaati
     }
     $d.Yuzde = [double]$script:Yuzde
     $d.IsTamamlandi = [bool]$script:IsTamamlandi
