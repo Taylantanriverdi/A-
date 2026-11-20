@@ -229,7 +229,7 @@ function Komut-Sonucu([string]$ad, [int]$rc) {
     $t = [Eding]::RCText($rc)
     Yaz "$ad : HATA ($t)"
     $ne = "Eding komutu reddetti. Eding'in kendi hata mesajına bakın: Ayarlar › Eding › GÖSTER (alttaki mesaj listesi)."
-    $ne += "`r`nEding hata durumundaysa ALARMI TEMİZLE'ye basıp tekrar deneyin. 'CPU is not enabled' yazıyorsa Eding kontrol kartı (CPU5B) bu bilgisayarda etkin değildir."
+    $ne += "`r`nEding hata durumundaysa RESET'e basıp tekrar deneyin. 'CPU is not enabled' yazıyorsa Eding kontrol kartı (CPU5B) bu bilgisayarda etkin değildir."
     (Ui-Kutu "$ad başarısız:`r`n$t`r`n`r`n$ne" 'Kazıma Paneli' 'OK' 'Error') | Out-Null
     return $false
 }

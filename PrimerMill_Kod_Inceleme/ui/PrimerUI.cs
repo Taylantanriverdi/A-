@@ -2803,7 +2803,7 @@ namespace PrimerUI
             ana.Ekle(bk, 0, 3);
             btnHome = bk.Ekle(Dugme("HOME", Simge.Ev, Rol.Normal, "home", ""), 0, 0); btnHome.AltMetin = "";
             btnPark = bk.Ekle(Dugme("PARK", Simge.Park, Rol.Normal, "park", ""), 1, 0);
-            btnReset = bk.Ekle(Dugme("ALARMI TEMİZLE", Simge.Yenile, Rol.Normal, "makine.reset", ""), 2, 0);
+            btnReset = bk.Ekle(Dugme("RESET", Simge.Yenile, Rol.Normal, "makine.reset", ""), 2, 0);
             btnBlok = bk.Ekle(Dugme("YENİ BLOK", Simge.Blok, Rol.Vurgu, "blok.yeni", ""), 3, 0);
             btnBlok.YalnizOlay = true;
             btnBlok.Tiklandi += delegate { YeniBlok(); };
@@ -2974,7 +2974,7 @@ namespace PrimerUI
             // düğmeler
             if (d.Durum == Durum.Duraklatildi) { btnBaslat.Metin = "DEVAM"; btnBaslat.KomutAyarla("is.devam", ""); }
             else { btnBaslat.Metin = "BAŞLAT"; btnBaslat.KomutAyarla("is.baslat", ""); }
-            btnReset.Metin = d.AcilStop ? "KİLİDİ KALDIR" : "ALARMI TEMİZLE";
+            btnReset.Metin = d.AcilStop ? "KİLİDİ KALDIR" : "RESET";
             btnReset.KomutAyarla(d.AcilStop ? "acilstop.kaldir" : "makine.reset", "");
             btnReset.Rol = d.Durum == Durum.Alarm ? Rol.TehlikeCizgi : Rol.Normal;
             btnHome.AltMetin = d.HomeAlindi ? "" : "home gerekli";
@@ -5572,7 +5572,7 @@ namespace PrimerUI
             {
                 mesaj.Ayarla(MesajTuru.Hata, d.SonMesajZamani == DateTime.MinValue ? "" : d.SonMesajZamani.ToString("HH:mm", Bicim.Inv),
                     "ALARM · " + (string.IsNullOrEmpty(d.SonMesaj) ? (d.DurumMetni ?? "") : d.SonMesaj), true);
-                MesajDugmesi("ALARMI TEMİZLE", "makine.reset");
+                MesajDugmesi("RESET", "makine.reset");
             }
             else
             {

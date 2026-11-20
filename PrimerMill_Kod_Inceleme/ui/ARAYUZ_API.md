@@ -58,7 +58,7 @@ Sütunlar: **Ad** · **Arg** · **Nereden** · **Önerilen onay** (TASARIM §6; 
 |---|---|---|---|
 | `acilstop` | — | Üst şerit ACİL STOP (basıldığı an), her diyalogdaki küçük ACİL STOP ve diyalog açıkken ana ACİL STOP'un üstüne konan canlı katman (Diyalog.AcilStop atanmamışsa), Esc | yok — anında |
 | `acilstop.kaldir` | — | Alt şerit (alarm bandı) "KİLİDİ KALDIR", Üretim bakım şeridi (acil stop varken) | Normal |
-| `makine.reset` | — | Alt şerit "ALARMI TEMİZLE" (Durum=Alarm), Üretim "ALARMI TEMİZLE" | Normal (çalışırken) |
+| `makine.reset` | — | Alt şerit "RESET" (Durum=Alarm), Üretim "RESET" | Normal (çalışırken) |
 | `ekran` | ekran adı | Ekran değişti (bilgi) | — |
 | `panel.kucult` / `panel.kapat` | — | Ayarlar › Genel › Panel penceresi | kapat: Normal (çalışırken uyarılı); **kiosk modunda** KÜÇÜLT pasif, KAPAT (ve pencere kapatma / Alt+F4) kiosk PIN'i ister, kapanınca Windows masaüstü açılır |
 | `sistem.kapat` | — | Sol menünün en altı, güç simgesi "Kapat" (her ekranda) | `Diyalog.Secim` KAPAT / YENİDEN BAŞLAT / VAZGEÇ (Enter hiçbir şey yapmaz). İş sürerken / duraklıyken / makine hareket ederken / panel işlemi sürerken pasif (izin tablosu). Eding ayarları kaydederek kapanır (≤ 15 sn), sonra `shutdown.exe /s` (ya da `/r`) `/t 0 /f`. DEMO'da bilgisayar kapanmaz: "DEMO: cihaz kapatılmaz", panel kapanır |
@@ -341,7 +341,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | 3.6 | BAŞLAT / DEVAM | Üretim › BAŞLAT (duraklatılmışken DEVAM) | `is.baslat` / `is.devam` |
 | 3.7 | DURAKLAT | Üretim › DURAKLAT | `is.duraklat` |
 | 3.8 | DURDUR | Üretim › DURDUR | `is.durdur` |
-| 3.9 | RESET | Üretim › ALARMI TEMİZLE; alt şerit alarm bandı | `makine.reset` |
+| 3.9 | RESET | Üretim › RESET; alt şerit alarm bandı | `makine.reset` |
 | 3.10 | FREZ BIRAK | Takımlar › Takım değişimi › FREZİ BIRAK; ayrıca TAKIM → BOŞALT (T0) | `frez.birak` / `takim.degistir 0` |
 | 3.11 | PENS AÇ / KAPAT | Takımlar › PENS AÇ / PENS KAPAT (Takım değişimi, Yuva ayarı, İş mili ve hava) | `pens.ac`, `pens.kapat` |
 | 3.12 | TEMİZLİK / PARK | Üretim › TEMİZLİK ve ayrı PARK düğmesi | `temizlik`, `park` |
@@ -370,7 +370,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | 4.4 | DURAKLAT | DURAKLAT | `is.duraklat` |
 | 4.5 | DURDUR | DURDUR (DURAKLAT'tan ayrık) | `is.durdur` |
 | 4.6 | HOME | HOME | `home` |
-| 4.7 | RESET | ALARMI TEMİZLE / KİLİDİ KALDIR | `makine.reset`, `acilstop.kaldir` |
+| 4.7 | RESET | RESET / KİLİDİ KALDIR | `makine.reset`, `acilstop.kaldir` |
 | 4.8 | FREZ BIRAK | FREZİ BIRAK | `frez.birak` |
 | 4.9 | PENS AÇ / KAPAT | PENS AÇ / KAPAT | `pens.ac`, `pens.kapat` |
 | 4.10 | TEMİZLİK / PARK | TEMİZLİK, PARK | `temizlik`, `park` |

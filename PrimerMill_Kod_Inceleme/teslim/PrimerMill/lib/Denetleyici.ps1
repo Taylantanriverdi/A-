@@ -142,8 +142,8 @@ function Ana-Tik {
             if ($calisiyor) { [Kayit]::Yaz("ACİL STOP basılıyken Eding hareket etti ($durum): tekrar kesiliyor"); Acil-Stop 'bekçi' }
             Durum-Yaz 'ACİL STOP  ·  kaldırmak için KİLİDİ KALDIR' $cKirmizi
         }
-        elseif ($hatali -and -not $acil) { Durum-Yaz 'Eding hatası  ·  ALARMI TEMİZLE' $cKirmizi }
-        elseif ($acil)      { Durum-Yaz 'Makine hata sinyali (EXTERR)  ·  ALARMI TEMİZLE' $cKirmizi }
+        elseif ($hatali -and -not $acil) { Durum-Yaz 'Eding hatası  ·  RESET' $cKirmizi }
+        elseif ($acil)      { Durum-Yaz 'Makine hata sinyali (EXTERR)  ·  RESET' $cKirmizi }
         elseif ($durakli)   { Durum-Yaz "Duraklatıldı$tStr" $cAltinAc }
         elseif ($calisiyor) { Durum-Yaz $(if ($script:IsAktif) { "Kazınıyor$tStr" } else { "Hareket ediyor$tStr" }) $cYesil }
         elseif (-not $homeTamam) { Durum-Yaz 'Home alınmadı' $cAltinAc }
