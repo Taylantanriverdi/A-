@@ -26,6 +26,9 @@ Uzak-Etiket-Guncelle | DEGISTI | etiket yerine $script:UzakDurumMetni
 Devam-Diyalog | DEGISTI | özel pencere -> Ui-Devam (Diyalog.Devam); dönüş aynı (Sec, Takim)
 Devam-Baslat | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır
 Devam-Acilis | DEGISTI | etiketler -> durum değişkenleri
+Devam-Kaydet | DEGISTI | kaldığı yerden devam senaryo 1/2 (kullanıcı isteği): satır < 1 ise 1; Eding kopukken son bilinen takım; kırık frez alanları (Kirik, KirikSatir, KirikFark, KirikSinir); ekranda 'Son kayıt' için DevamSonKayit
+Devam-Sil | DEGISTI | DevamSonKayit de temizlenir (ekrandaki 'Son kayıt' satırı)
+Devam-NC-Uret | DEGISTI | yeni 'frez' kipi (kırık frezin işini son T{k} M6 satırından baştan; MAKİNEDE DOĞRULA 30); tam/yakin/guvenli çıktısı bayt bayt aynı (GKod altın testi)
 Btn-Baslat-Ic | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır; Takim-Kapisi'ndan sonra frez ömrü denetimi (Frez-Omru-Baslat-Kontrol: ömrü dolan frez için onay, varsayılan VAZGEÇ; hareket / G-kod değişmez)
 Btn-Durdur | DEGISTI | $bar.Value -> $script:Yuzde; etiket -> SureMetni
 Btn-FrezBirak | DEGISTI | Onay -> Ui-Tehlikeli-Onay (TASARIM §6); hareket aynı

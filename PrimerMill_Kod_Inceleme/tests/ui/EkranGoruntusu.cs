@@ -181,6 +181,10 @@ static class EkranGoruntusu
         Ekle(no() + "_takimlar_frez_omru_calisirken_koyu_1920.png", 1920, 1080, true, () => { Uygula(Ornek(), izinOmur()); Git("takimlar.omur"); });
         Ekle(no() + "_takimlar_frez_omru_acik_1024.png", 1024, 768, false, () => { Uygula(Hazir(), IzinHazir()); Git("takimlar.omur"); });
         Ekle(no() + "_diyalog_frez_omru_uyari_koyu_1024.png", 1024, 768, true, () => { Uygula(Hazir(), IzinHazir()); Git("uretim"); Diyalog.Onay("Frez ömrü", "Bu işin kullandığı frez ömrünü doldurdu:\n\nT3 ömrünü doldurdu: 1043/1000 dk.\n\nFrezi değiştirip Takımlar › Frez ömrü › SIFIRLA · YENİ FREZ ile sıfırlayabilirsiniz.\n\nYine de başlatılsın mı?"); });
+        // kaldığı yerden devam: senaryo 2 (kırık frez) ve devam kaydı satırı
+        Ekle(no() + "_diyalog_devam_kirik_frez_koyu_1024.png", 1024, 768, true, () => { var d = Hazir(); d.Takim = 2; Uygula(d, IzinHazir()); Git("uretim"); Diyalog.Devam("ZY2_45", "T2 frezi KIRIK (boy 1.84 mm değişti, sınır 0.2 mm)\n2026-11-20 14:31:07  ·  iş satır 61 240'da durdu  ·  %88\nNerede kırıldığı bilinemediği için T2'nin bu işteki işi baştan kesilir: satır 34 702 (T2 takım değişimi).", 0, 2); });
+        Ekle(no() + "_diyalog_freze_hatasi_koyu_1024.png", 1024, 768, true, () => { var d = Hazir(); d.Takim = 2; d.Durum = Durum.Alarm; d.DurumMetni = "Eding hatası"; Uygula(d, IzinHazir()); Git("uretim"); Diyalog.Hata("FREZE HATASI", "T2 frezesinin boyu iş sonrası ölçümde 1.84 mm değişmiş (izin verilen: 0.2 mm).\nFreze kırılmış, aşınmış ya da pensin içinde kaymış olabilir. Kazıma bir sonraki frezeye geçmeden durduruldu.\n\n1. ALARMI TEMİZLE'ye bas.\n2. Frezi tut, PENS AÇ ile kırık frezi çıkar (dikkat: iş milinde kırık T2).\n3. Yeni T2 frezini T2 yuvasına tak (otomatik mod).\n4. BAŞLAT → T2'NİN İŞİNİ BAŞTAN: nerede kırıldığı bilinemediği için T2'nin bu işteki işi, T2'nin takım değişiminden itibaren yeniden kesilir."); });
+        Ekle(no() + "_uretim_devam_kaydi_koyu_1024.png", 1024, 768, true, () => { var d = Ornek(); d.DevamKaydi = "Son kayıt: satır 44 812 (14:31:07)"; Uygula(d, IzinCalisiyor()); Git("uretim"); });
     }
 
     static IEnumerable<Control> Tum(Control k)

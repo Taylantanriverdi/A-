@@ -314,7 +314,7 @@ function Ui-Sahte-Yukle {
     function script:Ui-Takim-Sec([int]$mevcut, [string[]]$aciklamalar) { return -1 }
     function script:Ui-Geri-Sayim([string]$metin, [int]$saniye) { Ui-Not "GERISAYIM $metin"; return [bool]$script:SahteGeriSayim }
     function script:Ui-Manuel-Adim([int]$adim, [string]$metin, [string[]]$dugmeler, [string]$baslik) { Ui-Not "MANUEL $adim $baslik"; return -1 }
-    function script:Ui-Devam([string]$dosya, [string]$bilgi, [int]$takim) { Ui-Not "DEVAM $dosya"; return @{ Secim = 'iptal'; Takim = $takim } }
+    function script:Ui-Devam([string]$dosya, [string]$bilgi, [int]$takim, [int]$kirik = 0) { Ui-Not "DEVAM $dosya kirik=$kirik"; return @{ Secim = 'iptal'; Takim = $takim } }
     function script:Ui-Dosya-Ac([string]$baslik, [string]$filtre, [string]$klasor) { return $null }
     function script:Ui-Bildir([string]$metin, [string]$tur = 'Bilgi') { Ui-Not "BILDIR [$tur] $metin" }
     function script:Ui-Olaylar { Start-Sleep -Milliseconds 5 }

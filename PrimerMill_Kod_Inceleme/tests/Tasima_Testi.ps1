@@ -83,5 +83,5 @@ foreach ($ad in $eskiF.Keys) {
 }
 foreach ($ad in $liste.Keys) { if (-not $eskiF.Contains($ad)) { Kaldi "TASIMA_DEGISEN.txt: '$ad' eski panelde yok" } }
 Bilgi "eski panelde $($eskiF.Count) fonksiyon: $ayni birebir, $degisti değişti (gerekçeli), $kalkti kaldırıldı (gerekçeli)"
-Dogru ($ayni -ge 95) "en az 95 fonksiyon birebir taşındı ($ayni)"
+Dogru ($ayni -ge 90) "en az 90 fonksiyon birebir taşındı ($ayni)"   # 95 idi; Devam-Kaydet / Devam-Sil / Devam-NC-Uret kaldığı yerden devam senaryoları için bilerek değişti
 Ozet 'Taşıma'
