@@ -36,7 +36,7 @@ Sayılar görünümde her yerde `InvariantCulture` ile biçimlenir; komut argüm
 | `void IzinleriUygula(IDictionary<string,bool> izin, IDictionary<string,string> neden)` | İzin tablosu. Bkz. §6. |
 | `void IzinleriUygula(IDictionary<string,string> neden)` | Kısa yol: tablodaki her anahtar pasif, nedeni değer. Tabloda olmayan her şey etkin. |
 | `void IzinleriUygulaTablo(IDictionary izin, IDictionary neden)` | PowerShell `Hashtable` kolaylığı. |
-| `void TemaUygula(string mod)` | Tema (çalışırken): `koyu`, `acik`, `gecisli`, `safak` (bilinmeyen = koyu). Ayarlar › Genel › Tema (Koyu / Açık / Geçişli / Şafak) da bunu çağırır ve `ayar.kaydet Tema=koyu|acik|gecisli|safak` gönderir. `TemaUygula(TemaModu)` aynı; `TemaUygula(bool koyu)` uyumluluk için kalır (true = Koyu, false = Açık). |
+| `void TemaUygula(string mod)` | Tema (çalışırken): `koyu`, `acik`, `gecisli`, `safak`, `canli` (bilinmeyen = koyu). Ayarlar › Genel › Tema (Koyu / Açık / Geçişli / Şafak / Canlı) da bunu çağırır ve `ayar.kaydet Tema=koyu|acik|gecisli|safak|canli` gönderir. `TemaUygula(TemaModu)` aynı; `TemaUygula(bool koyu)` uyumluluk için kalır (true = Koyu, false = Açık). |
 | `void GecisiTamamla()` | İlerleme temalarında (Geçişli, Şafak) yumuşak geçişi beklemeden rengi hedefe atlatır (ekran görüntüsü / test). İlerleme teması = iki uç paleti (`IlerlemePaleti`: `Tema.GecisliPalet` mavi→yeşil, `Tema.SafakPalet` gece çiviti→şafak bakırı); ilerlemeyi `Uygula(MakineDurumu)` içinden alır: `IsTamamlandi` → tam yeşil; `IsAktif` ve `Durum` ÇALIŞIYOR/DURAKLATILDI → `Yuzde/100`; değilse mavi. Kabuk içindeki 33 ms'lik zamanlayıcı gösterilen değeri üstel yumuşatmayla (τ ≈ 0,45 s) hedefe taşır ve fark < 0,001 olunca durur (TASARIM §5). |
 | `void EkranGoster(string ad)` | `uretim`, `takimlar`, `kalibrasyon`, `ayarlar`, `kayitlar`, `uzaktan`; alt sayfa: `takimlar.yuva`, `takimlar.hareket`, `takimlar.ismili`, `takimlar.omur` (Frez ömrü), `kalibrasyon.disk`, `kalibrasyon.oto`, `ayarlar.0`…`ayarlar.6`. |
 | `void Bildir(string metin, MesajTuru tur)` | Alt şeritte 5 sn görünen bildirim (kalıcı pencere açmaz; KU-09). |
@@ -161,7 +161,7 @@ Sihirbaz adımı **denetleyicinindir**: `MakineDurumu.DiskAdim` / `OtoAdim` (0�
 
 | Ad | Arg | Nereden |
 |---|---|---|
-| `ayar.kaydet` | `<Anahtar>=<değer>` | Tüm anahtar / seçim / değer kutuları. Anahtarlar: `Tema` (koyu/acik/gecisli/safak; bilinmeyen = koyu), `MakineAdi`, `SanalKlavye`, `TamEkran`, `WinBaslangic`, `Koordinat`, `Dansci`, `FrezModu` (MANUEL/OTOMATIK), `OtomatikHazirlik`, `GeriSayim` (0–60), `SadeTaraf` (3/9), `ModSor`, `BlokSor`, `JogAdim`, `JogHiz`, `EdingGizli`, `EdingSifirla`, `Uzak`, `UzakKilit` — açık/kapalı değerleri `1`/`0` |
+| `ayar.kaydet` | `<Anahtar>=<değer>` | Tüm anahtar / seçim / değer kutuları. Anahtarlar: `Tema` (koyu/acik/gecisli/safak/canli; bilinmeyen = koyu), `MakineAdi`, `SanalKlavye`, `TamEkran`, `WinBaslangic`, `Koordinat`, `Dansci`, `FrezModu` (MANUEL/OTOMATIK), `OtomatikHazirlik`, `GeriSayim` (0–60), `SadeTaraf` (3/9), `ModSor`, `BlokSor`, `JogAdim`, `JogHiz`, `EdingGizli`, `EdingSifirla`, `Uzak`, `UzakKilit` — açık/kapalı değerleri `1`/`0` |
 | `eding.goster` / `eding.gizle` | — | Eding sekmesi |
 | `eding.yeniden` | — | Eding sekmesi (Tehlikeli değil, Normal onay; iş sürerken izin kapatılmalı) |
 | `eding.kapat` | — | Eding'i ayarları kaydederek kapat (Normal onay) |

@@ -92,7 +92,7 @@ namespace PrimerUI
 
     /// <summary>Tema modu: Koyu, Açık ve iki ilerleme teması (koyu taban; yüzeyler işin ilerlemesine göre kayar):
     /// Geçişli (maviden yeşile), Şafak (gece çivitinden şafak bakırına).</summary>
-    public enum TemaModu { Koyu, Acik, Gecisli, Safak }
+    public enum TemaModu { Koyu, Acik, Gecisli, Safak, Canli }
 
     /// <summary>İlerleme teması: yüzey belirteçlerinin iki uç paleti (t = 0 ve t = 1) ve ara renk yolu.
     /// Sıra: Zemin, Kart, KartKenar, Dugme, DugmeKenar, Menu, Ayrac, Secili, Golge.</summary>
@@ -113,7 +113,7 @@ namespace PrimerUI
         public static TemaModu Mod = TemaModu.Koyu;
         /// <summary>İlerleme teması mı (Geçişli, Şafak): yüzeyler GecisT'ye göre hesaplanır, Kabuk yumuşak geçiş zamanlayıcısını çalıştırır.</summary>
         public static bool Ilerlemeli { get { return IlerlemeliMi(Mod); } }
-        public static bool IlerlemeliMi(TemaModu m) { return m == TemaModu.Gecisli || m == TemaModu.Safak; }
+        public static bool IlerlemeliMi(TemaModu m) { return m == TemaModu.Gecisli || m == TemaModu.Safak || m == TemaModu.Canli; }
         /// <summary>İlerleme temasında o an çizilen konum (0 = iş yok / başında, 1 = iş bitti).</summary>
         public static float GecisT;
         /// <summary>Yerleşim katsayısı (1024×768 = 1.0, 1920×1080 ≈ 1.4).</summary>
@@ -151,6 +151,7 @@ namespace PrimerUI
             if (v == "acik" || v == "açık") return TemaModu.Acik;
             if (v == "gecisli" || v == "geçişli") return TemaModu.Gecisli;
             if (v == "safak" || v == "şafak") return TemaModu.Safak;
+            if (v == "canli" || v == "canlı") return TemaModu.Canli;
             return TemaModu.Koyu;
         }
         /// <summary>Mod → ayar değeri ("koyu", "acik", "gecisli", "safak").</summary>
@@ -161,6 +162,7 @@ namespace PrimerUI
                 case TemaModu.Acik: return "acik";
                 case TemaModu.Gecisli: return "gecisli";
                 case TemaModu.Safak: return "safak";
+                case TemaModu.Canli: return "canli";
                 default: return "koyu";
             }
         }
@@ -177,8 +179,14 @@ namespace PrimerUI
             new[] { "#0E0B26", "#18133B", "#2C2563", "#211B4A", "#362E72", "#120E2F", "#272056", "#221C4D", "#06041A" },
             new[] { "#1B1007", "#2A1A0D", "#57381C", "#352112", "#64421F", "#22150A", "#4A2F17", "#3A2513", "#0D0703" }, true);
 
+        /// <summary>Canlı: Geçişli gibi maviden yeşile, ama doygun ve belirgin renklerle (kullanıcı isteği: geçiş daha belirgin).
+        /// Yazı/kart kontrastı ≥ 7:1 (Koyu kadar yüksek değil, okunaklı); OKLab'da doğrusal (mavi → camgöbeği → yeşil).</summary>
+        public static readonly IlerlemePaleti CanliPalet = new IlerlemePaleti("Canlı",
+            new[] { "#0A2563", "#12357A", "#2C56B0", "#1A428F", "#3864BE", "#0C2C6E", "#2650A0", "#1F4A96", "#03102C" },
+            new[] { "#08401F", "#0F5A2D", "#2A8F50", "#16693A", "#349E5E", "#0B4A25", "#25834A", "#1D7542", "#02200E" }, false);
+
         /// <summary>Etkin modun ilerleme paleti (ilerleme teması değilse null).</summary>
-        public static IlerlemePaleti EtkinPalet { get { return Mod == TemaModu.Safak ? SafakPalet : Mod == TemaModu.Gecisli ? GecisliPalet : null; } }
+        public static IlerlemePaleti EtkinPalet { get { return Mod == TemaModu.Canli ? CanliPalet : Mod == TemaModu.Safak ? SafakPalet : Mod == TemaModu.Gecisli ? GecisliPalet : null; } }
 
         /// <summary>İlerleme temasında yüzey belirteçlerini t'ye (0..1) göre etkin paletin iki ucu arasından hesaplar (ara renklerin hepsi).
         /// Olay (Degisti) tetiklemez; çağıran yeniden boyar. Dönüş: 8 bitlik renklerden biri değişti mi (değişmediyse boyamaya gerek yok).</summary>
@@ -3834,10 +3842,10 @@ namespace PrimerUI
 
             // Genel
             var g = Sayfa(0);
-            tema = new SecimGrubu(new[] { "Koyu", "Açık", "Geçişli", "Şafak" }, new[] { "koyu", "acik", "gecisli", "safak" }, "ayar.kaydet", "Tema");
+            tema = new SecimGrubu(new[] { "Koyu", "Açık", "Geçişli", "Şafak", "Canlı" }, new[] { "koyu", "acik", "gecisli", "safak", "canli" }, "ayar.kaydet", "Tema");
             tema.Secili = 0;
             tema.SecimDegisti += delegate { var h = TemaIstendi; if (h != null) h(tema.SeciliDeger); };
-            g.Ekle(new AyarSatiri("Tema", "Geçişli / Şafak: zemin iş ilerledikçe renk değiştirir (mavi→yeşil, gece→şafak).", tema, 420), 62);
+            g.Ekle(new AyarSatiri("Tema", "Geçişli / Şafak / Canlı: zemin iş ilerledikçe renk değiştirir (mavi→yeşil, gece→şafak, canlı mavi→yeşil).", tema, 420), 62);
             var ad = new DegerKutusu { Metinsel = true, AyarAdi = "MakineAdi", EnCokKarakter = 30, Pt = 13f, Etiket = "Makine adı" };
             degerler["MakineAdi"] = ad;
             g.Ekle(new AyarSatiri("Makine adı", "Uzaktan portalda görünen ad.", ad, 280), 62);

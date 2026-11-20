@@ -157,7 +157,7 @@ function Ui-One-Al {
 }
 
 function Ui-Ustte([bool]$ustte) { try { $script:Kabuk.TopMost = $ustte } catch { } }
-# Tema modu: 'koyu' | 'acik' | 'gecisli' | 'safak' (Kabuk.TemaUygula(string); bilinmeyen = koyu)
+# Tema modu: 'koyu' | 'acik' | 'gecisli' | 'safak' | 'canli' (Kabuk.TemaUygula(string); bilinmeyen = koyu)
 function Ui-Tema([string]$mod) { try { $script:Kabuk.TemaUygula([string]$mod) } catch { } }
 function Ui-Kucult { try { $script:Kabuk.WindowState = 'Minimized' } catch { } }
 function Ui-Kapat { try { $script:Kabuk.Close() } catch { } }

@@ -230,7 +230,7 @@ Esit '18.50' $script:Tercih.KalT 'ayar.kaydet KalT'
 [void](Komut-Isle 'ayar.kaydet' 'Koordinat=1')
 Esit 'MAKINE' $script:Tercih.Koordinat 'ayar.kaydet Koordinat=1 -> MAKINE (eski dosya biçimi)'
 # tema: koyu | acik | gecisli (bilinmeyen -> koyu), panel_ayarlar.ini'ye yazılır, görünüme ve Ayarlar tablosuna gider
-foreach ($c in @(@('koyu', 'koyu'), @('acik', 'acik'), @('gecisli', 'gecisli'), @(' GECISLI ', 'gecisli'), @('safak', 'safak'), @('Safak', 'safak'), @('', 'koyu'), @('mor', 'koyu'), @('acık', 'koyu'))) {
+foreach ($c in @(@('koyu', 'koyu'), @('acik', 'acik'), @('gecisli', 'gecisli'), @(' GECISLI ', 'gecisli'), @('safak', 'safak'), @('Safak', 'safak'), @('canli', 'canli'), @('Canli', 'canli'), @('', 'koyu'), @('mor', 'koyu'), @('acık', 'koyu'))) {
     Esit $c[1] (Tema-Normalle $c[0]) "Tema-Normalle '$($c[0])' -> $($c[1])"
 }
 $script:SonTema = $null

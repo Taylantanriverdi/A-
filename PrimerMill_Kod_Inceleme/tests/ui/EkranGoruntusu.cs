@@ -185,6 +185,13 @@ static class EkranGoruntusu
         Ekle(no() + "_diyalog_devam_kirik_frez_koyu_1024.png", 1024, 768, true, () => { var d = Hazir(); d.Takim = 2; Uygula(d, IzinHazir()); Git("uretim"); Diyalog.Devam("ZY2_45", "T2 frezi KIRIK (boy 1.84 mm değişti, sınır 0.2 mm)\n2026-11-20 14:31:07  ·  iş satır 61 240'da durdu  ·  %88\nNerede kırıldığı bilinemediği için T2'nin bu işteki işi baştan kesilir: satır 34 702 (T2 takım değişimi).", 0, 2); });
         Ekle(no() + "_diyalog_freze_hatasi_koyu_1024.png", 1024, 768, true, () => { var d = Hazir(); d.Takim = 2; d.Durum = Durum.Alarm; d.DurumMetni = "Eding hatası"; Uygula(d, IzinHazir()); Git("uretim"); Diyalog.Hata("FREZE HATASI", "T2 frezesinin boyu iş sonrası ölçümde 1.84 mm değişmiş (izin verilen: 0.2 mm).\nFreze kırılmış, aşınmış ya da pensin içinde kaymış olabilir. Kazıma bir sonraki frezeye geçmeden durduruldu.\n\n1. ALARMI TEMİZLE'ye bas.\n2. Frezi tut, PENS AÇ ile kırık frezi çıkar (dikkat: iş milinde kırık T2).\n3. Yeni T2 frezini T2 yuvasına tak (otomatik mod).\n4. BAŞLAT → T2'NİN İŞİNİ BAŞTAN: nerede kırıldığı bilinemediği için T2'nin bu işteki işi, T2'nin takım değişiminden itibaren yeniden kesilir."); });
         Ekle(no() + "_uretim_devam_kaydi_koyu_1024.png", 1024, 768, true, () => { var d = Ornek(); d.DevamKaydi = "Son kayıt: satır 44 812 (14:31:07)"; Uygula(d, IzinCalisiyor()); Git("uretim"); });
+        // Canlı: Geçişli gibi maviden yeşile, doygun renklerle (sona eklendi, eski numaralar değişmesin)
+        var C2 = TemaModu.Canli;
+        Ekle(no() + "_uretim_canli_0_1024.png", 1024, 768, C2, () => { var d = Hazir(); Uygula(d, IzinHazir()); Git("uretim"); });
+        Ekle(no() + "_uretim_canli_50_1024.png", 1024, 768, C2, () => { var d = Ornek(); d.Yuzde = 50; d.Satir = 34876; d.GecenSn = 33 * 60; d.KalanSn = 33 * 60; Uygula(d, IzinCalisiyor()); Git("uretim"); });
+        Ekle(no() + "_uretim_canli_100_1024.png", 1024, 768, C2, () => { var d = Bitti(); Uygula(d, IzinHazir()); Git("uretim"); });
+        Ekle(no() + "_uretim_canli_duraklatildi_92_1024.png", 1024, 768, C2, () => { var d = Ornek(); d.Yuzde = 92; d.Durum = Durum.Duraklatildi; d.DurumMetni = "Duraklatıldı"; d.Satir = 64170; d.KalanSn = 5 * 60 + 17; Uygula(d, IzinDuraklatildi()); Git("uretim"); });
+        Ekle(no() + "_ayarlar_genel_canli_1024.png", 1024, 768, C2, () => { var d = Ornek(); d.Yuzde = 40; d.Ayarlar["Tema"] = "canli"; Uygula(d, IzinCalisiyor()); Git("ayarlar.0"); });
     }
 
     static IEnumerable<Control> Tum(Control k)

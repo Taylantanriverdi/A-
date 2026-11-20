@@ -218,3 +218,8 @@ Geçişler 150 ms (ekran değişiminde içerik solarak gelir, ilerleme çubuğu 
 - **Donmama:** cncapi çağrıları kısa ve iş parçacığı güvenliği bilinmediği için UI iş parçacığında kalır (eski davranış). Uzun bekleyişler (home, takım değişimi, kalibrasyon) yeniden girişe karşı korunmuş bekleme döngüsüyle yapılır; bu sırada arayüz "meşgul" katmanı gösterir, ama **ACİL STOP her zaman çalışır** (yeniden giriş korumasının dışında). Zamanlayıcılar tek bir ana zamanlayıcıda birleştirilir ve yeniden girişe karşı korunur.
 - **Demo modu:** `KazimaBaslat.bat /demo` ya da `cncapi.dll` bulunamazsa (sorularak) `EdingSim.cs` yüklenir. Bu, gerçek `[Eding]` sınıfıyla **aynı adlı ve aynı üyeli** sahte bir sınıftır: eksenler, durum makinesi (READY/RUNNING/PAUSE…), iş ilerlemesi, takım numarası, değişkenler (#4000–#4199, #5221–#5225) bellekte simüle edilir. Ekranda sürekli "DEMO" etiketi görünür. Gerçek makinede demo modu kendiliğinden açılmaz.
 - **Geri dönüş:** Düzeltilmiş eski panel `KazimaBaslat_Klasik.ps1` / `KazimaBaslat_Klasik.bat` olarak teslimde kalır.
+
+
+### Canlı tema (ilerleme teması, belirgin)
+
+Geçişli ile aynı eşleme ve yumuşak geçiş; uçlar daha doygun: mavi zemin `#0A2563` / kart `#12357A` → yeşil zemin `#08401F` / kart `#0F5A2D` (OKLab'da doğrusal, mavi → camgöbeği → yeşil). Yazı/kart kontrastı ≥ 7:1 (Koyu kadar yüksek değil, okunaklı). Ayarlar › Genel › Tema: Koyu / Açık / Geçişli / Şafak / Canlı (`Tema=canli`).
