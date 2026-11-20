@@ -2791,7 +2791,7 @@ namespace PrimerUI
             //     kenarları ve aralıkları aynı (simetrik).
             var dg = new Izgara(4, 1).Sutunlar(-25, -25, -25, -25); dg.Bosluk = 10;
             ana.Ekle(dg, 0, 2);
-            btnSec = dg.Ekle(BuyukDugme("İŞ SEÇ", Simge.Klasor, Rol.Normal, "is.sec", ""), 0, 0);
+            btnSec = dg.Ekle(BuyukDugme("İŞ SEÇ", Simge.Klasor, Rol.Bilgi, "is.sec", ""), 0, 0);
             btnBaslat = dg.Ekle(BuyukDugme("BAŞLAT", Simge.Oynat, Rol.Basari, "is.baslat", ""), 1, 0);
             btnDuraklat = dg.Ekle(BuyukDugme("DURAKLAT", Simge.Duraklat, Rol.Uyari, "is.duraklat", ""), 2, 0);
             btnDurdur = dg.Ekle(BuyukDugme("DURDUR", Simge.Durdur, Rol.Tehlike, "is.durdur", ""), 3, 0);
