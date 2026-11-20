@@ -43,6 +43,25 @@ namespace PrimerUI
         public string Fark;
     }
 
+    /// <summary>Frez (takım) ömrü: kesimde geçen süre ve operatörün girdiği ömür (dakika). ARAYUZ_API §4.</summary>
+    public class FrezOmruBilgisi
+    {
+        /// <summary>Takım numarası (1–99).</summary>
+        public int Takim;
+        /// <summary>Kesimde geçen süre (dk): yalnız iş RUNNING iken ve bu takım iş milindeyken sayılır.</summary>
+        public double Dakika;
+        /// <summary>Ömür (dk); 0 = ömür girilmedi (yalnız dakika gösterilir).</summary>
+        public double Omur;
+        /// <summary>Son sıfırlama tarihi metni ("dd.MM.yyyy HH:mm", boş = hiç sıfırlanmadı).</summary>
+        public string Sifirlama;
+        public FrezOmruBilgisi() { }
+        public FrezOmruBilgisi(int takim, double dakika, double omur, string sifirlama) { Takim = takim; Dakika = dakika; Omur = omur; Sifirlama = sifirlama; }
+        /// <summary>Ömrün yüzdesi (0–∞); ömür girilmediyse -1.</summary>
+        public double Yuzde { get { return Omur > 0 ? 100.0 * Dakika / Omur : -1; } }
+        /// <summary>0 normal (&lt; %80 ya da ömür yok), 1 yaklaşıyor (%80–99), 2 doldu (≥ %100).</summary>
+        public int Seviye { get { double y = Yuzde; return y >= 100 ? 2 : (y >= 80 ? 1 : 0); } }
+    }
+
     /// <summary>Kayıtlar ekranındaki tek satır.</summary>
     public class KayitSatiri
     {
@@ -133,6 +152,8 @@ namespace PrimerUI
         public bool PensAcik;
         public bool HavaYok;
         public string ManuelMesaj;
+        /// <summary>Frez ömrü: T1–T6 her zaman, diğer takımlar (7–99) yalnız dakikası 0 değilse. Takımlar kartları, Frez ömrü sekmesi, Üretim TAKIM kartı.</summary>
+        public List<FrezOmruBilgisi> FrezOmurleri = new List<FrezOmruBilgisi>();
 
         // --- iş
         public string Dosya;

@@ -146,7 +146,7 @@ if ($MakineBilgisayari) {
 if ($script:Demo) { $script:ApiHazir = $true }
 
 # ---------------- Mantık modülleri ----------------
-foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'Kalibrasyon', 'Uzak', 'Kiosk', 'Denetleyici', 'ArayuzKapisi')) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', "$m.ps1")) }
+foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'FrezOmru', 'Kalibrasyon', 'Uzak', 'Kiosk', 'Denetleyici', 'ArayuzKapisi')) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', "$m.ps1")) }
 if ($script:Demo) { . ([System.IO.Path]::Combine($PanelKlasor, 'lib', 'Demo.ps1')) }
 $script:PanelSurum = 'PrimerMill 2'
 

@@ -36,7 +36,7 @@ $MakineBilgisayari = $false
 $script:Demo = $true
 $script:Yonetici = $false
 [Kayit]::Ac([System.IO.Path]::Combine($ScriptKlasor, 'loglar'))
-foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'Kalibrasyon', 'Uzak', 'Denetleyici', 'Demo')) { . ([System.IO.Path]::Combine($lib, "$m.ps1")) }
+foreach ($m in @('Kapi', 'Cekirdek', 'Eding', 'Makine', 'FrezOmru', 'Kalibrasyon', 'Uzak', 'Denetleyici', 'Demo')) { . ([System.IO.Path]::Combine($lib, "$m.ps1")) }
 . Ui-Sahte-Yukle
 $script:ApiHazir = $true
 [Eding]::SimSifirla()

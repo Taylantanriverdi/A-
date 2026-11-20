@@ -602,6 +602,7 @@ function Btn-Baslat-Ic {
     if (-not (Makro-Hazir-Mi 'Başlat')) { return }
     if ([System.IO.Path]::GetFileName($script:SeciliDosya) -like 'PM_kalibrasyon_otomatik*' -and -not (OtoKal-Prob-Gecerli-Mi 'Başlat')) { return }   # K8
     if (-not (Takim-Kapisi 'Başlat')) { return }
+    if (-not (Frez-Omru-Baslat-Kontrol)) { return }   # frez ömrü >= %100: onay (varsayılan VAZGEÇ); >= %90 alt şerit uyarısı
 
     # Bu dosyanın yarım kalmış kaydı varsa: kaldığı yerden mi, baştan mı?
     $dk = Devam-Oku

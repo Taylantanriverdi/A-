@@ -78,6 +78,7 @@ function Tercih-Baslangic {
     $kt = 1; try { $kt = [int]$script:Tercih.KalTest + 1 } catch { }; if ($kt -lt 1 -or $kt -gt 4) { $kt = 1 }
     $script:DiskTestNo = $kt
     foreach ($ad in $KalOlcumTanim.Keys) { $script:DiskOlcum[$ad] = [string]$KalOlcumTanim[$ad][1] }
+    Frez-Omru-Yukle   # frez ömrü (lib/FrezOmru.ps1): $ScriptKlasor\frez_omru.json
 }
 
 # ------------------------------------------------------------------ işlem koruması
@@ -203,6 +204,7 @@ function Zamanlayici-Tik {
             if ($anaTik) { $script:TikSonraki = ''; Ana-Tik }   # eski ana zamanlayıcı: 1 sn
             try { Eding-Gizle-Tik } catch { }                                     # eski: 250 ms
             Okuma-Yap                                                              # eski koordinat: 50 ms
+            try { Frez-Omru-Tik } catch { }                                        # frez ömrü: yalnız RUNNING + iş + takım (lib/FrezOmru.ps1)
             Durum-Yenile
         } catch { try { [Kayit]::Yaz("ZAMANLAYICI: $($_.Exception.Message)") } catch { } }
         finally { $script:TikMesgul = $false }
@@ -347,6 +349,8 @@ function Izin-Hesapla {
     if ($script:OtoAdim -ge 1 -and -not (Prob-Gecti)) { $sonuc['kal.oto.ileri'] = 'Prob testi zorunlu: önce PROB TESTİNİ BAŞLAT, TEMAS VAR görün'; foreach ($i in 2..4) { $sonuc["kal.oto.adim:$i"] = $sonuc['kal.oto.ileri'] } }
     # Görünüm yalnız izin anahtarı olarak kullanır (komutu diyaloğun sonucu gönderir)
     $by = Izin-Neden 'blok.yenihazir' '' $c; if ($by) { $sonuc['blok.yeni'] = $by }
+    # Frez ömrü sıfırlama: iş sürerken, işin kullandığı / iş milindeki frez için düğme başına pasif (frez.omur.sifirla:T3)
+    if ($c.Suruyor) { foreach ($i in 1..6) { $n = Frez-Omru-Sifirla-Neden "T$i" $c; if ($n) { $sonuc["frez.omur.sifirla:T$i"] = $n } } }
     return $sonuc
 }
 
@@ -716,6 +720,9 @@ Komut-Tanimla 'ismili.durdur' 'hareket' { Tek-Komut 'İş mili durdur' 'M5' }
 Komut-Tanimla 'sogutma.m7' 'hareket' { Tek-Komut 'M7' 'M7' }
 Komut-Tanimla 'sogutma.m8' 'hareket' { Tek-Komut 'M8' 'M8' }
 Komut-Tanimla 'sogutma.kapat' 'hareket' { Tek-Komut 'M9' 'M9' }
+# Frez ömrü (lib/FrezOmru.ps1): yalnız veri, makineye komut yok. AYARLA her zaman; SIFIRLA iş sürerken o işin frezi için yok.
+Komut-Tanimla 'frez.omur.ayarla' 'serbest' { param($a) Frez-Omru-Ayarla $a }
+Komut-Tanimla 'frez.omur.sifirla' 'serbest' { param($a) Frez-Omru-Sifirla $a } -Ek { param($a, $c) return (Frez-Omru-Sifirla-Neden $a $c) }
 # Kalibrasyon
 Komut-Tanimla 'kal.ac' 'serbest' { param($a) if ($a -eq 'disk') { Kal-Yerlesim-Yaz }; if ($script:ApiHazir -and $script:Bagli) { try { Kal-Degerleri-Goster; OtoKal-Goster } catch { } } }
 foreach ($ne in @('ileri', 'geri', 'adim', 'bitir')) {
@@ -814,6 +821,7 @@ function Durum-Topla {
     $d.PensAcik = [bool]$script:PensAcik
     $d.HavaYok = [bool]$script:HavaYok
     $d.ManuelMesaj = [string]$script:ManuelMesajMetni
+    $d.FrezOmurleri = (Frez-Omru-Liste)
     if ($d.Takim -gt 0 -and $script:YuvaListesi) { foreach ($y in $script:YuvaListesi) { if ($y.Ad -eq "T$($d.Takim)") { $d.TakimAciklama = $(if ($y.Kayitli) { 'yuvası kayıtlı' } else { 'yuvası kayıtlı değil' }) } } }
     # iş
     if ($script:SeciliDosya) { $d.Dosya = $(if ($script:DosyaMetni) { [string]$script:DosyaMetni } else { [System.IO.Path]::GetFileNameWithoutExtension([string]$script:SeciliDosya) }) }
@@ -966,6 +974,7 @@ function Panel-Kapanis {
     # Panel kapanınca Eding görünmez kalmasın (cihaz kapanırken gösterilmez: ekranda Windows / Eding görünmesin)
     if (-not $script:SistemKapaniyor) { try { foreach ($pr in @(Get-Process -Name $script:EdingExeAd -ErrorAction Ignore)) { [void][Pencere]::Goster($pr.Id) } } catch { } }
     if ($script:ApiHazir -and $script:Bagli) { try { [void][Eding]::CncDisConnectServer() } catch { }; $script:Bagli = $false }
+    try { Frez-Omru-Kaydet-Gerekirse } catch { }
     Hatalari-Kaydet
     [Kayit]::Yaz('=== PANEL KAPATILDI ===')
     [Kayit]::Kapat()

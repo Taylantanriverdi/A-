@@ -2279,6 +2279,19 @@ namespace PrimerUI
         public YuvaKarti() { Cursor = Cursors.Hand; }
 
         public YuvaBilgisi Bilgi { get { return bilgi; } set { bilgi = value ?? new YuvaBilgisi(); Invalidate(); } }
+        FrezOmruBilgisi omur;
+        string omurImza = "";
+        /// <summary>Bu yuvadaki frezin ömrü (null = gösterme). Yalnız değişince yeniden çizilir.</summary>
+        public FrezOmruBilgisi Omur
+        {
+            get { return omur; }
+            set
+            {
+                string im = value == null ? "" : OmurCizim.Kisa(value) + "|" + value.Seviye.ToString(Bicim.Inv);
+                omur = value;
+                if (im != omurImza) { omurImza = im; Invalidate(); }
+            }
+        }
         public bool Secili { get { return secili; } set { if (secili != value) { secili = value; Invalidate(); } } }
 
         protected override void OnMouseUp(MouseEventArgs e)
@@ -2310,11 +2323,179 @@ namespace PrimerUI
             Ikon.Ciz(g, sm, new RectangleF(r.X + (r.Width - sb) / 2, sy, sb, sb), durumR);
             Font fd = Tema.Sigdir(g, dm, false, true, 9f, 6.5f, new SizeF(r.Width - Tema.PxF(8), Tema.PxF(16)));
             Tema.Yaz(g, dm, fd, durumR, new RectangleF(r.X + Tema.PxF(4), sy + sb + Tema.PxF(2), r.Width - Tema.PxF(8), fd.GetHeight(g) + 2), StringAlignment.Center, StringAlignment.Near, true);
+            float altY = r.Bottom - Tema.PxF(6);
             if (!string.IsNullOrEmpty(bilgi.Aciklama))
             {
                 Font fa = Tema.F(9f);
-                Tema.Yaz(g, bilgi.Aciklama, fa, Tema.Soluk, new RectangleF(r.X + Tema.PxF(4), r.Bottom - fa.GetHeight(g) - Tema.PxF(6), r.Width - Tema.PxF(8), fa.GetHeight(g) + 2), StringAlignment.Center, StringAlignment.Near, true);
+                altY = r.Bottom - fa.GetHeight(g) - Tema.PxF(6);
+                Tema.Yaz(g, bilgi.Aciklama, fa, Tema.Soluk, new RectangleF(r.X + Tema.PxF(4), altY, r.Width - Tema.PxF(8), fa.GetHeight(g) + 2), StringAlignment.Center, StringAlignment.Near, true);
             }
+            if (omur != null)
+            {
+                // Frez ömrü: "%23" (renkli) / "230 / 1000 dk" (soluk) / ince çubuk; ömür girilmediyse "412 dk" / "ömür girilmedi"
+                float ust2 = sy + sb + Tema.PxF(2) + fd.GetHeight(g) + Tema.PxF(4);
+                float cy = altY - Tema.PxF(6), ch = Math.Max(3f, Tema.PxF(4));
+                float gx = r.X + Tema.PxF(10), gw = r.Width - Tema.PxF(20);
+                Color oc = OmurCizim.Renk(omur);
+                string s1 = OmurCizim.Yuzde(omur), s2 = OmurCizim.DakikaOmur(omur);
+                if (omur.Omur <= 0) { s1 = OmurCizim.Dk(omur.Dakika) + " dk"; s2 = "ömür girilmedi"; }
+                Font f2 = Tema.Sigdir(g, s2, false, false, 9f, 6f, new SizeF(r.Width - Tema.PxF(8), Tema.PxF(15)));
+                float h2 = f2.GetHeight(g);
+                float y2 = cy - ch - Tema.PxF(3) - h2;
+                Font f1 = Tema.Sigdir(g, s1, true, true, 11f, 7f, new SizeF(gw, Math.Max(Tema.PxF(10), y2 - ust2)));
+                float h1 = f1.GetHeight(g);
+                float y1 = y2 - h1;
+                if (y1 >= ust2 - Tema.PxF(2))
+                {
+                    Tema.Yaz(g, s1, f1, omur.Omur > 0 ? oc : Tema.Yazi, new RectangleF(r.X + Tema.PxF(4), y1, r.Width - Tema.PxF(8), h1 + 1), StringAlignment.Center, StringAlignment.Near, true);
+                    Tema.Yaz(g, s2, f2, Tema.Soluk, new RectangleF(r.X + Tema.PxF(4), y2, r.Width - Tema.PxF(8), h2 + 1), StringAlignment.Center, StringAlignment.Near, true);
+                }
+                OmurCizim.Cubuk(g, new RectangleF(gx, cy - ch, gw, ch), omur);
+            }
+        }
+    }
+
+    /// <summary>Frez ömrü çizim yardımcıları (Takımlar kartları, Frez ömrü sekmesi, Üretim TAKIM kartı ortak).</summary>
+    public static class OmurCizim
+    {
+        /// <summary>&lt; %80 normal (yeşil çubuk), %80–99 kehribar (Duraklatıldı), ≥ %100 kırmızı (Alarm); ömür yoksa soluk.</summary>
+        public static Color Renk(FrezOmruBilgisi f)
+        {
+            if (f == null || f.Omur <= 0) return Tema.Soluk;
+            switch (f.Seviye) { case 2: return Tema.Alarm; case 1: return Tema.Duraklatildi; default: return Tema.Hazir; }
+        }
+        /// <summary>Yazı rengi: normalde düz yazı, eşiklerde durum rengi.</summary>
+        public static Color YaziRengi(FrezOmruBilgisi f)
+        {
+            if (f == null || f.Omur <= 0 || f.Seviye == 0) return Tema.Yazi;
+            return Renk(f);
+        }
+        /// <summary>Dakika: 100'ün altında 1 ondalık ("37.5"), üstünde tam sayı ("1043").</summary>
+        public static string Dk(double dk)
+        {
+            if (dk < 0) dk = 0;
+            if (dk < 99.95) return dk.ToString("0.0", Bicim.Inv);
+            return Math.Round(dk).ToString("0", Bicim.Inv);
+        }
+        /// <summary>"3 sa 50 dk"</summary>
+        public static string Saat(double dk)
+        {
+            if (dk < 0) dk = 0;
+            int t = (int)Math.Floor(dk);
+            if (t < 60) return t.ToString(Bicim.Inv) + " dk";
+            return (t / 60).ToString(Bicim.Inv) + " sa " + (t % 60).ToString(Bicim.Inv) + " dk";
+        }
+        /// <summary>"%23" (aşağı yuvarlanır; 999.9 dk / 1000 → %99); ömür yoksa "".</summary>
+        public static string Yuzde(FrezOmruBilgisi f)
+        {
+            if (f == null || f.Omur <= 0) return "";
+            return "%" + Math.Floor(f.Yuzde + 1e-9).ToString("0", Bicim.Inv);
+        }
+        /// <summary>"230 / 1000 dk"; ömür yoksa "230 dk".</summary>
+        public static string DakikaOmur(FrezOmruBilgisi f)
+        {
+            if (f == null) return "";
+            if (f.Omur <= 0) return Dk(f.Dakika) + " dk";
+            return Dk(f.Dakika) + " / " + Dk(f.Omur) + " dk";
+        }
+        /// <summary>"230 / 1000 dk · %23"; ömür yoksa "230 dk · ömür girilmedi".</summary>
+        public static string Kisa(FrezOmruBilgisi f)
+        {
+            if (f == null) return "";
+            if (f.Omur <= 0) return Dk(f.Dakika) + " dk · ömür girilmedi";
+            return DakikaOmur(f) + " · " + Yuzde(f);
+        }
+        /// <summary>İnce ömür çubuğu (iz + dolgu; %100 üstü tam dolu).</summary>
+        public static void Cubuk(Graphics g, RectangleF r, FrezOmruBilgisi f)
+        {
+            if (r.Width < 4 || r.Height < 1) return;
+            float yr = r.Height / 2;
+            Tema.YuvarlakDoldur(g, r, yr, Tema.Ayrac);
+            if (f == null || f.Omur <= 0) return;
+            float w = (float)(r.Width * Math.Max(0, Math.Min(100, f.Yuzde)) / 100.0);
+            if (w <= 0.5f) return;
+            Tema.YuvarlakDoldur(g, new RectangleF(r.X, r.Y, Math.Max(w, Math.Min(r.Height, r.Width)), r.Height), yr, Renk(f));
+        }
+        /// <summary>Listede takım numarasını bul (yoksa null).</summary>
+        public static FrezOmruBilgisi Bul(MakineDurumu d, int takim)
+        {
+            if (d == null || d.FrezOmurleri == null) return null;
+            foreach (var f in d.FrezOmurleri) if (f != null && f.Takim == takim) return f;
+            return null;
+        }
+    }
+
+    /// <summary>Takımlar › Frez ömrü sekmesindeki tek takım satırı (çizim). Düğmeler (ÖMRÜ AYARLA / SIFIRLA) ayrı TouchButton.</summary>
+    public class FrezOmruSatiri : TemelKontrol
+    {
+        FrezOmruBilgisi bilgi;
+        bool isMilinde;
+        string imza = "";
+        public int Takim = 1;
+
+        public void Ayarla(FrezOmruBilgisi f, bool milde)
+        {
+            string im = f == null ? "" : OmurCizim.Kisa(f) + "|" + f.Seviye.ToString(Bicim.Inv) + "|" + (f.Sifirlama ?? "") + "|" + OmurCizim.Saat(f.Dakika);
+            im += milde ? "|M" : "";
+            bilgi = f; isMilinde = milde;
+            if (im != imza) { imza = im; Invalidate(); }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics; Tema.Hazirla(g);
+            float k = Math.Max(1, Tema.PxF(1));
+            var r = new RectangleF(k, k, Width - 2 * k - 1, Height - 2 * k - 1);
+            var f = bilgi ?? new FrezOmruBilgisi(Takim, 0, 0, "");
+            Color oc = OmurCizim.Renk(f);
+            Color kenar = f.Omur > 0 && f.Seviye > 0 ? oc : (isMilinde ? Tema.Calisiyor : Tema.DugmeKenar);
+            Tema.YuvarlakDoldur(g, r, Tema.PxF(8), Tema.Dugme);
+            Tema.YuvarlakCiz(g, r, Tema.PxF(8), kenar, f.Omur > 0 && f.Seviye > 0 || isMilinde ? k * 2f : k);
+            float p = Tema.PxF(12);
+            float x = r.X + p, w = r.Width - 2 * p, h = r.Height;
+            // sütunlar: ad 12 % · kullanılan 25 % · çubuk 35 % · ömür / sıfırlama 28 %
+            float wAd = w * 0.12f, wKul = w * 0.25f, wCub = w * 0.35f, wOm = w - wAd - wKul - wCub;
+            float gap = Tema.PxF(10);
+            string ad = "T" + f.Takim.ToString(Bicim.Inv);
+            Font fAd = Tema.Sigdir(g, ad, false, true, 20f, 10f, new SizeF(wAd - gap, h * 0.55f));
+            float ust = r.Y, yAd = isMilinde ? r.Y + h * 0.08f : r.Y;
+            Tema.Yaz(g, ad, fAd, Tema.Yazi, new RectangleF(x, yAd, wAd - gap, isMilinde ? h * 0.6f : h), StringAlignment.Near, StringAlignment.Center, true);
+            if (isMilinde)
+            {
+                Font fm = Tema.Sigdir(g, "İŞ MİLİNDE", false, true, 7.5f, 5.5f, new SizeF(wAd - Tema.PxF(4), h * 0.3f));
+                Tema.Yaz(g, "İŞ MİLİNDE", fm, Tema.Calisiyor, new RectangleF(x, r.Y + h * 0.62f, wAd, h * 0.3f), StringAlignment.Near, StringAlignment.Near, true);
+            }
+            x += wAd;
+            // kullanılan
+            string kul = OmurCizim.Dk(f.Dakika) + " dk", kulAlt = OmurCizim.Saat(f.Dakika) + " kesim";
+            Font fK = Tema.Sigdir(g, kul, true, true, 15f, 8f, new SizeF(wKul - gap, h * 0.45f));
+            Font fK2 = Tema.Sigdir(g, kulAlt, false, false, 9.5f, 6.5f, new SizeF(wKul - gap, h * 0.3f));
+            float hk = fK.GetHeight(g), hk2 = fK2.GetHeight(g), yk = ust + (h - hk - hk2) / 2;
+            Tema.Yaz(g, kul, fK, OmurCizim.YaziRengi(f), new RectangleF(x, yk, wKul - gap, hk + 1), StringAlignment.Near, StringAlignment.Near, true);
+            Tema.Yaz(g, kulAlt, fK2, Tema.Soluk, new RectangleF(x, yk + hk, wKul - gap, hk2 + 1), StringAlignment.Near, StringAlignment.Near, true);
+            x += wKul;
+            // çubuk + yüzde
+            string yz = f.Omur > 0 ? OmurCizim.Yuzde(f) : "ömür girilmedi";
+            string yzSag = f.Omur > 0 ? (f.Seviye == 2 ? "DOLDU" : (f.Seviye == 1 ? "YAKLAŞIYOR" : "")) : "";
+            Font fY = f.Omur > 0 ? Tema.Sigdir(g, yz, true, true, 14f, 8f, new SizeF(wCub * 0.5f, h * 0.42f)) : Tema.Sigdir(g, yz, false, false, 10f, 6.5f, new SizeF(wCub - gap, h * 0.42f));
+            float hy = fY.GetHeight(g), ch = Math.Max(4f, Tema.PxF(7));
+            float yy = ust + (h - hy - Tema.PxF(6) - ch) / 2;
+            Tema.Yaz(g, yz, fY, f.Omur > 0 ? oc : Tema.Soluk, new RectangleF(x, yy, wCub - gap, hy + 1), StringAlignment.Near, StringAlignment.Near, true);
+            if (yzSag.Length > 0)
+            {
+                Font fs = Tema.Sigdir(g, yzSag, false, true, 8.5f, 6f, new SizeF(wCub * 0.45f, hy));
+                Tema.Yaz(g, yzSag, fs, oc, new RectangleF(x, yy, wCub - gap, hy + 1), StringAlignment.Far, StringAlignment.Center, true);
+            }
+            OmurCizim.Cubuk(g, new RectangleF(x, yy + hy + Tema.PxF(6), wCub - gap, ch), f);
+            x += wCub;
+            // ömür + son sıfırlama
+            string om = f.Omur > 0 ? "Ömür " + OmurCizim.Dk(f.Omur) + " dk" : "Ömür: —";
+            string sf = string.IsNullOrEmpty(f.Sifirlama) ? "Sıfırlanmadı" : "Yeni frez " + f.Sifirlama;
+            Font fO = Tema.Sigdir(g, om, true, false, 11f, 7f, new SizeF(wOm, h * 0.4f));
+            Font fS = Tema.Sigdir(g, sf, false, false, 9f, 6f, new SizeF(wOm, h * 0.3f));
+            float ho = fO.GetHeight(g), hs = fS.GetHeight(g), yo = ust + (h - ho - hs) / 2;
+            Tema.Yaz(g, om, fO, f.Omur > 0 ? Tema.Yazi : Tema.Soluk, new RectangleF(x, yo, wOm, ho + 1), StringAlignment.Near, StringAlignment.Near, true);
+            Tema.Yaz(g, sf, fS, Tema.Soluk, new RectangleF(x, yo + ho, wOm, hs + 1), StringAlignment.Near, StringAlignment.Near, true);
         }
     }
 
@@ -2515,7 +2696,7 @@ namespace PrimerUI
         readonly ProgressBand ilerleme;
         readonly BigValue bvGecen, bvKalan, bvBitis, bvSatir;
         readonly BigValue bvTakim;
-        readonly Yazi lblTakimAciklama, lblMod, lblPens;
+        readonly Yazi lblTakimAciklama, lblMod, lblPens, lblOmur;
         readonly TouchButton btnUyari;
         readonly AxisPanel eksen;
         readonly Yazi lblHiz;
@@ -2570,12 +2751,13 @@ namespace PrimerUI
 
             takimKart = new Card("Takım"); takimKart.BaslikSimge = Simge.IsMili;
             ust.Ekle(takimKart, 1, 0);
-            var tk = new Izgara(1, 4).Satirlar(-100, 24, 24, 24); tk.Bosluk = 2;
+            var tk = new Izgara(1, 5).Satirlar(-100, 22, 22, 22, 22); tk.Bosluk = 2;
             takimKart.Controls.Add(tk); tk.Dock = DockStyle.Fill;
             bvTakim = tk.Ekle(new BigValue("", 40f), 0, 0); bvTakim.Hiza = StringAlignment.Center; bvTakim.Sayisal = false;
             lblTakimAciklama = tk.Ekle(Etiket("", 11.5f, false, YaziRol.Normal), 0, 1); lblTakimAciklama.Yatay = StringAlignment.Center;
             lblMod = tk.Ekle(Etiket("", 10.5f, true, YaziRol.Marka), 0, 2); lblMod.Yatay = StringAlignment.Center;
-            lblPens = tk.Ekle(Etiket("", 10f, false, YaziRol.Soluk), 0, 3); lblPens.Yatay = StringAlignment.Center;
+            lblOmur = tk.Ekle(Etiket("", 10.5f, true, YaziRol.Normal), 0, 3); lblOmur.Yatay = StringAlignment.Center; lblOmur.Kucult = true;
+            lblPens = tk.Ekle(Etiket("", 10f, false, YaziRol.Soluk), 0, 4); lblPens.Yatay = StringAlignment.Center;
             takimKart.BaslikTiklandi += delegate { };
 
             // --- orta: simülasyon + konum
@@ -2769,6 +2951,15 @@ namespace PrimerUI
             lblMod.Metin = manuel ? "MANUEL DEĞİŞİM" : "OTOMATİK DEĞİŞİM";
             lblPens.Metin = "Pens " + (d.PensAcik ? "AÇIK" : "kapalı") + (d.HavaYok ? "  ·  HAVA YOK" : "");
             if (d.PensAcik || d.HavaYok) lblPens.Renk(Tema.Duraklatildi); else lblPens.RenkRol = YaziRol.Soluk;
+            var om = d.Takim > 0 ? OmurCizim.Bul(d, d.Takim) : null;
+            if (om == null) { lblOmur.Metin = ""; }
+            else if (om.Omur <= 0) { lblOmur.Metin = "Ömür girilmedi · " + OmurCizim.Dk(om.Dakika) + " dk"; lblOmur.RenkRol = YaziRol.Soluk; }
+            else
+            {
+                lblOmur.Metin = "Ömür " + OmurCizim.Yuzde(om) + " · " + OmurCizim.Dk(om.Dakika) + "/" + OmurCizim.Dk(om.Omur) + " dk";
+                if (om.Seviye == 0) lblOmur.RenkRol = YaziRol.Normal; else lblOmur.Renk(OmurCizim.Renk(om));
+            }
+            takimKart.Vurgu = om != null && om.Omur > 0 && om.Seviye == 2 ? Tema.Alarm : Color.Empty;
 
             // konum
             eksen.Ayarla(d.X, d.Y, d.Z, d.A, d.B, d.MX, d.MY, d.MZ, d.MA, d.MB);
@@ -2812,7 +3003,7 @@ namespace PrimerUI
         readonly Yazi lblMil, lblMod, lblPens;
         readonly TouchButton btnMod;
         readonly SecimGrubu sekme;
-        readonly Control[] sayfalar = new Control[4];
+        readonly Control[] sayfalar = new Control[5];
         // sayfa A
         readonly YuvaKarti[] kartlar = new YuvaKarti[8];
         readonly Yazi lblSecili;
@@ -2833,6 +3024,11 @@ namespace PrimerUI
         readonly DegerKutusu devir;
         readonly TouchButton btnMilCalis;
         readonly Yazi lblMilDurum, lblSogutma;
+        // sayfa E: frez ömrü
+        readonly FrezOmruSatiri[] omurSatir = new FrezOmruSatiri[6];
+        readonly TouchButton[] omurSifirla = new TouchButton[6];
+        readonly Yazi lblOmurDiger;
+        readonly Card omurKart;
         string secili = "T1";
         MakineDurumu son;
 
@@ -2851,7 +3047,7 @@ namespace PrimerUI
             btnMod = bi.Ekle(Dugme("DEĞİŞTİR", Simge.Takim, Rol.Normal, "frez.modu", "MANUEL"), 2, 0); btnMod.YaziPt = 11f;
             lblPens = bi.Ekle(Etiket("Pens: —", 12f, false, YaziRol.Soluk), 3, 0); lblPens.Yatay = StringAlignment.Far; lblPens.Kucult = true;
 
-            sekme = ana.Ekle(new SecimGrubu(new[] { "Takım değişimi", "Yuva ayarı", "Hareket (jog)", "İş mili ve hava" }, null, null, null), 0, 1);
+            sekme = ana.Ekle(new SecimGrubu(new[] { "Takım değişimi", "Yuva ayarı", "Hareket (jog)", "İş mili ve hava", "Frez ömrü" }, null, null, null), 0, 1);
             sekme.Secili = 0; sekme.Pt = 12.5f;
             sekme.SecimDegisti += delegate { SekmeGoster(sekme.Secili); };
 
@@ -3001,13 +3197,30 @@ namespace PrimerUI
             si.Ekle(Dugme("HEPSİNİ KAPAT (M9)", Simge.Kapat, Rol.Normal, "sogutma.kapat", ""), 0, 2);
             lblSogutma = si.Ekle(Etiket("", 11f, false, YaziRol.Soluk), 0, 3); lblSogutma.Dikey = StringAlignment.Near;
 
+            // ---------- E: frez ömrü (takım başına kesim süresi, operatörün girdiği ömür, yüzde)
+            omurKart = new Card("Frez ömrü · kesimde geçen süre"); omurKart.BaslikSimge = Simge.Takim; omurKart.SagRenk = Tema.Soluk;
+            omurKart.SagMetin = "yalnız iş kesim yaparken sayılır";
+            sayfalar[4] = omurKart;
+            var oi = new Izgara(1, 7).Satirlar(-16.66f, -16.66f, -16.66f, -16.66f, -16.66f, -16.66f, 30); oi.Bosluk = 8;
+            omurKart.Controls.Add(oi); oi.Dock = DockStyle.Fill;
+            for (int i = 0; i < 6; i++)
+            {
+                string tn = "T" + (i + 1).ToString(Bicim.Inv);
+                var sr = new Izgara(3, 1).Sutunlar(-100, 158, 178); sr.Bosluk = 8;
+                oi.Ekle(sr, 0, i);
+                omurSatir[i] = sr.Ekle(new FrezOmruSatiri { Takim = i + 1 }, 0, 0);
+                var ba = sr.Ekle(Dugme("ÖMRÜ AYARLA", Simge.Ayar, Rol.Normal, "frez.omur.ayarla", tn), 1, 0); ba.YaziPt = 11f;
+                omurSifirla[i] = sr.Ekle(Dugme("SIFIRLA · YENİ FREZ", Simge.Yenile, Rol.Normal, "frez.omur.sifirla", tn), 2, 0); omurSifirla[i].YaziPt = 10.5f;
+            }
+            lblOmurDiger = oi.Ekle(Etiket("", 10.5f, false, YaziRol.Soluk), 0, 6); lblOmurDiger.Kucult = true; lblOmurDiger.SayiYazisi = false;
+
             foreach (var s in sayfalar) { s.Dock = DockStyle.Fill; s.Visible = false; host.Controls.Add(s); }
             SekmeGoster(0);
             JogArgYenile();
             Sec("T1");
         }
 
-        /// <summary>0 takım değişimi, 1 yuva ayarı, 2 hareket, 3 iş mili ve hava.</summary>
+        /// <summary>0 takım değişimi, 1 yuva ayarı, 2 hareket, 3 iş mili ve hava, 4 frez ömrü.</summary>
         public void SekmeGoster(int i)
         {
             if (i < 0 || i >= sayfalar.Length) return;
@@ -3096,6 +3309,7 @@ namespace PrimerUI
                 if (d.Yuvalar != null) foreach (var k in d.Yuvalar) if (k.Ad == yuvaAdlari[i]) y = k;
                 if (y == null) y = new YuvaBilgisi { Ad = yuvaAdlari[i], Dolu = i < 6 };
                 kartlar[i].Bilgi = y;
+                kartlar[i].Omur = i < 6 ? OmurCizim.Bul(d, i + 1) : null;
                 string kay = y.Kayitli ? Bicim.Sayi(y.X, 2) + " / " + Bicim.Sayi(y.Y, 2) : "kayıt yok";
                 var ts = new TabloSatiri(y.Ad, kay, string.IsNullOrEmpty(y.Yeni) ? "—" : y.Yeni, string.IsNullOrEmpty(y.Fark) ? "ölçülmedi" : y.Fark);
                 if (!string.IsNullOrEmpty(y.Yeni) && y.Yeni != "—") { ts.Renk = Tema.Hazir; }
@@ -3121,6 +3335,22 @@ namespace PrimerUI
             if (d.IsMiliCalisiyor) lblMilDurum.Renk(Tema.Calisiyor); else lblMilDurum.RenkRol = YaziRol.Soluk;
             lblSogutma.Metin = "M7 " + (d.M7 ? "AÇIK" : "kapalı") + "   ·   M8 " + (d.M8 ? "AÇIK" : "kapalı");
             lstKart.SagMetin = d.YuvaKaydedilmemis ? "KAYDEDİLMEDİ" : "";
+
+            // frez ömrü sekmesi
+            var diger = new StringBuilder();
+            int dolan = 0, yakin = 0;
+            if (d.FrezOmurleri != null)
+                foreach (var f in d.FrezOmurleri)
+                {
+                    if (f == null) continue;
+                    if (f.Omur > 0 && f.Seviye == 2) dolan++; else if (f.Omur > 0 && f.Seviye == 1) yakin++;
+                    if (f.Takim >= 1 && f.Takim <= 6) continue;
+                    diger.Append(diger.Length > 0 ? "   ·   " : "").Append("T" + f.Takim.ToString(Bicim.Inv) + "  " + OmurCizim.Kisa(f));
+                }
+            for (int i = 0; i < 6; i++) omurSatir[i].Ayarla(OmurCizim.Bul(d, i + 1) ?? new FrezOmruBilgisi(i + 1, 0, 0, ""), d.Takim == i + 1);
+            lblOmurDiger.Metin = diger.Length > 0 ? "Diğer takımlar:   " + diger : "Diğer takımlar: yok   ·   ömür dakika olarak girilir (0 = girilmedi); süre yalnız iş kesim yaparken iş milindeki frez için sayılır";
+            omurKart.SagMetin = dolan > 0 ? dolan.ToString(Bicim.Inv) + " FREZ ÖMRÜNÜ DOLDURDU" : (yakin > 0 ? yakin.ToString(Bicim.Inv) + " FREZ ÖMRÜNE YAKLAŞTI" : "yalnız iş kesim yaparken sayılır");
+            omurKart.SagRenk = dolan > 0 ? Tema.Alarm : (yakin > 0 ? Tema.Duraklatildi : Tema.Soluk);
         }
     }
 
@@ -5228,7 +5458,7 @@ namespace PrimerUI
         }
 
         // ------------------------------------------------------------ gezinti
-        /// <summary>Ekran aç: "uretim", "takimlar", "kalibrasyon", "ayarlar", "kayitlar", "uzaktan"; alt sayfalar: "takimlar.yuva", "takimlar.hareket", "takimlar.ismili", "kalibrasyon.disk", "kalibrasyon.oto", "ayarlar.0".."ayarlar.6".</summary>
+        /// <summary>Ekran aç: "uretim", "takimlar", "kalibrasyon", "ayarlar", "kayitlar", "uzaktan"; alt sayfalar: "takimlar.yuva", "takimlar.hareket", "takimlar.ismili", "takimlar.omur", "kalibrasyon.disk", "kalibrasyon.oto", "ayarlar.0".."ayarlar.6".</summary>
         public void EkranGoster(string ad)
         {
             if (string.IsNullOrEmpty(ad)) return;
@@ -5239,7 +5469,7 @@ namespace PrimerUI
             if (!ekranlar.TryGetValue(ana, out e)) return;
             if (alt != null)
             {
-                if (ana == "takimlar") Takimlar.SekmeGoster(alt == "yuva" ? 1 : alt == "hareket" ? 2 : alt == "ismili" ? 3 : 0);
+                if (ana == "takimlar") Takimlar.SekmeGoster(alt == "yuva" ? 1 : alt == "hareket" ? 2 : alt == "ismili" ? 3 : alt == "omur" ? 4 : 0);
                 else if (ana == "kalibrasyon") Kalibrasyon.Sayfa(alt);
                 else if (ana == "ayarlar") { int k; if (int.TryParse(alt, out k)) Ayarlar.SekmeGoster(k); }
             }

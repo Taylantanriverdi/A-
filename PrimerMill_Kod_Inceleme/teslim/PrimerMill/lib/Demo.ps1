@@ -49,6 +49,7 @@ function Demo-Makine-Hazirla {
         [Eding]::SimDegiskenYaz(4031, $RafDegisimVarsayilan.X); [Eding]::SimDegiskenYaz(4032, $RafDegisimVarsayilan.Y); [Eding]::SimDegiskenYaz(4033, $RafDegisimVarsayilan.Z)
         [Kayit]::Yaz('DEMO: sahte makinede yuvalar / sensör / değişim noktası doğrulanmış değerlerle dolduruldu')
     } catch { }
+    try { Frez-Omru-Demo-Hazirla } catch { }   # örnek frez ömrü (yalnız demo_calisma\frez_omru.json yoksa)
 }
 function Macro-Pens-Yamasi { }
 function Windows-Baslangic-Ayarla { }

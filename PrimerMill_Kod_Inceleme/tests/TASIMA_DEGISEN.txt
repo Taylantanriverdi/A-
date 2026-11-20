@@ -20,13 +20,13 @@ Yeni-Blok | DEGISTI | pencereyi görünüm açar (Diyalog.YeniBlok), seçim komu
 Uzak-Engel | DEGISTI | Ayarlar penceresi yerine Takımlar/Kalibrasyon/Ayarlar ekranı; panelde işlem sürerken uzaktan başlat/seç/blok reddi (yeni, güvenlik)
 Uzak-Is-Sec | DEGISTI | $lblDosya -> $script:DosyaMetni
 Uzak-Komut | DEGISTI | sec / baslat / duraklat / durdur / blok öncesi yerel izin tablosu da sorulur (GV-01/UZ-02); eski kontroller aynı sırada
-Uzak-Durum | DEGISTI | etiket metinleri yerine durum değişkenleri (JSON alanları aynı)
+Uzak-Durum | DEGISTI | etiket metinleri yerine durum değişkenleri (JSON alanları aynı; yeni alan frezOmru: iş milindeki frezin ömrü)
 Uzak-Baslat | DEGISTI | demo: yalnız 127.0.0.1; ekran görüntüsü kaynağı (EkranYakala); sayfa yolu $PanelKlasor; zamanlayıcı yerine $script:UzakAcik
 Uzak-Etiket-Guncelle | DEGISTI | etiket yerine $script:UzakDurumMetni
 Devam-Diyalog | DEGISTI | özel pencere -> Ui-Devam (Diyalog.Devam); dönüş aynı (Sec, Takim)
 Devam-Baslat | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır
 Devam-Acilis | DEGISTI | etiketler -> durum değişkenleri
-Btn-Baslat-Ic | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır
+Btn-Baslat-Ic | DEGISTI | WaitCursor -> Ui-Mesgul; iş başlayınca ilerleme durum değişkenleri sıfırlanır; Takim-Kapisi'ndan sonra frez ömrü denetimi (Frez-Omru-Baslat-Kontrol: ömrü dolan frez için onay, varsayılan VAZGEÇ; hareket / G-kod değişmez)
 Btn-Durdur | DEGISTI | $bar.Value -> $script:Yuzde; etiket -> SureMetni
 Btn-FrezBirak | DEGISTI | Onay -> Ui-Tehlikeli-Onay (TASARIM §6); hareket aynı
 Btn-Home | DEGISTI | WaitCursor -> Ui-Mesgul ("Home alınıyor…")

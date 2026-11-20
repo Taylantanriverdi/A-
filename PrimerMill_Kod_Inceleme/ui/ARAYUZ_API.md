@@ -38,7 +38,7 @@ Sayılar görünümde her yerde `InvariantCulture` ile biçimlenir; komut argüm
 | `void IzinleriUygulaTablo(IDictionary izin, IDictionary neden)` | PowerShell `Hashtable` kolaylığı. |
 | `void TemaUygula(string mod)` | Tema (çalışırken): `koyu`, `acik`, `gecisli`, `safak` (bilinmeyen = koyu). Ayarlar › Genel › Tema (Koyu / Açık / Geçişli / Şafak) da bunu çağırır ve `ayar.kaydet Tema=koyu|acik|gecisli|safak` gönderir. `TemaUygula(TemaModu)` aynı; `TemaUygula(bool koyu)` uyumluluk için kalır (true = Koyu, false = Açık). |
 | `void GecisiTamamla()` | İlerleme temalarında (Geçişli, Şafak) yumuşak geçişi beklemeden rengi hedefe atlatır (ekran görüntüsü / test). İlerleme teması = iki uç paleti (`IlerlemePaleti`: `Tema.GecisliPalet` mavi→yeşil, `Tema.SafakPalet` gece çiviti→şafak bakırı); ilerlemeyi `Uygula(MakineDurumu)` içinden alır: `IsTamamlandi` → tam yeşil; `IsAktif` ve `Durum` ÇALIŞIYOR/DURAKLATILDI → `Yuzde/100`; değilse mavi. Kabuk içindeki 33 ms'lik zamanlayıcı gösterilen değeri üstel yumuşatmayla (τ ≈ 0,45 s) hedefe taşır ve fark < 0,001 olunca durur (TASARIM §5). |
-| `void EkranGoster(string ad)` | `uretim`, `takimlar`, `kalibrasyon`, `ayarlar`, `kayitlar`, `uzaktan`; alt sayfa: `takimlar.yuva`, `takimlar.hareket`, `takimlar.ismili`, `kalibrasyon.disk`, `kalibrasyon.oto`, `ayarlar.0`…`ayarlar.6`. |
+| `void EkranGoster(string ad)` | `uretim`, `takimlar`, `kalibrasyon`, `ayarlar`, `kayitlar`, `uzaktan`; alt sayfa: `takimlar.yuva`, `takimlar.hareket`, `takimlar.ismili`, `takimlar.omur` (Frez ömrü), `kalibrasyon.disk`, `kalibrasyon.oto`, `ayarlar.0`…`ayarlar.6`. |
 | `void Bildir(string metin, MesajTuru tur)` | Alt şeritte 5 sn görünen bildirim (kalıcı pencere açmaz; KU-09). |
 | `void MesgulGoster(string metin)` | İçerik alanını "meşgul" katmanıyla kapatır (null = kaldır). Üst şerit ve ACİL STOP açık kalır. `MakineDurumu.Mesgul` ile de yapılır. |
 | `Uretim`, `Takimlar`, `Kalibrasyon`, `Ayarlar`, `Kayitlar`, `Uzaktan` | Ekran nesneleri (salt okunur alanlar). |
@@ -122,6 +122,8 @@ Kalan kartında dosya uyarı/hata sayısı (`⚠ 2 UYARI`) dokunulunca görünü
 | `ismili.calistir` | devir, ör. `18000` | İş mili › ÇALIŞTIR (M3); devir kutusu 1000–24000 | Normal |
 | `ismili.durdur` | — | DURDUR (M5) | yok |
 | `sogutma.m7` / `sogutma.m8` / `sogutma.kapat` | — | Soğutma kartı | yok |
+| `frez.omur.ayarla` | `T1`…`T6` (ya da `T7`…`T99`); `T3=1000,5` doğrudan değer (uzaktan / test; `,` ve `.` kabul) | Takımlar › Frez ömrü › ÖMRÜ AYARLA | yok — denetleyici `Diyalog.SayiGir` açar (dakika, 0–100000, 0.1 dk; 0 = ömür girilmedi). Yalnız veri: **her zaman** serbest, iş sürerken de |
+| `frez.omur.sifirla` | `T1`…`T6` (`T7`…`T99`) | Takımlar › Frez ömrü › SIFIRLA · YENİ FREZ | Normal (varsayılan VAZGEÇ; eski dakika günlüğe yazılır, ömür ayarı korunur). İş sürerken / duraklıyken **o işin kullandığı ya da iş milindeki frez için pasif** (izin anahtarı `frez.omur.sifirla:T3`, neden "İş sürüyor ve bu iş T3 frezini kullanıyor…"); diğer frezler serbest |
 
 ### 3.4 Kalibrasyon
 
@@ -193,6 +195,7 @@ Tüm alanlar düz (public field). Listeler kurucuda boş oluşturulur; `null` ve
 | `X,Y,Z,A,B` / `MX,MY,MZ,MA,MB` | double | İş / makine konumu (ikisi birlikte; KU-24) |
 | `KoordMakine` | bool | Makine konumu büyük gösterilsin (ya da `Ayarlar["Koordinat"]`) |
 | `Takim`, `TakimAciklama` | int, string | Takım kartı (0 = boş) |
+| `FrezOmurleri` | List<FrezOmruBilgisi {Takim, Dakika, Omur, Sifirlama; Yuzde, Seviye}> | Frez ömrü: T1–T6 her zaman, diğer takımlar (7–99) yalnız dakikası > 0 ise. Takımlar yuva kartlarında `%23` + `230 / 1000 dk` + ince çubuk, Takımlar › Frez ömrü sekmesi (kullanılan dk ve saat, ömür, %, son sıfırlama, "Diğer takımlar" satırı), Üretim TAKIM kartında iş milindeki frez "Ömür %23 · 230/1000 dk". Renk: < %80 normal, %80–99 kehribar (Duraklatıldı), ≥ %100 kırmızı (Alarm; Üretim TAKIM kartı kırmızı vurgulu); `Omur = 0` → "ömür girilmedi", yalnız dakika |
 | `FrezModu` | "OTOMATIK"/"MANUEL" | Takım kartı, Takımlar başlığı |
 | `PensAcik`, `HavaYok` | bool | Pens/hava göstergeleri |
 | `ManuelMesaj` | string | İş kartında kehribar "MANUEL FREZ: …" (HavaYok → kırmızı "KOMPRESÖRÜ AÇ") |
@@ -221,7 +224,7 @@ Tüm alanlar düz (public field). Listeler kurucuda boş oluşturulur; `null` ve
 | `Klasorler` | List<BilgiSatiri> | `Ad="Eding"` → Ayarlar › Eding klasörü |
 | `UzakAcik`, `UzakAdres`, `UzakAdresler`, `UzakPin`, `UzakIzin`, `UzakDurumMetni`, `UzakCihazlar` (List<UzakCihaz {Adres, Zaman, Son}>) | | Uzaktan ekranı |
 
-Yardımcı sınıflar: `YuvaBilgisi {Ad, Aciklama, Kayitli, Dolu, IsMilinde, Uyari, X,Y,Z,A,B, ZVar, Yeni, Fark}`, `KalSonucSatiri {Eksen, Eski, Duzeltme, Yeni, Iyi}`, `KalKaliteSatiri {Ad, Deger, Tur}`, `MesajTuru {Bilgi, Basari, Uyari, Hata}`.
+Yardımcı sınıflar: `YuvaBilgisi {Ad, Aciklama, Kayitli, Dolu, IsMilinde, Uyari, X,Y,Z,A,B, ZVar, Yeni, Fark}`, `FrezOmruBilgisi {Takim, Dakika, Omur (0 = girilmedi), Sifirlama ("dd.MM.yyyy HH:mm"); Yuzde (-1 = ömür yok), Seviye 0/1/2}`, `KalSonucSatiri {Eksen, Eski, Duzeltme, Yeni, Iyi}`, `KalKaliteSatiri {Ad, Deger, Tur}`, `MesajTuru {Bilgi, Basari, Uyari, Hata}`.
 
 ## 5. `Diyalog` (statik)
 
@@ -253,6 +256,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 - Anahtar = komut adı (§3). Arama sırası: `"ad:arg"` → `"ad"` → en uzun `"önek.*"` (ör. `kal.*`, `yuva.*`, `hiz.*`) → `"*"`. Tabloda olmayan komut **etkindir**.
 - Neden tablosu aynı kurallarla aranır; pasif düğmede alt satır, ipucu ve dokununca alt şerit bildirimi olarak gösterilir.
 - Görünümün kendi kuralları yalnız görseldir: seçili yuva SENSÖR/MANUEL iken "AL" düğmesi pasif; sihirbaz ilk adımında GERİ pasif. **İzin kararı daima denetleyicinin tablosudur** (yerel düğme, klavye kısayolu ve uzaktan komut aynı tablodan; GV-01/UZ-02).
+- Düğme başına izin: `frez.omur.sifirla:T1`…`:T6` (iş sürerken o işin frezleri pasif; `ad:arg` araması).
 - Yalnız izin anahtarı olarak kullanılanlar (komutu olay sahibi gönderir): `blok.yeni` (YENİ BLOK), `takim.degistir` (Üretim TAKIM), `kal.konum.yuva`, `degisken.kaydet`, `uzak.pin`, `mdi.gonder`.
 - Değer kutuları/anahtarlar `ayar.kaydet:<Anahtar>` biçimiyle de kapatılabilir (ör. `ayar.kaydet:FrezModu` iş sırasında).
 
@@ -448,6 +452,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | 8.4.2 | Durdur (M5) | DURDUR (M5) | `ismili.durdur` |
 | 8.4.3 | Pens aç / kapat / hava üfle | Pens ve hava kartı | `pens.ac`, `pens.kapat`, `hava.ufle` |
 | 8.4.4 | M7 / M8 / M9 | Soğutma kartı | `sogutma.m7/m8/kapat` |
+| 8.4.5 (yeni) | Frez ömrü: takım başına kesim süresi, ömür (dk), yüzde, sıfırlama | Takımlar › Frez ömrü sekmesi (ÖMRÜ AYARLA, SIFIRLA · YENİ FREZ); yuva kartlarında ve Üretim TAKIM kartında ömür satırı; BAŞLAT'ta ömrü dolan frez için onay (≥ %100, varsayılan VAZGEÇ) ve alt şerit uyarısı (≥ %90). Sayım yalnız Eding RUNNING + panelden başlatılan iş + iş milinde frez; `frez_omru.json` (veri klasörü). Uzaktan durum JSON'unda `frezOmru` (iş milindeki frez) | `frez.omur.ayarla`, `frez.omur.sifirla`, `FrezOmurleri` |
 | 8.5.1 | G54 kutuları | Ayarlar › Makine değişkenleri (dokun → tuş takımı) | `G54`, `degisken.kaydet` |
 | 8.5.2 | #4000–#4006 | Aynı sayfa, 7 kutu (adlarıyla) | `Param` |
 | 8.5.3 | G92 satırı + uyarı | Aynı sayfa G92 sütunu (X/Y/A/B ≠ 0 kırmızı); Kalibrasyon bilgi şeridi | `G92` |
@@ -555,6 +560,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | 13.2.1 | ayarlar.txt | Arka plan | — |
 | 13.2.2 | devam.json | Arka plan → `Diyalog.Devam` | — |
 | 13.2.3 | bloklar.csv | Arka plan → `BlokSonrakiIsim` | — |
+| 13.2.11 (yeni) | frez_omru.json | Takımlar › Frez ömrü (takım başına `Dakika`, `Omur`, `Sifirlama`; InvariantCulture, atomik yazma) | `FrezOmurleri` |
 | 13.2.4 | kalibrasyon_gecmisi.csv | GEÇMİŞ düğmeleri | `kal.disk.gecmis` |
 | 13.2.5 | oto_kalibrasyon_gecmisi.csv | GEÇMİŞ düğmeleri | `kal.oto.gecmis` |
 | 13.2.6 | yedekler\ayar_*.txt | Yedekler kartı/sekmesi, TehlikeliOnay "Yedek alındı" satırı | `yedek.*`, `SonYedek` |
@@ -591,7 +597,7 @@ Bölüm 16 (değişken kullanımı) ve 17 (macro.cnc eşlemesi) arayüz özelli�
 
 ## 9. Ekran görüntüleri
 
-`tests/ui/ekran_goruntusu_al.sh` → `teslim/ekran_goruntuleri/` (Mono + Xvfb, gerçek arayüz kodundan). Koyu tema 1024×768 ve 1920×1080'de her ekran, her sihirbaz adımı (1024) ve önemli diyaloglar; açık temada Üretim, Takımlar, Oto sihirbaz ④ ve Tehlikeli onay; Geçişli temada Üretim %0 / %50 / %100 (1024), %64 (1920) ve Ayarlar › Genel; Şafak temada Üretim %0 (HAZIRLIK) / %50 / %100, %92 DURAKLATILDI ve Ayarlar › Genel.
+`tests/ui/ekran_goruntusu_al.sh` → `teslim/ekran_goruntuleri/` (Mono + Xvfb, gerçek arayüz kodundan). Koyu tema 1024×768 ve 1920×1080'de her ekran, her sihirbaz adımı (1024) ve önemli diyaloglar; açık temada Üretim, Takımlar, Oto sihirbaz ④ ve Tehlikeli onay; Geçişli temada Üretim %0 / %50 / %100 (1024), %64 (1920) ve Ayarlar › Genel; Şafak temada Üretim %0 (HAZIRLIK) / %50 / %100, %92 DURAKLATILDI ve Ayarlar › Genel; Takımlar › Frez ömrü (78 koyu 1024, 79 iş sürerken 1920, 80 açık 1024) ve BAŞLAT'taki frez ömrü onayı (81). Örnek veride T2 %91 (kehribar), T3 %104 (kırmızı), T5 ömür girilmedi, T8 "diğer".
 
 ## 10. Mono ile Windows farkları (bilinen)
 

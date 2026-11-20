@@ -107,6 +107,7 @@ function Uzak-Durum {
         derinlik = $(if ($script:Tercih.SadeDerinlik) { $script:Tercih.SadeDerinlik } else { '0.15' })
         sonrakiNo = "$(Blok-Sonraki-No)"
         ad = [string]$script:Tercih.MakineAdi; mod = [string]$script:Tercih.FrezModu
+        frezOmru = (Frez-Omru-Uzak $tk)
     }
     [WebSunucu]::DurumJson = (ConvertTo-Json $o -Compress -Depth 3)
     # UZ-05: iş sürerken yükleme yok, seçili iş dosyasının üstüne yazılmaz
