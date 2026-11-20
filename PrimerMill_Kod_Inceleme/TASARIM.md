@@ -28,7 +28,7 @@ Gerekçe:
 | --- | --- | --- |
 | 0 | **Kabuk** (her ekranda) | Üst şerit: marka, durum hapı, bağlantı, saat, **ACİL STOP** (sağ üst, 96 px, her zaman erişilebilir). Sol menü (ikon + yazı, 88 px genişlik); menünün en altında güç simgeli **Kapat** (cihazı kapat / yeniden başlat, `sistem.kapat`). Alt şerit: son mesaj/alarm (dokununca Kayıtlar). |
 | 1 | **Üretim** (ana ekran) | İş kartı (dosya, blok, ilerleme, geçen/kalan süre, satır), takım kartı, simülasyon, eksen konumları, hız ayarı, 6 büyük işlem düğmesi. |
-| 2 | **Takımlar** | 6 yuva + sensör + manuel nokta kartları; seçili yuvaya git / yaklaş / al / kaydet; takım değiştir (T0–T6), takım ölç, aşınma kontrolü, pens aç, frez bırak, manuel/otomatik frez modu, jog paneli. |
+| 2 | **Takımlar** | 6 yuva + sensör + manuel nokta kartları; seçili yuvaya git / yaklaş / al / kaydet; takım değiştir (T0–T6), takım ölç, aşınma kontrolü, pens aç, frez bırak, manuel/otomatik frez modu, jog paneli; **Frez ömrü** sekmesi (§4.2a). |
 | 3 | **Kalibrasyon** | Kart menüsü: Disk kalibrasyonu (sihirbaz), Otomatik kalibrasyon (sihirbaz + prob testi), Z alma / #4000, G54 üretici farkı ve geri dönüş, yedekten yükle. |
 | 4 | **Ayarlar** | Sekmeler: Genel (tema, dil metinleri, açılış), İş akışı (frez modu, blok sorusu, geri sayım), Hareket (jog adımı, hız sınırları), Eding (yol, göster/gizle, yeniden başlat), Uzaktan erişim, Yedek ve geri yükleme, Makine değişkenleri (G54, #4000–#4006, onaylı düzenleme). |
 | 5 | **Kayıtlar** | Mesaj geçmişi (renkli, filtreli), MDI (onaylı, iş sırasında kilitli), teknik bilgi (makro sürümü, Eding durumu, rc kodları), klasör aç. |
@@ -83,6 +83,10 @@ Düğme durumları duruma göre değişir (tek kaynak: izin tablosu, §7):
 │      │ └───────────────────────────────────────────────────────────────┘   │
 └──────┴────────────────────────────────────────────────────────────────────┘
 ```
+
+### 4.2a Takımlar › Frez ömrü (kullanıcı isteği)
+
+Takım başına kesimde geçen süre (dk) ve operatörün girdiği ömür (dk) → yüzde (1000 dk ömür, 100 dk → %10). Beşinci sekme: T1–T6 satırları (kullanılan dk + saat, çubuk ve %, ömür, son "yeni frez" tarihi) ve her satırda **ÖMRÜ AYARLA** (sayı girişi, 0 = girilmedi) / **SIFIRLA · YENİ FREZ** (Normal onay); altta "Diğer takımlar" (T7–T99, dakikası varsa). Aynı bilgi yuva kartlarında (`%23`, `230 / 1000 dk`, ince çubuk) ve Üretim TAKIM kartında ("Ömür %23 · 230/1000 dk"). Renk sistemi §5: < %80 normal (yeşil çubuk), %80–99 DURAKLATILDI kehribarı, ≥ %100 ALARM kırmızısı. Sayım yalnız Eding RUNNING + panelden başlatılan iş + iş milinde frez; BAŞLAT'ta ömrü dolan frez için Normal onay (varsayılan VAZGEÇ), %90'da alt şerit uyarısı. Makineye komut yok (kural 4 kapsamı dışında); ayrıntı `ui/ARAYUZ_API.md` §3.3, §4, 8.4.5.
 
 ### 4.3 Kalibrasyon › Otomatik kalibrasyon sihirbazı
 

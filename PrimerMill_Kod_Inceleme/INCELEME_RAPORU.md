@@ -54,7 +54,8 @@ YÜKSEK önemdeki düzeltmelerin tamamı ve her birinin commit'i Ek B'de (düzel
   - Kısmi: basılı tutarak jog, M7/M8 göstergesi, dans eden hayvan yerine parıltı.
   - Yok: ölü blok sorusu (5.6/11.7) ve bilinçli olarak kaldırılan CORS.
 - Eski (düzeltilmiş) panel `KazimaBaslat_Klasik.bat` olarak teslimde duruyor.
-- Ekran görüntüleri: `teslim/ekran_goruntuleri/` (65 adet; koyu/açık, 1024×768 ve 1920×1080). Bunlar arayüz kodundan örnek verilerle Mono üzerinde alındı. Windows'ta gerçek demo modundan görüntü almak için `tests/Demo_Ekran_Testi.ps1` kullanılabilir.
+- Frez ömrü (kullanıcı isteği, yeni): takım başına kesim dakikası, ömür (dk) ve yüzde; Takımlar › Frez ömrü, yuva kartları, Üretim TAKIM kartı, BAŞLAT'ta ömrü dolan frez için onay. Yalnız veri, makine hareketine dokunmaz (`lib/FrezOmru.ps1`, `tests/Frez_Omru_Testi.ps1`, MAKİNEDE DOĞRULA 27).
+- Ekran görüntüleri: `teslim/ekran_goruntuleri/` (81 adet; koyu/açık/Geçişli/Şafak, 1024×768 ve 1920×1080). Bunlar arayüz kodundan örnek verilerle Mono üzerinde alındı. Windows'ta gerçek demo modundan görüntü almak için `tests/Demo_Ekran_Testi.ps1` kullanılabilir.
 
 ## 4. Testler
 
@@ -107,6 +108,7 @@ Windows PowerShell 5.1 ile çalıştırılmadı. İlk iş olarak Windows'ta çal
 | 24 | Kiosk kurtarma yolları: WINDOWS'A GEÇ (PIN 2457) → görev çubuğu açılmalı (Shell değeri geçici kaldırılıp geri yazılır); panel 3 kez çökünce kabuk Windows'u açmalı; kiosk.on silinince / Güvenli Modda Windows masaüstü açılmalı; KIOSK_KALDIR her şeyi geri almalı | Her yolu bir kez deneyin: Görev Yöneticisi'nden değil, `loglar\kabuk.log` ile izleyin. Çökme denemesi: panel açıkken `taskkill /f /im powershell.exe` (Windows'a geçip yönetici cmd'den) 4 kez. WINDOWS'A GEÇ sonrası `reg query "HKCU\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" /v Shell` yine Kabuk.ps1'i göstermeli |
 | 25 | Kiosk klavye kilidi (`lib/Kiosk.cs`, WH_KEYBOARD_LL, ayrı iş parçacığı): Win, Menü, Alt+Tab, Alt+Esc, Ctrl+Esc, Ctrl+Shift+Esc, Alt+F4, Alt+Boşluk kesilir; tek başına Esc (ACİL STOP) ve yazı serbest | Kiosk'ta bu tuşları deneyin: hiçbiri Windows'u göstermemeli. **Esc ACİL STOP'u tetiklemeli** (Eding simülasyonunda). MDI ve PIN kutusuna yazı yazılabilmeli. WINDOWS'A GEÇ'ten sonra Win tuşu çalışmalı, panele dönünce yine kilitli olmalı |
 | 26 | Dokunmatik kenar kaydırma (AllowEdgeSwipe=0) ve bildirimler: ekranın kenarından kaydırma Eylem Merkezi / görev görünümü açmamalı | Dokunmatik ekranda dört kenardan da kaydırın; Windows 10 ve 11'de ilke farklı davranabilir |
+| 27 | Frez ömrü (yeni özellik, `lib/FrezOmru.ps1`): dakika yalnız panelden başlatılan iş Eding'de **RUNNING** iken ve `CncGetCurrentToolNumber` > 0 iken sayılıyor; RUN-SUB (takım değişimi makrosu), PAUSE*, elle frez beklemesi sayılmıyor. Gerçek Eding'in iş sırasında hangi durum metinlerini verdiği (ör. kesim arasında kısa RUN-SUB / READY geçişleri, M0'da PAUSE) ve takım numarasını M6'dan hemen sonra güncelleyip güncellemediği makinede görülmedi. Makine hareketine dokunmaz | Bir işi kronometreyle izleyin: Takımlar › Frez ömrü'ndeki toplam artış, kronometredeki kesim süresine (takım değişimleri hariç) ±%2 içinde uymalı ve her frezin dakikası kendi kesim süresine gitmeli. DURAKLAT'ta sayaç durmalı. `loglar\Panel_*.log` içindeki `EDING DURUMU:` satırlarında RUNNING dışında bir kesim durumu görülürse not edin |
 
 ## 6. Uygulanmayan öneriler
 

@@ -170,11 +170,17 @@ static class EkranGoruntusu
         Ekle(no() + "_ayarlar_genel_gecisli_1024.png", 1024, 768, G, () => { var d = Ornek(); d.Yuzde = 30; d.Kiosk = true; d.Ayarlar["Tema"] = "gecisli"; Uygula(d, IzinCalisiyor()); Git("ayarlar.0"); });
         // Şafak: gece çiviti (0) → erik → şafak bakırı (1). %0'da HAZIRLIK (mor hap çivit zeminde), %92'de DURAKLATILDI (kehribar hap bakır zeminde)
         var S = TemaModu.Safak;
+        // Frez ömrü sekmesi (yeni; sona eklendi, eski numaralar değişmesin)
+        Func<Dictionary<string, string>> izinOmur = () => { var iz = IzinCalisiyor(); iz["frez.omur.sifirla:T1"] = "İş sürüyor ve bu iş T1'i kullanıyor: iş bitince sıfırlayın"; iz["frez.omur.sifirla:T2"] = "İş sürüyor ve bu iş T2'yi kullanıyor: iş bitince sıfırlayın"; iz["frez.omur.sifirla:T3"] = "İş sürüyor ve bu iş T3'ü kullanıyor: iş bitince sıfırlayın"; return iz; };
         Ekle(no() + "_uretim_safak_0_1024.png", 1024, 768, S, () => { var d = Hazir(); d.Durum = Durum.Hazirlik; d.DurumMetni = "Home gerekli"; d.HomeAlindi = false; Uygula(d, IzinHazir()); Git("uretim"); });
         Ekle(no() + "_uretim_safak_50_1024.png", 1024, 768, S, () => { var d = Ornek(); d.Yuzde = 50; d.Satir = 34876; d.GecenSn = 33 * 60; d.KalanSn = 33 * 60; Uygula(d, IzinCalisiyor()); Git("uretim"); });
         Ekle(no() + "_uretim_safak_100_1024.png", 1024, 768, S, () => { var d = Bitti(); Uygula(d, IzinHazir()); Git("uretim"); });
         Ekle(no() + "_uretim_safak_duraklatildi_92_1024.png", 1024, 768, S, () => { var d = Ornek(); d.Yuzde = 92; d.Durum = Durum.Duraklatildi; d.DurumMetni = "Duraklatıldı"; d.Satir = 64170; d.KalanSn = 5 * 60 + 17; d.SonMesaj = "İş duraklatıldı (satır 64 170). Devam için DEVAM."; d.SonMesajTuru = MesajTuru.Uyari; Uygula(d, IzinDuraklatildi()); Git("uretim"); });
         Ekle(no() + "_ayarlar_genel_safak_1024.png", 1024, 768, S, () => { var d = Ornek(); d.Yuzde = 70; d.Kiosk = true; d.Ayarlar["Tema"] = "safak"; Uygula(d, IzinCalisiyor()); Git("ayarlar.0"); });
+        Ekle(no() + "_takimlar_frez_omru_koyu_1024.png", 1024, 768, true, () => { Uygula(Hazir(), IzinHazir()); Git("takimlar.omur"); });
+        Ekle(no() + "_takimlar_frez_omru_calisirken_koyu_1920.png", 1920, 1080, true, () => { Uygula(Ornek(), izinOmur()); Git("takimlar.omur"); });
+        Ekle(no() + "_takimlar_frez_omru_acik_1024.png", 1024, 768, false, () => { Uygula(Hazir(), IzinHazir()); Git("takimlar.omur"); });
+        Ekle(no() + "_diyalog_frez_omru_uyari_koyu_1024.png", 1024, 768, true, () => { Uygula(Hazir(), IzinHazir()); Git("uretim"); Diyalog.Onay("Frez ömrü", "Bu işin kullandığı frez ömrünü doldurdu:\n\nT3 ömrünü doldurdu: 1043/1000 dk.\n\nFrezi değiştirip Takımlar › Frez ömrü › SIFIRLA · YENİ FREZ ile sıfırlayabilirsiniz.\n\nYine de başlatılsın mı?"); });
     }
 
     static IEnumerable<Control> Tum(Control k)
@@ -266,6 +272,11 @@ static class EkranGoruntusu
         double[] y = { -65.166, -45.166, -25.166, -5.166, 14.834, 34.834 };
         for (int i = 0; i < 6; i++)
             d.Yuvalar.Add(new YuvaBilgisi { Ad = "T" + (i + 1), Aciklama = ac[i], Kayitli = i != 2, Dolu = i != 4, IsMilinde = i == 1, X = -125.557, Y = y[i], Z = -46.9, ZVar = true, A = 0, B = 0, Uyari = i == 2 ? "AYARSIZ" : null });
+        // frez ömrü: T2 (iş milinde) %91 kehribar, T3 %104 kırmızı, T5 ömür girilmedi, T8 "diğer"
+        double[] dk = { 412.6, 912.0, 1043.0, 156.2, 37.5, 655.0 }, om = { 1200, 1000, 1000, 1500, 0, 1000 };
+        string[] sf = { "02.11.2026 08:15", "21.10.2026 09:02", "04.10.2026 16:40", "14.11.2026 07:55", "", "28.10.2026 10:30" };
+        for (int i = 0; i < 6; i++) d.FrezOmurleri.Add(new FrezOmruBilgisi(i + 1, dk[i], om[i], sf[i]));
+        d.FrezOmurleri.Add(new FrezOmruBilgisi(8, 12.4, 0, ""));
         d.Yuvalar.Add(new YuvaBilgisi { Ad = "SENSÖR", Aciklama = "takım boyu", Kayitli = true, X = -125.557, Y = -100.2, A = 0, B = 0 });
         d.Yuvalar.Add(new YuvaBilgisi { Ad = "MANUEL", Aciklama = "değişim noktası", Kayitli = true, X = -64.25, Y = -52, Z = 0, ZVar = true });
         d.G54 = new[] { -53.307, -37.166, 0.0, 0.0, 0.0 };

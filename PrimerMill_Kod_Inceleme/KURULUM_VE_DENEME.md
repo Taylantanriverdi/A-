@@ -30,6 +30,7 @@ teslim/
    - İŞ SEÇ → `ORNEK_ZY2_45_kisa` → BAŞLAT → DURAKLAT. Duraklıyken jog, pens aç, MDI, G54 kaydet **soluk ve nedenli** olmalı. DEVAM → iş biter.
    - Takımlar, Kalibrasyon (otomatik sihirbaz prob testi geçmeden ② adımından ileri gitmemeli), Ayarlar › Makine değişkenleri (KAYDET → kırmızı tehlikeli onay, eski/yeni değerler, yedek dosya adı), Kayıtlar (MDI onayı), Uzaktan (`http://127.0.0.1:8080`, 6 haneli PIN).
    - Ayarlar › Genel › Tema › **Geçişli**: zemin maviye döner; iş başlatılınca yüzde ilerledikçe zemin ve kartlar sıçramadan camgöbeği üzerinden yeşile kaymalı, iş bitince tam yeşil kalmalı, yeni dosya seçilince yavaşça maviye dönmeli. Yazılar ve durum hapı her renkte okunur olmalı. Panel kapatılıp açılınca tema korunmalı (`panel_ayarlar.ini` `Tema=gecisli`). Koyu/Açık'a dönüş anında olmalı. **Şafak** için aynısı: gece çiviti → erik → bakır; seçim düğmesinde dört seçenek ("Koyu / Açık / Geçişli / Şafak") kesilmeden okunmalı.
+   - Takımlar › **Frez ömrü**: demo örnek verileriyle gelir (T2 %91 kehribar, T3 %104 kırmızı, T5 ömür girilmedi). T1 ÖMRÜ AYARLA → `1000,5` yazın (virgül de olur) → "1000.5 dk". İŞ SEÇ → BAŞLAT: iş T3'ü kullanıyorsa "T3 ömrünü doldurdu: 1043/1000 dk. Yine de başlatılsın mı?" sorulmalı (Enter = VAZGEÇ, iş başlamaz). İş sürerken iş milindeki frezin dakikası artmalı, DURAKLAT'ta durmalı; o işin frezleri için SIFIRLA soluk olmalı (bkz. §7).
    - Herhangi bir diyalogda **Esc = ACİL STOP** olmalı.
    - `teslim\PrimerMill\loglar\Panel_*.log` içinde `PROGRAM HATASI` satırı olmamalı.
    Sorun görürseniz `HataBul.bat` çalıştırıp çıkan metni ve log dosyasını saklayın.
@@ -128,3 +129,15 @@ Not: Kabuktan açılan panel yönetici değildir (UAC). Eding'i panel kendisi a�
 ### 6.4 Kaldırma
 
 Kiosk'un kurulduğu hesapta (önce WINDOWS'A GEÇ) `KIOSK_KALDIR.bat` → **Yönetici olarak çalıştır**. Kabuk Windows Gezgini olur, `kiosk.on` silinir, ilkeler kaldırılır (önceden var olanlar eski değerine döner), bcdedit değerleri geri yüklenir, KIOSK_KUR kurduysa otomatik oturum kapatılır ve kayıtlı parola silinir, "PrimerMill" başlangıç görevi yeniden açılır. Yeniden başlatın.
+
+## 7. Frez ömrü (takım başına kesim süresi)
+
+Panel her frezin (T1–T6; makroda başka numara kullanılırsa onlar da "Diğer takımlar" satırında) **kesimde geçen süresini dakika olarak** sayar ve operatörün girdiği ömre göre yüzde gösterir. Örnek: T1 ömrü 1000 dk, 100 dk çalıştı → **%10**. Makineye hiçbir komut gönderilmez, G-kodu değişmez.
+
+- **Nerede:** Takımlar › **Frez ömrü** sekmesi (kullanılan dk ve saat, ömür, %, son "yeni frez" tarihi); Takımlar › Takım değişimi yuva kartlarında `%23` ve `230 / 1000 dk`; Üretim › TAKIM kartında iş milindeki frez için "Ömür %23 · 230/1000 dk". Renk: %80'in altı normal, %80–99 kehribar, %100 ve üstü kırmızı. Ömür girilmemişse yalnız dakika ve "ömür girilmedi".
+- **Ömrü ayarlamak:** Frez ömrü › ilgili satırda **ÖMRÜ AYARLA** → dakika yazın (0–100000; `1000,5` ya da `1000.5`; **0 = ömür girilmedi**). Kullanılan süreye dokunmaz. İş sürerken de yapılabilir.
+- **Yeni frez takınca:** **SIFIRLA · YENİ FREZ** → onay (varsayılan VAZGEÇ). Kullanılan süre 0 olur, ömür ayarı korunur, eski değer ve tarih günlüğe (`loglar\Panel_*.log`) yazılır. İş sürerken (duraklıyken de) o işin kullandığı ya da iş milindeki frez için düğme soluktur: iş bitince sıfırlayın.
+- **Ne sayılır:** yalnız panelden başlatılan iş Eding'de tam olarak **RUNNING** iken ve iş milinde frez varken (takım değişimi makrosu RUN-SUB, DURAKLAT, elle frez değişimi beklemesi, jog, MDI, home sayılmaz). Süre gerçek saatle ölçülür; panel donarsa tek seferde en çok 2 sn eklenir. Eding'in kendi ekranından başlatılan iş sayılmaz.
+- **BAŞLAT'ta uyarı:** işin kullandığı bir frez ömrünün %100'üne ulaşmışsa "T2 ömrünü doldurdu: 1050/1000 dk. Yine de başlatılsın mı?" sorusu (VAZGEÇ = iş başlamaz; EVET = iş normal başlar). %90–99 ise yalnız alt şeritte uyarı. Kesim sırasında %100'e ulaşan frez için bir kez alt şerit bildirimi; iş durmaz.
+- **Dosya:** `PrimerMill\frez_omru.json` (demo modunda `demo_calisma\frez_omru.json`, gerçek dosyaya dokunulmaz). Sayılırken 30 sn'de bir, iş durunca ve panel kapanırken yazılır. Bozulursa panel boş başlar, bozuk dosyayı `frez_omru.json.bozuk_<tarih>` olarak saklar. Kurulumda bu dosyanın üzerine yazmayın (teslimde yok).
+- **Makinede ilk denemede:** bir işi kronometreyle izleyin; Frez ömrü sekmesindeki dakika artışı kronometredeki kesim süresiyle (takım değişimleri hariç) uyuşmalı (bkz. `INCELEME_RAPORU.md` › MAKİNEDE DOĞRULA 27).
