@@ -257,8 +257,8 @@ function Hareket-Bitene-Kadar-Bekle([int]$saniye) {
 }
 
 # ================= MAKRO SÜRÜMÜ VE #4039 BAYRAĞI (K6) =================
-# macro.cnc 'sub pm_surum' -> #4038 = 5. Makroda değişiklik yapılırsa ikisi birlikte güncellenir.
-$BeklenenMakroSurum = 5
+# macro.cnc 'sub pm_surum' -> #4038 = 6. Makroda değişiklik yapılırsa ikisi birlikte güncellenir.
+$BeklenenMakroSurum = 6
 $script:MakroKontrolTamam = $false   # bu Eding bağlantısında sürüm kontrolü ve bayrak sıfırlama yapıldı mı
 $script:MakroSurumUyumsuz = $false
 $script:MakroKontrolSon = [datetime]::MinValue

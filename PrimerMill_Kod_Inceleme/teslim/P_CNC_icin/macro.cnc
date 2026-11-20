@@ -5,13 +5,18 @@
 ;  Degerler PrimerMill > Ayarlar > KALIBRASYON > "Su anki konum = Tn" ile kaydedilir.
 ;  #4020 sensor X   #4021 sensor Y   (sensorde A = G54 A, Z olcumu degismedi)
 ;  #4030 frez degisimi: 0 otomatik (magazin), 1 manuel   #4031-#4033 manuel degisim noktasi
+;PrimerMill surum 6 (carpisma incelemesi): disk/tutucu ustunde hareket sirasi her yerde ayni:
+;  1) Z en uste (#5163)  2) A duz (#5224)  3) X/Y  4) B ve hedef A egimi disk disinda (sensor / G30 kosesi / yuva)
+;  Z ile A/B, ya da X/Y ile A/B ayni satirda hareket etmez (izinli istisna: home_all icindeki ureticinin kose hareketi).
 
 Sub user_1
 	msg "Zero Z (G92) using toolsetter"
 	gosub sensor_check
 	m5
 	m9
-	g53 g90 g0 z[#5163] a[#5224]
+	;PrimerMill surum 6: once Z en uste, sonra A duz, sonra sensor X/Y (eskiden Z ve A ayni satirda)
+	g53 g90 g0 z[#5163]
+	g53 g90 g0 a[#5224]
 	g53 g90 g0 x[#4020] y[#4021]
 	m54p4
 	g4p0.5
@@ -144,10 +149,14 @@ Endsub
 sub home_all
 	;PrimerMill (MC-04): kalici "pens elle acildi" bayragi takili kalmasin
 	#4039 = 0
+	;PrimerMill surum 6 (carpisma): eski sira z, x, y, a, b idi -> is RESET sonrasi A egikken X/Y uzun frezle
+	;  egik disk/tutucu ustunden gecip carpiyordu. Yeni sira: Z yukari, A home ve DUZ, sonra X/Y (koseye),
+	;  B en son kosede (B donerken disk dikey gecebilir, kose disk/tutucu yaricapi disinda)
 	gosub home_z
+	gosub home_a
+	g53 g90 g0 a[#5224]
 	gosub home_x
 	gosub home_y
-	gosub home_a
         gosub home_b
 
         g0 g53 x-4.0 y-4.0 z-4.0 a4.0
@@ -161,7 +170,8 @@ sub home_all
 	gosub home_b
 
         msg "Home complete"
-	g30
+	;PrimerMill surum 6: G30 tum eksenleri ayni anda surer; yerine sirali park (pm_park)
+	gosub pm_park
         g64 p0.1 d0.001
 endsub
 
@@ -240,9 +250,11 @@ sub change_tool
 			gosub pm_yuva_kontrol
 
 			;Drop current tool
+			;PrimerMill surum 6: Z yukari, A duz, sensor X/Y (disk disi), B ancak orada (B180 -> B0 disk ustunde dikey gecerdi)
 			g53 g90 g0 z[#5163]
-			g53 g90 g0 a[#5224] b[#5225]
-			g53 g90 g0 x[#4020]
+			g53 g90 g0 a[#5224]
+			g53 g90 g0 x[#4020] y[#4021]
+			g53 g90 g0 b[#5225]
 
 
 			if [[#5008] == 0]
@@ -396,7 +408,7 @@ endsub
 
 ;PrimerMill: panel bu macronun yuklu oldugunu buradan anlar
 sub pm_surum
-	#4038 = 5
+	#4038 = 6
 endsub
 
 ;PrimerMill: panelden PENS AC -> pens acilir, makine frezin cikarildigini bilir (T0)
@@ -424,8 +436,11 @@ sub manual_change
 	endif
 	m5
 	m9
+	;PrimerMill surum 6: degisim noktasi diskin ortasinda; B yalniz sensorde (disk disi) dondurulur
 	g53 g90 g0 z[#5163]
-	g53 g90 g0 a[#5224] b[#5225]
+	g53 g90 g0 a[#5224]
+	g53 g90 g0 x[#4020] y[#4021]
+	g53 g90 g0 b[#5225]
 	g53 g90 g0 x[#4031] y[#4032]
 	if [#4033 <> 0]
 		g53 g90 g0 z[#4033]
@@ -913,8 +928,20 @@ sub z_safe
 endsub
 
 sub azxy_safe
-	g53 g90 g0 z[#5163] a[#5224]
+	;PrimerMill surum 6: Z ile A ayni satirda degil (A, Z yukari cikmadan donmesin)
+	g53 g90 g0 z[#5163]
+	g53 g90 g0 a[#5224]
 	g53 g90 g0 x[#4020] y[#4021]
+endsub
+
+;PrimerMill surum 6: G30 yerine sirali park. G30 X/Y/Z/A/B'yi ayni anda surer: disk ustunden gelirken
+;  A -4.84'e (duzden ~25 derece) donerek carpabilir. Sira: Z en ust, A duz, G30 X/Y (kose, disk disi), G30 Z, G30 A/B
+sub pm_park
+	g53 g90 g0 z[#5163]
+	g53 g90 g0 a[#5224]
+	g53 g90 g0 x[#5181] y[#5182]
+	g53 g90 g0 z[#5183]
+	g53 g90 g0 a[#5184] b[#5185]
 endsub
 
 sub check_empty_tool
@@ -925,10 +952,12 @@ sub check_empty_tool
 	endif
 endsub
 
-;PrimerMill: guvenli home - Z yukari, switch ustu (#4901 #4902), C kol duz, sonra orijinal home_all
+;PrimerMill: guvenli home - Z yukari, A duz, switch ustu (#4901 #4902), B duz, sonra home_all (cagrilmiyor)
 sub pm_home_guvenli
+	;PrimerMill surum 6: A duz X/Y'den ONCE; B disk disinda (X/Y'den sonra)
 	g53 g90 g0 z[#5163]
+	g53 g90 g0 a[#5224]
 	g53 g90 g0 x[#4901] y[#4902]
-	g53 g90 g0 a[#5224] b[#5225]
+	g53 g90 g0 b[#5225]
 	gosub home_all
 endsub

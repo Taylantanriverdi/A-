@@ -55,7 +55,7 @@ echo.
 echo  Yapilacaklar:
 echo    1. Eding ve acik panel kapatilir - is calisiyorsa KAPATMAZ, durur
 echo    2. %EDING%\macro.cnc ve cnc.ini yedeklenir
-echo    3. Yeni macro.cnc - surum 5 - kopyalanir
+echo    3. Yeni macro.cnc - surum 6 - kopyalanir
 echo    4. Masaustune "PrimerMill 2" kisayolu konur
 echo    5. Yeni panel acilir
 echo.
@@ -94,9 +94,9 @@ echo        %EDING%\cnc_yedek_%TS%.ini
 echo  [3/5] Yeni macro.cnc kopyalaniyor...
 copy /y "%YENIMAKRO%" "%EDING%\macro.cnc" >nul
 if errorlevel 1 goto kopya_hata
-findstr /c:"#4038 = 5" "%EDING%\macro.cnc" >nul
+findstr /c:"#4038 = 6" "%EDING%\macro.cnc" >nul
 if errorlevel 1 goto surum_hata
-echo        Tamam: makro surum 5
+echo        Tamam: makro surum 6
 
 echo  [4/5] Masaustu kisayolu: PrimerMill 2
 "%PS%" -NoProfile -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\PrimerMill 2.lnk'); $s.TargetPath='%PANEL%\KazimaBaslat.bat'; $s.WorkingDirectory='%PANEL%'; $s.Save()" >nul 2>&1
@@ -117,7 +117,7 @@ goto son_hata
 echo  HATA: macro.cnc kopyalanamadi - dosya acik olabilir.
 goto son_hata
 :surum_hata
-echo  HATA: kopyalanan macro.cnc surum 5 degil.
+echo  HATA: kopyalanan macro.cnc surum 6 degil.
 goto son_hata
 
 :son_hata

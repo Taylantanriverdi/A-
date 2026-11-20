@@ -36,7 +36,7 @@ copy /y "%EDING%\%SON%" "%EDING%\macro.cnc" >nul
 if errorlevel 1 goto kopya_hata
 echo.
 echo  Tamam: eski macro.cnc geri kondu. Eski paneli eskisi gibi acabilirsiniz.
-echo  Not: yeni panel surum 5 makro ister; eski makroyla is baslatmaz.
+echo  Not: yeni panel surum 6 makro ister; eski makroyla is baslatmaz.
 goto son
 :kapanmadi
 echo  Eding KAPATILMADI, geri alinmadi.
