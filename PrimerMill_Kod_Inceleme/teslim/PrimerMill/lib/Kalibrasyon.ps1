@@ -75,7 +75,8 @@ function Yuva-Git {
         if (-not (Onay "İş milinde freze var (T$([Eding]::CncGetCurrentToolNumber())). $ad yuvasında freze varsa çarpabilir; iş mili en üstte gidecek ve üstünde duracak. Devam?" 'Yuvaya git')) { return }
     }
     $h = Yuva-Hedef $ad
-    $sat = @('G90 G53 G0 Z[#5163]', "G53 G0 A$(Sayi $h.A) B$(Sayi $h.B)", "G53 G0 X$(Sayi $h.X) Y$(Sayi $h.Y)")
+    # Çarpışma incelemesi: Z üst, A düz, B en yakın düz açı (büyük B dönüşü disk dışında), X/Y, hedef A/B en son (Değişim noktası disk ortasında)
+    $sat = Guvenli-Sira-Simdi @("G53 G0 X$(Sayi $h.X) Y$(Sayi $h.Y)") @("G53 G0 A$(Sayi $h.A) B$(Sayi $h.B)") ([double]$h.B)
     if ($ad -eq 'Değişim' -and $h.Z -and $h.Z -ne 0) { $sat += "G53 G0 Z$(Sayi $h.Z)" }
     $ok = Satirlar-Gonder "$ad noktasına git" $sat 90
     if ($ok) { $script:SonAyarYuva = $ad; $script:YuvaDurumMetni = "İş mili $ad üstünde (en üstte). Şimdi X/Y ile ortala, gerekirse aşağı in." }

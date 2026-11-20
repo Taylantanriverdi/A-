@@ -3130,15 +3130,23 @@ function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz) {
     if ($milAcik -and $S -gt 0) { $C.Add("S$(& $fmt $S) M3") }
     if ($m7) { $C.Add('M7') }; if ($m8) { $C.Add('M8') }
     $C.Add('GOSUB Z_SAFE'); $C.Add('GOSUB AZXY_SAFE')
-    $C.Add("G0 A$(& $fmt $A) B$(& $fmt $B)")
-    $C.Add("G90 F$(& $fmt $ilerle)")
     if ($q -gt $r -and $null -ne $X -and $null -ne $Y -and $null -ne $Z) {
-        # Yakın nokta: iş mili yukarıdayken X/Y'ye gider, sonra yavaşça kaldığı Z'ye iner
+        # Yakın nokta (çarpışma incelemesi, makro sürüm 6): AZXY_SAFE sonrası iş mili en üstte, A düz, sensör X/Y'de (disk dışı).
+        # B burada döner (B180 dönüşü disk ortasında diski dikey geçirir); X/Y'ye disk DÜZ iken gidilir; A eğimi en son,
+        # noktanın üstünde (eğik disk üstünden X/Y gezinmesi yok). Sonra yavaşça kaldığı Z'ye iner.
+        $C.Add("G0 B$(& $fmt $B)")
+        $C.Add("G90 F$(& $fmt $ilerle)")
         $C.Add("G0 X$(& $fmt $X) Y$(& $fmt $Y)")
+        $C.Add("G0 A$(& $fmt $A)")
         $C.Add("G1 Z$(& $fmt $Z) F$(& $fmt ([math]::Min($ilerle, 600)))")
         $C.Add("G$G Z$(& $fmt $Z) F$(& $fmt $ilerle)")
         $bas = $q
-    } else { $bas = $r }
+    } else {
+        # güvenli kip: A/B sensör X/Y'de (disk dışında) döner, CAM kendi Z_SAFE satırından sürer (çıktı değişmedi)
+        $C.Add("G0 A$(& $fmt $A) B$(& $fmt $B)")
+        $C.Add("G90 F$(& $fmt $ilerle)")
+        $bas = $r
+    }
     $harita = @{ Bas = $C.Count + 1; Orijinal = $bas + 1 }
     for ($i = $bas; $i -lt $L.Length; $i++) { $C.Add($L[$i]) }
     $hedef = [System.IO.Path]::Combine($IsKlasor, ([System.IO.Path]::GetFileNameWithoutExtension($kaynak) -replace '_devam\d*$', '') + '_devam.nc')
@@ -3426,8 +3434,8 @@ function Btn-FrezBirak {
     $tk = [Eding]::CncGetCurrentToolNumber()
     if ($tk -eq 0) { [Kayit]::Show('Yazılıma göre iş milinde freze yok (T0).', 'Frez Bırak', 'OK', 'Information') | Out-Null; return }
     if (-not (Onay "İş milindeki T$tk kendi yuvasına bırakılacak.`r`n`r`nT$tk yuvası BOŞ mu ve kompresör açık mı?" 'Frez Bırak')) { return }
-    $script:TakimKomutuAni = Get-Date
-    [void](Komut-Sonucu 'Frez Bırak (M6 T0)' ([Eding]::CncRunSingleLine('M6 T0')))
+    # Çarpışma incelemesi: önce Z üst, A düz, B en yakın düz açı (makro sürüm 6 da sensöre disk düz gider)
+    [void](Satirlar-Gonder 'Frez Bırak (M6 T0)' @((Guvenli-Sira-Simdi @() @()) + 'M6 T0') 180)
 }
 
 function Btn-Home([bool]$sor = $true) {
@@ -3436,7 +3444,7 @@ function Btn-Home([bool]$sor = $true) {
     if ([Eding]::CncGetEMStopActive() -ne 0) { [Kayit]::Show('Önce makinedeki acil stop butonunu bırak.', 'Home', 'OK', 'Warning') | Out-Null; return }
     if (Is-Suruyor-Uyari 'Home') { return }
     # GV-09: "iş milinde freze olmamalı" sorusu sade sürümde de atlanmaz (açılıştaki geri sayım penceresi aynı soruyu sorar)
-    if ($sor -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra C kol düz, sonra X, Y, A, B.`r`n`r`nİş milinde freze olmamalı (Eding'e göre: T$([Eding]::CncGetCurrentToolNumber())), kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
+    if ($sor -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra kol (A) düz, sonra X, Y (köşe), en son B.`r`n`r`nİş milinde freze olmamalı (Eding'e göre: T$([Eding]::CncGetCurrentToolNumber())), kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
 
     $form.Cursor = 'WaitCursor'
     try {
@@ -3444,7 +3452,18 @@ function Btn-Home([bool]$sor = $true) {
         Yaz "Home: sürücüler açılıyor (reset): $([Eding]::RCText([Eding]::CncReset()))"
         Start-Sleep -Milliseconds 800
 
-        # Home: makinenin orijinal home_all makrosu (orijinal yazılımdaki gibi)
+        # Çarpışma incelemesi (iş RESET'lenip HOME'a basılınca uzun frez eğik diske çarpıyordu): eksenler zaten home'luysa
+        # (konum biliniyor) önce iş mili en üste, A düz, B en yakın düz açıya, sonra G30 köşesine (disk dışı); home_all
+        # (makro sürüm 6: z, a + düz, x, y, b) kalanını köşede yapar. Home'suzsa doğrudan home_all. MAKİNEDE DOĞRULA.
+        if ([Eding]::CncGetAllAxesHomed() -ne 0) {
+            Yaz 'Home öncesi: iş mili en üste, disk düz, köşeye (G30 X/Y)...'
+            if (-not (Satirlar-Gonder 'Home öncesi geri çekilme' (Guvenli-Sira-Simdi @('G53 G0 X[#5181] Y[#5182]') @()) 90)) {
+                if (-not (Onay "Home öncesi güvenli geri çekilme yapılamadı (Detaylar kaydına bak).`r`n`r`nYine de home alınsın mı? (makro önce Z'yi kaldırır, kolu düzler, sonra X/Y)" 'Home')) { return }
+                [void][Eding]::CncReset(); Start-Sleep -Milliseconds 800
+            }
+        }
+
+        # Home: home_all makrosu (sürüm 6 sırası: Z, A düz, X, Y, B; sonunda sıralı park)
         Yaz 'Home: makinenin home_all makrosu çalışıyor...'
         $rc = [Eding]::CncRunSingleLine('gosub home_all')
         if (-not (Rc-Tamam $rc)) { [void](Komut-Sonucu 'Home (gosub home_all)' $rc); return }
@@ -3704,17 +3723,15 @@ function Btn-Temizlik {
     if ((Calisiyor-Mu)) { [Kayit]::Show('Makine çalışıyor. Önce DURDUR.', 'Temizlik', 'OK', 'Warning') | Out-Null; return }
     $form.Cursor = 'WaitCursor'
     try {
-        if (-not (Komut-Sonucu 'Z en üste' ([Eding]::CncRunSingleLine('G53 G0 Z[#5163]')))) { return }
-        if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Z hareketi bitmedi, kol döndürülmedi.'; return }
+        # Çarpışma incelemesi: Z üst -> A düz -> B en yakın düz açı (disk ters ise B yalnız disk dışında döner) -> X/Y.
+        # Park: eskiden tek satır G30 (tüm eksenler aynı anda: disk üstünden A -4.84'e dönerek köşeye). MAKİNEDE DOĞRULA.
         if (-not $script:TemizlikDuz) {
-            if (Komut-Sonucu 'Kol yatay' ([Eding]::CncRunSingleLine('G53 G0 A[#5224] B[#5225]'))) {
-                if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Kol hareketi bitmedi ya da durum okunamadı.'; return }
+            if (Satirlar-Gonder 'Kol yatay' (Guvenli-Sira-Simdi @() @('G53 G0 A[#5224] B[#5225]') -BDuz) 60) {
                 $script:TemizlikDuz = $true; $btnTemizlik.Text = 'PARK'
                 Yaz 'Temizlik: kol yatay. Bitince PARK''a bas.'
             }
         } else {
-            if (Komut-Sonucu 'Park konumu (G30)' ([Eding]::CncRunSingleLine('G30'))) {
-                if (-not (Hareket-Bitene-Kadar-Bekle 60)) { Yaz 'Park hareketi bitmedi ya da durum okunamadı.'; return }
+            if (Satirlar-Gonder 'Park konumu (sıralı G30)' (Park-Satirlari-Simdi) 90) {
                 $script:TemizlikDuz = $false; $btnTemizlik.Text = 'TEMİZLİK'
                 Yaz 'Park konumuna dönüldü.'
             }
@@ -4054,6 +4071,19 @@ function Satirlar-Gonder([string]$ad, [string[]]$satirlar, [int]$bekle = 60) {
     return $true
 }
 
+# ---------------- Çarpışma: güvenli hareket sırası (takım dik, disk/tutucu A ve B ile eğilir) ----------------
+# Guvenli-Sira (Cekirdek.ps1) o anki makine B'si ve G54 B (#5225) ile. -BDuz: hedef B = #5225 (disk üst yüzü yukarı).
+# B'nin disk dışında döneceği nokta: sensör (#4020/#4021 kayıtlıysa), değilse G30 köşesi.
+function Guvenli-Sira-Simdi([string[]]$xy, [string[]]$son, [double]$bHedef = [double]::NaN, [switch]$BDuz) {
+    $mB = [double]([Eding]::MachinePos()).B; $b0 = [double][Eding]::CncGetVariable(5225)
+    $dis = 'G53 G0 X[#5181] Y[#5182]'
+    if ([Eding]::CncGetVariable(4020) -ne 0 -and [Eding]::CncGetVariable(4021) -ne 0) { $dis = 'G53 G0 X[#4020] Y[#4021]' }
+    $bh = $bHedef; if ($BDuz) { $bh = $b0 }
+    return (Guvenli-Sira $mB $b0 $xy $son $bh $dis)
+}
+# Sıralı park (G30 yerine): Z üst, A düz, B en yakın düz açı, G30 X/Y (köşe), G30 Z, G30 A/B (köşede)
+function Park-Satirlari-Simdi { return (Guvenli-Sira-Simdi @('G53 G0 X[#5181] Y[#5182]') @('G53 G0 Z[#5183]', 'G53 G0 A[#5184] B[#5185]')) }
+
 # --- HAREKET ---
 function Jog([string]$eksen, [int]$yon) {
     if (-not (Hazir-Hareket 'Elle hareket')) { return }
@@ -4077,21 +4107,19 @@ function Yuvaya-Git([string]$ad) {
     $mut = $script:YuvaMutlak[$ad]
     $rn = [regex]::Match($ad, '^T(\d)$')
     if ($ad -eq 'Sensör' -and [Eding]::CncGetVariable(4020) -ne 0 -and [Eding]::CncGetVariable(4021) -ne 0) {
-        $ok = Satirlar-Gonder "$ad üstüne git" @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#5224] B[#5225]', 'G53 G0 X[#4020] Y[#4021]') 90
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @('G53 G0 X[#4020] Y[#4021]') @('G53 G0 A[#5224] B[#5225]') -BDuz) 90
     } elseif ($rn.Success -and [Eding]::CncGetVariable(4010) -ne 0 -and [Eding]::CncGetVariable(4010 + [int]$rn.Groups[1].Value) -ne 0) {
         $k = [int]$rn.Groups[1].Value
-        $ok = Satirlar-Gonder "$ad üstüne git" @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#4017] B[#4018]', "G53 G0 X[#4010] Y[#$(4010 + $k)]") 90
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @("G53 G0 X[#4010] Y[#$(4010 + $k)]") @('G53 G0 A[#4017] B[#4018]') ([double][Eding]::CncGetVariable(4018))) 90
     } elseif ($mut) {
         # macro'daki sabit (G53) konum: frez alırken kullanılan nokta ile birebir aynı
         $ab = if ($null -ne $mut.A) { "G53 G0 A$(Sayi $mut.A) B$(Sayi $mut.B)" } else { 'G53 G0 A[#5224] B[#5225]' }
-        $ok = Satirlar-Gonder "$ad üstüne git" @('G90 G53 G0 Z[#5163]', $ab, "G53 G0 X$(Sayi $mut.X) Y$(Sayi $mut.Y)") 90
+        $bh = if ($null -ne $mut.A) { [double]$mut.B } else { [double][Eding]::CncGetVariable(5225) }
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @("G53 G0 X$(Sayi $mut.X) Y$(Sayi $mut.Y)") @($ab) $bh) 90
     } else {
         $ofs = $TakimY[$ad]
         $ofsTxt = if ($ofs -lt 0) { "$ofs" } else { "+$ofs" }
-        $ok = Satirlar-Gonder "$ad üstüne git" @(
-            'G90 G53 G0 Z[#5163]',
-            'G53 G0 A[#5224] B[#5225]',
-            "G53 G0 X[#5221-$($script:YuvaX)] Y[#5222$ofsTxt]") 90
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @("G53 G0 X[#5221-$($script:YuvaX)] Y[#5222$ofsTxt]") @('G53 G0 A[#5224] B[#5225]') -BDuz) 90
     }
     if ($ok) { $script:SonYuva = $ad; $lblYuva.Text = "İş mili $ad üstünde (yukarıda)" }
 }
@@ -4115,7 +4143,7 @@ function Takim-Degistir([int]$n) {
     $simdiki = [Eding]::CncGetCurrentToolNumber()
     $m = if ($n -eq 0) { "İş milindeki T$simdiki yuvasına bırakılacak.`r`nYuvası boş mu?" } else { "İş milindeki T$simdiki bırakılıp T$n alınacak, sonra boyu ölçülecek.`r`nT$n yuvasında freze var mı, T$simdiki'in yuvası boş mu?" }
     if (-not (Onay $m 'Takım değiştir')) { return }
-    [void](Satirlar-Gonder "M6 T$n" @("M6 T$n") 180)
+    [void](Satirlar-Gonder "M6 T$n" @((Guvenli-Sira-Simdi @() @()) + "M6 T$n") 180)   # önce Z üst, A düz, B düz (çarpışma)
 }
 
 function Takim-Olc {
@@ -4123,13 +4151,13 @@ function Takim-Olc {
     if (-not (Takim-Kapisi 'Takım boyu ölç')) { return }
     if ([Eding]::CncGetCurrentToolNumber() -eq 0) { [Kayit]::Show('İş milinde freze yok (T0). Önce bir takım al.', 'Takım boyu ölç', 'OK', 'Information') | Out-Null; return }
     if (-not (Onay 'İş mili sensöre gidip takım boyunu ölçecek (G92 Z güncellenir). Devam?' 'Takım boyu ölç')) { return }
-    [void](Satirlar-Gonder 'Takım boyu ölç' @('gosub user_1') 120)
+    [void](Satirlar-Gonder 'Takım boyu ölç' @((Guvenli-Sira-Simdi @() @()) + 'gosub user_1') 120)
 }
 
 function Asinma-Kontrol {
     if (-not (Hazir-Hareket 'Aşınma kontrolü')) { return }
     if ([Eding]::CncGetCurrentToolNumber() -eq 0) { [Kayit]::Show('İş milinde freze yok (T0).', 'Aşınma kontrolü', 'OK', 'Information') | Out-Null; return }
-    if (Satirlar-Gonder 'Aşınma kontrolü' @('M100') 120) {
+    if (Satirlar-Gonder 'Aşınma kontrolü' @((Guvenli-Sira-Simdi @() @()) + 'M100') 120) {
         $as = [Eding]::CncGetVariable(4002) - [Eding]::CncGetVariable(5063)
         Yaz "Aşınma: $(Sayi $as) mm (sınır #4005 = $(Sayi ([Eding]::CncGetVariable(4005))))"
         [Kayit]::Show("Ölçülen aşınma: $(Sayi $as) mm`r`nSınır (#4005): $(Sayi ([Eding]::CncGetVariable(4005))) mm`r`n`r`nAyrıntı Eding mesajlarında.", 'Aşınma kontrolü', 'OK', 'Information') | Out-Null
@@ -4139,7 +4167,7 @@ function Asinma-Kontrol {
 function Bos-Mu {
     if (-not (Hazir-Hareket 'İş mili boş mu')) { return }
     if (-not (Onay 'İş mili sensöre inip boş olup olmadığını kontrol edecek. Devam?' 'İş mili boş mu')) { return }
-    if (Satirlar-Gonder 'İş mili boş mu' @('gosub is_empty_tool') 120) { [Kayit]::Show('İş mili boş.', 'İş mili boş mu', 'OK', 'Information') | Out-Null }
+    if (Satirlar-Gonder 'İş mili boş mu' @((Guvenli-Sira-Simdi @() @()) + 'gosub is_empty_tool') 120) { [Kayit]::Show('İş mili boş.', 'İş mili boş mu', 'OK', 'Information') | Out-Null }
 }
 
 # --- İŞ MİLİ VE HAVA ---
@@ -4674,10 +4702,11 @@ for ($i = 0; $i -lt $eksenler.Count; $i++) {
 
 A-Baslik 'HAZIR KONUMLAR' 24 182
 [void](A-Buton 'İş mili en üste' 24 208 170 40 { Yukari-Kaldir })
-[void](A-Buton 'Kol düz (takım alma)' 200 208 170 40 { Konuma-Git 'Kol düz' @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#5224] B[#5225]') '' })
-[void](A-Buton 'Takım alanı' 376 208 170 40 { Konuma-Git 'Takım alanı' @('gosub azxy_safe') '' })
-[void](A-Buton 'Blok değiştirme' 552 208 170 40 { Konuma-Git 'Blok değiştirme' @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#5224] B[#5225]', 'gosub ClearPos') '' })
-[void](A-Buton 'Park (G30)' 728 208 170 40 { Konuma-Git 'Park (G30)' @('G90 G53 G0 Z[#5163]', 'G30') '' })
+# Çarpışma incelemesi: Z üst -> A düz -> B en yakın düz açı (büyük B dönüşü disk dışında) -> X/Y -> hedef açı (Guvenli-Sira-Simdi)
+[void](A-Buton 'Kol düz (takım alma)' 200 208 170 40 { Konuma-Git 'Kol düz' (Guvenli-Sira-Simdi @() @('G53 G0 A[#5224] B[#5225]') -BDuz) '' })
+[void](A-Buton 'Takım alanı' 376 208 170 40 { Konuma-Git 'Takım alanı' @((Guvenli-Sira-Simdi @() @()) + 'gosub azxy_safe') '' })
+[void](A-Buton 'Blok değiştirme' 552 208 170 40 { Konuma-Git 'Blok değiştirme' @((Guvenli-Sira-Simdi @() @('G53 G0 A[#5224] B[#5225]') -BDuz) + 'gosub ClearPos') '' })
+[void](A-Buton 'Park (G30)' 728 208 170 40 { Konuma-Git 'Park (G30)' (Park-Satirlari-Simdi) '' })
 [void](A-Etiket 'Her konumda önce iş mili en üste çıkar. "Blok değiştirme", bloğu takıp çıkarmak için kolu öne getirir.' 24 256 880)
 $lblYuva = A-Etiket '' 24 290 880
 $lblYuva.ForeColor = $cAltinAc
@@ -4785,7 +4814,8 @@ function Yuva-Git {
         if (-not (Onay "İş milinde freze var (T$([Eding]::CncGetCurrentToolNumber())). $ad yuvasında freze varsa çarpabilir; iş mili en üstte gidecek ve üstünde duracak. Devam?" 'Yuvaya git')) { return }
     }
     $h = Yuva-Hedef $ad
-    $sat = @('G90 G53 G0 Z[#5163]', "G53 G0 A$(Sayi $h.A) B$(Sayi $h.B)", "G53 G0 X$(Sayi $h.X) Y$(Sayi $h.Y)")
+    # Çarpışma incelemesi: Z üst, A düz, B en yakın düz açı (büyük B dönüşü disk dışında), X/Y, hedef A/B en son (Değişim noktası disk ortasında)
+    $sat = Guvenli-Sira-Simdi @("G53 G0 X$(Sayi $h.X) Y$(Sayi $h.Y)") @("G53 G0 A$(Sayi $h.A) B$(Sayi $h.B)") ([double]$h.B)
     if ($ad -eq 'Değişim' -and $h.Z -and $h.Z -ne 0) { $sat += "G53 G0 Z$(Sayi $h.Z)" }
     $ok = Satirlar-Gonder "$ad noktasına git" $sat 90
     if ($ok) { $lblYuvaDurum.Text = "İş mili $ad üstünde (en üstte). Şimdi X/Y ile ortala, gerekirse aşağı in." }
@@ -5006,6 +5036,27 @@ $KalGruplar = @{ 1 = @(15.5, 3.0); 2 = @(-15.5, -2.0); 3 = @(-2.5, 21.0); 4 = @(
 $KalGrupYer = @{ 1 = 'merkezin sağı'; 2 = 'merkezin solu'; 3 = 'merkezin önü (saat 6 tarafı)'; 4 = 'merkezin arkası, sağa yakın' }
 $KalHalkaR = 38.0
 
+# --- ÇARPIŞMA: güvenli hareket sırası (takım her zaman dik; disk/tutucu A ve B ile eğilir) ---
+# Kural (macro.cnc sürüm 6 ile aynı): 1) Z en üste (#5163)  2) A düz (#5224)  3) X/Y  4) B ve hedef A eğimi disk dışında.
+# B180 -> B0 gibi büyük B dönüşleri disk ortasında diski dikey geçirir (yükseklik = tutucu yarıçapı): yalnız disk dışında.
+# MAKİNEDE DOĞRULA (INCELEME_RAPORU.md Çarpışma incelemesi).
+# Park (G30 yerine): G30 tüm eksenleri aynı anda sürer; disk üstünden gelirken A'yı -4.84'e (düzden ~25°) döndürür.
+function Park-Satirlari { return @('G53 G90 G0 Z[#5163]', 'G53 G90 G0 A[#5224]', 'G53 G90 G0 X[#5181] Y[#5182]', 'G53 G90 G0 Z[#5183]', 'G53 G90 G0 A[#5184] B[#5185]') }
+# B ekseninde $mB'ye en yakın düz açı ($b0 + k·180; B0 ve B180 düz). Oraya dönüş eğimi hep azaltır: her X/Y'de güvenli.
+function B-Duz-Aci([double]$mB, [double]$b0) { return ($b0 + 180.0 * [math]::Round(($mB - $b0) / 180.0)) }
+# Panelden hareket: Z üst, A düz, B en yakın düz açıya; hedef B (bHedef, makine) en yakın düz açıdan 5°'den fazla uzaksa
+# önce disk dışındaki noktaya ($disXY) gidip B orada döner; sonra $xy, sonra $son (hedef A/B, Z).
+function Guvenli-Sira([double]$mB, [double]$b0, [string[]]$xy, [string[]]$son, [double]$bHedef = [double]::NaN, [string]$disXY = 'G53 G0 X[#5181] Y[#5182]') {
+    $s = New-Object System.Collections.Generic.List[string]
+    $s.Add('G90 G53 G0 Z[#5163]'); $s.Add('G53 G0 A[#5224]')
+    $d = B-Duz-Aci $mB $b0
+    if ([math]::Abs($mB - $d) -gt 0.05) { $s.Add("G53 G0 B$(Sayi $d)") }
+    if (-not [double]::IsNaN($bHedef) -and [math]::Abs($bHedef - $d) -gt 5.0) { $s.Add($disXY); $s.Add("G53 G0 B$(Sayi $bHedef)") }
+    foreach ($l in @($xy)) { if ($l) { $s.Add([string]$l) } }
+    foreach ($l in @($son)) { if ($l) { $s.Add([string]$l) } }
+    return ,($s.ToArray())
+}
+
 function Kal-Saat([double]$derece) {
     # Saat 3'ten saat yönünde (öne doğru) derece -> "3:45" gibi
     $dk = [int][math]::Round((3 * 60 + $derece * 2) % 720)
@@ -5146,7 +5197,7 @@ function Kal-NC-Uret([double]$T, [double]$D, [int]$k = 1) {
     & $L 'G0 B0.0'
     & $L 'M5'
     & $L 'T0 M6'
-    & $L 'G30'
+    foreach ($p in (Park-Satirlari)) { & $L $p }   # G30 yerine sıralı park (çarpışma incelemesi)
     & $L 'M30'
     & $L '%'
     return $sb.ToString()
@@ -5497,7 +5548,7 @@ function OtoKal-NC-Uret([double]$T, [int]$kimlik) {
     & $L 'msg "PM KALIBRASYON: olcum bitti - PrimerMill > Ayarlar > OTO KALIBRASYON > SONUCLARI OKU"'
     & $L 'M5'
     & $L 'T0 M6'
-    & $L 'G30'
+    foreach ($p in (Park-Satirlari)) { & $L $p }   # G30 yerine sıralı park (çarpışma incelemesi)
     & $L 'M30'
     & $L '%'
     return $sb.ToString()
@@ -5650,6 +5701,8 @@ function OtoKal-Sim-Uret([string]$nc, [double]$T) {
         if ($u -match '^#(\d+)\s*=\s*(.+)$') { $deg[[int]$Matches[1]] = & $hesap $Matches[2]; & $L "($u  ->  $(& $f $deg[[int]$Matches[1]]))"; continue }
         if ($u -match '^(if\s|endif|errmsg|msg\s)') { continue }
         if ($u -match '^GOSUB\s+user_1') { & $L 'M100 (GOSUB user_1: takim boyu sensorde)'; continue }
+        # sıralı park (G53 + makine değişkenleri #5163/#5181..): simülasyonda makine koordinatı yok -> yorum
+        if ($u -match '^G53\b' -and $u.Contains('[')) { & $L "($u : park, simulasyonda yok)"; continue }
         # [ifade] -> sayı
         $u2 = [regex]::Replace($u, '\[[^\[\]]*(\[[^\[\]]*\][^\[\]]*)*\]', { param($m) & $f (& $hesap $m.Value) })
         $g = [regex]::Match($u2, '^G38\.2\s+Z(-?[\d.]+)\s+F([\d.]+)')

@@ -611,6 +611,7 @@ function Devam-Baslat($k, [string]$mod, [int]$takimSimdi) {
             try { [Kayit]::Yaz("DEVAM: #4099=0 -> $([Eding]::RCText([Eding]::CncRunSingleLine('#4099=0')))"); [void](Hareket-Bitene-Kadar-Bekle 3) } catch { }
         }
         if (-not (Bayrak-Sifirla 'Devam')) { (Ui-Kutu "Takım bildirim bayrağı (#4039) sıfırlanamadı. Devam başlatılmadı." 'Devam' 'OK' 'Warning') | Out-Null; return }
+        if (-not (Carpisma-Hazirla $d.Yol)) { return }   # takım boyu / eğik tutucu taraması (çarpışma incelemesi)
         if (-not (Komut-Sonucu 'Devam programı yükleme' ([Eding]::CncLoadJobA($d.Yol)))) { return }
         $rc = Is-Calistir
         if (Komut-Sonucu 'Devam başlat' $rc) {
@@ -791,6 +792,7 @@ function Btn-Baslat-Ic {
         try { if ([Eding]::CncGetVariable(4034) -ne 0) { [void][Eding]::CncRunSingleLine('#4034=0'); [void](Hareket-Bitene-Kadar-Bekle 3) } } catch { }
         if (-not (Bayrak-Sifirla 'Başlat')) { (Ui-Kutu "Takım bildirim bayrağı (#4039) sıfırlanamadı. Kazıma başlatılmadı." 'Başlat' 'OK' 'Warning') | Out-Null; return }
         $script:ManuelSonSeq = ''
+        if (-not (Carpisma-Hazirla $yuklenecek)) { return }   # takım boyu / eğik tutucu taraması (çarpışma incelemesi)
         Yaz "Eding'e yükleniyor: $($script:SeciliDosya)"
         if (-not (Komut-Sonucu 'Dosya yükleme' ([Eding]::CncLoadJobA($yuklenecek)))) { return }
         $rc = Is-Calistir
@@ -844,8 +846,8 @@ function Btn-FrezBirak {
     $tk = [Eding]::CncGetCurrentToolNumber()
     if ($tk -eq 0) { (Ui-Kutu 'Yazılıma göre iş milinde freze yok (T0).' 'Frez Bırak' 'OK' 'Information') | Out-Null; return }
     if (-not (Ui-Tehlikeli-Onay 'Frez Bırak' "İş milindeki T$tk kendi yuvasına bırakılacak.`r`n`r`nT$tk yuvası BOŞ mu ve kompresör açık mı?" $null $null $null)) { return }
-    $script:TakimKomutuAni = Get-Date
-    [void](Komut-Sonucu 'Frez Bırak (M6 T0)' ([Eding]::CncRunSingleLine('M6 T0')))
+    # Çarpışma incelemesi: önce Z üst, A düz, B en yakın düz açı (makro sürüm 6 da sensöre disk düz gider)
+    [void](Satirlar-Gonder 'Frez Bırak (M6 T0)' @((Guvenli-Sira-Simdi @() @()) + 'M6 T0') 180)
 }
 
 function Btn-Home([bool]$sor = $true) {
@@ -854,7 +856,7 @@ function Btn-Home([bool]$sor = $true) {
     if ([Eding]::CncGetEMStopActive() -ne 0) { (Ui-Kutu 'Önce makinedeki acil stop butonunu bırak.' 'Home' 'OK' 'Warning') | Out-Null; return }
     if (Is-Suruyor-Uyari 'Home') { return }
     # GV-09: "iş milinde freze olmamalı" sorusu sade sürümde de atlanmaz (açılıştaki geri sayım penceresi aynı soruyu sorar)
-    if ($sor -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra C kol düz, sonra X, Y, A, B.`r`n`r`nİş milinde freze olmamalı (Eding'e göre: T$([Eding]::CncGetCurrentToolNumber())), kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
+    if ($sor -and -not (Onay "Makine home alacak: önce iş mili yukarı, sonra kol (A) düz, sonra X, Y (köşe), en son B.`r`n`r`nİş milinde freze olmamalı (Eding'e göre: T$([Eding]::CncGetCurrentToolNumber())), kapak kapalı olmalı.`r`nDevam edilsin mi?" 'Home')) { return }
 
     Ui-Mesgul 'Home alınıyor…'
     try {
@@ -862,7 +864,18 @@ function Btn-Home([bool]$sor = $true) {
         Yaz "Home: sürücüler açılıyor (reset): $([Eding]::RCText([Eding]::CncReset()))"
         Start-Sleep -Milliseconds 800
 
-        # Home: makinenin orijinal home_all makrosu (orijinal yazılımdaki gibi)
+        # Çarpışma incelemesi (iş RESET'lenip HOME'a basılınca uzun frez eğik diske çarpıyordu): eksenler zaten home'luysa
+        # (konum biliniyor) önce iş mili en üste, A düz, B en yakın düz açıya, sonra G30 köşesine (disk dışı); home_all
+        # (makro sürüm 6: z, a + düz, x, y, b) kalanını köşede yapar. Home'suzsa doğrudan home_all. MAKİNEDE DOĞRULA.
+        if ([Eding]::CncGetAllAxesHomed() -ne 0) {
+            Yaz 'Home öncesi: iş mili en üste, disk düz, köşeye (G30 X/Y)...'
+            if (-not (Satirlar-Gonder 'Home öncesi geri çekilme' (Guvenli-Sira-Simdi @('G53 G0 X[#5181] Y[#5182]') @()) 90)) {
+                if (-not (Onay "Home öncesi güvenli geri çekilme yapılamadı (Detaylar kaydına bak).`r`n`r`nYine de home alınsın mı? (makro önce Z'yi kaldırır, kolu düzler, sonra X/Y)" 'Home')) { return }
+                [void][Eding]::CncReset(); Start-Sleep -Milliseconds 800
+            }
+        }
+
+        # Home: home_all makrosu (sürüm 6 sırası: Z, A düz, X, Y, B; sonunda sıralı park)
         Yaz 'Home: makinenin home_all makrosu çalışıyor...'
         $rc = [Eding]::CncRunSingleLine('gosub home_all')
         if (-not (Rc-Tamam $rc)) { [void](Komut-Sonucu 'Home (gosub home_all)' $rc); return }
@@ -1092,17 +1105,15 @@ function Btn-Temizlik([string]$adim = 'temizlik') {
     if ((Calisiyor-Mu)) { (Ui-Kutu 'Makine çalışıyor. Önce DURDUR.' 'Temizlik' 'OK' 'Warning') | Out-Null; return }
     Ui-Mesgul $(if ($adim -eq 'park') { 'Park konumuna gidiliyor…' } else { 'Temizlik konumuna gidiliyor…' })
     try {
-        if (-not (Komut-Sonucu 'Z en üste' ([Eding]::CncRunSingleLine('G53 G0 Z[#5163]')))) { return }
-        if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Z hareketi bitmedi, kol döndürülmedi.'; return }
+        # Çarpışma incelemesi: Z üst -> A düz -> B en yakın düz açı (disk ters ise B yalnız disk dışında döner) -> X/Y.
+        # Park: eskiden tek satır G30 (tüm eksenler aynı anda: disk üstünden A -4.84'e dönerek köşeye). MAKİNEDE DOĞRULA.
         if ($adim -ne 'park') {
-            if (Komut-Sonucu 'Kol yatay' ([Eding]::CncRunSingleLine('G53 G0 A[#5224] B[#5225]'))) {
-                if (-not (Hareket-Bitene-Kadar-Bekle 30)) { Yaz 'Kol hareketi bitmedi ya da durum okunamadı.'; return }
+            if (Satirlar-Gonder 'Kol yatay' (Guvenli-Sira-Simdi @() @('G53 G0 A[#5224] B[#5225]') -BDuz) 60) {
                 $script:TemizlikDuz = $true
                 Yaz 'Temizlik: kol yatay. Bitince PARK''a bas.'
             }
         } else {
-            if (Komut-Sonucu 'Park konumu (G30)' ([Eding]::CncRunSingleLine('G30'))) {
-                if (-not (Hareket-Bitene-Kadar-Bekle 60)) { Yaz 'Park hareketi bitmedi ya da durum okunamadı.'; return }
+            if (Satirlar-Gonder 'Park konumu (sıralı G30)' (Park-Satirlari-Simdi) 90) {
                 $script:TemizlikDuz = $false
                 Yaz 'Park konumuna dönüldü.'
             }
@@ -1133,12 +1144,30 @@ function Satirlar-Gonder([string]$ad, [string[]]$satirlar, [int]$bekle = 60) {
     return $true
 }
 
+# ---------------- Çarpışma: güvenli hareket sırası (takım dik, disk/tutucu A ve B ile eğilir) ----------------
+# Guvenli-Sira (Cekirdek.ps1) o anki makine B'si ve G54 B (#5225) ile. -BDuz: hedef B = #5225 (disk üst yüzü yukarı).
+# B'nin disk dışında döneceği nokta: sensör (#4020/#4021 kayıtlıysa), değilse G30 köşesi.
+function Guvenli-Sira-Simdi([string[]]$xy, [string[]]$son, [double]$bHedef = [double]::NaN, [switch]$BDuz) {
+    $mB = [double]([Eding]::MachinePos()).B; $b0 = [double][Eding]::CncGetVariable(5225)
+    $dis = 'G53 G0 X[#5181] Y[#5182]'
+    if ([Eding]::CncGetVariable(4020) -ne 0 -and [Eding]::CncGetVariable(4021) -ne 0) { $dis = 'G53 G0 X[#4020] Y[#4021]' }
+    $bh = $bHedef; if ($BDuz) { $bh = $b0 }
+    return (Guvenli-Sira $mB $b0 $xy $son $bh $dis)
+}
+# Sıralı park (G30 yerine): Z üst, A düz, B en yakın düz açı, G30 X/Y (köşe), G30 Z, G30 A/B (köşede)
+function Park-Satirlari-Simdi { return (Guvenli-Sira-Simdi @('G53 G0 X[#5181] Y[#5182]') @('G53 G0 Z[#5183]', 'G53 G0 A[#5184] B[#5185]')) }
+
 # --- HAREKET ---
 function Jog([string]$eksen, [int]$yon) {
     if (-not (Hazir-Hareket 'Elle hareket')) { return }
     $adim = $script:AdimMm * $yon
     if ($eksen -eq 'Z' -and $yon -lt 0 -and $script:AdimMm -ge 10) {
         if (-not (Onay "Z ekseni $($script:AdimMm) mm AŞAĞI inecek. Altında bir şey olmadığından emin misin?" 'Elle hareket')) { return }
+    }
+    if (@('X', 'Y') -contains $eksen) {
+        # Çarpışma incelemesi: disk eğikken ve uç tutucunun en üst noktasından aşağıdayken X/Y jog uyarısı
+        $uy = $null; try { $uy = Jog-Carpisma-Uyarisi } catch { }
+        if ($uy -and -not (Onay $uy 'Elle hareket')) { return }
     }
     $hiz = if ($eksen -in @('A', 'B')) { [math]::Max(50, [math]::Min(1000, $script:Hiz)) } else { $script:Hiz }
     [void](Satirlar-Gonder "Jog $eksen$(Sayi $adim)" @("G91 G1 $eksen$(Sayi $adim) F$hiz", 'G90') 120)
@@ -1156,21 +1185,19 @@ function Yuvaya-Git([string]$ad) {
     $mut = $script:YuvaMutlak[$ad]
     $rn = [regex]::Match($ad, '^T(\d)$')
     if ($ad -eq 'Sensör' -and [Eding]::CncGetVariable(4020) -ne 0 -and [Eding]::CncGetVariable(4021) -ne 0) {
-        $ok = Satirlar-Gonder "$ad üstüne git" @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#5224] B[#5225]', 'G53 G0 X[#4020] Y[#4021]') 90
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @('G53 G0 X[#4020] Y[#4021]') @('G53 G0 A[#5224] B[#5225]') -BDuz) 90
     } elseif ($rn.Success -and [Eding]::CncGetVariable(4010) -ne 0 -and [Eding]::CncGetVariable(4010 + [int]$rn.Groups[1].Value) -ne 0) {
         $k = [int]$rn.Groups[1].Value
-        $ok = Satirlar-Gonder "$ad üstüne git" @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#4017] B[#4018]', "G53 G0 X[#4010] Y[#$(4010 + $k)]") 90
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @("G53 G0 X[#4010] Y[#$(4010 + $k)]") @('G53 G0 A[#4017] B[#4018]') ([double][Eding]::CncGetVariable(4018))) 90
     } elseif ($mut) {
         # macro'daki sabit (G53) konum: frez alırken kullanılan nokta ile birebir aynı
         $ab = if ($null -ne $mut.A) { "G53 G0 A$(Sayi $mut.A) B$(Sayi $mut.B)" } else { 'G53 G0 A[#5224] B[#5225]' }
-        $ok = Satirlar-Gonder "$ad üstüne git" @('G90 G53 G0 Z[#5163]', $ab, "G53 G0 X$(Sayi $mut.X) Y$(Sayi $mut.Y)") 90
+        $bh = if ($null -ne $mut.A) { [double]$mut.B } else { [double][Eding]::CncGetVariable(5225) }
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @("G53 G0 X$(Sayi $mut.X) Y$(Sayi $mut.Y)") @($ab) $bh) 90
     } else {
         $ofs = $TakimY[$ad]
         $ofsTxt = if ($ofs -lt 0) { "$ofs" } else { "+$ofs" }
-        $ok = Satirlar-Gonder "$ad üstüne git" @(
-            'G90 G53 G0 Z[#5163]',
-            'G53 G0 A[#5224] B[#5225]',
-            "G53 G0 X[#5221-$($script:YuvaX)] Y[#5222$ofsTxt]") 90
+        $ok = Satirlar-Gonder "$ad üstüne git" (Guvenli-Sira-Simdi @("G53 G0 X[#5221-$($script:YuvaX)] Y[#5222$ofsTxt]") @('G53 G0 A[#5224] B[#5225]') -BDuz) 90
     }
     if ($ok) { $script:SonYuva = $ad; $script:YuvaDurumMetni = "İş mili $ad üstünde (yukarıda)" }
 }
@@ -1194,7 +1221,7 @@ function Takim-Degistir([int]$n) {
     $simdiki = [Eding]::CncGetCurrentToolNumber()
     $m = if ($n -eq 0) { "İş milindeki T$simdiki yuvasına bırakılacak.`r`nYuvası boş mu?" } else { "İş milindeki T$simdiki bırakılıp T$n alınacak, sonra boyu ölçülecek.`r`nT$n yuvasında freze var mı, T$simdiki'in yuvası boş mu?" }
     if (-not (Onay $m 'Takım değiştir')) { return }
-    [void](Satirlar-Gonder "M6 T$n" @("M6 T$n") 180)
+    [void](Satirlar-Gonder "M6 T$n" @((Guvenli-Sira-Simdi @() @()) + "M6 T$n") 180)   # önce Z üst, A düz, B düz (çarpışma)
 }
 
 function Takim-Olc {
@@ -1202,13 +1229,13 @@ function Takim-Olc {
     if (-not (Takim-Kapisi 'Takım boyu ölç')) { return }
     if ([Eding]::CncGetCurrentToolNumber() -eq 0) { (Ui-Kutu 'İş milinde freze yok (T0). Önce bir takım al.' 'Takım boyu ölç' 'OK' 'Information') | Out-Null; return }
     if (-not (Onay 'İş mili sensöre gidip takım boyunu ölçecek (G92 Z güncellenir). Devam?' 'Takım boyu ölç')) { return }
-    [void](Satirlar-Gonder 'Takım boyu ölç' @('gosub user_1') 120)
+    [void](Satirlar-Gonder 'Takım boyu ölç' @((Guvenli-Sira-Simdi @() @()) + 'gosub user_1') 120)
 }
 
 function Asinma-Kontrol {
     if (-not (Hazir-Hareket 'Aşınma kontrolü')) { return }
     if ([Eding]::CncGetCurrentToolNumber() -eq 0) { (Ui-Kutu 'İş milinde freze yok (T0).' 'Aşınma kontrolü' 'OK' 'Information') | Out-Null; return }
-    if (Satirlar-Gonder 'Aşınma kontrolü' @('M100') 120) {
+    if (Satirlar-Gonder 'Aşınma kontrolü' @((Guvenli-Sira-Simdi @() @()) + 'M100') 120) {
         $as = [Eding]::CncGetVariable(4002) - [Eding]::CncGetVariable(5063)
         Yaz "Aşınma: $(Sayi $as) mm (sınır #4005 = $(Sayi ([Eding]::CncGetVariable(4005))))"
         (Ui-Kutu "Ölçülen aşınma: $(Sayi $as) mm`r`nSınır (#4005): $(Sayi ([Eding]::CncGetVariable(4005))) mm`r`n`r`nAyrıntı Eding mesajlarında." 'Aşınma kontrolü' 'OK' 'Information') | Out-Null
@@ -1218,7 +1245,7 @@ function Asinma-Kontrol {
 function Bos-Mu {
     if (-not (Hazir-Hareket 'İş mili boş mu')) { return }
     if (-not (Onay 'İş mili sensöre inip boş olup olmadığını kontrol edecek. Devam?' 'İş mili boş mu')) { return }
-    if (Satirlar-Gonder 'İş mili boş mu' @('gosub is_empty_tool') 120) { (Ui-Kutu 'İş mili boş.' 'İş mili boş mu' 'OK' 'Information') | Out-Null }
+    if (Satirlar-Gonder 'İş mili boş mu' @((Guvenli-Sira-Simdi @() @()) + 'gosub is_empty_tool') 120) { (Ui-Kutu 'İş mili boş.' 'İş mili boş mu' 'OK' 'Information') | Out-Null }
 }
 
 # --- İŞ MİLİ VE HAVA ---
@@ -1703,3 +1730,128 @@ $script:SonGecerliSatir = 0
 $script:AdayHam = 0
 $script:AdaySayac = 0
 $script:SonEdingDurum = ''
+
+# ================= ÇARPIŞMA KORUMASI: takım boyu (uç boşluğu) ve eğik disk/tutucu =================
+# İş başlarken program taranır ([CarpismaAnaliz], lib/NcAnaliz.cs): her takımın kalan kısmında, takım disk/tutucu bölgesindeyken
+# diskin en büyük eğimi. İş sürerken her takım değişiminden sonra (takım no ya da G92 Z değişip Eding RUNNING'e dönünce) o takımın
+# uç boşluğu (güvenli Z'de uç yüksekliği) gerekenle karşılaştırılır; yetmezse iş HEMEN duraklatılır (sonraki eğimden önce, elden
+# geldiğince) ve operatöre DURDUR / DEVAM sorulur. Ayar: Ayarlar › Hareket (TutucuYaricap, TutucuYariYukseklik, CarpismaPayi,
+# CarpismaBekci). R / H MAKİNEDE ÖLÇÜLMELİ (INCELEME_RAPORU.md Çarpışma incelemesi).
+$script:CarpAnaliz = $null      # [CarpismaAnaliz] yüklenen programın
+$script:CarpKontrol = $null     # @{ Takim; Uc } son denetlenen takım ve uç boşluğu
+$script:CarpAlarm = $null       # duraklatılan iş için bekleyen uyarı
+$script:CarpAlarmAcik = $false
+
+function Uc-Boslugu-Simdi {
+    $w = [Eding]::WorkPos(); $m = [Eding]::MachinePos()
+    return (Uc-Boslugu ([double][Eding]::CncGetVariable(5163)) ([double]$w.Z) ([double]$m.Z))
+}
+
+function Carpisma-Metni([int]$t, [double]$uc, [double]$egim, [int]$satir, $ay) {
+    $gerek = Bosluk-Hesapla $egim $ay.R $ay.H $ay.Pay
+    $kalan = $uc - ($gerek - $ay.Pay)
+    $ci = [System.Globalization.CultureInfo]::InvariantCulture
+    $f = { param($v) ([double]$v).ToString('0.0', $ci) }
+    $yak = if ($kalan -gt 0) { "uç tutucuya $(& $f $kalan) mm yaklaşır (en az $(& $f $ay.Pay) mm pay gerekir)" } else { "uç tutucuya $(& $f (-$kalan)) mm GİRER (çarpar)" }
+    return "T$t çok uzun: disk $(& $f $egim)° eğikken (programda satır $satir) $yak.`r`n" +
+           "Uç boşluğu (güvenli Z'de uç yüksekliği) $(& $f $uc) mm, gereken $(& $f $gerek) mm " +
+           "(tutucu R $(& $f $ay.R) · H $(& $f $ay.H) · pay $(& $f $ay.Pay) mm, Ayarlar › Hareket)."
+}
+
+# BAŞLAT / DEVAM: yüklenecek program taranır. İş milindeki takım (sıfır değilse) programın ilk takım değişimine kadar kullanılır:
+# onun uç boşluğu şimdi bilinir, yetmezse başlatılmaz. Diğer takımlar iş sırasında (Carpisma-Bekci) denetlenir.
+function Carpisma-Hazirla([string]$yol) {
+    $script:CarpAnaliz = $null; $script:CarpKontrol = $null; $script:CarpAlarm = $null
+    if ([string]$script:Tercih.CarpismaBekci -eq '0') { Yaz 'Çarpışma koruması KAPALI (Ayarlar › Hareket): takım boyu denetlenmiyor.'; return $true }
+    $ay = Carpisma-Ayar
+    try {
+        $v = @{}; foreach ($n in @(4020, 4021, 5181, 5182, 5184, 5185, 5221, 5222, 5224, 5225)) { $v[$n] = [double][Eding]::CncGetVariable($n) }
+        $sx = [double]::NaN; $sy = [double]::NaN
+        if ($v[4020] -ne 0 -and $v[4021] -ne 0) { $sx = $v[4020] - $v[5221]; $sy = $v[4021] - $v[5222] }
+        $script:CarpAnaliz = [CarpismaAnaliz]::Oku($yol, ($ay.R + $ay.Pay), $sx, $sy,
+            ($v[5181] - $v[5221]), ($v[5182] - $v[5222]), ($v[5184] - $v[5224]), ($v[5185] - $v[5225]),
+            $v[5221], $v[5222], $v[5224], $v[5225], ($AEksenSinir[0] - $v[5224]), ($AEksenSinir[1] - $v[5224]))
+    } catch {
+        [Kayit]::Yaz("ÇARPIŞMA: tarama yapılamadı: $($_.Exception.Message)")
+        return (Onay "Programın çarpışma taraması yapılamadı ($($_.Exception.Message)).`r`nTakım boyu iş sırasında denetlenemeyecek.`r`n`r`nYine de başlatılsın mı?" 'Çarpışma riski')
+    }
+    $c = $script:CarpAnaliz
+    $gm = Bosluk-Hesapla $c.EnBuyukEgim $ay.R $ay.H $ay.Pay
+    Yaz "Çarpışma taraması: disk/tutucu üstünde en büyük eğim $([math]::Round($c.EnBuyukEgim, 1))° (satır $($c.EnBuyukSatir)), bunun için uç boşluğu en az $([math]::Round($gm, 1)) mm."
+    $tk = 0; try { $tk = [int][Eding]::CncGetCurrentToolNumber() } catch { }
+    if ($tk -gt 0 -and $c.KalanEgim.Length -gt 0 -and $c.KalanEgim[0] -gt 0.01) {
+        $uc = Uc-Boslugu-Simdi
+        $gerek = Bosluk-Hesapla $c.KalanEgim[0] $ay.R $ay.H $ay.Pay
+        if ($uc -lt $gerek) {
+            $m = Carpisma-Metni $tk $uc $c.KalanEgim[0] $c.KalanSatir[0] $ay
+            [Kayit]::Yaz("ÇARPIŞMA: başlatılmadı: $m")
+            (Ui-Kutu "$m`r`n`r`nİş başlatılmadı. Daha kısa bir frez tak (ya da frezi pense daha derin oturt) ve boyunu ölç." 'Çarpışma riski' 'OK' 'Error') | Out-Null
+            $script:CarpAnaliz = $null
+            return $false
+        }
+    }
+    return $true
+}
+
+# Ana zamanlayıcıdan (200 ms, korumalı blok; pencere açmaz). İş RUNNING iken takım ya da uç boşluğu değiştiyse denetler.
+function Carpisma-Bekci {
+    if (-not $script:IsAktif -or $null -eq $script:CarpAnaliz -or $script:CarpAlarm) { return }
+    $h = $script:Hizli
+    if (-not $h.Okundu -or $h.Durum -ne 'RUNNING' -or [int]$h.Takim -le 0) { return }
+    $c = $script:CarpAnaliz
+    if ($c.KalanEgim.Length -eq 0) { return }
+    $t = [int]$h.Takim
+    $uc = Uc-Boslugu-Simdi
+    $k = $script:CarpKontrol
+    if ($k -and $k.Takim -eq $t -and [math]::Abs([double]$k.Uc - $uc) -lt 0.05) { return }
+    $satir = [int][Eding]::CncGetCurExecLine()
+    $i = [math]::Max(0, [math]::Min($c.KalanEgim.Length - 1, $satir - 1))
+    # Eding takım değişiminden hemen sonra hâlâ M6 satırını gösterebilir: o satır eski takımın parçasıdır, yeni takımınki bir sonraki
+    if ($c.Takim[$i] -ne $t -and $i + 1 -lt $c.Takim.Length -and $c.Takim[$i + 1] -eq $t) { $i++ }
+    $e = [double]$c.KalanEgim[$i]
+    $ay = Carpisma-Ayar
+    $gerek = Bosluk-Hesapla $e $ay.R $ay.H $ay.Pay
+    $script:CarpKontrol = @{ Takim = $t; Uc = $uc }
+    [Kayit]::Yaz("ÇARPIŞMA BEKÇİSİ: T$t uç boşluğu $(Sayi $uc) mm · satır $satir · kalan en büyük eğim $(Sayi $e)° (satır $($c.KalanSatir[$i])) · gereken $(Sayi $gerek) mm")
+    if ($e -le 0.01 -or $uc -ge $gerek) { return }
+    $rc = [Eding]::CncPauseJob()
+    $m = Carpisma-Metni $t $uc $e $c.KalanSatir[$i] $ay
+    $script:CarpAlarm = @{ Metin = $m; Takim = $t }
+    [Kayit]::Yaz("ÇARPIŞMA BEKÇİSİ: İŞ DURAKLATILDI ($([Eding]::RCText($rc))): $m")
+    Yaz "ÇARPIŞMA RİSKİ: iş duraklatıldı. T$t çok uzun (uç boşluğu $([math]::Round($uc, 1)) mm, gereken $([math]::Round($gerek, 1)) mm)."
+}
+
+# Korumanın dışında (diyalog açar): DURDUR (önerilen) ya da tehlikeli onayla DEVAM
+function Carpisma-Alarm-Isle {
+    $a = $script:CarpAlarm
+    if (-not $a -or $script:CarpAlarmAcik) { return }
+    $script:CarpAlarmAcik = $true
+    try {
+        $s = Ui-Secim 'Çarpışma riski' ("$($a.Metin)`r`n`r`nİş DURAKLATILDI. Ne yapılsın?") @('İŞİ DURDUR (önerilen)', 'YİNE DE DEVAM ET')
+        if ($s -eq 1) {
+            if (Ui-Tehlikeli-Onay 'Çarpışma riski' "Uzun frezle devam edilecek: disk eğilince takım tutucuya / B ünitesine ÇARPABİLİR (kırık frez, bozuk kalibrasyon).`r`n`r`nYalnız tutucu ölçüleri (Ayarlar › Hareket) fazla büyük girildiyse ve makinede ölçerek emin olduysan devam et." $null $null $null) {
+                [Kayit]::Yaz("ÇARPIŞMA: operatör tehlikeli onayla DEVAM etti (T$($a.Takim))")
+                [void](Komut-Sonucu 'Devam' ([Eding]::CncRunOrResumeJob()))
+                return
+            }
+            Yaz 'Çarpışma riski: iş duraklatılmış bekliyor (DEVAM onaylanmadı). DURDUR ile bitir.'
+        } elseif ($s -eq 0) {
+            [Kayit]::Yaz("ÇARPIŞMA: operatör İŞİ DURDUR seçti (T$($a.Takim))")
+            Btn-Durdur $false
+        } else {
+            Yaz 'Çarpışma riski: iş duraklatılmış bekliyor. DURDUR ile bitir (devam ancak kısa frezle).'
+        }
+    } finally { $script:CarpAlarm = $null; $script:CarpAlarmAcik = $false }
+}
+
+# Jog X/Y öncesi: disk eğikken (> 1°) ve ucun şu anki yüksekliği tutucunun en üst noktası + paydan aşağıdaysa uyarı metni ('' = sorun yok)
+function Jog-Carpisma-Uyarisi {
+    if (-not $script:ApiHazir -or -not $script:Bagli) { return '' }
+    $w = [Eding]::WorkPos()
+    $e = Egim-Aci ([double]$w.A) ([double]$w.B)
+    if ($e -le 1.0) { return '' }
+    $ay = Carpisma-Ayar
+    $g = Bosluk-Hesapla $e $ay.R $ay.H $ay.Pay
+    if ([double]$w.Z -ge $g) { return '' }
+    return "Disk $([math]::Round($e, 1))° eğik ve uç orta düzlemin $([math]::Round([double]$w.Z, 1)) mm üstünde: eğik tutucunun en üst noktası ~$([math]::Round($g - $ay.Pay, 1)) mm.`r`nX/Y hareketinde takım tutucuya / B ünitesine çarpabilir.`r`nÖnce Z'yi kaldır ve kolu düzle (Takımlar › Hareket › Kol düz).`r`n`r`nYine de X/Y hareket edilsin mi?"
+}

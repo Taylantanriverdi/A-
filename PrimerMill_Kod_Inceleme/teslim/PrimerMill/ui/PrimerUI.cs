@@ -3876,6 +3876,17 @@ namespace PrimerUI
             secimler["JogHiz"] = jh;
             hr.Ekle(new AyarSatiri("Varsayılan jog hızı", "Yavaş 100 · Orta 300 · Hızlı 1000 mm/dk (A/B 50–1000).", jh, 300), 62);
             hr.Ekle(new AyarSatiri("Z− güvenliği", "Z− yönünde 10 mm ve üstü adım onay ister.", null, 0), 56);
+            // Çarpışma koruması (takım boyu): disk + tutucu + B ünitesi ölçüleri. Varsayılanlar tahmin, MAKİNEDE ÖLÇÜLMELİ.
+            Satir(hr, "Çarpışma koruması (takım boyu)", "Açık: uç boşluğu eğik tutucuya yetmeyen frezle BAŞLAT reddedilir, iş sürerken takım değişince iş duraklatılır.", "CarpismaBekci");
+            var cR = new DegerKutusu { AyarAdi = "TutucuYaricap", Ondalik = 1, Min = 0, Max = 200, Birim = "mm", Etiket = "R" };
+            degerler["TutucuYaricap"] = cR;
+            hr.Ekle(new AyarSatiri("Tutucu yarıçapı (R)", "Disk merkezinden tutucu halkası / B ünitesinin en dış noktası. MAKİNEDE ÖLÇÜLMELİ (varsayılan 56 tahmin).", cR, 200), 62);
+            var cH = new DegerKutusu { AyarAdi = "TutucuYariYukseklik", Ondalik = 1, Min = 0, Max = 200, Birim = "mm", Etiket = "H" };
+            degerler["TutucuYariYukseklik"] = cH;
+            hr.Ekle(new AyarSatiri("Tutucu yarı yüksekliği (H)", "Disk düzken orta düzlemden tutucunun en üst noktası. MAKİNEDE ÖLÇÜLMELİ (varsayılan 13 tahmin).", cH, 200), 62);
+            var cP = new DegerKutusu { AyarAdi = "CarpismaPayi", Ondalik = 1, Min = 0, Max = 200, Birim = "mm", Etiket = "Pay" };
+            degerler["CarpismaPayi"] = cP;
+            hr.Ekle(new AyarSatiri("Çarpışma payı", "Uç ile tutucu arasında kalması gereken en az boşluk (varsayılan 3).", cP, 200), 62);
             hr.Ekle(new AyarSatiri("İlerleme oranı (kazıma hızı)", "Üretim ekranında %30–%150 arası, 10'ar adım. %120 üstü onay ister.", null, 0), 56);
             var jbt = new TouchButton("JOG EKRANINA GİT", Simge.Sag, Rol.Normal, null, null); jbt.YaziPt = 11f;
             jbt.Tiklandi += delegate { Gezinti.Ac("takimlar.hareket"); };

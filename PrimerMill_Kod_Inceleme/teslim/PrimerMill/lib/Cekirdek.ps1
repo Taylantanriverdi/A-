@@ -215,6 +215,59 @@ $KalGruplar = @{ 1 = @(15.5, 3.0); 2 = @(-15.5, -2.0); 3 = @(-2.5, 21.0); 4 = @(
 $KalGrupYer = @{ 1 = 'merkezin sağı'; 2 = 'merkezin solu'; 3 = 'merkezin önü (saat 6 tarafı)'; 4 = 'merkezin arkası, sağa yakın' }
 $KalHalkaR = 38.0
 
+# --- ÇARPIŞMA: güvenli hareket sırası (takım her zaman dik; disk/tutucu A ve B ile eğilir) ---
+# Kural (macro.cnc sürüm 6 ile aynı): 1) Z en üste (#5163)  2) A düz (#5224)  3) X/Y  4) B ve hedef A eğimi disk dışında.
+# B180 -> B0 gibi büyük B dönüşleri disk ortasında diski dikey geçirir (yükseklik = tutucu yarıçapı): yalnız disk dışında.
+# MAKİNEDE DOĞRULA (INCELEME_RAPORU.md Çarpışma incelemesi).
+# Park (G30 yerine): G30 tüm eksenleri aynı anda sürer; disk üstünden gelirken A'yı -4.84'e (düzden ~25°) döndürür.
+function Park-Satirlari { return @('G53 G90 G0 Z[#5163]', 'G53 G90 G0 A[#5224]', 'G53 G90 G0 X[#5181] Y[#5182]', 'G53 G90 G0 Z[#5183]', 'G53 G90 G0 A[#5184] B[#5185]') }
+# B ekseninde $mB'ye en yakın düz açı ($b0 + k·180; B0 ve B180 düz). Oraya dönüş eğimi hep azaltır: her X/Y'de güvenli.
+function B-Duz-Aci([double]$mB, [double]$b0) { return ($b0 + 180.0 * [math]::Round(($mB - $b0) / 180.0)) }
+# Panelden hareket: Z üst, A düz, B en yakın düz açıya; hedef B (bHedef, makine) en yakın düz açıdan 5°'den fazla uzaksa
+# önce disk dışındaki noktaya ($disXY) gidip B orada döner; sonra $xy, sonra $son (hedef A/B, Z).
+function Guvenli-Sira([double]$mB, [double]$b0, [string[]]$xy, [string[]]$son, [double]$bHedef = [double]::NaN, [string]$disXY = 'G53 G0 X[#5181] Y[#5182]') {
+    $s = New-Object System.Collections.Generic.List[string]
+    $s.Add('G90 G53 G0 Z[#5163]'); $s.Add('G53 G0 A[#5224]')
+    $d = B-Duz-Aci $mB $b0
+    if ([math]::Abs($mB - $d) -gt 0.05) { $s.Add("G53 G0 B$(Sayi $d)") }
+    if (-not [double]::IsNaN($bHedef) -and [math]::Abs($bHedef - $d) -gt 5.0) { $s.Add($disXY); $s.Add("G53 G0 B$(Sayi $bHedef)") }
+    foreach ($l in @($xy)) { if ($l) { $s.Add([string]$l) } }
+    foreach ($l in @($son)) { if ($l) { $s.Add([string]$l) } }
+    return ,($s.ToArray())
+}
+
+# --- UÇ BOŞLUĞU / TUTUCU BOŞLUĞU (yalnız yeni panel) ---
+# Disk + tutucu: dış yarıçap R (TutucuYaricap), düz duruşta orta düzlemden en üst noktası H (TutucuYariYukseklik), pay (CarpismaPayi).
+# Düzden θ eğik diskin en üst noktası ≈ R·sin|θ| + H·cos θ (orta düzleme göre). Takımın ucu güvenli Z'de (#5163) iken orta
+# düzlemin uç boşluğu (Uc-Boslugu) kadar üstündedir: iş Z sıfırı = disk orta düzlemi, G92 Z takım boyunu içerir; UZUN frez = KÜÇÜK boşluk.
+# Varsayılanlar TAHMİN (R 56, H 13, pay 3): MAKİNEDE ÖLÇÜLMELİ (INCELEME_RAPORU.md Çarpışma incelemesi).
+$CarpismaVarsayilan = @{ TutucuYaricap = 56.0; TutucuYariYukseklik = 13.0; CarpismaPayi = 3.0 }
+# A ekseni makine sınırları (Eding/cnc.ini [JOINT_3] negativeLimit / positiveLimit): taramada A bunların ötesine gidemez
+$AEksenSinir = @(-5.597, 46.003)
+# İş A/B (°) -> diskin düzden eğimi (0..90). B0/B180 ve A0 düz; A ve B dik eksenler: cos θ = |cos A|·|cos B|
+function Egim-Aci([double]$a, [double]$b) {
+    $c = [math]::Abs([math]::Cos($a * [math]::PI / 180.0)) * [math]::Abs([math]::Cos($b * [math]::PI / 180.0))
+    if ($c -gt 1.0) { $c = 1.0 }
+    return ([math]::Acos($c) * 180.0 / [math]::PI)
+}
+# θ eğimde takım ucunun güvenli Z'de olması gereken en küçük yükseklik (orta düzleme göre, mm)
+function Bosluk-Hesapla([double]$egim, [double]$R, [double]$H, [double]$pay) {
+    $t = [math]::Min(90.0, [math]::Abs($egim)) * [math]::PI / 180.0
+    return ($R * [math]::Sin($t) + $H * [math]::Cos($t) + $pay)
+}
+# Güvenli Z'de uç yüksekliği: #5163 + (iş Z - makine Z); fark o anki G54 Z + G92 Z (takım boyu) ile sabittir
+function Uc-Boslugu([double]$guvZ, [double]$isZ, [double]$makZ) { return ($guvZ + ($isZ - $makZ)) }
+# Ayarlardaki R / H / pay (geçersiz ya da boşsa varsayılan)
+function Carpisma-Ayar {
+    $r = @{}
+    foreach ($k in $CarpismaVarsayilan.Keys) {
+        $v = $null; try { $v = Metin-Sayi ([string]$script:Tercih[$k]) } catch { }
+        if ($null -eq $v -or $v -lt 0 -or $v -gt 200) { $v = [double]$CarpismaVarsayilan[$k] }
+        $r[$k] = [double]$v
+    }
+    return @{ R = $r.TutucuYaricap; H = $r.TutucuYariYukseklik; Pay = $r.CarpismaPayi }
+}
+
 function Kal-Saat([double]$derece) {
     # Saat 3'ten saat yönünde (öne doğru) derece -> "3:45" gibi
     $dk = [int][math]::Round((3 * 60 + $derece * 2) % 720)
@@ -355,7 +408,7 @@ function Kal-NC-Uret([double]$T, [double]$D, [int]$k = 1) {
     & $L 'G0 B0.0'
     & $L 'M5'
     & $L 'T0 M6'
-    & $L 'G30'
+    foreach ($p in (Park-Satirlari)) { & $L $p }   # G30 yerine sıralı park (çarpışma incelemesi)
     & $L 'M30'
     & $L '%'
     return $sb.ToString()
@@ -514,7 +567,7 @@ function OtoKal-NC-Uret([double]$T, [int]$kimlik) {
     & $L 'msg "PM KALIBRASYON: olcum bitti - PrimerMill > Ayarlar > OTO KALIBRASYON > SONUCLARI OKU"'
     & $L 'M5'
     & $L 'T0 M6'
-    & $L 'G30'
+    foreach ($p in (Park-Satirlari)) { & $L $p }   # G30 yerine sıralı park (çarpışma incelemesi)
     & $L 'M30'
     & $L '%'
     return $sb.ToString()
@@ -667,6 +720,8 @@ function OtoKal-Sim-Uret([string]$nc, [double]$T) {
         if ($u -match '^#(\d+)\s*=\s*(.+)$') { $deg[[int]$Matches[1]] = & $hesap $Matches[2]; & $L "($u  ->  $(& $f $deg[[int]$Matches[1]]))"; continue }
         if ($u -match '^(if\s|endif|errmsg|msg\s)') { continue }
         if ($u -match '^GOSUB\s+user_1') { & $L 'M100 (GOSUB user_1: takim boyu sensorde)'; continue }
+        # sıralı park (G53 + makine değişkenleri #5163/#5181..): simülasyonda makine koordinatı yok -> yorum
+        if ($u -match '^G53\b' -and $u.Contains('[')) { & $L "($u : park, simulasyonda yok)"; continue }
         # [ifade] -> sayı
         $u2 = [regex]::Replace($u, '\[[^\[\]]*(\[[^\[\]]*\][^\[\]]*)*\]', { param($m) & $f (& $hesap $m.Value) })
         $g = [regex]::Match($u2, '^G38\.2\s+Z(-?[\d.]+)\s+F([\d.]+)')
@@ -797,15 +852,23 @@ function Devam-NC-Uret([string]$kaynak, [int]$satir, [string]$mod, $analiz, [int
     if ($milAcik -and $S -gt 0) { $C.Add("S$(& $fmt $S) M3") }
     if ($m7) { $C.Add('M7') }; if ($m8) { $C.Add('M8') }
     $C.Add('GOSUB Z_SAFE'); $C.Add('GOSUB AZXY_SAFE')
-    $C.Add("G0 A$(& $fmt $A) B$(& $fmt $B)")
-    $C.Add("G90 F$(& $fmt $ilerle)")
     if ($q -gt $r -and $null -ne $X -and $null -ne $Y -and $null -ne $Z) {
-        # Yakın nokta: iş mili yukarıdayken X/Y'ye gider, sonra yavaşça kaldığı Z'ye iner
+        # Yakın nokta (çarpışma incelemesi, makro sürüm 6): AZXY_SAFE sonrası iş mili en üstte, A düz, sensör X/Y'de (disk dışı).
+        # B burada döner (B180 dönüşü disk ortasında diski dikey geçirir); X/Y'ye disk DÜZ iken gidilir; A eğimi en son,
+        # noktanın üstünde (eğik disk üstünden X/Y gezinmesi yok). Sonra yavaşça kaldığı Z'ye iner.
+        $C.Add("G0 B$(& $fmt $B)")
+        $C.Add("G90 F$(& $fmt $ilerle)")
         $C.Add("G0 X$(& $fmt $X) Y$(& $fmt $Y)")
+        $C.Add("G0 A$(& $fmt $A)")
         $C.Add("G1 Z$(& $fmt $Z) F$(& $fmt ([math]::Min($ilerle, 600)))")
         $C.Add("G$G Z$(& $fmt $Z) F$(& $fmt $ilerle)")
         $bas = $q
-    } else { $bas = $r }
+    } else {
+        # güvenli kip: A/B sensör X/Y'de (disk dışında) döner, CAM kendi Z_SAFE satırından sürer (çıktı değişmedi)
+        $C.Add("G0 A$(& $fmt $A) B$(& $fmt $B)")
+        $C.Add("G90 F$(& $fmt $ilerle)")
+        $bas = $r
+    }
     $harita = @{ Bas = $C.Count + 1; Orijinal = $bas + 1 }
     for ($i = $bas; $i -lt $L.Length; $i++) { $C.Add($L[$i]) }
     $hedef = [System.IO.Path]::Combine($IsKlasor, ([System.IO.Path]::GetFileNameWithoutExtension($kaynak) -replace '_devam\d*$', '') + '_devam.nc')

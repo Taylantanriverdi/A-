@@ -260,7 +260,11 @@ G0 B0.0
 (#4100 = 1  ->  1)
 M5
 T0 M6
-G30
+(G53 G90 G0 Z[#5163] : park, simulasyonda yok)
+(G53 G90 G0 A[#5224] : park, simulasyonda yok)
+(G53 G90 G0 X[#5181] Y[#5182] : park, simulasyonda yok)
+(G53 G90 G0 Z[#5183] : park, simulasyonda yok)
+(G53 G90 G0 A[#5184] B[#5185] : park, simulasyonda yok)
 M30
 %
 

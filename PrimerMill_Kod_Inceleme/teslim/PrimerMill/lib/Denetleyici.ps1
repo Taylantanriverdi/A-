@@ -204,6 +204,7 @@ function Zamanlayici-Tik {
             if ($anaTik) { $script:TikSonraki = ''; Ana-Tik }   # eski ana zamanlayıcı: 1 sn
             try { Eding-Gizle-Tik } catch { }                                     # eski: 250 ms
             Okuma-Yap                                                              # eski koordinat: 50 ms
+            try { Carpisma-Bekci } catch { try { [Kayit]::Yaz("ÇARPIŞMA BEKÇİSİ: $($_.Exception.Message)") } catch { } }   # takım boyu (lib/Makine.ps1)
             try { Frez-Omru-Tik } catch { }                                        # frez ömrü: yalnız RUNNING + iş + takım (lib/FrezOmru.ps1)
             Durum-Yenile
         } catch { try { [Kayit]::Yaz("ZAMANLAYICI: $($_.Exception.Message)") } catch { } }
@@ -226,6 +227,10 @@ function Zamanlayici-Tik {
         } catch { [Kayit]::Yaz("ZAMANLAYICI ($sonraki): $($_.Exception.Message)") }
     }
     Tik-Sonrasi-Calistir
+    # çarpışma bekçisi işi duraklattıysa: DURDUR / DEVAM sorusu korumanın dışında
+    if ($script:CarpAlarm -and -not $script:IslemSuruyor -and -not $script:TikMesgul) {
+        try { Islem-Calistir 'Çarpışma uyarısı' { Carpisma-Alarm-Isle } } catch { try { [Kayit]::Yaz("ÇARPIŞMA UYARISI: $($_.Exception.Message)") } catch { } }
+    }
 }
 
 # SK-01: korumalı blok sırasında gelen komutlar ve ertelenen pencereler, koruma bırakıldıktan hemen sonra.
@@ -503,6 +508,12 @@ function Tercih-Kaydet([string]$arg) {
         'JogAdim' { if ($null -ne (Metin-Sayi $v)) { $script:Tercih.JogAdim = $v; Tercih-Yaz } }
         'JogHiz' { if ($null -ne (Metin-Sayi $v)) { $script:Tercih.JogHiz = $v; Tercih-Yaz } }
         'FrezModu' { Frez-Modu-Ayarla ($v -eq 'MANUEL') }
+        { @('TutucuYaricap', 'TutucuYariYukseklik', 'CarpismaPayi') -contains $_ } {
+            $g = Metin-Sayi $v
+            if ($null -ne $g -and $g -ge 0 -and $g -le 200) { $script:Tercih[$k] = (([double]$g).ToString('0.0##', [System.Globalization.CultureInfo]::InvariantCulture)); Tercih-Yaz; [Kayit]::Yaz("AYAR: $k = $($script:Tercih[$k]) mm (çarpışma koruması)") }
+            else { Ui-Bildir "$k 0–200 mm olmalı: $v" 'Uyari' }
+        }
+        'CarpismaBekci' { $script:Tercih.CarpismaBekci = $(if ($ac) { '1' } else { '0' }); Tercih-Yaz; [Kayit]::Yaz("AYAR: çarpışma koruması $(if ($ac) { 'AÇIK' } else { 'KAPALI' })") }
         { @('KalT', 'KalD', 'OkT', 'OkUcD') -contains $_ } { if ($null -ne (Metin-Sayi $v)) { $script:Tercih[$k] = $v; Tercih-Yaz } else { Ui-Bildir "Sayı değil: $v" 'Uyari' } }
         { @('KalSA', 'KalSB', 'KalSY') -contains $_ } { $script:Tercih[$k] = $(if ($ac) { '1' } else { '0' }); Tercih-Yaz }
         'OkUc' { $script:Tercih.OkUc = $(if ($v -eq 'kure') { 'kure' } else { 'duz' }); Tercih-Yaz }
@@ -652,7 +663,7 @@ Komut-Tanimla 'is.duraklat' 'is' { Btn-Duraklat } -IcIce -Ek { param($a, $c) if 
 Komut-Tanimla 'is.durdur' 'is' { Btn-Durdur $true } -IcIce -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not $c.Suruyor) { return $script:IzinMetni.Yok }; return '' }
 Komut-Tanimla 'takim.degistir' 'hareket' { param($a) $n = 0; if (-not [int]::TryParse($a, [ref]$n) -or $n -lt 0 -or $n -gt 6) { Ui-Bildir "Geçersiz takım: $a" 'Uyari'; return }; Takim-Degistir $n } -Raf
 Komut-Tanimla 'temizlik' 'hareket' { if (Normal-Onay 'Temizlik' "İş mili en üste çıkacak, kol yatay konuma dönecek (temizlik).`r`nDevam?") { Btn-Temizlik 'temizlik' } }
-Komut-Tanimla 'park' 'hareket' { if (Normal-Onay 'Park' "İş mili en üste çıkacak, sonra park konumuna (G30) gidecek.`r`nDevam?") { Btn-Temizlik 'park' } }
+Komut-Tanimla 'park' 'hareket' { if (Normal-Onay 'Park' "İş mili en üste çıkacak, kol düzlenecek, köşeye (G30 X/Y) gidip park açısına dönecek.`r`nDevam?") { Btn-Temizlik 'park' } }
 Komut-Tanimla 'home' 'makine' { Btn-Home }
 Komut-Tanimla 'hiz.azalt' 'is' { Hiz-Komut 'azalt' } -IcIce -Ek { param($a, $c) if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; return '' }
 Komut-Tanimla 'hiz.artir' 'is' { Hiz-Komut 'artir' } -IcIce -Ek { param($a, $c) if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; return '' }
@@ -711,10 +722,11 @@ Komut-Tanimla 'jog' 'hareket' { param($a) Jog-Komut $a }
 $script:JogYok = { param($a, $c) return 'Basılı tutarak sürekli hareket bu sürümde yok: adım seçin (0.01–10)' }
 Komut-Tanimla 'jog.basla' 'yok' { } -Ek $script:JogYok
 Komut-Tanimla 'jog.bitir' 'yok' { } -Ek $script:JogYok
-Komut-Tanimla 'konum.koldz' 'hareket' { if (Normal-Onay 'Kol düz' "İş mili en üste çıkacak, kol takım alma açısına (G54 A/B) dönecek.`r`nDevam?") { Konuma-Git 'Kol düz' @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#5224] B[#5225]') '' } }
-Komut-Tanimla 'konum.takimalani' 'hareket' { if (Normal-Onay 'Takım alanı' "İş mili takım alanına gidecek (gosub azxy_safe).`r`nDevam?") { Konuma-Git 'Takım alanı' @('gosub azxy_safe') '' } }
-Komut-Tanimla 'konum.blok' 'hareket' { if (Normal-Onay 'Blok değiştirme' "İş mili en üste çıkacak, kol bloğu takıp çıkarmak için öne gelecek.`r`nDevam?") { Konuma-Git 'Blok değiştirme' @('G90 G53 G0 Z[#5163]', 'G53 G0 A[#5224] B[#5225]', 'gosub ClearPos') '' } }
-Komut-Tanimla 'konum.park' 'hareket' { if (Normal-Onay 'Park (G30)' "İş mili en üste çıkacak, sonra park konumuna (G30) gidecek.`r`nDevam?") { Konuma-Git 'Park (G30)' @('G90 G53 G0 Z[#5163]', 'G30') '' } }
+# Çarpışma incelemesi: hepsi Z üst -> A düz -> B en yakın düz açı (büyük B dönüşü disk dışında) -> X/Y -> hedef açı (Guvenli-Sira-Simdi)
+Komut-Tanimla 'konum.koldz' 'hareket' { if (Normal-Onay 'Kol düz' "İş mili en üste çıkacak, kol takım alma açısına (G54 A/B) dönecek.`r`n(Disk ters duruyorsa B yalnız disk dışında döner.)`r`nDevam?") { Konuma-Git 'Kol düz' (Guvenli-Sira-Simdi @() @('G53 G0 A[#5224] B[#5225]') -BDuz) '' } }
+Komut-Tanimla 'konum.takimalani' 'hareket' { if (Normal-Onay 'Takım alanı' "İş mili takım alanına gidecek (en üste, kol düz, gosub azxy_safe).`r`nDevam?") { Konuma-Git 'Takım alanı' @((Guvenli-Sira-Simdi @() @()) + 'gosub azxy_safe') '' } }
+Komut-Tanimla 'konum.blok' 'hareket' { if (Normal-Onay 'Blok değiştirme' "İş mili en üste çıkacak, kol bloğu takıp çıkarmak için öne gelecek.`r`nDevam?") { Konuma-Git 'Blok değiştirme' @((Guvenli-Sira-Simdi @() @('G53 G0 A[#5224] B[#5225]') -BDuz) + 'gosub ClearPos') '' } }
+Komut-Tanimla 'konum.park' 'hareket' { if (Normal-Onay 'Park (G30)' "İş mili en üste çıkacak, kol düzlenecek, köşeye (G30 X/Y) gidip park açısına dönecek.`r`nDevam?") { Konuma-Git 'Park (G30)' (Park-Satirlari-Simdi) '' } }
 Komut-Tanimla 'ismili.calistir' 'hareket' { param($a) Ismili-Calistir $a }
 Komut-Tanimla 'ismili.durdur' 'hareket' { Tek-Komut 'İş mili durdur' 'M5' }
 Komut-Tanimla 'sogutma.m7' 'hareket' { Tek-Komut 'M7' 'M7' }
@@ -823,6 +835,14 @@ function Durum-Topla {
     $d.ManuelMesaj = [string]$script:ManuelMesajMetni
     $d.FrezOmurleri = (Frez-Omru-Liste)
     if ($d.Takim -gt 0 -and $script:YuvaListesi) { foreach ($y in $script:YuvaListesi) { if ($y.Ad -eq "T$($d.Takim)") { $d.TakimAciklama = $(if ($y.Kayitli) { 'yuvası kayıtlı' } else { 'yuvası kayıtlı değil' }) } } }
+    if ($d.Takim -gt 0 -and $bagli -and $h.Home) {
+        # Uç boşluğu: güvenli Z'de takım ucunun disk orta düzleminden yüksekliği (#5163 + iş Z - makine Z); uzun frez = küçük
+        try {
+            $ub = Uc-Boslugu ([double][Eding]::CncGetVariable(5163)) ([double]$k.Z) ([double]$k.MZ)
+            $ubT = "uç boşluğu $(([double]$ub).ToString('0.0', [System.Globalization.CultureInfo]::InvariantCulture)) mm"
+            $d.TakimAciklama = $(if ($d.TakimAciklama) { "$($d.TakimAciklama)  ·  $ubT" } else { $ubT })
+        } catch { }
+    }
     # iş
     if ($script:SeciliDosya) { $d.Dosya = $(if ($script:DosyaMetni) { [string]$script:DosyaMetni } else { [System.IO.Path]::GetFileNameWithoutExtension([string]$script:SeciliDosya) }) }
     if ($script:BekleyenBlok) { $d.Blok = [string]$script:BekleyenBlok.Metin }
@@ -911,6 +931,8 @@ function Durum-Topla {
         KalSA = $(if ($t.KalSA -eq '1') { '1' } else { '0' }); KalSB = $(if ($t.KalSB -eq '1') { '1' } else { '0' }); KalSY = $(if ($t.KalSY -eq '1') { '1' } else { '0' })
         OkT = $(if ($t.OkT) { [string]$t.OkT } else { '10.00' }); OkUc = $(if ($t.OkUc -eq 'kure') { 'kure' } else { 'duz' }); OkUcD = $(if ($t.OkUcD) { [string]$t.OkUcD } else { '3.00' })
         YuvaZ = $(if ($script:YuvaZ) { '1' } else { '0' })
+        TutucuYaricap = $(if ($t.TutucuYaricap) { [string]$t.TutucuYaricap } else { '56' }); TutucuYariYukseklik = $(if ($t.TutucuYariYukseklik) { [string]$t.TutucuYariYukseklik } else { '13' })
+        CarpismaPayi = $(if ($t.CarpismaPayi) { [string]$t.CarpismaPayi } else { '3' }); CarpismaBekci = $(if ($t.CarpismaBekci -eq '0') { '0' } else { '1' })
     }
     foreach ($kk in $ayar.Keys) { if ($null -ne $ayar[$kk]) { $d.Ayarlar[$kk] = [string]$ayar[$kk] } }
     # kayıtlar (yalnız değişince yeniden kurulur)
