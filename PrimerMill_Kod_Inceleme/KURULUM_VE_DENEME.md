@@ -13,7 +13,7 @@ teslim/
     EdingKapat.bat, HataBul.bat, YoneticiKurulum.bat, portal.html, uzak.html, eding_yolu.txt
     KIOSK_KUR.bat, KIOSK_KALDIR.bat, Kabuk.ps1   kiosk modu (§6, isteğe bağlı)
     lib/  ui/  demo/
-  P_CNC_icin/macro.cnc   → makinede P:\CNC\macro.cnc (makro sürüm 5)
+  P_CNC_icin/macro.cnc   → makinede P:\CNC\macro.cnc (makro sürüm 6)
   ekran_goruntuleri/     → yeni arayüzün görüntüleri
 ```
 
@@ -46,12 +46,12 @@ teslim/
 4. `teslim\P_CNC_icin\macro.cnc` → `P:\CNC\macro.cnc`.
 5. `eding_yolu.txt` yalnız açıklama satırları içerir; makinede `P:\CNC` kendiliğinden bulunur. Farklı bir klasör gerekiyorsa dosyaya tek satır yol yazın.
 6. Başlangıç görevi ve güvenlik duvarı için `YoneticiKurulum.bat`'ı **yönetici olarak** bir kez çalıştırın (görev artık yeni `KazimaBaslat.bat`'ı açar ve 72 saat sınırı kaldırılır).
-7. Paneli açın. Açılışta panel Eding'deki makro sürümünü kontrol eder; **5** değilse uyarır ve iş başlatmaz. Bu durumda Eding'i kapatıp açın.
+7. Paneli açın. Açılışta panel Eding'deki makro sürümünü kontrol eder; **6** değilse uyarır ve iş başlatmaz. Bu durumda Eding'i kapatıp açın.
 8. Takım yuvaları ve sensör değişkenleri (#4010–#4021, #4031–#4032) boşsa panel artık **kendiliğinden yazmaz**. Uyarı verir ve BAŞLAT/M6'yı engeller. Ayarlar › Yuva ayarı'ndan gerçek konumları ölçüp kaydedin. "Doğrulanmış değerlere dön" düğmesinin değerleri üreticininkinden farklıdır (bkz. `INCELEME_RAPORU.md` › MAKİNEDE DOĞRULA).
 
 ## 3. Eski sürüme geri dönme
 
-- **Hızlı:** Aynı klasörde `KazimaBaslat_Klasik.bat` (düzeltilmiş eski panel; aynı ayar dosyalarını ve makro sürüm 5'i kullanır). İki panel aynı anda açılmaz.
+- **Hızlı:** Aynı klasörde `KazimaBaslat_Klasik.bat` (düzeltilmiş eski panel; aynı ayar dosyalarını ve makro sürüm 6'yı kullanır). İki panel aynı anda açılmaz.
 - **Tam geri dönüş (orijinal yazılım):** Eding'i kapatın, `PrimerMill_eski_<tarih>` klasörünü ve `macro_yedek_<tarih>.cnc` dosyasını geri koyun, Eding'i açın. Orijinal panel makro sürüm 3 bekler; yeni makro ile orijinal panel birlikte kullanılmamalıdır.
 - Başlangıç görevinin klasik paneli açması için `KazimaBaslat.bat`'ın içeriğini `KazimaBaslat_Klasik.bat` ile değiştirmek yeterlidir.
 
@@ -152,3 +152,24 @@ Panel her frezin (T1–T6; makroda başka numara kullanılırsa onlar da "Diğer
 - **BAŞLAT'ta uyarı:** işin kullandığı bir frez ömrünün %100'üne ulaşmışsa "T2 ömrünü doldurdu: 1050/1000 dk. Yine de başlatılsın mı?" sorusu (VAZGEÇ = iş başlamaz; EVET = iş normal başlar). %90–99 ise yalnız alt şeritte uyarı. Kesim sırasında %100'e ulaşan frez için bir kez alt şerit bildirimi; iş durmaz.
 - **Dosya:** `PrimerMill\frez_omru.json` (demo modunda `demo_calisma\frez_omru.json`, gerçek dosyaya dokunulmaz). Sayılırken 30 sn'de bir, iş durunca ve panel kapanırken yazılır. Bozulursa panel boş başlar, bozuk dosyayı `frez_omru.json.bozuk_<tarih>` olarak saklar. Kurulumda bu dosyanın üzerine yazmayın (teslimde yok).
 - **Makinede ilk denemede:** bir işi kronometreyle izleyin; Frez ömrü sekmesindeki dakika artışı kronometredeki kesim süresiyle (takım değişimleri hariç) uyuşmalı (bkz. `INCELEME_RAPORU.md` › MAKİNEDE DOĞRULA 27).
+
+## 8. Çarpışma koruması (takım boyu, makro sürüm 6)
+
+Takım hep diktir; disk A ile eğilir, B ile çevrilir. Uzun bir frez en üst Z'de bile eğik disk tutucusuna / B ünitesine yetişebilir. Sürüm 6'da (ayrıntı: `INCELEME_RAPORU.md` §5a):
+
+- **Hareket sırası:** her panel hareketi, HOME, PARK, takım değişimi ve devam başlangıcı önce Z'yi en üste çıkarır, kolu (A) düzler, sonra X/Y'ye gider; B'nin büyük dönüşleri (B180 ↔ B0) yalnız sensörde / köşede, eğim en son. PARK artık tek satır G30 değil.
+- **Uç boşluğu:** güvenli Z'de frez ucunun disk orta düzleminden yüksekliği (Üretim › TAKIM kartı: "uç boşluğu 42.4 mm"). Uzun frez = küçük uç boşluğu.
+- **Koruma:** BAŞLAT/DEVAM'da program taranır; iş sürerken her takım değişiminden sonra o frezin uç boşluğu, programın kalan kısmındaki en büyük eğim için gerekenle (`R·sin θ + H·cos θ + pay`) karşılaştırılır. Yetmezse iş hemen DURAKLATILIR ve sorulur: İŞİ DURDUR (önerilen) / YİNE DE DEVAM ET (tehlikeli onay). İş milindeki frez yetmiyorsa iş başlatılmaz.
+
+Ayarlar › Hareket (`panel_ayarlar.ini`):
+
+| Ayar | Anahtar | Varsayılan | Not |
+| --- | --- | --- | --- |
+| Çarpışma koruması | `CarpismaBekci` | 1 (açık) | 0: tarama ve bekçi kapalı |
+| Tutucu yarıçapı (R) | `TutucuYaricap` | 56 mm | **MAKİNEDE ÖLÇÜLMELİ** (tahmin) |
+| Tutucu yarı yüksekliği (H) | `TutucuYariYukseklik` | 13 mm | **MAKİNEDE ÖLÇÜLMELİ** (tahmin) |
+| Çarpışma payı | `CarpismaPayi` | 3 mm | |
+
+**İlk kurulumda R ve H'yi ölçün** (en kalın blok ve en uzun frezle; kâğıt yöntemi, `INCELEME_RAPORU.md` §5a "R ve H'yi makinede ölçme"). Ölçmeden varsayılanlarla çalışmak: R/H gerçekte büyükse koruma yetersiz kalır.
+
+Deneme (simülasyonda, sonra makinede %10 hızla, frezsiz): A eğik ve B180 iken RESET → HOME (önce Z, sonra kol düz, sonra köşe); PARK; Kol düz; kaldığı yerden devam (X/Y'ye disk düzken). MAKİNEDE DOĞRULA 32–38.

@@ -1,6 +1,6 @@
 # PrimerMill — İnceleme Raporu
 
-Durum: **Tamamlandı (19.11.2026).** İnceleme, düzeltmeler, yeni arayüz, testler ve bağımsız son kontrol bitti.
+Durum: **Tamamlandı (19.11.2026); çarpışma incelemesi eklendi (20.11.2026, §5a, makro sürüm 6).** İnceleme, düzeltmeler, yeni arayüz, testler ve bağımsız son kontrol bitti.
 Satır numaraları aksi yazılmadıkça orijinal `PrimerMill/KazimaBaslat.ps1` içindir (commit `35a684f`).
 Bu ortamda Windows ve makine yoktu: hiçbir değişiklik makinede ya da Windows'ta **çalıştırılmadı**. Mantık, testlerle ve sahte Eding (EdingSim) üzerinde denendi. Arayüz kodu derleyiciden geçti ve ekran görüntüleri arayüz kodundan alındı. Önce `KURULUM_VE_DENEME.md`'deki sırayla deneyin.
 
@@ -74,6 +74,7 @@ YÜKSEK önemdeki düzeltmelerin tamamı ve her birinin commit'i Ek B'de (düzel
 | Denetleyici | İzin tablosu, komut dağıtımı, demo iş akışı (179 madde) |
 | Tasima | Eski → yeni fonksiyon taşıma farklarının gerekçeli listesi |
 | Demo_Ekran | Windows'ta paneli demo açıp her ekranı kaydeder (Linux'ta atlanır) |
+| Carpisma | Çarpışma incelemesi (§5a): uç boşluğu / tutucu boşluğu hesabı, güvenli hareket sırası, park satırları, devam başlığı sırası, macro.cnc g0 satırı denetimi (Z+A/B, X/Y+A/B; izinli istisna listesi) ve home_all sırası, `CarpismaAnaliz` taraması, EdingSim uçtan uca: HOME öncesi geri çekilme, Kol düz (disk ters), uzun frezde iş duraklar (DURDUR / DEVAM), BAŞLAT reddi, TAKIM kartında uç boşluğu |
 | Devam | Devam programının başlangıç satırı: tam / yakin / guvenli ve senaryo 2 'frez' kipi (çok takımlı girdide doğru `T{k} M6` satırı, başlıkta takım değişimi yok) |
 | Devam_Akis | Uçtan uca (EdingSim): DURDUR, EXTERR, ACİL STOP, Eding kopması, duraklama, panel kapanışı → kayıt satırı ve devam; kırık frez T1→T2→T5 işinde T2: yalnız T2'nin işi sunulur, kırık frez Eding'de iş milindeyken başlamaz, ömür sıfırlama, devam programı T2 M6 satırından |
 
@@ -116,10 +117,74 @@ Windows PowerShell 5.1 ile çalıştırılmadı. İlk iş olarak Windows'ta çal
 | 29 | Senaryo 2, kırık frez algılama: panel işin Eding hatasıyla bittiğini görür (`*ERR*` durumu) ve `#4099` (makro m100'ün ölçtüğü boy farkı) > `#4005` (sınır) > 0 ise iş milindeki takımı (`CncGetCurrentToolNumber` = #5008) kırık sayar, devam.json'a `Kirik`, `KirikSatir`, `KirikFark`, `KirikSinir` yazar. Panel errmsg metnini okuyamaz; yalnız bu iki değişkene ve hata durumuna dayanır. m100 her ölçümde #4099'u 0'dan başlattığı için başka bir hatada eski fark kalmaz, yalnız kırık sonrası "frezin işini baştan" başlatılırken panel `#4099=0` yazar (değişken yazma, hareket yok) | Simülasyonda bir işin M100'ünde frezi değiştirmeden #4005'i çok küçük (ör. 0.001) yapın: Eding errmsg ile durmalı, panelde FREZE HATASI penceresi (4 adım) çıkmalı, Kayıtlar'da "Kırık frez kaydedildi". Errmsg'den sonra Eding'in durum metni gerçekten `*ERR*` mi? (değilse algılama çalışmaz, raporlayın) |
 | 30 | Senaryo 2, "T{k}'NİN İŞİNİ BAŞTAN" (Devam-NC-Uret 'frez' kipi, **gerçek takım değişimi yapar**): program, durduğu satırdan önceki son `T{k} M6` (ya da `M6 T{k}` / ayrı satırda T ve M6) satırından başlar. Başlık: `G0 G17 G40 G49 G54 G80 G90`, `M9`, `M5`, `GOSUB Z_SAFE`, `GOSUB AZXY_SAFE`, `G0 B0.0` (asıl işin kendi giriş satırlarıyla aynı); başlıkta `T M6`, `S M3`, `M7`, `F` YOK: değişimi kopyalanan satır yapar, makro (change_tool) m5 m9 yapar ve user_1 ile yeni frezi ölçer (f50), sonra CAM'in kendi `S… M3` / `F` satırları gelir; yani değişimden sonraki modal durum asıl işle aynı. Örnek ZY2_45 tek takımlı; çok takımlı CAM çıktısının her `T M6`'dan sonra `S… M3` yazdığı varsayıldı (yazmasaydı asıl iş de iş mili kapalı keserdi). Diğer kiplerin çıktısı değişmedi (altın test) | Simülasyonda T1→T2→T5 kullanan gerçek bir HyperDent işi: T2'nin M100'ünde kırık oluşturun → ALARMI TEMİZLE → PENS AÇ → BAŞLAT → T2'NİN İŞİNİ BAŞTAN. Onay penceresindeki "başlayacağı satır" dosyada `T2 M6` olmalı; makine güvenli Z'ye kalkıp A/B, X/Y'ye gitmeli, T0'ı bırakıp (DropTool0) T2'yi yuvasından almalı, sensörde ölçmeli, sonra T2'nin ilk kesimine gitmeli. `T2 M6`'dan sonra CAM'in `S… M3` yazdığını dosyada kontrol edin. Makinede %10–30 hızla, iş mili boşken bir kez |
 | 31 | Senaryo 2, iş milindeki kırık frez: Eding T{k} derken (`#5008 = k`) program başlatılmaz; aksi halde makrodaki "Tool already in spindle" dalı değişim yapmadan KIRIK frezi ölçüp onunla keserdi. Otomatik modda "Kırık frez iş milinden çıkarıldı mı? (PENS AÇ)" sorulur; EVET → Eding'e T0 bildirilir (mevcut `#4039=1; M6 T0; #4039=0` hareketsiz bildirimi), HAYIR → başlamaz, adımlar gösterilir. Manuel modda Eding'e T0 bildirilir ve manuel değişim penceresi pensi açtırır (kırık frez o adımda çıkarılır). Devam penceresinde iş milinde T{k} seçilirse başlamaz. Uzaktan BAŞLAT kırık kaydında reddedilir | Otomatik mod: kırık sonrası PENS AÇ yapmadan BAŞLAT → soru çıkmalı, HAYIR → hiçbir eksen kıpırdamamalı, Eding T{k} kalmalı. EVET → eksenler kıpırdamadan Eding T0 göstermeli, sonra program T{k}'yi yuvasından almalı (yuvaya yeni frez konmuş olmalı). Manuel mod: aynı akış, T{k} değişiminde pens açma adımı gelmeli |
+| 32 | Çarpışma C1 (makro sürüm 6 `home_all`: Z, A home + düz, X, Y, B; sonunda `pm_park`) ve panel HOME öncesi geri çekilme (Z üst, A düz, B en yakın düz, G30 X/Y) | Simülasyonda, sonra makinede %10 hızla, **frezsiz**: bir işi A eğik ve B180 iken RESET → HOME. Sıra: Z yukarı, kol düz, sonra köşe; X/Y giderken disk düz olmalı. Ardından home'suz (Eding yeniden açık) HOME: makro sırası aynı |
+| 33 | Çarpışma C5 (PARK: G30 yerine sıralı Z, A düz, G30 X/Y, G30 Z, G30 A/B) ve program sonları (`Kal-NC-Uret`, `OtoKal-NC-Uret`) | PARK'a disk üstünden basın: önce düzlenip köşeye gitmeli, -4.84'e köşede dönmeli. Köşede (X0.4 Y0.9) A/B dönerken tutucunun takıma yaklaşmadığını gözle kontrol edin |
+| 34 | Çarpışma C6–C9 (Kol düz / Temizlik / Yuvaya git / M6 / manuel değişim): B yalnız en yakın düz açıya yerinde, büyük B dönüşü sensörde; change_tool artık sensör **X ve Y**'ye gidip B'yi orada döndürüyor | B180'de RESET'lenmiş bir işten sonra Kol düz ve Takım değiştir: B dönüşü sensör üstünde olmalı. Sensörün (#4020/#4021) A/B dönüş alanı dışında olduğunu (dönerken tutucu takıma değmiyor) gözle doğrulayın |
+| 35 | Çarpışma C2 (devam başlığı: B sensörde, X/Y disk düz, A eğimi noktanın üstünde, sonra yavaş iniş) | A ≠ 0 bir işlemde durdurulan işi KALDIĞI YERDEN sürdürün (%10 hız): X/Y'ye disk düzken gitmeli, eğim noktanın üstünde, sonra iniş |
+| 36 | Çarpışma C16 (uç boşluğu bekçisi): **R ve H ölçülmeli** (Ayarlar › Hareket, varsayılan 56 / 13 tahmin, ölçme yöntemi §5a) | Ölçümden sonra: uzun bir frezle (TAKIM kartında uç boşluğu < R·sin25.8 + H·cos25.8 + pay) A 46'ya eğilen bir işte takım değişiminden hemen sonra iş duraklamalı ve soru çıkmalı. Duraklamanın eğim hareketinden ÖNCE geldiğini (Eding ileri okuma) %10 hızla gözleyin |
+| 37 | Çarpışma C15 (Jog X/Y uyarısı) ve C12 (m100 değişmedi: CAM modal A) | Disk eğik ve uç aşağıdayken X jog: onay sorulmalı. CAM programlarında M100'ün nerede çağrıldığını kontrol edin (eğik A'da çağrılıyorsa X/Y sensöre eğik disk üstünden gider) |
+| 38 | Çarpışma C17: `ClearPos` (X0.4'te A−25) ve home_all köşe hareketi değişmedi | Blok değiştirme konumunda en uzun frezle tutucu halkasının takıma yaklaşmadığını gözle doğrulayın |
+
+## 5a. Çarpışma incelemesi (takım ↔ B ünitesi / disk tutucu, takım boyu)
+
+Kullanıcı bildirimi: (a) iş RESET'lenip HOME'a basılınca, (b) durdurulan iş "kaldığı yerden" sürdürülünce takım B ünitesine / diske çarpıyor; birkaç frez kırıldı, kalibrasyon bozuldu. Bütün hareket senaryoları takım boyu hesaba katılarak gözden geçirildi (makro sürüm **6**, commit'ler "Carpisma: ...").
+
+**Makine gerçekleri (cnc.ini):** takım hep dik (makine Z), disk tarafı eğilir. A: −5.597…+46.003°, G54 A = 20.209 → disk **düz** makine A ≈ 20.2'de (A home 0 = düzden ~20° eğik). B: sürekli (±3600°), B180 diski ters çevirir; B'nin ekseni disk düzleminde olduğundan B90'da disk **dikeydir** (en üst noktası ≈ tutucu yarıçapı R). Z: +3.9…−69, #5163 = 3.8 güvenli Z (en üst). G30 = X0.4 Y0.9 Z3.8 A−4.8372 B−2.3508 (A −4.84 = düzden ~25°; köşe disk merkezinden ~76 mm). İş Z sıfırı = disk orta düzlemi, takım boyu G92 Z ile.
+
+**Uç boşluğu:** güvenli Z'de takım ucunun disk orta düzleminden yüksekliği = `#5163 + (iş Z − makine Z)`. Uzun frez = küçük uç boşluğu. cnc.ini'deki G92 (#5213 = −247.53) ile son ölçülen frezde 42.4 mm. Düzden θ eğik disk + tutucunun en üst noktası ≈ `R·sin|θ| + H·cos θ`; R = tutucu (halka / B ünitesi) dış yarıçapı, H = düzken orta düzlemden tutucunun en üst noktası. R 56, H 13, θ 25.8° (A 46) → 36.1 mm (+3 pay = 39.1): 42.4 mm'lik frez sığar, ~3 mm daha uzun frez çarpar. Disk DÜZken gereken yalnız H + pay (16 mm): güvenli Z'de her frez geçer. **Sonuç: X/Y gezinmesi yalnız disk düzken; B'nin büyük dönüşleri yalnız disk dışında; eğim en son, noktanın üstünde ve yalnız uç boşluğu yetiyorsa.**
+
+### Senaryo tablosu (eski sıra → risk → yeni sıra)
+
+| # | Senaryo | Eski sıra | Risk | Yeni sıra |
+| --- | --- | --- | --- | --- |
+| C1 | **HOME** (iş RESET'lendikten sonra; `home_all`) | Z home, **X home, Y home** (A işteki eğimde), A home, B home, köşe, M81/M80, B, G30 | (a) bildirimi: A eğikken uzun frez en üst Z'de eğik disk/tutucu üstünden köşeye gider → çarpma | Panel (eksenler zaten home'lu, konum biliniyor): Z üst → A düz → B en yakın düz açı → G30 X/Y köşesi; sonra makro: **Z → A home + `a[#5224]` (düz) → X → Y → B (köşede)** → üreticinin köşe hareketi → M81/M80 → B → `pm_park` |
+| C2 | **Kaldığı yerden devam** `tam` / `yakin` | Z_SAFE, AZXY_SAFE (Z ile A aynı satırda), `G0 A.. B..` (sensörde), **`G0 X Y` (eğik disk üstünden)**, G1 Z | (b) bildirimi: eğik disk/tutucu üstünden X/Y; A, Z yükselirken dönüyor | AZXY_SAFE (Z, sonra A düz, sonra sensör X/Y) → `G0 B` (sensörde, disk dışı: B180 dönüşü burada) → `G0 X Y` (disk düz) → `G0 A` (noktanın üstünde) → G1 Z. Ayrıca iş sürerken uç boşluğu bekçisi (C16) |
+| C3 | Devam `guvenli` | ... `G0 A.. B..` sensörde, sonra CAM'in Z_SAFE satırı | A/B sensörde dönüyor (güvenli); AZXY_SAFE içindeki Z+A | Çıktı aynı; AZXY_SAFE makroda bölündü. CAM'in kendi hareketleri bekçinin denetiminde |
+| C4 | Devam `frez` (kırık frez) | başlık Z_SAFE, AZXY_SAFE, B0; CAM'in `T M6` satırı | change_tool riski (C8) | Başlık aynı; change_tool düzeltildi (C8), bekçi yeni frezi denetler |
+| C5 | **PARK** (`park`, `konum.park`, eski panel PARK) ve üretilen programların sonu | Z üst, sonra **tek satır `G30`** (X Y Z A B aynı anda) | Disk üstünden köşeye giderken A −4.84'e (düzden ~25°) döner; sensörden köşeye giden doğru disk merkezinin ~29 mm yakınından geçer | Z üst → A düz → B en yakın düz → G30 X/Y (köşe) → G30 Z → G30 A/B (köşede). Makroda `sub pm_park`; programlarda (`Kal-NC-Uret`, `OtoKal-NC-Uret`) aynı beş G53 satırı |
+| C6 | TEMİZLİK / Kol düz / Blok değiştirme | Z üst, `A[#5224] B[#5225]` olduğu yerde | Disk ters (B ≈ 180, alt yüz işlenirken RESET) ise B180 → B−2.35 dönüşü disk ortasında diski **dikey** geçirir (yükseklik ≈ R ≈ 56 mm > uç boşluğu) | Z üst → A düz → B en yakın düz açıya (yerinde: eğim hep azalır) → disk tersse sensöre (yoksa G30 köşesine) gidip B orada → hedef A/B. Blok değiştirme sonra `ClearPos` (değişmedi) |
+| C7 | Yuvaya git (Sensör, T1–T6), Yuva ayarı › Git (Değişim dahil) | Z üst, hedef A/B olduğu yerde, X/Y | C6 ile aynı B dönüşü; Değişim noktası disk ortasında | Z üst → A düz → B en yakın düz → (B hedefi 5°'den uzaksa disk dışında döner) → X/Y → hedef A/B (yuvada A #4017 ≈ 23, düzden 2.8°) |
+| C8 | **M6** (iş içi `T M6`, Takım değiştir, Frez bırak, Başlat öncesi frez bırakma): `change_tool` | Z üst, `a[#5224] b[#5225]` **olduğu yerde**, sensör X | Disk ters iken B dönüşü disk üstünde (C6) | Makro: Z üst → A düz → **sensör X/Y** → B (sensörde) → Drop/Pick (yuvalar X ≈ −125, disk dışı; değişmedi). Panelden gönderilen M6'dan önce ayrıca Z üst → A düz → B en yakın düz |
+| C9 | Manuel frez değişimi (`manual_change`) | Z üst, A/B olduğu yerde, değişim noktası X/Y (disk ortası) | C6 ile aynı | Z üst → A düz → sensör X/Y → B → değişim noktası X/Y → (#4033 ≠ 0 ise Z) |
+| C10 | Takım ölç (`user_1`, M6 sonrası da) | `g0 z[#5163] a[#5224]` (aynı satır), sensör X/Y | A, Z daha yükselirken dönüyor | Z → A düz → sensör X/Y. Panel düğmesinde önce Z/A/B-düz |
+| C11 | `azxy_safe` (CAM, üreticiler, Takım alanı) | `g0 z[#5163] a[#5224]` aynı satır | C10 ile aynı | Z → A düz → sensör X/Y |
+| C12 | Aşınma kontrolü (M100 → `m100`), İş mili boş mu (`is_empty_tool`) | Z üst, sensör X/Y (A olduğu gibi) | m100 CAM içinden çağrılır; A'yı düzlemek CAM'in modal A'sını bozar | **Makro değişmedi** (CAM modal A). Panel düğmelerinde önce Z/A/B-düz. Tarama M100'ü "eğik X/Y gezinmesi" sayar (bekçi denetler). Öneri: CAM'de M100'ü A0 sonrasına koymak |
+| C13 | Kalibrasyon programları (disk testi, otomatik kalibrasyon) | A ±15/±20 ve B ±15 eğimleri Z_SAFE sonrası ölçüm noktasında; B180 AZXY_SAFE sonrası (sensörde); son `G30` | Eğik disk üstünde ölçüm (kaçınılmaz); son G30 (C5) | Ölçüm sırası **değişmedi** (kalibrasyon). Son G30 → sıralı park. T1 (pim) ölçüldükten sonra bekçi denetler: otomatik kalibrasyon 15° → 30.1 mm, disk testi 20° → 34.4 mm uç boşluğu ister |
+| C14 | CAM programı sonu `G30` (HyperDent çıktısı) | T0 M6 sonra G30 | İş mili boş (T0): yalnız iş mili burnu; boşluğu frezli uçtan büyük | CAM dosyası değiştirilmez. Öneri (uygulanmadı): post-processor'da `G30` → `GOSUB PM_PARK` |
+| C15 | Jog X/Y | serbest | Eğik diskte uç tutucunun altındayken X/Y | Disk > 1° eğik ve uç (iş Z) < gereken yükseklik ise onay ister. Z / A / B jog değişmedi |
+| C16 | **İş sürerken uzun frez** (yeni) | yok | Takım boyu programda yok: her takım değişiminden sonra boy farklı | BAŞLAT/DEVAM: program taranır (`CarpismaAnaliz`); iş milindeki frez programın ilk kısmı için kısaysa başlatılmaz. Her takım değişiminden sonra (takım no ya da G92 değişip Eding RUNNING): uç boşluğu < `R·sin θ + H·cos θ + pay` (θ: o frezin kalan kısmında disk/tutucu bölgesindeki en büyük eğim) ise **iş hemen duraklatılır**, "T{n} çok uzun: disk θ° eğikken uç tutucuya x mm yaklaşır / GİRER" sorusu: İŞİ DURDUR (önerilen) / YİNE DE DEVAM ET (tehlikeli onay) |
+| C17 | `ClearPos` (Blok değiştirme), home_all köşe hareketi `x-4 y-4 z-4 a4`, yuva Drop/Pick A #4017/B #4018 | — | Köşede / disk dışında | Değişmedi (gerekçe: X 0.4 makine = merkezden 53.5 mm, tutucu kirişi küçük; köşe ~70 mm; yuvalar X ≈ −72 iş). Makro testinde izinli istisna listesinde tek satır: `g0 g53 x-4.0 y-4.0 z-4.0 a4.0` |
+| C18 | ACİL STOP, iş mili, hava, pens | hareket yok | — | değişmedi |
+| C19 | `pm_home_guvenli` (çağrılmıyor) | Z, X/Y, A/B | X/Y A eğikken | Z → A düz → X/Y → B → home_all |
+
+### Parametreler (panel_ayarlar.ini, Ayarlar › Hareket)
+
+| Anahtar | Varsayılan | Anlamı |
+| --- | --- | --- |
+| `TutucuYaricap` | 56 mm | R: disk merkezinden tutucu halkası / B ünitesinin en dış noktası. **MAKİNEDE ÖLÇÜLMELİ** (tahmin) |
+| `TutucuYariYukseklik` | 13 mm | H: disk düzken orta düzlemden tutucunun en üst noktası. **MAKİNEDE ÖLÇÜLMELİ** (tahmin) |
+| `CarpismaPayi` | 3 mm | uç ile tutucu arasında kalacak en az boşluk |
+| `CarpismaBekci` | 1 | 0: çarpışma koruması kapalı (tarama ve bekçi yok) |
+
+Uç boşluğu Üretim › TAKIM kartında ve Takımlar'da "uç boşluğu 42.4 mm" olarak görünür.
+
+### Neler güvence altında, neler ölçüme bağlı
+
+- **Kodla ve testle güvence altında:** makro ve panel hareketlerinde Z ile A/B ya da X/Y ile A/B aynı satırda değil (tek izinli istisna köşede); panel hareketlerinde X/Y'den önce Z en üstte ve A düz; B en yakın düz açıya yerinde (eğim azalarak), daha büyük B dönüşleri sensörde / köşede; HOME ve PARK köşeye disk düzken gidiyor; devam başlığında eğim X/Y'den sonra; uzun frez tarama + bekçiyle duraklatılıyor (EdingSim'de uçtan uca).
+- **Ölçüme bağlı (MAKİNEDE DOĞRULA 32–38):** R ve H (varsayılanlar tahmin; büyük girilirse gereksiz duraklama, küçük girilirse koruma yetersiz); sensör ve G30 köşesinin A/B dönüş alanının dışında olması; Eding'in takım değişiminden (user_1 G92) sonra RUNNING'e döndüğü an ve ileri okuma (duraklama ~0.2 sn + Eding'in tampondaki hareketleri: "elden geldiğince sonraki eğimden önce"); CAM'in eğikken disk üstünde güvenli Z'den aşağıda gezinmemesi (tarama bölge içindeki her hareketi sayar ama ucun gerçek Z'sini değil); `Takim-Bildir` (#4039, ölçümsüz takım numarası) sonrası G92 eski frezindir.
+
+### R ve H'yi makinede ölçme
+
+1. Diski (en kalın blok, 25 mm) tutucuya takın, en uzun frezi alın ve boyunu ölçün (Takımlar › Takım boyu ölç). Kol düz (Takımlar › Hareket › Kol düz).
+2. **H:** uç, tutucu halkasının (ve B ünitesinin) en yüksek noktasının üstüne gelecek şekilde X/Y jog yapın (en üstte). Z−'yi 1 / 0.1 mm adımlarla, uç ile halka arasına konan kâğıt sürtünene kadar indirin. Konum kartında **iş Z** değerini okuyun (kâğıt kalınlığını düşün): H = iş Z. Halkanın birkaç noktasında ve B ünitesinin üstünde tekrarlayın, en büyüğünü alın.
+3. **R (cetvelle):** disk merkezinden halkanın / B ünitesinin en dış noktasına uzaklık. **R (eğimle, daha doğru):** Z en üstte, MDI `G53 G0 A46` (makine A sınırı, düzden θ = 25.8°). Takımı eğik tutucunun yükselen tarafının üstüne getirin, aynı kâğıt yöntemiyle indirin, iş Z = h46. R = (h46 − H·cos θ) / sin θ. Aynısını A−5 (θ = −25.8°) tarafında yapın, büyük olanı alın. B ±15 ile B ünitesinin tarafını da kontrol edin. **B'yi disk üstündeyken 90'a yaklaştırmayın.**
+4. Değerleri Ayarlar › Hareket'e girin. Denetim: en uzun frezle TAKIM kartındaki uç boşluğu ≥ h46 + pay olmalı; değilse o frezle A 46'ya eğilen işler başlatılmaz / duraklatılır.
 
 ## 6. Uygulanmayan öneriler
 
 Kural gereği makine hareketini değiştirdikleri ve doğru değer makinede bilinmeden yazılamayacakları için uygulanmadı:
+
+- **Çarpışma C12 / C14:** `m100` içinde A düzleme (CAM modal A bozulur) ve CAM çıktısının son `G30` satırını `GOSUB PM_PARK` yapma (post-processor işi); kalibrasyon programlarında eğimleri sensörde yapma (ölçüm sırası değişir). Bu durumlar uç boşluğu bekçisinin denetiminde.
 
 - **KL-01:** Prob arama mesafesini kısaltmak (ilk temas T/2−2 F60, diğerleri beklenen −1.5 mm) ve ilerlemeyi düşürmek.
 - **MC-01 / MC-02:** Yuva koordinatlarını üreticiyle eşitlemek, yuva başına A/B/Z değişkenleri.
