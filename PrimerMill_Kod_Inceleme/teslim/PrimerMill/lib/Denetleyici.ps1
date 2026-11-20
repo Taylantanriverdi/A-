@@ -656,7 +656,7 @@ Komut-Tanimla 'kiosk.pin' 'serbest' { Kiosk-Pin-Degistir }
 Komut-Tanimla 'is.sec' 'serbest' { Btn-DosyaSec } -Ek { param($a, $c) if ($c.Suruyor) { return 'Kazıma sürerken / duraklıyken yeni dosya seçilemez' }; if ($c.Acil) { return $script:IzinMetni.Acil }; return '' }
 Komut-Tanimla 'is.baslat' 'hareket' { Btn-Baslat } -Raf -Makro -Ek { param($a, $c) if (-not $script:SeciliDosya) { return $script:IzinMetni.Dosya }; if ($script:Engel) { return $script:IzinMetni.Engel }; return '' }
 Komut-Tanimla 'is.devam' 'is' { Btn-Baslat } -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if ($c.Acil) { return $script:IzinMetni.Acil }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not $c.Durak) { return 'Duraklatılmış iş yok' }; return '' }
-Komut-Tanimla 'is.duraklat' 'is' { Btn-Duraklat } -IcIce -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if (-not ($c.Calis -and -not $c.Durak)) { return $script:IzinMetni.Yok }; return '' }
+Komut-Tanimla 'is.duraklat' 'is' { Btn-Duraklat } -IcIce -Ek { param($a, $c) if ($c.Oniz) { return $script:IzinMetni.Oniz }; if (-not $c.Bagli) { return $script:IzinMetni.Bagli }; if ($c.Durak) { return 'İş zaten duraklatıldı: devam için DEVAM' }; if (-not $c.Calis) { return $script:IzinMetni.Yok }; return '' }
 # SK-09 (MAKİNEDE DOĞRULA): DURDUR (CncAbortJob) panelden başlayan bir işlem (home, takım değişimi, yuvaya git ...) sürerken de
 # çalışır (-IcIce); Btn-Durdur yalnız onay + CncAbortJob yapar, yeni uzun işlem başlatmaz. Dıştaki işlemin bekleyişi Eding'in
 # durumunu görüp kendi hata yoluyla biter.
