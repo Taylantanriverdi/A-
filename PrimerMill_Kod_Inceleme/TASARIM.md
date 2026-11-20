@@ -144,9 +144,9 @@ Düğme durumları duruma göre değişir (tek kaynak: izin tablosu, §7):
 
 Düğmeler: dolgu = işlev rengi (BAŞLAT yeşil, DURAKLAT kehribar, DURDUR kırmızı, diğerleri kart rengi + kenar). Pasif düğme %35 opaklık. Basılıyken 1 kademe koyu. 8 px köşe yarıçapı.
 
-### Geçişli tema (3. tema)
+### İlerleme temaları: Geçişli ve Şafak
 
-Ayarlar › Genel › Tema: **Koyu / Açık / Geçişli** (`panel_ayarlar.ini` `Tema=koyu|acik|gecisli`, bilinmeyen = koyu; açılışta uygulanır). Geçişli tema koyu tabanlıdır: durum renkleri, marka altını ve düğme dolguları Koyu ile aynıdır; yalnız **yüzey belirteçleri** (zemin, kart, kart kenarı, düğme zemini/kenarı, menü, ayraç/iz, seçili, gölge) işin ilerlemesine göre **maviden yeşile** kesintisiz kayar.
+Ayarlar › Genel › Tema: **Koyu / Açık / Geçişli / Şafak** (`panel_ayarlar.ini` `Tema=koyu|acik|gecisli|safak`, bilinmeyen = koyu; açılışta uygulanır). Bir ilerleme teması = iki uç paleti (`IlerlemePaleti`); eşleme, ara renk hesabı ve yumuşatma ikisinde ortaktır. Geçişli tema koyu tabanlıdır: durum renkleri, marka altını ve düğme dolguları Koyu ile aynıdır; yalnız **yüzey belirteçleri** (zemin, kart, kart kenarı, düğme zemini/kenarı, menü, ayraç/iz, seçili, gölge) işin ilerlemesine göre **maviden yeşile** kesintisiz kayar.
 
 | Belirteç | Mavi uç (t = 0) | Yeşil uç (t = 1) |
 | --- | --- | --- |
@@ -158,8 +158,21 @@ Ayarlar › Genel › Tema: **Koyu / Açık / Geçişli** (`panel_ayarlar.ini` `
 | Ayraç (ilerleme izi) | `#1A2D5A` | `#174230` |
 | Yazı / soluk yazı | `#F3F4F6` / `#A0A7B4` | aynı |
 
-- **Eşleme:** iş bitti (`IsTamamlandi`, %100) → t = 1 (yeni dosya seçilene / panel sıfırlanana kadar tam yeşil); iş sürüyor veya duraklatıldı (`IsAktif` ve ÇALIŞIYOR/DURAKLATILDI) → t = `Yuzde`/100; iş yok → t = 0 (mavi).
-- **Ara renkler:** uçlar arasında OKLab'da doğrusal karışım (mavi → camgöbeği → yeşil; parlaklık sabit kalır, çamurlu gri geçiş yok), her 8 bitlik ara renk görünür.
+**Şafak** (aynı kurallar; gece çiviti/mor → erik → şafak bakırı, marka altınıyla uyumlu):
+
+| Belirteç | Gece ucu (t = 0) | Şafak ucu (t = 1) |
+| --- | --- | --- |
+| Zemin | `#0E0B26` | `#1B1007` |
+| Kart | `#18133B` | `#2A1A0D` |
+| Kart kenarı | `#2C2563` | `#57381C` |
+| Düğme / kenar | `#211B4A` / `#362E72` | `#352112` / `#64421F` |
+| Menü | `#120E2F` | `#22150A` |
+| Ayraç (ilerleme izi) | `#272056` | `#4A2F17` |
+
+Çivit ve bakır zıt tonlar olduğundan Şafak OKLCh'de karışır (ton açısı kısa yoldan erik/kızıl üzerinden döner; OKLab'da orta nokta griye düşerdi). Yazı/kart ≥ 15:1, yazı/düğme ≥ 13,8:1. Kehribar DURAKLATILDI hapı ve altın vurgular bakır uçta, mor HAZIRLIK hapı çivit uçta ince açık çerçeveyle ayrışır (ekran görüntüleri 73–77).
+
+- **Eşleme:** iş bitti (`IsTamamlandi`, %100) → t = 1 (yeni dosya seçilene / panel sıfırlanana kadar uç renk: tam yeşil / tam bakır); iş sürüyor veya duraklatıldı (`IsAktif` ve ÇALIŞIYOR/DURAKLATILDI) → t = `Yuzde`/100; iş yok → t = 0 (mavi / gece çiviti).
+- **Ara renkler (Geçişli):** uçlar arasında OKLab'da doğrusal karışım (mavi → camgöbeği → yeşil; parlaklık sabit kalır, çamurlu gri geçiş yok), her 8 bitlik ara renk görünür.
 - **Hareket:** denetleyici `Yuzde`'yi 200 ms'de bir verir; Kabuk'taki 33 ms'lik zamanlayıcı gösterilen t'yi üstel yumuşatmayla (τ ≈ 0,45 s) hedefe taşır, yalnız 8 bitlik renk değişen karelerde yüzeyleri yeniden boyar ve |hedef − gösterilen| < 0,001 olunca durur (boşta CPU yükü yok). Koyu ve Açık temada zamanlayıcı hiç çalışmaz.
 - **Kontrast:** yazı/kart kontrastı her t'de Koyu temadakinden düşük değil (≥ 14:1; soluk yazı ≥ 6,7:1). Renkli zeminde durum hapı ve ilerleme çubuğu ince yarı saydam beyaz çerçeveyle ayrışır (ÇALIŞIYOR mavi hap mavi zeminde, HAZIR yeşil hap yeşil zeminde).
 
@@ -170,7 +183,7 @@ Ayarlar › Genel › Tema: **Koyu / Açık / Geçişli** (`panel_ayarlar.ini` `
 
 ### Hareket
 
-Geçişler 150 ms (ekran değişiminde içerik solarak gelir, ilerleme çubuğu yumuşak ilerler). Alarmda durum hapı 1 Hz yanıp söner. Geçişli temada zemin rengi ilerlemeyle yavaşça kayar (yukarıda). Başka animasyon yok.
+Geçişler 150 ms (ekran değişiminde içerik solarak gelir, ilerleme çubuğu yumuşak ilerler). Alarmda durum hapı 1 Hz yanıp söner. İlerleme temalarında (Geçişli, Şafak) zemin rengi ilerlemeyle yavaşça kayar (yukarıda). Başka animasyon yok.
 
 ## 6. Onay düzeyleri
 

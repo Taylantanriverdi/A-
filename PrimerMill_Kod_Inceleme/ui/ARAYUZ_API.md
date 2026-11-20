@@ -36,8 +36,8 @@ Sayılar görünümde her yerde `InvariantCulture` ile biçimlenir; komut argüm
 | `void IzinleriUygula(IDictionary<string,bool> izin, IDictionary<string,string> neden)` | İzin tablosu. Bkz. §6. |
 | `void IzinleriUygula(IDictionary<string,string> neden)` | Kısa yol: tablodaki her anahtar pasif, nedeni değer. Tabloda olmayan her şey etkin. |
 | `void IzinleriUygulaTablo(IDictionary izin, IDictionary neden)` | PowerShell `Hashtable` kolaylığı. |
-| `void TemaUygula(string mod)` | Tema (çalışırken): `koyu`, `acik`, `gecisli` (bilinmeyen = koyu). Ayarlar › Genel › Tema (Koyu / Açık / Geçişli) da bunu çağırır ve `ayar.kaydet Tema=koyu|acik|gecisli` gönderir. `TemaUygula(TemaModu)` aynı; `TemaUygula(bool koyu)` uyumluluk için kalır (true = Koyu, false = Açık). |
-| `void GecisiTamamla()` | Geçişli temada yumuşak geçişi beklemeden rengi hedefe atlatır (ekran görüntüsü / test). Geçişli tema ilerlemeyi `Uygula(MakineDurumu)` içinden alır: `IsTamamlandi` → tam yeşil; `IsAktif` ve `Durum` ÇALIŞIYOR/DURAKLATILDI → `Yuzde/100`; değilse mavi. Kabuk içindeki 33 ms'lik zamanlayıcı gösterilen değeri üstel yumuşatmayla (τ ≈ 0,45 s) hedefe taşır ve fark < 0,001 olunca durur (TASARIM §5). |
+| `void TemaUygula(string mod)` | Tema (çalışırken): `koyu`, `acik`, `gecisli`, `safak` (bilinmeyen = koyu). Ayarlar › Genel › Tema (Koyu / Açık / Geçişli / Şafak) da bunu çağırır ve `ayar.kaydet Tema=koyu|acik|gecisli|safak` gönderir. `TemaUygula(TemaModu)` aynı; `TemaUygula(bool koyu)` uyumluluk için kalır (true = Koyu, false = Açık). |
+| `void GecisiTamamla()` | İlerleme temalarında (Geçişli, Şafak) yumuşak geçişi beklemeden rengi hedefe atlatır (ekran görüntüsü / test). İlerleme teması = iki uç paleti (`IlerlemePaleti`: `Tema.GecisliPalet` mavi→yeşil, `Tema.SafakPalet` gece çiviti→şafak bakırı); ilerlemeyi `Uygula(MakineDurumu)` içinden alır: `IsTamamlandi` → tam yeşil; `IsAktif` ve `Durum` ÇALIŞIYOR/DURAKLATILDI → `Yuzde/100`; değilse mavi. Kabuk içindeki 33 ms'lik zamanlayıcı gösterilen değeri üstel yumuşatmayla (τ ≈ 0,45 s) hedefe taşır ve fark < 0,001 olunca durur (TASARIM §5). |
 | `void EkranGoster(string ad)` | `uretim`, `takimlar`, `kalibrasyon`, `ayarlar`, `kayitlar`, `uzaktan`; alt sayfa: `takimlar.yuva`, `takimlar.hareket`, `takimlar.ismili`, `kalibrasyon.disk`, `kalibrasyon.oto`, `ayarlar.0`…`ayarlar.6`. |
 | `void Bildir(string metin, MesajTuru tur)` | Alt şeritte 5 sn görünen bildirim (kalıcı pencere açmaz; KU-09). |
 | `void MesgulGoster(string metin)` | İçerik alanını "meşgul" katmanıyla kapatır (null = kaldır). Üst şerit ve ACİL STOP açık kalır. `MakineDurumu.Mesgul` ile de yapılır. |
@@ -159,7 +159,7 @@ Sihirbaz adımı **denetleyicinindir**: `MakineDurumu.DiskAdim` / `OtoAdim` (0�
 
 | Ad | Arg | Nereden |
 |---|---|---|
-| `ayar.kaydet` | `<Anahtar>=<değer>` | Tüm anahtar / seçim / değer kutuları. Anahtarlar: `Tema` (koyu/acik/gecisli; bilinmeyen = koyu), `MakineAdi`, `SanalKlavye`, `TamEkran`, `WinBaslangic`, `Koordinat`, `Dansci`, `FrezModu` (MANUEL/OTOMATIK), `OtomatikHazirlik`, `GeriSayim` (0–60), `SadeTaraf` (3/9), `ModSor`, `BlokSor`, `JogAdim`, `JogHiz`, `EdingGizli`, `EdingSifirla`, `Uzak`, `UzakKilit` — açık/kapalı değerleri `1`/`0` |
+| `ayar.kaydet` | `<Anahtar>=<değer>` | Tüm anahtar / seçim / değer kutuları. Anahtarlar: `Tema` (koyu/acik/gecisli/safak; bilinmeyen = koyu), `MakineAdi`, `SanalKlavye`, `TamEkran`, `WinBaslangic`, `Koordinat`, `Dansci`, `FrezModu` (MANUEL/OTOMATIK), `OtomatikHazirlik`, `GeriSayim` (0–60), `SadeTaraf` (3/9), `ModSor`, `BlokSor`, `JogAdim`, `JogHiz`, `EdingGizli`, `EdingSifirla`, `Uzak`, `UzakKilit` — açık/kapalı değerleri `1`/`0` |
 | `eding.goster` / `eding.gizle` | — | Eding sekmesi |
 | `eding.yeniden` | — | Eding sekmesi (Tehlikeli değil, Normal onay; iş sürerken izin kapatılmalı) |
 | `eding.kapat` | — | Eding'i ayarları kaydederek kapat (Normal onay) |
@@ -203,8 +203,8 @@ Tüm alanlar düz (public field). Listeler kurucuda boş oluşturulur; `null` ve
 | `BitisSaati` | string "HH:mm" | BİTİŞ |
 | `IsTakimlari` | string | "T1 · T2 · T3" |
 | `IsUyarilari`, `IsHatalari` | List<string> | Ön kontrol rozeti + liste; hata varsa kırmızı şerit |
-| `IsTamamlandi` | bool | KALAN yerine "BİTTİ" (yeşil); Geçişli temada tam yeşil zemin (yeni dosya seçilene kadar) |
-| `IsAktif` | bool | İş başlatıldı ve sürüyor (duraklatılmış olabilir). Geçişli tema `Yuzde`'yi yalnız bu iken renge yansıtır (iptalden kalan eski yüzde MDI/home sırasında zemini yeşile kaydırmaz) |
+| `IsTamamlandi` | bool | KALAN yerine "BİTTİ" (yeşil); ilerleme temalarında uç renk (Geçişli tam yeşil, Şafak tam bakır; yeni dosya seçilene kadar) |
+| `IsAktif` | bool | İş başlatıldı ve sürüyor (duraklatılmış olabilir). İlerleme temaları (Geçişli, Şafak) `Yuzde`'yi yalnız bu iken renge yansıtır (iptalden kalan eski yüzde MDI/home sırasında zemini yeşile kaydırmaz) |
 | `Hiz` | int % | İlerleme oranı (>120 kırmızı, ≠100 yeşil) |
 | `BlokDurum`, `BekleyenBlok`, `BlokSonrakiIsim`, `BlokKalinlik`, `BlokDerinlik` | | Bakım şeridi yazısı, Yeni blok diyaloğu varsayılanları |
 | `SonMesaj`, `SonMesajTuru`, `SonMesajZamani` | | Alt şerit; Hata ise Kayıtlar menüsünde rozet |
@@ -260,7 +260,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 
 ## 7. Görsel kurallar (TASARIM §5 uygulaması)
 
-- Renk belirteçleri `Tema` içinde birebir (`Tema.Mod`: Koyu / Açık / Geçişli; Geçişli'de yüzeyler `Tema.GecisAyarla(t)` ile hesaplanır): koyu/açık zemin, kart, kenar, yazı, soluk, marka; durum renkleri HAZIR/ÇALIŞIYOR/DURAKLATILDI/ALARM/HAZIRLIK/PASİF. Düğme rolleri: BAŞLAT yeşil dolgu, DURAKLAT kehribar, DURDUR kırmızı; tehlikeli işlemler kırmızı çerçeve; sihirbaz ana eylemleri altın çerçeve. Pasif = %35 opaklık; basılı = 1 kademe koyu; 8 px köşe.
+- Renk belirteçleri `Tema` içinde birebir (`Tema.Mod`: Koyu / Açık / Geçişli / Şafak; ilerleme temalarında yüzeyler `Tema.GecisAyarla(t)` ile etkin paletten hesaplanır): koyu/açık zemin, kart, kenar, yazı, soluk, marka; durum renkleri HAZIR/ÇALIŞIYOR/DURAKLATILDI/ALARM/HAZIRLIK/PASİF. Düğme rolleri: BAŞLAT yeşil dolgu, DURAKLAT kehribar, DURDUR kırmızı; tehlikeli işlemler kırmızı çerçeve; sihirbaz ana eylemleri altın çerçeve. Pasif = %35 opaklık; basılı = 1 kademe koyu; 8 px köşe.
 - Yazı: Segoe UI → DejaVu Sans → Arial; sayılar Consolas → DejaVu Sans Mono → Courier New. Kalan süre 40 pt (1080p'de ≈56 pt), durum hapı 18 pt kalın, eksenler 22 pt, düğmeler 15 pt kalın, kart başlıkları 10 pt büyük harf soluk.
 - Hareket: ekran geçişi 150 ms solma (Windows), ilerleme bandı yumuşak, ALARM hapı 1 Hz. İsteğe bağlı ilerleme parıltısı (`Dansci=1`).
 - Simgeler vektörel çizilir (simge yazı tipine bağımlı değil; KU-26).
@@ -574,7 +574,7 @@ Hepsi temalı, dokunmatik boyutlu (düğmeler ≥ 56 px), sahibi `Kabuk`, Kabuk'
 | 15.2 | Kapat onayı | Ayarlar › Genel › KAPAT → denetleyici onayı (çalışırken uyarılı) | `panel.kapat` |
 | 15.3 | Eding'i ayar kaydederek kapatma | Ayarlar › Eding › KAPAT; EdingKapat.bat | `eding.kapat` |
 | 15.4 (yeni) | Cihazı kapat / yeniden başlat | Sol menü altı "Kapat" (her ekranda) | `sistem.kapat` |
-| 15.6 (yeni) | Tema: Koyu / Açık / Geçişli | Ayarlar › Genel › Tema (3 seçenekli seçim); `panel_ayarlar.ini` `Tema=`, açılışta uygulanır. Geçişli: zemin/kart yüzeyleri iş ilerledikçe maviden yeşile kesintisiz döner | `ayar.kaydet Tema=`, `Kabuk.TemaUygula(string)`, `Yuzde`, `IsAktif`, `IsTamamlandi` |
+| 15.6 (yeni) | Tema: Koyu / Açık / Geçişli / Şafak | Ayarlar › Genel › Tema (4 seçenekli seçim); `panel_ayarlar.ini` `Tema=`, açılışta uygulanır. Geçişli: zemin/kart yüzeyleri iş ilerledikçe maviden yeşile, Şafak: gece çivitinden erik üzerinden şafak bakırına kesintisiz döner | `ayar.kaydet Tema=`, `Kabuk.TemaUygula(string)`, `Yuzde`, `IsAktif`, `IsTamamlandi` |
 | 15.5 (yeni) | Kiosk modu: Windows'a geçiş (PIN), kiosk PIN'i | Ayarlar › Genel › Kiosk modu; kurulum `KIOSK_KUR.bat` / `KIOSK_KALDIR.bat`, kabuk `Kabuk.ps1` | `kiosk.windows`, `kiosk.pin`, `Kiosk` |
 
 Bölüm 16 (değişken kullanımı) ve 17 (macro.cnc eşlemesi) arayüz özelliği değildir; değişkenlerin görünür olanları Ayarlar › Makine değişkenleri ve Kalibrasyon bilgi şeridindedir.
@@ -591,7 +591,7 @@ Bölüm 16 (değişken kullanımı) ve 17 (macro.cnc eşlemesi) arayüz özelli�
 
 ## 9. Ekran görüntüleri
 
-`tests/ui/ekran_goruntusu_al.sh` → `teslim/ekran_goruntuleri/` (Mono + Xvfb, gerçek arayüz kodundan). Koyu tema 1024×768 ve 1920×1080'de her ekran, her sihirbaz adımı (1024) ve önemli diyaloglar; açık temada Üretim, Takımlar, Oto sihirbaz ④ ve Tehlikeli onay; Geçişli temada Üretim %0 / %50 / %100 (1024), %64 (1920) ve Ayarlar › Genel.
+`tests/ui/ekran_goruntusu_al.sh` → `teslim/ekran_goruntuleri/` (Mono + Xvfb, gerçek arayüz kodundan). Koyu tema 1024×768 ve 1920×1080'de her ekran, her sihirbaz adımı (1024) ve önemli diyaloglar; açık temada Üretim, Takımlar, Oto sihirbaz ④ ve Tehlikeli onay; Geçişli temada Üretim %0 / %50 / %100 (1024), %64 (1920) ve Ayarlar › Genel; Şafak temada Üretim %0 (HAZIRLIK) / %50 / %100, %92 DURAKLATILDI ve Ayarlar › Genel.
 
 ## 10. Mono ile Windows farkları (bilinen)
 

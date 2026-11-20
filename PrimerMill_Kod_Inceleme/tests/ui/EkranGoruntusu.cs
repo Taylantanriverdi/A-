@@ -168,6 +168,13 @@ static class EkranGoruntusu
         Ekle(no() + "_uretim_gecisli_100_1024.png", 1024, 768, G, () => { var d = Bitti(); Uygula(d, IzinHazir()); Git("uretim"); });
         Ekle(no() + "_uretim_gecisli_64_1920.png", 1920, 1080, G, () => { Calisiyor(); Git("uretim"); });
         Ekle(no() + "_ayarlar_genel_gecisli_1024.png", 1024, 768, G, () => { var d = Ornek(); d.Yuzde = 30; d.Kiosk = true; d.Ayarlar["Tema"] = "gecisli"; Uygula(d, IzinCalisiyor()); Git("ayarlar.0"); });
+        // Şafak: gece çiviti (0) → erik → şafak bakırı (1). %0'da HAZIRLIK (mor hap çivit zeminde), %92'de DURAKLATILDI (kehribar hap bakır zeminde)
+        var S = TemaModu.Safak;
+        Ekle(no() + "_uretim_safak_0_1024.png", 1024, 768, S, () => { var d = Hazir(); d.Durum = Durum.Hazirlik; d.DurumMetni = "Home gerekli"; d.HomeAlindi = false; Uygula(d, IzinHazir()); Git("uretim"); });
+        Ekle(no() + "_uretim_safak_50_1024.png", 1024, 768, S, () => { var d = Ornek(); d.Yuzde = 50; d.Satir = 34876; d.GecenSn = 33 * 60; d.KalanSn = 33 * 60; Uygula(d, IzinCalisiyor()); Git("uretim"); });
+        Ekle(no() + "_uretim_safak_100_1024.png", 1024, 768, S, () => { var d = Bitti(); Uygula(d, IzinHazir()); Git("uretim"); });
+        Ekle(no() + "_uretim_safak_duraklatildi_92_1024.png", 1024, 768, S, () => { var d = Ornek(); d.Yuzde = 92; d.Durum = Durum.Duraklatildi; d.DurumMetni = "Duraklatıldı"; d.Satir = 64170; d.KalanSn = 5 * 60 + 17; d.SonMesaj = "İş duraklatıldı (satır 64 170). Devam için DEVAM."; d.SonMesajTuru = MesajTuru.Uyari; Uygula(d, IzinDuraklatildi()); Git("uretim"); });
+        Ekle(no() + "_ayarlar_genel_safak_1024.png", 1024, 768, S, () => { var d = Ornek(); d.Yuzde = 70; d.Kiosk = true; d.Ayarlar["Tema"] = "safak"; Uygula(d, IzinCalisiyor()); Git("ayarlar.0"); });
     }
 
     static IEnumerable<Control> Tum(Control k)
