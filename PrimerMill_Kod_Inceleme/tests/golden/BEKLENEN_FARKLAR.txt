@@ -5,3 +5,11 @@
 # Örnek:
 #   Kal-NC-Uret/*   KL-03 [math]::Max(0, ...) tamsayı aşırı yüklemesi düzeltildi, cep çapları değişti
 Kal-NC-Uret/*   KL-03 [math]::Max(0, ...) tamsayi asiri yuklemesi duzeltildi, cep caplari degisti (MAKINEDE DOGRULA)
+Kal-NC-Uret/*   CARPISMA: program sonundaki G30 yerine sirali park (Z ust, A duz, G30 X/Y, G30 Z, G30 A/B) - INCELEME_RAPORU Carpisma incelemesi (MAKINEDE DOGRULA)
+OtoKal-NC-Uret/*   CARPISMA: program sonundaki G30 yerine sirali park (Z ust, A duz, G30 X/Y, G30 Z, G30 A/B) (MAKINEDE DOGRULA)
+OtoKal-Sim-Uret/uretilen_T16   CARPISMA: simulasyon kopyasi OtoKal-NC-Uret ciktisindan; G30 yerine sirali park satirlari yorum olarak (simulasyonda makine koordinati yok)
+OtoKal-Sim-Uret/uretilen_T20   CARPISMA: ayni (sirali park yorum)
+OtoKal-Sim-Uret/ornek_olcum_10mm   CARPISMA: girdi ornekler/ornek_olcum_programi_10mm.nc yeni ureticiyle yenilendi (son G30 -> sirali park), park satirlari yorum
+Devam-NC-Uret/ZY2_kisa_s400_yakin   CARPISMA: devam basligi - B sensorde, X/Y disk DUZ iken, A egimi X/Y'den sonra (G0 A B -> G0 B ... G0 X Y, G0 A) (MAKINEDE DOGRULA)
+Devam-NC-Uret/ZY2_kisa_s700_yakin_T2   CARPISMA: ayni devam basligi sirasi
+Devam-NC-Uret/ZY2_kisa_s99999_yakin   CARPISMA: ayni devam basligi sirasi

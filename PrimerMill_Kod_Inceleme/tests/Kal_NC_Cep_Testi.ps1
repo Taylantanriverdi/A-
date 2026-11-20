@@ -11,7 +11,7 @@ if (Test-Path -LiteralPath $Kaynak -PathType Container) {
     $metin = (@(Get-ChildItem -LiteralPath $Kaynak -Filter '*.ps1' -Recurse -File | Where-Object { $_.Name -notlike '*_Klasik.ps1' } | Sort-Object FullName | ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n")
     $ast = [System.Management.Automation.Language.Parser]::ParseInput($metin, [ref]$null, [ref]$null)
 } else { $ast = [System.Management.Automation.Language.Parser]::ParseFile($Kaynak, [ref]$null, [ref]$null) }
-$fAd = @('Kal-Saat', 'Kal-Duzen', 'Kal-Nokta', 'Kal-NC-Uret'); $vAd = @('KalGruplar', 'KalHalkaR')
+$fAd = @('Kal-Saat', 'Kal-Duzen', 'Kal-Nokta', 'Kal-NC-Uret', 'Park-Satirlari'); $vAd = @('KalGruplar', 'KalHalkaR')
 foreach ($n in $ast.EndBlock.Statements) {
     if ($n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and ($vAd -contains $n.Left.VariablePath.UserPath)) { Invoke-Expression $n.Extent.Text }
 }

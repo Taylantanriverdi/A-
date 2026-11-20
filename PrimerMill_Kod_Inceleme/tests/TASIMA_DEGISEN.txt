@@ -42,7 +42,8 @@ Acil-Stop-Kaldir | DEGISTI | E-stop düğmesi ve PENS düğmesi yazısı kaldır
 Btn-Reset | DEGISTI | PENS düğmesi yazısı kaldırıldı
 Btn-Pens | DEGISTI | düğme yazısı kaldırıldı (yeni arayüzde PENS AÇ / PENS KAPAT ayrı komut: pens.ac -> Btn-Pens-Ac, pens.kapat -> Tek-Komut M55 P2)
 Mdi-Gonder | DEGISTI | satır komut argümanı; Onay -> Ui-Tehlikeli-Onay; G10/G92/#4xxx/#5xxx satırında (boşluksuz yazım dahil, Mdi-Ayar-Yazar-Mi) önce ayar yedeği (yeni, güvenlik)
-Btn-Temizlik | DEGISTI | TEMİZLİK ve PARK ayrı düğme (KU-13): $adim parametresi; Z / A-B / G30 satırları ve beklemeler aynı
+Btn-Temizlik | DEGISTI | TEMİZLİK ve PARK ayrı düğme (KU-13): $adim parametresi; hareket satırları eski panelle aynı (çarpışma incelemesi: Guvenli-Sira-Simdi / Park-Satirlari-Simdi, iki panelde de)
+Jog | DEGISTI | çarpışma incelemesi: disk eğikken ve uç tutucunun en üst noktasından aşağıdayken X/Y jog onay ister (Jog-Carpisma-Uyarisi, yalnız yeni panel); hareket satırı aynı
 Konuma-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
 Yuvaya-Git | DEGISTI | etiket -> $script:YuvaDurumMetni
 Yuvaya-Yaklas | DEGISTI | Onay -> Ui-Tehlikeli-Onay; etiket -> durum değişkeni

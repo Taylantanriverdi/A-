@@ -41,7 +41,7 @@ if (Test-Path -LiteralPath $Kaynak -PathType Container) {
 } else { $ast = [System.Management.Automation.Language.Parser]::ParseFile($Kaynak, [ref]$tok, [ref]$perr) }
 if ($perr -and $perr.Count) { throw "Ayrıştırma hatası: $($perr[0].Message) satır $($perr[0].Extent.StartLineNumber)" }
 
-$FonkAdlari = @('Sayi', 'Metin-Sayi', 'OkRot', 'OkModel', 'OkCoz', 'OtoKal-Hesapla-Ic', 'OtoKal-NC-Uret', 'OtoKal-Sim-Uret')
+$FonkAdlari = @('Sayi', 'Metin-Sayi', 'OkRot', 'OkModel', 'OkCoz', 'OtoKal-Hesapla-Ic', 'OtoKal-NC-Uret', 'OtoKal-Sim-Uret', 'Park-Satirlari')
 $DegAdlari = @('OkTeta', 'OkD', 'OkR', 'OkNoktalar')
 $FonkMetin = @{}; $FonkSatir = @{}
 $tumFonk = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)
