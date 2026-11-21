@@ -40,7 +40,7 @@ export function randomPassword(len = 16): string {
 
 export function sanitizeText(s: unknown, max: number): string {
   if (typeof s !== 'string') throw new HttpsError('invalid-argument', 'Metin bekleniyor.');
-  // eslint-disable-next-line no-control-regex
+   
   const clean = s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').replace(/<[^>]*>/g, ' ');
   if (clean.length > max) throw new HttpsError('invalid-argument', `Metin en fazla ${max} karakter olabilir.`);
   return clean.trim();
