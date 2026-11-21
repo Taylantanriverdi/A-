@@ -31,5 +31,5 @@ Write-Host "  EKSİK UO DOSYALARI ($UoFiles):"
 foreach ($e in $eksik) { Write-Host "    - $e" }
 Write-Host ""
 Write-Host "  Orijinal Ultima Online Classic kurulum klasöründeki TÜM dosyaları"
-Write-Host "  bu klasöre kopyala (bkz. OKU_BENI.txt, bölüm 2)."
+Write-Host "  bu klasöre kopyala: 5_UO_Dosyalarini_Kopyala.bat (bkz. OKU_BENI.txt, bölüm 2)."
 exit 1

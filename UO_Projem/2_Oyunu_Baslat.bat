@@ -40,6 +40,7 @@ echo [0/3] Orijinal UO dosyaları kontrol ediliyor...
 if errorlevel 1 (
     echo.
     echo   Bu dosyalar olmadan ServUO açılırken çöker ve kendini sürekli yeniden başlatır.
+    echo   Otomatik bulmak ve kopyalamak için: 5_UO_Dosyalarini_Kopyala.bat
     goto :Hata
 )
 echo.

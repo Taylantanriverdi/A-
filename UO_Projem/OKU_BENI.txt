@@ -9,6 +9,7 @@ KLASÖR YAPISI
     2_Oyunu_Baslat.bat         -> Yedek alır, sunucuyu açar, hazır olunca ClassicUO'yu açar
     3_Online_Moduna_Gecis.bat  -> IP adresini VDS/VPS dış IP'si ile değiştirir
     4_Sunucuyu_Durdur.bat      -> Tüm ServUO pencerelerini zorla kapatır (acil durum)
+    5_UO_Dosyalarini_Kopyala.bat -> Kurulu UO Classic'i bulup UO_Files'a kopyalar
     Araclar\                   -> Yardımcı betikler ve ORTAK AYARLAR (ayarlar.cmd)
     Server\                    -> ServUO sunucu dosyaları (ServUO.exe, Config, Saves)
     Client\                    -> ClassicUO (ClassicUO.exe, settings.json)
@@ -40,6 +41,18 @@ KLASÖR YAPISI
 
   Kopyalanacak yer:
       C:\UO_Projem\Client\UO_Files
+
+  UO HİÇ KURULU DEĞİLSE (ücretsiz ve yasal yol):
+    1. https://uo.com/client-download/ adresinden "Ultima Online Classic
+       Client" kurulum dosyasını indir ve kur.
+    2. Kurulumdan sonra açılan patcher/launcher güncellemeyi bitirene kadar
+       bekle (birkaç GB indirir). EA hesabı açman veya oyuna girmen GEREKMEZ;
+       sadece dosyalar lazım.
+    3. 5_UO_Dosyalarini_Kopyala.bat dosyasını çalıştır. Kurulu klasörü
+       kendisi bulur (kayıt defteri + bilinen klasörler) ve UO_Files'a
+       kopyalar. Bulamazsa yolu elle girebilirsin.
+
+  ELLE KOPYALAMAK İSTERSEN:
 
   Kaynak: Orijinal "Ultima Online Classic" kurulum klasörü, örneğin
       C:\Program Files (x86)\Electronic Arts\Ultima Online Classic
@@ -157,3 +170,6 @@ SÜRÜM GEÇMİŞİ
         (CrashGuard'ın sonsuz yeniden başlatma döngüsü engellendi).
       - Takılı kalmış ServUO süreçleri başlatmadan önce temizlenebiliyor.
       - Yeni: 4_Sunucuyu_Durdur.bat
+  v3  - Yeni: 5_UO_Dosyalarini_Kopyala.bat - kurulu UO Classic'i otomatik bulur
+        ve UO_Files'a kopyalar; bulamazsa resmi indirme sayfasını açar.
+      - Eksik dosya mesajlarında bu dosyaya yönlendirme.
