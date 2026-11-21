@@ -9,7 +9,16 @@ import { getFunctions, connectFunctionsEmulator, httpsCallable } from 'firebase/
 
 const env = import.meta.env;
 const useEmu = env.VITE_USE_EMULATORS === 'true';
-if (env.PROD && !env.VITE_FIREBASE_API_KEY) console.error('Firebase yapılandırması (VITE_FIREBASE_*) eksik: derlemeyi .env ile yapın.');
+const fallback = document.getElementById('boot-fallback');
+if (!env.VITE_FIREBASE_API_KEY && !useEmu) {
+  // Yapılandırma yoksa beyaz ekran yerine açık bir uyarı göster ve dur.
+  if (fallback) {
+    const p = fallback.querySelector('p');
+    if (p) p.textContent = 'Firebase ayarları eksik: program .env dosyasındaki VITE_FIREBASE_* değerleri girilerek derlenmelidir.';
+  }
+  throw new Error('Firebase yapılandırması (VITE_FIREBASE_*) eksik: derlemeyi .env ile yapın.');
+}
+fallback?.remove();
 
 const app = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY, authDomain: env.VITE_FIREBASE_AUTH_DOMAIN, projectId: env.VITE_FIREBASE_PROJECT_ID,

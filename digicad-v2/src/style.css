@@ -25,3 +25,5 @@ input, select, textarea { font:inherit; padding:7px 9px; border:1px solid var(--
 .late { color:var(--err); font-weight:600; } .filters { display:flex; gap:8px; flex-wrap:wrap; align-items:end; margin:8px 0; } .progress { height:6px; background:var(--line); border-radius:3px; overflow:hidden; margin:2px 0; } .progress > i { display:block; height:100%; background:var(--pri); }
 .detail dt { font-size:13px; color:var(--muted); margin-top:8px; } .detail dd { margin:2px 0 0; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline:2px solid var(--pri); outline-offset:1px; }
+.boot-fallback{max-width:640px;margin:15vh auto;padding:24px;font-family:system-ui,sans-serif;line-height:1.5;border:1px solid #dde3ec;border-radius:12px;background:#fff;color:#1a2740}
+.boot-fallback h1{font-size:20px;margin:0 0 12px}
