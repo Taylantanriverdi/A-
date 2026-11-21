@@ -14,7 +14,14 @@
 5. Dosya bütünlüğü: `sha256sum migration/input/primer-dental-*.json` çıktısını not edin; göç raporundaki "Kaynak SHA-256" ile **aynı olmalı**.
 
 ## 2. Yeni projeyi kurma
-`README.md` → "Dağıtım" adımları 1–6 (Blaze, Firestore, Storage, Identity Platform + TOTP, App Check, Secret, yedek bucket). Ardından kuralları ve fonksiyonları dağıtın.
+`README.md` → "Dağıtım" adımları 1–6 (Blaze, Firestore, Storage, Identity Platform + TOTP, App Check, Secret, yedek bucket). Ardından kuralları, indeksleri ve fonksiyonları dağıtın.
+
+**Önemli ayarlar (göçten ÖNCE yapın):**
+- **Firestore konumu `europe-west1`** olmalı (`eur3` değil): konum sonradan değiştirilemez; Cloud Functions bölgesi (`europe-west1`) ve zamanlanmış yedek bununla uyumludur.
+- **`BACKUP_BUCKET`**: `functions/.env.<proje>` içinde yedek bucket adı (§8). Tanımsızsa `scheduledBackup` hata verir ve Cloud Logging'e **`YEDEK BAŞARISIZ`** yazar. Logs-based alert: filtre `severity>=ERROR AND textPayload:"YEDEK BAŞARISIZ"` (veya jsonPayload/message eşleşmesi) → e-posta bildirimi. Ayrıca `labs/<lab>/auditLog` içinde `action=scheduledBackup`, `status=FAILED` kaydı oluşur.
+- **Storage CORS**: yönetim panelindeki toplu ZIP indirme tarayıcıdan `fetch` ile yapılır. `cors.json` içindeki yer tutucu alan adlarını Hosting adresinizle değiştirip `gsutil cors set cors.json gs://<BUCKET>` çalıştırın; yoksa ZIP içine `*_INDIRILEMEDI.txt` konur.
+- **Ortam değişkenleri** (derleme zamanı, `.env`): `VITE_OFFLINE_CACHE` (varsayılan kapalı = bellek önbelleği; `true` = kalıcı IndexedDB), `VITE_AUTH_PERSISTENCE` (varsayılan sekme ömürlü oturum; `local` = kalıcı). Ayrıntı: README "Ortam değişkenleri".
+- **Yönetici hesapları**: `scripts/bootstrap-admin.ts PROJE-ID eposta [--lab digicad]`. Primer Teknoloji için **ayrı bir hesap** ve `--lab primer`: yönetici yalnızca kendi `lab` claim'indeki alana erişir, arayüzde alan seçici yoktur.
 
 Servis hesabı anahtarı: yeni proje → Proje ayarları → Hizmet hesapları → **Yeni özel anahtar**. Dosyayı depo **dışında** saklayın, `export GOOGLE_APPLICATION_CREDENTIALS=/güvenli/yol/anahtar.json`. Göçten sonra anahtarı silin/devre dışı bırakın.
 
@@ -28,9 +35,15 @@ Dry-run yalnızca yerel `migration/out/` altına rapor ve dosya manifesti yazar.
   - Eski kök yapıdaki fazladan kayıtlar gerçekten sizin verinizse `--include-legacy-root` ile taşıyın; bilerek vazgeçiyorsanız `--ignore-legacy-root`. Tanınmayan anahtarları bilerek yok sayacaksanız `--ignore-unknown` (uyarı olarak raporlanır; ham JSON arşiviniz zaten sizde).
 - `UYARI:` satırları: iç içe diziler (Firestore desteklemez) `{_nestedArray: [...]}` olarak **sarılır, kaybolmaz**; `__x__` ve boş alan adları `x` önekiyle yeniden adlandırılır; her ikisi de belgenin `_legacy` alanında kayıtlıdır. Gizli olabilecek (şifre benzeri adlı) alanlar taşınırsa uyarılır.
 - "gizli alan temizlendi": hekim/teknisyen kayıtlarındaki `password/pass/pin/pwd/sifre/şifre/parola` (büyük/küçük harf fark etmez) taşınmaz; yönetici `pass` ve `meta/pass` da taşınmaz. Hekim `username` alanı taşınır (şifresi taşınmaz).
-- "e-postasız hesap", "ortak/geçersiz e-posta": bu hekim/teknisyenler için Auth hesabı **açılmaz** (aynı e-postayı paylaşan iki kayıttan biri diğerinin erişimini ezerdi). Hesabı sonradan Yönetim → Hekimler/Teknisyenler → **Hesap aç** ile oluşturursunuz.
+- "e-postasız hesap", "ortak/geçersiz e-posta": bu hekim/teknisyenler için Auth hesabı **açılmaz** (aynı e-postayı paylaşan iki kayıttan biri diğerinin erişimini ezerdi; bir Auth hesabı tek `doctorId`/`techId` claim'i taşır). **Elle hesap açma adımı:** rapordaki listeden kayıtları belirleyin → her kayıt için *farklı* bir e-posta adresi belirleyin (örn. `ad.soyad+klinik@...` takma adı da olur) → Yönetim → Hekimler/Teknisyenler → ilgili kaydı **Düzenle** ile e-postayı girip kaydedin → **Hesap aç** (geçici şifre bir kez gösterilir; güvenli kanaldan iletin). İki kişi gerçekten aynı kutuyu paylaşıyorsa bile her biri için ayrı e-posta/hesap gerekir; ortak bir hesapla iki hekimin verisi görülemez.
 
-Dönüşümler (eski veri bozulmaz, yalnızca erişim kuralları için tamamlanır): işlere `doctorId` (metin; `drId` aynen kalır, hekimsiz işte boş metin) ve `techIds` (metin dizisi; `techId` aynen kalır); `pendingJobs.techId` metne çevrilir (güvenlik kuralı metin karşılaştırır); her belgeye `id` ve `_legacy` (kaynak çalışma alanı/anahtar) eklenir; zaman damgası olmayan sohbet mesajına, mesaj kimliğinden (Date.now) `timestamp` türetilir (`_legacy.derivedTimestamp`).
+Dönüşümler (eski veri bozulmaz, yalnızca erişim kuralları için tamamlanır): işlere `doctorId` (metin; `drId` aynen kalır, hekimsiz işte boş metin) ve `techIds` (metin dizisi; `techId` aynen kalır); `pendingJobs.techId` metne çevrilir (güvenlik kuralı metin karşılaştırır); her belgeye `id` ve `_legacy` (kaynak çalışma alanı/anahtar) eklenir; **`jobs/pendingJobs/doctorSubmissions` belgelerine `deleted` alanı yoksa `false` yazılır** (portallar çöpü `where('deleted','==',false)` ile süzer; alanı olmayan kayıt listede görünmezdi); durumu olmayan işe `status:'Bekliyor'` yazılır (`_legacy.defaultedStatus`); zaman damgası olmayan sohbet mesajına, mesaj kimliğinden (Date.now) `timestamp` türetilir (`_legacy.derivedTimestamp`).
+
+**Eski iş sohbetleri:** eski sistemde sohbet iş bazlıdır (`chats/job_<işId>`); göç bunları `threads/job_<işId>` olarak taşır. Yeni kurallar bu konuşmaları işin hekimine (`doctorId`) ve atanmış teknisyenlerine (`techIds`) açar; hekim/teknisyen portalında iş detayından, yönetici panelinde Mesajlar'dan görülür. Eski mesajların alanları (`senderRole: 'technician'`, `senderName`, ek `fileUrl`) aynen korunur.
+
+**Eski durum değerleri:** eski kodda iş durumu yalnızca `Bekliyor, Tasarımda, Üretimde, Makyajda, Tamamlama Onayı, Tamamlandı` (+ yazım varyantı `Bekleyen`) idi (`Beklemede/Gönderildi/İptal` satışlara, `Yeni/İncelendi/Aktarıldı/Reddedildi` gönderim/onay kayıtlarına aittir). Kurallar `Bekleyen`'i kabul eder; başka/bilinmeyen bir değer göçle gelirse kayıt güncellenebilir (değer aynı kaldığı sürece), arayüz değeri "(eski)" olarak gösterir ve yönetici kanonik bir duruma çekebilir.
+
+**Göçle gelen özel alanlar:** `_legacy`, `{_nestedArray: [...]}` sarmalı ve `x` önekli (`x__id__` gibi) alanlar arayüzde gösterilmez ama **silinmez**: kurallar mevcut alanların kaldırılmasını reddeder, ön yüz yalnızca değişen alanları yazar (testle doğrulanır).
 
 ## 4. Gerçek göç
 ```bash
@@ -70,6 +83,7 @@ Nesne yolu korunur (`<prefix>/<eski yol>`), eski indirme token'ı yeni nesneye y
 4. Yönetici hesabı ile giriş yapın (TOTP), Genel Bakış sayaçlarını eski sistemle karşılaştırın.
 5. Hekim/teknisyen hesap bilgilerini iletin; bir hekim ve bir teknisyenle deneme yapın.
 6. Çalışma günü boyunca eski sistemi **yalnızca okumak için** açık tutun.
+7. Primer Teknoloji verisi de varsa: ayrı yönetici hesabı (`bootstrap-admin.ts ... --lab primer`) ile giriş yapıp kontrol edin; digicad yöneticisi primer verisini göremez.
 
 ## 7. Eski projeyi salt-okunur kilitleme (SİZİN kararınız; araç yapmaz)
 Geçiş doğrulandıktan sonra Firebase konsolu → `primer-dental` → Realtime Database → **Kurallar**:
@@ -90,4 +104,14 @@ gcloud storage buckets update gs://$BUCKET --retention-period=30d      # retenti
 gcloud storage buckets add-iam-policy-binding gs://$BUCKET --member="serviceAccount:$PROJE@appspot.gserviceaccount.com" --role=roles/storage.objectCreator
 gcloud projects add-iam-policy-binding $PROJE --member="serviceAccount:$PROJE@appspot.gserviceaccount.com" --role=roles/datastore.importExportAdmin
 ```
-`BACKUP_BUCKET` parametresini bu bucket adına ayarlayın. `scheduledBackup` her gün 03:15'te (İstanbul) Firestore'un tamamını dışa aktarır. **Geri yükleme provası yapın:** `gcloud firestore import gs://$BUCKET/firestore/YYYY-MM-DD --project=<deneme-projesi>`. Test edilmemiş yedek, yedek değildir.
+`BACKUP_BUCKET` parametresini bu bucket adına ayarlayın (`functions/.env.<proje>`: `BACKUP_BUCKET=<bucket>`; gs:// olmadan). `scheduledBackup` her gün 03:15'te (İstanbul) Firestore'un tamamını dışa aktarır. **Geri yükleme provası yapın:** `gcloud firestore import gs://$BUCKET/firestore/YYYY-MM-DD --project=<deneme-projesi>`. Test edilmemiş yedek, yedek değildir.
+
+
+### Storage dosyalarının yedeği (Firestore yedeği DOSYALARI KAPSAMAZ)
+`scheduledBackup` yalnızca Firestore'u dışa aktarır. İş/tasarım/tarama dosyaları ve sohbet ekleri ana Storage bucket'ındadır; kurallar silme ve ezmeyi engeller ama bucket/proje sahibi silebilir. En az şunları yapın:
+```bash
+gcloud storage buckets update gs://<ANA-BUCKET> --versioning                      # nesne sürümleme (ezilen/silinen sürüm geri getirilebilir)
+gcloud storage buckets update gs://<ANA-BUCKET> --soft-delete-duration=30d        # soft delete (silinenler 30 gün tutulur)
+# İsteğe bağlı: ikinci bölge/bucket'a düzenli kopya (Storage Transfer Service, günlük)
+```
+Sürümleme depolama maliyetini artırır; eski sürümler için yaşam döngüsü (lifecycle) kuralı tanımlayın. Geri yükleme provasına Storage nesnelerini de ekleyin.

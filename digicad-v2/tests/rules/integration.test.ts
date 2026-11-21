@@ -3,6 +3,8 @@ import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 import { initializeTestEnvironment, assertFails, assertSucceeds, type RulesTestEnvironment } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getBytes, ref, uploadBytes } from 'firebase/storage';
+import { buildPlan } from '../../migration/src/transform';
+import { jobEditPatch, statusPatch } from '../../src/admin/calc';
 
 // Bölümler arası entegrasyon: çöp filtresi, eski iş sohbetleri (job_*), eski durum değerleri, kapalı dönem, dosya adı kara listesi.
 let env: RulesTestEnvironment;
@@ -196,5 +198,29 @@ describe('Storage: çöpteki işin dosyaları hekime/teknisyene kapalı', () => 
     await assertFails(getBytes(ref(dr, 'labs/digicad/jobFiles/101/a.zip')));
     const t = ctx('t1', { role: 'tech', techId: '7', lab: 'digicad' }).storage();
     await assertFails(getBytes(ref(t, 'labs/digicad/jobFiles/101/a.zip')));
+  });
+});
+
+describe('Göç fixture belgesi: admin güncelleme yaması mevcut alanları (_legacy, {_nestedArray}, bilinmeyen alanlar) korur ve kurallardan geçer', () => {
+  const root = JSON.parse(readFileSync('migration/test/fixtures/rtdb-export.fake.json', 'utf8'));
+  const plan = buildPlan(root, { ignoreUnknown: true, includeLegacyRoot: true, ignoreLegacyRoot: true });
+  const fx = (id: string) => plan.docs.find((d) => d.path === `labs/digicad/jobs/${id}`)!.data;
+  it('jobEditPatch ile güncelleme (gerçek ön yüz yaması) başarılı; tüm alanlar korunur', async () => {
+    const cur = { ...fx('1700000000100'), id: '1700000000100' } as Record<string, unknown>;
+    await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), `${L}/jobs/1700000000100`), cur); });
+    const patch = jobEditPatch(cur, { doctor: { id: String(cur.doctorId), name: 'Dr' }, patient: 'Yeni Ad', type: 'Kron', qty: 3, price: 10, currency: 'TRY', dateout: '2025-03-01', color: 'A2', note: 'n', tech: null, status: 'Tasarımda' }, '2026-01-01T00:00:00.000Z');
+    const body = { ...patch, orderForm: { ...(cur.orderForm as object), teeth: [11] }, updatedBy: 'adm', updatedAt: 'x' };
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/1700000000100`), body));
+    const snap = await assertSucceeds(getDoc(doc(admin(), `${L}/jobs/1700000000100`))); const d = snap.data()!;
+    for (const k of Object.keys(cur)) if (!(k in d)) throw new Error(`alan kayboldu: ${k}`);
+    if (JSON.stringify(d._legacy) !== JSON.stringify(cur._legacy) || JSON.stringify(d.teethMap) !== JSON.stringify(cur.teethMap)) throw new Error('göç alanları bozuldu');
+  });
+  it('bilinmeyen durumlu ve hekimsiz göç belgesi: durum yaması + hekim ataması geçer; alanları düşüren set() reddedilir', async () => {
+    const cur = { ...fx('1700000000102'), id: '1700000000102' } as Record<string, unknown>; // status 'Beklemede', doctorId ''
+    await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), `${L}/jobs/1700000000102`), cur); });
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/1700000000102`), { note: 'x', updatedBy: 'adm' }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/1700000000102`), { ...(statusPatch(cur, 'Bekliyor', 'n') as object), doctorId: '1', updatedBy: 'adm' }));
+    const { _legacy: _l, ...withoutLegacy } = cur; void _l;
+    await assertFails(setDoc(doc(admin(), `${L}/jobs/1700000000102`), { ...withoutLegacy, updatedBy: 'adm' })); // ön yüz bunu yapmaz; kural yine de korur
   });
 });

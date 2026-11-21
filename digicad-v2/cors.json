@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://YER-TUTUCU-ALAN-ADI.web.app", "https://YER-TUTUCU-ALAN-ADI.firebaseapp.com"],
+    "method": ["GET"],
+    "responseHeader": ["Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]

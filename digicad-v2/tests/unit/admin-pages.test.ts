@@ -157,13 +157,13 @@ describe('çalışma alanı, hesap devre dışı bırakma, hekim seçimi, dosya 
     btnByText(mod, 'Seç ve onayla').click(); await flush(); expect(m.approvePending).not.toHaveBeenCalled(); // hekim seçilmedi
     (mod.querySelector('select[name=doctorId]') as HTMLSelectElement).value = 'd2'; btnByText(mod, 'Seç ve onayla').click(); await flush(60);
     expect(m.approvePending).toHaveBeenCalledTimes(1);
-    const build = m.approvePending.mock.calls[0][2] as unknown as (p: Record<string, unknown>) => Record<string, unknown>;
+    const build = (m.approvePending.mock.calls[0] as unknown as unknown[])[2] as (p: Record<string, unknown>) => Record<string, unknown>;
     expect(build({ id: 'p9', patient: 'x', type: 'K' })).toMatchObject({ doctorId: 'd2' });
   });
   it('hekim gönderiminden aktarılan siparişte dosyalar sunucuda iş klasörüne kopyalanır (teknisyen görebilsin)', async () => {
     const c = ctx({ doctors, technicians: techs }, { prefill: { id: 'sub1', drId: 'd1', patient: 'Ali', jobType: 'Kron', teeth: ['11'], files: [{ name: 'a.stl', path: 'labs/digicad/submissions/d1/a.stl' }] } as never });
     const el = show(P1.order(c)); btnByText(el, 'Siparişi kaydet').click(); await flush(60);
-    const jobIds = (m.createOrder.mock.calls[0][1] as { name: string; id: string }[]).filter((o) => o.name === 'jobs').map((o) => o.id);
+    const jobIds = ((m.createOrder.mock.calls[0] as unknown as [unknown, { name: string; id: string }[]])[1]).filter((o) => o.name === 'jobs').map((o) => o.id);
     expect(jobIds.length).toBe(1); expect(m.callFn).toHaveBeenCalledWith('copyJobFiles', { jobId: jobIds[0] });
   });
   it('iş detayı: hâlâ submissions altında dosyası olan işte "teknisyen için hazırla" düğmesi ve iş sohbeti düğmesi var', () => {

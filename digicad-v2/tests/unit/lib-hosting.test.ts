@@ -37,6 +37,21 @@ describe('firebase.json Hosting başlıkları', () => {
       for (const need of ['https://firestore.googleapis.com', 'https://identitytoolkit.googleapis.com', 'https://securetoken.googleapis.com', 'https://firebasestorage.googleapis.com', 'https://firebaseappcheck.googleapis.com']) expect(c, need).toContain(need);
     }
   });
+  it('connect-src: v2 callable adresleri (https://europe-west1-<proje>.cloudfunctions.net/<ad>) CSP ile eşleşir; run.app gerekmez', () => {
+    const url = new URL('https://europe-west1-ornek-proje.cloudfunctions.net/adminCreateUser'); // firebase/functions httpsCallable(getFunctions(app,'europe-west1'), ad) adresi
+    const hostOk = (src: string, u: URL) => { const m = /^https:\/\/(\*\.)?([^/*]+)$/.exec(src); if (!m) return false; return m[1] ? u.hostname.endsWith('.' + m[2]) && u.hostname.split('.').length === m[2].split('.').length + 1 : u.hostname === m[2]; };
+    for (const p of PAGES) expect(dir(headersFor(p)['Content-Security-Policy'], 'connect-src').some((s) => hostOk(s, url)), p).toBe(true);
+    expect(readFileSync(resolve(root, 'src/lib/firebase.ts'), 'utf8')).toMatch(/getFunctions\(app, 'europe-west1'\)/); // functions bölgesi (functions/src/util.ts REGION) ile aynı
+    expect(readFileSync(resolve(root, 'functions/src/util.ts'), 'utf8')).toMatch(/REGION = 'europe-west1'/);
+  });
+  it('cors.json: Storage GET CORS (ZIP indirme fetch) yer tutucu alan adıyla, yalnızca GET', () => {
+    const c = JSON.parse(readFileSync(resolve(root, 'cors.json'), 'utf8')) as { origin: string[]; method: string[] }[];
+    expect(c[0].method).toEqual(['GET']); expect(c[0].origin.every((o) => /^https:\/\//.test(o) && !o.includes('*'))).toBe(true);
+  });
+  it('Firestore indeksleri çöp filtreli portal sorgularını kapsar', () => {
+    const idx = JSON.parse(readFileSync(resolve(root, 'firestore.indexes.json'), 'utf8')).indexes as { collectionGroup: string; fields: { fieldPath: string }[] }[];
+    for (const [g, f] of [['jobs', 'doctorId'], ['jobs', 'techIds'], ['pendingJobs', 'techId'], ['doctorSubmissions', 'doctorId']]) expect(idx.some((i) => i.collectionGroup === g && i.fields[0].fieldPath === f && i.fields[1].fieldPath === 'deleted'), `${g}.${f}`).toBe(true);
+  });
   it('Google Identity Services / Gmail yalnızca admin sayfasına açık', () => {
     const adm = headersFor('/admin.html'); const csp = adm['Content-Security-Policy'];
     expect(dir(csp, 'script-src')).toContain('https://accounts.google.com/gsi/client'); expect(dir(csp, 'connect-src')).toContain('https://gmail.googleapis.com');

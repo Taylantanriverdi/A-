@@ -1,1 +1,9 @@
-{ "indexes": [], "fieldOverrides": [] }
+{
+  "indexes": [
+    { "collectionGroup": "jobs", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "doctorId", "order": "ASCENDING" }, { "fieldPath": "deleted", "order": "ASCENDING" }] },
+    { "collectionGroup": "jobs", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "techIds", "arrayConfig": "CONTAINS" }, { "fieldPath": "deleted", "order": "ASCENDING" }] },
+    { "collectionGroup": "pendingJobs", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "techId", "order": "ASCENDING" }, { "fieldPath": "deleted", "order": "ASCENDING" }] },
+    { "collectionGroup": "doctorSubmissions", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "doctorId", "order": "ASCENDING" }, { "fieldPath": "deleted", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": []
+}
