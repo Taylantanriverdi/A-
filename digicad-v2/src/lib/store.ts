@@ -1,5 +1,5 @@
 import {
-  collection, doc, onSnapshot, setDoc, updateDoc, query, where, serverTimestamp, writeBatch, orderBy, limit,
+  collection, doc, onSnapshot, getDoc, setDoc, updateDoc, query, where, serverTimestamp, writeBatch, orderBy, limit,
   type QueryConstraint, type DocumentData,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -14,7 +14,16 @@ export function listen(lab: string, name: string, cb: (rows: Rec[]) => void, con
   const q = query(collection(db, colPath(lab, name)), ...constraints);
   return onSnapshot(q, (s) => cb(s.docs.map((d) => ({ ...(d.data() as DocumentData), id: d.id }))), (e) => onErr?.(e));
 }
+/** Tek belge dinleyici (ör. hekimin kendi `doctors/{id}` kaydı). Yoksa `null` gelir. */
+export function listenDoc(lab: string, name: string, id: string, cb: (row: Rec | null) => void, onErr?: (e: Error) => void): () => void {
+  return onSnapshot(doc(db, colPath(lab, name), id), (d) => cb(d.exists() ? { ...(d.data() as DocumentData), id: d.id } : null), (e) => onErr?.(e));
+}
+export const readDoc = async (lab: string, name: string, id: string): Promise<Rec | null> => {
+  const d = await getDoc(doc(db, colPath(lab, name), id)); return d.exists() ? { ...(d.data() as DocumentData), id: d.id } : null;
+};
 export const byField = (f: string, v: unknown): QueryConstraint => where(f, '==', v);
+/** Dizi alanı belirli bir değeri içeriyor (ör. işin `techIds` listesi). */
+export const hasItem = (f: string, v: unknown): QueryConstraint => where(f, 'array-contains', v);
 export const recent = (f: string, n = 200): QueryConstraint[] => [orderBy(f, 'desc'), limit(n)];
 
 const clean = <T extends Record<string, unknown>>(o: T): T => JSON.parse(JSON.stringify(o)); // undefined alanlarını at
@@ -38,5 +47,6 @@ export async function putMany(s: Session, ops: { name: string; id: string | numb
   for (const o of ops) b.set(doc(db, colPath(s.lab, o.name), String(o.id)), { ...clean(o.data), updatedAt: new Date().toISOString(), updatedBy: s.user.uid, createdAt: new Date().toISOString(), createdBy: s.user.uid }, { merge: true });
   await b.commit();
 }
-export const newId = (): string => String(Date.now()) + String(Math.floor(Math.random() * 900 + 100));
+/** Sayısal kimlik (eski biçimle uyumlu: 13 hane zaman + 3 hane rastgele); rastgelelik kriptografik. */
+export const newId = (): string => String(Date.now()) + String(100 + (crypto.getRandomValues(new Uint32Array(1))[0] % 900));
 export const stamp = serverTimestamp;

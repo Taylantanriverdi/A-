@@ -1,4 +1,5 @@
 import { h, mount, type Child } from './dom';
+import { firebaseErrorMessage } from './checks';
 
 export function toast(msg: string, kind: 'ok' | 'err' = 'ok'): void {
   let box = document.getElementById('toasts');
@@ -7,14 +8,22 @@ export function toast(msg: string, kind: 'ok' | 'err' = 'ok'): void {
   box.appendChild(t);
   setTimeout(() => t.remove(), 4500);
 }
-export const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+export const errMsg = (e: unknown): string => firebaseErrorMessage(e) ?? (e instanceof Error ? e.message : String(e));
 export async function guard(fn: () => Promise<unknown>, okMsg?: string): Promise<boolean> {
   try { await fn(); if (okMsg) toast(okMsg); return true; } catch (e) { toast(errMsg(e), 'err'); return false; }
 }
 
-export function modal(title: string, body: Child, actions: Child = null): { close: () => void } {
+/** Düğmeyi işlem boyunca devre dışı bırakır (çift gönderimi önler). */
+export async function withBusy(b: HTMLButtonElement, fn: () => Promise<unknown>, okMsg?: string): Promise<boolean> {
+  const old = b.textContent; b.disabled = true;
+  try { return await guard(fn, okMsg); } finally { b.disabled = false; b.textContent = old; }
+}
+
+export function modal(title: string, body: Child, actions: Child = null, onClose?: () => void): { close: () => void } {
   const back = h('div', { class: 'modal-back', role: 'dialog', 'aria-modal': 'true', 'aria-label': title });
-  const close = () => back.remove();
+  const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+  const close = () => { if (!back.isConnected) return; document.removeEventListener('keydown', onKey); back.remove(); onClose?.(); };
+  document.addEventListener('keydown', onKey);
   back.appendChild(h('div', { class: 'modal' }, h('div', { class: 'modal-h' }, h('b', null, title), h('button', { class: 'btn ghost', on: { click: close } }, '✕')), h('div', { class: 'modal-b' }, body), h('div', { class: 'modal-f' }, actions)));
   document.body.appendChild(back);
   return { close };

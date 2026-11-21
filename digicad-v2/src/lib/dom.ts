@@ -10,21 +10,32 @@ export interface Props {
   [attr: string]: unknown;
 }
 
-const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href']);
+const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'data', 'ping', 'cite', 'background', 'srcset', 'manifest', 'codebase', 'longdesc', 'usemap', 'profile']);
+/** Hiçbir koşulda üretilmeyecek etiketler (betik/çerçeve/stil/gömme enjeksiyonu). */
+const FORBIDDEN_TAGS = new Set(['script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'base', 'meta', 'link', 'applet', 'noscript', 'template', 'portal']);
+/** Geçerli öznitelik adı: harf/altçizgi/iki nokta ile başlar; yalnızca güvenli karakterler. */
+const ATTR_NAME = /^[a-zA-Z_][a-zA-Z0-9_:.-]*$/;
+const CTRL_OR_BACKSLASH = /[\u0000-\u0020\u007f-\u009f\\]/;
 
-/** Yalnızca https:, blob: ve göreli adreslere izin verir. */
+/**
+ * Yalnızca https:, blob: ve göreli adreslere izin verir.
+ * Tarayıcıların URL ayrıştırıcısı sekme/satır sonu atar ve `\` karakterini `/` sayar:
+ * `/\evil.com` veya `/<TAB>/evil.com` protokol-göreli (açık yönlendirme) olur; bu yüzden
+ * kontrol karakteri / boşluk / ters eğik çizgi içeren adresler reddedilir.
+ */
 export function safeUrl(u: unknown): string {
   if (typeof u !== 'string') return '#';
   const t = u.trim();
-  if (/^https:\/\//i.test(t) || /^blob:/i.test(t)) return t;
-  if (/^[./#?]/.test(t) && !/^\/\//.test(t)) return t;
-  return '#';
+  if (!t || CTRL_OR_BACKSLASH.test(t)) return '#';
+  if (/^https:\/\/[^/?#]/i.test(t) || /^blob:https?:\/\//i.test(t)) return t;
+  if (/^(\.{1,2}\/|#|\?)/.test(t) || (/^\/[^/]/.test(t))) return t;
+  return t === '/' ? t : '#';
 }
 
 /** Dosya adını gösterim/indirme için temizler (yol ayırıcı ve kontrol karakterleri çıkar). */
 export function safeFileName(n: unknown): string {
-   
-  const s = String(n ?? '').replace(/[\u0000-\u001f\u007f\\/]+/g, '_').replace(/^\.+/, '_').slice(0, 180);
+  // Kontrol karakterleri, yol ayırıcılar ve Unicode yön değiştirme karakterleri (RLO ile uzantı sahteciliği) temizlenir.
+    const s = String(n ?? '').replace(/[\u0000-\u001f\u007f-\u009f\\/\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+/g, '_').replace(/^\.+/, '_').trim().slice(0, 180);
   return s || 'dosya';
 }
 
@@ -35,6 +46,7 @@ function append(parent: Node, c: Child): void {
 }
 
 export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: Props | null, ...children: Child[]): HTMLElementTagNameMap[K] {
+  if (FORBIDDEN_TAGS.has(String(tag).toLowerCase())) throw new Error(`h(): '${tag}' etiketi yasak (CSP/XSS).`);
   const el = document.createElement(tag);
   if (props) {
     for (const [k, v] of Object.entries(props)) {
@@ -45,8 +57,10 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: Props |
         el.className = String(v);
       } else if (k === 'text') {
         el.textContent = String(v);
-      } else if (/^on/i.test(k) || k.toLowerCase() === 'style' || k.toLowerCase() === 'srcdoc') {
+      } else if (/^on/i.test(k) || k.toLowerCase() === 'style' || k.toLowerCase() === 'srcdoc' || k.toLowerCase() === 'is' || /^xmlns/i.test(k)) {
         throw new Error(`h(): '${k}' özniteliği yasak (CSP/XSS).`);
+      } else if (!ATTR_NAME.test(k)) {
+        throw new Error(`h(): geçersiz öznitelik adı '${k}'.`);
       } else if (URL_ATTRS.has(k.toLowerCase())) {
         el.setAttribute(k, safeUrl(v));
       } else if (v === true) {
@@ -55,6 +69,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: Props |
         el.setAttribute(k, String(v));
       }
     }
+    // target=_blank ile açılan bağlantılar window.opener erişimi vermesin.
+    if (el.getAttribute('target') === '_blank') el.setAttribute('rel', 'noopener noreferrer');
   }
   append(el, children);
   return el;
