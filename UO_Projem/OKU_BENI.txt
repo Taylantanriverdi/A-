@@ -5,6 +5,7 @@
 KLASÖR YAPISI
 -------------
   C:\UO_Projem\
+    0_HEPSINI_YAP.bat          -> TEK TIKLA: eksik adımları sırayla yapar ve oyunu açar
     1_Kurulum_ve_Derleme.bat   -> Araçları kurar, ServUO + ClassicUO indirir, derler, ayarlar
     2_Oyunu_Baslat.bat         -> Yedek alır, sunucuyu açar, hazır olunca ClassicUO'yu açar
     3_Online_Moduna_Gecis.bat  -> IP adresini VDS/VPS dış IP'si ile değiştirir
@@ -18,6 +19,20 @@ KLASÖR YAPISI
 
   Bu dosyaların hepsi C:\UO_Projem klasöründe olmalı. Başka bir klasör
   kullanmak istersen Araclar\ayarlar.cmd içindeki UO_ROOT değerini değiştir.
+
+
+EN KOLAY YOL: 0_HEPSINI_YAP.bat
+-------------------------------
+  Sadece bu dosyaya çift tıkla. Şunları kendisi kontrol edip yapar:
+    A. Zip'i başka bir yere (ör. İndirilenler) açtıysan betikleri
+       C:\UO_Projem içine kopyalar.
+    B. ServUO / ClassicUO kurulu değilse 1_Kurulum_ve_Derleme.bat'ı çalıştırır.
+    C. UO oyun dosyaları yoksa: kurulu UO Classic'i bulup kopyalar; kurulu
+       değilse İndirilenler'deki UOClassicSetup...exe dosyasını çalıştırır;
+       o da yoksa resmi indirme sayfasını açar.
+    D. 2_Oyunu_Baslat.bat ile sunucuyu ve oyunu başlatır.
+  Bir adımda durursa ekrandaki mesajı yapıp dosyayı tekrar çalıştır.
+  Aşağıdaki bölümler her adımı tek tek yapmak isteyenler içindir.
 
 
 1) KURULUM
@@ -173,3 +188,5 @@ SÜRÜM GEÇMİŞİ
   v3  - Yeni: 5_UO_Dosyalarini_Kopyala.bat - kurulu UO Classic'i otomatik bulur
         ve UO_Files'a kopyalar; bulamazsa resmi indirme sayfasını açar.
       - Eksik dosya mesajlarında bu dosyaya yönlendirme.
+  v4  - Yeni: 0_HEPSINI_YAP.bat - tek tıkla tüm adımlar (betikleri C:\UO_Projem'e
+        taşıma, kurulum, UO kurulum dosyasını bulup çalıştırma, kopyalama, başlatma).
