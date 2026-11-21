@@ -4,5 +4,5 @@
     "strict": true, "noEmit": true, "skipLibCheck": true, "isolatedModules": true, "resolveJsonModule": true,
     "types": ["vite/client", "node"], "noUnusedLocals": true, "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "tests", "migration", "vite.config.ts", "vitest.config.ts", "vitest.rules.config.ts"]
+  "include": ["src", "tests", "migration", "demo", "vite.config.ts", "vite.demo.config.ts", "vitest.config.ts", "vitest.rules.config.ts"]
 }

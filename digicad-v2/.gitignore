@@ -13,3 +13,4 @@ functions/lib/
 firebase-debug.log
 ui-debug.log
 firestore-debug.log
+demo-dist/
