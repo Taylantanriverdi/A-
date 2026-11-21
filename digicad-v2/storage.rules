@@ -25,15 +25,30 @@ service firebase.storage {
       return request.resource.contentType.matches('image/(png|jpeg|webp)')
         || request.resource.contentType == 'application/pdf';
     }
+    // Dosya adı kara listesi: tarayıcıda etkin içerik/çalıştırılabilir olabilecek uzantılar (octet-stream her ada açık olduğundan zorunlu).
+    // İstemci kontrolüyle (src/lib/files.ts DANGEROUS_EXT) aynı küme; son uzantı ya da çift uzantı ortasındaki ('x.html.zip') eşleşir.
+    function safeName(file) {
+      return !file.lower().matches('.*\\.(html?|xhtml|xht|svgz?|js|mjs|cjs|jsx|exe|dll|bat|cmd|com|msi|scr|jar|sh|bash|ps1|psm1|vbs|vbe|wsf|hta|lnk|apk|php[0-9]?|phtml|asp|aspx|jsp|cgi|swf|xml|xsl)(\\..*)?');
+    }
     function jobDoc(lab, jobId) {
       return firestore.get(/databases/(default)/documents/labs/$(lab)/jobs/$(jobId));
+    }
+    // Çöpteki (deleted:true) işin dosyaları hekim/teknisyene kapalı (Firestore kurallarıyla tutarlı; alan yoksa false).
+    function jobLive(lab, jobId) { return jobDoc(lab, jobId).data.get('deleted', false) == false; }
+    // Eski iş sohbeti job_{işId}: o işin hekimi/atanmış teknisyeni.
+    function jobThreadMember(lab, threadId) {
+      return threadId.matches('job_[^/]+')
+        && firestore.exists(/databases/(default)/documents/labs/$(lab)/jobs/$(threadId.replace('^job_', '')))
+        && jobLive(lab, threadId.replace('^job_', ''))
+        && ((isDoctor(lab) && jobDoc(lab, threadId.replace('^job_', '')).data.get('doctorId', '') == string(request.auth.token.doctorId))
+            || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, threadId.replace('^job_', '')).data.get('techIds', [])));
     }
 
     // Teknisyen: işe atanmış, işin çöpte olmaması ve Tamamlandı olmaması gerekir (Firestore kurallarıyla tutarlı).
     function techMayUpload(lab, jobId) {
       return isTech(lab)
         && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds
-        && jobDoc(lab, jobId).data.get('deleted', false) != true
+        && jobLive(lab, jobId)
         && jobDoc(lab, jobId).data.status != 'Tamamlandı';
     }
 
@@ -42,10 +57,10 @@ service firebase.storage {
     // İş dosyaları: labs/{lab}/jobFiles/{jobId}/{dosya}
     match /labs/{lab}/jobFiles/{jobId}/{file} {
       allow read: if isAdmin(lab)
-        || (isDoctor(lab) && jobDoc(lab, jobId).data.doctorId == string(request.auth.token.doctorId))
-        || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds);
+        || (isDoctor(lab) && jobDoc(lab, jobId).data.doctorId == string(request.auth.token.doctorId) && jobLive(lab, jobId))
+        || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds && jobLive(lab, jobId));
       allow create: if resource == null && (isAdmin(lab) || techMayUpload(lab, jobId))
-        && maxMB(200) && scanType();
+        && maxMB(200) && scanType() && safeName(file);
       allow update, delete: if false;
     }
 
@@ -53,7 +68,7 @@ service firebase.storage {
     match /labs/{lab}/submissions/{doctorId}/{file} {
       allow read: if isAdmin(lab) || (isDoctor(lab) && string(request.auth.token.doctorId) == doctorId);
       allow create: if resource == null && isDoctor(lab) && string(request.auth.token.doctorId) == doctorId
-        && maxMB(200) && scanType();
+        && maxMB(200) && scanType() && safeName(file);
       allow update, delete: if false;
     }
 
@@ -61,11 +76,13 @@ service firebase.storage {
     match /labs/{lab}/chat/{threadId}/{file} {
       allow read: if isAdmin(lab)
         || (isDoctor(lab) && threadId == 'dr_' + string(request.auth.token.doctorId))
-        || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId));
+        || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId))
+        || jobThreadMember(lab, threadId);
       allow create: if resource == null && (isAdmin(lab)
         || (isDoctor(lab) && threadId == 'dr_' + string(request.auth.token.doctorId))
-        || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId)))
-        && maxMB(25) && chatType();
+        || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId))
+        || jobThreadMember(lab, threadId))
+        && maxMB(25) && chatType() && safeName(file);
       allow update, delete: if false;
     }
   }

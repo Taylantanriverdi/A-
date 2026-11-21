@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
-import { requireAdminMfa, rateLimit, sanitizeText, REGION } from './util';
+import { requireAdminMfa, rateLimit, sanitizeText, CALLABLE_OPTS } from './util';
 
 const OPENAI_API_KEY = defineSecret('OPENAI_API_KEY'); // Secret Manager: firebase functions:secrets:set OPENAI_API_KEY
 const MAX_CHARS = 12000;
@@ -26,8 +26,8 @@ export function coerceParsed(raw: unknown): ParsedOrder {
   };
 }
 
-export const parseOrderMail = onCall({ enforceAppCheck: true, secrets: [OPENAI_API_KEY], region: REGION, timeoutSeconds: 60, maxInstances: 3 }, async (req) => {
-  const uid = requireAdminMfa(req);
+export const parseOrderMail = onCall({ ...CALLABLE_OPTS, secrets: [OPENAI_API_KEY], timeoutSeconds: 60, maxInstances: 3 }, async (req) => {
+  const { uid } = requireAdminMfa(req);
   await rateLimit(uid, 'parseMail', 30, 3600);
   await rateLimit(uid, 'parseMailDay', 150, 86400);
   // Ayırıcı sahteciliğini önle: metindeki ayırıcıyı çıkar.

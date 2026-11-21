@@ -2,25 +2,31 @@ import { HttpsError, type CallableRequest } from 'firebase-functions/v2/https';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { randomInt } from 'node:crypto';
 
-export const LAB = 'digicad';
+/** Yalnızca yönetici-olmayan sistem kayıtları (zamanlanmış yedek notu) için varsayılan çalışma alanı. Kullanıcı işlemleri ÇAĞIRANIN lab claim'ini kullanır. */
+export const DEFAULT_LAB = 'digicad';
 export const REGION = 'europe-west1';
+/** Çalışma alanı (lab) kimliği: Firestore yolu ve claim değeri olarak güvenli, küçük harfli. */
+export const LAB_RE = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+/** Yönetici callable'larının ortak seçenekleri: App Check zorunlu + tek kullanımlık (replay korumalı) token. İstemci `limitedUseAppCheckTokens` ile çağırmalıdır. */
+export const CALLABLE_OPTS = { enforceAppCheck: true, consumeAppCheckToken: true, region: REGION, maxInstances: 5 } as const;
 
 interface TokenLike { role?: unknown; lab?: unknown; firebase?: { sign_in_second_factor?: string } }
 
-/** Saf denetim: token yönetici + MFA'lı mı? Hata durumunda HttpsError fırlatır. */
-export function assertAdminMfaToken(t: TokenLike | undefined, emulator: boolean): void {
+/** Saf denetim: token yönetici + geçerli lab claim'li + MFA'lı mı? Dönen değer çağıranın çalışma alanıdır. Hata durumunda HttpsError fırlatır. */
+export function assertAdminMfaToken(t: TokenLike | undefined, emulator: boolean): string {
   if (!t) throw new HttpsError('unauthenticated', 'Giriş gerekli.');
-  if (t.role !== 'admin' || t.lab !== LAB) throw new HttpsError('permission-denied', 'Yalnızca yönetici.');
+  if (t.role !== 'admin' || typeof t.lab !== 'string' || !LAB_RE.test(t.lab)) throw new HttpsError('permission-denied', 'Yalnızca yönetici.');
   if (!t.firebase?.sign_in_second_factor && !emulator) {
     throw new HttpsError('permission-denied', 'Çok faktörlü doğrulama zorunludur.');
   }
+  return t.lab;
 }
 
-/** Çağıran admin değilse veya TOTP çok faktörlü doğrulama yoksa reddet. */
-export function requireAdminMfa(req: CallableRequest<unknown>): string {
+/** Çağıran admin değilse veya TOTP çok faktörlü doğrulama yoksa reddet. Yönetici yalnızca KENDİ lab claim'indeki çalışma alanında işlem yapar. */
+export function requireAdminMfa(req: CallableRequest<unknown>): { uid: string; lab: string } {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Giriş gerekli.');
-  assertAdminMfaToken(req.auth.token as unknown as TokenLike, process.env.FUNCTIONS_EMULATOR === 'true');
-  return req.auth.uid;
+  const lab = assertAdminMfaToken(req.auth.token as unknown as TokenLike, process.env.FUNCTIONS_EMULATOR === 'true');
+  return { uid: req.auth.uid, lab };
 }
 
 export interface RateState { start: number; n: number }

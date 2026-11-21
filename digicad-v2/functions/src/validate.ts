@@ -1,5 +1,4 @@
 import { HttpsError } from 'firebase-functions/v2/https';
-import { LAB } from './util';
 
 export type Role = 'admin' | 'doctor' | 'tech';
 export const ROLES: readonly Role[] = ['admin', 'doctor', 'tech'];
@@ -24,9 +23,10 @@ export function refId(v: unknown, label: string): string {
   return v;
 }
 
-export function claimsFor(role: unknown, doctorId?: unknown, techId?: unknown): Record<string, string> {
+/** Claim'ler: role, lab, doctorId (hekim), techId (teknisyen; hepsi METİN). Göç aracı, kurallar ve ön yüzle birebir aynı adlar. */
+export function claimsFor(role: unknown, lab: string, doctorId?: unknown, techId?: unknown): Record<string, string> {
   if (typeof role !== 'string' || !ROLES.includes(role as Role)) throw new HttpsError('invalid-argument', 'Geçersiz rol.');
-  const c: Record<string, string> = { role, lab: LAB };
+  const c: Record<string, string> = { role, lab };
   if (role === 'doctor') c.doctorId = refId(doctorId, 'doctorId');
   if (role === 'tech') c.techId = refId(techId, 'techId');
   return c;

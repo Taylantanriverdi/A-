@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { gunzipSync } from 'node:zlib';
+import * as nodeCrypto from 'node:crypto';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { assertAdminMfaToken, decideRate, randomPassword, sanitizeText } from '../src/util';
 import { normalizeEmail, validateUid, claimsFor, refId, mapAuthError, cleanDisplayName } from '../src/validate';
 import { kindOf, actorOf, pack, AUDITED } from '../src/auditLogic';
 import { coerceParsed } from '../src/parseMail';
 import { backupPrefix } from '../src/backup';
+import { planFileCopies, applyCopies } from '../src/files';
 
 const code = (fn: () => unknown) => { try { fn(); } catch (e) { return (e as HttpsError).code; } return 'ok'; };
 
@@ -13,7 +15,8 @@ describe('assertAdminMfaToken', () => {
   it('reddeder: token yok, admin değil, lab yanlış, MFA yok', () => {
     expect(code(() => assertAdminMfaToken(undefined, false))).toBe('unauthenticated');
     expect(code(() => assertAdminMfaToken({ role: 'doctor', lab: 'digicad' }, false))).toBe('permission-denied');
-    expect(code(() => assertAdminMfaToken({ role: 'admin', lab: 'baska' }, false))).toBe('permission-denied');
+    expect(code(() => assertAdminMfaToken({ role: 'admin', lab: 'Bas ka/..' }, false))).toBe('permission-denied');
+    expect(code(() => assertAdminMfaToken({ role: 'admin' }, false))).toBe('permission-denied');
     expect(code(() => assertAdminMfaToken({ role: 'admin', lab: 'digicad', firebase: {} }, false))).toBe('permission-denied');
   });
   it('kabul eder: admin + MFA; emülatörde MFA gevşer', () => {
@@ -49,15 +52,15 @@ describe('doğrulama', () => {
     for (const bad of ['', 'a/b', 'x'.repeat(129), 1, undefined, '../x']) expect(code(() => validateUid(bad))).toBe('invalid-argument');
   });
   it('claimsFor: rol ve kimlik doğrulaması', () => {
-    expect(claimsFor('admin')).toEqual({ role: 'admin', lab: 'digicad' });
-    expect(claimsFor('doctor', 12)).toEqual({ role: 'doctor', lab: 'digicad', doctorId: '12' });
-    expect(claimsFor('tech', undefined, 't_1')).toEqual({ role: 'tech', lab: 'digicad', techId: 't_1' });
-    expect(code(() => claimsFor('root'))).toBe('invalid-argument');
-    expect(code(() => claimsFor('doctor'))).toBe('invalid-argument');
-    expect(code(() => claimsFor('doctor', { a: 1 }))).toBe('invalid-argument');
-    expect(code(() => claimsFor('doctor', true))).toBe('invalid-argument');
-    expect(code(() => claimsFor('tech', undefined, 'a/b'))).toBe('invalid-argument');
-    expect(code(() => claimsFor(undefined))).toBe('invalid-argument');
+    expect(claimsFor('admin', 'digicad')).toEqual({ role: 'admin', lab: 'digicad' });
+    expect(claimsFor('doctor', 'digicad', 12)).toEqual({ role: 'doctor', lab: 'digicad', doctorId: '12' });
+    expect(claimsFor('tech', 'primer', undefined, 't_1')).toEqual({ role: 'tech', lab: 'primer', techId: 't_1' });
+    expect(code(() => claimsFor('root', 'digicad'))).toBe('invalid-argument');
+    expect(code(() => claimsFor('doctor', 'digicad'))).toBe('invalid-argument');
+    expect(code(() => claimsFor('doctor', 'digicad', { a: 1 }))).toBe('invalid-argument');
+    expect(code(() => claimsFor('doctor', 'digicad', true))).toBe('invalid-argument');
+    expect(code(() => claimsFor('tech', 'digicad', undefined, 'a/b'))).toBe('invalid-argument');
+    expect(code(() => claimsFor(undefined, 'digicad'))).toBe('invalid-argument');
     expect(refId(0, 'x')).toBe('0');
     expect(code(() => refId(-1, 'x'))).toBe('invalid-argument');
   });
@@ -103,7 +106,7 @@ describe('audit mantığı', () => {
     expect(JSON.parse(gunzipSync(p.compressed!.after!).toString())).toEqual(big);
   });
   it('pack: sıkıştırılamayan dev belge oversize işaretlenir', () => {
-    const { randomBytes } = require('node:crypto') as typeof import('node:crypto');
+    const randomBytes = (n: number) => nodeCrypto.randomBytes(n);
     const rnd = { t: randomBytes(900_000).toString('base64') };
     expect(pack(rnd, null, false).oversize).toBe(true);
   });
@@ -129,5 +132,32 @@ describe('backupPrefix', () => {
   });
   it('geçersiz bucket reddedilir', () => {
     for (const b of ['', 'gs://x-bucket', 'A_B', 'ab', 'x/y', 'bucket name']) expect(() => backupPrefix(b)).toThrow();
+  });
+});
+
+describe('assertAdminMfaToken: lab claim', () => {
+  it('çağıranın lab claim değerini döndürür (sabit lab yok)', () => {
+    const mfa = { sign_in_second_factor: 'totp' };
+    expect(assertAdminMfaToken({ role: 'admin', lab: 'primer', firebase: mfa }, false)).toBe('primer');
+    expect(assertAdminMfaToken({ role: 'admin', lab: 'digicad', firebase: mfa }, false)).toBe('digicad');
+  });
+});
+
+describe('planFileCopies / applyCopies (hekim gönderim dosyaları → iş klasörü)', () => {
+  const sub = (n: string) => ({ name: n, path: `labs/digicad/submissions/5/${n}`, size: 3 });
+  it('yalnızca işin hekimine ait submissions yollarını planlar', () => {
+    const files = [sub('a.stl'), { name: 'b', path: 'labs/digicad/jobFiles/9/b.zip' }, { name: 'c', url: 'https://x' }, { name: 'd', path: 'labs/digicad/submissions/6/d.stl' }, { name: 'e', path: 'labs/primer/submissions/5/e.stl' }, { name: 'f', path: 'labs/digicad/submissions/5/../6/f.stl' }];
+    expect(planFileCopies('digicad', '900', '5', files)).toEqual([{ index: 0, from: 'labs/digicad/submissions/5/a.stl', to: 'labs/digicad/jobFiles/900/a.stl' }]);
+  });
+  it('geçersiz kimlik/girdi boş plan döner', () => {
+    expect(planFileCopies('digicad', '../x', '5', [sub('a')])).toEqual([]);
+    expect(planFileCopies('digicad', '1', '', [sub('a')])).toEqual([]);
+    expect(planFileCopies('digicad', '1', '5', 'x')).toEqual([]);
+  });
+  it('applyCopies yolu günceller, kaynağı copiedFrom olarak saklar, diğerlerine dokunmaz', () => {
+    const files = [sub('a.stl'), { name: 'u', url: 'https://x' }];
+    const out = applyCopies(files, new Map([[files[0].path, 'labs/digicad/jobFiles/900/a.stl']])) as Record<string, unknown>[];
+    expect(out[0]).toMatchObject({ name: 'a.stl', path: 'labs/digicad/jobFiles/900/a.stl', copiedFrom: 'labs/digicad/submissions/5/a.stl' });
+    expect(out[1]).toEqual({ name: 'u', url: 'https://x' });
   });
 });

@@ -34,17 +34,45 @@ service cloud.firestore {
     function adminCreate(lab) { return isAdmin(lab) && stamped(request.resource.data); }
     function adminUpdate(lab) { return isAdmin(lab) && stamped(request.resource.data) && keepsFields() && keepsCreated(); }
 
+    // Çöpteki (deleted:true) kayıt hekim/teknisyene görünmez.
+    //  - get (tek belge): `deleted` alanı olmayan kayıt (eski/göç verisi) görünür sayılır.
+    //  - list (sorgu): kural sorgunun `where('deleted','==',false)` kısıtıyla KANITLANABİLİR olmalı (get('deleted', false) biçimi
+    //    sorguda kanıtlanamaz ve çöpü sızdırır); bu yüzden alanı olmayan kayıt listede çıkmaz → göç aracı ve ön yüz alanı hep yazar.
+    function notDeleted() { return resource.data.get('deleted', false) == false; }
+    function notDeletedQ() { return resource.data.deleted == false; }
+
+    // Eski uygulamada iş durumu yalnızca bu 6 değerdi; 'Bekleyen' eski kodda 'Bekliyor' için yazım varyantı olarak geçiyordu.
+    // Göçle gelen başka/bilinmeyen bir değer YENİ yazımda kabul edilmez ama kayıt güncellenirken (değer aynı kalıyorsa) engel olmaz.
     function jobStatusOk(s) {
-      return s in ['Bekliyor', 'Tasarımda', 'Üretimde', 'Makyajda', 'Tamamlama Onayı', 'Tamamlandı'];
+      return s in ['Bekliyor', 'Tasarımda', 'Üretimde', 'Makyajda', 'Tamamlama Onayı', 'Tamamlandı', 'Bekleyen'];
     }
     function techStatusOk(s) {
       return s in ['Bekliyor', 'Tasarımda', 'Üretimde', 'Makyajda', 'Tamamlama Onayı'];
     }
-    function validJob(d) {
-      return str(d.doctorId, 64) && jobStatusOk(d.status)
+    function validJobBase(d) {
+      return str(d.doctorId, 64)
         && optStr(d, 'patient', 300) && optStr(d, 'note', 5000)
         && (!('deleted' in d) || d.deleted is bool)
         && (!('techIds' in d) || (d.techIds is list && d.techIds.size() <= 20));
+    }
+    // Yeni iş: hekim ZORUNLU (boş doctorId yok) ve geçerli durum.
+    function validJobCreate(d) {
+      return validJobBase(d) && d.doctorId.size() > 0 && jobStatusOk(d.status);
+    }
+    // Güncelleme: göçle gelen hekimsiz (doctorId:'') eski iş, hekim alanı DEĞİŞMEDİKÇE güncellenebilir; eski durum değeri korunabilir.
+    function validJobUpdate(d) {
+      return validJobBase(d)
+        && (d.doctorId.size() > 0 || d.doctorId == resource.data.get('doctorId', ''))
+        && (jobStatusOk(d.get('status', null)) || d.get('status', null) == resource.data.get('status', null))
+        && closedJobKept();
+    }
+    // Hesabı kapatılmış dönemdeki (closureId dolu) işin hekim/fiyat/adet/para birimi değiştirilemez (kapanış bakiyesi bozulmasın).
+    function closedJobKept() {
+      return resource.data.get('closureId', null) == null
+        || (request.resource.data.get('doctorId', null) == resource.data.get('doctorId', null)
+            && request.resource.data.get('price', null) == resource.data.get('price', null)
+            && request.resource.data.get('qty', null) == resource.data.get('qty', null)
+            && request.resource.data.get('currency', null) == resource.data.get('currency', null));
     }
     // Teknisyen yalnızca bu alanları değiştirebilir.
     function techKeysOk() {
@@ -80,11 +108,14 @@ service cloud.firestore {
 
       // ---------- İşler ----------
       match /jobs/{id} {
-        allow read: if isAdmin(lab)
-          || (isDoctor(lab) && resource.data.doctorId == myDoctorId())
-          || (isTech(lab) && 'techIds' in resource.data && myTechId() in resource.data.techIds);
-        allow create: if adminCreate(lab) && validJob(request.resource.data);
-        allow update: if (adminUpdate(lab) && validJob(request.resource.data))
+        allow get: if isAdmin(lab)
+          || (isDoctor(lab) && resource.data.doctorId == myDoctorId() && notDeleted())
+          || (isTech(lab) && 'techIds' in resource.data && myTechId() in resource.data.techIds && notDeleted());
+        allow list: if isAdmin(lab)
+          || (isDoctor(lab) && resource.data.doctorId == myDoctorId() && notDeletedQ())
+          || (isTech(lab) && myTechId() in resource.data.techIds && notDeletedQ());
+        allow create: if adminCreate(lab) && validJobCreate(request.resource.data);
+        allow update: if (adminUpdate(lab) && validJobUpdate(request.resource.data))
           || (isTech(lab)
               && 'techIds' in resource.data && myTechId() in resource.data.techIds
               && resource.data.get('deleted', false) != true      // çöpteki iş değiştirilemez
@@ -99,12 +130,14 @@ service cloud.firestore {
 
       // ---------- Onay bekleyen işler ----------
       match /pendingJobs/{id} {
-        allow read: if isAdmin(lab) || (isTech(lab) && resource.data.techId == myTechId());
+        allow get: if isAdmin(lab) || (isTech(lab) && resource.data.techId == myTechId() && notDeleted());
+        allow list: if isAdmin(lab) || (isTech(lab) && resource.data.techId == myTechId() && notDeletedQ());
         allow create: if adminCreate(lab)
           || (isTech(lab) && request.resource.data.techId == myTechId()
               && request.resource.data.status == 'Onay Bekliyor'
               && request.resource.data.keys().hasOnly(['id', 'drName', 'patient', 'type', 'qty', 'dateout', 'note', 'techId', 'status',
-                   'submittedBy', 'submittedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+                   'submittedBy', 'submittedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy', 'deleted'])
+              && request.resource.data.get('deleted', false) == false
               && request.resource.data.createdBy == request.auth.uid && stamped(request.resource.data)
               && str(request.resource.data.patient, 300)
               && optStr(request.resource.data, 'drName', 300) && optStr(request.resource.data, 'type', 300)
@@ -116,12 +149,14 @@ service cloud.firestore {
 
       // ---------- Hekim gönderimleri ----------
       match /doctorSubmissions/{id} {
-        allow read: if isAdmin(lab) || (isDoctor(lab) && resource.data.doctorId == myDoctorId());
+        allow get: if isAdmin(lab) || (isDoctor(lab) && resource.data.doctorId == myDoctorId() && notDeleted());
+        allow list: if isAdmin(lab) || (isDoctor(lab) && resource.data.doctorId == myDoctorId() && notDeletedQ());
         allow create: if isDoctor(lab)
           && request.resource.data.doctorId == myDoctorId()
           && (!('drId' in request.resource.data) || string(request.resource.data.drId) == myDoctorId())
           && request.resource.data.keys().hasOnly(['id', 'doctorId', 'drId', 'patient', 'jobType', 'teeth', 'jaw', 'color', 'notes', 'files',
-               'status', 'source', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+               'status', 'source', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy', 'deleted'])
+          && request.resource.data.get('deleted', false) == false
           && request.resource.data.status == 'Yeni'
           && request.resource.data.createdBy == request.auth.uid && stamped(request.resource.data)
           && str(request.resource.data.patient, 300)
@@ -148,19 +183,33 @@ service cloud.firestore {
       match /{coll}/{docId}/history/{hid} { allow read: if isAdmin(lab); allow write: if false; }
 
       // ---------- Mesajlaşma ----------
+      // Konuşma kimlikleri: dr_{hekimId} (hekim↔lab), tech_{teknisyenId} (teknisyen↔lab) ve göçle gelen eski iş sohbetleri
+      // job_{işId}: o işin hekimi (doctorId) ve atanmış teknisyenleri (techIds); iş çöpteyse/yoksa erişim yok.
+      function jobOf(tid) { return get(/databases/$(database)/documents/labs/$(lab)/jobs/$(tid.replace('^job_', ''))).data; }
+      function jobThreadOk(tid) {
+        return tid.matches('job_[^/]+')
+          && exists(/databases/$(database)/documents/labs/$(lab)/jobs/$(tid.replace('^job_', '')))
+          && jobOf(tid).get('deleted', false) == false
+          && ((isDoctor(lab) && jobOf(tid).get('doctorId', '') == myDoctorId())
+              || (isTech(lab) && myTechId() in jobOf(tid).get('techIds', [])));
+      }
       function threadAllowed(tid) {
         return isAdmin(lab)
           || (isDoctor(lab) && tid == 'dr_' + myDoctorId())
-          || (isTech(lab) && tid == 'tech_' + myTechId());
+          || (isTech(lab) && tid == 'tech_' + myTechId())
+          || jobThreadOk(tid);
+      }
+      // Konuşma belgesi: yeni yazılan alanlar yalnızca updatedAt/createdAt. Göçle gelen eski alanlar (id, _legacy ...) korunur, silinemez.
+      function threadWriteOk() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt', 'createdAt'])
+          && optStr(request.resource.data, 'updatedAt', 40);
       }
       match /threads/{tid} {
         allow read: if threadAllowed(tid);
         allow create: if threadAllowed(tid)
           && request.resource.data.keys().hasOnly(['updatedAt', 'createdAt'])
           && optStr(request.resource.data, 'updatedAt', 40);
-        allow update: if threadAllowed(tid) && keepsFields()
-          && request.resource.data.keys().hasOnly(['updatedAt', 'createdAt'])
-          && optStr(request.resource.data, 'updatedAt', 40);
+        allow update: if threadAllowed(tid) && keepsFields() && threadWriteOk();
         allow delete: if false;
         match /messages/{mid} {
           allow read: if threadAllowed(tid);

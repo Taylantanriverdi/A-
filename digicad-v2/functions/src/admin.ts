@@ -1,15 +1,17 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 import { createHash } from 'node:crypto';
-import { LAB, REGION, requireAdminMfa, rateLimit, randomPassword } from './util';
-import { claimsFor, normalizeEmail, validateUid, cleanDisplayName, mapAuthError } from './validate';
+import { CALLABLE_OPTS, requireAdminMfa, rateLimit, randomPassword } from './util';
+import { claimsFor, normalizeEmail, validateUid, cleanDisplayName, mapAuthError, refId } from './validate';
+import { planFileCopies, applyCopies } from './files';
 
-const OPTS = { enforceAppCheck: true, region: REGION, maxInstances: 5 } as const;
+const OPTS = CALLABLE_OPTS;
 
-async function audit(actor: string, action: string, detail: Record<string, unknown>) {
+async function audit(lab: string, actor: string, action: string, detail: Record<string, unknown>) {
   try {
-    await getFirestore().collection(`labs/${LAB}/auditLog`).add({ at: FieldValue.serverTimestamp(), actor, action, detail });
+    await getFirestore().collection(`labs/${lab}/auditLog`).add({ at: FieldValue.serverTimestamp(), actor, action, detail });
   } catch (e) {
     console.error('auditLog yazılamadı', action, (e as { code?: unknown })?.code);
   }
@@ -22,21 +24,28 @@ function pwFingerprint(rec: { passwordHash?: string; passwordSalt?: string }): s
 }
 
 /** doctorId/techId gerçekten var olan bir kayda işaret etmeli (yanlış kimlikle başka hekimin verisine erişimi önler). */
-async function assertRefExists(claims: Record<string, string>): Promise<void> {
+async function assertRefExists(lab: string, claims: Record<string, string>): Promise<void> {
   const coll = claims.role === 'doctor' ? 'doctors' : claims.role === 'tech' ? 'technicians' : null;
   if (!coll) return;
   const id = claims.role === 'doctor' ? claims.doctorId : claims.techId;
-  const s = await getFirestore().doc(`labs/${LAB}/${coll}/${id}`).get();
+  const s = await getFirestore().doc(`labs/${lab}/${coll}/${id}`).get();
   if (!s.exists) throw new HttpsError('failed-precondition', 'Bağlanacak hekim/teknisyen kaydı bulunamadı.');
 }
 
+/** Hedef hesap bu çalışma alanına ait mi? (claim'i olmayan/başka lab'daki hesaba dokunulmaz.) */
+function assertSameLab(claims: Record<string, unknown> | undefined, lab: string, allowUnassigned = false): void {
+  const l = claims?.lab;
+  if (l == null || l === '') { if (allowUnassigned) return; throw new HttpsError('permission-denied', 'Kullanıcı bu laboratuvara ait değil.'); }
+  if (l !== lab) throw new HttpsError('permission-denied', 'Kullanıcı başka bir laboratuvara ait.');
+}
+
 export const adminCreateUser = onCall(OPTS, async (req) => {
-  const actor = requireAdminMfa(req);
+  const { uid: actor, lab } = requireAdminMfa(req);
   await rateLimit(actor, 'adminUsers', 60, 3600);
   const d = (req.data ?? {}) as Record<string, unknown>;
   const email = normalizeEmail(d.email);
-  const claims = claimsFor(d.role, d.doctorId, d.techId);
-  await assertRefExists(claims);
+  const claims = claimsFor(d.role, lab, d.doctorId, d.techId); // hedef lab = çağıranın lab'ı
+  await assertRefExists(lab, claims);
   const tempPassword = randomPassword();
   let uid: string;
   try {
@@ -51,67 +60,133 @@ export const adminCreateUser = onCall(OPTS, async (req) => {
       throw e;
     }
   } catch (e) { throw mapAuthError(e); }
-  await audit(actor, 'adminCreateUser', { uid, email, role: claims.role });
+  await audit(lab, actor, 'adminCreateUser', { uid, email, role: claims.role });
   // Geçici şifre yalnızca bu yanıtta döner; saklanmaz/loglanmaz.
   return { uid, email, tempPassword };
 });
 
 export const adminSetRole = onCall(OPTS, async (req) => {
-  const actor = requireAdminMfa(req);
+  const { uid: actor, lab } = requireAdminMfa(req);
   await rateLimit(actor, 'adminUsers', 60, 3600);
   const d = (req.data ?? {}) as Record<string, unknown>;
   const uid = validateUid(d.uid);
   if (uid === actor && d.role !== 'admin') throw new HttpsError('failed-precondition', 'Kendi yöneticilik rolünüzü kaldıramazsınız.');
-  const claims = claimsFor(d.role, d.doctorId, d.techId);
-  await assertRefExists(claims);
+  const claims = claimsFor(d.role, lab, d.doctorId, d.techId);
+  await assertRefExists(lab, claims);
   try {
     const target = await getAuth().getUser(uid);
     const prev = target.customClaims ?? {};
-    if (prev.lab != null && prev.lab !== LAB) throw new HttpsError('permission-denied', 'Kullanıcı başka bir laboratuvara ait.');
+    assertSameLab(prev, lab, true);
     const keep: Record<string, unknown> = {};
     if (prev.mustChangePassword) { keep.mustChangePassword = true; if (prev.pwv) keep.pwv = prev.pwv; }
     await getAuth().setCustomUserClaims(uid, { ...claims, ...keep });
     await getAuth().revokeRefreshTokens(uid);
   } catch (e) { throw mapAuthError(e); }
-  await audit(actor, 'adminSetRole', { uid, role: claims.role });
+  await audit(lab, actor, 'adminSetRole', { uid, role: claims.role });
   return { ok: true };
 });
 
 export const adminResetPassword = onCall(OPTS, async (req) => {
-  const actor = requireAdminMfa(req);
+  const { uid: actor, lab } = requireAdminMfa(req);
   await rateLimit(actor, 'adminUsers', 60, 3600);
   const uid = validateUid(((req.data ?? {}) as Record<string, unknown>).uid);
   const tempPassword = randomPassword();
   try {
     const before = await getAuth().getUser(uid);
-    if (before.customClaims?.lab != null && before.customClaims.lab !== LAB) throw new HttpsError('permission-denied', 'Kullanıcı başka bir laboratuvara ait.');
+    assertSameLab(before.customClaims, lab);
     const user = await getAuth().updateUser(uid, { password: tempPassword });
     const rec = await getAuth().getUser(uid);
     const fp = pwFingerprint(rec);
     await getAuth().setCustomUserClaims(uid, { ...(user.customClaims ?? {}), mustChangePassword: true, ...(fp ? { pwv: fp } : {}) });
     await getAuth().revokeRefreshTokens(uid);
   } catch (e) { throw mapAuthError(e); }
-  await audit(actor, 'adminResetPassword', { uid });
+  await audit(lab, actor, 'adminResetPassword', { uid });
   return { uid, tempPassword };
+});
+
+/**
+ * Yumuşak silinen hekim/teknisyenin giriş hesabını devre dışı bırakır (ve oturumlarını iptal eder);
+ * `disabled:false` ile (kayıt çöp kutusundan geri alınınca) yeniden etkinleştirir.
+ * Yalnızca bu lab'ın hekim/teknisyen hesapları; yönetici hesabı ve kendi hesabınız bu yolla kapatılamaz.
+ */
+export const adminDisableUser = onCall(OPTS, async (req) => {
+  const { uid: actor, lab } = requireAdminMfa(req);
+  await rateLimit(actor, 'adminUsers', 60, 3600);
+  const d = (req.data ?? {}) as Record<string, unknown>;
+  const uid = validateUid(d.uid);
+  const disabled = d.disabled !== false;
+  if (uid === actor) throw new HttpsError('failed-precondition', 'Kendi hesabınızı kapatamazsınız.');
+  try {
+    const target = await getAuth().getUser(uid);
+    assertSameLab(target.customClaims, lab);
+    const role = target.customClaims?.role;
+    if (role !== 'doctor' && role !== 'tech') throw new HttpsError('failed-precondition', 'Yalnızca hekim/teknisyen hesapları kapatılabilir.');
+    await getAuth().updateUser(uid, { disabled });
+    if (disabled) await getAuth().revokeRefreshTokens(uid);
+  } catch (e) { throw mapAuthError(e); }
+  await audit(lab, actor, disabled ? 'adminDisableUser' : 'adminEnableUser', { uid });
+  return { ok: true, disabled };
+});
+
+/**
+ * Siparişe aktarılan işin dosyalarını hekim gönderim klasöründen işin klasörüne (jobFiles/{jobId}) kopyalar
+ * (sunucu tarafı kopya; teknisyen yalnızca jobFiles'ı okuyabilir). Idempotent: yalnızca hâlâ submissions altında olan girdiler işlenir.
+ */
+export const copyJobFiles = onCall(OPTS, async (req) => {
+  const { uid: actor, lab } = requireAdminMfa(req);
+  await rateLimit(actor, 'copyJobFiles', 300, 3600);
+  const jobId = refId(((req.data ?? {}) as Record<string, unknown>).jobId, 'jobId');
+  const db = getFirestore();
+  const jref = db.doc(`labs/${lab}/jobs/${jobId}`);
+  const snap = await jref.get();
+  if (!snap.exists) throw new HttpsError('not-found', 'İş bulunamadı.');
+  const job = snap.data() ?? {};
+  const doctorId = String(job.doctorId ?? job.drId ?? '');
+  const steps = planFileCopies(lab, jobId, doctorId, job.files);
+  if (!steps.length) return { copied: 0, failed: 0 };
+  const bucket = getStorage().bucket();
+  const done = new Map<string, string>(); let failed = 0;
+  for (const st of steps) {
+    try {
+      const dest = bucket.file(st.to);
+      const [exists] = await dest.exists();
+      if (!exists) await bucket.file(st.from).copy(dest);
+      done.set(st.from, st.to);
+    } catch (e) { failed++; console.error('Dosya kopyalanamadı', (e as { code?: unknown })?.code); }
+  }
+  if (done.size) {
+    await db.runTransaction(async (tx) => {
+      const cur = await tx.get(jref);
+      const files = cur.data()?.files;
+      if (!Array.isArray(files)) return;
+      tx.update(jref, { files: applyCopies(files, done), updatedAt: new Date().toISOString(), updatedBy: actor });
+    });
+  }
+  await audit(lab, actor, 'copyJobFiles', { jobId, copied: done.size, failed });
+  return { copied: done.size, failed };
 });
 
 /**
  * Kullanıcı geçici şifresini değiştirdikten sonra `mustChangePassword` claim'ini kaldırır.
  * (Claim'i istemci kaldıramaz; aksi halde kullanıcı sonsuza dek şifre ekranında kalır.)
+ * Göçle açılan hesaplarda `pwv` yoktur: bayrak doğrudan kaldırılır. adminCreateUser/adminResetPassword hesaplarında `pwv`
+ * (şifre özeti parmak izi) bulunur ve şifre gerçekten değişmeden bayrak kaldırılmaz.
  */
 export const clearMustChangePassword = onCall(OPTS, async (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Giriş gerekli.');
   const uid = req.auth.uid;
   await rateLimit(uid, 'clearMcp', 20, 3600);
+  let lab = '';
   try {
     const rec = await getAuth().getUser(uid);
     const c = { ...(rec.customClaims ?? {}) } as Record<string, unknown>;
+    lab = typeof c.lab === 'string' ? c.lab : '';
     if (!c.mustChangePassword) return { ok: true };
     const fp = pwFingerprint(rec);
     if (fp && c.pwv && fp === c.pwv) throw new HttpsError('failed-precondition', 'Şifre henüz değiştirilmedi.');
     delete c.mustChangePassword; delete c.pwv;
     await getAuth().setCustomUserClaims(uid, c);
   } catch (e) { throw mapAuthError(e); }
-  await audit(uid, 'clearMustChangePassword', { uid });
+  if (lab) await audit(lab, uid, 'clearMustChangePassword', { uid });
   return { ok: true };
 });

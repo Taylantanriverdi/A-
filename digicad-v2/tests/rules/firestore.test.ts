@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, 
 let env: RulesTestEnvironment;
 const L = 'labs/digicad';
 
-const MFA = { firebase: { sign_in_second_factor: 'totp' } };
+const MFA = { firebase: { sign_in_provider: 'custom', sign_in_second_factor: 'totp' } };
 const admin = () => env.authenticatedContext('adm', { role: 'admin', lab: 'digicad', ...MFA }).firestore();
 const drA = () => env.authenticatedContext('dA', { role: 'doctor', doctorId: '1', lab: 'digicad' }).firestore();
 const drB = () => env.authenticatedContext('dB', { role: 'doctor', doctorId: '2', lab: 'digicad' }).firestore();
@@ -52,7 +52,7 @@ describe('Firestore: hekim izolasyonu', () => {
   it('hekim başka hekimin işini okuyamaz', async () => { await assertFails(getDoc(doc(drA(), `${L}/jobs/101`))); });
   it('hekim filtresiz iş listesi çekemez, filtreli çeker', async () => {
     await assertFails(getDocs(collection(drA(), `${L}/jobs`)));
-    await assertSucceeds(getDocs(query(collection(drA(), `${L}/jobs`), where('doctorId', '==', '1'))));
+    await assertSucceeds(getDocs(query(collection(drA(), `${L}/jobs`), where('doctorId', '==', '1'), where('deleted', '==', false))));
   });
   it('hekim iş yazamaz/güncelleyemez', async () => {
     await assertFails(updateDoc(doc(drA(), `${L}/jobs/100`), { status: 'Tamamlandı' }));

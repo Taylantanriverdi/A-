@@ -2,7 +2,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineString } from 'firebase-functions/params';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { v1 } from '@google-cloud/firestore';
-import { LAB, REGION } from './util';
+import { DEFAULT_LAB, REGION } from './util';
 
 const BACKUP_BUCKET = defineString('BACKUP_BUCKET'); // ayrı, sürümlemeli, retention-lock'lu bucket adı (gs:// olmadan)
 const BUCKET_RE = /^[a-z0-9][a-z0-9._-]{2,221}$/;
@@ -15,7 +15,7 @@ export function backupPrefix(bucket: string, now = new Date()): string {
 
 async function note(status: string, detail: Record<string, unknown>) {
   try {
-    await getFirestore().collection(`labs/${LAB}/auditLog`).add({ at: FieldValue.serverTimestamp(), actor: 'system', action: 'scheduledBackup', status, detail });
+    await getFirestore().collection(`labs/${DEFAULT_LAB}/auditLog`).add({ at: FieldValue.serverTimestamp(), actor: 'system', action: 'scheduledBackup', status, detail });
   } catch (e) { console.error('Yedek durumu auditLog\'a yazılamadı', (e as { code?: unknown })?.code); }
 }
 
