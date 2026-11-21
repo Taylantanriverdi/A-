@@ -1,0 +1,13 @@
+{
+  "name": "digicad-functions",
+  "private": true,
+  "main": "lib/index.js",
+  "engines": { "node": "20" },
+  "scripts": { "build": "tsc", "lint": "tsc --noEmit" },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.9.0",
+    "firebase-admin": "^12.4.0",
+    "firebase-functions": "^6.0.1"
+  },
+  "devDependencies": { "typescript": "^5.5.4", "@types/node": "^20.14.0" }
+}

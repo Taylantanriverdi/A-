@@ -1,0 +1,58 @@
+rules_version = '2';
+// DigiCAD v2 — Storage kuralları. Yol bazlı, boyut/MIME sınırlı, sahiplik denetimli. Silme YOK.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() { return request.auth != null; }
+    function role() { return signedIn() && 'role' in request.auth.token ? request.auth.token.role : ''; }
+    function isAdmin() { return role() == 'admin'; }
+    function inLab(lab) { return signedIn() && 'lab' in request.auth.token && request.auth.token.lab == lab; }
+    function isDoctor(lab) { return role() == 'doctor' && inLab(lab) && 'doctorId' in request.auth.token; }
+    function isTech(lab) { return role() == 'tech' && inLab(lab) && 'techId' in request.auth.token; }
+
+    function maxMB(n) { return request.resource.size < n * 1024 * 1024; }
+    function scanType() {
+      return request.resource.contentType.matches('application/(octet-stream|zip|x-zip-compressed|pdf|sla)')
+        || request.resource.contentType.matches('model/.*')
+        || request.resource.contentType.matches('image/(png|jpeg|webp)');
+    }
+    function chatType() {
+      return request.resource.contentType.matches('image/(png|jpeg|webp)')
+        || request.resource.contentType == 'application/pdf';
+    }
+    function jobDoc(lab, jobId) {
+      return firestore.get(/databases/(default)/documents/labs/$(lab)/jobs/$(jobId));
+    }
+
+    match /{allPaths=**} { allow read, write: if false; }
+
+    // İş dosyaları: labs/{lab}/jobFiles/{jobId}/{dosya}
+    match /labs/{lab}/jobFiles/{jobId}/{file} {
+      allow read: if isAdmin()
+        || (isDoctor(lab) && jobDoc(lab, jobId).data.doctorId == string(request.auth.token.doctorId))
+        || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds);
+      allow create: if resource == null && (isAdmin() || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds))
+        && maxMB(200) && scanType();
+      allow update, delete: if false;
+    }
+
+    // Hekim gönderim dosyaları: labs/{lab}/submissions/{doctorId}/{dosya}
+    match /labs/{lab}/submissions/{doctorId}/{file} {
+      allow read: if isAdmin() || (isDoctor(lab) && string(request.auth.token.doctorId) == doctorId);
+      allow create: if resource == null && isDoctor(lab) && string(request.auth.token.doctorId) == doctorId
+        && maxMB(200) && scanType();
+      allow update, delete: if false;
+    }
+
+    // Sohbet ekleri: labs/{lab}/chat/{threadId}/{dosya}
+    match /labs/{lab}/chat/{threadId}/{file} {
+      allow read: if isAdmin()
+        || (isDoctor(lab) && threadId == 'dr_' + string(request.auth.token.doctorId))
+        || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId));
+      allow create: if resource == null && (isAdmin()
+        || (isDoctor(lab) && threadId == 'dr_' + string(request.auth.token.doctorId))
+        || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId)))
+        && maxMB(25) && chatType();
+      allow update, delete: if false;
+    }
+  }
+}
