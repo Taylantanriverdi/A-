@@ -34,7 +34,7 @@ export function claimsFor(role: unknown, lab: string, doctorId?: unknown, techId
 
 export function cleanDisplayName(v: unknown): string | undefined {
   if (typeof v !== 'string') return undefined;
-  // eslint-disable-next-line no-control-regex
+   
   const s = v.replace(/[\u0000-\u001F\u007F<>]/g, ' ').trim().slice(0, 120);
   return s || undefined;
 }

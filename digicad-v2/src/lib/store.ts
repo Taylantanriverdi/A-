@@ -24,6 +24,11 @@ export const readDoc = async (lab: string, name: string, id: string): Promise<Re
 export const byField = (f: string, v: unknown): QueryConstraint => where(f, '==', v);
 /** Dizi alanı belirli bir değeri içeriyor (ör. işin `techIds` listesi). */
 export const hasItem = (f: string, v: unknown): QueryConstraint => where(f, 'array-contains', v);
+/**
+ * Çöp (deleted:true) kayıtları hekim/teknisyen sorgularından dışlar. Kurallar (list) bu kısıtı ŞART koşar
+ * (get('deleted', false) sorguda kanıtlanamaz); göç aracı `deleted` alanını jobs/pendingJobs/doctorSubmissions'a her zaman yazar.
+ */
+export const notDeleted = (): QueryConstraint => where('deleted', '==', false);
 export const recent = (f: string, n = 200): QueryConstraint[] => [orderBy(f, 'desc'), limit(n)];
 
 const clean = <T extends Record<string, unknown>>(o: T): T => JSON.parse(JSON.stringify(o)); // undefined alanlarını at

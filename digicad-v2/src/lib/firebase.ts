@@ -5,7 +5,7 @@ import {
   initializeFirestore, memoryLocalCache, persistentLocalCache, persistentMultipleTabManager, connectFirestoreEmulator, terminate, clearIndexedDbPersistence,
 } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator } from 'firebase/storage';
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { getFunctions, connectFunctionsEmulator, httpsCallable } from 'firebase/functions';
 
 const env = import.meta.env;
 const useEmu = env.VITE_USE_EMULATORS === 'true';
@@ -39,6 +39,13 @@ export const db = initializeFirestore(app, {
 });
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'europe-west1');
+
+/**
+ * Cloud Functions çağrısı. Sunucu `consumeAppCheckToken` ile tek kullanımlık App Check token'ı ister (replay koruması),
+ * bu yüzden istemci HER çağrıda `limitedUseAppCheckTokens` ile yeni token alır.
+ */
+export const callFn = <T = unknown>(name: string, data: unknown = {}): Promise<T> =>
+  httpsCallable<unknown, T>(functions, name, { limitedUseAppCheckTokens: true })(data).then((r) => r.data);
 
 if (useEmu) {
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });

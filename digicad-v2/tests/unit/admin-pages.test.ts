@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({
   put: vi.fn(async () => undefined), patch: vi.fn(async () => undefined), softDelete: vi.fn(async () => undefined), restore: vi.fn(async () => undefined),
   createOrder: vi.fn(async () => undefined), approvePending: vi.fn(async () => { await new Promise((r) => setTimeout(r, 20)); }), transition: vi.fn(async () => undefined), mutateJob: vi.fn(async () => ({})),
-  closeStatement: vi.fn(async () => undefined), undoClosure: vi.fn(async () => undefined), hideMessage: vi.fn(async () => undefined), postMessage: vi.fn(async () => undefined), stopMsgs: vi.fn(), msgCb: null as null | ((r: unknown[]) => void),
+  callFn: vi.fn(async () => ({ copied: 1, failed: 0 })), closeStatement: vi.fn(async () => undefined), undoClosure: vi.fn(async () => undefined), hideMessage: vi.fn(async () => undefined), postMessage: vi.fn(async () => undefined), stopMsgs: vi.fn(), msgCb: null as null | ((r: unknown[]) => void),
 }));
-vi.mock('../../src/lib/firebase', () => ({ db: {}, auth: {}, storage: {}, functions: {} }));
+vi.mock('../../src/lib/firebase', () => ({ db: {}, auth: {}, storage: {}, functions: {}, callFn: m.callFn }));
 vi.mock('firebase/functions', () => ({ httpsCallable: () => async () => ({ data: {} }) }));
 vi.mock('firebase/storage', () => ({ ref: vi.fn(), uploadBytes: vi.fn(), getDownloadURL: vi.fn(async () => 'https://x/y') }));
 vi.mock('../../src/lib/store', async () => { let n = 0; return { put: m.put, patch: m.patch, softDelete: m.softDelete, restore: m.restore, newId: () => `id${++n}`, listen: () => () => undefined, colPath: (l: string, c: string) => `labs/${l}/${c}` }; });
@@ -41,7 +41,7 @@ describe('admin sayfaları: güvenli çizim ve duman testi', () => {
     const c = ctx({ doctors, technicians: techs, jobs, payments: [{ id: 'p1', doctorId: 'd1', amount: 20, date: '2026-02-02', drName: XSS }], expenses: [{ id: 'e1', date: '2026-02-03', amount: 7, title: XSS, category: 'Sabit' }], sales: [{ id: 's1', customer: XSS, items: [{ name: XSS, qty: 1, price: 1 }], total: 1, date: '2026-02-01' }],
       pendingJobs: [{ id: 'p1', status: 'Onay Bekliyor', drName: XSS, patient: 'x', type: 'K' }], doctorSubmissions: [{ id: 's1', status: 'Yeni', patient: XSS, doctorId: 'd1' }], statementClosures: [], mailFilters: [{ id: 'main', items: ['a@b.com'] }] });
     const pages: Record<string, () => HTMLElement> = { dash: () => P1.dash(c), order: () => P1.order(c), subs: () => P1.doctorsubs(c), pending: () => P1.pending(c), dispatch: () => P1.dispatch(c), jobs: () => P1.jobsPage(c, false), done: () => P1.jobsPage(c, true), files: () => P1.files(c),
-      doctors: () => P2.doctors(c), techs: () => P2.techs(c), expenses: () => P2.expenses(c), archive: () => P2.archive(c), monthly: () => P2.monthly(c), trash: () => P2.trash(c), settings: () => P2.settings(c, { lab: 'digicad', set: vi.fn() }), chat: () => P2.chat(c), sales: () => P3.sales(c), mail: () => P3.mail(c, vi.fn()) };
+      doctors: () => P2.doctors(c), techs: () => P2.techs(c), expenses: () => P2.expenses(c), archive: () => P2.archive(c), monthly: () => P2.monthly(c), trash: () => P2.trash(c), settings: () => P2.settings(c), chat: () => P2.chat(c), sales: () => P3.sales(c), mail: () => P3.mail(c, vi.fn()) };
     for (const [name, fn] of Object.entries(pages)) { const el = show(fn()); expect(el.querySelector('img'), name).toBeNull(); expect(el.querySelector('script'), name).toBeNull(); expect(el.querySelector('[onerror],[onclick]'), name).toBeNull(); }
     show(P1.files(c)); const a = [...document.querySelectorAll('a')].find((x) => x.textContent?.includes('eski'))!; expect(a.getAttribute('href')).toBe('#');
   });
@@ -97,4 +97,80 @@ describe('satışlar', () => {
     expect(coll).toBe('sales'); expect(isNew).toBe(true); expect(data).toMatchObject({ customer: 'Klinik X', subtotal: 0.3, vatAmt: 0.06, total: 0.36, vat: 20, currency: 'TRY', status: 'Beklemede' }); expect(String(data.formNo)).toMatch(/^PT-\d{8}-\d{3}$/);
   });
   it('müşterisiz form kaydedilmez', async () => { const c = ctx(); show(P3.sales(c)); btnByText(document.body, 'Yeni form').click(); btnByText(document.querySelector('.modal-back') as HTMLElement, 'Kaydet').click(); await flush(); expect(m.put).not.toHaveBeenCalled(); });
+});
+
+import { readFileSync } from 'node:fs';
+import { buildPlan } from '../../migration/src/transform';
+
+describe('göçle gelen belgeler (_legacy, {_nestedArray}, x-önekli alanlar, bilinmeyen durum)', () => {
+  const root = JSON.parse(readFileSync('migration/test/fixtures/rtdb-export.fake.json', 'utf8'));
+  const plan = buildPlan(root, { ignoreUnknown: true, includeLegacyRoot: true, ignoreLegacyRoot: true });
+  const migrated = (id: string): Record<string, unknown> => ({ ...(plan.docs.find((d) => d.path === `labs/digicad/jobs/${id}`)!.data), id });
+  const upd = (cur: Record<string, unknown>, patch: Record<string, unknown>) => ({ ...cur, ...patch }); // updateDoc: yalnızca verilen alanlar değişir, diğerleri korunur
+
+  it('fixture içinde göçün ürettiği özel alanlar var (test anlamlı)', () => {
+    const j = migrated('1700000000100');
+    expect(j._legacy).toBeTruthy(); expect(JSON.stringify(j.teethMap)).toContain('_nestedArray');
+  });
+  it('admin düzenleme yaması mevcut alanların hiçbirini silmez (kurallardaki keys().hasAll ile uyumlu)', async () => {
+    for (const id of ['1700000000100', '1700000000102']) {
+      const cur = migrated(id); let patch: Record<string, unknown> = {};
+      m.mutateJob.mockImplementationOnce((async (_s: unknown, _id: string, fn: (j: Record<string, unknown>) => Record<string, unknown> | null) => { patch = fn(cur) ?? {}; return patch; }) as never);
+      const c = ctx({ doctors: [{ id: String(cur.doctorId || 'd1'), name: 'Dr' }, { id: 'd1', name: 'Dr' }], technicians: techs, jobs: [cur] });
+      const el = show(P1.jobsPage(c, cur.status === 'Tamamlandı')); btnByText(el, 'Detay').click();
+      const sel = (document.querySelector('.modal-back') as HTMLElement).querySelector('select[name=doctorId]') as HTMLSelectElement;
+      if (!cur.doctorId) { expect(sel.value).toBe(''); sel.value = 'd1'; } // hekimsiz eski iş: sessizce ilk hekime atanmaz, yönetici seçer
+      btnByText(document.querySelector('.modal-back') as HTMLElement, 'Kaydet').click(); await flush();
+      const after = upd(cur, { ...patch, updatedBy: 'u1' });
+      for (const k of Object.keys(cur)) expect(Object.keys(after), `${id}: ${k} korunmalı`).toContain(k);
+      expect(after._legacy).toEqual(cur._legacy);
+      if ('teethMap' in cur) expect(after.teethMap).toEqual(cur.teethMap);
+      expect(Object.keys(patch)).not.toContain('_legacy'); expect(Object.keys(patch).some((k) => /^x__/.test(k))).toBe(false);
+      document.body.replaceChildren();
+    }
+  });
+  it('bilinmeyen/eski durum çizilir, seçicide "(eski)" olarak korunur ve değiştirilmeden kaydedilince Geçersiz durum hatası vermez', async () => {
+    const cur = { id: 'o1', doctorId: 'd1', drName: 'Dr', patient: 'Eski', type: 'Kron', status: 'Gönderildi', techIds: [] };
+    const c = ctx({ doctors, jobs: [cur] }); const el = show(P1.jobsPage(c, false));
+    const sel = el.querySelector('select[name=st]') as HTMLSelectElement; expect(sel.value).toBe('Gönderildi'); expect([...sel.options].some((o) => o.textContent?.includes('(eski)'))).toBe(true);
+    let patch: Record<string, unknown> | null = {}; m.mutateJob.mockImplementationOnce((async (_s: unknown, _id: string, fn: (j: Record<string, unknown>) => Record<string, unknown> | null) => { patch = fn(cur); return patch; }) as never);
+    btnByText(el, 'Detay').click(); btnByText(document.querySelector('.modal-back') as HTMLElement, 'Kaydet').click(); await flush();
+    expect(patch).not.toBeNull(); expect((patch as unknown as Record<string, unknown>).status).toBeUndefined(); // durum dokunulmadan kalır
+  });
+});
+
+describe('çalışma alanı, hesap devre dışı bırakma, hekim seçimi, dosya kopyası', () => {
+  it('ayarlar: çalışma alanı seçici yok, yalnızca claim lab gösterilir', () => {
+    const el = show(P2.settings(ctx())); expect(el.querySelector('select[name=lab]')).toBeNull(); expect(el.textContent).toContain('"digicad"');
+  });
+  it('hekim silinince bağlı hesap devre dışı bırakılır; çöpten geri alınınca yeniden etkinleştirilir', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const c = ctx({ doctors: [{ id: 'd9', name: 'Dr Z', authUid: 'uidZ' }] }); const el = show(P2.doctors(c)); btnByText(el, 'Sil').click(); await flush();
+    expect(m.softDelete).toHaveBeenCalledWith(expect.anything(), 'doctors', 'd9'); expect(m.callFn).toHaveBeenCalledWith('adminDisableUser', { uid: 'uidZ', disabled: true });
+    m.callFn.mockClear(); const t = show(P2.trash(ctx({ doctors: [{ id: 'd9', name: 'Dr Z', authUid: 'uidZ', deleted: true, deletedAt: 'x' }] }))); btnByText(t, 'Geri al').click(); await flush();
+    expect(m.restore).toHaveBeenCalledWith(expect.anything(), 'doctors', 'd9'); expect(m.callFn).toHaveBeenCalledWith('adminDisableUser', { uid: 'uidZ', disabled: false });
+  });
+  it('hızlı iş talebi: hekim eşleşmezse onay hekim seçtirir; seçmeden approvePending çağrılmaz, seçince doctorId dolu iş oluşur', async () => {
+    const c = ctx({ doctors, pendingJobs: [{ id: 'p9', status: 'Onay Bekliyor', drName: 'Kayıtsız Hekim', patient: 'x', type: 'K' }] }); const el = show(P1.pending(c));
+    btnByText(el, 'Onayla').click(); await flush(); expect(m.approvePending).not.toHaveBeenCalled();
+    const mod = document.querySelector('.modal-back') as HTMLElement; expect(mod.textContent).toContain('eşleşmedi');
+    btnByText(mod, 'Seç ve onayla').click(); await flush(); expect(m.approvePending).not.toHaveBeenCalled(); // hekim seçilmedi
+    (mod.querySelector('select[name=doctorId]') as HTMLSelectElement).value = 'd2'; btnByText(mod, 'Seç ve onayla').click(); await flush(60);
+    expect(m.approvePending).toHaveBeenCalledTimes(1);
+    const build = m.approvePending.mock.calls[0][2] as unknown as (p: Record<string, unknown>) => Record<string, unknown>;
+    expect(build({ id: 'p9', patient: 'x', type: 'K' })).toMatchObject({ doctorId: 'd2' });
+  });
+  it('hekim gönderiminden aktarılan siparişte dosyalar sunucuda iş klasörüne kopyalanır (teknisyen görebilsin)', async () => {
+    const c = ctx({ doctors, technicians: techs }, { prefill: { id: 'sub1', drId: 'd1', patient: 'Ali', jobType: 'Kron', teeth: ['11'], files: [{ name: 'a.stl', path: 'labs/digicad/submissions/d1/a.stl' }] } as never });
+    const el = show(P1.order(c)); btnByText(el, 'Siparişi kaydet').click(); await flush(60);
+    const jobIds = (m.createOrder.mock.calls[0][1] as { name: string; id: string }[]).filter((o) => o.name === 'jobs').map((o) => o.id);
+    expect(jobIds.length).toBe(1); expect(m.callFn).toHaveBeenCalledWith('copyJobFiles', { jobId: jobIds[0] });
+  });
+  it('iş detayı: hâlâ submissions altında dosyası olan işte "teknisyen için hazırla" düğmesi ve iş sohbeti düğmesi var', () => {
+    const j = { id: 'k1', doctorId: 'd1', drName: 'Dr', patient: 'P', type: 'K', status: 'Bekliyor', techIds: ['t1'], files: [{ name: 'a', path: 'labs/digicad/submissions/d1/a.stl' }] };
+    const c = ctx({ doctors, technicians: techs, jobs: [j] }); const el = show(P1.jobsPage(c, false)); btnByText(el, 'Detay').click();
+    const mod = document.querySelector('.modal-back') as HTMLElement; expect(btnByText(mod, 'İş sohbeti')).toBeTruthy();
+    const tabs = [...mod.querySelectorAll('[role=tab]')] as HTMLElement[]; tabs.find((t) => t.textContent?.includes('Tarama'))!.click();
+    expect(btnByText(document.querySelector('.modal-back') as HTMLElement, 'teknisyen için hazırla')).toBeTruthy();
+  });
 });

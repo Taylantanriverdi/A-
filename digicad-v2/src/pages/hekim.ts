@@ -2,11 +2,11 @@ import '../style.css';
 import { gate } from '../lib/gate';
 import { h, mount } from '../lib/dom';
 import { logout, type Session } from '../lib/auth';
-import { byField, listen, listenDoc, newId, put, type Rec } from '../lib/store';
+import { byField, listen, listenDoc, newId, notDeleted, put, type Rec } from '../lib/store';
 import { shell, table, field, input, textarea, select, btn, guard, badge, val, modal, printNode, withBusy } from '../lib/ui';
-import { fmtDate, fmtDateTime, fmtSize, isOverdue, trUpper, STATUS_ICONS } from '../lib/format';
+import { fmtDate, fmtDateTime, fmtSize, isOverdue, todayLocal, trUpper, statusLabel } from '../lib/format';
 import { upload, validateFile, MAX_SCAN_MB, type FileRef } from '../lib/files';
-import { chatBox } from '../lib/chatbox';
+import { chatBox, openJobChat } from '../lib/chatbox';
 import { toothPicker, jawOf, jawLabel } from '../lib/teeth';
 import { fileChips, stageStepper, tabBar, empty } from '../lib/widgets';
 import { array, filterRows, splitJobs, stageOf, linkedJobs, live, type Row } from './_util';
@@ -49,7 +49,7 @@ gate(['doctor'], 'Hekim Portalı', (s: Session, root) => {
       const up: FileRef[] = [];
       for (const [i, file] of picked.entries()) up.push(await upload(`labs/${s.lab}/submissions/${did}`, file, s.user.uid, MAX_SCAN_MB, { onProgress: (p) => { summary.textContent = `Yükleniyor ${i + 1}/${picked.length} (%${p})…`; } }));
       const id = newId(); const tl = [...teeth].sort((a, b) => a - b);
-      await put(s, 'doctorSubmissions', id, { id, doctorId: did, drId: did, patient, jobType: type, teeth: tl, jaw: jawOf(tl), color, notes: val(f, 'notes'), files: up, status: 'Yeni', source: 'hekim-portal' }, true);
+      await put(s, 'doctorSubmissions', id, { id, doctorId: did, drId: did, patient, jobType: type, teeth: tl, jaw: jawOf(tl), color, notes: val(f, 'notes'), files: up, status: 'Yeni', source: 'hekim-portal', deleted: false }, true);
       f.reset(); picked.length = 0; teeth.clear(); tab = 'subs'; render();
     }, 'Gönderildi — laboratuvar inceleyecek'), 'btn primary');
     f.append(h('p', null, submit)); upd(); drawFiles();
@@ -60,19 +60,20 @@ gate(['doctor'], 'Hekim Portalı', (s: Session, root) => {
   function jobDetail(j: Rec): void {
     const sub = subs.find((x) => String(x.id) === String(j.sourceDoctorSubmissionId));
     modal(`${j.patient} — ${j.type ?? ''}`, h('dl', { class: 'detail' },
-      h('dt', null, 'Durum'), h('dd', null, `${STATUS_ICONS[j.status] ?? ''} ${j.status}`), h('dt', null, 'Adet'), h('dd', null, String(j.qty ?? 1)),
+      h('dt', null, 'Durum'), h('dd', null, statusLabel(j.status)), h('dt', null, 'Adet'), h('dd', null, String(j.qty ?? 1)),
       h('dt', null, 'Teslim tarihi'), h('dd', null, fmtDate(j.dateout) || '—'), h('dt', null, 'Renk'), h('dd', null, String(j.toothColor ?? '') || '—'),
       h('dt', null, 'Notlar'), h('dd', null, String(j.note ?? '') || '—'),
-      sub ? [h('dt', null, 'Gönderdiğim dosyalar'), h('dd', null, fileChips(sub.files))] : null));
+      sub ? [h('dt', null, 'Gönderdiğim dosyalar'), h('dd', null, fileChips(sub.files))] : null,
+      h('dt', null, 'Sohbet'), h('dd', null, btn('💬 Bu işin sohbetini aç', () => openJobChat(s, j), 'btn ghost'))));
   }
   function jobsList(): HTMLElement {
     const { ongoing, done } = splitJobs(jobs);
-    const rows = filterRows(jobsTab === 'done' ? done : ongoing, { ...flt, dateKey: 'dateout' }); const today = new Date().toISOString().slice(0, 10);
+    const rows = filterRows(jobsTab === 'done' ? done : ongoing, { ...flt, dateKey: 'dateout' }); const today = todayLocal();
     const box = h('div');
     box.append(table([
       { head: 'Hasta', cell: (j: Rec) => h('b', null, String(j.patient ?? '')) }, { head: 'İş', cell: (j: Rec) => `${j.type ?? ''}${j.qty > 1 ? ` ×${j.qty}` : ''}` },
       { head: 'Teslim', cell: (j: Rec) => (jobsTab === 'ongoing' && isOverdue(j.dateout, today) ? h('span', { class: 'late' }, `⚠️ ${fmtDate(j.dateout)}`) : fmtDate(j.dateout)) },
-      { head: jobsTab === 'done' ? 'Tamamlanma' : 'Durum', cell: (j: Rec) => (jobsTab === 'done' ? `✅ ${fmtDate(j.completedAt) || '—'}` : `${STATUS_ICONS[j.status] ?? ''} ${j.status}`) },
+      { head: jobsTab === 'done' ? 'Tamamlanma' : 'Durum', cell: (j: Rec) => (jobsTab === 'done' ? `✅ ${fmtDate(j.completedAt) || '—'}` : statusLabel(j.status)) },
       { head: '', cell: (j: Rec) => btn('Detay', () => jobDetail(j), 'btn ghost') },
     ], rows, flt.q || flt.from || flt.to ? 'Kriterlere uyan iş yok' : jobsTab === 'done' ? 'Tamamlanmış iş yok' : 'Devam eden iş yok'));
     box.append(btn('🖨️ Listeyi yazdır / PDF', () => printNode(h('div', null, h('h2', null, `İş listesi — ${jobsTab === 'done' ? 'Tamamlanan' : 'Devam eden'}`), table([
@@ -96,7 +97,7 @@ gate(['doctor'], 'Hekim Portalı', (s: Session, root) => {
       h('dl', { class: 'detail' }, h('dt', null, 'Dişler'), h('dd', null, tl.join(', ') || '—'), h('dt', null, 'Çene'), h('dd', null, jawLabel(r.jaw) || '—'),
         h('dt', null, 'Renk'), h('dd', null, String(r.color ?? '') || '—'), h('dt', null, 'Notlar'), h('dd', null, String(r.notes ?? '') || '—'),
         h('dt', null, 'Tarama dosyaları'), h('dd', null, fileChips(r.files)), h('dt', null, 'Gönderim tarihi'), h('dd', null, fmtDateTime(r.createdAt)),
-        linkedJobs(r as Row, jobs).length ? [h('dt', null, 'Bağlı işler'), h('dd', null, linkedJobs(r as Row, jobs).map((j) => h('div', null, `${j.type} — ${STATUS_ICONS[j.status] ?? ''} ${j.status}`)))] : null)));
+        linkedJobs(r as Row, jobs).length ? [h('dt', null, 'Bağlı işler'), h('dd', null, linkedJobs(r as Row, jobs).map((j) => h('div', null, `${j.type} — ${statusLabel(j.status)}`)))] : null)));
   }
   function subsView(): HTMLElement {
     const rows = live(subs as Row[]).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -118,7 +119,7 @@ gate(['doctor'], 'Hekim Portalı', (s: Session, root) => {
   // Aktif filtre alanı odaktayken liste yenilenmesin (yazarken odak kaybolmasın).
   const typing = () => !!document.activeElement?.closest('.filters');
   listenDoc(s.lab, 'doctors', did, (r) => { const first = me === null; me = r; if (first && tab === 'new') render(); });
-  listen(s.lab, 'jobs', (r) => { jobs = r; if ((tab === 'jobs' && !typing()) || tab === 'subs') render(); }, [byField('doctorId', did)], onErr);
-  listen(s.lab, 'doctorSubmissions', (r) => { subs = r; if (tab === 'subs') render(); }, [byField('doctorId', did)], onErr);
+  listen(s.lab, 'jobs', (r) => { jobs = r; if ((tab === 'jobs' && !typing()) || tab === 'subs') render(); }, [byField('doctorId', did), notDeleted()], onErr);
+  listen(s.lab, 'doctorSubmissions', (r) => { subs = r; if (tab === 'subs') render(); }, [byField('doctorId', did), notDeleted()], onErr);
   render();
 });

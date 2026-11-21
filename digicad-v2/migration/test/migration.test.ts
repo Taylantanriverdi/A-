@@ -90,6 +90,16 @@ describe('kayıpsızlık: tüm yollar ve alanlar', () => {
     expect(docs.store.get(`labs/digicad/doctors/${D1}`)).toMatchObject({ name: 'Dr. Örnek Bir', username: 'ornekbir', autoTechId: 1 });
   });
 
+  it('çöp filtresi için deleted alanı (jobs/pendingJobs/doctorSubmissions) her zaman yazılır; durumsuz iş açık sayılır; mevcut değerler korunur', async () => {
+    const docs = new MemoryDocSink(); await run({ sourceText, execute: true, docs, ...base });
+    expect(docs.store.get('labs/digicad/jobs/1700000000100')).toMatchObject({ deleted: false, status: 'Üretimde' });
+    expect(docs.store.get('labs/digicad/jobs/1700000000101')).toMatchObject({ deleted: true });
+    expect(docs.store.get('labs/digicad/pendingJobs/1700000000200')).toMatchObject({ deleted: false });
+    for (const [path, d] of docs.store) if (/^labs\/[^/]+\/(jobs|pendingJobs|doctorSubmissions)\/[^/]+$/.test(path)) expect(typeof d.deleted, path).toBe('boolean');
+    const t = buildPlan({ db: { digicad: { jobs: { 9: { id: 9, drId: 1, patient: 'Durumsuz' } } } } }).docs.find((x) => x.path === 'labs/digicad/jobs/9')!;
+    expect(t.data).toMatchObject({ status: 'Bekliyor', deleted: false, _legacy: { defaultedStatus: true } });
+  });
+
   it('kimlik ve tür normalizasyonu: doctorId/techIds metin, pendingJobs.techId metin, hekimsiz iş doctorId boş metin', async () => {
     const docs = new MemoryDocSink(); await run({ sourceText, execute: true, docs, ...base });
     const j = docs.store.get('labs/digicad/jobs/1700000000100')!;

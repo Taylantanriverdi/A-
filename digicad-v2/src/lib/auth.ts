@@ -2,8 +2,7 @@ import {
   signInWithEmailAndPassword, signOut, onIdTokenChanged, updatePassword, getMultiFactorResolver,
   multiFactor, TotpMultiFactorGenerator, type User, type MultiFactorError, type TotpSecret,
 } from 'firebase/auth';
-import { httpsCallable } from 'firebase/functions';
-import { auth, functions, wipeLocalData } from './firebase';
+import { auth, callFn, wipeLocalData } from './firebase';
 import { validatePassword, isTotpCode } from './checks';
 
 export type Role = 'admin' | 'doctor' | 'tech';
@@ -73,11 +72,12 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * Sunucudaki `mustChangePassword` bayrağını kaldırması için `clearMustChangePassword` callable'ını çağırır
- * (functions/ ekibinden istenen; yoksa false döner ve bayrak bir sonraki girişte yeniden sorulur).
+ * Sunucudaki `mustChangePassword` bayrağını kaldırması için `clearMustChangePassword` callable'ını çağırır.
+ * Sunucu: göçle açılan hesaplarda (pwv yok) bayrağı doğrudan kaldırır; adminCreateUser/adminResetPassword hesaplarında
+ * şifre gerçekten değişmişse kaldırır. Başarısızlıkta hata fırlatır (sessizce yutulmaz).
  */
-export async function clearMustChangePassword(): Promise<boolean> {
-  try { await httpsCallable(functions, 'clearMustChangePassword')({}); return true; } catch { return false; }
+export async function clearMustChangePassword(): Promise<void> {
+  await callFn('clearMustChangePassword', {});
 }
 
 export async function changePassword(newPassword: string): Promise<void> {
@@ -85,8 +85,11 @@ export async function changePassword(newPassword: string): Promise<void> {
   const bad = validatePassword(newPassword);
   if (bad) throw new Error(bad);
   await updatePassword(auth.currentUser, newPassword);
-  await clearMustChangePassword();
-  await auth.currentUser.getIdToken(true);
+  try { await clearMustChangePassword(); } catch {
+    // Şifre değişti ama sunucu bayrağı kaldıramadı (ağ/App Check): kullanıcı aynı ekranda kalır ve tekrar dener (şifre zaten yeni).
+    throw new Error('Şifreniz güncellendi ancak hesap durumu güncellenemedi. Lütfen "Kaydet"e tekrar basın.');
+  }
+  await auth.currentUser.getIdToken(true); // yeni claim'ler (mustChangePassword yok) token'a işlensin
 }
 
 /** TOTP kaydı: gizli anahtarı ve otpauth bağlantısını döndürür (kullanıcı kimlik doğrulayıcı uygulamaya ekler). */

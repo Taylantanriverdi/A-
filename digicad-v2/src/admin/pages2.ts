@@ -1,8 +1,7 @@
-import { httpsCallable } from 'firebase/functions';
 import { h, type Child } from '../lib/dom';
 import { fmtDate } from '../lib/format';
-import { functions } from '../lib/firebase';
-import { newId, patch, put, restore, softDelete, type Rec } from '../lib/store';
+import { callFn } from '../lib/firebase';
+import { listen, newId, patch, put, restore, softDelete, type Rec } from '../lib/store';
 import { badge, btn, field, input, modal, printNode, select, table, textarea, toast, val } from '../lib/ui';
 import { COLLECTIONS, doctorOf, live, techOf, type State } from './state';
 import { downloadUrl, upload } from '../lib/files';
@@ -12,9 +11,9 @@ import { abtn, arr, curOptions, fmtSums, money, searchInput, sure, trLower } fro
 import { CURRENCIES, curOf, doctorTotals, fromCents, incomeDate, isoToLocalDate, jobCents, monthlyData, monthLocal, payCents, planClosure, sumExpenses, techIdsOf, todayLocal, toCents, yearsOf, zeroSums, type Cur, type R, type Sums } from './calc';
 import { closeStatement, hideMessage, postMessage, undoClosure, watchMessages, setDoctorPrices } from './data';
 import { printReport } from './print';
-import { saveBlob } from './zip';
+import { saveBlob } from '../lib/zip';
 
-const callAdmin = <T>(name: string, data: unknown) => httpsCallable<unknown, T>(functions, name)(data).then((r) => r.data);
+const callAdmin = <T>(name: string, data: unknown) => callFn<T>(name, data);
 const nowIso = (): string => new Date().toISOString();
 const sumsOf = (rows: R[], cents: (r: R) => number): Sums => rows.reduce<Sums>((s, r) => { s[curOf(r)] += cents(r); return s; }, zeroSums());
 
@@ -26,7 +25,14 @@ function showTemp(email: string, pw: string): void {
 const CHAT_TYPES = /^(image\/(png|jpeg|webp)|application\/pdf)$/;
 export function chat(c: Ctx): HTMLElement {
   const state = (c.ps.chat ??= { thread: null }) as { thread: string | null };
-  const threads = [...live(c.st.doctors).map((d) => ({ id: `dr_${d.id}`, name: `Hekim: ${d.name}` })), ...live(c.st.technicians).map((t) => ({ id: `tech_${t.id}`, name: `Teknisyen: ${t.name}` }))];
+  // İş sohbetleri (job_{işId}): eski uygulamadan göçle gelenler ve hekim/teknisyenin iş detayından açtıkları; `threads` koleksiyonundan listelenir.
+  let jobThreads: Rec[] = [];
+  const jobName = (tid: string): string => { const j = c.st.jobs.find((x) => `job_${x.id}` === tid); return `İş: ${j ? `${j.patient ?? ''} — ${j.type ?? ''}` : tid.slice(4)}`; };
+  const threadList = (): { id: string; name: string }[] => {
+    const jobs = [...jobThreads].sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? ''))).slice(0, 60).map((t) => String(t.id));
+    if (state.thread?.startsWith('job_') && !jobs.includes(state.thread)) jobs.unshift(state.thread);
+    return [...live(c.st.doctors).map((d) => ({ id: `dr_${d.id}`, name: `Hekim: ${d.name}` })), ...live(c.st.technicians).map((t) => ({ id: `tech_${t.id}`, name: `Teknisyen: ${t.name}` })), ...jobs.map((id) => ({ id, name: jobName(id) }))];
+  };
   const side = h('div', { class: 'chat-list' }); const right = h('div', { class: 'chat-conv' }); let stop: (() => void) | undefined;
   c.own(() => { stop?.(); stop = undefined; });
   const open = (tid: string): void => {
@@ -46,9 +52,10 @@ export function chat(c: Ctx): HTMLElement {
       box.scrollTop = box.scrollHeight;
     }, (e) => toast(`Mesajlar okunamadı: ${e.message}`, 'err'));
   };
-  const drawSide = (): void => side.replaceChildren(...threads.map((t) => h('button', { type: 'button', class: `btn ${state.thread === t.id ? 'primary' : 'ghost'}`, on: { click: () => open(t.id) } }, t.name)));
+  const drawSide = (): void => side.replaceChildren(...threadList().map((t) => h('button', { type: 'button', class: `btn ${state.thread === t.id ? 'primary' : 'ghost'}`, on: { click: () => open(t.id) } }, t.name)));
   drawSide(); right.replaceChildren(h('p', { class: 'muted' }, 'Bir konuşma seçin'));
-  if (state.thread && threads.some((t) => t.id === state.thread)) open(state.thread);
+  if (state.thread && threadList().some((t) => t.id === state.thread)) open(state.thread);
+  c.own(listen(c.s.lab, 'threads', (rows) => { jobThreads = rows.filter((r) => String(r.id).startsWith('job_')); drawSide(); }, [], () => undefined));
   return h('div', null, h('h2', null, 'Mesajlar'), h('div', { class: 'chat' }, side, right));
 }
 
@@ -149,7 +156,11 @@ function personPage(c: Ctx, kind: 'doctors' | 'technicians'): HTMLElement {
     const openJobs = live(c.st.jobs).filter((j) => j.status !== 'Tamamlandı' && (isDr ? String(j.doctorId || j.drId) === String(r.id) : techIdsOf(j).includes(String(r.id)))).length;
     if (openJobs) throw new Error(`${openJobs} açık işi var; önce işleri tamamlayın/devredin.`);
     if (isDr) { const t = doctorTotals(live(c.st.jobs), live(c.st.payments), String(r.id)); if (CURRENCIES.some((cur) => t.balance[cur] !== 0) && !sure(`Hekimin açık bakiyesi var (${fmtSums(t.balance)}). Yine de silinenlere taşınsın mı?`)) return; }
-    if (sure('Silinenlere taşınsın mı? (Geri alınabilir. Not: giriş hesabı ayrıca devre dışı bırakılmalıdır.)')) await softDelete(c.s, kind, r.id);
+    if (!sure('Silinenlere taşınsın mı? (Geri alınabilir. Bağlı giriş hesabı da devre dışı bırakılır ve oturumları kapatılır.)')) return;
+    await softDelete(c.s, kind, r.id);
+    if (r.authUid) {
+      try { await callAdmin('adminDisableUser', { uid: r.authUid, disabled: true }); toast('Giriş hesabı devre dışı bırakıldı'); } catch (e) { toast(`Kayıt silindi ama giriş hesabı devre dışı bırakılamadı: ${(e as Error).message}`, 'err'); }
+    }
   }, 'btn ghost');
   const techDetail = (r: Rec) => {
     const jobs = live(c.st.jobs).filter((j) => techIdsOf(j).includes(String(r.id))); const pays = live(c.st.payments).filter((p) => String(p.collectorId) === String(r.id)); const exps = live(c.st.expenses).filter((e) => String(e.spenderId) === String(r.id));
@@ -234,18 +245,23 @@ export function trash(c: Ctx): HTMLElement {
   const rows = TRASH.flatMap(([n, label]) => (c.st[n as (typeof COLLECTIONS)[number]] as Rec[]).filter((r) => r.deleted).map((r) => ({ n, label, r })));
   return h('div', null, h('h2', null, 'Silinenler'), h('p', { class: 'muted' }, 'Kayıtlar fiziksel olarak silinmez; buradan geri alınabilir.'), table([
     { head: 'Tür', cell: (x: { label: string }) => x.label }, { head: 'Kayıt', cell: (x: { r: Rec }) => String(x.r.patient ?? x.r.name ?? x.r.title ?? x.r.customer ?? x.r.id) }, { head: 'Silinme', cell: (x: { r: Rec }) => fmtDate(x.r.deletedAt) },
-    { head: '', cell: (x: { n: string; r: Rec }) => abtn('Geri al', () => restore(c.s, x.n, x.r.id), 'btn', 'Geri alındı') }], rows.sort((a, b) => String(b.r.deletedAt).localeCompare(String(a.r.deletedAt))), 'Silinen kayıt yok'));
+    { head: '', cell: (x: { n: string; r: Rec }) => abtn('Geri al', async () => {
+      await restore(c.s, x.n, x.r.id);
+      // Hekim/teknisyen geri alınınca (silerken kapatılan) giriş hesabı yeniden etkinleştirilir.
+      if ((x.n === 'doctors' || x.n === 'technicians') && x.r.authUid) {
+        try { await callAdmin('adminDisableUser', { uid: x.r.authUid, disabled: false }); } catch (e) { toast(`Kayıt geri alındı ama giriş hesabı etkinleştirilemedi: ${(e as Error).message}`, 'err'); }
+      }
+    }, 'btn', 'Geri alındı') }], rows.sort((a, b) => String(b.r.deletedAt).localeCompare(String(a.r.deletedAt))), 'Silinen kayıt yok'));
 }
 
 /* ---------------- Ayarlar ---------------- */
-export function settings(c: Ctx, workspace: { lab: string; set: (l: string) => void }): HTMLElement {
+export function settings(c: Ctx): HTMLElement {
   const main = c.st.settings.find((x) => x.id === 'main'); const f: HTMLElement = h('div', { class: 'card' }, field('Laboratuvar adı', input('labName', 'text', main?.labName ?? '', { maxlength: 200 })), field('Telefon', input('phone', 'tel', main?.phone ?? '', { maxlength: 40 })), field('Adres', textarea('address', String(main?.address ?? ''))),
     abtn('Kaydet', () => put(c.s, 'settings', 'main', { id: 'main', labName: val(f, 'labName'), phone: val(f, 'phone'), address: val(f, 'address') }, !main), 'btn primary', 'Kaydedildi'));
-  const ws = select('lab', [['digicad', 'DigiCAD'], ['primer', 'Primer Teknoloji']], workspace.lab);
   const backup = abtn('Veriyi JSON olarak indir', async () => {
     if (!sure('Dosya HASTA VE FİNANS verisi içerir. Güvenli bir yerde saklayacağınıza emin misiniz?')) return;
     const data: Record<string, Rec[]> = {}; for (const k of COLLECTIONS) data[k] = (c.st as State)[k]; saveBlob(new Blob([JSON.stringify({ lab: c.s.lab, exportedAt: nowIso(), data }, null, 1)], { type: 'application/json' }), `digicad-${c.s.lab}-${todayLocal()}.json`);
   }, 'btn ghost');
-  return h('div', null, h('h2', null, 'Ayarlar'), f, h('h3', null, 'Çalışma alanı'), h('p', { class: 'muted' }, 'Primer Teknoloji kayıtları ayrı bir çalışma alanında (labs/primer) tutulur.'), h('div', { class: 'row' }, ws, btn('Çalışma alanını değiştir', () => workspace.set(ws.value))),
+  return h('div', null, h('h2', null, 'Ayarlar'), f, h('h3', null, 'Çalışma alanı'), h('p', null, `Bu hesap yalnızca "${c.s.lab}" çalışma alanına bağlıdır (hesabın lab yetkisi). Başka bir alan (ör. Primer Teknoloji) için o alana ait ayrı yönetici hesabıyla giriş yapılır.`),
     h('h3', null, 'Yedek'), h('p', { class: 'muted' }, 'Sunucu tarafı günlük yedek ayrıca çalışır; bu düğme yalnızca ekranda yüklü verinin anlık kopyasını indirir.'), backup, h('h3', null, 'Güvenlik'), h('p', null, 'Hesap/rol yönetimi Hekimler ve Teknisyenler sayfalarındadır. Eski 4 haneli PIN sistemi kaldırılmıştır.'));
 }

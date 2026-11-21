@@ -1,6 +1,7 @@
 import { h, link, type Child } from '../lib/dom';
-import { fmtDate, fmtMoney, JOB_STATUSES, STATUS_ICONS } from '../lib/format';
+import { fmtDate, fmtMoney, JOB_STATUSES, normStatus, statusOptions } from '../lib/format';
 import { patch, newId, softDelete, type Rec } from '../lib/store';
+import { callFn } from '../lib/firebase';
 import { downloadUrl, upload, type FileRef } from '../lib/files';
 import { badge, btn, field, input, modal, printNode, select, table, textarea, toast, val } from '../lib/ui';
 import { doctorOf, isOpen, live, techOf, unassigned, type State } from './state';
@@ -11,14 +12,24 @@ import {
   pendingToJob, rejectCompletionPatch, statusPatch, sumExpenses, suggestTech, activeLoad, todayLocal, unassignPatch, validateOrderLines, zeroSums, monthLocal, techIdsOf, doctorIdOf, type Cur, type OrderLine, type R,
 } from './calc';
 import { approvePending, createOrder, jobHistory, mutateJob, transition } from './data';
-import { toothChart } from './teeth';
-import { downloadJobsZip } from './zip';
+import { toothChart } from '../lib/teeth';
+import { downloadJobsZip } from '../lib/zip';
 import { printReport } from './print';
 
 export interface Ctx { s: Session; st: State; rerender: () => void; go: (page: string, prefill?: Rec) => void; prefill?: Rec; own: (off: () => void) => void; onData: (fn: () => void) => void; ps: Record<string, any> }  
 
 const nowIso = (): string => new Date().toISOString();
 const openFile = async (path: string): Promise<void> => { const a = h('a', { href: await downloadUrl(path), target: '_blank', rel: 'noopener noreferrer' }); document.body.appendChild(a); a.click(); a.remove(); };
+
+/** İşin dosyalarından hâlâ hekim gönderim klasöründe (submissions/) duranlar var mı? Teknisyen yalnızca jobFiles/{işId}/ altını okuyabilir. */
+export const needsFileCopy = (j: Rec): boolean => arr(j.files).some((f: Rec) => typeof f?.path === 'string' && /^labs\/[^/]+\/submissions\//.test(f.path));
+/** Sunucu tarafı kopya (functions: copyJobFiles). Başarısızlık siparişi/atamayı engellemez; yönetici uyarılır ve İş Detayı > Tarama'dan yeniden deneyebilir. */
+export async function copyFilesForTech(ids: string[]): Promise<boolean> {
+  try {
+    for (const id of ids) { const r = await callFn<{ failed?: number }>('copyJobFiles', { jobId: id }); if (r?.failed) throw new Error(`${r.failed} dosya kopyalanamadı`); }
+    return true;
+  } catch (e) { toast(`Hekim dosyaları iş klasörüne kopyalanamadı (teknisyen göremez): ${(e as Error).message}. İş Detayı > Tarama sekmesinden tekrar deneyin.`, 'err'); return false; }
+}
 
 export const fileLinks = (files: unknown): Child =>
   arr(files).map((f: Rec) => h('div', null, f.path ? abtn(`📎 ${f.name ?? 'dosya'}`, () => openFile(String(f.path)), 'btn ghost') : f.url ? link(String(f.url), `📎 ${f.name ?? 'dosya'} (eski arşiv)`) : h('span', { class: 'muted' }, `📎 ${f.name ?? 'dosya'}`)));
@@ -33,7 +44,7 @@ export function dash(c: Ctx): HTMLElement {
   const cnt = (f: (j: Rec) => boolean) => jobs.filter(f).length;
   return h('div', null, h('h2', null, 'Genel Bakış'),
     awaiting.length ? h('div', { class: 'card rowhl' }, h('b', null, `📨 ${awaiting.length} iş tamamlama onayı bekliyor. `), btn('Hemen incele', () => { c.ps.pending = { tab: 'completion' }; c.go('pending'); }, 'btn primary')) : null,
-    h('div', { class: 'stats' }, stat('Bekliyor', cnt((j) => j.status === 'Bekliyor'), () => c.go('jobs')), stat('Süreçte', cnt((j) => ['Tasarımda', 'Üretimde', 'Makyajda', 'Tamamlama Onayı'].includes(j.status)), () => c.go('jobs')), stat('Tamamlanan', cnt((j) => j.status === 'Tamamlandı'), () => c.go('done')),
+    h('div', { class: 'stats' }, stat('Bekliyor', cnt((j) => normStatus(j.status) === 'Bekliyor'), () => c.go('jobs')), stat('Süreçte', cnt((j) => isOpen(j) && normStatus(j.status) !== 'Bekliyor'), () => c.go('jobs')), stat('Tamamlanan', cnt((j) => j.status === 'Tamamlandı'), () => c.go('done')),
       stat('Onay bekleyen', live(c.st.pendingJobs).filter((p) => p.status === 'Onay Bekliyor').length, () => c.go('pending')), stat('Hekimden gelen (yeni)', live(c.st.doctorSubmissions).filter((x) => x.status === 'Yeni').length, () => c.go('doctorsubs')),
       stat('Atanmamış', open.filter(unassigned).length, () => c.go('dispatch')), stat('Teslimi geçen', late.length, () => c.go('jobs'), late.length ? 'warn' : ''),
       stat('Açık bakiye (alacak)', fmtSums(debt, true), () => c.go('archive')), stat('Bu ay gider', fmtSums(expMonth, true), () => c.go('expenses'))),
@@ -78,6 +89,7 @@ export function order(c: Ctx): HTMLElement {
     const notes = [val(root, 'notes'), restTeeth.length ? `Diş notu: ${restTeeth.join(' ')}` : '', pre.jaw ? `Çene: ${pre.jaw}` : ''].filter(Boolean).join('\n');
     const r = buildOrder({ doctor: dr, tech: auto, patient, lines: valid, teeth: chart.get(), material: val(root, 'material'), color: val(root, 'color'), dateout: val(root, 'dateout'), notes, files: arr(pre.files), sourceSubId: srcId, now: nowIso(), newId });
     await createOrder(c.s, r.ops, srcId);
+    if (arr(pre.files).length) await copyFilesForTech(r.ops.filter((o) => o.name === 'jobs').map((o) => o.id));
     const f = { drName: dr.name, patient, dateout: val(root, 'dateout'), color: val(root, 'color'), teeth: chart.get(), material: val(root, 'material'), notes };
     root.replaceChildren(h('h2', null, 'Sipariş kaydedildi'), h('p', null, r.auto ? `Hekimin otomatik teknisyeni (${auto?.name}) olduğu için ${valid.length} iş onaysız "Devam Eden İşler"e düştü.` : `${valid.length} kalem "Onay Bekleyen" listesine gönderildi.`),
       btn('🖨️ Yazdır', () => printNode(orderPrintNode(f, valid))), btn('Yeni form', () => c.go('order'), 'btn primary'), btn(r.auto ? 'Devam eden işler' : 'Onay bekleyenler', () => c.go(r.auto ? 'jobs' : 'pending')));
@@ -121,6 +133,17 @@ function pendingEdit(c: Ctx, p: Rec): void {
     m.close();
   }, 'btn primary', 'Kaydedildi'));
 }
+/** Hızlı iş talebinde hekim adı kayıtlarla eşleşmediyse: hekim seçtirir, sonra onaylar. */
+function chooseDoctorThenApprove(c: Ctx, p: Rec): void {
+  const sel = select('doctorId', [['', '— Hekim seçin —'], ...live(c.st.doctors).map((d): [string, string] => [String(d.id), String(d.name)])], '');
+  const m = modal('Hekim seçin', h('div', null, h('p', null, `"${p.drName || '—'}" adlı hekim kayıtlarla eşleşmedi. İşi onaylamak için hekimi seçin (hekimsiz iş oluşturulmaz).`), field('Hekim', sel)),
+    abtn('Seç ve onayla', async () => {
+      const dr = doctorOf(c.st, sel.value); if (!dr) throw new Error('Hekim seçin.');
+      await approvePending(c.s, String(p.id), (x) => pendingToJob(x, dr, nowIso()));
+      m.close();
+      if (needsFileCopy(p)) await copyFilesForTech([String(p.id)]);
+    }, 'btn primary', 'İş onaylandı'));
+}
 export function pending(c: Ctx): HTMLElement {
   const state = (c.ps.pending ??= { tab: 'incoming' }) as { tab: string };
   const incoming = live(c.st.pendingJobs).filter((p) => p.status === 'Onay Bekliyor' || p.status === 'Reddedildi').sort((a, b) => String(b.id).localeCompare(String(a.id)));
@@ -130,7 +153,13 @@ export function pending(c: Ctx): HTMLElement {
     { head: 'Tutar', cell: (r: Rec) => money(jobCents(r), curOf(r)) }, { head: 'Teslim', cell: (r: Rec) => fmtDate(r.dateout) }, { head: 'Dosya', cell: (r: Rec) => (arr(r.files).length ? `📎 ${arr(r.files).length}` : '') }, { head: 'Not', cell: (r: Rec) => `${r.note ?? ''}${r.rejectReason ? ` (Red: ${r.rejectReason})` : ''}` },
     { head: 'Durum', cell: (r: Rec) => badge(String(r.status)) },
     { head: '', cell: (r: Rec) => (r.status === 'Onay Bekliyor' ? h('span', null, btn('Düzenle', () => pendingEdit(c, r), 'btn ghost'),
-      abtn('Onayla', async () => { if (!sure(`"${r.patient}" için ${r.type || 'iş'} onaylanıp ana listeye eklensin mi?`)) return; await approvePending(c.s, r.id, (p) => pendingToJob(p, matchDoctor(p, live(c.st.doctors)), nowIso())); }, 'btn primary', 'İş onaylandı'),
+      abtn('Onayla', async () => {
+        const dr = matchDoctor(r, live(c.st.doctors));
+        if (!dr) { chooseDoctorThenApprove(c, r); return; } // hekim eşleşmedi: seçmeden iş oluşmaz (doctorId boş iş yok)
+        if (!sure(`"${r.patient}" için ${r.type || 'iş'} onaylanıp ana listeye eklensin mi?`)) return;
+        await approvePending(c.s, r.id, (p) => pendingToJob(p, dr, nowIso()));
+        if (needsFileCopy(r)) await copyFilesForTech([String(r.id)]);
+      }, 'btn primary', 'İş onaylandı'),
       abtn('Reddet', async () => { const why = ask('Ret nedeni (teknisyene gösterilir):', 'Eksik/hatalı bilgi'); if (why === null) return; await transition(c.s, 'pendingJobs', r.id, 'Onay Bekliyor', 'Reddedildi', { rejectReason: why.slice(0, 500), rejectedAt: nowIso() }); }, 'btn ghost', 'Reddedildi'))
       : abtn('Sil', async () => { if (sure('Çöp kutusuna taşınsın mı?')) await softDelete(c.s, 'pendingJobs', r.id); }, 'btn ghost')) },
   ], incoming, 'Gelen iş onayı yok') : table([
@@ -147,7 +176,7 @@ export function pending(c: Ctx): HTMLElement {
 export function dispatch(c: Ctx): HTMLElement {
   const techs = live(c.st.technicians); const jobs = live(c.st.jobs); const rows = jobs.filter((j) => isOpen(j) && unassigned(j));
   const opts: [string, string][] = [['', '— Teknisyen —'], ...techs.map((t): [string, string] => [String(t.id), `${t.name} (${activeLoad(jobs, String(t.id))} aktif)`])];
-  const assign = (j: Rec, techId: string, note: string) => mutateJob(c.s, j.id, (cur) => { const t = techOf(c.st, techId); if (!t) throw new Error('Teknisyen seçin.'); if (cur.status === 'Tamamlandı') throw new Error('Tamamlanmış işe atama yapılamaz.'); return assignPatch(t, note); });
+  const assign = (j: Rec, techId: string, note: string) => mutateJob(c.s, j.id, (cur) => { const t = techOf(c.st, techId); if (!t) throw new Error('Teknisyen seçin.'); if (cur.status === 'Tamamlandı') throw new Error('Tamamlanmış işe atama yapılamaz.'); return assignPatch(t, note); }).then(async () => { const j2 = c.st.jobs.find((x) => x.id === j.id); if (j2 && needsFileCopy(j2)) await copyFilesForTech([String(j.id)]); });
   const best = suggestTech(techs, jobs);
   return h('div', null, h('h2', null, 'İş Dağıtım Merkezi'), best ? h('p', { class: 'muted' }, `En az yüklü teknisyen: ${best.name} (${activeLoad(jobs, String(best.id))} aktif iş)`) : null, table([
     { head: 'Hekim', cell: (r: Rec) => r.drName }, { head: 'Hasta', cell: (r: Rec) => r.patient }, { head: 'İş', cell: (r: Rec) => r.type }, { head: 'Teslim', cell: (r: Rec) => fmtDate(r.dateout) }, { head: 'Durum', cell: (r: Rec) => r.status },
@@ -171,25 +200,27 @@ export function jobDetail(c: Ctx, j0: Rec): void {
   const info = (): HTMLElement => {
     const chart = toothChart(j.orderForm?.teeth ?? []);
     const f = h('div', null, closed ? h('p', { class: 'muted' }, 'Bu iş hesabı kapatılmış bir döneme dahil: hekim/tutar/adet değiştirilemez.') : null,
-      field('Hekim', select('doctorId', live(c.st.doctors).map((d): [string, string] => [String(d.id), String(d.name)]), doctorIdOf(j))), field('Hasta', input('patient', 'text', j.patient ?? '', { maxlength: 300 })), field('İş türü', input('type', 'text', j.type ?? '', { maxlength: 200 })),
+      field('Hekim', select('doctorId', [...(doctorIdOf(j) ? [] : [['', '— Hekim seçin (eski kayıt hekimsiz) —'] as [string, string]]), ...live(c.st.doctors).map((d): [string, string] => [String(d.id), String(d.name)])], doctorIdOf(j))), field('Hasta', input('patient', 'text', j.patient ?? '', { maxlength: 300 })), field('İş türü', input('type', 'text', j.type ?? '', { maxlength: 200 })),
       field('Adet', input('qty', 'number', j.qty ?? 1, { min: 0, step: 1 })), field('Birim fiyat', input('price', 'number', j.price ?? 0, { min: 0, step: '0.01' })), field('Para birimi', select('currency', curOptions, curOf(j))), field('Teslim', input('dateout', 'date', j.dateout ?? '')),
       field('Renk', input('color', 'text', j.toothColor ?? '', { maxlength: 40 })), field('Materyal', input('material', 'text', j.orderForm?.material ?? '', { maxlength: 100 })), h('div', { class: 'field' }, h('span', null, 'Dişler'), chart.el),
       field('Teknisyen', select('techId', [['', '— Atanmamış —'], ...live(c.st.technicians).map((t): [string, string] => [String(t.id), String(t.name)])], techIdsOf(j)[0] ?? '')),
-      field('Durum', select('status', JOB_STATUSES.map((x): [string, string] => [x, `${STATUS_ICONS[x]} ${x}`]), String(j.status))), field('Not', textarea('note', String(j.note ?? ''))),
+      field('Durum', select('status', statusOptions(j.status), String(j.status))), field('Not', textarea('note', String(j.note ?? ''))),
       h('p', { class: 'muted' }, `Teknisyen notu: ${j.techNote || '—'}${j.completionRejectReason ? ` | Son ret sebebi: ${j.completionRejectReason}` : ''}`));
     return h('div', null, f, abtn('Kaydet', async () => {
       const doctor = doctorOf(c.st, val(f, 'doctorId')); if (!doctor) throw new Error('Hekim seçin.');
       const form = { doctor, patient: val(f, 'patient'), type: val(f, 'type'), qty: Number(val(f, 'qty')), price: Number(val(f, 'price')), currency: val(f, 'currency') as Cur, dateout: val(f, 'dateout'), color: val(f, 'color'), note: val(f, 'note'), tech: techOf(c.st, val(f, 'techId')) ?? null, status: val(f, 'status') };
       if (form.status === 'Tamamlandı' && j.status !== 'Tamamlandı' && !sure('İş "Tamamlandı" yapılacak ve hekimin bakiyesine yansıyacak. Emin misiniz?')) return;
       await mutateJob(c.s, j.id, (cur) => ({ ...jobEditPatch(cur, form, nowIso()), orderForm: { ...(cur.orderForm ?? {}), teeth: chart.get(), material: val(f, 'material'), doctorName: doctor.name } }));
+      if (form.tech && needsFileCopy(j)) await copyFilesForTech([String(j.id)]);
       m.close();
-    }, 'btn primary', 'İş güncellendi'), btn('🖨️ İş emri yazdır', () => printJob(j), 'btn ghost'), btn('💬 Hekime yaz', () => { m.close(); c.ps.chat = { thread: `dr_${doctorIdOf(j)}` }; c.go('chat'); }, 'btn ghost'),
+    }, 'btn primary', 'İş güncellendi'), btn('🖨️ İş emri yazdır', () => printJob(j), 'btn ghost'), btn('💬 Hekime yaz', () => { m.close(); c.ps.chat = { thread: `dr_${doctorIdOf(j)}` }; c.go('chat'); }, 'btn ghost'), btn('💬 İş sohbeti', () => { m.close(); c.ps.chat = { thread: `job_${j.id}` }; c.go('chat'); }, 'btn ghost'),
     abtn('Sil', async () => { if (j.closureId) throw new Error('Hesabı kapatılmış dönemdeki iş silinemez (önce dönem kapatmayı geri alın).'); if (sure('İş çöp kutusuna taşınsın mı? (Silinenlerden geri alınabilir)')) { await softDelete(c.s, 'jobs', j.id); m.close(); } }, 'btn ghost'));
   };
   const files = (field: 'files' | 'designFiles'): HTMLElement => {
     const list = arr(j[field]) as Rec[]; const pick = h('input', { type: 'file', multiple: true });
     return h('div', null, list.length ? list.map((f) => h('div', { class: 'row' }, fileLinks([f]), f.size ? h('span', { class: 'muted' }, `${(f.size / 1048576).toFixed(1)} MB`) : null,
       abtn('Listeden kaldır', async () => { if (!sure(`"${f.name}" iş kaydından kaldırılsın mı? (Dosya depoda kalır)`)) return; await mutateJob(c.s, j.id, (cur) => ({ [field]: arr(cur[field]).filter((x: Rec) => (x.path ?? x.url ?? x.name) !== (f.path ?? f.url ?? f.name)), ...(field === 'designFiles' ? { designFilesUpdatedAt: nowIso() } : {}) })); m.close(); }, 'btn ghost'))) : h('p', { class: 'muted' }, 'Dosya yok.'),
+    field === 'files' && needsFileCopy(j) ? abtn('📁 Dosyaları teknisyen için hazırla', async () => { if (await copyFilesForTech([String(j.id)])) { toast('Dosyalar iş klasörüne kopyalandı'); m.close(); } }, 'btn ghost') : null,
     list.length ? abtn('📦 Tümünü ZIP indir', async () => { const x = await downloadJobsZip([j], field === 'files' ? 'scan' : 'design'); toast(`${x.ok} dosya paketlendi${x.fail ? `, ${x.fail} başarısız` : ''}`, x.fail ? 'err' : 'ok'); }) : null,
     h('div', { class: 'row' }, pick, abtn('Yükle', async () => { const picked = Array.from((pick as HTMLInputElement).files ?? []); if (!picked.length) return; const up: FileRef[] = []; for (const x of picked) up.push(await upload(`labs/${c.s.lab}/jobFiles/${j.id}`, x, c.s.user.uid));
       await mutateJob(c.s, j.id, (cur) => ({ [field]: [...arr(cur[field]), ...up], ...(field === 'designFiles' ? { designFilesUpdatedAt: nowIso() } : {}) })); m.close(); }, 'btn', 'Dosyalar yüklendi')));
@@ -210,7 +241,7 @@ export function jobsPage(c: Ctx, done: boolean): HTMLElement {
   const base = live(c.st.jobs).filter((j) => (j.status === 'Tamamlandı') === done).sort((a, b) => String(done ? b.completedAt ?? '' : a.dateout ?? '9999').localeCompare(String(done ? a.completedAt ?? '' : b.dateout ?? '9999')));
   const box = h('div'); const today = todayLocal();
   const statusSel = (j: Rec) => {
-    const s = select('st', JOB_STATUSES.map((x): [string, string] => [x, `${STATUS_ICONS[x]} ${x}`]), String(j.status));
+    const s = select('st', statusOptions(j.status), String(j.status));
     s.addEventListener('change', () => { const next = s.value; s.disabled = true; void (async () => {
       try { if (next === 'Tamamlandı' && !sure(`"${j.patient}" işi Tamamlandı yapılsın mı? (Hekimin bakiyesine yansır)`)) { s.value = j.status; return; } await mutateJob(c.s, j.id, (cur) => statusPatch(cur, next, nowIso())); toast('Durum güncellendi'); } catch (e) { s.value = j.status; toast((e as Error).message, 'err'); } finally { s.disabled = false; }
     })(); });

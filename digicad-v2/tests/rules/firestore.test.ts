@@ -6,7 +6,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, 
 let env: RulesTestEnvironment;
 const L = 'labs/digicad';
 
-const MFA = { firebase: { sign_in_provider: 'custom', sign_in_second_factor: 'totp' } };
+const MFA = { firebase: { sign_in_provider: 'custom' as const, sign_in_second_factor: 'totp' } };
 const admin = () => env.authenticatedContext('adm', { role: 'admin', lab: 'digicad', ...MFA }).firestore();
 const drA = () => env.authenticatedContext('dA', { role: 'doctor', doctorId: '1', lab: 'digicad' }).firestore();
 const drB = () => env.authenticatedContext('dB', { role: 'doctor', doctorId: '2', lab: 'digicad' }).firestore();

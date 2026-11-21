@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const st = vi.hoisted(() => ({
   data: {} as Record<string, unknown[]>, put: vi.fn(async () => undefined), patch: vi.fn(async () => undefined), upload: vi.fn(async (_b: string, f: File) => ({ name: f.name, path: `p/${f.name}`, size: f.size, uploadedBy: 'u1', uploadedAt: 'x' })),
+  openChat: vi.fn(),
   listeners: [] as { name: string; c: unknown[] }[],
 }));
 vi.mock('../../src/lib/gate', () => ({ gate: (_a: unknown, _t: unknown, start: (s: unknown, r: HTMLElement) => void) => start({ user: { uid: 'u1', email: 't@x.y' }, role: 'tech', lab: 'digicad', techId: '7', mustChangePassword: false }, document.getElementById('app') as HTMLElement) }));
@@ -10,9 +11,9 @@ vi.mock('../../src/lib/auth', () => ({ logout: vi.fn() }));
 vi.mock('../../src/lib/firebase', () => ({ db: {}, auth: {}, storage: {}, functions: {} }));
 vi.mock('../../src/lib/store', () => ({
   listen: (_l: string, name: string, cb: (r: unknown[]) => void, c: unknown[] = []) => { st.listeners.push({ name, c }); cb(st.data[name] ?? []); return () => undefined; },
-  byField: (f: string, v: unknown) => ({ f, v }), hasItem: (f: string, v: unknown) => ({ has: f, v }), put: st.put, patch: st.patch, newId: () => '1700000000000999',
+  byField: (f: string, v: unknown) => ({ f, v }), notDeleted: () => ({ f: 'deleted', v: false }), hasItem: (f: string, v: unknown) => ({ has: f, v }), put: st.put, patch: st.patch, newId: () => '1700000000000999',
 }));
-vi.mock('../../src/lib/chatbox', () => ({ chatBox: (_s: unknown, tid: string) => { const el = document.createElement('div'); el.className = 'chat'; el.textContent = tid; return { el, stop: vi.fn() }; } }));
+vi.mock('../../src/lib/chatbox', () => ({ openJobChat: (...a: unknown[]) => st.openChat(...a), chatBox: (_s: unknown, tid: string) => { const el = document.createElement('div'); el.className = 'chat'; el.textContent = tid; return { el, stop: vi.fn() }; } }));
 vi.mock('../../src/lib/files', async (orig) => ({ ...(await orig<typeof import('../../src/lib/files')>()), upload: st.upload, openFile: vi.fn() }));
 vi.mock('firebase/storage', () => ({ ref: vi.fn(), uploadBytesResumable: vi.fn(), getDownloadURL: vi.fn() }));
 
@@ -26,7 +27,7 @@ const job = (o: Record<string, unknown>) => ({ id: 'j1', patient: 'Ayşe', type:
 
 describe('teknisyen paneli', () => {
   it('işler techIds array-contains ile, taleplerim techId ile sorgulanır', async () => {
-    await load(); expect(st.listeners.find((l) => l.name === 'jobs')!.c).toEqual([{ has: 'techIds', v: '7' }]); expect(st.listeners.find((l) => l.name === 'pendingJobs')!.c).toEqual([{ f: 'techId', v: '7' }]);
+    await load(); expect(st.listeners.find((l) => l.name === 'jobs')!.c).toEqual([{ has: 'techIds', v: '7' }, { f: 'deleted', v: false }]); expect(st.listeners.find((l) => l.name === 'pendingJobs')!.c).toEqual([{ f: 'techId', v: '7' }, { f: 'deleted', v: false }]);
   });
   it('durum değişimi yalnızca status yazar; teknisyen seçeneklerinde Tamamlandı yok', async () => {
     st.data.jobs = [job({})]; await load();
@@ -57,7 +58,7 @@ describe('teknisyen paneli', () => {
     ([...f.querySelectorAll('button.tooth')].find((b) => b.textContent === '21') as HTMLButtonElement).click(); click('Onaya gönder', f); await flush();
     const [, coll, , body, isNew] = st.put.mock.calls[0] as unknown as [unknown, string, string, Record<string, unknown>, boolean];
     expect(coll).toBe('pendingJobs'); expect(isNew).toBe(true);
-    const allowed = ['id', 'drName', 'patient', 'type', 'qty', 'dateout', 'note', 'techId', 'status', 'submittedBy', 'submittedAt']; expect(Object.keys(body).filter((k) => !allowed.includes(k))).toEqual([]);
+    const allowed = ['id', 'drName', 'patient', 'type', 'qty', 'dateout', 'note', 'techId', 'status', 'submittedBy', 'submittedAt', 'deleted']; expect(Object.keys(body).filter((k) => !allowed.includes(k))).toEqual([]);
     expect(body).toMatchObject({ techId: '7', status: 'Onay Bekliyor', patient: 'VELİ', qty: 1 }); expect(String(body.note)).toContain('Dişler: 21'); expect(String(body.note)).toContain('Renk: B1'); expect(String(body.note)).toContain('acil');
   });
   it('hızlı talep: hasta yoksa yazılmaz', async () => { await load(); click('Hızlı iş talebi'); click('Onaya gönder'); await flush(); expect(st.put).not.toHaveBeenCalled(); });

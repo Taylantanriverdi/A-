@@ -7,7 +7,7 @@ import { getBytes, ref, uploadBytes } from 'firebase/storage';
 // Bölümler arası entegrasyon: çöp filtresi, eski iş sohbetleri (job_*), eski durum değerleri, kapalı dönem, dosya adı kara listesi.
 let env: RulesTestEnvironment;
 const L = 'labs/digicad';
-const MFA = { firebase: { sign_in_provider: 'custom', sign_in_second_factor: 'totp' } };
+const MFA = { firebase: { sign_in_provider: 'custom' as const, sign_in_second_factor: 'totp' } };
 const ctx = (uid: string, claims: Record<string, unknown>) => env.authenticatedContext(uid, claims);
 const admin = () => ctx('adm', { role: 'admin', lab: 'digicad', ...MFA }).firestore();
 const drA = () => ctx('dA', { role: 'doctor', doctorId: '1', lab: 'digicad' }).firestore();

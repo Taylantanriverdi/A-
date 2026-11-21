@@ -1,12 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({ updatePassword: vi.fn(), signOut: vi.fn(async () => undefined), call: vi.fn(), wipe: vi.fn(async () => undefined), cur: null as null | { getIdToken: (f: boolean) => Promise<string> } }));
-vi.mock('../../src/lib/firebase', () => ({ db: {}, storage: {}, functions: {}, wipeLocalData: m.wipe, auth: { get currentUser() { return m.cur; } } }));
+vi.mock('../../src/lib/firebase', () => ({ db: {}, storage: {}, functions: {}, callFn: (...a: unknown[]) => m.call(...a), wipeLocalData: m.wipe, auth: { get currentUser() { return m.cur; } } }));
 vi.mock('firebase/auth', () => ({
   signInWithEmailAndPassword: vi.fn(), signOut: m.signOut, onIdTokenChanged: vi.fn(), updatePassword: m.updatePassword, getMultiFactorResolver: vi.fn(), multiFactor: vi.fn(),
   TotpMultiFactorGenerator: { FACTOR_ID: 'totp', assertionForSignIn: vi.fn(), assertionForEnrollment: vi.fn(), generateSecret: vi.fn() },
 }));
-vi.mock('firebase/functions', () => ({ httpsCallable: () => m.call }));
 import { readSession, claimsKey, changePassword, clearMustChangePassword, logout } from '../../src/lib/auth';
 
 const user = (claims: Record<string, unknown>) => ({ uid: 'u', getIdTokenResult: vi.fn(async () => ({ claims })) }) as never;
@@ -35,9 +34,15 @@ describe('changePassword', () => {
   it('başarılı: şifre güncellenir, bayrak temizleme çağrılır, token yenilenir', async () => {
     await changePassword('Laboratuvar2026'); expect(m.updatePassword).toHaveBeenCalledTimes(1); expect(m.call).toHaveBeenCalledTimes(1); expect(m.cur!.getIdToken).toHaveBeenCalledWith(true);
   });
-  it('clearMustChangePassword fonksiyon yoksa false döner, akışı bozmaz', async () => {
-    m.call.mockRejectedValueOnce(new Error('not-found')); expect(await clearMustChangePassword()).toBe(false); m.call.mockRejectedValueOnce(new Error('x'));
+  it("sunucudaki callable adı 'clearMustChangePassword' (functions/src/admin.ts ile aynı) ve boş veriyle çağrılır", async () => {
+    await clearMustChangePassword(); expect(m.call).toHaveBeenCalledWith('clearMustChangePassword', {});
+  });
+  it('bayrak temizlenemezse hata görünür (sessiz yutulmaz), token yenilenmez; yeniden denemede başarılı olur', async () => {
+    m.call.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(changePassword('Laboratuvar2026')).rejects.toThrow(/tekrar/);
+    expect(m.cur!.getIdToken).not.toHaveBeenCalled();
     await expect(changePassword('Laboratuvar2026')).resolves.toBeUndefined();
+    expect(m.cur!.getIdToken).toHaveBeenCalledWith(true);
   });
 });
 

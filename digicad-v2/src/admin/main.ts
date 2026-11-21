@@ -23,7 +23,7 @@ let stopAll: (() => void) | undefined; // oturumdan çıkış / ikinci başlatma
 
 gate(['admin'], 'DigiCAD Yönetim', (session, root) => {
   stopAll?.(); // gate aynı oturum için start'ı yeniden çağırırsa (şifre değişimi) eski dinleyiciler kapatılır
-  let s: Session = session; let st: State = emptyState(); let page = 'dash'; let prefill: Rec | undefined; let off: (() => void) | undefined; let disposers: (() => void)[] = []; let dataFns: (() => void)[] = [];
+  const s: Session = session; let st: State = emptyState(); let page = 'dash'; let prefill: Rec | undefined; let off: (() => void) | undefined; let disposers: (() => void)[] = []; let dataFns: (() => void)[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined; let dirty = false; let prevJobs: Record<string, { status: string; design: string }> = {}; let first = true; let stopped = false; let unsubAuth: (() => void) | undefined; const shown = new Set<string>();
   const ps: Record<string, any> = {};  
   const nav = h('div'); const { root: ui, main } = shell('DigiCAD Yönetim', nav, () => { stop(); void logout(); }, session.user.email ?? '');
@@ -43,7 +43,7 @@ gate(['admin'], 'DigiCAD Yönetim', (session, root) => {
     const view: Record<string, () => HTMLElement> = {
       dash: () => P1.dash(c), order: () => P1.order(c), doctorsubs: () => P1.doctorsubs(c), chat: () => P2.chat(c), pending: () => P1.pending(c), dispatch: () => P1.dispatch(c), jobs: () => P1.jobsPage(c, false), done: () => P1.jobsPage(c, true), files: () => P1.files(c),
       doctors: () => P2.doctors(c), techs: () => P2.techs(c), mail: () => P3.mail(c, (p) => go('order', p)), archive: () => P2.archive(c), expenses: () => P2.expenses(c), monthly: () => P2.monthly(c), sales: () => P3.sales(c), trash: () => P2.trash(c),
-      settings: () => P2.settings(c, { lab: s.lab, set: (l) => { if (l === s.lab) return; off?.(); disposers.forEach((d) => d()); disposers = []; s = { ...s, lab: l }; st = emptyState(); first = true; prevJobs = {}; Object.keys(ps).forEach((k) => delete ps[k]); prefill = undefined; start(); toast(`Çalışma alanı: ${l}`); } }),
+      settings: () => P2.settings(c),
     };
     try { mount(main, view[page]()); } catch (e) { mount(main, h('div', { class: 'card' }, h('h2', null, 'Sayfa yüklenemedi'), h('p', null, (e as Error).message))); console.error(e); }
     dirty = false;

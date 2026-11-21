@@ -113,7 +113,11 @@ export function transformRecord(collection: string, key: string, rec: Json, ws: 
     // Kurallar pendingJobs.techId'yi metinle karşılaştırır (resource.data.techId == myTechId()).
     if (collection === 'pendingJobs' && data.techId != null && typeof data.techId !== 'string') data.techId = String(data.techId);
   }
+  // Hekim/teknisyen portalları çöpü `where('deleted','==',false)` ile süzer (kurallar sorguda bunu şart koşar): alanı olmayan eski kayıt listede çıkmazdı.
+  // Alan yoksa false yazılır (eski uygulama silinmemişi alansız tutardı; silinmişi deleted:true).
+  if (['jobs', 'pendingJobs', 'doctorSubmissions'].includes(collection) && data.deleted == null) data.deleted = false;
   const legacy: Json = { workspace: ws, key };
+  if (collection === 'jobs' && (data.status == null || data.status === '')) { data.status = 'Bekliyor'; legacy.defaultedStatus = true; } // eski kod durumu olmayan işi açık sayardı; kurallar durum ister
   if (c.renamed.length) legacy.renamedKeys = c.renamed;
   if (c.nested.length) legacy.nestedArrays = c.nested;
   data._legacy = legacy;

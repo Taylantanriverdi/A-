@@ -1,7 +1,6 @@
-import { httpsCallable } from 'firebase/functions';
 import { h, type Child } from '../lib/dom';
 import { fmtDate, fmtMoney } from '../lib/format';
-import { functions } from '../lib/firebase';
+import { callFn } from '../lib/firebase';
 import { newId, put, softDelete, type Rec } from '../lib/store';
 import { badge, btn, field, input, modal, printNode, select, table, textarea, toast, val } from '../lib/ui';
 import { live } from './state';
@@ -9,7 +8,7 @@ import type { Ctx } from './pages1';
 import { abtn, arr, curOptions, fmtSums, searchInput, sure, trLower } from './util';
 import { curOf, formNo, fromCents, gmailQuery, isoToLocalDate, mailContent, sanitizeFilter, saleTotals, SALE_STATUSES, SALE_TYPES, SALE_UNITS, toCents, todayLocal, zeroSums, type Cur, type R, type SaleItem, type MailPart } from './calc';
 import { addMailFilter, removeMailFilter } from './data';
-import { saveBlob } from './zip';
+import { saveBlob } from '../lib/zip';
 
 /* ---------------- Satışlar (eski `sales`: servis / sarf formu) ---------------- */
 function saleNode(c: Ctx, s: Rec): HTMLElement {
@@ -68,7 +67,7 @@ export function sales(c: Ctx): HTMLElement {
 /* ---------------- Mail Kutusu ---------------- */
 /** Gmail erişim anahtarı yalnızca bellekte tutulur (localStorage/sessionStorage YOK). */
 let gmailToken: string | null = null; let mails: Rec[] = [];
-const callAdmin = <T>(name: string, data: unknown) => httpsCallable<unknown, T>(functions, name)(data).then((r) => r.data);
+const callAdmin = <T>(name: string, data: unknown) => callFn<T>(name, data);
 const hdr = (m: Rec, n: string): string => String((m.payload?.headers ?? []).find((x: R) => String(x.name).toLowerCase() === n)?.value ?? '');
 const fromEmail = (m: Rec): string => { const f = hdr(m, 'from'); return (f.match(/<([^>]+)>/)?.[1] ?? f).trim().toLowerCase(); };
 async function gmail(path: string): Promise<Response> {

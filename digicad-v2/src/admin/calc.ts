@@ -3,11 +3,15 @@
  * Para: kuruş (tamsayı) hesaplanır, yalnızca saklarken/gösterirken TL'ye çevrilir (float hatası yok).
  * Tarih: laboratuvar saat dilimi (Europe/Istanbul) esas alınır; UTC'ye göre ay/gün kayması olmaz.
  */
-import { JOB_STATUSES } from '../lib/format';
+import { JOB_STATUSES, LAB_TZ, isoToLocalDate, todayLocal, monthLocal, safeName, uniqueNames, jobInfoText } from '../lib/format';
+import { FDI, formatTeeth, parseTeethDetailed } from '../lib/teeth';
+
+// Ortak yardımcılar src/lib'e taşındı (portallar da kullanır); testler/diğer modüller için buradan da erişilir.
+export { LAB_TZ, isoToLocalDate, todayLocal, monthLocal, safeName, uniqueNames, jobInfoText, FDI, formatTeeth };
+export const parseTeeth = parseTeethDetailed;
 
  
 export type R = { [k: string]: any };
-export const LAB_TZ = 'Europe/Istanbul';
 export type Cur = 'TRY' | 'USD' | 'EUR';
 export const CURRENCIES: readonly Cur[] = ['TRY', 'USD', 'EUR'];
 export type Sums = Record<Cur, number>;
@@ -52,16 +56,6 @@ export function withIds<T extends Record<string, unknown>>(j: T): T & { doctorId
 }
 
 /* ---------- Tarih (lab saat dilimi) ---------- */
-/** 'YYYY-MM-DD' ise aynen; zaman damgası ise Istanbul yerel tarihi. Geçersizse ''. */
-export function isoToLocalDate(v: unknown, tz: string = LAB_TZ): string {
-  const s = String(v ?? '').trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const d = new Date(s);
-  if (!s || isNaN(+d)) return '';
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-}
-export const todayLocal = (now: Date = new Date()): string => isoToLocalDate(now.toISOString());
-export const monthLocal = (v: unknown): string => isoToLocalDate(v).slice(0, 7);
 /** Gelir tarihi: tamamlanma anı (yerel gün) → teslim tarihi → kayıt kimliğindeki zaman. */
 export function incomeDate(j: R): string {
   if (j.completedAt) { const d = isoToLocalDate(j.completedAt); if (d) return d; }
@@ -146,8 +140,8 @@ export type JobStatus = (typeof JOB_STATUSES)[number];
 export const isStatus = (s: unknown): s is JobStatus => (JOB_STATUSES as readonly string[]).includes(String(s));
 /** Admin durum değişikliği yaması. Değişiklik yoksa null; kural ihlalinde Error. */
 export function statusPatch(job: R, next: string, now: string): R | null {
+  if (job.status === next) return null; // değişiklik yok (göçle gelen eski/bilinmeyen durum olduğu gibi korunur)
   if (!isStatus(next)) throw new Error('Geçersiz durum.');
-  if (job.status === next) return null;
   if (job.status === 'Tamamlandı' && job.closureId) throw new Error('Hesabı kapatılmış dönemdeki iş yeniden açılamaz (önce dönem kapatmayı geri alın).');
   if (next === 'Tamamlandı') return { status: next, completedAt: job.completedAt || now, completionApprovedBy: 'admin', completionApprovedAt: now };
   if (job.status === 'Tamamlandı') return { status: next, completedAt: null, completionApprovedBy: null, completionApprovedAt: null };
@@ -183,16 +177,6 @@ export function autoTechOf(doctor: R, techs: R[]): R | null {
 }
 
 /* ---------- Dişler (FDI) ---------- */
-export const FDI = { ur: [18, 17, 16, 15, 14, 13, 12, 11], ul: [21, 22, 23, 24, 25, 26, 27, 28], br: [48, 47, 46, 45, 44, 43, 42, 41], bl: [31, 32, 33, 34, 35, 36, 37, 38] } as const;
-const VALID_TEETH = new Set<number>([...FDI.ur, ...FDI.ul, ...FDI.br, ...FDI.bl, 51, 52, 53, 54, 55, 61, 62, 63, 64, 65, 71, 72, 73, 74, 75, 81, 82, 83, 84, 85]);
-export function parseTeeth(v: unknown): { teeth: number[]; rest: string[] } {
-  const toks = Array.isArray(v) ? v.map(String) : String(v ?? '').split(/[,;\s]+/);
-  const set = new Set<number>(); const rest: string[] = [];
-  for (const raw of toks) { const t = raw.trim(); if (!t) continue; const n = Number(t); if (/^\d{2}$/.test(t) && VALID_TEETH.has(n)) set.add(n); else rest.push(t); }
-  return { teeth: [...set].sort((a, b) => a - b), rest };
-}
-export const formatTeeth = (t: unknown): string => parseTeeth(t).teeth.join(', ');
-
 /* ---------- Sipariş ---------- */
 export interface OrderLine { type: string; qty: number; price: number; currency: Cur }
 export interface OrderInput { doctor: R; tech: R | null; patient: string; lines: OrderLine[]; teeth: number[]; material: string; color: string; dateout: string; notes: string; files: unknown[]; sourceSubId: string | null; now: string; newId: () => string }
@@ -281,24 +265,6 @@ export function sanitizeFilter(v: string): string | null {
   return null;
 }
 export const gmailQuery = (items: string[]): string => (items.length ? items.map((x) => `from:${x.replace(/^@/, '')}`).join(' OR ') : 'in:inbox');
-
-/* ---------- ZIP ---------- */
-export const safeName = (s: unknown, max = 80): string => String(s ?? '').replace(/[\\/:*?"<>|\u0000-\u001f\u007f]+/g, '_').replace(/^\.+/, '_').replace(/\s+/g, ' ').trim().slice(0, max) || 'dosya';
-/** Aynı adlı dosyaları ZIP içinde ezmemek için benzersizleştirir: a.stl, a (2).stl */
-export function uniqueNames(names: string[]): string[] {
-  const seen = new Map<string, number>();
-  return names.map((n) => {
-    const k = n.toLowerCase(); const c = (seen.get(k) ?? 0) + 1; seen.set(k, c);
-    if (c === 1) return n;
-    const dot = n.lastIndexOf('.'); return dot > 0 ? `${n.slice(0, dot)} (${c})${n.slice(dot)}` : `${n} (${c})`;
-  });
-}
-export function jobInfoText(j: R, kind: 'scan' | 'design' = 'scan'): string {
-  const teeth = formatTeeth(j.orderForm?.teeth);
-  const files = (Array.isArray(kind === 'design' ? j.designFiles : j.files) ? (kind === 'design' ? j.designFiles : j.files) : []) as R[];
-  return ['DIGICAD DENTAL LABORATUVAR — İŞ BİLGİSİ', '='.repeat(48), `Hekim         : ${j.drName ?? '—'}`, `Hasta         : ${j.patient ?? '—'}`, `İş Türü       : ${j.type ?? '—'}`, `Dişler        : ${teeth || '—'}`, `Diş Rengi     : ${j.toothColor ?? '—'}`,
-    `Teslim Tarihi : ${j.dateout ? isoToLocalDate(j.dateout) : '—'}`, `Durum         : ${j.status ?? '—'}`, '', 'Notlar:', String(j.note || '—'), '', kind === 'design' ? 'Tasarım dosyaları:' : 'Tarama dosyaları:', ...(files.length ? files.map((f, k) => `  ${k + 1}. ${f.name}`) : ['  —'])].join('\r\n');
-}
 
 /* ---------- İş düzenleme ---------- */
 export interface JobEditForm { doctor: R; patient: string; type: string; qty: number; price: number; currency: Cur; dateout: string; color: string; note: string; tech: R | null; status: string }

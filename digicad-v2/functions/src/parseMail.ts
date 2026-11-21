@@ -7,7 +7,7 @@ const MAX_CHARS = 12000;
 
 export interface ParsedOrder { patient: string; doctorName: string; jobType: string; teeth: string[]; color: string; dateout: string; notes: string }
 
-// eslint-disable-next-line no-control-regex
+ 
 const CTRL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F<>]/g;
 
 /** Model çıktısını katı şemaya zorlar: yalnızca bilinen alanlar, tür/uzunluk sınırı, kontrol karakteri ve işaretleme temizliği. */

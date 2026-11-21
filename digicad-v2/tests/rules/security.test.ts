@@ -7,7 +7,7 @@ import { ref, uploadBytes } from 'firebase/storage';
 // Denetim turunda bulunan açıkların regresyon testleri (Firestore + Storage).
 let env: RulesTestEnvironment;
 const L = 'labs/digicad';
-const MFA = { firebase: { sign_in_second_factor: 'totp' } };
+const MFA = { firebase: { sign_in_provider: 'custom' as const, sign_in_second_factor: 'totp' } };
 const fs = (uid: string, claims: Record<string, unknown>) => env.authenticatedContext(uid, claims).firestore();
 const admin = () => fs('adm', { role: 'admin', lab: 'digicad', ...MFA });
 const adminNoMfa = () => fs('adm', { role: 'admin', lab: 'digicad' });

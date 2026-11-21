@@ -1,6 +1,8 @@
-import { downloadUrl } from '../lib/files';
-import { h } from '../lib/dom';
-import { jobInfoText, safeName, uniqueNames, type R } from './calc';
+import { downloadUrl } from './files';
+import { h } from './dom';
+import { jobInfoText, safeName, uniqueNames } from './format';
+
+type R = Record<string, any>;
 
 export type ZipKind = 'scan' | 'design' | 'both';
 interface FileEntry { name?: string; path?: string; url?: string; size?: number }

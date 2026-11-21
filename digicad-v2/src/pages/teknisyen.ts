@@ -3,11 +3,11 @@ import { array, filterRows, splitJobs, techStats, composeQuickNote } from './_ut
 import { gate } from '../lib/gate';
 import { h, mount } from '../lib/dom';
 import { logout, type Session } from '../lib/auth';
-import { listen, newId, patch, put, byField, hasItem, type Rec } from '../lib/store';
+import { listen, newId, notDeleted, patch, put, byField, hasItem, type Rec } from '../lib/store';
 import { shell, table, field, input, textarea, select, btn, guard, val, badge, withBusy } from '../lib/ui';
-import { fmtDate, fmtDateTime, isOverdue, trUpper, TECH_STATUSES, STATUS_ICONS } from '../lib/format';
+import { fmtDate, fmtDateTime, isOverdue, todayLocal, trUpper, TECH_STATUSES, statusLabel, statusOptions } from '../lib/format';
 import { upload, validateFile, MAX_SCAN_MB, type FileRef } from '../lib/files';
-import { chatBox } from '../lib/chatbox';
+import { chatBox, openJobChat } from '../lib/chatbox';
 import { toothPicker, jawLabel, jawOf } from '../lib/teeth';
 import { fileChips, tabBar, empty } from '../lib/widgets';
 
@@ -16,13 +16,13 @@ gate(['tech'], 'Teknisyen Paneli', (s: Session, root) => {
   let jobs: Rec[] = []; let pend: Rec[] = []; let tab = 'jobs'; let jobsTab: 'ongoing' | 'done' = 'ongoing'; let stop: (() => void) | undefined; const flt = { q: '', from: '', to: '' };
   const nav = h('div'); const { root: ui, main } = shell('Teknisyen Paneli', nav, () => void logout(), s.user.email ?? ''); mount(root, ui);
   const TABS: [string, string][] = [['jobs', '📋 İşlerim'], ['quick', '➕ Hızlı iş talebi'], ['chat', '💬 Laboratuvarla yaz']];
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => todayLocal();
   /** Kurallar: teknisyen yalnızca atandığı, çöpte olmayan ve Tamamlandı olmayan işi değiştirebilir. */
   const editable = (j: Rec) => j.status !== 'Tamamlandı' && !j.deleted;
 
   const statusCell = (j: Rec) => {
-    if (!editable(j)) return badge(`${STATUS_ICONS[j.status] ?? ''} ${j.status}`, j.status === 'Tamamlandı' ? 'ok' : '');
-    const sel = select('st', TECH_STATUSES.map((x): [string, string] => [x, `${STATUS_ICONS[x]} ${x}`]), String(j.status));
+    if (!editable(j)) return badge(statusLabel(j.status), j.status === 'Tamamlandı' ? 'ok' : '');
+    const sel = select('st', statusOptions(j.status, TECH_STATUSES), String(j.status));
     sel.setAttribute('aria-label', 'Durum');
     sel.addEventListener('change', () => void guard(() => patch(s, 'jobs', j.id, { status: sel.value }), 'Durum güncellendi').then((ok) => { if (!ok) sel.value = String(j.status); }));
     return sel;
@@ -61,7 +61,7 @@ gate(['tech'], 'Teknisyen Paneli', (s: Session, root) => {
       mount(results, table([
         { head: 'Hasta', cell: (j: Rec) => h('b', null, String(j.patient ?? '')) }, { head: 'İş', cell: infoCell },
         { head: 'Teslim', cell: (j: Rec) => (jobsTab === 'ongoing' && isOverdue(j.dateout, today()) ? h('span', { class: 'late' }, `⚠️ ${fmtDate(j.dateout)}`) : fmtDate(j.dateout)) },
-        { head: 'Durum', cell: statusCell }, { head: 'Tasarım dosyası', cell: designCell }, { head: 'Not', cell: noteCell },
+        { head: 'Durum', cell: statusCell }, { head: 'Tasarım dosyası', cell: designCell }, { head: 'Not', cell: noteCell }, { head: 'Sohbet', cell: (j: Rec) => btn('💬', () => openJobChat(s, j), 'btn ghost') },
       ], rows, flt.q || flt.from || flt.to ? 'Kriterlere uyan iş yok' : 'Kayıt yok'));
     };
     const filt = (name: 'q' | 'from' | 'to', type: string, label: string) => field(label, h('input', { type, value: flt[name], on: { input: (e) => { flt[name] = (e.target as HTMLInputElement).value; redraw(); } } }));
@@ -82,7 +82,7 @@ gate(['tech'], 'Teknisyen Paneli', (s: Session, root) => {
       const patient = trUpper(val(f, 'patient')).trim(); if (!patient) throw new Error('Hasta adı girin.');
       const tl = [...picked].sort((a, b) => a - b); const id = newId();
       const note = composeQuickNote({ note: val(f, 'note'), teeth: tl, color: trUpper(val(f, 'color')) }) + (tl.length ? ` (${jawLabel(jawOf(tl))})` : '');
-      await put(s, 'pendingJobs', id, { id, drName: val(f, 'drName'), patient, type: val(f, 'type'), qty: Math.min(999, Math.max(1, Math.floor(Number(val(f, 'qty'))) || 1)), dateout: val(f, 'dateout'), note: note.slice(0, 5000), techId: tid, status: 'Onay Bekliyor', submittedBy: 'tech', submittedAt: new Date().toISOString() }, true);
+      await put(s, 'pendingJobs', id, { id, drName: val(f, 'drName'), patient, type: val(f, 'type'), qty: Math.min(999, Math.max(1, Math.floor(Number(val(f, 'qty'))) || 1)), dateout: val(f, 'dateout'), note: note.slice(0, 5000), techId: tid, status: 'Onay Bekliyor', submittedBy: 'tech', submittedAt: new Date().toISOString(), deleted: false }, true);
       picked.clear(); tab = 'quick'; render();
     }, 'Talep gönderildi — yönetici onayı bekleniyor'), 'btn primary');
     f.append(send);
@@ -100,7 +100,7 @@ gate(['tech'], 'Teknisyen Paneli', (s: Session, root) => {
   const onErr = (e: Error) => mount(main, empty(`Veriler yüklenemedi: ${e.message}`));
   // Yazı/dosya seçimi sürerken liste yenilenip girdiyi silmesin.
   const busy = () => { const a = document.activeElement; return !!a && (a.matches('input, textarea, select') && !!a.closest('main')); };
-  listen(s.lab, 'jobs', (r) => { jobs = r; if (tab === 'jobs' && !busy()) render(); }, [hasItem('techIds', tid)], onErr);
-  listen(s.lab, 'pendingJobs', (r) => { pend = r; if (tab === 'quick' && !busy()) render(); }, [byField('techId', tid)], onErr);
+  listen(s.lab, 'jobs', (r) => { jobs = r; if (tab === 'jobs' && !busy()) render(); }, [hasItem('techIds', tid), notDeleted()], onErr);
+  listen(s.lab, 'pendingJobs', (r) => { pend = r; if (tab === 'quick' && !busy()) render(); }, [byField('techId', tid), notDeleted()], onErr);
   render();
 });

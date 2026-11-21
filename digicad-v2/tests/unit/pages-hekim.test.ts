@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const st = vi.hoisted(() => ({
   data: {} as Record<string, unknown[]>, doc: null as unknown, put: vi.fn(async () => undefined), upload: vi.fn(async (_b: string, f: File) => ({ name: f.name, path: `p/${f.name}`, size: f.size, uploadedBy: 'u1', uploadedAt: 'x' })),
+  openChat: vi.fn(),
   listeners: [] as { name: string; cb: (r: unknown[]) => void; c: unknown[] }[], doctorId: '5',
 }));
 vi.mock('../../src/lib/gate', () => ({ gate: (_a: unknown, _t: unknown, start: (s: unknown, r: HTMLElement) => void) => start({ user: { uid: 'u1', email: 'dr@x.y' }, role: 'doctor', lab: 'digicad', doctorId: st.doctorId, mustChangePassword: false }, document.getElementById('app') as HTMLElement) }));
@@ -11,9 +12,9 @@ vi.mock('../../src/lib/firebase', () => ({ db: {}, auth: {}, storage: {}, functi
 vi.mock('../../src/lib/store', () => ({
   listen: (_l: string, name: string, cb: (r: unknown[]) => void, c: unknown[] = []) => { st.listeners.push({ name, cb, c }); cb(st.data[name] ?? []); return () => undefined; },
   listenDoc: (_l: string, _n: string, _id: string, cb: (r: unknown) => void) => { cb(st.doc); return () => undefined; },
-  byField: (f: string, v: unknown) => ({ f, v }), put: st.put, newId: () => '1700000000000123',
+  byField: (f: string, v: unknown) => ({ f, v }), notDeleted: () => ({ f: 'deleted', v: false }), put: st.put, newId: () => '1700000000000123',
 }));
-vi.mock('../../src/lib/chatbox', () => ({ chatBox: (_s: unknown, tid: string) => { const el = document.createElement('div'); el.className = 'chat'; el.textContent = tid; return { el, stop: vi.fn() }; } }));
+vi.mock('../../src/lib/chatbox', () => ({ openJobChat: (...a: unknown[]) => st.openChat(...a), chatBox: (_s: unknown, tid: string) => { const el = document.createElement('div'); el.className = 'chat'; el.textContent = tid; return { el, stop: vi.fn() }; } }));
 vi.mock('../../src/lib/files', async (orig) => ({ ...(await orig<typeof import('../../src/lib/files')>()), upload: st.upload, openFile: vi.fn() }));
 vi.mock('firebase/storage', () => ({ ref: vi.fn(), uploadBytesResumable: vi.fn(), getDownloadURL: vi.fn() }));
 
@@ -26,7 +27,7 @@ beforeEach(() => { st.data = {}; st.doc = null; st.listeners.length = 0; st.put.
 
 describe('hekim portalı', () => {
   it('işler yalnızca kendi doctorId ile sorgulanır (kurallar liste sorgusunda filtre ister)', async () => {
-    await load(); for (const n of ['jobs', 'doctorSubmissions']) expect(st.listeners.find((l) => l.name === n)!.c).toEqual([{ f: 'doctorId', v: '5' }]);
+    await load(); for (const n of ['jobs', 'doctorSubmissions']) expect(st.listeners.find((l) => l.name === n)!.c).toEqual([{ f: 'doctorId', v: '5' }, { f: 'deleted', v: false }]); // çöp filtresi: kurallar (list) şart koşar
   });
   it('devam eden/tamamlanan sekmeleri, gecikme işareti ve XSS içerikli hasta adı metin olarak çizilir', async () => {
     st.data.jobs = [{ id: '1', patient: '<img src=x onerror=1>', type: 'Kron', status: 'Üretimde', dateout: '2020-01-01' }, { id: '2', patient: 'Bitti', type: 'Köprü', status: 'Tamamlandı', completedAt: '2026-01-01' }, { id: '3', patient: 'Silindi', status: 'Bekliyor', deleted: true }];
@@ -53,7 +54,7 @@ describe('hekim portalı', () => {
     expect(st.upload).toHaveBeenCalledTimes(1); expect(st.upload.mock.calls[0][0]).toBe('labs/digicad/submissions/5');
     const [, coll, id, body, isNew] = st.put.mock.calls[0] as unknown as [unknown, string, string, Record<string, unknown>, boolean];
     expect(coll).toBe('doctorSubmissions'); expect(isNew).toBe(true); expect(id).toBe('1700000000000123');
-    const allowed = ['id', 'doctorId', 'drId', 'patient', 'jobType', 'teeth', 'jaw', 'color', 'notes', 'files', 'status', 'source'];
+    const allowed = ['id', 'doctorId', 'drId', 'patient', 'jobType', 'teeth', 'jaw', 'color', 'notes', 'files', 'status', 'source', 'deleted'];
     expect(Object.keys(body).filter((k) => !allowed.includes(k))).toEqual([]);
     expect(body).toMatchObject({ doctorId: '5', drId: '5', patient: 'IŞIK CAN', jobType: 'Zirkonya Kron', teeth: [11, 41], jaw: 'her', color: 'A2', status: 'Yeni' });
   });
