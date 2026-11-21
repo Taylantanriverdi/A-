@@ -23,6 +23,28 @@ rem Sunucu zaten çalışıyor mu?
 set "ZATEN_CALISIYOR="
 %PS% -File "%UO_TOOLS%\PortBekle.ps1" -Port %UO_PORT% -Kontrol
 if not errorlevel 1 set "ZATEN_CALISIYOR=1"
+if defined ZATEN_CALISIYOR goto :DosyaKontrolAtla
+
+rem Port kapalı ama ServUO süreci varsa: büyük olasılıkla çökme/yeniden başlatma döngüsünde takılı kalmıştır.
+tasklist /FI "IMAGENAME eq ServUO.exe" 2>nul | find /I "ServUO.exe" >nul
+if errorlevel 1 goto :DosyaKontrol
+echo UYARI: Port %UO_PORT% kapalı ama çalışan ServUO süreç^(ler^)i var ^(takılı kalmış veya hâlâ açılıyor olabilir^).
+choice /C EH /M "  Bu ServUO süreçleri kapatılsın mı? (E=Evet, H=Hayır)"
+if errorlevel 2 goto :Hata
+taskkill /F /T /IM ServUO.exe >nul 2>&1
+timeout /t 2 >nul
+
+:DosyaKontrol
+echo [0/3] Orijinal UO dosyaları kontrol ediliyor...
+%PS% -File "%UO_TOOLS%\UODosyaKontrol.ps1" -UoFiles "%UO_FILES%"
+if errorlevel 1 (
+    echo.
+    echo   Bu dosyalar olmadan ServUO açılırken çöker ve kendini sürekli yeniden başlatır.
+    goto :Hata
+)
+echo.
+
+:DosyaKontrolAtla
 
 rem ------------------------------------------------------------------
 echo [1/3] Dünya kayıtları yedekleniyor...
@@ -65,10 +87,11 @@ echo   NOT: İlk çalıştırmada sunucu penceresi "create the owner account now
 echo        O pencereye geçip y yaz, kullanıcı adı ve şifre belirle; port ancak bundan sonra açılır.
 
 :Bekle
-%PS% -File "%UO_TOOLS%\PortBekle.ps1" -Port %UO_PORT% -TimeoutSn %UO_WAIT_SECONDS% -ProcessName ServUO
+%PS% -File "%UO_TOOLS%\PortBekle.ps1" -Port %UO_PORT% -TimeoutSn %UO_WAIT_SECONDS% -ProcessName ServUO -ServerDir "%UO_SERVER%"
 set "RC=%ERRORLEVEL%"
 if "%RC%"=="0" goto :SunucuHazir
 if "%RC%"=="2" goto :Hata
+if "%RC%"=="3" goto :Hata
 choice /C EH /M "  Sunucu henüz hazır değil. Beklemeye devam edilsin mi? (E=Evet, H=Hayır)"
 if errorlevel 2 goto :Hata
 goto :Bekle

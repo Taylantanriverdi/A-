@@ -168,14 +168,9 @@ echo.
 
 rem ------------------------------------------------------------------
 echo [7/7] Oyun dosyaları kontrol ediliyor...
-set "UO_DOSYA_VAR="
-if exist "%UO_FILES%\*.uop" set "UO_DOSYA_VAR=1"
-if exist "%UO_FILES%\*.mul" set "UO_DOSYA_VAR=1"
-if defined UO_DOSYA_VAR (
-    echo   Tamam: %UO_FILES% içinde UO dosyaları bulundu.
-) else (
-    echo   DİKKAT: %UO_FILES% klasörü henüz boş!
-    echo   Orijinal UO istemcisinin .mul / .uop dosyalarını bu klasöre kopyalamalısın.
+%PS% -File "%UO_TOOLS%\UODosyaKontrol.ps1" -UoFiles "%UO_FILES%"
+if errorlevel 1 (
+    echo   DİKKAT: Bu dosyalar kopyalanmadan 2_Oyunu_Baslat.bat sunucuyu başlatmaz.
 )
 echo.
 echo ==================================================================

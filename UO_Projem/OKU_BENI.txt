@@ -8,6 +8,7 @@ KLASÖR YAPISI
     1_Kurulum_ve_Derleme.bat   -> Araçları kurar, ServUO + ClassicUO indirir, derler, ayarlar
     2_Oyunu_Baslat.bat         -> Yedek alır, sunucuyu açar, hazır olunca ClassicUO'yu açar
     3_Online_Moduna_Gecis.bat  -> IP adresini VDS/VPS dış IP'si ile değiştirir
+    4_Sunucuyu_Durdur.bat      -> Tüm ServUO pencerelerini zorla kapatır (acil durum)
     Araclar\                   -> Yardımcı betikler ve ORTAK AYARLAR (ayarlar.cmd)
     Server\                    -> ServUO sunucu dosyaları (ServUO.exe, Config, Saves)
     Client\                    -> ClassicUO (ClassicUO.exe, settings.json)
@@ -128,3 +129,31 @@ KLASÖR YAPISI
   4. Oyunculara Client klasörünü (UO_Files dahil) ver; settings.json
      zaten dış IP'yi gösterir.
   Yerel moda dönmek için aynı dosyayı çalıştırıp IP olarak 127.0.0.1 yaz.
+
+
+7) SORUN GİDERME
+----------------
+  Sunucu penceresi sürekli açılıp kapanıyorsa:
+    ServUO çöktüğünde içindeki "CrashGuard" sunucuyu yeni bir pencerede
+    otomatik yeniden başlatır. Çökmenin sebebi düzelmediyse bu sonsuz
+    döngüye dönüşür. En sık sebep: UO_Files klasöründe harita dosyalarının
+    (map0, statics0, staidx0, tiledata...) olmamasıdır.
+
+    1. 4_Sunucuyu_Durdur.bat ile tüm ServUO pencerelerini kapat.
+    2. Orijinal UO dosyalarını C:\UO_Projem\Client\UO_Files içine kopyala.
+    3. 2_Oyunu_Baslat.bat'ı tekrar çalıştır. Artık dosyalar eksikse sunucuyu
+       hiç başlatmaz; çökme olursa döngüyü kendisi durdurup çökme raporunu
+       ekrana yazar.
+
+  Çökme raporları: C:\UO_Projem\Server\Crash <tarih>.log
+  Çökme anındaki kayıt yedekleri: C:\UO_Projem\Server\Backups\Crashed\
+
+
+SÜRÜM GEÇMİŞİ
+-------------
+  v1  İlk sürüm: kurulum/derleme, yedekli başlatma, online moduna geçiş.
+  v2  - Başlatmadan önce gerekli UO dosyaları kontrol ediliyor (eksikse başlatmaz).
+      - Çökme algılanınca ServUO kapatılıyor ve rapor gösteriliyor
+        (CrashGuard'ın sonsuz yeniden başlatma döngüsü engellendi).
+      - Takılı kalmış ServUO süreçleri başlatmadan önce temizlenebiliyor.
+      - Yeni: 4_Sunucuyu_Durdur.bat
