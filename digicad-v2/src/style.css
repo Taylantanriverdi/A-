@@ -3,7 +3,8 @@
 * { box-sizing: border-box; } body { margin:0; font:15px/1.45 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
 .shell { min-height:100vh; display:flex; flex-direction:column; } .top { display:flex; gap:12px; align-items:center; padding:10px 16px; background:var(--card); border-bottom:1px solid var(--line); } .grow { flex:1; }
 .body { display:flex; flex:1; } .side { width:230px; padding:8px; background:var(--card); border-right:1px solid var(--line); display:flex; flex-direction:column; gap:2px; } .main { flex:1; padding:16px; min-width:0; }
-@media (max-width:800px) { .body { flex-direction:column; } .side { width:auto; flex-direction:row; overflow-x:auto; } }
+.side > div { display:flex; flex-direction:column; gap:2px; }
+@media (max-width:800px) { .side > div { flex-direction:row; } .body { flex-direction:column; } .side { width:auto; flex-direction:row; overflow-x:auto; } }
 .nav-item { text-align:left; background:none; border:0; color:inherit; padding:8px 10px; border-radius:6px; cursor:pointer; white-space:nowrap; font:inherit; } .nav-item.active, .nav-item:hover { background:var(--bg); font-weight:600; }
 .nav-badge { background:var(--err); color:#fff; border-radius:9px; padding:0 6px; margin-left:6px; font-size:12px; }
 .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; max-width:760px; } .login { max-width:380px; margin:10vh auto; }

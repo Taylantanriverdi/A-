@@ -24,8 +24,6 @@ body{padding-top:44px}
 .demo-bar a.cur{background:#fff;color:#7a2e00;border-color:#fff}
 @media (max-width:700px){body{padding-top:84px}}
 /* Uygulamadaki menü sarmalayıcısı (div) sütun değil satır içi akıyor: iki menü öğesi yan yana düşüp üzerine gelince titriyor. Yalnızca demoda düzeltilir. */
-.side>div{display:flex;flex-direction:column;gap:2px}
-@media (max-width:800px){.side>div{flex-direction:row}}
 `;
 
 function banner(): void {
