@@ -1,0 +1,11 @@
+.tchart { margin: 8px 0; } .tgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; max-width: 460px; }
+.tq { display: flex; gap: 3px; } .tq.ur, .tq.br { justify-content: flex-end; } .tq.ur, .tq.ul { padding-bottom: 8px; border-bottom: 2px solid var(--line); } .tq.ur, .tq.br { padding-right: 8px; border-right: 2px solid var(--line); }
+.tooth { min-width: 26px; height: 34px; padding: 0 2px; font: 12px system-ui; border: 1px solid var(--line); border-radius: 5px; background: var(--card); color: inherit; cursor: pointer; }
+.tooth.on { background: var(--pri); color: #fff; border-color: var(--pri); } .tooth:disabled { cursor: default; } .tinfo { flex: 1; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 10px; } .tab { background: none; border: 0; border-bottom: 3px solid transparent; padding: 7px 10px; font: inherit; color: inherit; cursor: pointer; } .tab.active { border-bottom-color: var(--pri); font-weight: 600; }
+.modal.wide { width: min(900px, 100%); } .stat.warn b { color: var(--err); } .stat b small { font-size: 12px; font-weight: 400; display: block; }
+.pend-late { color: var(--err); font-weight: 600; } .rowhl { background: rgba(255, 193, 7, .12); } .bal-debt { color: var(--err); font-weight: 600; } .bal-ok { color: var(--ok); font-weight: 600; }
+.mailbody { white-space: pre-wrap; max-height: 40vh; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--bg); }
+.chat-list .btn { text-align: left; } .chat-file { display: block; margin-top: 4px; }
+.print-doc table { width: 100%; border-collapse: collapse; } .print-doc th, .print-doc td { border-bottom: 1px solid #999; padding: 4px 6px; text-align: left; font-size: 12px; }
+@media (max-width: 800px) { .tgrid { grid-template-columns: 1fr; } .tq.ur, .tq.br { border-right: 0; padding-right: 0; } .chat { flex-direction: column; } }
