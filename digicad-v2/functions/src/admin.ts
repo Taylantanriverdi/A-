@@ -4,7 +4,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { createHash } from 'node:crypto';
 import { CALLABLE_OPTS, requireAdminMfa, rateLimit, randomPassword } from './util';
-import { claimsFor, normalizeEmail, validateUid, cleanDisplayName, mapAuthError, refId } from './validate';
+import { claimsFor, clearDecision, normalizeEmail, validateUid, cleanDisplayName, mapAuthError, refId } from './validate';
 import { planFileCopies, applyCopies } from './files';
 
 const OPTS = CALLABLE_OPTS;
@@ -181,9 +181,9 @@ export const clearMustChangePassword = onCall(OPTS, async (req) => {
     const rec = await getAuth().getUser(uid);
     const c = { ...(rec.customClaims ?? {}) } as Record<string, unknown>;
     lab = typeof c.lab === 'string' ? c.lab : '';
-    if (!c.mustChangePassword) return { ok: true };
-    const fp = pwFingerprint(rec);
-    if (fp && c.pwv && fp === c.pwv) throw new HttpsError('failed-precondition', 'Şifre henüz değiştirilmedi.');
+    const decision = clearDecision(c, pwFingerprint(rec));
+    if (decision === 'noop') return { ok: true };
+    if (decision === 'wait') throw new HttpsError('failed-precondition', 'Şifre henüz değiştirilmedi.');
     delete c.mustChangePassword; delete c.pwv;
     await getAuth().setCustomUserClaims(uid, c);
   } catch (e) { throw mapAuthError(e); }

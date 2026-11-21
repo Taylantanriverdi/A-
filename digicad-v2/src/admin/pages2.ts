@@ -9,7 +9,7 @@ import type { Ctx } from './pages1';
 import { jobDetail } from './pages1';
 import { abtn, arr, curOptions, fmtSums, money, searchInput, sure, trLower } from './util';
 import { CURRENCIES, curOf, doctorTotals, fromCents, incomeDate, isoToLocalDate, jobCents, monthlyData, monthLocal, payCents, planClosure, sumExpenses, techIdsOf, todayLocal, toCents, yearsOf, zeroSums, type Cur, type R, type Sums } from './calc';
-import { closeStatement, hideMessage, postMessage, undoClosure, watchMessages, setDoctorPrices } from './data';
+import { closeStatement, hideMessage, postMessage, recentAudit, undoClosure, watchMessages, setDoctorPrices } from './data';
 import { printReport } from './print';
 import { saveBlob } from '../lib/zip';
 
@@ -262,6 +262,15 @@ export function settings(c: Ctx): HTMLElement {
     if (!sure('Dosya HASTA VE FİNANS verisi içerir. Güvenli bir yerde saklayacağınıza emin misiniz?')) return;
     const data: Record<string, Rec[]> = {}; for (const k of COLLECTIONS) data[k] = (c.st as State)[k]; saveBlob(new Blob([JSON.stringify({ lab: c.s.lab, exportedAt: nowIso(), data }, null, 1)], { type: 'application/json' }), `digicad-${c.s.lab}-${todayLocal()}.json`);
   }, 'btn ghost');
+  const auditBox = h('div');
+  const showAudit = abtn('Son denetim kayıtlarını göster', async () => {
+    const rows = await recentAudit(c.s, 50);
+    auditBox.replaceChildren(table([
+      { head: 'Zaman', cell: (r: Rec) => (r.at?.toDate ? r.at.toDate().toLocaleString('tr-TR') : '') }, { head: 'Kayıt', cell: (r: Rec) => (r.coll ? `${r.coll}/${r.id}` : String(r.action ?? '')) },
+      { head: 'İşlem', cell: (r: Rec) => `${r.kind ?? r.action ?? ''}${r.status ? ` (${r.status})` : ''}` }, { head: 'Yapan (beyan)', cell: (r: Rec) => String(r.actor ?? '') },
+      { head: 'Not', cell: (r: Rec) => [r.oversize ? '⚠️ belge çok büyük (kayıt eksik olabilir)' : '', r.beforeGz || r.afterGz ? 'sıkıştırılmış kayıt' : '', r.actor === 'system' ? 'sistem' : ''].filter(Boolean).join(' · ') },
+    ], rows, 'Denetim kaydı yok'));
+  }, 'btn ghost');
   return h('div', null, h('h2', null, 'Ayarlar'), f, h('h3', null, 'Çalışma alanı'), h('p', null, `Bu hesap yalnızca "${c.s.lab}" çalışma alanına bağlıdır (hesabın lab yetkisi). Başka bir alan (ör. Primer Teknoloji) için o alana ait ayrı yönetici hesabıyla giriş yapılır.`),
-    h('h3', null, 'Yedek'), h('p', { class: 'muted' }, 'Sunucu tarafı günlük yedek ayrıca çalışır; bu düğme yalnızca ekranda yüklü verinin anlık kopyasını indirir.'), backup, h('h3', null, 'Güvenlik'), h('p', null, 'Hesap/rol yönetimi Hekimler ve Teknisyenler sayfalarındadır. Eski 4 haneli PIN sistemi kaldırılmıştır.'));
+    h('h3', null, 'Yedek'), h('p', { class: 'muted' }, 'Sunucu tarafı günlük yedek ayrıca çalışır; bu düğme yalnızca ekranda yüklü verinin anlık kopyasını indirir.'), backup, h('h3', null, 'Denetim'), h('p', { class: 'muted' }, 'Kayıtlar sunucuda tutulur (istemci yazamaz); "yapan" istemci beyanıdır, kesin kimlik için Cloud Audit Logs.'), showAudit, auditBox, h('h3', null, 'Güvenlik'), h('p', null, 'Hesap/rol yönetimi Hekimler ve Teknisyenler sayfalarındadır. Eski 4 haneli PIN sistemi kaldırılmıştır.'));
 }

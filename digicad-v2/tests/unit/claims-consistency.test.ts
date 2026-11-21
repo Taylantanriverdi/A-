@@ -27,7 +27,7 @@ describe('claim adları (role, lab, doctorId, techId metin, mustChangePassword)'
     expect(adm).toMatch(/export const clearMustChangePassword = onCall/); expect(auth).toContain("callFn('clearMustChangePassword'");
     expect(adm).toMatch(/mustChangePassword: true, \.\.\.\(pwFingerprint\(rec\) \? \{ pwv: pwFingerprint\(rec\) \} : \{\}\)/); // adminCreateUser
     expect(adm).toMatch(/mustChangePassword: true, \.\.\.\(fp \? \{ pwv: fp \} : \{\}\)/); // adminResetPassword
-    expect(adm).toMatch(/if \(fp && c\.pwv && fp === c\.pwv\)/); // pwv yoksa (göç/bootstrap hesabı) doğrudan kaldırılır
+    expect(adm).toContain('clearDecision(c, pwFingerprint(rec))'); // karar saf fonksiyonda (functions/test: göç hesabında pwv yok → doğrudan kaldırılır)
     expect(read('migration/src/sinks.ts')).toContain('mustChangePassword: true'); expect(read('scripts/bootstrap-admin.ts')).toContain('mustChangePassword: true');
   });
 });

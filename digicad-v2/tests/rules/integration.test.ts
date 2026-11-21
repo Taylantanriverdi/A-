@@ -224,3 +224,38 @@ describe('Göç fixture belgesi: admin güncelleme yaması mevcut alanları (_le
     await assertFails(setDoc(doc(admin(), `${L}/jobs/1700000000102`), { ...withoutLegacy, updatedBy: 'adm' })); // ön yüz bunu yapmaz; kural yine de korur
   });
 });
+
+describe('Ön yüzün gerçek yazım biçimleri kurallardan geçer (src/pages/*.ts, src/lib/store.ts put/patch, chatbox)', () => {
+  it('hekim gönderimi (hekim.ts put isNew)', async () => {
+    const body = { id: 's9', doctorId: '1', drId: '1', patient: 'AYŞE', jobType: 'Kron', teeth: [11, 12], jaw: 'ust', color: 'A2', notes: '', files: [{ name: 'a.stl', path: 'labs/digicad/submissions/1/a.stl', size: 3, uploadedBy: 'dA', uploadedAt: 'x' }], status: 'Yeni', source: 'hekim-portal', deleted: false, updatedAt: 'x', updatedBy: 'dA', createdAt: 'x', createdBy: 'dA' };
+    await assertSucceeds(setDoc(doc(drA(), `${L}/doctorSubmissions/s9`), body, { merge: true }));
+    const snap = await assertSucceeds(getDocs(query(collection(drA(), `${L}/doctorSubmissions`), where('doctorId', '==', '1'), where('deleted', '==', false))));
+    if (!snap.docs.some((d) => d.id === 's9')) throw new Error('kendi gönderimi listede yok');
+  });
+  it('teknisyen hızlı talebi (teknisyen.ts put isNew) ve kendi talepleri sorgusu', async () => {
+    const body = { id: 'q9', drName: 'Dr X', patient: 'ALİ', type: 'Kron', qty: 2, dateout: '2026-01-01', note: 'DİŞLER: 11', techId: '7', status: 'Onay Bekliyor', submittedBy: 'tech', submittedAt: 'x', deleted: false, updatedAt: 'x', updatedBy: 't1', createdAt: 'x', createdBy: 't1' };
+    await assertSucceeds(setDoc(doc(tech(), `${L}/pendingJobs/q9`), body, { merge: true }));
+    const snap = await assertSucceeds(getDocs(query(collection(tech(), `${L}/pendingJobs`), where('techId', '==', '7'), where('deleted', '==', false))));
+    if (!snap.docs.some((d) => d.id === 'q9')) throw new Error('kendi talebi listede yok');
+  });
+  it('teknisyen patch (durum, tasarım dosyaları, not) — store.patch gövdesi', async () => {
+    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { status: 'Makyajda', updatedAt: 'x', updatedBy: 't1' }));
+    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { designFiles: [{ name: 'd.stl', path: 'labs/digicad/jobFiles/100/d.stl' }], designFilesUpdatedAt: 'x', updatedAt: 'x', updatedBy: 't1' }));
+    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { techNote: 'not', updatedAt: 'x', updatedBy: 't1' }));
+  });
+  it('admin: sipariş aktarımı, onay, dönem kapatma/geri alma, silme/geri alma yazımları', async () => {
+    const stamp = { createdAt: 'x', createdBy: 'adm', updatedAt: 'x', updatedBy: 'adm' };
+    await assertSucceeds(setDoc(doc(admin(), `${L}/jobs/300`), { id: '300', drId: '1', doctorId: '1', drName: 'Dr', patient: 'P', type: 'Kron', price: 10, currency: 'TRY', qty: 1, techId: null, techName: '', techIds: [], status: 'Bekliyor', deleted: false, files: [], orderForm: { teeth: [11] }, ...stamp }));
+    await assertSucceeds(setDoc(doc(admin(), `${L}/orderForms/300`), { id: '300', drId: '1', doctorId: '1', drName: 'Dr', patient: 'P', ...stamp }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/300`), { status: 'Tamamlandı', completedAt: 'x', updatedAt: 'x', updatedBy: 'adm' }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/300`), { closureId: 'c9', updatedAt: 'x', updatedBy: 'adm' }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/300`), { closureId: null, updatedAt: 'x', updatedBy: 'adm' }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/300`), { deleted: true, deletedAt: 'x', deletedBy: 'adm', updatedAt: 'x', updatedBy: 'adm' }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/300`), { deleted: false, deletedAt: null, deletedBy: null, updatedAt: 'x', updatedBy: 'adm' }));
+  });
+  it('sohbet: eski göç konuşmasına mesaj + thread updatedAt (chatbox.ts)', async () => {
+    await assertSucceeds(setDoc(doc(drA(), `${L}/threads/job_100/messages/x1`), { text: 'selam', senderUid: 'dA', senderRole: 'doctor', senderName: 'Hekim', timestamp: 'x' }));
+    await assertSucceeds(setDoc(doc(drA(), `${L}/threads/job_100`), { updatedAt: 'x' }, { merge: true }));
+    await assertSucceeds(setDoc(doc(tech(), `${L}/threads/tech_7`), { updatedAt: 'x' }, { merge: true }));
+  });
+});

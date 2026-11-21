@@ -3,7 +3,7 @@ import { gunzipSync } from 'node:zlib';
 import * as nodeCrypto from 'node:crypto';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { assertAdminMfaToken, decideRate, randomPassword, sanitizeText } from '../src/util';
-import { normalizeEmail, validateUid, claimsFor, refId, mapAuthError, cleanDisplayName } from '../src/validate';
+import { normalizeEmail, validateUid, claimsFor, refId, mapAuthError, cleanDisplayName, clearDecision } from '../src/validate';
 import { kindOf, actorOf, pack, AUDITED } from '../src/auditLogic';
 import { coerceParsed } from '../src/parseMail';
 import { backupPrefix } from '../src/backup';
@@ -160,4 +160,17 @@ describe('planFileCopies / applyCopies (hekim gönderim dosyaları → iş klas�
     expect(out[0]).toMatchObject({ name: 'a.stl', path: 'labs/digicad/jobFiles/900/a.stl', copiedFrom: 'labs/digicad/submissions/5/a.stl' });
     expect(out[1]).toEqual({ name: 'u', url: 'https://x' });
   });
+});
+
+describe('clearDecision (mustChangePassword akışı)', () => {
+  it('bayrak yoksa işlem yok', () => { expect(clearDecision({ role: 'doctor' }, 'abc')).toBe('noop'); });
+  it('adminCreateUser/adminResetPassword hesabı: şifre değişmediyse bekletir, değiştiyse kaldırır', () => {
+    expect(clearDecision({ mustChangePassword: true, pwv: 'aaa' }, 'aaa')).toBe('wait');
+    expect(clearDecision({ mustChangePassword: true, pwv: 'aaa' }, 'bbb')).toBe('clear');
+  });
+  it('göçle/bootstrap ile açılan hesap (pwv yok): doğrudan kaldırılır', () => {
+    expect(clearDecision({ mustChangePassword: true }, 'bbb')).toBe('clear');
+    expect(clearDecision({ mustChangePassword: true }, null)).toBe('clear');
+  });
+  it('parmak izi çıkarılamazsa (parola özeti yok) fail-open', () => { expect(clearDecision({ mustChangePassword: true, pwv: 'aaa' }, null)).toBe('clear'); });
 });

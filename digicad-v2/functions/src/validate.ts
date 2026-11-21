@@ -49,3 +49,13 @@ export function mapAuthError(e: unknown): HttpsError {
   console.error('Beklenmeyen hata kodu:', code || 'bilinmiyor');
   return new HttpsError('internal', 'İşlem tamamlanamadı.');
 }
+
+/**
+ * `clearMustChangePassword` kararı (saf): bayrak yoksa 'noop'; şifre parmak izi claim'deki `pwv` ile aynıysa (şifre değişmedi) 'wait';
+ * aksi halde 'clear'. Göçle/bootstrap ile açılan hesaplarda `pwv` yoktur → doğrudan 'clear'. Parmak izi çıkarılamıyorsa (fp null) fail-open 'clear'.
+ */
+export function clearDecision(claims: Record<string, unknown>, fp: string | null): 'noop' | 'wait' | 'clear' {
+  if (!claims.mustChangePassword) return 'noop';
+  if (fp && claims.pwv && fp === claims.pwv) return 'wait';
+  return 'clear';
+}

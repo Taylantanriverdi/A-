@@ -95,6 +95,12 @@ export const setJobFiles = (s: Session, id: string, field: 'files' | 'designFile
 /** Hekim fiyat listesi (doctors/{id}.prices) */
 export const setDoctorPrices = (s: Session, id: string, prices: unknown[]): Promise<void> => updateDoc(ref(s, 'doctors', id), { prices: clean({ v: prices }).v, ...stamp(s) });
 
+/** Son denetim kayıtları (auditLog; istemci yazamaz). Büyük belgelerde `beforeGz/afterGz` (sıkıştırılmış) ve `oversize` işaretleri gelir; yedek durumu `actor:'system'` kayıtlarıdır. */
+export async function recentAudit(s: Session, n = 50): Promise<Rec[]> {
+  const sn = await getDocs(query(collection(db, colPath(s.lab, 'auditLog')), orderBy('at', 'desc'), limit(n)));
+  return sn.docs.map((d) => ({ ...(d.data() as DocumentData), id: d.id }));
+}
+
 export async function jobHistory(s: Session, id: string): Promise<R[]> {
   const sn = await getDocs(query(collection(db, `${colPath(s.lab, 'jobs')}/${id}/history`), orderBy('at', 'desc'), limit(40)));
   return sn.docs.map((d) => ({ ...(d.data() as DocumentData), id: d.id }));

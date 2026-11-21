@@ -29,7 +29,7 @@ doctors, jobs, payments, technicians, pendingJobs, expenses, sales, orderForms, 
 | Çalışma alanı | `lab` claim'ine bağlı (seçici yok; ikinci alan için ayrı yönetici hesabı) |
 | Bildirimler (tamamlandı / onay bekliyor / tasarım yüklendi) | KISMİ (canlı toast; e-posta/push yok) |
 | Yazdırma çıktıları (sipariş formu, iş emri, ekstre, listeler) | TAM |
-| Denetim/geçmiş görüntüleme (`auditLog`, `history`) | KISMİ (iş geçmişi sekmesi var; genel denetim günlüğü ekranı YOK — konsoldan okunur; yeni alanlar `beforeGz/afterGz/oversize/status/actor:'system'`) |
+| Denetim/geçmiş görüntüleme (`auditLog`, `history`) | KISMİ (iş geçmişi sekmesi + Ayarlar'da son 50 denetim kaydı: `oversize`, sıkıştırılmış kayıt, `actor:'system'` yedek durumu gösterilir; filtre/arama ve eski kayıt sayfalama YOK) |
 
 ## Hekim portalı
 Giriş (Auth), hekimin işleri (devam eden/tamamlanan, arama/tarih süzgeci, yazdır), **yeni gönderim (FDI diş şeması, renk, notlar, tarama dosyaları)**, gönderimlerim (aşama göstergesi, bağlı işler), laboratuvarla mesajlaşma ve **iş sohbeti** (iş detayından) — TAM. Çöpteki kayıtlar görünmez.
@@ -41,7 +41,7 @@ Atanmış işler, durum güncelleme (eski durum değerleri korunur), tasarım do
 `doctorSubmissions` (görüldü/reddet/yazdır) ve `orderForms` (yazdırıldı) — TAM.
 
 ## Henüz YOK / bilinen eksikler
-Genel denetim günlüğü ekranı; e-posta/push bildirimi; Storage dosyalarının otomatik yedeği (sürümleme elle açılır); E2E tarayıcı testleri; WebAuthn/passkey.
+Denetim günlüğü filtre/arama/sayfalama (yalnızca son 50 kayıt); e-posta/push bildirimi; Storage dosyalarının otomatik yedeği (sürümleme elle açılır); E2E tarayıcı testleri; WebAuthn/passkey.
 
 ## Bilinçli değişiklikler
 4 haneli PIN ve düz metin şifreler kaldırıldı; localStorage'a hasta verisi yazılmaz; fiziksel silme yok; çalışma alanları arası geçiş kaldırıldı (claim'e bağlı); iş sohbetlerinde adlar yerine rol etiketi gösterilir (eski davranış).

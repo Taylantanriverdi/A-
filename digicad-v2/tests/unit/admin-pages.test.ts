@@ -4,14 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({
   put: vi.fn(async () => undefined), patch: vi.fn(async () => undefined), softDelete: vi.fn(async () => undefined), restore: vi.fn(async () => undefined),
   createOrder: vi.fn(async () => undefined), approvePending: vi.fn(async () => { await new Promise((r) => setTimeout(r, 20)); }), transition: vi.fn(async () => undefined), mutateJob: vi.fn(async () => ({})),
-  callFn: vi.fn(async () => ({ copied: 1, failed: 0 })), closeStatement: vi.fn(async () => undefined), undoClosure: vi.fn(async () => undefined), hideMessage: vi.fn(async () => undefined), postMessage: vi.fn(async () => undefined), stopMsgs: vi.fn(), msgCb: null as null | ((r: unknown[]) => void),
+  callFn: vi.fn(async () => ({ copied: 1, failed: 0 })), recentAudit: vi.fn(async () => [{ id: 'a1', coll: 'jobs', kind: 'update', actor: 'u1', oversize: true }, { id: 'b1', action: 'scheduledBackup', status: 'FAILED', actor: 'system' }]), closeStatement: vi.fn(async () => undefined), undoClosure: vi.fn(async () => undefined), hideMessage: vi.fn(async () => undefined), postMessage: vi.fn(async () => undefined), stopMsgs: vi.fn(), msgCb: null as null | ((r: unknown[]) => void),
 }));
 vi.mock('../../src/lib/firebase', () => ({ db: {}, auth: {}, storage: {}, functions: {}, callFn: m.callFn }));
 vi.mock('firebase/functions', () => ({ httpsCallable: () => async () => ({ data: {} }) }));
 vi.mock('firebase/storage', () => ({ ref: vi.fn(), uploadBytes: vi.fn(), getDownloadURL: vi.fn(async () => 'https://x/y') }));
 vi.mock('../../src/lib/store', async () => { let n = 0; return { put: m.put, patch: m.patch, softDelete: m.softDelete, restore: m.restore, newId: () => `id${++n}`, listen: () => () => undefined, colPath: (l: string, c: string) => `labs/${l}/${c}` }; });
 vi.mock('../../src/admin/data', () => ({ createOrder: m.createOrder, approvePending: m.approvePending, transition: m.transition, mutateJob: m.mutateJob, closeStatement: m.closeStatement, undoClosure: m.undoClosure, hideMessage: m.hideMessage, postMessage: m.postMessage,
-  watchMessages: (_s: unknown, _t: string, cb: (r: unknown[]) => void) => { m.msgCb = cb; return m.stopMsgs; }, jobHistory: async () => [], setDoctorPrices: vi.fn(), setJobFiles: vi.fn(), addMailFilter: vi.fn(), removeMailFilter: vi.fn() }));
+  watchMessages: (_s: unknown, _t: string, cb: (r: unknown[]) => void) => { m.msgCb = cb; return m.stopMsgs; }, jobHistory: async () => [], recentAudit: m.recentAudit, setDoctorPrices: vi.fn(), setJobFiles: vi.fn(), addMailFilter: vi.fn(), removeMailFilter: vi.fn() }));
 
 import * as P1 from '../../src/admin/pages1';
 import * as P2 from '../../src/admin/pages2';
@@ -142,6 +142,10 @@ describe('göçle gelen belgeler (_legacy, {_nestedArray}, x-önekli alanlar, bi
 describe('çalışma alanı, hesap devre dışı bırakma, hekim seçimi, dosya kopyası', () => {
   it('ayarlar: çalışma alanı seçici yok, yalnızca claim lab gösterilir', () => {
     const el = show(P2.settings(ctx())); expect(el.querySelector('select[name=lab]')).toBeNull(); expect(el.textContent).toContain('"digicad"');
+  });
+  it('ayarlar: denetim kayıtları (oversize/sistem/yedek durumu) listelenir', async () => {
+    const el = show(P2.settings(ctx())); btnByText(el, 'denetim kayıtlarını').click(); await flush();
+    expect(el.textContent).toContain('jobs/a1'); expect(el.textContent).toContain('belge çok büyük'); expect(el.textContent).toContain('scheduledBackup'); expect(el.textContent).toContain('FAILED');
   });
   it('hekim silinince bağlı hesap devre dışı bırakılır; çöpten geri alınınca yeniden etkinleştirilir', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
