@@ -1,0 +1,130 @@
+﻿==================================================================
+  ULTIMA ONLINE YEREL SUNUCU - OKU BENİ
+==================================================================
+
+KLASÖR YAPISI
+-------------
+  C:\UO_Projem\
+    1_Kurulum_ve_Derleme.bat   -> Araçları kurar, ServUO + ClassicUO indirir, derler, ayarlar
+    2_Oyunu_Baslat.bat         -> Yedek alır, sunucuyu açar, hazır olunca ClassicUO'yu açar
+    3_Online_Moduna_Gecis.bat  -> IP adresini VDS/VPS dış IP'si ile değiştirir
+    Araclar\                   -> Yardımcı betikler ve ORTAK AYARLAR (ayarlar.cmd)
+    Server\                    -> ServUO sunucu dosyaları (ServUO.exe, Config, Saves)
+    Client\                    -> ClassicUO (ClassicUO.exe, settings.json)
+    Client\UO_Files\           -> ORİJİNAL UO OYUN DOSYALARI BURAYA
+    Backups\                   -> Saves_YYYY-AA-GG_SS-DD-ss adlı otomatik yedekler
+
+  Bu dosyaların hepsi C:\UO_Projem klasöründe olmalı. Başka bir klasör
+  kullanmak istersen Araclar\ayarlar.cmd içindeki UO_ROOT değerini değiştir.
+
+
+1) KURULUM
+----------
+  1. 1_Kurulum_ve_Derleme.bat dosyasına çift tıkla.
+     - git veya .NET SDK (8 ya da üstü) eksikse winget ile kurmayı önerir.
+       Bunun için yönetici izni ister (UAC penceresinde "Evet" de).
+     - Kurulumdan sonra "bulunamadı" hatası alırsan pencereyi kapatıp
+       dosyayı tekrar çalıştır (yeni PATH ayarı yüklenir).
+  2. Dosya tekrar çalıştırılabilir: ServUO'yu git pull ile günceller,
+     yeniden derler ve ayarları yeniden yazar.
+
+  Not: ServUO .NET Framework 4.8 (net48) için derlenir. .NET SDK yalnızca
+  derleme aracıdır; çalışma zamanı Windows 10/11'de zaten yüklü gelir.
+
+
+2) ORİJİNAL UO DOSYALARINI KOPYALA  (EN ÖNEMLİ ADIM)
+----------------------------------------------------
+  ServUO ve ClassicUO, haritaları ve grafikleri orijinal Ultima Online
+  istemcisinden okur. Bu dosyalar telif nedeniyle otomatik indirilmez.
+
+  Kopyalanacak yer:
+      C:\UO_Projem\Client\UO_Files
+
+  Kaynak: Orijinal "Ultima Online Classic" kurulum klasörü, örneğin
+      C:\Program Files (x86)\Electronic Arts\Ultima Online Classic
+
+  O klasördeki TÜM dosyaları (alt klasörlerle birlikte) UO_Files içine kopyala.
+  Özellikle şunlar olmalı:
+      *.uop    -> map0LegacyMUL.uop, artLegacyMUL.uop, gumpartLegacyMUL.uop,
+                  soundLegacyMUL.uop, tileart.uop, MultiCollection.uop ...
+      *.mul    -> tiledata.mul, hues.mul, multi.mul, verdata.mul,
+                  statics0.mul, staidx0.mul, radarcol.mul, skills.mul ...
+      client.exe (varsa) -> ClassicUO istemci sürümünü buradan okur
+      cliloc.enu, *.def dosyaları
+
+  Bu iki ayar kurulumda otomatik yapılır:
+      Server\Config\DataPath.cfg -> CustomPath=C:\UO_Projem\Client\UO_Files
+      Client\settings.json       -> "ultimaonlinedirectory": "C:\\UO_Projem\\Client\\UO_Files"
+
+  İstemci sürümü hatası alırsan (ClassicUO "client version" sorarsa):
+      Araclar\ayarlar.cmd içinde  set "UO_CLIENT_VERSION=7.0.95.0"
+      gibi kendi dosyalarına uyan sürümü yaz ve 1_Kurulum_ve_Derleme.bat'ı
+      tekrar çalıştır (veya settings.json içindeki "clientversion" değerini
+      elle düzenle).
+
+
+3) İLK ÇALIŞTIRMA VE YÖNETİCİ HESABI
+------------------------------------
+  1. 2_Oyunu_Baslat.bat dosyasına çift tıkla.
+  2. "ServUO - MyCustomUO" adlı sunucu penceresi açılır. İlk çalıştırmada:
+         This server has no accounts.
+         Do you want to create the owner account now? (y/n)
+     sorusunu sorar. O pencereye tıkla, y yaz, Enter'a bas, ardından
+     kullanıcı adı (Username) ve şifre (Password) gir.
+     Bu hesap en yüksek yetkiye (Owner) sahiptir.
+     Sunucu portu (2593) ancak bu adımdan sonra açılır.
+  3. Port açılınca ClassicUO kendiliğinden başlar. Giriş ekranında
+     az önce oluşturduğun kullanıcı adı ve şifreyi yaz, "MyCustomUO"
+     sunucusunu seç ve bir karakter oluştur.
+
+
+4) [createworld KOMUTU - DÜNYAYI DOLDURMA
+-----------------------------------------
+  Yeni kurulan bir ServUO dünyası BOŞTUR: kapılar, tabelalar, moongate'ler,
+  NPC satıcılar ve yaratık spawnları yoktur. Bunları bir kez oluşturmalısın.
+
+  1. Owner hesabıyla oyuna gir.
+  2. Oyun içinde sohbet satırına şunu yaz ve Enter'a bas:
+         [createworld
+     (Başındaki [ işareti komut ön ekidir.)
+  3. Açılan pencerede oluşturulacak her şeyi işaretle (veya hepsini seç)
+     ve "Create" düğmesine bas. Bu işlem birkaç dakika sürebilir;
+     bitene kadar bekle.
+  4. Bittiğinde dünyayı kaydet:
+         [save
+
+  Diğer işe yarar komutlar:
+      [admin        -> Yönetim paneli
+      [go           -> Haritada bir yere ışınlan
+      [add          -> Eşya/yaratık ekle
+      [props        -> Bir nesnenin özelliklerini düzenle
+      [decorate     -> Sadece dekorasyonları ekle
+      [save         -> Dünyayı hemen kaydet
+  Sunucu konsoluna "save" ve "shutdown" yazarak sunucuyu güvenle kapatabilirsin.
+  Pencereyi X ile kapatırsan son otomatik kayıttan sonraki değişiklikler kaybolur.
+
+
+5) YEDEKLER
+-----------
+  2_Oyunu_Baslat.bat her çalıştığında Server\Saves klasörünü
+  Backups\Saves_<tarih-saat> olarak kopyalar. En yeni 30 yedek tutulur
+  (Araclar\ayarlar.cmd -> UO_BACKUP_KEEP, 0 = sınırsız).
+
+  Bir yedeği geri yüklemek için: sunucuyu kapat, Server\Saves klasörünü
+  sil/yeniden adlandır, istediğin yedek klasörünü Server\Saves adıyla
+  geri kopyala.
+
+
+6) ONLINE'A (VDS/VPS) TAŞIMA
+----------------------------
+  1. C:\UO_Projem klasörünün tamamını VDS'e kopyala (aynı yola).
+  2. VDS üzerinde 3_Online_Moduna_Gecis.bat dosyasını YÖNETİCİ olarak çalıştır
+     ve VDS'in dış IP adresini gir. Dosya:
+       - Server\Config\Server.cfg  -> Address=<dış IP>
+       - Client\settings.json      -> "ip": "<dış IP>"
+     değerlerini değiştirir (eski hâller .bak olarak saklanır) ve
+     istersen Windows Güvenlik Duvarı'nda TCP 2593 portunu açar.
+  3. VDS sağlayıcının panelinde de TCP 2593'ü aç.
+  4. Oyunculara Client klasörünü (UO_Files dahil) ver; settings.json
+     zaten dış IP'yi gösterir.
+  Yerel moda dönmek için aynı dosyayı çalıştırıp IP olarak 127.0.0.1 yaz.
