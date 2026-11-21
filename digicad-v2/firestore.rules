@@ -7,15 +7,33 @@ service cloud.firestore {
     // ---------- Yardımcılar ----------
     function signedIn() { return request.auth != null; }
     function role() { return signedIn() && 'role' in request.auth.token ? request.auth.token.role : ''; }
-    function isAdmin() { return role() == 'admin'; }
     function inLab(lab) { return signedIn() && 'lab' in request.auth.token && request.auth.token.lab == lab; }
-    function isDoctor(lab) { return role() == 'doctor' && inLab(lab) && 'doctorId' in request.auth.token; }
-    function isTech(lab) { return role() == 'tech' && inLab(lab) && 'techId' in request.auth.token; }
+    // Yönetici: rol + KENDİ laboratuvarı + TOTP ikinci faktörle girilmiş token (MFA'sız admin tokeni hiçbir şey yapamaz).
+    function hasMfa() { return 'firebase' in request.auth.token && 'sign_in_second_factor' in request.auth.token.firebase; }
+    function isAdmin(lab) { return role() == 'admin' && inLab(lab) && hasMfa(); }
+    function isDoctor(lab) {
+      return role() == 'doctor' && inLab(lab) && 'doctorId' in request.auth.token && string(request.auth.token.doctorId).size() > 0;
+    }
+    function isTech(lab) {
+      return role() == 'tech' && inLab(lab) && 'techId' in request.auth.token && string(request.auth.token.techId).size() > 0;
+    }
     function myDoctorId() { return string(request.auth.token.doctorId); }
     function myTechId() { return string(request.auth.token.techId); }
 
     function str(v, max) { return v is string && v.size() <= max; }
     function optStr(d, k, max) { return !(k in d) || d[k] == null || str(d[k], max); }
+    // Denetim izi: yazan kişi kendi uid'sini updatedBy olarak yazmak zorunda (başkası adına yazılamaz).
+    function stamped(d) { return d.updatedBy == request.auth.uid; }
+    // Güncellemede mevcut hiçbir alan kaldırılamaz (set() ile veri silme / deleteField engeli).
+    function keepsFields() { return request.resource.data.keys().hasAll(resource.data.keys()); }
+    // Oluşturma damgası değiştirilemez.
+    function keepsCreated() {
+      return request.resource.data.get('createdAt', null) == resource.data.get('createdAt', null)
+        && request.resource.data.get('createdBy', null) == resource.data.get('createdBy', null);
+    }
+    function adminCreate(lab) { return isAdmin(lab) && stamped(request.resource.data); }
+    function adminUpdate(lab) { return isAdmin(lab) && stamped(request.resource.data) && keepsFields() && keepsCreated(); }
+
     function jobStatusOk(s) {
       return s in ['Bekliyor', 'Tasarımda', 'Üretimde', 'Makyajda', 'Tamamlama Onayı', 'Tamamlandı'];
     }
@@ -25,7 +43,18 @@ service cloud.firestore {
     function validJob(d) {
       return str(d.doctorId, 64) && jobStatusOk(d.status)
         && optStr(d, 'patient', 300) && optStr(d, 'note', 5000)
+        && (!('deleted' in d) || d.deleted is bool)
         && (!('techIds' in d) || (d.techIds is list && d.techIds.size() <= 20));
+    }
+    // Teknisyen yalnızca bu alanları değiştirebilir.
+    function techKeysOk() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['status', 'designFiles', 'designFilesUpdatedAt', 'techNote', 'updatedAt', 'updatedBy']);
+    }
+    function techDesignOk() {
+      return !('designFiles' in request.resource.data.diff(resource.data).affectedKeys())
+        || (request.resource.data.designFiles is list && request.resource.data.designFiles.size() <= 200
+            && (!('designFiles' in resource.data) || request.resource.data.designFiles.hasAll(resource.data.designFiles)));
     }
 
     // Varsayılan: her şey kapalı
@@ -35,92 +64,121 @@ service cloud.firestore {
 
       // ---------- Hekimler ----------
       match /doctors/{id} {
-        allow read: if isAdmin() || (isDoctor(lab) && id == myDoctorId());
-        allow create, update: if isAdmin() && str(request.resource.data.name, 200);
+        allow read: if isAdmin(lab) || (isDoctor(lab) && id == myDoctorId());
+        allow create: if adminCreate(lab) && str(request.resource.data.name, 200);
+        allow update: if adminUpdate(lab) && str(request.resource.data.name, 200);
         allow delete: if false;
       }
 
       // ---------- Teknisyenler ----------
       match /technicians/{id} {
-        allow read: if isAdmin() || (isTech(lab) && id == myTechId());
-        allow create, update: if isAdmin() && str(request.resource.data.name, 200);
+        allow read: if isAdmin(lab) || (isTech(lab) && id == myTechId());
+        allow create: if adminCreate(lab) && str(request.resource.data.name, 200);
+        allow update: if adminUpdate(lab) && str(request.resource.data.name, 200);
         allow delete: if false;
       }
 
       // ---------- İşler ----------
       match /jobs/{id} {
-        allow read: if isAdmin()
+        allow read: if isAdmin(lab)
           || (isDoctor(lab) && resource.data.doctorId == myDoctorId())
           || (isTech(lab) && 'techIds' in resource.data && myTechId() in resource.data.techIds);
-        allow create: if isAdmin() && validJob(request.resource.data);
-        allow update: if (isAdmin() && validJob(request.resource.data))
+        allow create: if adminCreate(lab) && validJob(request.resource.data);
+        allow update: if (adminUpdate(lab) && validJob(request.resource.data))
           || (isTech(lab)
               && 'techIds' in resource.data && myTechId() in resource.data.techIds
-              && request.resource.data.diff(resource.data).affectedKeys()
-                   .hasOnly(['status', 'designFiles', 'designFilesUpdatedAt', 'techNote', 'updatedAt', 'updatedBy'])
-              && (!('status' in request.resource.data) || techStatusOk(request.resource.data.status))
-              && (!('designFiles' in request.resource.data) || request.resource.data.designFiles.size() <= 200)
+              && resource.data.get('deleted', false) != true      // çöpteki iş değiştirilemez
+              && resource.data.status != 'Tamamlandı'             // kapanmış iş yeniden açılamaz
+              && stamped(request.resource.data) && keepsFields() && keepsCreated()
+              && techKeysOk()
+              && techStatusOk(request.resource.data.status)
+              && techDesignOk()
               && optStr(request.resource.data, 'techNote', 5000));
         allow delete: if false;
       }
 
       // ---------- Onay bekleyen işler ----------
       match /pendingJobs/{id} {
-        allow read: if isAdmin() || (isTech(lab) && resource.data.techId == myTechId());
-        allow create: if isAdmin()
+        allow read: if isAdmin(lab) || (isTech(lab) && resource.data.techId == myTechId());
+        allow create: if adminCreate(lab)
           || (isTech(lab) && request.resource.data.techId == myTechId()
               && request.resource.data.status == 'Onay Bekliyor'
-              && str(request.resource.data.patient, 300));
-        allow update: if isAdmin();
+              && request.resource.data.keys().hasOnly(['id', 'drName', 'patient', 'type', 'qty', 'dateout', 'note', 'techId', 'status',
+                   'submittedBy', 'submittedAt', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
+              && request.resource.data.createdBy == request.auth.uid && stamped(request.resource.data)
+              && str(request.resource.data.patient, 300)
+              && optStr(request.resource.data, 'drName', 300) && optStr(request.resource.data, 'type', 300)
+              && optStr(request.resource.data, 'note', 5000) && optStr(request.resource.data, 'dateout', 40)
+              && (!('qty' in request.resource.data) || request.resource.data.qty is number));
+        allow update: if adminUpdate(lab);
         allow delete: if false;
       }
 
       // ---------- Hekim gönderimleri ----------
       match /doctorSubmissions/{id} {
-        allow read: if isAdmin() || (isDoctor(lab) && resource.data.doctorId == myDoctorId());
+        allow read: if isAdmin(lab) || (isDoctor(lab) && resource.data.doctorId == myDoctorId());
         allow create: if isDoctor(lab)
           && request.resource.data.doctorId == myDoctorId()
+          && (!('drId' in request.resource.data) || string(request.resource.data.drId) == myDoctorId())
+          && request.resource.data.keys().hasOnly(['id', 'doctorId', 'drId', 'patient', 'jobType', 'teeth', 'jaw', 'color', 'notes', 'files',
+               'status', 'source', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'])
           && request.resource.data.status == 'Yeni'
-          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdBy == request.auth.uid && stamped(request.resource.data)
           && str(request.resource.data.patient, 300)
+          && optStr(request.resource.data, 'jobType', 200) && optStr(request.resource.data, 'color', 100)
+          && optStr(request.resource.data, 'jaw', 20) && optStr(request.resource.data, 'source', 40)
           && optStr(request.resource.data, 'notes', 5000)
+          && (!('teeth' in request.resource.data) || (request.resource.data.teeth is list && request.resource.data.teeth.size() <= 60))
           && (!('files' in request.resource.data) || (request.resource.data.files is list && request.resource.data.files.size() <= 50));
-        allow update: if isAdmin();
+        allow update: if adminUpdate(lab);
         allow delete: if false;
       }
 
       // ---------- Yalnızca admin: finans ve yönetim ----------
-      match /payments/{id}          { allow read, create, update: if isAdmin(); allow delete: if false; }
-      match /expenses/{id}          { allow read, create, update: if isAdmin(); allow delete: if false; }
-      match /sales/{id}             { allow read, create, update: if isAdmin(); allow delete: if false; }
-      match /orderForms/{id}        { allow read, create, update: if isAdmin(); allow delete: if false; }
-      match /statementClosures/{id} { allow read, create, update: if isAdmin(); allow delete: if false; }
-      match /settings/{id}          { allow read, create, update: if isAdmin(); allow delete: if false; }
-      match /mailFilters/{id}       { allow read, create, update: if isAdmin(); allow delete: if false; }
+      match /payments/{id}          { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
+      match /expenses/{id}          { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
+      match /sales/{id}             { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
+      match /orderForms/{id}        { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
+      match /statementClosures/{id} { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
+      match /settings/{id}          { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
+      match /mailFilters/{id}       { allow read: if isAdmin(lab); allow create: if adminCreate(lab); allow update: if adminUpdate(lab); allow delete: if false; }
 
       // ---------- Denetim ve geçmiş: istemci YAZAMAZ ----------
-      match /auditLog/{id} { allow read: if isAdmin(); allow write: if false; }
-      match /{coll}/{docId}/history/{hid} { allow read: if isAdmin(); allow write: if false; }
+      match /auditLog/{id} { allow read: if isAdmin(lab); allow write: if false; }
+      match /{coll}/{docId}/history/{hid} { allow read: if isAdmin(lab); allow write: if false; }
 
       // ---------- Mesajlaşma ----------
       function threadAllowed(tid) {
-        return isAdmin()
+        return isAdmin(lab)
           || (isDoctor(lab) && tid == 'dr_' + myDoctorId())
           || (isTech(lab) && tid == 'tech_' + myTechId());
       }
       match /threads/{tid} {
         allow read: if threadAllowed(tid);
-        allow create, update: if threadAllowed(tid);
+        allow create: if threadAllowed(tid)
+          && request.resource.data.keys().hasOnly(['updatedAt', 'createdAt'])
+          && optStr(request.resource.data, 'updatedAt', 40);
+        allow update: if threadAllowed(tid) && keepsFields()
+          && request.resource.data.keys().hasOnly(['updatedAt', 'createdAt'])
+          && optStr(request.resource.data, 'updatedAt', 40);
         allow delete: if false;
         match /messages/{mid} {
           allow read: if threadAllowed(tid);
           allow create: if threadAllowed(tid)
+            && request.resource.data.keys().hasOnly(['text', 'senderUid', 'senderRole', 'senderName', 'timestamp', 'filePath', 'fileName'])
             && str(request.resource.data.text, 4000)
             && request.resource.data.senderUid == request.auth.uid
-            && request.resource.data.senderRole == role();
-          // Düzenleme yok; yalnızca admin yumuşak silme alanlarını ekleyebilir.
-          allow update: if isAdmin()
-            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy']);
+            && request.resource.data.senderRole == role()
+            && optStr(request.resource.data, 'senderName', 200) && optStr(request.resource.data, 'timestamp', 40)
+            && optStr(request.resource.data, 'fileName', 300)
+            && (!('filePath' in request.resource.data)
+                || (request.resource.data.filePath is string
+                    && request.resource.data.filePath.matches('labs/' + lab + '/chat/' + tid + '/[^/]+')));
+          // Düzenleme yok; yalnızca admin yumuşak silme alanlarını (kendi uid'si ile) ekleyebilir/geri alabilir.
+          allow update: if isAdmin(lab)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+            && keepsFields()
+            && (request.resource.data.get('deletedBy', null) == null || request.resource.data.deletedBy == request.auth.uid);
           allow delete: if false;
         }
       }

@@ -27,7 +27,7 @@ const drA = () => st('dA', { role: 'doctor', doctorId: '1', lab: 'digicad' });
 const drB = () => st('dB', { role: 'doctor', doctorId: '2', lab: 'digicad' });
 const tech = () => st('t1', { role: 'tech', techId: '7', lab: 'digicad' });
 const tech2 = () => st('t2', { role: 'tech', techId: '8', lab: 'digicad' });
-const admin = () => st('adm', { role: 'admin', lab: 'digicad' });
+const admin = () => st('adm', { role: 'admin', lab: 'digicad', firebase: { sign_in_second_factor: 'totp' } });
 
 describe('Storage kuralları', () => {
   it('anonim okuyamaz/yazamaz', async () => {

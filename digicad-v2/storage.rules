@@ -4,10 +4,16 @@ service firebase.storage {
   match /b/{bucket}/o {
     function signedIn() { return request.auth != null; }
     function role() { return signedIn() && 'role' in request.auth.token ? request.auth.token.role : ''; }
-    function isAdmin() { return role() == 'admin'; }
     function inLab(lab) { return signedIn() && 'lab' in request.auth.token && request.auth.token.lab == lab; }
-    function isDoctor(lab) { return role() == 'doctor' && inLab(lab) && 'doctorId' in request.auth.token; }
-    function isTech(lab) { return role() == 'tech' && inLab(lab) && 'techId' in request.auth.token; }
+    // Yönetici: rol + kendi laboratuvarı + TOTP ikinci faktör (Firestore kurallarıyla aynı).
+    function hasMfa() { return 'firebase' in request.auth.token && 'sign_in_second_factor' in request.auth.token.firebase; }
+    function isAdmin(lab) { return role() == 'admin' && inLab(lab) && hasMfa(); }
+    function isDoctor(lab) {
+      return role() == 'doctor' && inLab(lab) && 'doctorId' in request.auth.token && string(request.auth.token.doctorId).size() > 0;
+    }
+    function isTech(lab) {
+      return role() == 'tech' && inLab(lab) && 'techId' in request.auth.token && string(request.auth.token.techId).size() > 0;
+    }
 
     function maxMB(n) { return request.resource.size < n * 1024 * 1024; }
     function scanType() {
@@ -23,21 +29,29 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/labs/$(lab)/jobs/$(jobId));
     }
 
+    // Teknisyen: işe atanmış, işin çöpte olmaması ve Tamamlandı olmaması gerekir (Firestore kurallarıyla tutarlı).
+    function techMayUpload(lab, jobId) {
+      return isTech(lab)
+        && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds
+        && jobDoc(lab, jobId).data.get('deleted', false) != true
+        && jobDoc(lab, jobId).data.status != 'Tamamlandı';
+    }
+
     match /{allPaths=**} { allow read, write: if false; }
 
     // İş dosyaları: labs/{lab}/jobFiles/{jobId}/{dosya}
     match /labs/{lab}/jobFiles/{jobId}/{file} {
-      allow read: if isAdmin()
+      allow read: if isAdmin(lab)
         || (isDoctor(lab) && jobDoc(lab, jobId).data.doctorId == string(request.auth.token.doctorId))
         || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds);
-      allow create: if resource == null && (isAdmin() || (isTech(lab) && string(request.auth.token.techId) in jobDoc(lab, jobId).data.techIds))
+      allow create: if resource == null && (isAdmin(lab) || techMayUpload(lab, jobId))
         && maxMB(200) && scanType();
       allow update, delete: if false;
     }
 
     // Hekim gönderim dosyaları: labs/{lab}/submissions/{doctorId}/{dosya}
     match /labs/{lab}/submissions/{doctorId}/{file} {
-      allow read: if isAdmin() || (isDoctor(lab) && string(request.auth.token.doctorId) == doctorId);
+      allow read: if isAdmin(lab) || (isDoctor(lab) && string(request.auth.token.doctorId) == doctorId);
       allow create: if resource == null && isDoctor(lab) && string(request.auth.token.doctorId) == doctorId
         && maxMB(200) && scanType();
       allow update, delete: if false;
@@ -45,10 +59,10 @@ service firebase.storage {
 
     // Sohbet ekleri: labs/{lab}/chat/{threadId}/{dosya}
     match /labs/{lab}/chat/{threadId}/{file} {
-      allow read: if isAdmin()
+      allow read: if isAdmin(lab)
         || (isDoctor(lab) && threadId == 'dr_' + string(request.auth.token.doctorId))
         || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId));
-      allow create: if resource == null && (isAdmin()
+      allow create: if resource == null && (isAdmin(lab)
         || (isDoctor(lab) && threadId == 'dr_' + string(request.auth.token.doctorId))
         || (isTech(lab) && threadId == 'tech_' + string(request.auth.token.techId)))
         && maxMB(25) && chatType();

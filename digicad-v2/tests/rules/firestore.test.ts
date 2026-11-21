@@ -6,7 +6,8 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, getDocs, query, 
 let env: RulesTestEnvironment;
 const L = 'labs/digicad';
 
-const admin = () => env.authenticatedContext('adm', { role: 'admin', lab: 'digicad' }).firestore();
+const MFA = { firebase: { sign_in_second_factor: 'totp' } };
+const admin = () => env.authenticatedContext('adm', { role: 'admin', lab: 'digicad', ...MFA }).firestore();
 const drA = () => env.authenticatedContext('dA', { role: 'doctor', doctorId: '1', lab: 'digicad' }).firestore();
 const drB = () => env.authenticatedContext('dB', { role: 'doctor', doctorId: '2', lab: 'digicad' }).firestore();
 const tech = () => env.authenticatedContext('t1', { role: 'tech', techId: '7', lab: 'digicad' }).firestore();
@@ -65,7 +66,7 @@ describe('Firestore: hekim izolasyonu', () => {
     await assertFails(getDoc(doc(drA(), `${L}/doctors/2`)));
   });
   it('hekim yalnızca kendi adına gönderim oluşturur', async () => {
-    const ok = { doctorId: '1', status: 'Yeni', createdBy: 'dA', patient: 'Ornek', files: [] };
+    const ok = { doctorId: '1', status: 'Yeni', createdBy: 'dA', updatedBy: 'dA', patient: 'Ornek', files: [] };
     await assertSucceeds(setDoc(doc(drA(), `${L}/doctorSubmissions/s1`), ok));
     await assertFails(setDoc(doc(drB(), `${L}/doctorSubmissions/s2`), ok));
     await assertFails(setDoc(doc(drA(), `${L}/doctorSubmissions/s3`), { ...ok, status: 'Aktarıldı' }));
@@ -89,7 +90,7 @@ describe('Firestore: teknisyen', () => {
     await assertFails(getDoc(doc(tech(), `${L}/jobs/101`)));
   });
   it('izinli alanı günceller', async () => {
-    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { status: 'Üretimde', techNote: 'not', updatedAt: 'x' }));
+    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { status: 'Üretimde', techNote: 'not', updatedAt: 'x', updatedBy: 't1' }));
   });
   it('izinsiz alanı güncelleyemez (fiyat, hekim, techIds)', async () => {
     await assertFails(updateDoc(doc(tech(), `${L}/jobs/100`), { price: 1 }));
@@ -99,22 +100,22 @@ describe('Firestore: teknisyen', () => {
   });
   it('doğrudan Tamamlandı yapamaz', async () => {
     await assertFails(updateDoc(doc(tech(), `${L}/jobs/100`), { status: 'Tamamlandı' }));
-    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { status: 'Tamamlama Onayı' }));
+    await assertSucceeds(updateDoc(doc(tech(), `${L}/jobs/100`), { status: 'Tamamlama Onayı', updatedBy: 't1' }));
   });
   it('başkasının işini güncelleyemez', async () => {
-    await assertFails(updateDoc(doc(tech(), `${L}/jobs/101`), { status: 'Üretimde' }));
+    await assertFails(updateDoc(doc(tech(), `${L}/jobs/101`), { status: 'Üretimde', updatedBy: 't1' }));
   });
   it('finansı okuyamaz', async () => { await assertFails(getDoc(doc(tech(), `${L}/payments/1`))); });
   it('kendi adına bekleyen iş oluşturur, başkası adına oluşturamaz', async () => {
-    await assertSucceeds(setDoc(doc(tech(), `${L}/pendingJobs/p1`), { techId: '7', status: 'Onay Bekliyor', patient: 'Ornek' }));
-    await assertFails(setDoc(doc(tech(), `${L}/pendingJobs/p2`), { techId: '8', status: 'Onay Bekliyor', patient: 'Ornek' }));
+    await assertSucceeds(setDoc(doc(tech(), `${L}/pendingJobs/p1`), { techId: '7', status: 'Onay Bekliyor', patient: 'Ornek', createdBy: 't1', updatedBy: 't1' }));
+    await assertFails(setDoc(doc(tech(), `${L}/pendingJobs/p2`), { techId: '8', status: 'Onay Bekliyor', patient: 'Ornek', createdBy: 't1', updatedBy: 't1' }));
   });
 });
 
 describe('Firestore: admin ve silme yasağı', () => {
   it('admin okur/yazar', async () => {
     await assertSucceeds(getDoc(doc(admin(), `${L}/payments/1`)));
-    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/100`), { price: 50, deletedAt: 'x', deletedBy: 'adm' }));
+    await assertSucceeds(updateDoc(doc(admin(), `${L}/jobs/100`), { price: 50, deletedAt: 'x', deletedBy: 'adm', updatedBy: 'adm' }));
   });
   it('admin dahil kimse fiziksel silemez', async () => {
     for (const p of ['jobs/100', 'payments/1', 'doctors/1']) {
@@ -124,7 +125,7 @@ describe('Firestore: admin ve silme yasağı', () => {
     }
   });
   it('admin geçersiz durumlu iş yazamaz', async () => {
-    await assertFails(updateDoc(doc(admin(), `${L}/jobs/100`), { status: 'Uydurma' }));
+    await assertFails(updateDoc(doc(admin(), `${L}/jobs/100`), { status: 'Uydurma', updatedBy: 'adm' }));
   });
   it('auditLog istemciden yazılamaz, yalnızca admin okur', async () => {
     await assertFails(setDoc(doc(admin(), `${L}/auditLog/a2`), { x: 1 }));
