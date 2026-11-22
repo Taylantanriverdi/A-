@@ -2,7 +2,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: tam ekran 3B atölye görünümü solda, cihaz paneli sağda; telefonda alt alta. Bilinçli olarak tek (koyu) tema. */
+/* Layout: solda 3B atölye, sağda iki sekmeli panel (Nasıl çalışır / Dene); telefonda alt alta. Bilinçli olarak tek (koyu) tema. */
 :root {
   color-scheme: dark;
   --bg: #0f1417;
@@ -18,170 +18,248 @@
   --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
-body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; overflow: hidden; }
-.app { display: grid; grid-template-columns: minmax(0, 1fr) 350px; height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14.5px; overflow: hidden; }
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 370px; height: 100%; }
 .stage { position: relative; min-width: 0; overflow: hidden; }
 .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding-block: 16px 24px; padding-inline: 16px; display: flex; flex-direction: column; gap: 18px; }
+.panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; display: flex; flex-direction: column; }
 @media (max-width: 820px) {
   body { overflow: auto; }
-  .app { grid-template-columns: 1fr; grid-template-rows: 62vh auto; height: auto; }
-  .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .app { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
+  .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
 }
-header.top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.panel-head { padding-block: 14px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; position: sticky; top: 0; background: var(--panel); z-index: 2; border-bottom: 1px solid var(--line); }
+.title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 h1 { font-size: 17px; font-weight: 600; margin: 0; text-wrap: balance; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.tabs button { background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--muted); padding: 10px 6px; font-size: 14px; }
+.tabs button[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--air); }
+.tab-body { padding-block: 16px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 18px; }
 .pill { font-family: var(--font-data); font-size: 12px; font-weight: 600; letter-spacing: .06em; padding: 4px 10px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
 .pill.safe { color: var(--ok); }
 .pill.armed { color: var(--armed); background: color-mix(in srgb, var(--armed) 14%, transparent); }
 .pill.estop { color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); }
-section { display: flex; flex-direction: column; gap: 10px; }
 h2 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0; }
+p { margin: 0; line-height: 1.55; }
+.muted { color: var(--muted); font-size: 13px; }
+button { font: inherit; font-weight: 600; border-radius: 8px; padding: 10px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); }
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--air); outline-offset: 2px; }
+button:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Tur */
+.tour-count { font-family: var(--font-data); font-size: 12px; color: var(--air); letter-spacing: .05em; }
+.tour h3 { font-size: 20px; font-weight: 600; margin: 4px 0 0; text-wrap: balance; }
+.tour-text { display: flex; flex-direction: column; gap: 10px; }
+.tour-text b { color: var(--air); font-weight: 600; }
+.fact { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 13px; }
+.fact dt { color: var(--muted); }
+.fact dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.act { background: color-mix(in srgb, var(--air) 16%, var(--panel-2)); border-color: var(--air); color: var(--fg); width: 100%; }
+.nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nav .next { background: var(--air); border-color: var(--air); color: #062027; }
+.dots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.dots button { width: 10px; height: 10px; padding: 0; border-radius: 50%; background: var(--line); border: 0; }
+.dots button.on { background: var(--air); }
+
+/* Dene */
+.steps { display: flex; flex-direction: column; gap: 10px; }
+.step { display: grid; grid-template-columns: 28px 1fr; gap: 4px 12px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; align-items: start; }
+.step.done { border-color: color-mix(in srgb, var(--ok) 55%, var(--line)); }
+.step.cur { border-color: var(--air); }
+.step .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-data); font-weight: 600; background: var(--line); font-size: 13px; }
+.step.done .n { background: var(--ok); color: #06210f; }
+.step.cur .n { background: var(--air); color: #062027; }
+.step-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.step-body strong { font-weight: 600; }
+.aim-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-family: var(--font-data); font-size: 12.5px; color: var(--muted); }
+.aim-row button { padding: 6px 10px; font-size: 13px; font-weight: 500; font-family: var(--font-ui); }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+.switch input { appearance: none; width: 46px; height: 26px; border-radius: 13px; background: var(--line); position: relative; cursor: pointer; margin: 0; transition: background .15s; flex: none; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--fg); transition: left .15s; }
+.switch input:checked { background: var(--armed); }
+.switch input:checked::after { left: 23px; }
+#fireBtn { font-size: 17px; padding: 14px; letter-spacing: .03em; }
+#fireBtn.ready { background: var(--panel-2); color: var(--armed); border-color: var(--armed); }
+#fireBtn.hot { background: var(--armed); color: #1a1205; border-color: var(--armed); }
+#estopBtn { background: var(--danger); color: #fff; border-color: var(--danger); letter-spacing: .05em; }
+#estopBtn.latched { background: transparent; color: var(--danger); }
+.result { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; font-size: 13.5px; line-height: 1.55; }
+.result b { font-family: var(--font-data); color: var(--air); }
 .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
-.row label { color: var(--fg); }
 .row output { font-family: var(--font-data); font-variant-numeric: tabular-nums; color: var(--air); }
 .row input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--air); }
+.row .why { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 select { background: var(--panel-2); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: inherit; }
-.readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .readout div { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
-.readout span { font-size: 11px; color: var(--muted); }
-.readout b { font-family: var(--font-data); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.readout span { font-size: 11.5px; color: var(--muted); }
+.readout b { font-family: var(--font-data); font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .meter { height: 8px; border-radius: 4px; background: var(--panel-2); border: 1px solid var(--line); position: relative; overflow: hidden; }
 .meter i { position: absolute; inset: 0 auto 0 0; background: var(--ok); width: 0; transition: width .15s; }
 .meter.over i { background: var(--danger); }
 .meter::after { content: ""; position: absolute; top: 0; bottom: 0; left: 80%; width: 2px; background: var(--fg); opacity: .6; }
-.meter-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--font-data); }
-.warn { font-size: 12.5px; line-height: 1.45; color: var(--danger); margin: 0; }
-.hint { font-size: 12.5px; line-height: 1.45; color: var(--muted); margin: 0; }
-.btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-button { font: inherit; font-weight: 600; border-radius: 8px; padding: 10px 12px; cursor: pointer; border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); }
-button:hover:not(:disabled) { border-color: var(--muted); }
-button:focus-visible, input:focus-visible, select:focus-visible, .switch:focus-within { outline: 2px solid var(--air); outline-offset: 2px; }
-button:disabled { opacity: .4; cursor: not-allowed; }
-#armBtn { color: var(--armed); border-color: color-mix(in srgb, var(--armed) 50%, var(--line)); }
-#fireBtn { background: var(--armed); color: #1a1205; border-color: var(--armed); }
-#estopBtn { grid-column: 1 / -1; background: var(--danger); color: #fff; border-color: var(--danger); letter-spacing: .05em; }
-#estopBtn.latched { background: transparent; color: var(--danger); }
-.switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; cursor: pointer; }
-.switch input { appearance: none; width: 40px; height: 22px; border-radius: 11px; background: var(--line); position: relative; cursor: pointer; margin: 0; transition: background .15s; }
-.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--fg); transition: left .15s; }
-.switch input:checked { background: var(--armed); }
-.switch input:checked::after { left: 21px; }
+.meter-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-family: var(--font-data); margin-top: 4px; }
+.warn { font-size: 12.5px; line-height: 1.45; color: var(--danger); }
+details { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+details[open] { display: flex; flex-direction: column; gap: 12px; }
+summary { cursor: pointer; font-weight: 600; }
 .check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .check input { accent-color: var(--air); width: 16px; height: 16px; }
-.views { display: flex; gap: 6px; flex-wrap: wrap; }
-.views button { padding: 6px 10px; font-weight: 500; font-size: 13px; }
-.log { font-family: var(--font-data); font-size: 11.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; min-height: 60px; }
+.log { font-family: var(--font-data); font-size: 11.5px; color: var(--muted); margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
 .log li b { color: var(--fg); font-weight: 600; }
-.shot { font-size: 13px; line-height: 1.5; margin: 0; }
-.shot b { font-family: var(--font-data); color: var(--air); }
+
 /* Sahne üstü katmanlar */
-.cam { position: absolute; top: 12px; left: 12px; border: 1px solid var(--air); border-radius: 6px; cursor: crosshair; overflow: hidden; }
-.cam::before, .cam::after { content: ""; position: absolute; background: var(--danger); opacity: .9; }
+.cam { position: absolute; top: 12px; left: 12px; border: 1px solid var(--air); border-radius: 6px; cursor: crosshair; overflow: hidden; z-index: 3; }
+.cam::before, .cam::after { content: ""; position: absolute; background: var(--danger); opacity: .9; pointer-events: none; }
 .cam::before { left: 50%; top: 22%; bottom: 22%; width: 1px; }
 .cam::after { top: 50%; left: 22%; right: 22%; height: 1px; }
-.cam .ring { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid var(--danger); border-radius: 50%; }
+.cam .ring { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid var(--danger); border-radius: 50%; pointer-events: none; }
 .cam .tag { position: absolute; left: 6px; top: 5px; font-family: var(--font-data); font-size: 10.5px; color: var(--air); letter-spacing: .06em; text-shadow: 0 1px 2px #000; }
-.cam .rec { position: absolute; right: 6px; top: 5px; font-family: var(--font-data); font-size: 10.5px; color: var(--fg); text-shadow: 0 1px 2px #000; }
-.phases { position: absolute; left: 12px; right: 12px; bottom: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; pointer-events: none; }
-.phases div { background: color-mix(in srgb, var(--bg) 82%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.3; color: var(--muted); transition: all .12s; }
+.cam .rec { position: absolute; left: 6px; bottom: 5px; font-family: var(--font-data); font-size: 10.5px; color: var(--fg); text-shadow: 0 1px 2px #000; }
+.labels { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.lbl { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; display: flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--bg) 78%, transparent); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px 3px 3px; font-size: 12px; color: var(--fg); cursor: pointer; white-space: nowrap; font-weight: 500; }
+.lbl i { font-style: normal; width: 18px; height: 18px; border-radius: 50%; background: var(--line); display: grid; place-items: center; font-family: var(--font-data); font-size: 10.5px; font-weight: 600; }
+.lbl.hi { border-color: var(--air); }
+.lbl.hi i { background: var(--air); color: #062027; }
+.lbl:hover { border-color: var(--muted); }
+.partcard { position: absolute; right: 12px; bottom: 12px; max-width: min(340px, calc(100% - 24px)); background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--air); border-radius: 10px; padding: 12px 14px; z-index: 4; display: flex; flex-direction: column; gap: 6px; }
+.partcard strong { font-size: 15px; }
+.partcard p { font-size: 13.5px; }
+.partcard button { align-self: flex-end; padding: 4px 10px; font-size: 12.5px; font-weight: 500; }
+.phases { position: absolute; left: 12px; right: 12px; bottom: 12px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; pointer-events: none; z-index: 3; }
+.phases div { background: color-mix(in srgb, var(--bg) 84%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 11.5px; line-height: 1.3; color: var(--muted); }
 .phases div b { display: block; font-family: var(--font-data); font-size: 10.5px; letter-spacing: .05em; }
-.phases div.on { border-color: var(--air); color: var(--fg); background: color-mix(in srgb, var(--air) 18%, var(--bg)); }
-.phases div.done { color: var(--fg); opacity: .65; }
-.clock { position: absolute; right: 12px; top: 12px; font-family: var(--font-data); font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--bg) 80%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; font-variant-numeric: tabular-nums; pointer-events: none; text-align: right; line-height: 1.5; }
+.phases div.on { border-color: var(--air); color: var(--fg); background: color-mix(in srgb, var(--air) 20%, var(--bg)); }
+.phases div.done { color: var(--fg); opacity: .6; }
+.clock { position: absolute; right: 12px; top: 12px; font-family: var(--font-data); font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--bg) 80%, transparent); border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; font-variant-numeric: tabular-nums; pointer-events: none; text-align: right; line-height: 1.5; z-index: 3; }
 .clock b { color: var(--fg); font-weight: 600; }
+.hintbar { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--bg) 80%, transparent); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; pointer-events: none; white-space: nowrap; z-index: 1; }
+@media (max-width: 820px) { .hintbar { display: none; } }
 @media (max-width: 560px) {
-  .phases { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; left: 6px; right: 6px; bottom: 6px; }
+  .phases { gap: 3px; left: 6px; right: 6px; bottom: 6px; }
   .phases div { font-size: 0; padding: 5px 4px; }
   .phases div b { font-size: 10px; }
-  .clock { top: auto; bottom: 46px; right: 6px; font-size: 11px; }
+  .lbl { font-size: 0; gap: 0; padding: 3px; }
+  .clock { font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <div class="app">
   <div class="stage" id="stage">
-    <div class="cam" id="cam" title="Tıklayarak o noktaya nişan al">
+    <div class="labels" id="labels"></div>
+    <div class="cam" id="cam" title="Tıkla: taret o noktaya döner">
       <span class="ring"></span>
-      <span class="tag">KAMERA · NAMLU</span>
-      <span class="rec" id="camRec">P 0.0° T 0.0°</span>
+      <span class="tag">NAMLU KAMERASI · tıkla = nişan</span>
+      <span class="rec" id="camRec">P 0,0° T 0,0°</span>
     </div>
-    <div class="clock" id="clock">sim <b id="simT">—</b><br><span id="slowLbl">yavaş çekim ×20</span></div>
-    <div class="phases" id="phases">
-      <div data-p="0"><b>1 · GERİ</b>Nozzle geri, BB düşer</div>
-      <div data-p="1"><b>2 · YUVA</b>Nozzle BB'yi lastiğe iter</div>
-      <div data-p="2"><b>3 · VALF</b>Valf açık, basınç dolar</div>
-      <div data-p="3"><b>4 · NAMLU</b>BB namluda hızlanır</div>
-      <div data-p="4"><b>5 · UÇUŞ</b>Hedefe doğru uçuş</div>
+    <div class="hintbar" id="hintbar">Sürükle: döndür · Tekerlek: yakınlaş · Etikete tıkla: parça bilgisi</div>
+    <div class="clock" id="clock" hidden>sim <b id="simT">—</b><br><span id="slowLbl">yavaş çekim ×20</span></div>
+    <div class="phases" id="phases" hidden>
+      <div><b>1 · GERİ</b>Nozzle geri, BB düşer</div>
+      <div><b>2 · YUVA</b>BB lastiğe oturur</div>
+      <div><b>3 · VALF</b>Valf açılır, hava dolar</div>
+      <div><b>4 · NAMLU</b>BB hızlanır</div>
+      <div><b>5 · UÇUŞ</b>Hedefe uçuş</div>
+    </div>
+    <div class="partcard" id="partcard" hidden>
+      <strong id="pcTitle"></strong>
+      <p id="pcText"></p>
+      <button id="pcClose">Kapat</button>
     </div>
   </div>
 
   <aside class="panel">
-    <header class="top">
-      <h1>Hedef Tareti Simülatörü</h1>
-      <span class="pill safe" id="status">EMNİYETTE</span>
-    </header>
+    <div class="panel-head">
+      <div class="title-row">
+        <h1>Hedef Tareti Simülatörü</h1>
+        <span class="pill safe" id="status">EMNİYETTE</span>
+      </div>
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tabTour" aria-selected="true" aria-controls="paneTour">1 · Nasıl çalışır</button>
+        <button role="tab" id="tabTry" aria-selected="false" aria-controls="paneTry">2 · Kendin dene</button>
+      </div>
+    </div>
 
-    <section>
-      <h2>Hava ve atış ayarları</h2>
-      <div class="row"><label for="pressure">Regülatör basıncı</label><output id="pressureOut">2.0 bar</output>
-        <input type="range" id="pressure" min="1" max="4" step="0.1" value="2"></div>
-      <div class="row"><label for="dwell">Valf açık kalma süresi</label><output id="dwellOut">40 ms</output>
-        <input type="range" id="dwell" min="20" max="80" step="5" value="40"></div>
-      <div class="row"><label for="hop">Hop-up (geri dönüş)</label><output id="hopOut">%60</output>
-        <input type="range" id="hop" min="0" max="100" step="5" value="60"></div>
-      <div class="row"><label for="mass">BB ağırlığı</label>
-        <select id="mass"><option value="0.20" selected>0,20 g</option><option value="0.25">0,25 g</option></select></div>
+    <!-- TUR -->
+    <div class="tab-body tour" id="paneTour" role="tabpanel">
+      <div>
+        <div class="tour-count" id="tourCount">ADIM 1 / 9</div>
+        <h3 id="tourTitle"></h3>
+      </div>
+      <div class="tour-text" id="tourText"></div>
+      <button class="act" id="tourAct" hidden></button>
+      <div class="nav">
+        <button id="tourPrev">← Geri</button>
+        <button class="next" id="tourNext">İleri →</button>
+      </div>
+      <div class="dots" id="dots"></div>
+      <label class="check" for="showLabels"><input type="checkbox" id="showLabels" checked> Parça etiketlerini göster</label>
+    </div>
+
+    <!-- DENE -->
+    <div class="tab-body" id="paneTry" role="tabpanel" hidden>
+      <div class="steps">
+        <div class="step cur" id="st1">
+          <span class="n">1</span>
+          <div class="step-body">
+            <strong>Nişan al</strong>
+            <p class="muted">Sol üstteki kamera görüntüsünde hedefe tıkla. İnce ayar için ok tuşları.</p>
+            <div class="aim-row"><span id="aimTxt">Yatay 0,0° · Dikey 0,0°</span><button id="centerBtn">Ortala</button></div>
+          </div>
+        </div>
+        <div class="step" id="st2">
+          <span class="n">2</span>
+          <div class="step-body">
+            <label class="switch" for="arming"><strong>Emniyet anahtarını aç</strong><input type="checkbox" id="arming"></label>
+            <p class="muted">Gerçekte bu, taret üstündeki fiziksel anahtardır. Kapalıyken valf hiç çalışamaz.</p>
+          </div>
+        </div>
+        <div class="step" id="st3">
+          <span class="n">3</span>
+          <div class="step-body">
+            <button id="fireBtn" disabled>Silahla</button>
+            <p class="muted" id="fireHint">Önce emniyet anahtarını aç.</p>
+          </div>
+        </div>
+      </div>
+      <button id="estopBtn">ACİL STOP</button>
+      <div class="result" id="result">Henüz atış yok. Atıştan sonra sonuç burada görünür.</div>
+
+      <h2>Ayarlar</h2>
+      <div class="row"><label for="pressure">Basınç (regülatör)</label><output id="pressureOut">2,0 bar</output>
+        <input type="range" id="pressure" min="1" max="4" step="0.1" value="2">
+        <span class="why">Artırınca BB daha hızlı çıkar. Kural: en fazla 4 bar ve 1 J.</span></div>
+      <div class="row"><label for="hop">Hop-up</label><output id="hopOut">%60</output>
+        <input type="range" id="hop" min="0" max="100" step="5" value="60">
+        <span class="why">BB düşüyorsa artır, yükseliyorsa azalt.</span></div>
       <div class="readout">
         <div><span>Çıkış hızı</span><b id="vOut">—</b></div>
         <div><span>Enerji</span><b id="eOut">—</b></div>
-        <div><span>BB'ye kuvvet</span><b id="fOut">—</b></div>
       </div>
       <div>
         <div class="meter" id="meter"><i id="meterFill"></i></div>
-        <div class="meter-label"><span>0 J</span><span>sınır 1,0 J</span><span>1,25 J</span></div>
+        <div class="meter-label"><span>0 J</span><span>sınır 1 J</span><span>1,25 J</span></div>
       </div>
-      <p class="warn" id="warn" hidden>Enerji 1 J sınırını aşıyor. Basıncı veya valf süresini düşür (CLAUDE.md §3). Atış kilitli.</p>
-    </section>
+      <p class="warn" id="warn" hidden>Enerji 1 J sınırını aşıyor. Basıncı veya valf süresini düşür. Atış kilitli.</p>
 
-    <section>
-      <h2>Nişan</h2>
-      <div class="row"><label for="pan">Yatay (pan)</label><output id="panOut">0.0°</output>
-        <input type="range" id="pan" min="-60" max="60" step="0.5" value="0"></div>
-      <div class="row"><label for="tilt">Dikey (tilt)</label><output id="tiltOut">0.0°</output>
-        <input type="range" id="tilt" min="-10" max="20" step="0.25" value="0"></div>
-      <p class="hint">Sol üstteki kamera görüntüsüne tıklayınca taret o noktaya döner. Klavye: ok tuşları nişan, A silahla, Boşluk ateş, Esc emniyet.</p>
-    </section>
-
-    <section>
-      <h2>Atış kontrolü</h2>
-      <label class="switch" for="arming"><span>Fiziksel emniyet anahtarı</span><input type="checkbox" id="arming"></label>
-      <div class="btns">
-        <button id="armBtn" disabled>Silahla (A)</button>
-        <button id="fireBtn" disabled>Ateş (Boşluk)</button>
-        <button id="estopBtn">ACİL STOP</button>
-      </div>
-      <p class="hint" id="armHint">Önce emniyet anahtarını aç, sonra silahla. Silahlama 10 sn içinde kullanılmazsa düşer.</p>
-      <p class="shot" id="shotInfo">Henüz atış yok.</p>
-    </section>
-
-    <section>
-      <h2>Görünüm</h2>
-      <div class="row"><label for="slow">Zaman</label>
-        <select id="slow"><option value="1">Gerçek zaman</option><option value="0.05" selected>Yavaş ×20</option><option value="0.01">Çok yavaş ×100</option></select></div>
-      <label class="check" for="cut"><input type="checkbox" id="cut" checked> Kesit görünümü (iç parçaları göster)</label>
-      <div class="views">
-        <button data-view="genel">Genel</button>
-        <button data-view="mekanizma">Mekanizma</button>
-        <button data-view="hedef">Hedef</button>
+      <details>
+        <summary>Gelişmiş ayarlar</summary>
+        <div class="row"><label for="dwell">Valf açık kalma süresi</label><output id="dwellOut">40 ms</output>
+          <input type="range" id="dwell" min="20" max="80" step="5" value="40"></div>
+        <div class="row"><label for="mass">BB ağırlığı</label>
+          <select id="mass"><option value="0.20" selected>0,20 g</option><option value="0.25">0,25 g</option></select></div>
+        <div class="row"><label for="slow">Zaman</label>
+          <select id="slow"><option value="1">Gerçek zaman</option><option value="0.05" selected>Yavaş ×20</option><option value="0.01">Çok yavaş ×100</option></select></div>
+        <label class="check" for="cut"><input type="checkbox" id="cut" checked> Kesit görünümü (iç parçalar)</label>
         <button id="clearBtn">Hedefi temizle</button>
-      </div>
-    </section>
-
-    <section>
-      <h2>Olay kaydı</h2>
-      <ul class="log" id="log"></ul>
-    </section>
+        <h2>Olay kaydı</h2>
+        <ul class="log" id="log"></ul>
+      </details>
+    </div>
   </aside>
 </div>
 
@@ -192,29 +270,26 @@ button:disabled { opacity: .4; cursor: not-allowed; }
 'use strict';
 const $ = id => document.getElementById(id);
 const DEG = Math.PI / 180;
+const fmt = (n, d = 1) => n.toFixed(d).replace('.', ',');
+const smooth = x => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
 
-// ---------- Fizik sabitleri ----------
-const BB_R = 0.003;                       // 6 mm BB
-const AREA = Math.PI * BB_R * BB_R;       // m²
-const BARREL_L = 0.25;                    // m
-const TZ = 5.0, TY = 0.36, PAPER = 0.4;   // hedef
-const BACKSTOP_Z = 5.35;
-const PIVOT_Y = 0.36;
+// ---------- Fizik ----------
+const BB_R = 0.003, AREA = Math.PI * BB_R * BB_R, BARREL_L = 0.25;
+const TZ = 5.0, TY = 0.36, PAPER = 0.4, BACKSTOP_Z = 5.35;
 
 const S = {
   pressure: 2, dwell: 40, hop: 0.6, mass: 0.20,
   panT: 0, tiltT: 0, pan: 0, tilt: 0,
   switchOn: false, armed: false, armedAt: 0, estop: false,
-  slow: 0.05, cut: true,
-  seq: null, flight: null, flow: 0, dip: 0, shots: 0
+  slow: 0.05, cut: true, seq: null, flight: null,
+  flow: 0, flowHold: false, dip: 0, blink: false, shots: 0, aimed: false,
+  tab: 'tour', showCam: false
 };
-
 function ballistics() {
   const P = S.pressure * 1e5;
   const eff = 0.42 * (1 - Math.exp(-S.dwell / 22)) * (S.mass > 0.22 ? 1.04 : 1);
   const E = eff * P * AREA * BARREL_L;
-  const v = Math.sqrt(2 * E / (S.mass / 1000));
-  return { E, v, F: P * AREA };
+  return { E, v: Math.sqrt(2 * E / (S.mass / 1000)), F: P * AREA };
 }
 
 // ---------- Sahne ----------
@@ -228,39 +303,28 @@ stage.prepend(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0f1417);
-scene.fog = new THREE.Fog(0x0f1417, 6, 14);
-
+scene.fog = new THREE.Fog(0x0f1417, 7, 15);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 60);
-camera.position.set(-0.75, 0.65, -0.55);
+camera.position.set(-1.1, 1.5, -1.9);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 0.32, 0.9);
+controls.target.set(-0.25, 0.1, 1.1);
 controls.enableDamping = true;
 controls.maxPolarAngle = Math.PI * 0.495;
-controls.minDistance = 0.12;
+controls.minDistance = 0.1;
 controls.maxDistance = 9;
 
 scene.add(new THREE.HemisphereLight(0xcfe3ea, 0x1a2126, 0.75));
 const sun = new THREE.DirectionalLight(0xffffff, 0.9);
-sun.position.set(-2, 4, -1.5);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
+sun.position.set(-2, 4, -1.5); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
 Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 3, bottom: -3, near: 0.5, far: 12 });
 sun.shadow.camera.updateProjectionMatrix();
-sun.target.position.set(0, 0, 1.5);
-scene.add(sun, sun.target);
-const fill = new THREE.PointLight(0x4fc3d9, 0.25, 3);
-fill.position.set(0.4, 0.6, 0.2);
-scene.add(fill);
+sun.target.position.set(0, 0, 1.5); scene.add(sun, sun.target);
+const fillL = new THREE.PointLight(0x4fc3d9, 0.25, 3); fillL.position.set(-0.4, 0.6, 0.2); scene.add(fillL);
 
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshStandardMaterial({ color: 0x182025, roughness: 0.95 }));
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
-const grid = new THREE.GridHelper(30, 60, 0x2b373d, 0x212a2f);
-grid.position.y = 0.001;
-scene.add(grid);
+ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const grid = new THREE.GridHelper(30, 60, 0x2b373d, 0x212a2f); grid.position.y = 0.001; scene.add(grid);
 
-// Malzemeler
 const M = {
   steel: new THREE.MeshStandardMaterial({ color: 0x8a959b, metalness: 0.7, roughness: 0.35 }),
   dark: new THREE.MeshStandardMaterial({ color: 0x2a3237, metalness: 0.5, roughness: 0.5 }),
@@ -268,23 +332,25 @@ const M = {
   brass: new THREE.MeshStandardMaterial({ color: 0xc9a25a, metalness: 0.8, roughness: 0.3, transparent: true }),
   hop: new THREE.MeshStandardMaterial({ color: 0x3b4449, metalness: 0.3, roughness: 0.6, transparent: true }),
   rubber: new THREE.MeshStandardMaterial({ color: 0xb0413a, roughness: 0.8 }),
-  glass: new THREE.MeshStandardMaterial({ color: 0x9fd6e2, transparent: true, opacity: 0.22, roughness: 0.1 }),
+  glass: new THREE.MeshStandardMaterial({ color: 0x9fd6e2, transparent: true, opacity: 0.22, roughness: 0.1, depthWrite: false }),
   blue: new THREE.MeshStandardMaterial({ color: 0x2f6f9a, metalness: 0.4, roughness: 0.45 }),
   coil: new THREE.MeshStandardMaterial({ color: 0x5a4a2a, emissive: 0x000000, metalness: 0.3, roughness: 0.5 }),
   bb: new THREE.MeshStandardMaterial({ color: 0xf4f4f0, roughness: 0.25 }),
   air: new THREE.MeshBasicMaterial({ color: 0x4fc3d9, transparent: true, opacity: 0.55 }),
   hose: new THREE.MeshStandardMaterial({ color: 0x2f8fb0, roughness: 0.6 }),
   red: new THREE.MeshStandardMaterial({ color: 0xc23b3b, roughness: 0.5 }),
+  green: new THREE.MeshStandardMaterial({ color: 0x3f9a6a, roughness: 0.5 }),
   wood: new THREE.MeshStandardMaterial({ color: 0x6b5236, roughness: 0.9 }),
   backstop: new THREE.MeshStandardMaterial({ color: 0x3d2f26, roughness: 1 })
 };
+const PARTS = {};
+function part(key, ...objs) { (PARTS[key] = PARTS[key] || { objs: [] }).objs.push(...objs); return objs[0]; }
 function mesh(geo, mat, parent, pos, rot) {
   const m = new THREE.Mesh(geo, mat);
   if (pos) m.position.set(pos[0], pos[1], pos[2]);
   if (rot) m.rotation.set(rot[0], rot[1], rot[2]);
   m.castShadow = true; m.receiveShadow = true;
-  (parent || scene).add(m);
-  return m;
+  (parent || scene).add(m); return m;
 }
 const cylZ = (r, len, seg = 24) => new THREE.CylinderGeometry(r, r, len, seg).rotateX(Math.PI / 2);
 const cylX = (r, len, seg = 24) => new THREE.CylinderGeometry(r, r, len, seg).rotateZ(Math.PI / 2);
@@ -294,136 +360,110 @@ const box = (x, y, z) => new THREE.BoxGeometry(x, y, z);
 const base = new THREE.Group(); scene.add(base);
 mesh(box(0.3, 0.03, 0.3), M.dark, base, [0, 0.015, 0]);
 mesh(new THREE.CylinderGeometry(0.03, 0.04, 0.19, 24), M.steel, base, [0, 0.125, 0]);
-mesh(box(0.06, 0.05, 0.04), M.blue, base, [0, 0.19, -0.04]);           // pan motoru
+part('motor', mesh(box(0.06, 0.05, 0.04), M.blue, base, [0, 0.19, -0.04]));
 
 const panG = new THREE.Group(); panG.position.y = 0.22; base.add(panG);
 mesh(box(0.13, 0.012, 0.09), M.dark, panG, [0, 0.006, 0]);
 mesh(box(0.012, 0.15, 0.05), M.dark, panG, [0.056, 0.075, 0]);
 mesh(box(0.012, 0.15, 0.05), M.dark, panG, [-0.056, 0.075, 0]);
-mesh(box(0.035, 0.04, 0.04), M.blue, panG, [0.08, 0.14, 0]);           // tilt motoru
+part('motor', mesh(box(0.035, 0.04, 0.04), M.blue, panG, [0.08, 0.14, 0]));
 
 const tiltG = new THREE.Group(); tiltG.position.y = 0.14; panG.add(tiltG);
-mesh(cylX(0.006, 0.12), M.steel, tiltG, [0, 0, 0]);                      // tilt aksı
-mesh(box(0.03, 0.008, 0.42), M.alu, tiltG, [0, -0.026, -0.02]);         // taşıyıcı ray
+mesh(cylX(0.006, 0.12), M.steel, tiltG, [0, 0, 0]);
+mesh(box(0.03, 0.008, 0.42), M.alu, tiltG, [0, -0.026, -0.02]);
 
-// Hop-up gövdesi
-const hopBlock = mesh(box(0.026, 0.03, 0.04), M.hop, tiltG, [0, 0, 0]);
-const bucking = mesh(new THREE.TorusGeometry(0.0043, 0.0013, 10, 24), M.rubber, tiltG, [0, 0, 0.008]);
-const hopWheel = mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.004, 16), M.red, tiltG, [0, 0.018, 0.008]);
-mesh(box(0.004, 0.003, 0.004), M.steel, hopWheel, [0.005, 0.002, 0]);   // ayar işareti
+const hopBlock = part('hopup', mesh(box(0.026, 0.03, 0.04), M.hop, tiltG, [0, 0, 0]));
+part('hopup', mesh(new THREE.TorusGeometry(0.0043, 0.0013, 10, 24), M.rubber, tiltG, [0, 0, 0.008]));
+const hopWheel = part('hopup', mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.004, 16), M.red, tiltG, [0, 0.018, 0.008]));
+mesh(box(0.004, 0.003, 0.004), M.steel, hopWheel, [0.005, 0.002, 0]);
 
-// İç ve dış namlu
-const inner = mesh(cylZ(0.0042, BARREL_L), M.brass, tiltG, [0, 0, 0.02 + BARREL_L / 2]);
-const outer = mesh(cylZ(0.011, 0.245), M.alu, tiltG, [0, 0, 0.02 + 0.245 / 2]);
-mesh(cylZ(0.013, 0.02), M.dark, tiltG, [0, 0, 0.275]);                  // namlu ağzı
+part('namlu', mesh(cylZ(0.0042, BARREL_L), M.brass, tiltG, [0, 0, 0.02 + BARREL_L / 2]));
+part('namlu', mesh(cylZ(0.011, 0.245), M.alu, tiltG, [0, 0, 0.02 + 0.245 / 2]));
+part('namlu', mesh(cylZ(0.013, 0.02), M.dark, tiltG, [0, 0, 0.275]));
 
-// Nozzle + mini silindir
 const NZ_FWD = -0.012, NZ_TRAVEL = 0.018;
-const nozzle = mesh(cylZ(0.0036, 0.03), M.steel, tiltG, [0, 0, NZ_FWD]);
-mesh(cylZ(0.006, 0.04), M.blue, tiltG, [0, -0.015, -0.045]);            // nozzle silindiri
-const rod = mesh(cylZ(0.002, 0.03), M.steel, tiltG, [0, -0.015, -0.015]);
-const link = mesh(box(0.004, 0.016, 0.004), M.steel, tiltG, [0, -0.008, -0.02]);
+const nozzle = part('nozzle', mesh(cylZ(0.0036, 0.03), M.steel, tiltG, [0, 0, NZ_FWD]));
+part('nozzle', mesh(cylZ(0.006, 0.04), M.blue, tiltG, [0, -0.015, -0.045]));
+const rod = part('nozzle', mesh(cylZ(0.002, 0.03), M.steel, tiltG, [0, -0.015, -0.015]));
+const link = part('nozzle', mesh(box(0.004, 0.016, 0.004), M.steel, tiltG, [0, -0.008, -0.02]));
 
-// Valf + bobin
-mesh(box(0.026, 0.026, 0.03), M.dark, tiltG, [0, 0, -0.065]);
-const coil = mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.018, 20), M.coil, tiltG, [0, 0.022, -0.065]);
-mesh(cylZ(0.003, 0.02), M.steel, tiltG, [0, 0, -0.04]);                 // valf → nozzle hattı
+part('valf', mesh(box(0.026, 0.026, 0.03), M.dark, tiltG, [0, 0, -0.065]));
+part('valf', mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.018, 20), M.coil, tiltG, [0, 0.022, -0.065]));
+mesh(cylZ(0.003, 0.02), M.steel, tiltG, [0, 0, -0.04]);
 
-// Tampon tank (karşı ağırlık)
-mesh(cylZ(0.02, 0.12), M.steel, tiltG, [0, -0.004, -0.155]);
-mesh(new THREE.SphereGeometry(0.02, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), M.steel, tiltG, [0, -0.004, -0.215]);
+part('tank', mesh(cylZ(0.02, 0.12), M.steel, tiltG, [0, -0.004, -0.155]));
+part('tank', mesh(new THREE.SphereGeometry(0.02, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2), M.steel, tiltG, [0, -0.004, -0.215]));
 mesh(cylZ(0.003, 0.02), M.hose, tiltG, [0, -0.002, -0.09]);
 
-// Besleme tüpü + hazne
-mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.055, 16), M.glass, tiltG, [0, 0.043, -0.006]);
-mesh(box(0.045, 0.04, 0.045), M.glass, tiltG, [0, 0.09, -0.006]);
-const hopperBBs = [];
-for (let i = 0; i < 14; i++) {
-  const b = mesh(new THREE.SphereGeometry(BB_R, 12, 8), M.bb, tiltG,
-    [((i % 4) - 1.5) * 0.008, 0.074 + Math.floor(i / 4) * 0.006, ((i * 7) % 5 - 2) * 0.006]);
-  hopperBBs.push(b);
-}
+part('hazne', mesh(new THREE.CylinderGeometry(0.0045, 0.0045, 0.055, 16), M.glass, tiltG, [0, 0.043, -0.006]));
+part('hazne', mesh(box(0.045, 0.04, 0.045), M.glass, tiltG, [0, 0.09, -0.006]));
+for (let i = 0; i < 14; i++) mesh(new THREE.SphereGeometry(BB_R, 12, 8), M.bb, tiltG, [((i % 4) - 1.5) * 0.008, 0.074 + Math.floor(i / 4) * 0.006, ((i * 7) % 5 - 2) * 0.006]);
 for (let i = 0; i < 6; i++) mesh(new THREE.SphereGeometry(BB_R, 12, 8), M.bb, tiltG, [0, 0.026 + i * 0.0062, -0.006]);
 
-// Kamera modülü
-mesh(box(0.03, 0.022, 0.04), M.dark, tiltG, [0, 0.033, 0.14]);
-mesh(cylZ(0.006, 0.008), M.glass, tiltG, [0, 0.033, 0.163]);
+part('kamera', mesh(box(0.03, 0.022, 0.04), M.dark, tiltG, [0, 0.033, 0.14]));
+part('kamera', mesh(cylZ(0.006, 0.008), M.steel, tiltG, [0, 0.033, 0.163]));
 const turretCam = new THREE.PerspectiveCamera(24, 4 / 3, 0.02, 40);
-turretCam.position.set(0, 0.033, 0.165);
-turretCam.rotation.y = Math.PI;
-tiltG.add(turretCam);
+turretCam.position.set(0, 0.033, 0.165); turretCam.rotation.y = Math.PI; tiltG.add(turretCam);
 
-// Hava sütunu (namlu içinde basınçlı hava)
 const airCol = new THREE.Mesh(cylZ(0.0032, 1, 16).translate(0, 0, 0.5), M.air);
 airCol.visible = false; tiltG.add(airCol);
-
-// Atılan BB
 const bb = new THREE.Mesh(new THREE.SphereGeometry(BB_R, 16, 12), M.bb);
-bb.castShadow = true; bb.visible = false; tiltG.add(bb);
+bb.visible = false; tiltG.add(bb);
 
-// ---------- Kompresör ve hortum ----------
+// ---------- Kompresör, regülatör, hortum ----------
 const comp = new THREE.Group(); comp.position.set(-0.85, 0, -0.55); comp.rotation.y = 0.5; scene.add(comp);
-mesh(cylX(0.11, 0.42), M.red, comp, [0, 0.14, 0]);
-mesh(box(0.2, 0.14, 0.14), M.dark, comp, [0.02, 0.32, 0]);
+part('kompresor', mesh(cylX(0.11, 0.42), M.red, comp, [0, 0.14, 0]));
+part('kompresor', mesh(box(0.2, 0.14, 0.14), M.dark, comp, [0.02, 0.32, 0]));
 mesh(cylX(0.03, 0.03), M.steel, comp, [0.24, 0.14, 0]);
 [[-0.15, 0.08], [0.15, 0.08], [-0.15, -0.08], [0.15, -0.08]].forEach(p => mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 14), M.dark, comp, [p[0], 0.01, p[1]]));
-// Regülatör + emniyet ventili
 const regG = new THREE.Group(); regG.position.set(0.3, 0.2, 0); comp.add(regG);
-mesh(box(0.05, 0.08, 0.05), M.steel, regG, [0, 0, 0]);
-mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 14), M.dark, regG, [0, 0.055, 0]);
-mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 12), M.ok || M.steel, regG, [0.03, 0.02, 0.03]);
+part('regulator', mesh(box(0.05, 0.08, 0.05), M.steel, regG, [0, 0, 0]));
+part('regulator', mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.03, 14), M.dark, regG, [0, 0.055, 0]));
+part('regulator', mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 12), M.green, regG, [0.03, 0.02, 0.03]));
 
+function gaugeAng(bar) { return (-135 + bar * 27) * DEG; }
 function gaugeTexture(label) {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const g = c.getContext('2d');
   g.fillStyle = '#f2f2ee'; g.beginPath(); g.arc(128, 128, 124, 0, Math.PI * 2); g.fill();
   g.strokeStyle = '#222'; g.lineWidth = 6; g.stroke();
-  g.fillStyle = '#c23b3b';
-  g.beginPath(); g.moveTo(128, 128); g.arc(128, 128, 104, gaugeAng(8) - Math.PI / 2, gaugeAng(10) - Math.PI / 2); g.closePath(); g.fill();
+  g.fillStyle = '#c23b3b'; g.beginPath(); g.moveTo(128, 128);
+  g.arc(128, 128, 104, gaugeAng(8) - Math.PI / 2, gaugeAng(10) - Math.PI / 2); g.closePath(); g.fill();
   g.fillStyle = '#f2f2ee'; g.beginPath(); g.arc(128, 128, 90, 0, Math.PI * 2); g.fill();
   g.fillStyle = '#222'; g.font = '600 22px IBM Plex Mono, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let i = 0; i <= 10; i++) {
-    const a = gaugeAng(i) - Math.PI / 2;
-    g.lineWidth = i % 2 ? 2 : 4;
+    const a = gaugeAng(i) - Math.PI / 2; g.lineWidth = i % 2 ? 2 : 4;
     g.beginPath(); g.moveTo(128 + Math.cos(a) * 92, 128 + Math.sin(a) * 92); g.lineTo(128 + Math.cos(a) * 108, 128 + Math.sin(a) * 108); g.stroke();
     if (i % 2 === 0) g.fillText(i, 128 + Math.cos(a) * 74, 128 + Math.sin(a) * 74);
   }
   g.font = '500 18px IBM Plex Sans, sans-serif'; g.fillText(label, 128, 180); g.fillText('bar', 128, 202);
   const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
 }
-function gaugeAng(bar) { return (-135 + bar * 27) * DEG; }
-function makeGauge(parent, pos, label) {
-  const g = new THREE.Group(); g.position.set(pos[0], pos[1], pos[2]); parent.add(g);
+function makeGauge(parent, pos, label, scale) {
+  const g = new THREE.Group(); g.position.set(pos[0], pos[1], pos[2]); g.scale.setScalar(scale); parent.add(g);
   mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.015, 32).rotateX(Math.PI / 2), M.steel, g, [0, 0, -0.008]);
   const face = new THREE.Mesh(new THREE.CircleGeometry(0.036, 32), new THREE.MeshBasicMaterial({ map: gaugeTexture(label) }));
-  face.position.z = 0.0001; face.rotation.y = 0; g.add(face);
+  face.position.z = 0.0001; g.add(face);
   const needle = new THREE.Mesh(box(0.003, 0.03, 0.002).translate(0, 0.014, 0), new THREE.MeshBasicMaterial({ color: 0x111111 }));
   needle.position.z = 0.002; g.add(needle);
-  return { g, needle };
+  return { needle };
 }
-const gComp = makeGauge(comp, [0.02, 0.32, 0.075], 'TANK');
-const gReg = makeGauge(regG, [0, 0, 0.03], 'REGÜLE');
-gComp.g.scale.setScalar(0.9);
-gReg.g.scale.setScalar(0.75);
+const gComp = makeGauge(comp, [0.02, 0.32, 0.075], 'TANK', 0.9);
+const gReg = makeGauge(regG, [0, 0, 0.03], 'REGÜLE', 0.75);
 
-// Hortum eğrisi (dünya koordinatında)
 comp.updateMatrixWorld(true);
 const hoseStart = new THREE.Vector3(0.3, 0.16, 0).applyMatrix4(comp.matrixWorld);
 const hoseCurve = new THREE.CatmullRomCurve3([
-  hoseStart,
-  hoseStart.clone().add(new THREE.Vector3(0.1, -0.13, 0.05)),
-  new THREE.Vector3(-0.35, 0.012, -0.3),
-  new THREE.Vector3(-0.12, 0.012, -0.12),
-  new THREE.Vector3(-0.035, 0.08, -0.03)
+  hoseStart, hoseStart.clone().add(new THREE.Vector3(0.1, -0.13, 0.05)),
+  new THREE.Vector3(-0.35, 0.012, -0.3), new THREE.Vector3(-0.12, 0.012, -0.12), new THREE.Vector3(-0.035, 0.08, -0.03)
 ]);
-mesh(new THREE.TubeGeometry(hoseCurve, 80, 0.006, 10, false), M.hose, scene);
+part('hortum', mesh(new THREE.TubeGeometry(hoseCurve, 80, 0.006, 10, false), M.hose, scene));
 
-// Hortumdaki hava akışı
 const FLOW_N = 70;
 const flowGeo = new THREE.BufferGeometry();
 flowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(FLOW_N * 3), 3));
-const flowMat = new THREE.PointsMaterial({ color: 0x7fe0f0, size: 0.014, transparent: true, opacity: 0, depthWrite: false });
-const flowPts = new THREE.Points(flowGeo, flowMat); scene.add(flowPts);
+const flowMat = new THREE.PointsMaterial({ color: 0x9be8f5, size: 0.016, transparent: true, opacity: 0, depthWrite: false });
+scene.add(new THREE.Points(flowGeo, flowMat));
 const flowU = Array.from({ length: FLOW_N }, (_, i) => i / FLOW_N);
 
 // ---------- Hedef ----------
@@ -434,17 +474,12 @@ function drawTarget() {
   const g = tCtx;
   g.fillStyle = '#f3f1ea'; g.fillRect(0, 0, 512, 512);
   for (let i = 10; i >= 1; i--) {
-    const r = i * 24;
-    g.beginPath(); g.arc(256, 256, r, 0, Math.PI * 2);
+    g.beginPath(); g.arc(256, 256, i * 24, 0, Math.PI * 2);
     g.fillStyle = i <= 4 ? '#1c1c1c' : '#f3f1ea'; g.fill();
     g.lineWidth = 2; g.strokeStyle = i <= 4 ? '#f3f1ea' : '#1c1c1c'; g.stroke();
   }
   g.font = '600 15px IBM Plex Mono, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (let i = 1; i <= 9; i++) {
-    const score = 11 - i - 0; const x = 256 + (i * 24 - 12);
-    g.fillStyle = i <= 4 ? '#f3f1ea' : '#1c1c1c';
-    if (i > 1) g.fillText(String(11 - i), x, 256);
-  }
+  for (let i = 2; i <= 9; i++) { g.fillStyle = i <= 4 ? '#f3f1ea' : '#1c1c1c'; g.fillText(String(11 - i), 256 + i * 24 - 12, 256); }
   g.fillStyle = '#1c1c1c'; g.font = '500 14px IBM Plex Sans, sans-serif'; g.textAlign = 'left';
   g.fillText('5 m · 10 halka · 2 cm aralık', 14, 494);
   tTex.needsUpdate = true;
@@ -452,14 +487,13 @@ function drawTarget() {
 drawTarget();
 const tgt = new THREE.Group(); tgt.position.set(0, 0, TZ); scene.add(tgt);
 const paper = new THREE.Mesh(new THREE.PlaneGeometry(PAPER, PAPER), new THREE.MeshStandardMaterial({ map: tTex, roughness: 0.9 }));
-paper.position.set(0, TY, -0.003); paper.rotation.y = Math.PI; paper.receiveShadow = true; tgt.add(paper);
-mesh(box(0.46, 0.46, 0.012), M.wood, tgt, [0, TY, 0.004]);
+paper.position.set(0, TY, -0.003); paper.rotation.y = Math.PI; tgt.add(paper);
+part('hedef', mesh(box(0.46, 0.46, 0.012), M.wood, tgt, [0, TY, 0.004]));
 mesh(box(0.03, TY - 0.23, 0.03), M.wood, tgt, [-0.18, (TY - 0.23) / 2, 0.01]);
 mesh(box(0.03, TY - 0.23, 0.03), M.wood, tgt, [0.18, (TY - 0.23) / 2, 0.01]);
-const backstop = mesh(box(1.4, 1.1, 0.3), M.backstop, scene, [0, 0.55, BACKSTOP_Z + 0.15]);
+part('backstop', mesh(box(1.4, 1.1, 0.3), M.backstop, scene, [0, 0.55, BACKSTOP_Z + 0.15]));
 mesh(box(1.5, 0.06, 0.4), M.dark, scene, [0, 1.13, BACKSTOP_Z + 0.15]);
 
-// Mermi izi
 const TRAIL_N = 400;
 const trailGeo = new THREE.BufferGeometry();
 trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
@@ -467,18 +501,15 @@ trailGeo.setDrawRange(0, 0);
 const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xf0a33c, transparent: true, opacity: 0.85 }));
 trail.frustumCulled = false; scene.add(trail);
 let trailCount = 0;
+function trailReset() { trailCount = 0; trailGeo.setDrawRange(0, 0); }
 function trailPush(p) {
   if (trailCount >= TRAIL_N) return;
   trailGeo.attributes.position.setXYZ(trailCount++, p.x, p.y, p.z);
-  trailGeo.setDrawRange(0, trailCount);
-  trailGeo.attributes.position.needsUpdate = true;
+  trailGeo.setDrawRange(0, trailCount); trailGeo.attributes.position.needsUpdate = true;
 }
-
-// Uçuşta görünür kılmak için büyütülmüş "hayalet" BB
 const flyBB = new THREE.Mesh(new THREE.SphereGeometry(BB_R * 2.2, 16, 12), new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x553311 }));
 flyBB.visible = false; scene.add(flyBB);
 
-// ---------- Kesit görünümü ----------
 function applyCut() {
   const c = S.cut;
   M.alu.opacity = c ? 0.18 : 1; M.alu.depthWrite = !c;
@@ -488,349 +519,461 @@ function applyCut() {
 }
 applyCut();
 
-// ---------- UI bağlama ----------
-const ui = {
-  pressure: $('pressure'), dwell: $('dwell'), hop: $('hop'), mass: $('mass'),
-  pan: $('pan'), tilt: $('tilt'), arming: $('arming'), armBtn: $('armBtn'), fireBtn: $('fireBtn'),
-  estopBtn: $('estopBtn'), slow: $('slow'), cut: $('cut'), status: $('status'), armHint: $('armHint')
+// ---------- Parça bilgileri ve etiketler ----------
+const INFO = {
+  kompresor: { n: 'Kompresör', anchor: [comp, -0.05, 0.42, 0], t: 'Havayı sıkıştırıp kendi tankında 8 bar basınçta depolar. Taretin enerji kaynağı budur.' },
+  regulator: { n: 'Regülatör', anchor: [regG, 0, 0.1, 0], t: '8 bar\'ı 2–4 bar\'a düşürür ve sabit tutar. Yeşil emniyet ventili 4,5 bar\'ı aşan havayı dışarı atar.' },
+  hortum: { n: 'Hortum', anchor: [scene, -0.3, 0.05, -0.28], t: 'Regüle edilmiş havayı tarete taşır. Taret döndüğü için hortum gevşek bırakılır.' },
+  tank: { n: 'Tampon tank', anchor: [tiltG, 0, -0.04, -0.17], t: 'Valfin hemen arkasındaki küçük hava deposu. Her atışta aynı miktarda hava hazır olur. Arkada durduğu için namluya karşı ağırlık da yapar.' },
+  valf: { n: 'Selenoid valf', anchor: [tiltG, 0, 0.05, -0.065], t: 'Elektrikle açılan hava kapısı. Arduino bobine 40–80 ms akım verir, hava geçer, akım kesilince kapanır. Atışın tetiği budur.' },
+  nozzle: { n: 'Nozzle', anchor: [tiltG, 0, -0.04, -0.03], t: 'Hava memesi. Küçük bir silindir onu ileri geri iter: geri çekilince BB düşer, ileri gidince BB\'yi lastiğe oturtur ve havayı tam arkasına verir.' },
+  hazne: { n: 'BB haznesi', anchor: [tiltG, 0, 0.13, -0.006], t: 'BB\'ler yerçekimiyle tüpten tek tek aşağı iner. Nozzle ileri gidince tüpün ağzını kapatır, sıradaki BB bekler.' },
+  hopup: { n: 'Hop-up', anchor: [tiltG, 0, 0.035, 0.03], t: 'İçindeki lastik (bucking) BB\'yi tutar ve üstünden sürterek geriye doğru döndürür. Bu dönüş BB\'yi havada taşır, düz ve uzağa uçmasını sağlar.' },
+  namlu: { n: 'Namlu', anchor: [tiltG, 0, 0.03, 0.24], t: '6,03 mm iç namlu BB\'yi yönlendirir. Basınçlı hava BB\'yi 25 cm boyunca hızlandırır, BB birkaç milisaniyede çıkar.' },
+  kamera: { n: 'Kamera', anchor: [tiltG, 0, 0.06, 0.14], t: 'Namluya paralel bağlıdır, namlu nereye bakarsa o da oraya bakar. Görüntüsü ekrana gelir, nişanı buradan alırsın.' },
+  motor: { n: 'Pan / tilt motoru', anchor: [panG, 0.11, 0.17, 0], t: 'Biri tareti sağa-sola (pan), diğeri yukarı-aşağı (tilt) çevirir. Fiziksel stoplar namlunun atış alanı dışına dönmesini engeller.' },
+  hedef: { n: 'Hedef', anchor: [tgt, 0, TY + 0.28, 0], t: '5 metredeki kağıt hedef. 10 halka, her halka 2 cm. Yalnızca cansız hedeflere atış yapılır.' },
+  backstop: { n: 'Mermi tutucu', anchor: [scene, 0.5, 1.0, BACKSTOP_Z], t: 'Hedefi ıskalayan BB\'leri durdurur. Atış alanının arkasında olması zorunludur.' }
 };
-function fmt(n, d = 1) { return n.toFixed(d).replace('.', ','); }
+const labelsEl = $('labels');
+const labelKeys = Object.keys(INFO);
+labelKeys.forEach((k, i) => {
+  const el = document.createElement('button');
+  el.className = 'lbl'; el.type = 'button';
+  el.innerHTML = `<i>${i + 1}</i>${INFO[k].n}`;
+  el.addEventListener('click', () => showPart(k));
+  labelsEl.appendChild(el);
+  INFO[k].el = el;
+  INFO[k].local = new THREE.Vector3(INFO[k].anchor[1], INFO[k].anchor[2], INFO[k].anchor[3]);
+});
+function showPart(k) {
+  labelSet = null;
+  $('pcTitle').textContent = INFO[k].n; $('pcText').textContent = INFO[k].t;
+  $('partcard').hidden = false; highlight([k]);
+  labelKeys.forEach(x => INFO[x].el.classList.toggle('hi', x === k));
+}
+$('pcClose').addEventListener('click', () => { $('partcard').hidden = true; highlight(TOUR_HI()); });
+
+const hiMat = new THREE.MeshStandardMaterial({ color: 0x4fc3d9, emissive: 0x4fc3d9, emissiveIntensity: 0.5, roughness: 0.4 });
+const hiMatT = new THREE.MeshStandardMaterial({ color: 0x4fc3d9, emissive: 0x4fc3d9, emissiveIntensity: 0.5, transparent: true, opacity: 0.4, depthWrite: false });
+let hiMeshes = [], hiKeys = [], labelSet = null;
+function highlight(keys) {
+  hiMeshes.forEach(m => { m.material = m.userData.orig; });
+  hiMeshes = []; hiKeys = keys;
+  keys.forEach(k => (PARTS[k] ? PARTS[k].objs : []).forEach(o => o.traverse(m => {
+    if (!m.isMesh || m.material.map) return;
+    m.userData.orig = m.material;
+    m.material = (m.material.transparent && m.material.opacity < 1) ? hiMatT : hiMat;
+    hiMeshes.push(m);
+  })));
+  labelKeys.forEach(x => INFO[x].el.classList.toggle('hi', keys.includes(x)));
+}
+
+// ---------- Kamera görünümleri ----------
+const VIEWS = {
+  genel: { p: [-1.1, 1.5, -1.9], t: [-0.25, 0.1, 1.1] },
+  kompresor: { p: [-0.2, 0.6, 0.25], t: [-0.7, 0.18, -0.5] },
+  tankvalf: { p: [-0.32, 0.5, -0.36], t: [0, 0.36, -0.1] },
+  besleme: { p: [-0.2, 0.46, -0.06], t: [0, 0.39, -0.01] },
+  hopup: { p: [-0.2, 0.42, 0.1], t: [0, 0.36, 0.06] },
+  mekanizma: { p: [-0.26, 0.45, -0.1], t: [0, 0.37, -0.02] },
+  kamera: { p: [-0.4, 0.55, -0.3], t: [0, 0.38, 0.4] },
+  hedef: { p: [0.55, 0.55, 4.25], t: [0, TY, TZ] },
+  alan: { p: [-1.6, 1.3, 0.8], t: [0, 0.4, 3.2] },
+  dene: { p: [-0.55, 0.55, -0.55], t: [0, 0.34, 1.2] }
+};
+let viewAnim = null;
+function goView(name) {
+  const v = VIEWS[name];
+  viewAnim = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: new THREE.Vector3(...v.p), t1: new THREE.Vector3(...v.t) };
+}
+
+// ---------- Tur ----------
+const TOUR = [
+  { title: 'Genel bakış', view: 'genel', hi: [], labels: ['kompresor', 'hortum', 'motor', 'kamera', 'namlu', 'hedef', 'backstop'], text: [
+      'Bu taret kağıt hedefe <b>hava ile BB</b> atar. Üç ana bölümü var:',
+      '<b>Hava:</b> kompresör, regülatör ve hortum enerjiyi sağlar.<br><b>Taret:</b> valf, nozzle, hop-up ve namlu atışı yapar; motorlar nişan alır.<br><b>Bilgisayar:</b> kameradan görüntüyü ekrana getirir, sen tıklayınca motorları ve valfi sürer.',
+      'İleri\'ye basarak havanın yolunu baştan sona takip edeceğiz. Sahneyi fareyle istediğin gibi döndürebilirsin.'] },
+  { title: 'Kompresör ve regülatör', view: 'kompresor', hi: ['kompresor', 'regulator', 'hortum'], flow: true, text: [
+      'Kompresör havayı tankında <b>8 bar</b>da tutar. Bu, namlu için fazla.',
+      '<b>Regülatör</b> basıncı <b>2 bar</b>a düşürür ve sabit tutar. Basınç her atışta aynı olursa BB hep aynı hızda çıkar, isabet tutarlı olur.',
+      'Yeşil <b>emniyet ventili</b> bir arıza olursa 4,5 bar üstündeki havayı dışarı atar. Mavi noktalar hortumdan tarete giden havayı gösteriyor.'],
+    facts: [['Kompresör', '8 bar'], ['Regülatör çıkışı', '2 bar (en fazla 4)'], ['Emniyet ventili', '4,5 bar']] },
+  { title: 'Tampon tank ve valf', view: 'tankvalf', hi: ['tank', 'valf'], blink: true, text: [
+      'Hava önce taretin arkasındaki küçük <b>tampon tanka</b> dolar. Valfe çok yakın olduğu için atış anında hava hızla gelir.',
+      '<b>Selenoid valf</b> elektrikle açılan bir kapıdır. Arduino bobine kısa bir akım verir (40–80 ms), valf açılır, sonra kendiliğinden kapanır. Yanıp sönen sarı bobin bunu gösteriyor.',
+      'Valfin ne kadar açık kaldığı da hızı etkiler. Bu yüzden süre kodda sabit bir üst sınırla tutulur.'] },
+  { title: 'Besleme ve nozzle', view: 'besleme', hi: ['hazne', 'nozzle'], act: { label: '▶ Nozzle hareketini göster', fn: () => startSeq(true) }, text: [
+      'BB\'ler hazneden tüpe, tüpten yerçekimiyle aşağı iner.',
+      '<b>Nozzle</b> (hava memesi) küçük bir silindirle ileri geri gider:',
+      '<b>1.</b> Geri çekilir, tüpün ağzı açılır, bir BB düşer.<br><b>2.</b> İleri gider, BB\'yi öndeki lastiğe oturtur ve tüpü kapatır.',
+      'Aşağıdaki düğmeye basıp ağır çekimde izle.'] },
+  { title: 'Hop-up ve namlu', view: 'hopup', hi: ['hopup', 'namlu'], text: [
+      'BB, <b>hop-up</b> içindeki kırmızı lastiğin (bucking) dudaklarında bekler. Lastik BB\'yi hava basıncı yeterince yükselene kadar tutar.',
+      'BB çıkarken lastik üstünden sürtünür ve BB\'yi <b>geriye doğru döndürür</b>. Bu dönüş havada kaldırma kuvveti üretir, BB düşmeden daha uzağa düz gider. Üstteki kırmızı tekerlek bu ayarı yapar.',
+      '<b>Namlu</b> 25 cm uzunluğunda. BB bu mesafede hızlanır ve yaklaşık 7 ms\'de çıkar.'] },
+  { title: 'Atış anı', view: 'mekanizma', hi: [], act: { label: '▶ Ağır çekim atışı göster (×100)', fn: () => startSeq(false, 0.01) }, text: [
+      'Şimdi hepsi bir arada. Ateş komutu gelince sırasıyla:',
+      '<b>1.</b> Nozzle geri, BB düşer (60 ms)<br><b>2.</b> Nozzle ileri, BB yuvada (60 ms)<br><b>3.</b> Valf açılır, mavi hava BB\'nin arkasına dolar<br><b>4.</b> Basınç lastiği yener, BB namluda hızlanır<br><b>5.</b> BB çıkar ve hedefe uçar',
+      'Bütün bu sıra gerçekte <b>0,2 saniyeden kısa</b> sürer. Burada 100 kat yavaşlatılmış hâlini görüyorsun.'] },
+  { title: 'Kamera ve nişan', view: 'kamera', hi: ['kamera', 'motor'], cam: true, text: [
+      'Namlunun üstündeki <b>kamera</b> namluyla birlikte döner. Görüntüsü sol üstte. Kırmızı artı, namlunun baktığı yerdir.',
+      'Görüntüde bir noktaya <b>tıkla</b>: bilgisayar o noktanın kaç derece sağda/yukarıda olduğunu hesaplar ve <b>pan / tilt motorlarını</b> o kadar döndürür. Şimdi dene!',
+      'Kamera namlunun 3,5 cm üstünde olduğu için ilk atışlardan sonra nişangâh ayarı (kalibrasyon) yapılır.'] },
+  { title: 'Uçuş ve hedef', view: 'hedef', hi: ['hedef'], text: [
+      'BB 2 bar\'da yaklaşık <b>70 m/s</b> ile çıkar ve 5 metreyi yaklaşık <b>75 ms</b>\'de geçer.',
+      'Yolda üç şey etkiler: <b>yerçekimi</b> aşağı çeker, <b>hava direnci</b> yavaşlatır, <b>hop-up dönüşü</b> yukarı kaldırır. Hop-up doğru ayarlanınca bu kuvvetler dengelenir, BB düz gider.',
+      'Her isabet hedefte turuncu bir iz bırakır.'],
+    facts: [['Mesafe', '5 m'], ['Halka aralığı', '2 cm'], ['Tam puan', '10']] },
+  { title: 'Güvenlik', view: 'alan', hi: ['backstop'], text: [
+      'Gerçek tarette ve bu simülasyonda aynı kurallar var:',
+      '<b>Emniyet anahtarı</b> kapalıyken valf hiç çalışmaz.<br><b>İki adımlı ateş:</b> önce Silahla, sonra Ateş. Silahlama 10 saniyede düşer.<br><b>Acil stop</b> valfin ve motorların gücünü keser.<br><b>Enerji sınırı:</b> 1 J üstünde ateş kilitlenir.<br><b>Mermi tutucu</b> ıskalanan BB\'leri durdurur.',
+      'Hazırsın. "Kendin dene" sekmesinde ilk atışını yap.'],
+    act: { label: 'Kendin dene →', fn: () => setTab('try') } }
+];
+let tourI = 0;
+const TOUR_HI = () => S.tab === 'tour' ? TOUR[tourI].hi : [];
+const dotsEl = $('dots');
+TOUR.forEach((s, i) => {
+  const d = document.createElement('button'); d.type = 'button'; d.setAttribute('aria-label', 'Adım ' + (i + 1) + ': ' + s.title);
+  d.addEventListener('click', () => showTour(i)); dotsEl.appendChild(d);
+});
+function showTour(i) {
+  tourI = Math.max(0, Math.min(TOUR.length - 1, i));
+  const s = TOUR[tourI];
+  $('tourCount').textContent = `ADIM ${tourI + 1} / ${TOUR.length}`;
+  $('tourTitle').textContent = s.title;
+  let html = s.text.map(t => `<p>${t}</p>`).join('');
+  if (s.facts) html += '<dl class="fact">' + s.facts.map(f => `<dt>${f[0]}</dt><dd>${f[1]}</dd>`).join('') + '</dl>';
+  $('tourText').innerHTML = html;
+  const act = $('tourAct');
+  act.hidden = !s.act; if (s.act) act.textContent = s.act.label;
+  $('tourPrev').disabled = tourI === 0;
+  $('tourNext').textContent = tourI === TOUR.length - 1 ? 'Kendin dene →' : 'İleri →';
+  [...dotsEl.children].forEach((d, k) => d.classList.toggle('on', k === tourI));
+  S.flowHold = !!s.flow; S.blink = !!s.blink;
+  S.showCam = !!s.cam; layoutCam();
+  $('partcard').hidden = true;
+  labelSet = s.labels || null;
+  highlight(s.hi); goView(s.view);
+}
+$('tourAct').addEventListener('click', () => TOUR[tourI].act && TOUR[tourI].act.fn());
+$('tourPrev').addEventListener('click', () => showTour(tourI - 1));
+$('tourNext').addEventListener('click', () => tourI === TOUR.length - 1 ? setTab('try') : showTour(tourI + 1));
+$('showLabels').addEventListener('change', e => { labelsEl.hidden = !e.target.checked; });
+
+function setTab(t) {
+  S.tab = t;
+  $('tabTour').setAttribute('aria-selected', t === 'tour'); $('tabTry').setAttribute('aria-selected', t === 'try');
+  $('paneTour').hidden = t !== 'tour'; $('paneTry').hidden = t !== 'try';
+  if (t === 'try') {
+    if (S.seq && S.seq.dry) { bb.visible = false; endSeq(); }
+    S.flowHold = false; S.blink = false; S.showCam = true; layoutCam();
+    labelSet = ['kamera', 'namlu', 'hedef', 'backstop', 'kompresor'];
+    highlight([]); $('partcard').hidden = true; goView('dene');
+    S.slow = +$('slow').value; updateSteps();
+  } else showTour(tourI);
+}
+$('tabTour').addEventListener('click', () => setTab('tour'));
+$('tabTry').addEventListener('click', () => setTab('try'));
+
+// ---------- Dene: kontroller ----------
+const ui = { pressure: $('pressure'), dwell: $('dwell'), hop: $('hop'), mass: $('mass'), arming: $('arming'), fireBtn: $('fireBtn'), estopBtn: $('estopBtn'), slow: $('slow'), cut: $('cut') };
 function refreshBallistics() {
   S.pressure = +ui.pressure.value; S.dwell = +ui.dwell.value; S.hop = +ui.hop.value / 100; S.mass = +ui.mass.value;
   $('pressureOut').textContent = fmt(S.pressure) + ' bar';
   $('dwellOut').textContent = S.dwell + ' ms';
   $('hopOut').textContent = '%' + Math.round(S.hop * 100);
-  const b = ballistics();
+  const b = ballistics(), over = b.E > 1.0;
   $('vOut').textContent = fmt(b.v, 0) + ' m/s';
   $('eOut').textContent = fmt(b.E, 2) + ' J';
-  $('fOut').textContent = fmt(b.F, 1) + ' N';
-  const over = b.E > 1.0;
+  $('eOut').style.color = over ? 'var(--danger)' : 'var(--ok)';
   $('meterFill').style.width = Math.min(100, b.E / 1.25 * 100) + '%';
   $('meter').classList.toggle('over', over);
-  $('eOut').style.color = over ? 'var(--danger)' : 'var(--ok)';
   $('warn').hidden = !over;
   hopWheel.rotation.y = S.hop * Math.PI * 1.5;
-  refreshButtons();
-}
-function refreshAim() {
-  S.panT = +ui.pan.value; S.tiltT = +ui.tilt.value;
-  $('panOut').textContent = fmt(S.panT) + '°';
-  $('tiltOut').textContent = fmt(S.tiltT, 2) + '°';
+  updateSteps();
 }
 ['pressure', 'dwell', 'hop', 'mass'].forEach(k => ui[k].addEventListener('input', refreshBallistics));
-['pan', 'tilt'].forEach(k => ui[k].addEventListener('input', refreshAim));
-ui.slow.addEventListener('change', () => {
-  S.slow = +ui.slow.value;
-  $('slowLbl').textContent = S.slow === 1 ? 'gerçek zaman' : 'yavaş çekim ×' + Math.round(1 / S.slow);
-});
+ui.slow.addEventListener('change', () => { S.slow = +ui.slow.value; });
 ui.cut.addEventListener('change', () => { S.cut = ui.cut.checked; applyCut(); });
 
 function log(kind, text) {
   const li = document.createElement('li');
-  const t = new Date();
-  const ts = t.toTimeString().slice(0, 8);
-  li.innerHTML = `${ts} <b>${kind}</b> ${text}`;
-  const L = $('log'); L.prepend(li);
-  while (L.children.length > 7) L.lastChild.remove();
+  li.innerHTML = `${new Date().toTimeString().slice(0, 8)} <b>${kind}</b> ${text}`;
+  const L = $('log'); L.prepend(li); while (L.children.length > 8) L.lastChild.remove();
 }
-
-function setStatus() {
-  const s = ui.status;
-  if (S.estop) { s.className = 'pill estop'; s.textContent = 'ACİL STOP'; }
-  else if (S.armed) {
-    const left = Math.max(0, 10 - (performance.now() - S.armedAt) / 1000);
-    s.className = 'pill armed'; s.textContent = 'SİLAHLI ' + Math.ceil(left) + ' sn';
-  } else { s.className = 'pill safe'; s.textContent = 'EMNİYETTE'; }
+function setAim(p, t) {
+  if (S.estop || (S.seq && !S.seq.dry)) return;
+  S.panT = Math.max(-60, Math.min(60, p)); S.tiltT = Math.max(-10, Math.min(20, t));
+  S.aimed = true; updateSteps();
 }
-function refreshButtons() {
-  const over = ballistics().E > 1.0;
-  ui.armBtn.disabled = !S.switchOn || S.estop || S.armed || !!S.seq;
-  ui.fireBtn.disabled = !S.armed || S.estop || !!S.seq || over;
+function updateSteps() {
+  const over = ballistics().E > 1.0, busy = !!S.seq;
+  $('aimTxt').textContent = `Yatay ${fmt(S.panT)}° · Dikey ${fmt(S.tiltT)}°`;
+  const st = [$('st1'), $('st2'), $('st3')];
+  st[0].className = 'step ' + (S.aimed ? 'done' : 'cur');
+  st[1].className = 'step ' + (S.switchOn ? 'done' : (S.aimed ? 'cur' : ''));
+  st[2].className = 'step ' + (S.switchOn ? 'cur' : '');
+  const f = ui.fireBtn;
+  f.classList.remove('ready', 'hot');
+  let hint;
+  if (S.estop) { f.disabled = true; f.textContent = 'Silahla'; hint = 'Acil stop basılı. Önce çöz.'; }
+  else if (!S.switchOn) { f.disabled = true; f.textContent = 'Silahla'; hint = 'Önce emniyet anahtarını aç.'; }
+  else if (busy) { f.disabled = true; f.textContent = 'Atış sürüyor…'; hint = 'BB yolda. Ekranda izle.'; }
+  else if (over) { f.disabled = true; f.textContent = 'Kilitli (1 J üstü)'; hint = 'Basıncı veya valf süresini düşür.'; }
+  else if (!S.armed) { f.disabled = false; f.textContent = 'Silahla'; f.classList.add('ready'); hint = 'Silahla, sonra aynı düğme ATEŞ olur. (Klavye: A)'; }
+  else {
+    const left = Math.ceil(Math.max(0, 10 - (performance.now() - S.armedAt) / 1000));
+    f.disabled = false; f.textContent = 'ATEŞ!'; f.classList.add('hot'); hint = `Silahlı. ${left} sn içinde ateş et, yoksa düşer. (Klavye: Boşluk)`;
+  }
+  $('fireHint').textContent = hint;
   ui.estopBtn.textContent = S.estop ? 'Acil stopu çöz' : 'ACİL STOP';
   ui.estopBtn.classList.toggle('latched', S.estop);
-  ui.armHint.textContent = S.estop ? 'Acil stop basılı: valf ve motor gücü kesildi.'
-    : !S.switchOn ? 'Önce emniyet anahtarını aç, sonra silahla. Silahlama 10 sn içinde kullanılmazsa düşer.'
-    : S.armed ? (over ? 'Enerji sınırı aşıldığı için ateş kilitli.' : 'Silahlı. Ateş tek atış yapar, sonra sistem emniyete döner.')
-    : 'Anahtar açık. Silahla düğmesine bas.';
-  setStatus();
+  const s = $('status');
+  if (S.estop) { s.className = 'pill estop'; s.textContent = 'ACİL STOP'; }
+  else if (S.armed) { s.className = 'pill armed'; s.textContent = 'SİLAHLI'; }
+  else { s.className = 'pill safe'; s.textContent = 'EMNİYETTE'; }
 }
-function disarm(reason) {
-  if (S.armed) { S.armed = false; log('SAFE', reason); }
-  refreshButtons();
-}
+function disarm(reason) { if (S.armed) { S.armed = false; log('SAFE', reason); } updateSteps(); }
 ui.arming.addEventListener('change', () => {
-  S.switchOn = ui.arming.checked;
-  log('ANAHTAR', S.switchOn ? 'açıldı' : 'kapandı');
-  if (!S.switchOn) disarm('emniyet anahtarı kapandı');
-  refreshButtons();
+  S.switchOn = ui.arming.checked; log('ANAHTAR', S.switchOn ? 'açıldı' : 'kapandı');
+  if (!S.switchOn) disarm('emniyet anahtarı kapandı'); updateSteps();
 });
 function arm() {
-  if (ui.armBtn.disabled) return;
-  S.armed = true; S.armedAt = performance.now();
-  log('ARM', '10 sn içinde ateş edilmezse düşer');
-  refreshButtons();
+  if (!S.switchOn || S.estop || S.armed || S.seq || ballistics().E > 1) return;
+  S.armed = true; S.armedAt = performance.now(); log('ARM', '10 sn geçerli'); updateSteps();
 }
 function fire() {
-  if (ui.fireBtn.disabled) return;
-  S.armed = false;
-  S.aimLock = { pan: S.pan, tilt: S.tilt };
-  const b = ballistics();
-  S.seq = { t: 0, v: b.v, E: b.E, launched: false, phase: 0, tb: 2 * BARREL_L / b.v * 1000 };
-  S.shots++;
-  log('FIRE', `#${S.shots} · ${fmt(S.pressure)} bar · ${S.dwell} ms · ${fmt(b.v, 0)} m/s`);
-  trailCount = 0; trailGeo.setDrawRange(0, 0);
-  flyBB.visible = false;
-  refreshButtons();
+  if (!S.armed || S.estop || S.seq || ballistics().E > 1) return;
+  S.armed = false; startSeq(false);
 }
-function estop() {
-  if (S.estop) { S.estop = false; log('ESTOP', 'çözüldü, sistem emniyette'); refreshButtons(); return; }
+ui.fireBtn.addEventListener('click', () => S.armed ? fire() : arm());
+ui.estopBtn.addEventListener('click', () => {
+  if (S.estop) { S.estop = false; log('ESTOP', 'çözüldü'); updateSteps(); return; }
   S.estop = true; S.armed = false;
-  if (S.seq && !S.seq.launched) { S.seq = null; bb.visible = false; airCol.visible = false; setCoil(false); log('ESTOP', 'atış dizisi iptal, valf kapandı'); }
+  if (S.seq && !S.seq.launched) { endSeq(); bb.visible = false; log('ESTOP', 'atış iptal, valf kapandı'); }
   else log('ESTOP', 'valf ve motor gücü kesildi');
-  S.panT = S.pan; S.tiltT = S.tilt; ui.pan.value = S.pan; ui.tilt.value = S.tilt; refreshAim();
-  refreshButtons();
-}
-ui.armBtn.addEventListener('click', arm);
-ui.fireBtn.addEventListener('click', fire);
-ui.estopBtn.addEventListener('click', estop);
-$('clearBtn').addEventListener('click', () => { drawTarget(); trailCount = 0; trailGeo.setDrawRange(0, 0); flyBB.visible = false; $('shotInfo').textContent = 'Hedef temizlendi.'; });
+  S.panT = S.pan; S.tiltT = S.tilt; updateSteps();
+});
+$('centerBtn').addEventListener('click', () => setAim(0, 0));
+$('clearBtn').addEventListener('click', () => { drawTarget(); trailReset(); flyBB.visible = false; $('result').textContent = 'Hedef temizlendi.'; });
 
 window.addEventListener('keydown', e => {
   const tag = (e.target.tagName || '').toLowerCase();
-  if (tag === 'input' && e.target.type === 'range' && e.key.startsWith('Arrow')) return;
-  if (tag === 'select') return;
-  const step = e.shiftKey ? 2 : 0.5;
-  if (e.key === 'ArrowLeft') nudge(-step, 0);
-  else if (e.key === 'ArrowRight') nudge(step, 0);
-  else if (e.key === 'ArrowUp') nudge(0, step / 2);
-  else if (e.key === 'ArrowDown') nudge(0, -step / 2);
-  else if (e.key === 'a' || e.key === 'A') arm();
-  else if (e.key === ' ') { if (tag === 'button') return; fire(); }
+  if ((tag === 'input' && e.target.type === 'range') || tag === 'select') return;
+  const st = e.shiftKey ? 2 : 0.5;
+  if (e.key === 'ArrowLeft') setAim(S.panT - st, S.tiltT);
+  else if (e.key === 'ArrowRight') setAim(S.panT + st, S.tiltT);
+  else if (e.key === 'ArrowUp') setAim(S.panT, S.tiltT + st / 2);
+  else if (e.key === 'ArrowDown') setAim(S.panT, S.tiltT - st / 2);
+  else if (S.tab === 'try' && (e.key === 'a' || e.key === 'A')) arm();
+  else if (S.tab === 'try' && e.key === ' ') { if (tag === 'button') return; fire(); }
   else if (e.key === 'Escape') disarm('Esc tuşu');
   else return;
   e.preventDefault();
 });
-function nudge(dp, dt) {
-  if (S.estop || S.seq) return;
-  ui.pan.value = Math.max(-60, Math.min(60, S.panT + dp));
-  ui.tilt.value = Math.max(-10, Math.min(20, S.tiltT + dt));
-  refreshAim();
-}
 
-// Kamera görüntüsüne tıklayıp nişan alma
 const camEl = $('cam');
 camEl.addEventListener('click', e => {
-  if (S.estop || S.seq) return;
   const r = camEl.getBoundingClientRect();
-  const x = (e.clientX - r.left) / r.width - 0.5;
-  const y = (e.clientY - r.top) / r.height - 0.5;
-  const vfov = turretCam.fov;
-  const hfov = 2 * Math.atan(Math.tan(vfov / 2 * DEG) * turretCam.aspect) / DEG;
-  ui.pan.value = Math.max(-60, Math.min(60, S.panT + x * hfov));
-  ui.tilt.value = Math.max(-10, Math.min(20, S.tiltT - y * vfov));
-  refreshAim();
+  const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+  const vfov = turretCam.fov, hfov = 2 * Math.atan(Math.tan(vfov / 2 * DEG) * turretCam.aspect) / DEG;
+  setAim(S.panT + x * hfov, S.tiltT - y * vfov);
 });
-
-// Kamera görünümleri
-const VIEWS = {
-  genel: { p: [-0.75, 0.65, -0.55], t: [0, 0.32, 0.9] },
-  mekanizma: { p: [-0.26, 0.45, -0.1], t: [0, 0.37, -0.02] },
-  hedef: { p: [0.55, 0.55, 4.25], t: [0, TY, TZ] }
-};
-let viewAnim = null;
-document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
-  const v = VIEWS[b.dataset.view];
-  viewAnim = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), p1: new THREE.Vector3(...v.p), t1: new THREE.Vector3(...v.t) };
-  if (b.dataset.view === 'mekanizma' && !S.cut) { S.cut = ui.cut.checked = true; applyCut(); }
-}));
 
 // ---------- Atış dizisi ----------
 function setCoil(on) { M.coil.emissive.setHex(on ? 0xf0a33c : 0x000000); M.coil.emissiveIntensity = on ? 1.2 : 0; }
-const phaseEls = [...document.querySelectorAll('#phases div')];
+const phaseEls = [...$('phases').children];
 function showPhase(p) { phaseEls.forEach((el, i) => { el.classList.toggle('on', i === p); el.classList.toggle('done', p > i); }); }
-showPhase(-1);
 
+function startSeq(dry, slowOverride) {
+  if (S.seq) return;
+  const b = ballistics();
+  S.seq = { t: 0, v: b.v, E: b.E, dry, launched: false, tb: 2 * BARREL_L / b.v * 1000, slow: slowOverride || (dry ? 0.02 : null) };
+  if (!dry) {
+    S.shots++;
+    log('FIRE', `#${S.shots} · ${fmt(S.pressure)} bar · ${fmt(b.v, 0)} m/s`);
+    trailReset(); flyBB.visible = false;
+  }
+  $('phases').hidden = false; $('clock').hidden = false;
+  phaseEls.forEach((el, i) => el.style.display = (dry && i > 1) ? 'none' : '');
+  $('phases').style.gridTemplateColumns = dry ? 'repeat(2, minmax(0, 1fr))' : '';
+  updateSteps();
+}
+function endSeq() {
+  S.seq = null; airCol.visible = false; setCoil(false);
+  nozzle.position.z = NZ_FWD; rod.position.z = -0.015; link.position.z = -0.02;
+  setTimeout(() => { if (!S.seq) { $('phases').hidden = true; $('clock').hidden = true; } }, 1500);
+  updateSteps();
+}
 const BB_REST_Z = 0.006, BB_DROP_Z = -0.006;
 function updateSeq(dtMs) {
   const q = S.seq; if (!q) return;
   q.t += dtMs;
   const t = q.t, d = S.dwell, T_VALVE = 120, T_START = 122;
-  // nozzle konumu (1 = geri)
   let back = 0;
   if (t < 60) back = smooth(t / 60); else if (t < 120) back = 1 - smooth((t - 60) / 60);
   nozzle.position.z = NZ_FWD - back * NZ_TRAVEL;
   rod.position.z = -0.015 - back * NZ_TRAVEL;
   link.position.z = -0.02 - back * NZ_TRAVEL;
-  // BB
   if (!q.launched) {
     bb.visible = true;
     if (t < 20) bb.position.set(0, 0.026, BB_DROP_Z);
     else if (t < 60) { const k = smooth((t - 20) / 40); bb.position.set(0, 0.026 * (1 - k), BB_DROP_Z); }
     else if (t < 120) { const k = smooth((t - 60) / 60); bb.position.set(0, 0, BB_DROP_Z + (BB_REST_Z - BB_DROP_Z) * k); }
-    else if (t < T_START) bb.position.set(0, 0, BB_REST_Z);
+    else if (t < T_START || q.dry) bb.position.set(0, 0, BB_REST_Z);
     else {
-      const tt = (t - T_START) / 1000;
-      const a = q.v * q.v / (2 * BARREL_L);
-      const s = Math.min(BARREL_L, 0.5 * a * tt * tt);
-      bb.position.set(0, 0, BB_REST_Z + s);
+      const tt = (t - T_START) / 1000, a = q.v * q.v / (2 * BARREL_L);
+      bb.position.set(0, 0, BB_REST_Z + Math.min(BARREL_L, 0.5 * a * tt * tt));
       if (t - T_START >= q.tb) launch(q);
     }
   }
-  // valf ve hava sütunu
+  let p = t >= 60 ? 1 : 0;
+  if (q.dry) {
+    showPhase(p);
+    $('simT').textContent = fmt(t, 1) + ' ms';
+    if (t > 170) { bb.visible = false; endSeq(); }
+    return;
+  }
   const open = t >= T_VALVE && t < T_VALVE + d;
   setCoil(open);
   if (open) { S.dip = Math.min(0.6, S.dip + dtMs * 0.02); S.flow = 1; }
-  if (t >= T_VALVE && (open || (!q.launched))) {
+  if (t >= T_VALVE && (open || !q.launched)) {
     airCol.visible = true;
     const zEnd = q.launched ? 0.27 : bb.position.z;
     airCol.position.set(0, 0, 0.003);
     airCol.scale.set(1, 1, Math.max(0.001, zEnd - 0.003));
     M.air.opacity = 0.25 + 0.4 * (S.pressure / 4);
   } else airCol.visible = false;
-  // faz göstergesi
-  let p = 0;
-  if (t >= 60) p = 1;
   if (t >= T_VALVE) p = 2;
   if (t >= T_START + 0.3) p = 3;
   if (q.launched) p = 4;
   showPhase(p);
   $('simT').textContent = fmt(t, 1) + ' ms';
-  // bitiş
-  if (q.launched && t > T_VALVE + d && !S.flight) {
-    S.seq = null; airCol.visible = false; setCoil(false);
-    nozzle.position.z = NZ_FWD;
-    setTimeout(() => { if (!S.seq) showPhase(-1); }, 1200);
-    refreshButtons();
-  }
+  if (q.launched && t > T_VALVE + d && !S.flight) endSeq();
 }
-function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
 
-const _v = new THREE.Vector3(), _q = new THREE.Quaternion();
+const _q = new THREE.Quaternion();
 function launch(q) {
   q.launched = true;
   tiltG.updateMatrixWorld(true);
   const pos = new THREE.Vector3(0, 0, 0.275).applyMatrix4(tiltG.matrixWorld);
   tiltG.getWorldQuaternion(_q);
   const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(_q).normalize();
-  S.flight = { pos, vel: dir.multiplyScalar(q.v), time: 0, spin: 1, lastTrail: 0, v0: q.v, E: q.E };
-  bb.visible = false;
-  flyBB.visible = true; flyBB.position.copy(pos);
-  trailCount = 0; trailPush(pos);
+  S.flight = { pos, vel: dir.multiplyScalar(q.v), time: 0, spin: 1, lastTrail: 0 };
+  bb.visible = false; flyBB.visible = true; flyBB.position.copy(pos);
+  trailReset(); trailPush(pos);
 }
-
-const G = new THREE.Vector3(0, -9.81, 0);
-const UP = new THREE.Vector3(0, 1, 0);
+const G = new THREE.Vector3(0, -9.81, 0), UP = new THREE.Vector3(0, 1, 0);
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), prev = new THREE.Vector3();
 function updateFlight(dtS) {
   const f = S.flight; if (!f) return;
-  let rem = dtS;
-  const m = S.mass / 1000;
+  let rem = dtS; const m = S.mass / 1000;
   while (rem > 0 && S.flight) {
     const h = Math.min(rem, 0.0002); rem -= h;
-    const sp = f.vel.length();
-    const q = 0.5 * 1.2 * AREA * sp * sp;
-    // sürüklenme
-    tmpA.copy(f.vel).multiplyScalar(-q * 0.47 / (sp * m));
-    // hop-up kaldırma kuvveti (hıza dik, yukarı yönlü)
-    tmpB.copy(UP).addScaledVector(f.vel, -UP.dot(f.vel) / (sp * sp)).normalize()
-      .multiplyScalar(q * S.hop * 0.04 * f.spin / m);
+    const sp = f.vel.length(), qd = 0.5 * 1.2 * AREA * sp * sp;
+    tmpA.copy(f.vel).multiplyScalar(-qd * 0.47 / (sp * m));
+    tmpB.copy(UP).addScaledVector(f.vel, -UP.dot(f.vel) / (sp * sp)).normalize().multiplyScalar(qd * S.hop * 0.04 * f.spin / m);
     f.spin *= Math.exp(-h / 0.9);
     tmpA.add(tmpB).add(G);
     f.vel.addScaledVector(tmpA, h);
-    prev.copy(f.pos);
-    f.pos.addScaledVector(f.vel, h);
-    f.time += h;
+    prev.copy(f.pos); f.pos.addScaledVector(f.vel, h); f.time += h;
     if (f.time - f.lastTrail > 0.002) { trailPush(f.pos); f.lastTrail = f.time; }
     if (prev.z < TZ - 0.003 && f.pos.z >= TZ - 0.003) {
       const k = (TZ - 0.003 - prev.z) / (f.pos.z - prev.z);
       const hit = prev.clone().lerp(f.pos, k);
-      const dx = hit.x, dy = hit.y - TY;
-      if (Math.abs(dx) <= PAPER / 2 && Math.abs(dy) <= PAPER / 2) { endFlight(hit, true); return; }
+      if (Math.abs(hit.x) <= PAPER / 2 && Math.abs(hit.y - TY) <= PAPER / 2) { endFlight(hit, true); return; }
     }
     if (f.pos.z >= BACKSTOP_Z) { endFlight(f.pos.clone(), false, 'mermi tutucuya çarptı'); return; }
-    if (f.pos.y <= BB_R) { f.pos.y = BB_R; endFlight(f.pos.clone(), false, 'yere düştü'); return; }
-    if (f.time > 3) { endFlight(f.pos.clone(), false, 'menzil dışı'); return; }
+    if (f.pos.y <= BB_R) { f.pos.y = BB_R; endFlight(f.pos.clone(), false, 'hedefe varmadan yere düştü'); return; }
+    if (f.time > 3) { endFlight(f.pos.clone(), false, 'menzil dışına çıktı'); return; }
   }
   flyBB.position.copy(f.pos);
 }
 function endFlight(p, onPaper, why) {
   const f = S.flight;
-  trailPush(p);
-  flyBB.position.copy(p);
+  trailPush(p); flyBB.position.copy(p);
   const vImpact = f.vel.length();
   if (onPaper) {
-    const dx = p.x, dy = p.y - TY;
-    const r = Math.hypot(dx, dy);
+    const dx = p.x, dy = p.y - TY, r = Math.hypot(dx, dy);
     const score = Math.max(0, 10 - Math.floor(r / 0.02));
-    const u = (-dx + PAPER / 2) / PAPER, v = (dy + PAPER / 2) / PAPER;
-    const cx = u * 512, cy = (1 - v) * 512;
+    const cx = ((-dx + PAPER / 2) / PAPER) * 512, cy = (1 - (dy + PAPER / 2) / PAPER) * 512;
     tCtx.beginPath(); tCtx.arc(cx, cy, 8, 0, Math.PI * 2); tCtx.fillStyle = '#f0a33c'; tCtx.fill();
-    tCtx.lineWidth = 2.5; tCtx.strokeStyle = '#3a2408'; tCtx.stroke();
-    tTex.needsUpdate = true;
-    $('shotInfo').innerHTML = `Atış #${S.shots}: <b>${score} puan</b>, merkezden <b>${fmt(r * 100)} cm</b> ${dy >= 0 ? 'yukarı' : 'aşağı'}${Math.abs(dx) > 0.005 ? (dx > 0 ? ' / sol' : ' / sağ') : ''}. Uçuş <b>${fmt(f.time * 1000, 0)} ms</b>, hedefte hız <b>${fmt(vImpact, 0)} m/s</b>.`;
-    log('HİT', `${score} puan · ${fmt(r * 100)} cm`);
+    tCtx.lineWidth = 2.5; tCtx.strokeStyle = '#3a2408'; tCtx.stroke(); tTex.needsUpdate = true;
+    let tip = '';
+    if (r > 0.03) tip = dy < -0.02 ? ' BB aşağıda: nişanı biraz yukarı al veya hop-up\'ı artır.' : dy > 0.02 ? ' BB yukarıda: nişanı biraz aşağı al veya hop-up\'ı azalt.' : ' Yana kaçtı: nişanı düzelt.';
+    $('result').innerHTML = `<b>${score} puan</b> · merkezden ${fmt(r * 100)} cm. Uçuş ${fmt(f.time * 1000, 0)} ms, hedefte hız ${fmt(vImpact, 0)} m/s.${tip}`;
+    log('İSABET', `${score} puan`);
   } else {
-    $('shotInfo').innerHTML = `Atış #${S.shots}: hedef ıskalandı, BB ${why}. Uçuş <b>${fmt(f.time * 1000, 0)} ms</b>. Hop-up veya tilt ayarını değiştir.`;
+    $('result').innerHTML = `Iska: BB ${why}. Uçuş ${fmt(f.time * 1000, 0)} ms. Hop-up veya nişanı ayarla.`;
     log('ISKA', why);
   }
   S.flight = null;
 }
 
-// ---------- Döngü ----------
+// ---------- Boyut ve döngü ----------
+function layoutCam() {
+  const w = stage.clientWidth;
+  const cw = Math.round(Math.max(150, Math.min(300, w * 0.3))), ch = Math.round(cw * 0.75);
+  camEl.style.width = cw + 'px'; camEl.style.height = ch + 'px';
+  camEl.hidden = !S.showCam;
+  S.inset = { w: cw, h: ch };
+}
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
-  const cw = Math.round(Math.max(150, Math.min(300, w * 0.32)));
-  const ch = Math.round(cw * 0.75);
-  camEl.style.width = cw + 'px'; camEl.style.height = ch + 'px';
-  S.inset = { w: cw, h: ch };
+  layoutCam();
 }
 new ResizeObserver(resize).observe(stage);
 resize();
 
-let last = performance.now();
 const flowPos = flowGeo.attributes.position;
+const _w = new THREE.Vector3();
+let last = performance.now(), lastSec = -1;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  const simDt = dt * S.slow;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+  const slow = S.seq && S.seq.slow ? S.seq.slow : S.slow;
+  const simDt = dt * (S.seq || S.flight ? slow : S.slow);
+  $('slowLbl').textContent = slow === 1 ? 'gerçek zaman' : 'yavaş çekim ×' + Math.round(1 / slow);
 
-  // ARM zaman aşımı
-  if (S.armed && now - S.armedAt > 10000) disarm('10 sn doldu, silahlama düştü');
-  if (S.armed) setStatus();
-
-  // servo hareketi (gerçek zamanda, 90°/s); atış sırasında nişan kilitli
-  if (!S.estop && !S.seq) {
+  if (S.armed) {
+    if (now - S.armedAt > 10000) disarm('10 sn doldu');
+    const sec = Math.floor((now - S.armedAt) / 1000); if (sec !== lastSec) { lastSec = sec; updateSteps(); }
+  }
+  if (!S.estop && !(S.seq && !S.seq.dry)) {
     const rate = 90 * dt;
     S.pan += Math.max(-rate, Math.min(rate, S.panT - S.pan));
     S.tilt += Math.max(-rate, Math.min(rate, S.tiltT - S.tilt));
   }
-  panG.rotation.y = -S.pan * DEG;
-  tiltG.rotation.x = -S.tilt * DEG;
+  panG.rotation.y = -S.pan * DEG; tiltG.rotation.x = -S.tilt * DEG;
   $('camRec').textContent = `P ${fmt(S.pan)}° T ${fmt(S.tilt)}°`;
 
   updateSeq(simDt * 1000);
   updateFlight(simDt);
-  if (!S.seq && !S.flight) $('simT').textContent = '—';
 
-  // basınç göstergeleri ve hortum akışı (sim zamanında toparlanır)
+  if (S.blink && !S.seq) setCoil(Math.floor(now / 600) % 2 === 0);
+  else if (!S.seq) setCoil(false);
+  hiMat.emissiveIntensity = hiMatT.emissiveIntensity = 0.3 + 0.25 * Math.sin(now / 250);
+
+  if (S.flowHold) S.flow = Math.max(S.flow, 0.7);
   S.dip = Math.max(0, S.dip - simDt * 3);
-  S.flow = Math.max(0, S.flow - simDt * 4);
+  S.flow = Math.max(0, S.flow - (S.flowHold ? dt : simDt * 4));
   gComp.needle.rotation.z = -gaugeAng(8 - S.dip * 0.3);
   gReg.needle.rotation.z = -gaugeAng(Math.max(0, S.pressure - S.dip));
   flowMat.opacity = Math.min(0.9, S.flow * 1.2);
   if (S.flow > 0.01) {
+    const speed = S.flowHold ? dt * 0.25 : simDt * 6 * S.flow;
     for (let i = 0; i < FLOW_N; i++) {
-      flowU[i] = (flowU[i] + simDt * 6 * S.flow + dt * 0.05) % 1;
-      const p = hoseCurve.getPointAt(flowU[i]);
-      flowPos.setXYZ(i, p.x, p.y, p.z);
+      flowU[i] = (((flowU[i] + speed) % 1) + 1) % 1;
+      const p = hoseCurve.getPointAt(flowU[i]); flowPos.setXYZ(i, p.x, p.y, p.z);
     }
     flowPos.needsUpdate = true;
   }
 
-  // görünüm geçişi
   if (viewAnim) {
-    viewAnim.t = Math.min(1, viewAnim.t + dt * 1.6);
+    viewAnim.t = Math.min(1, viewAnim.t + dt * 1.5);
     const k = smooth(viewAnim.t);
     camera.position.lerpVectors(viewAnim.p0, viewAnim.p1, k);
     controls.target.lerpVectors(viewAnim.t0, viewAnim.t1, k);
@@ -838,22 +981,35 @@ function frame(now) {
   }
   controls.update();
 
-  // çizim: ana görünüm + namlu kamerası
+  // etiketleri ekrana yerleştir
   const w = stage.clientWidth, h = stage.clientHeight;
+  if (!labelsEl.hidden) {
+    scene.updateMatrixWorld();
+    const camDist = camera.position.distanceTo(controls.target);
+    labelKeys.forEach(k => {
+      const I = INFO[k];
+      _w.copy(I.local).applyMatrix4(I.anchor[0].matrixWorld);
+      const dist = camera.position.distanceTo(_w);
+      _w.project(camera);
+      const vis = (labelSet ? labelSet.includes(k) : (!hiKeys.length || hiKeys.includes(k))) && _w.z < 1 && Math.abs(_w.x) < 1.05 && Math.abs(_w.y) < 1.05 && dist < camDist * 4 + 0.6;
+      I.el.style.display = vis ? '' : 'none';
+      if (vis) { I.el.style.left = ((_w.x + 1) / 2 * w) + 'px'; I.el.style.top = ((1 - _w.y) / 2 * h) + 'px'; }
+    });
+  }
+
   renderer.setScissorTest(true);
   renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h);
   renderer.render(scene, camera);
-  const iw = S.inset.w, ih = S.inset.h, iy = h - 12 - ih;
-  renderer.setViewport(12, iy, iw, ih); renderer.setScissor(12, iy, iw, ih);
-  const oldFog = scene.fog; scene.fog = null;
-  renderer.render(scene, turretCam);
-  scene.fog = oldFog;
+  if (S.showCam) {
+    const iw = S.inset.w, ih = S.inset.h, iy = h - 12 - ih;
+    renderer.setViewport(12, iy, iw, ih); renderer.setScissor(12, iy, iw, ih);
+    const f = scene.fog; scene.fog = null; renderer.render(scene, turretCam); scene.fog = f;
+  }
   renderer.setScissorTest(false);
-
   requestAnimationFrame(frame);
 }
 refreshBallistics();
-refreshAim();
+showTour(0);
 log('HAZIR', 'sistem emniyette');
 requestAnimationFrame(frame);
 })();
