@@ -200,3 +200,33 @@ Hızı belirleyen başlıca üç şey var: **basınç**, **valf açık kalma sü
 2. Kronografla ölç, `OLCUMLER.md`ye yaz.
 3. 1 J'nin (0,20 g BB için ≈100 m/s) altında kalacak şekilde süre/basıncı
    ayarla. Kodda valf süresine **sabit üst sınır** koy.
+
+## 7. Merminin hava ile itilmesi (basınç zinciri)
+
+Mermi (BB) kendisi basınçlanmaz. Basınç **arkasında** birikir ve onu iter.
+
+```
+Kompresör tankı (8 bar)
+   → Regülatör (2–4 bar'a düşürür, sabit tutar)
+   → Emniyet ventili (4,5 bar üstünü dışarı atar)
+   → Tampon tank (atış başına sabit hava hacmi sağlar)
+   → Selenoid valf (kapalı → 40–80 ms açık → kapalı)
+   → Nozzle → BB'nin arkası
+```
+
+1. **Bekleme:** Tampon tank regüle basınçta dolu, valf kapalı. BB bucking'in
+   lastik dudaklarında tutuluyor.
+2. **Valf açılır:** Hava nozzle'a dolar, BB'nin arkasındaki basınç yükselir.
+3. **BB kopar:** Basıncın oluşturduğu kuvvet bucking'in tutuşunu yener, BB
+   namluda hızlanır. Kuvvet ≈ basınç × BB kesit alanı
+   (2 bar'da 6 mm BB için ≈ 5–6 N).
+4. **Valf kapanır:** Kalan hava namludan çıkar, tank regülatörden yeniden dolar.
+
+**Atışın tutarlılığını sağlayan şeyler:**
+- Regülatörün iyi olması: her atışta aynı basınç, aynı hız.
+- Tampon tankın valfe yakın olması: uzun ve ince hortum basıncı düşürür.
+- Valf süresinin sabit olması: kod belirler, üst sınır şart.
+- Sızdırmaz nozzle–bucking oturuşu.
+
+Basıncı artırmak hızı ve enerjiyi artırır. Bu yüzden **ayar yalnızca
+regülatörden** yapılır ve sınır kronografla doğrulanır (bkz. §6.5, `CLAUDE.md` §3).
