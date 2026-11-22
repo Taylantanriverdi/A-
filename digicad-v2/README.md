@@ -53,7 +53,7 @@ Her kullanıcının `lab` claim'i vardır (`digicad`, `primer`, ...). **Yönetic
 GOOGLE_APPLICATION_CREDENTIALS=anahtar.json npx tsx scripts/bootstrap-admin.ts PROJE-ID digicad-yonetici@ornek.com            # --lab varsayılan: digicad
 GOOGLE_APPLICATION_CREDENTIALS=anahtar.json npx tsx scripts/bootstrap-admin.ts PROJE-ID primer-yonetici@ornek.com --lab primer
 ```
-Claim adları her yerde aynıdır: `role` (`admin|doctor|tech`), `lab`, `doctorId`, `techId` (**metin**), `mustChangePassword` (+ sunucu içi `pwv`).
+Claim adları her yerde aynıdır: `role` (`admin|doctor|tech`), `lab`, `doctorId`, `techId` (**metin**), `mustChangePassword` (+ sunucu içi `pwt`).
 
 ## Yerel çalıştırma (emülatör)
 ```bash
@@ -80,8 +80,8 @@ npx firebase deploy --only firestore:rules,firestore:indexes,storage,functions,h
 9. App Check: yönetici callable'ları `consumeAppCheckToken` (tek kullanımlık token, replay koruması) ister; istemci `callFn` ile her çağrıda `limitedUseAppCheckTokens` kullanır. İkisi birlikte çalışır; App Check anahtarı olmadan callable çağrıları reddedilir.
 
 ## Hesaplar ve şifre akışı
-- `adminCreateUser` (Hekimler/Teknisyenler → **Hesap aç**) geçici şifre üretir ve `mustChangePassword` + `pwv` (şifre özeti parmak izi) claim'i yazar; kullanıcı ilk girişte şifre değiştirir → istemci `clearMustChangePassword` callable'ını çağırır (şifre gerçekten değişmediyse sunucu reddeder) → `getIdToken(true)` ile claim yenilenir. `adminResetPassword` aynı akışı yeniden başlatır.
-- Göçle açılan hesaplarda `pwv` yoktur: bayrak şifre değişiminden sonra doğrudan kaldırılır.
+- `adminCreateUser` (Hekimler/Teknisyenler → **Hesap aç**) geçici şifre üretir ve `mustChangePassword` + `pwt` (hesabın `tokensValidAfterTime` zamanı) claim'i yazar; kullanıcı ilk girişte şifre değiştirir → istemci `clearMustChangePassword` callable'ını çağırır (şifre gerçekten değişmediyse sunucu reddeder) → `getIdToken(true)` ile claim yenilenir. `adminResetPassword` aynı akışı yeniden başlatır.
+- Göç aracı ve `bootstrap-admin` de `pwt` yazar; `pwt` olmayan hesapta bayrak kaldırılmaz (yönetici "Şifre sıfırla" ile hesabı yeniden hazırlar).
 - Hekim/teknisyen **silinince** (yumuşak silme) bağlı Auth hesabı `adminDisableUser` ile devre dışı bırakılır ve oturumları iptal edilir; Silinenler'den geri alınınca yeniden etkinleştirilir.
 - **Ortak e-postalı hekim/teknisyenler** (iki kayıt aynı e-posta) göçte otomatik hesap almaz; elle hesap açma adımı için `docs/GOC_REHBERI.md`.
 

@@ -94,11 +94,12 @@ export function mail(c: Ctx, onOrder: (p: Rec) => void): HTMLElement {
   };
   const openMail = (m: Rec): void => {
     const { text, attachments } = mailContent(m.payload as MailPart); const sender = fromEmail(m); const doctor = live(c.st.doctors).find((d) => String(d.email ?? '').toLowerCase() === sender);
-    modal(hdr(m, 'subject') || '(konu yok)', h('div', null, h('p', { class: 'muted' }, `Gönderen: ${hdr(m, 'from')}${doctor ? ` → hekim: ${doctor.name}` : ''}`), h('div', { class: 'mailbody' }, text || '(gövde yok)'),
+    const dlg = modal(hdr(m, 'subject') || '(konu yok)', h('div', null, h('p', { class: 'muted' }, `Gönderen: ${hdr(m, 'from')}${doctor ? ` → hekim: ${doctor.name}` : ''}`), h('div', { class: 'mailbody' }, text || '(gövde yok)'),
       attachments.map((a) => abtn(`📎 ${a.filename}`, async () => { const r = await gmail(`messages/${m.id}/attachments/${a.attachmentId}`); const d = ((await r.json()) as { data?: string }).data ?? ''; const bin = atob(d.replace(/-/g, '+').replace(/_/g, '/')); saveBlob(new Blob([Uint8Array.from(bin, (ch) => ch.charCodeAt(0))], { type: a.mimeType }), a.filename); }, 'btn ghost')),
       abtn('Ayrıştır → Sipariş formu', async () => {
         const res = await callAdmin<R>('parseOrderMail', { text: `${hdr(m, 'subject')}\n${text}`.slice(0, 12000) });
         const byName = live(c.st.doctors).find((d) => trLower(d.name) === trLower(res.doctorName));
+        dlg.close(); // sipariş formu açılırken mail penceresi üstte kalmasın
         onOrder({ id: '', drId: doctor?.id ?? byName?.id ?? '', patient: res.patient, jobType: res.jobType, notes: res.notes, color: res.color, teeth: res.teeth, material: '' });
       }, 'btn primary', 'Ayrıştırıldı (taslak; kaydetmeden önce kontrol edin)')));
   };

@@ -61,7 +61,8 @@ export async function firestoreSinks(projectId: string, allowEmulator = false): 
           await au.setCustomUserClaims(u.uid, { ...(u.customClaims ?? {}), ...claimsFor(a) }); return { uid: u.uid, created: false };
         } catch (e) { if ((e as { code?: string }).code !== 'auth/user-not-found') throw e; }
         const u = await au.createUser({ email: a.email, password: pw, displayName: a.name || undefined });
-        await au.setCustomUserClaims(u.uid, { ...claimsFor(a), mustChangePassword: true });
+        const rec = await au.getUser(u.uid); const t = rec.tokensValidAfterTime ? Math.floor(Date.parse(rec.tokensValidAfterTime) / 1000) : 0;
+        await au.setCustomUserClaims(u.uid, { ...claimsFor(a), mustChangePassword: true, pwt: Number.isFinite(t) ? t : 0 });
         return { uid: u.uid, created: true };
       },
     },

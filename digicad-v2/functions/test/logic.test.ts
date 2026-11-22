@@ -3,7 +3,7 @@ import { gunzipSync } from 'node:zlib';
 import * as nodeCrypto from 'node:crypto';
 import { HttpsError } from 'firebase-functions/v2/https';
 import { assertAdminMfaToken, decideRate, randomPassword, sanitizeText } from '../src/util';
-import { normalizeEmail, validateUid, claimsFor, refId, mapAuthError, cleanDisplayName, clearDecision } from '../src/validate';
+import { normalizeEmail, validateUid, claimsFor, refId, mapAuthError, cleanDisplayName, clearDecision, validAfterSec } from '../src/validate';
 import { kindOf, actorOf, pack, AUDITED } from '../src/auditLogic';
 import { coerceParsed } from '../src/parseMail';
 import { backupPrefix } from '../src/backup';
@@ -163,14 +163,21 @@ describe('planFileCopies / applyCopies (hekim gönderim dosyaları → iş klas�
 });
 
 describe('clearDecision (mustChangePassword akışı)', () => {
-  it('bayrak yoksa işlem yok', () => { expect(clearDecision({ role: 'doctor' }, 'abc')).toBe('noop'); });
-  it('adminCreateUser/adminResetPassword hesabı: şifre değişmediyse bekletir, değiştiyse kaldırır', () => {
-    expect(clearDecision({ mustChangePassword: true, pwv: 'aaa' }, 'aaa')).toBe('wait');
-    expect(clearDecision({ mustChangePassword: true, pwv: 'aaa' }, 'bbb')).toBe('clear');
+  it('bayrak yoksa işlem yok', () => { expect(clearDecision({ role: 'doctor' }, 500)).toBe('noop'); });
+  it('şifre değişmediyse (geçerlilik zamanı ilerlemediyse) bekletir, ilerlediyse kaldırır', () => {
+    expect(clearDecision({ mustChangePassword: true, pwt: 1000 }, 1000)).toBe('wait');
+    expect(clearDecision({ mustChangePassword: true, pwt: 1000 }, 999)).toBe('wait');
+    expect(clearDecision({ mustChangePassword: true, pwt: 1000 }, 1001)).toBe('clear');
   });
-  it('göçle/bootstrap ile açılan hesap (pwv yok): doğrudan kaldırılır', () => {
-    expect(clearDecision({ mustChangePassword: true }, 'bbb')).toBe('clear');
-    expect(clearDecision({ mustChangePassword: true }, null)).toBe('clear');
+  it('pwt yoksa veya bozuksa kapalı kalır (fail-closed)', () => {
+    expect(clearDecision({ mustChangePassword: true }, 99999)).toBe('wait');
+    expect(clearDecision({ mustChangePassword: true, pwv: 'eski' }, 99999)).toBe('wait');
+    expect(clearDecision({ mustChangePassword: true, pwt: '1000' }, 99999)).toBe('wait');
+    expect(clearDecision({ mustChangePassword: true, pwt: NaN }, 99999)).toBe('wait');
   });
-  it('parmak izi çıkarılamazsa (parola özeti yok) fail-open', () => { expect(clearDecision({ mustChangePassword: true, pwv: 'aaa' }, null)).toBe('clear'); });
+  it('validAfterSec UTC metnini saniyeye çevirir', () => {
+    expect(validAfterSec({ tokensValidAfterTime: 'Thu, 01 Jan 1970 00:16:40 GMT' })).toBe(1000);
+    expect(validAfterSec({})).toBe(0);
+    expect(validAfterSec({ tokensValidAfterTime: 'bozuk' })).toBe(0);
+  });
 });

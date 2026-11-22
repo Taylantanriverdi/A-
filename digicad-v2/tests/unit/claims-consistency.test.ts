@@ -22,12 +22,16 @@ describe('claim adları (role, lab, doctorId, techId metin, mustChangePassword)'
     const auth = read('src/lib/auth.ts');
     for (const k of ['claims.role', 'claims.lab', 'claims.doctorId', 'claims.techId', 'claims.mustChangePassword']) expect(auth, k).toContain(k);
   });
-  it('mustChangePassword akışı: functions bayrağı ve pwv parmak izini yönetir; ön yüz aynı callable adını çağırır', () => {
+  it('mustChangePassword akışı: tüm hesap açma yolları pwt (tokensValidAfterTime) yazar; ön yüz aynı callable adını çağırır', () => {
     const adm = read('functions/src/admin.ts'); const auth = read('src/lib/auth.ts');
     expect(adm).toMatch(/export const clearMustChangePassword = onCall/); expect(auth).toContain("callFn('clearMustChangePassword'");
-    expect(adm).toMatch(/mustChangePassword: true, \.\.\.\(pwFingerprint\(rec\) \? \{ pwv: pwFingerprint\(rec\) \} : \{\}\)/); // adminCreateUser
-    expect(adm).toMatch(/mustChangePassword: true, \.\.\.\(fp \? \{ pwv: fp \} : \{\}\)/); // adminResetPassword
-    expect(adm).toContain('clearDecision(c, pwFingerprint(rec))'); // karar saf fonksiyonda (functions/test: göç hesabında pwv yok → doğrudan kaldırılır)
-    expect(read('migration/src/sinks.ts')).toContain('mustChangePassword: true'); expect(read('scripts/bootstrap-admin.ts')).toContain('mustChangePassword: true');
+    expect(adm).toContain('mustChangePassword: true, pwt: validAfterSec(rec)'); // adminCreateUser + adminResetPassword
+    expect(adm.split('pwt: validAfterSec(rec)').length - 1).toBe(2);
+    expect(adm).toContain('clearDecision(c, validAfterSec(rec))');
+    expect(adm).not.toContain('pwFingerprint');
+    // sıfırlamada iptal, geçerlilik zamanı okunmadan ÖNCE yapılmalı
+    const reset = adm.slice(adm.indexOf('adminResetPassword'));
+    expect(reset.indexOf('revokeRefreshTokens')).toBeLessThan(reset.indexOf('pwt: validAfterSec(rec)'));
+    for (const f of ['migration/src/sinks.ts', 'scripts/bootstrap-admin.ts']) expect(read(f), f).toMatch(/mustChangePassword: true, pwt:/);
   });
 });

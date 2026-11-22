@@ -24,5 +24,6 @@ const au = getAuth(app);
 const pw = randomBytes(18).toString('base64url') + '#9a';
 let uid: string;
 try { uid = (await au.getUserByEmail(email)).uid; } catch (e) { if ((e as { code?: string }).code !== 'auth/user-not-found') { console.error((e as Error).message); process.exit(1); } uid = (await au.createUser({ email, password: pw })).uid; console.log('Geçici şifre:', pw); }
-await au.setCustomUserClaims(uid, { role: 'admin', lab, mustChangePassword: true });
+const rec = await au.getUser(uid); const t = rec.tokensValidAfterTime ? Math.floor(Date.parse(rec.tokensValidAfterTime) / 1000) : 0;
+await au.setCustomUserClaims(uid, { role: 'admin', lab, mustChangePassword: true, pwt: Number.isFinite(t) ? t : 0 });
 console.log(`Yönetici yetkisi verildi: ${email} (çalışma alanı: ${lab})`);

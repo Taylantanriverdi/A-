@@ -54,8 +54,20 @@ export function mapAuthError(e: unknown): HttpsError {
  * `clearMustChangePassword` kararı (saf): bayrak yoksa 'noop'; şifre parmak izi claim'deki `pwv` ile aynıysa (şifre değişmedi) 'wait';
  * aksi halde 'clear'. Göçle/bootstrap ile açılan hesaplarda `pwv` yoktur → doğrudan 'clear'. Parmak izi çıkarılamıyorsa (fp null) fail-open 'clear'.
  */
-export function clearDecision(claims: Record<string, unknown>, fp: string | null): 'noop' | 'wait' | 'clear' {
+/**
+ * mustChangePassword bayrağı kaldırılabilir mi?
+ * Hesap açılırken/sıfırlanırken `pwt` claim'ine o anki `tokensValidAfterTime` (saniye) yazılır. Firebase şifre
+ * değişince bu zamanı ileri alır; yalnızca zaman `pwt`'den büyükse bayrak kaldırılır. `pwt` yoksa KAPALI kalır
+ * (yönetici "şifre sıfırla" ile hesabı yeniden hazırlayabilir).
+ */
+export function clearDecision(claims: Record<string, unknown>, validAfterSec: number): 'noop' | 'wait' | 'clear' {
   if (!claims.mustChangePassword) return 'noop';
-  if (fp && claims.pwv && fp === claims.pwv) return 'wait';
-  return 'clear';
+  if (typeof claims.pwt !== 'number' || !Number.isFinite(claims.pwt)) return 'wait';
+  return validAfterSec > claims.pwt ? 'clear' : 'wait';
+}
+
+/** UserRecord.tokensValidAfterTime (UTC metni) → saniye; okunamazsa 0. */
+export function validAfterSec(rec: { tokensValidAfterTime?: string }): number {
+  const t = rec.tokensValidAfterTime ? Date.parse(rec.tokensValidAfterTime) : NaN;
+  return Number.isFinite(t) ? Math.floor(t / 1000) : 0;
 }

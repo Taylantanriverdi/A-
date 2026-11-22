@@ -2,9 +2,8 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
-import { createHash } from 'node:crypto';
 import { CALLABLE_OPTS, requireAdminMfa, rateLimit, randomPassword } from './util';
-import { claimsFor, clearDecision, normalizeEmail, validateUid, cleanDisplayName, mapAuthError, refId } from './validate';
+import { claimsFor, clearDecision, validAfterSec, normalizeEmail, validateUid, cleanDisplayName, mapAuthError, refId } from './validate';
 import { planFileCopies, applyCopies } from './files';
 
 const OPTS = CALLABLE_OPTS;
@@ -17,11 +16,6 @@ async function audit(lab: string, actor: string, action: string, detail: Record<
   }
 }
 
-/** Şifre özeti parmak izi: kullanıcı şifreyi gerçekten değiştirdi mi kontrolü için (özetin kendisi saklanmaz). */
-function pwFingerprint(rec: { passwordHash?: string; passwordSalt?: string }): string | null {
-  if (!rec.passwordHash) return null;
-  return createHash('sha256').update(`${rec.passwordSalt ?? ''}:${rec.passwordHash}`).digest('hex').slice(0, 16);
-}
 
 /** doctorId/techId gerçekten var olan bir kayda işaret etmeli (yanlış kimlikle başka hekimin verisine erişimi önler). */
 async function assertRefExists(lab: string, claims: Record<string, string>): Promise<void> {
@@ -53,7 +47,7 @@ export const adminCreateUser = onCall(OPTS, async (req) => {
     uid = user.uid;
     try {
       const rec = await getAuth().getUser(uid);
-      await getAuth().setCustomUserClaims(uid, { ...claims, mustChangePassword: true, ...(pwFingerprint(rec) ? { pwv: pwFingerprint(rec) } : {}) });
+      await getAuth().setCustomUserClaims(uid, { ...claims, mustChangePassword: true, pwt: validAfterSec(rec) });
     } catch (e) {
       // Yetkisiz/yarım hesap kalmasın: yeni oluşturulan (veri içermeyen) auth kaydını geri al.
       await getAuth().deleteUser(uid).catch(() => undefined);
@@ -78,7 +72,7 @@ export const adminSetRole = onCall(OPTS, async (req) => {
     const prev = target.customClaims ?? {};
     assertSameLab(prev, lab, true);
     const keep: Record<string, unknown> = {};
-    if (prev.mustChangePassword) { keep.mustChangePassword = true; if (prev.pwv) keep.pwv = prev.pwv; }
+    if (prev.mustChangePassword) { keep.mustChangePassword = true; if (typeof prev.pwt === 'number') keep.pwt = prev.pwt; }
     await getAuth().setCustomUserClaims(uid, { ...claims, ...keep });
     await getAuth().revokeRefreshTokens(uid);
   } catch (e) { throw mapAuthError(e); }
@@ -94,11 +88,12 @@ export const adminResetPassword = onCall(OPTS, async (req) => {
   try {
     const before = await getAuth().getUser(uid);
     assertSameLab(before.customClaims, lab);
-    const user = await getAuth().updateUser(uid, { password: tempPassword });
-    const rec = await getAuth().getUser(uid);
-    const fp = pwFingerprint(rec);
-    await getAuth().setCustomUserClaims(uid, { ...(user.customClaims ?? {}), mustChangePassword: true, ...(fp ? { pwv: fp } : {}) });
+    await getAuth().updateUser(uid, { password: tempPassword });
+    // Önce oturumları iptal et, SONRA geçerlilik zamanını oku: aksi halde iptal zamanı "şifre değişti" sanılırdı.
     await getAuth().revokeRefreshTokens(uid);
+    const rec = await getAuth().getUser(uid);
+    const c = { ...(rec.customClaims ?? {}) } as Record<string, unknown>; delete c.pwv;
+    await getAuth().setCustomUserClaims(uid, { ...c, mustChangePassword: true, pwt: validAfterSec(rec) });
   } catch (e) { throw mapAuthError(e); }
   await audit(lab, actor, 'adminResetPassword', { uid });
   return { uid, tempPassword };
@@ -169,8 +164,8 @@ export const copyJobFiles = onCall(OPTS, async (req) => {
 /**
  * Kullanıcı geçici şifresini değiştirdikten sonra `mustChangePassword` claim'ini kaldırır.
  * (Claim'i istemci kaldıramaz; aksi halde kullanıcı sonsuza dek şifre ekranında kalır.)
- * Göçle açılan hesaplarda `pwv` yoktur: bayrak doğrudan kaldırılır. adminCreateUser/adminResetPassword hesaplarında `pwv`
- * (şifre özeti parmak izi) bulunur ve şifre gerçekten değişmeden bayrak kaldırılmaz.
+ * Tüm hesap açma yolları (adminCreateUser, adminResetPassword, göç, bootstrap) `pwt` yazar; şifre gerçekten
+ * değişmeden (tokensValidAfterTime ilerlemeden) bayrak kaldırılmaz. `pwt` yoksa kapalı kalır.
  */
 export const clearMustChangePassword = onCall(OPTS, async (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', 'Giriş gerekli.');
@@ -181,10 +176,10 @@ export const clearMustChangePassword = onCall(OPTS, async (req) => {
     const rec = await getAuth().getUser(uid);
     const c = { ...(rec.customClaims ?? {}) } as Record<string, unknown>;
     lab = typeof c.lab === 'string' ? c.lab : '';
-    const decision = clearDecision(c, pwFingerprint(rec));
+    const decision = clearDecision(c, validAfterSec(rec));
     if (decision === 'noop') return { ok: true };
-    if (decision === 'wait') throw new HttpsError('failed-precondition', 'Şifre henüz değiştirilmedi.');
-    delete c.mustChangePassword; delete c.pwv;
+    if (decision === 'wait') throw new HttpsError('failed-precondition', 'Şifre değişikliği henüz algılanmadı. Birkaç saniye sonra yeniden deneyin; sorun sürerse yöneticiden şifre sıfırlamasını isteyin.');
+    delete c.mustChangePassword; delete c.pwv; delete c.pwt;
     await getAuth().setCustomUserClaims(uid, c);
   } catch (e) { throw mapAuthError(e); }
   if (lab) await audit(lab, uid, 'clearMustChangePassword', { uid });
