@@ -136,3 +136,67 @@ havali-taret/
 - [ ] Kablo çekilince (heartbeat yok) sistem SAFE oluyor
 - [ ] Kronograf ölçümü ≤ 1 J
 - [ ] Backstop yerinde, alanda kimse yok, gözlükler takılı
+
+## 6. Namlu ve besleme mekaniği
+
+Namluyu sıfırdan torna ile yapmak yerine **hazır airsoft parçaları** kullanılır.
+Hazır parçalar ucuz ve hassastır, enerjiyi de 1 J sınırında tutmak kolaydır.
+
+### 6.1 Parçalar
+| Parça | Öneri | Görevi |
+|---|---|---|
+| İç namlu | 6,03 mm, 200–250 mm boy, pirinç/paslanmaz | BB'yi yönlendirir |
+| Hop-up ünitesi | Standart AEG (V2 gövde) hop-up + bucking (lastik) | BB'ye geri dönüş (backspin) verir, menzili uzatır |
+| Nozzle (hava memesi) | AEG nozzle, 1/4" hortum bağlantısına adaptörlü | Havayı hop-up'a verir, BB'yi yuvaya iter |
+| Nozzle hareketi | Mini pnömatik silindir (çift etkili, 10 mm strok) **veya** küçük servo | Nozzle'ı ileri/geri sürer |
+| Dış namlu | Alüminyum boru (Ø 20–25 mm) | İç namluyu korur, bağlantı noktası |
+| Besleme | Yerçekimli BB haznesi + 6,5 mm iç çaplı besleme tüpü | BB'leri hop-up besleme ağzına indirir |
+| Gövde | 20×20 sigma (alüminyum profil) + 3B baskı tutucular | Hepsini tilt eksenine bağlar |
+
+> Kolay yol: hazır bir **HPA motoru** (selenoidli airsoft HPA tetik ünitesi)
+> almak. Nozzle, valf ve zamanlama içinde gelir. Arduino sadece tetik
+> sinyalini verir. Kendi yapacaksan aşağıdaki düzen kullanılır.
+
+### 6.2 Kesit (yandan görünüş)
+```
+              BB haznesi
+                 │ │
+                 │●│  besleme tüpü
+                 └┬┘
+  hava ──[Valf]──[Nozzle]→ ● [bucking]═══════════ iç namlu ═══════════ → namlu ağzı
+                    ↑         hop-up ünitesi
+          [mini silindir/servo]   (ayar vidası üstte)
+```
+
+### 6.3 Bir atışın sırası
+1. **Nozzle geri** çekilir → besleme ağzı açılır, bir BB yerçekimiyle düşer.
+2. **Nozzle ileri** gider → BB'yi bucking'e oturtur ve besleme ağzını kapatır
+   (sonraki BB'ler beklemede kalır).
+3. **Valf açılır** (40–80 ms) → hava nozzle'dan geçer, BB namludan çıkar.
+4. Valf kapanır → sıra 1'e döner.
+
+Arduino'da bu bir zamanlama dizisidir: `NOZZLE_GERI` (≈60 ms) → `NOZZLE_ILERI`
+(≈60 ms) → `VALF` (≤80 ms). FIRE komutu bu diziyi **bir kez** çalıştırır.
+
+### 6.4 Yapım notları
+- **Hizalama:** Nozzle, hop-up ve iç namlu aynı eksende olmalı. Hop-up
+  gövdesini 3B baskı veya alüminyum bir yatağa sıkıca vidala. Kaçıklık isabeti
+  bozar ve BB'yi sıkıştırır.
+- **Sızdırmazlık:** Nozzle ucu bucking'in arkasına tam oturmalı. Sızıntı hızı
+  düşürür ve atıştan atışa farkı artırır.
+- **Hop-up ayarı:** Önce kapalı başla. BB düşüyorsa azar azar aç, yükseliyorsa
+  kıs. Düz bir uçuş hedeflenir.
+- **BB:** 0,20–0,25 g, kaliteli, dikişsiz BB kullan. Kötü BB namluyu tıkar.
+- **Kamera:** Namluya paralel, aynı plakaya sabitle. Titreşimde kayarsa
+  kalibrasyon bozulur.
+- **Denge:** Tilt ekseni ağırlık merkezinden geçmeli (namlu öne, tank/valf
+  arkaya). Servolar daha az zorlanır, nişan titremez.
+- **Hortum:** Dönen kısma kıvrımlı PU hortum veya döner rakor kullan.
+
+### 6.5 Enerjiyi sınırda tutmak
+Hızı belirleyen başlıca üç şey var: **basınç**, **valf açık kalma süresi** ve
+**namlu boyu**. Ayar sırası:
+1. Regülatör 2 bar, valf 40 ms ile başla.
+2. Kronografla ölç, `OLCUMLER.md`ye yaz.
+3. 1 J'nin (0,20 g BB için ≈100 m/s) altında kalacak şekilde süre/basıncı
+   ayarla. Kodda valf süresine **sabit üst sınır** koy.
