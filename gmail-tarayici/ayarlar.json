@@ -1,0 +1,26 @@
+{
+  "sorgu": "in:inbox newer_than:7d",
+  "en_fazla_mail": 200,
+  "izleme_araligi_saniye": 60,
+  "supheli_esik_puani": 40,
+  "etiket_uygula": false,
+  "supheli_etiketi": "Tarayici/Supheli",
+  "taranan_etiketi": "Tarayici/Tarandi",
+  "anahtar_kelimeler": {
+    "fatura": 0,
+    "ödeme": 0,
+    "acil": 10,
+    "hesabınız askıya": 30,
+    "şifrenizi doğrulayın": 35,
+    "kazandınız": 25,
+    "hediye kart": 20,
+    "verify your account": 35,
+    "password expired": 30,
+    "urgent": 10,
+    "bitcoin": 20,
+    "wire transfer": 20
+  },
+  "guvenilir_alan_adlari": ["google.com", "gmail.com"],
+  "engelli_gonderenler": [],
+  "izlenen_gonderenler": []
+}
