@@ -23,6 +23,8 @@ Kaynak: `cnc.ini` (CNC V4.03.54, CPU5B--6D 1.11LU) ve `macro.cnc` (PrimerMill s�
 | `sd_kart/P112.macro` / `P113.macro` | Pens aç / kapat | `user_4` / `user_5` |
 | `sd_kart/P114.macro` | Hava basıncı bekle | `check_pressure` |
 | `sd_kart/P115.macro` | Takım no → yuva Y (yardımcı) | — |
+| `donusturucu/eding2grblhal.py` | DentMill `.nc` dosyalarını çevirir | — |
+| `donusturucu/cevir.bat` | Sürükle-bırak ile çevirme (Windows) | — |
 
 `sd_kart/` içindekiler SD kartın **kök dizinine** (veya littlefs varsa `/littlefs/`) kopyalanır. Çağırma: `G65 P105` gibi.
 
@@ -102,14 +104,36 @@ Home davranışı ve soft limitler değiştiği için **bütün G53 konumları k
 - `G28.1` (güvenli Z: `#5163`, makrolarda her yerde kullanılır), `G30.1`, G54 A/B (`#5224/#5225`)
 - Eski değerleri başlangıç tahmini olarak kullanmak için Eding açıkken PrimerMill'den veya `user_3` diyaloğundan not alın. Pakette `#4000`'li değerler **yok**: bu `cnc.ini` 24.10'dan eski bir kopya.
 
-## CAM programları (DentMill)
+## CAM programları (DentMill) – `donusturucu/`
 
-DentMill'in ürettiği G-code içinde `M100`, `M54/M55/M56` veya Eding'e özgü başka satırlar varsa çevrilmesi gerekir. Örneğin `M100` → `G65 P105`, `M54 P2` → `M64 P0`. **Bir örnek .nc dosyası gönderin**, dönüştürücüsünü hazırlayayım.
+Beş örnek dosya incelendi (toplam ~2,6 milyon satır). Hepsi aynı yapıda: yalnızca `G0`/`G1` ile X Y Z A B F, yay (G2/G3) yok. Eding'e özgü yalnızca şu satırlar var:
+
+| Eding | grblHAL | Not |
+|---|---|---|
+| `GOSUB CHECK_EMPTY_TOOL` | `G65 P110` | program başı |
+| `GOSUB Z_SAFE` | `G65 P108` | |
+| `GOSUB AZXY_SAFE` | `G65 P109` | |
+| `M100` | `G65 P105` | takım aşınma kontrolü |
+| `M101` | kaldırılır | Eding'de yalnızca mesaj basıyordu |
+| `%` | kaldırılır | |
+| `M3` | `M3` + `G4 P1` | Eding'de 1 sn spindle rampası vardı (`spindleRampUpTime`), grblHAL beklemez |
+
+**Kullanım** (Windows'ta Python 3 kurulu olmalı): `.nc` dosyalarını `cevir.bat` üzerine sürükleyip bırakın veya:
+
+```
+python eding2grblhal.py parca.nc
+```
+
+Çıktı aynı klasöre `parca_grblhal.nc` adıyla yazılır. **Güvenlik:** Tanınmayan bir G/M kodu veya `GOSUB` görülürse satır numarasıyla hata verilir ve o dosyanın çıktısı **hiç yazılmaz**. Böylece yarım çevrilmiş bir program makineye gidemez.
+
+**Doğrulama:** Beş örnek dosyanın hepsi hatasız çevrildi. Değiştirilen satırlar dışında kalan her satır orijinalle birebir aynı (md5 karşılaştırması).
+
+Örneklerdeki eksen aralıkları (iş koordinatı): A −14.6…+15.3°, B 0…191.2°, X ±46, Y ±47, Z −14.1…+17.1 mm, F 400–2500, S 22.000–28.000. `M7` (sis soğutma) kullanılıyor, board map'te bir sis/hava çıkışı tanımlanmalı.
 
 ## Açık konular
 
 1. **`home_all` içindeki `M81` / `M80`:** Muhtemelen sürücü enable kapat/aç işlemi, ardından B tekrar home yapılıyor. Doğrulanana kadar `P102`'den sonra elle `$HB` gönderin.
-2. **`ClearPos` içindeki `#5004`:** A ekseni konumu varsayıldı (`#5423`). Doğrulanmalı.
+2. **`ClearPos` (`P107`):** `#5004` A ekseni konumu varsayıldı (`#5423`). Ayrıca `G54 A-25`, yeni A aralığının (makine 0…46°) dışına düşebilir. Örnek programlarda kullanılmıyor, kullanmadan önce doğrulayın.
 3. **Makro içinde `M0` ve iç içe `G65`:** grblHAL belgelerinde kesin bir kural yok. İlk testte kesici takmadan deneyin.
 4. **`M66` satır biçimi** (`P0 L0`, `P0 L3 Q300`) LinuxCNC standardına göre yazıldı. Kullandığınız grblHAL sürümünde deneyin.
 5. **Açılışta takım bilinmez:** Milde takım varsa `M61 Q<n>` ile bildirin veya `P106` ile pensi boşaltın.
