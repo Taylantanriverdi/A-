@@ -1,0 +1,20 @@
+; P111.macro - Parca merkezi bulma (Eding: Sub user_6)
+; Her adimda frezi istenen kenara JOG ile goturun, sonra Cycle Start.
+G92.1
+G90 G54
+(print, Adim 1: X ust kenara gidin, Cycle Start)
+M0
+#4050 = #5420
+(print, Adim 2: X alt kenara gidin, Cycle Start)
+M0
+#4051 = #5420
+(print, Adim 3: Y ust kenara gidin, Cycle Start)
+M0
+#4052 = #5421
+(print, Adim 4: Y alt kenara gidin, Cycle Start)
+M0
+#4053 = #5421
+G53 G0 Z[#5163]
+G0 X[[#4050+#4051]/2] Y[[#4052+#4053]/2]
+G10 L20 P1 X0 Y0 Z0 A0
+(print, Parca merkezi G54 olarak ayarlandi)

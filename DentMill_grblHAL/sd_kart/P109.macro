@@ -1,0 +1,5 @@
+; P109.macro - Z ve A guvenli, sensor ustune (Eding: sub azxy_safe)
+G65 P100
+G90
+G53 G0 Z[#5163] A[#5224]
+G53 G0 X[#4020] Y[#4021]

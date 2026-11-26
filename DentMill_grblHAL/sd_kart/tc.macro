@@ -1,0 +1,136 @@
+; tc.macro - DentMill X5 takim degisimi (Eding: sub change_tool + DropToolN + PickToolN + manual_change)
+; grblHAL her M6'da bu dosyayi calistirir ($341 = 0). Makro hatasiz biterse
+; yeni takim mevcut takim olur (Eding'deki "m6t[#5011]" satirina gerek yok).
+;
+; I/O eslemesi (board map'e gore degisebilir):
+;   M64/M65 P0 = pens ac/kapat     (Eding M54/M55 P2, AUX2 "OpenClamp2")
+;   M64/M65 P1 = hava ufleme        (Eding M54/M55 P4, AUX4 "Blowing4")
+;   M66 P0     = hava basinci girisi (Eding M56 P1,  AUX1 IN "ClampAir1")
+; Eding'e ozgu TCAGuard / ZHC komutlarinin grblHAL karsiligi yok, cikarildi.
+;
+; Gecici degiskenler: #4040 eski takim, #4041 yeni takim, #4042 yuva Y
+G65 P100
+M5
+M9
+G90
+#4040 = #<_current_tool>
+#4041 = #<_selected_tool>
+
+o100 if [[#4020 EQ 0] OR [#4021 EQ 0]]
+  (abort, Takim sensoru konumu ayarli degil: P100.macro #4020 #4021)
+o100 endif
+
+o110 if [#4040 EQ #4041]
+  (print, Takim zaten milde: T#4041)
+o110 else
+
+  o120 if [#4030 EQ 1]
+    ; ================= MANUEL DEGISIM =================
+    o121 if [[#4031 EQ 0] OR [#4032 EQ 0]]
+      (abort, Manuel degisim noktasi ayarli degil: P100.macro #4031 #4032)
+    o121 endif
+    G53 G0 Z[#5163]
+    G53 G0 A[#5224] B[#5225]
+    G53 G0 X[#4031] Y[#4032]
+    o122 if [#4033 NE 0]
+      G53 G0 Z[#4033]
+    o122 endif
+    (print, PM:1 MANUEL: T#4040 -> T#4041 - frezi tutun, Cycle Start pensi acar)
+    M0
+    G65 P114
+    M64 P0
+    G4 P0.5
+    M64 P1
+    G4 P0.5
+    M65 P1
+    (print, PM:2 MANUEL: T#4041 takin ve tutun, Cycle Start pensi kapatir)
+    M0
+    M65 P0
+    G4 P1
+    G53 G0 Z[#5163]
+
+  o120 else
+    ; ================= OTOMATIK (MAGAZIN) =================
+    o123 if [[#4010 EQ 0] OR [#4011 EQ 0]]
+      (abort, Frez magazini ayarli degil: P100.macro #4010-#4018)
+    o123 endif
+    o124 if [[#4041 GT 6] OR [#4041 LT 0]]
+      (abort, Lutfen 1-6 arasi bir takim secin)
+    o124 endif
+
+    G53 G0 Z[#5163]
+    G53 G0 A[#5224] B[#5225]
+    G53 G0 X[#4020]
+
+    ; ---------- Eski takimi birak ----------
+    o130 if [#4040 LE 0]
+      ; DropTool0: milde takim yok. Bos oldugunu dogrula, pensi ac
+      G65 P104
+      G65 P114
+      M64 P0
+      G4 P1
+      G53 G0 Z[#5163]
+      (print, T0 birakildi - pens acik)
+    o130 else
+      o131 if [#4040 GT 6]
+        (abort, Milde bilinmeyen takim var - elle cikarin ve M61 Q0 gonderin)
+      o131 endif
+      G65 P115 A#4040
+      G53 G0 Z[#5163]
+      G53 G0 A[#4017] B[#4018]
+      G53 G0 X[#4010] Y[#4042]
+      M64 P1
+      G4 P0.5
+      M65 P1
+      G53 G0 Z[#4000+1]
+      G65 P114
+      M64 P0
+      G4 P1
+      G53 G0 Z[#5163]
+      G53 G0 A[#5224] B[#5225]
+      (print, T#4040 yuvaya birakildi)
+      o132 if [#4006 NE 0]
+        M65 P0
+        G65 P104
+        M64 P0
+      o132 endif
+    o130 endif
+
+    ; ---------- Yeni takimi al ----------
+    o140 if [#4041 EQ 0]
+      ; PickTool0: takim alinmayacak, pensi kapat
+      M65 P0
+      G53 G0 Z[#5163]
+      G53 G0 X[#4020] Y[#4021]
+    o140 else
+      (print, T#4041 aliniyor)
+      G65 P115 A#4041
+      G53 G0 Z[#5163]
+      G53 G0 A[#4017] B[#4018]
+      G53 G0 X[#4010] Y[#4042]
+      M64 P1
+      G4 P0.5
+      M65 P1
+      G53 G0 Z[#4001]
+      G65 P114
+      G53 G1 Z[#4000] F800
+      M65 P0
+      G4 P1
+      G53 G0 Z[#5163]
+      G53 G0 A[#5224] B[#5225]
+      G53 G0 X[#4020] Y[#4021]
+    o140 endif
+  o120 endif
+
+  ; ---------- Yeni takimin boyunu olc ----------
+  o150 if [#4041 NE 0]
+    G65 P103
+    o151 if [#4030 EQ 1]
+      (print, PM:4 MANUEL: T#4041 takildi ve olculdu, Cycle Start kazimaya baslar)
+      M0
+    o151 endif
+  o150 endif
+  (print, T#4040 yerine T#4041 takildi)
+o110 endif
+
+G0

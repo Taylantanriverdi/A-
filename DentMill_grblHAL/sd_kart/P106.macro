@@ -1,0 +1,5 @@
+; P106.macro - Pensi elle ac, milde takim yok say (Eding: sub pm_pens_t0)
+; Eding'deki #4039 hilesine gerek yok: M61 Q0 hareket etmeden takimi T0 yapar.
+M64 P0
+M61 Q0
+(print, PM:0 Pens acik, takim T0)

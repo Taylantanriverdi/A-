@@ -1,0 +1,11 @@
+; P101.macro - Guvenli park, $H ONCESI (Eding: sub pm_home_guvenli ilk kismi)
+; SADECE makine daha once home yapilmissa kullanin (G53 konumlar gecerli olmali).
+; Ardindan konsoldan $H gonderin; home sonrasi icin P102.
+G65 P100
+o100 if [[#4901 EQ 0] OR [#4902 EQ 0]]
+  (abort, Park noktasi ayarli degil: P100.macro #4901 #4902)
+o100 endif
+G90
+G53 G0 Z[#5163]
+G53 G0 X[#4901] Y[#4902]
+G53 G0 A[#5224] B[#5225]

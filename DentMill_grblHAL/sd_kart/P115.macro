@@ -1,0 +1,19 @@
+; P115.macro - Takim numarasindan magazin yuva Y degerini bul -> #4042
+; Kullanim: G65 P115 A<takim>   (A -> #1)
+#4042 = 0
+o100 if [#1 EQ 1]
+  #4042 = #4011
+o100 elseif [#1 EQ 2]
+  #4042 = #4012
+o100 elseif [#1 EQ 3]
+  #4042 = #4013
+o100 elseif [#1 EQ 4]
+  #4042 = #4014
+o100 elseif [#1 EQ 5]
+  #4042 = #4015
+o100 elseif [#1 EQ 6]
+  #4042 = #4016
+o100 endif
+o110 if [#4042 EQ 0]
+  (abort, T#1 icin yuva Y ayarli degil veya takim 1-6 disinda: P100.macro)
+o110 endif

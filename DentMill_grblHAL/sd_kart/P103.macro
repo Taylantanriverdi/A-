@@ -1,0 +1,29 @@
+; P103.macro - Takim sensoru ile Z sifirlama (Eding: Sub user_1)
+; Eding'den fark: sensor tetiklenmezse uyari yerine IS DURDURULUR
+; (eski kod bu durumda yanlis G92 degeri atiyordu).
+; Sensor zaten tetikliyse (kablo kopuk / hasar) grblHAL G38'i ALARM 4 ile
+; reddeder - Eding'deki "probe damage" (M56 P61) kontrolunun karsiligi budur.
+G65 P100
+o100 if [[#4020 EQ 0] OR [#4021 EQ 0] OR [#4003 EQ 0] OR [#4004 EQ 0]]
+  (abort, Sensor ayarli degil: P100.macro #4020 #4021 #4003 #4004)
+o100 endif
+M5
+M9
+G90
+G53 G0 Z[#5163]
+G53 G0 A[#5224]
+G53 G0 X[#4020] Y[#4021]
+M64 P1
+G4 P0.5
+M65 P1
+G53 G0 Z[#4003]
+G91 G38.3 Z[#4004-#4003] F50
+G90
+o110 if [#5070 EQ 0]
+  G53 G0 Z[#5163]
+  (abort, Sensor tetiklenmedi: milde takim yok veya sensor arizali)
+o110 endif
+G0 Z#5063
+G92 Z[#4002]
+G53 G0 Z[#5163]
+(print, Z sifirlandi, takim T#<_current_tool>)

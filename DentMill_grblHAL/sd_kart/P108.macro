@@ -1,0 +1,3 @@
+; P108.macro - Z guvenli yukseklige (Eding: sub z_safe)
+G90
+G53 G0 Z[#5163]

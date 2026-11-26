@@ -1,0 +1,6 @@
+; P110.macro - Program basinda pens bos olmali (Eding: sub check_empty_tool)
+; DIKKAT: grblHAL'de mevcut takim (#5400) kalici degil; acilista 0'dir.
+; Acilista milde takim varsa M61 Q<n> ile bildirin.
+o100 if [#<_current_tool> NE 0]
+  (abort, Program baslamadan once pens bos olmali - milde T#<_current_tool> var)
+o100 endif

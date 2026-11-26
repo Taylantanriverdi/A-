@@ -1,0 +1,12 @@
+; P102.macro - $H SONRASI (Eding: sub home_all ikinci kismi)
+; Home sirasi Z,X,Y,A,B grblHAL ayarlari $44-$48 ile yapilir.
+; ACIK KONU: Eding burada M81 / M80 ile (muhtemelen surucu enable kapat/ac)
+; yapip B eksenini TEKRAR home yapiyordu. Bunun karsiligi:
+;   bu makrodan sonra konsoldan  $HB  gonderin (tek eksen home, $22 bit1 acik).
+; M81/M80'in makinenizde ne yaptigi dogrulanmadan bu adim eklenmedi.
+; Eding'deki "G64 P0.1 D0.001" grblHAL'de yok; kose yumusatma $11 ile ayarlanir.
+G90
+G53 G0 X-4.0 Y-4.0 Z-4.0 A4.0
+G4 P0.2
+G30
+(print, Home tamam)
