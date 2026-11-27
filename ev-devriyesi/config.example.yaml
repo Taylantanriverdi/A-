@@ -1,0 +1,50 @@
+# Bu dosyayi config.yaml adiyla kopyala ve kendine gore doldur.
+# config.yaml'i git'e EKLEME (icinde token var).
+
+robot:
+  # "homeassistant" (kolay, root gerekmez) veya "valetudo" (root'lu robot, tamamen yerel)
+  tur: homeassistant
+
+  # --- Home Assistant ---
+  url: http://192.168.1.10:8123
+  token: "HA_UZUN_OMURLU_ERISIM_TOKENI"   # Profil > Guvenlik > Uzun omurlu erisim tokeni
+  entity_id: vacuum.roborock
+  batarya_sensoru: sensor.roborock_battery  # yoksa bu satiri sil
+
+  # --- Valetudo kullaniyorsan yukaridakileri sil, bunlari ac ---
+  # tur: valetudo
+  # url: http://192.168.1.50
+  # kullanici: admin   # Valetudo'da sifre koymadiysan sil
+  # sifre: ""
+
+kamera:
+  # Robotun ustundeki kameranin RTSP adresi (markaya gore degisir)
+  kaynak: rtsp://kullanici:sifre@192.168.1.60:554/stream1
+  # Bilgisayarin webcam'i ile denemek icin:  kaynak: 0
+
+tespit:
+  model: yolov8n.pt   # ilk calistirmada otomatik iner; Raspberry Pi icin en hafifi
+  esik: 0.5           # 0-1 arasi; yanlis alarm cok olursa artir
+
+telegram:
+  token: "BOTFATHER_TOKENI"
+  chat_id: "123456789"
+
+devriye:
+  alarm_siniflari: [insan]     # [insan, kedi, kopek] da olabilir
+  min_batarya: 30              # bunun altinda devriye baslamaz
+  zaman_asimi: 180             # noktaya varmak icin en fazla sn
+  bekleme: 2                   # vardiktan sonra fotograf oncesi bekleme (sn)
+  kare_sayisi: 5
+  kare_araligi: 0.5
+  her_noktayi_gonder: false    # true: alarm olmasa da her noktanin fotosu gelir
+  kayit_klasoru: kayitlar
+
+# Haritadaki koordinatlar (Roborock birimi: mm, sarj istasyonu ~ 25500,25500)
+# Koordinat bulma: README.md > "Nokta koordinatlarini bulmak"
+noktalar:
+  - { ad: salon,       x: 25500, y: 28500 }
+  - { ad: mutfak,      x: 22000, y: 27000 }
+  - { ad: koridor,     x: 24000, y: 24000 }
+  - { ad: yatak_odasi, x: 27500, y: 22500 }
+  - { ad: balkon_kapisi, x: 29000, y: 29000 }

@@ -1,0 +1,47 @@
+# Home Assistant tarafi: devriyeyi otomatik baslatmak.
+#
+# 1) configuration.yaml'a ekle (yollari kendine gore duzenle):
+#
+# shell_command:
+#   ev_devriyesi: "cd /config/ev-devriyesi && python3 devriye.py >> devriye.log 2>&1"
+#
+# Not: HA OS kullaniyorsan YOLO'yu HA icinde calistirmak agirdir. Bu durumda
+# devriye.py'yi ayri bir Raspberry Pi / PC'de calistirip HA'dan SSH ile tetikle:
+#   ev_devriyesi: "ssh -i /config/.ssh/id_rsa pi@192.168.1.20 'cd ev-devriyesi && python3 devriye.py'"
+#
+# 2) Asagidaki otomasyonlari Ayarlar > Otomasyonlar > YAML olarak duzenle'ye yapistir.
+
+# --- Evde kimse kalmayinca 10 dk sonra devriye ---
+- alias: "Devriye - herkes evden cikinca"
+  trigger:
+    - platform: state
+      entity_id: zone.home
+      to: "0"
+      for: "00:10:00"
+  action:
+    - service: shell_command.ev_devriyesi
+
+# --- Gece 03:00 devriyesi (sadece kimse evde degilse) ---
+- alias: "Devriye - gece"
+  trigger:
+    - platform: time
+      at: "03:00:00"
+  condition:
+    - condition: state
+      entity_id: zone.home
+      state: "0"
+  action:
+    - service: shell_command.ev_devriyesi
+
+# --- Kapi sensoru acilirsa ve evde kimse yoksa hemen devriye ---
+- alias: "Devriye - kapi acildi"
+  trigger:
+    - platform: state
+      entity_id: binary_sensor.giris_kapisi
+      to: "on"
+  condition:
+    - condition: state
+      entity_id: zone.home
+      state: "0"
+  action:
+    - service: shell_command.ev_devriyesi
